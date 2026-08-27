@@ -826,6 +826,28 @@
             form.dataset.confirmProceed = proceedLabel;
         }
 
+        function submitButtonForAction(action) {
+            return action ? form.querySelector("button[type='submit'][data-form-action='" + action + "']") : null;
+        }
+
+        function resolveSubmitButton(event) {
+            const submitter = event.submitter || document.activeElement;
+            if (submitter && submitter.form === form && submitter.type === "submit") {
+                return submitter;
+            }
+            const pendingAction = form.dataset.pendingFormAction || (actionInput ? actionInput.value : "");
+            return submitButtonForAction(pendingAction) || form.querySelector("button[type='submit']");
+        }
+
+        form.querySelectorAll("button[type='submit'][data-form-action]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                form.dataset.pendingFormAction = button.dataset.formAction || "";
+                if (actionInput) {
+                    actionInput.value = form.dataset.pendingFormAction || "SAVE_DRAFT";
+                }
+            });
+        });
+
         function normalizeMoneyInput(value) {
             const cleaned = (value || "").replace(/,/g, "").replace(/[^\d.]/g, "");
             if (!cleaned) {
@@ -1471,15 +1493,14 @@
         }
 
         form.addEventListener("submit", function (event) {
-            const submitter = event.submitter || document.activeElement;
-            const submitButton = submitter && submitter.form === form && submitter.type === "submit"
-                ? submitter
-                : form.querySelector("button[type='submit']");
+            const submitButton = resolveSubmitButton(event);
             if (!submitButton || submitButton.disabled) {
                 return;
             }
+            const formAction = submitButton.dataset.formAction || form.dataset.pendingFormAction || "SAVE_DRAFT";
+            form.dataset.pendingFormAction = formAction;
             if (actionInput) {
-                actionInput.value = submitButton.dataset.formAction || "SAVE_DRAFT";
+                actionInput.value = formAction;
             }
             syncTenorInput();
             if (!tenorDisplayInput.reportValidity()) {
@@ -1503,6 +1524,7 @@
             if (form.dataset.confirmMessage && form.dataset.confirmBypass !== "true") {
                 return;
             }
+            delete form.dataset.pendingFormAction;
             submitButton.disabled = true;
             submitButton.classList.add("opacity-70", "cursor-not-allowed");
         });
@@ -1547,6 +1569,7 @@
             const counter = document.getElementById("guarantorSelectedCount");
             const selectedContainer = document.getElementById("selectedGuarantors");
             const hiddenInputs = document.getElementById("selectedGuarantorInputs");
+            const actionInput = document.getElementById("loanFormAction");
             const approvalModeInput = document.getElementById("guarantorApprovalMode");
             const approvalModeButtons = Array.from(document.querySelectorAll("[data-guarantor-approval-mode-option]"));
             const validationMarker = document.getElementById("guarantorValidationErrorMarker");
@@ -1782,6 +1805,14 @@
                 });
             }
 
+            function submitAction(event) {
+                const submitter = event.submitter || document.activeElement;
+                if (submitter && submitter.dataset && submitter.dataset.formAction) {
+                    return submitter.dataset.formAction;
+                }
+                return form.dataset.pendingFormAction || (actionInput ? actionInput.value : "");
+            }
+
             function renderSelected() {
                 selectedContainer.innerHTML = "";
                 Array.from(selected.values()).forEach(function (item) {
@@ -1980,11 +2011,11 @@
             }
 
             form.addEventListener("submit", function (event) {
-                const submitter = event.submitter || document.activeElement;
-                const action = submitter && submitter.dataset ? submitter.dataset.formAction : "";
+                const action = submitAction(event);
                 if (action !== "SAVE_DRAFT" && action !== "SEND_TO_GUARANTORS") {
                     return;
                 }
+                renderHiddenInputs();
                 if (selected.size !== required) {
                     const warning = msgSelectGuarantorsDraft.replace("{0}", required);
                     event.preventDefault();

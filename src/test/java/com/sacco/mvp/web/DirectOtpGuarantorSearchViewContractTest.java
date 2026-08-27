@@ -69,4 +69,20 @@ class DirectOtpGuarantorSearchViewContractTest {
             .contains("input.name = \"guarantorSelections\"")
             .contains("item.memberNo) + \" - \" + escapeHtml(item.fullName)");
     }
+
+    @Test
+    void confirmedSubmitKeepsSendActionAndSelectedGuarantors() throws Exception {
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String normalizedSource = source.replace("\r\n", "\n");
+
+        assertThat(normalizedSource)
+            .contains("function resolveSubmitButton(event)")
+            .contains("form.dataset.pendingFormAction = button.dataset.formAction || \"\";")
+            .contains("const formAction = submitButton.dataset.formAction || form.dataset.pendingFormAction || \"SAVE_DRAFT\";")
+            .contains("actionInput.value = formAction;")
+            .contains("function submitAction(event)")
+            .contains("return form.dataset.pendingFormAction || (actionInput ? actionInput.value : \"\");")
+            .contains("const action = submitAction(event);")
+            .contains("renderHiddenInputs();\n                if (selected.size !== required)");
+    }
 }
