@@ -4,6 +4,8 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.OtpSelectionPolicy;
+import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.StaffAccessStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -105,7 +107,7 @@ class UserOtpPreferenceServiceTest {
         Member member = member(memberId, "encoded-password");
         UserOtpPreferenceService service = service();
         when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId()))
+        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId(), false))
             .thenReturn(OtpSelectionPolicy.AT_LEAST_ONE);
 
         assertThatThrownBy(() -> service.update(memberId, false, false, "correct-password", ""))
@@ -121,7 +123,7 @@ class UserOtpPreferenceServiceTest {
         Member member = member(memberId, "encoded-password");
         UserOtpPreferenceService service = service();
         when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId()))
+        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId(), false))
             .thenReturn(OtpSelectionPolicy.NONE);
         when(userSettingsService.otpPreferences(memberId))
             .thenReturn(new UserSettingsService.OtpPreferences(false, false));
@@ -139,7 +141,7 @@ class UserOtpPreferenceServiceTest {
         Member member = member(memberId, "encoded-password");
         UserOtpPreferenceService service = service();
         when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId()))
+        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId(), false))
             .thenReturn(OtpSelectionPolicy.BOTH);
 
         assertThatThrownBy(() -> service.update(memberId, true, false, "", ""))
@@ -178,6 +180,28 @@ class UserOtpPreferenceServiceTest {
             eq(member.getStationId()),
             eq(member.getPhone())
         );
+    }
+
+    @Test
+    void platformAdminCanChooseNeitherWithoutAStationPolicy() {
+        UUID memberId = UUID.randomUUID();
+        Member member = member(memberId, "encoded-password");
+        member.setSaccoId(null);
+        member.setStationId(null);
+        member.setPosition(Position.ADMIN);
+        member.setStaffAccessStatus(StaffAccessStatus.ACTIVE);
+        UserOtpPreferenceService service = service();
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
+        when(stationOtpSettingsService.selectionPolicy(null, null, true))
+            .thenReturn(OtpSelectionPolicy.NONE);
+        when(userSettingsService.otpPreferences(memberId))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+        when(userSettingsService.updateOtpPreferences(memberId, false, false))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+
+        service.update(memberId, false, false, "", "");
+
+        verify(userSettingsService).updateOtpPreferences(memberId, false, false);
     }
 
     private UserOtpPreferenceService service() {

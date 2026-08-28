@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -65,6 +66,15 @@ public class MemberDirectoryService {
         return staffNo == null || staffNo.isBlank()
             ? Optional.empty()
             : memberRepository.findByStaffNo(staffNo);
+    }
+
+    public Optional<Member> findStaffLoginAccount(String staffNo) {
+        return findByStaffNo(staffNo);
+    }
+
+    public Optional<Member> findPlatformAdminLoginAccount(String loginId) {
+        return findByMemberNo(loginId)
+            .filter(member -> member.getActiveStaffRolesResolved().contains(Position.ADMIN));
     }
 
     public String savedSignatureText(UUID memberId) {

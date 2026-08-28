@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -84,6 +85,82 @@ class AppUserDetailsServiceTest {
         );
 
         service.loadUserByUsername("ADM001");
+    }
+
+    @Test
+    void platformAdminUsesDedicatedLoginWithStableMemberNumber() {
+        Member admin = Member.builder()
+            .id(UUID.randomUUID())
+            .memberNo("ADM001")
+            .staffNo(null)
+            .fullName("Platform Admin")
+            .staffRoles(new LinkedHashSet<>(List.of(Position.ADMIN)))
+            .memberAccount(false)
+            .status(MemberStatus.ACTIVE)
+            .passwordHash("secret")
+            .build();
+        when(memberRepository.findByMemberNo("ADM001")).thenReturn(Optional.of(admin));
+        when(memberAccessClaimRepository.findByIdMemberId(admin.getId())).thenReturn(List.of());
+
+        AppUserDetailsService service = new AppUserDetailsService(
+            new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
+        );
+
+        AppUserPrincipal principal = (AppUserPrincipal) service.loadPlatformAdminByLoginId("ADM001");
+
+        assertThat(principal.isPlatformIdentity()).isTrue();
+        assertThat(principal.isStaffSession()).isTrue();
+    }
+
+    @Test
+    void ordinaryStaffLoginRejectsPlatformAdminIdentity() {
+        Member admin = Member.builder()
+            .id(UUID.randomUUID())
+            .memberNo("ADM001")
+            .staffNo("ADM001")
+            .fullName("Platform Admin")
+            .staffRoles(new LinkedHashSet<>(List.of(Position.ADMIN)))
+            .memberAccount(false)
+            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE)
+            .status(MemberStatus.ACTIVE)
+            .passwordHash("secret")
+            .build();
+        when(memberRepository.findByStaffNo("ADM001")).thenReturn(Optional.of(admin));
+
+        AppUserDetailsService service = new AppUserDetailsService(
+            new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
+        );
+
+        assertThatThrownBy(() -> service.loadStaffByStaffNo("ADM001"))
+            .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+    }
+
+    @Test
+    void ordinaryMemberLoginRejectsPlatformAdminIdentity() {
+        Member admin = Member.builder()
+            .id(UUID.randomUUID())
+            .memberNo("ADM001")
+            .fullName("Platform Admin")
+            .staffRoles(new LinkedHashSet<>(List.of(Position.ADMIN)))
+            .memberAccount(true)
+            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE)
+            .status(MemberStatus.ACTIVE)
+            .passwordHash("secret")
+            .build();
+        when(memberRepository.findByMemberNo("ADM001")).thenReturn(Optional.of(admin));
+
+        AppUserDetailsService service = new AppUserDetailsService(
+            new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
+        );
+
+        assertThatThrownBy(() -> service.loadMemberByMemberNo("ADM001"))
+            .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
     }
 
     private SaccoStation station(SaccoAccessStatus accessStatus) {

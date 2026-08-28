@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpSelectionPolicy;
+import com.sacco.mvp.domain.Position;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -101,7 +102,11 @@ public class UserOtpPreferenceService {
     }
 
     private OtpSelectionPolicy selectionPolicy(Member member) {
-        return stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId());
+        return stationOtpSettingsService.selectionPolicy(
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getStaffRolesResolved().contains(Position.ADMIN)
+        );
     }
 
     private UserSettingsService.OtpPreferences effectivePreferences(UUID memberId, OtpSelectionPolicy policy) {

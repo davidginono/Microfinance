@@ -46,7 +46,7 @@ class StaffMfaServiceTest {
         MockHttpServletRequest request = requestWithPendingChallenge(memberId);
         Member member = staffMember(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.requiresLoginMfa(memberId, "SACCO-01", "ST-01")).thenReturn(false);
+        when(stationOtpSettingsService.requiresLoginMfa(memberId, "SACCO-01", "ST-01", false)).thenReturn(false);
         when(userClaimService.effectiveClaims(eq(memberId), anyCollection(), eq(false)))
             .thenReturn(Set.of(UserClaim.MANAGER_QUEUE_VIEW));
 
@@ -70,7 +70,7 @@ class StaffMfaServiceTest {
         MockHttpServletRequest request = requestWithPendingChallenge(memberId);
         Member member = staffMember(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.requiresLoginMfa(memberId, "SACCO-01", "ST-01")).thenReturn(true);
+        when(stationOtpSettingsService.requiresLoginMfa(memberId, "SACCO-01", "ST-01", false)).thenReturn(true);
 
         StaffMfaService.ChallengeCompletion completion =
             service.continueWithoutChallengeIfNoLongerRequired(request);
@@ -80,6 +80,32 @@ class StaffMfaServiceTest {
         assertThat(request.getSession(false).getAttribute(StaffMfaService.PENDING_MEMBER_ID_ATTR))
             .isEqualTo(memberId);
         verifyNoInteractions(emailOtpService, userClaimService);
+    }
+
+    @Test
+    void systemAdminChallengeCompletesAsAStaffSessionWhenPersonalOtpIsDisabled() {
+        UUID memberId = UUID.randomUUID();
+        StaffMfaService service = service();
+        MockHttpServletRequest request = requestWithPendingChallenge(memberId);
+        request.getSession(false).setAttribute(
+            StaffMfaService.PENDING_LOGIN_TYPE_ATTR,
+            "system-admin-password"
+        );
+        Member admin = staffMember(memberId);
+        admin.setSaccoId(null);
+        admin.setStationId(null);
+        admin.setPosition(Position.ADMIN);
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(admin));
+        when(stationOtpSettingsService.requiresLoginMfa(memberId, null, null, true)).thenReturn(false);
+        when(userClaimService.effectiveClaims(eq(memberId), anyCollection(), eq(false)))
+            .thenReturn(Set.of(UserClaim.ADMIN_DASHBOARD_VIEW));
+
+        StaffMfaService.ChallengeCompletion completion =
+            service.continueWithoutChallengeIfNoLongerRequired(request);
+
+        assertThat(completion).isNotNull();
+        assertThat(completion.principal().isPlatformIdentity()).isTrue();
+        assertThat(completion.principal().isStaffSession()).isTrue();
     }
 
     private StaffMfaService service() {

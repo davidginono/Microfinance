@@ -16,15 +16,16 @@
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-auth-notice-width-v1' />" />
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
-<c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
+<c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
 <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading">Log in to the Loan Application Portal</h1>
+                <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to the Loan Application Portal'}</h1>
             </div>
         </div>
+        <c:if test="${not systemAdminLogin}">
         <div class="mb-5">
             <div class="auth-tabs mb-5" role="tablist" aria-label="Choose login type">
                 <button type="button"
@@ -49,6 +50,7 @@
                 </button>
             </div>
         </div>
+        </c:if>
         <div class="pb-1">
 
                     <c:if test="${param.error != null}">
@@ -69,6 +71,45 @@
                     <c:if test="${not empty message}">
                         <div hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></div>
                     </c:if>
+
+                    <c:choose>
+                    <c:when test="${systemAdminLogin}">
+                    <button type="button" hidden data-login-tab-toggle="system-admin" data-active="true" aria-hidden="true"></button>
+                    <div data-login-tab="system-admin" class="space-y-5">
+                        <div class="auth-mode-card space-y-4">
+                            <div>
+                                <p class="auth-mode-title">System Admin</p>
+                            </div>
+                            <form action="/login" method="post" class="space-y-4" data-login-password-form>
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                <input type="hidden" name="loginType" value="system-admin-password" />
+                                <div>
+                                    <label class="mb-2 block auth-section-label">System Admin ID</label>
+                                    <input name="username" autocomplete="username" required autofocus class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                </div>
+                                <div>
+                                    <label class="mb-2 block auth-section-label">Password</label>
+                                    <input type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                </div>
+                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <span class="text-slate-500">Having trouble with your password?</span>
+                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="system-admin">Forgot password?</a>
+                                </div>
+                                <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
+                                    <span data-login-submit-label>Log in as System Admin</span>
+                                    <span class="hidden items-center gap-2" data-login-submit-loading>
+                                        <span class="auth-submit-spinner" aria-hidden="true"></span>
+                                        <span>Logging in...</span>
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                        <div class="auth-login-meta border-t border-slate-200 pt-6 text-center text-sm">
+                            <a href="/login" class="auth-text-link">Member or staff login</a>
+                        </div>
+                    </div>
+                    </c:when>
+                    <c:otherwise>
 
                     <div id="memberLoginPanel" role="tabpanel" aria-labelledby="memberLoginTab" data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'member'}">hidden</c:if>>
                         <div class="auth-mode-card space-y-4">
@@ -176,7 +217,12 @@
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
                         <span>Don't have an account? </span>
                         <a href="/register/member" class="auth-signup-link"><spring:message code="login.registerMember" /></a>
+                        <div class="mt-3">
+                            <a href="/system-admin/login" class="auth-text-link">System Admin login</a>
+                        </div>
                     </div>
+                    </c:otherwise>
+                    </c:choose>
                     </div>
         </div>
     </div>
@@ -897,18 +943,24 @@
                 actionButton.textContent = step === 'request' ? 'Send OTP Code' : (step === 'verify' ? 'Verify Code' : 'Save Password');
             };
             const open = (accountType) => {
-                accountTypeInput.value = accountType === 'staff' ? 'staff' : 'member';
-                const loginUsername = accountTypeInput.value === 'staff'
-                    ? document.querySelector('[data-login-tab="staff"] input[name="username"]')?.value
-                    : document.querySelector('[data-login-tab="member"] input[name="username"]')?.value;
+                accountTypeInput.value = accountType === 'system-admin'
+                    ? 'system-admin'
+                    : (accountType === 'staff' ? 'staff' : 'member');
+                const loginUsername = document.querySelector(
+                    '[data-login-tab="' + accountTypeInput.value + '"] input[name="username"]'
+                )?.value;
                 usernameInput.value = (loginUsername || '').trim();
                 if (usernameLabel) {
-                    usernameLabel.textContent = accountTypeInput.value === 'staff' ? 'Staff Number' : 'Member Number';
+                    usernameLabel.textContent = accountTypeInput.value === 'system-admin'
+                        ? 'System Admin ID'
+                        : (accountTypeInput.value === 'staff' ? 'Staff Number' : 'Member Number');
                 }
                 if (subtitle) {
-                    subtitle.textContent = accountTypeInput.value === 'staff'
-                        ? 'Enter your staff number. The code goes to the email saved on your account.'
-                        : 'Enter your member number. The code goes to the email saved on your account.';
+                    subtitle.textContent = accountTypeInput.value === 'system-admin'
+                        ? 'Enter your System Admin ID. The code goes to the email saved on your account.'
+                        : (accountTypeInput.value === 'staff'
+                            ? 'Enter your staff number. The code goes to the email saved on your account.'
+                            : 'Enter your member number. The code goes to the email saved on your account.');
                 }
                 otpInput.value = '';
                 passwordInput.value = '';

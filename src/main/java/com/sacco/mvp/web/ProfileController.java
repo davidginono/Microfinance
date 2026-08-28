@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberProfileImageService;
+import com.sacco.mvp.service.PlatformAdminProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class ProfileController {
     private final MemberDirectoryService memberDirectoryService;
     private final MemberProfileImageService memberProfileImageService;
+    private final PlatformAdminProfileService platformAdminProfileService;
 
     @GetMapping("/profile")
     public String profile(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -54,6 +56,24 @@ public class ProfileController {
             memberProfileImageService.delete(principal.getMemberId());
             redirectAttributes.addFlashAttribute("message", "Profile image removed.");
         } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/profile";
+    }
+
+    @PostMapping("/profile/contact")
+    public String updateContact(@AuthenticationPrincipal AppUserPrincipal principal,
+                                @RequestParam String email,
+                                @RequestParam(required = false) String phone,
+                                @RequestParam String currentPassword,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            if (principal == null || !principal.isPlatformIdentity()) {
+                throw new IllegalStateException("Only the System Admin can update this contact profile.");
+            }
+            platformAdminProfileService.updateContact(principal.getMemberId(), email, phone, currentPassword);
+            redirectAttributes.addFlashAttribute("message", "Contact details updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/profile";

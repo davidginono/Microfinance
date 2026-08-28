@@ -66,6 +66,21 @@ class StationOtpSettingsServiceTest {
     }
 
     @Test
+    void platformIdentityUsesOnlyPersonalPreferencesWithoutStationPolicyLookup() {
+        UUID memberId = UUID.randomUUID();
+        StationOtpSettingsService service =
+            new StationOtpSettingsService(stationRepository, userSettingsService, auditService);
+        when(userSettingsService.otpPreferences(memberId))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+        when(userSettingsService.requiresApprovalOtp(memberId)).thenReturn(false);
+
+        assertThat(service.requiresLoginMfa(memberId, null, null, true)).isFalse();
+        assertThat(service.requiresApprovalOtp(memberId, null, null, true)).isFalse();
+
+        verify(stationRepository, never()).findBySaccoIdAndStationIdAndActiveTrue(any(), any());
+    }
+
+    @Test
     void adminUpdatePersistsAndAuditsDeliveryAndSelectionPolicy() {
         UUID actorMemberId = UUID.randomUUID();
         SaccoStation station = SaccoStation.builder()

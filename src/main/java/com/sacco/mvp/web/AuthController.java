@@ -71,7 +71,7 @@ public class AuthController {
         return "redirect:" + WorkspaceLanding.authenticatedDefault(principal);
     }
 
-    @GetMapping("/login")
+    @GetMapping({"/login", "/system-admin/login"})
     public String login(Model model, HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -81,6 +81,7 @@ public class AuthController {
                 session.removeAttribute("loginErrorMessage");
             }
         }
+        model.addAttribute("systemAdminLogin", "/system-admin/login".equals(request.getRequestURI()));
         model.addAttribute("googleSsoEnabled", isGoogleSsoConfigured());
         return "login";
     }
@@ -203,9 +204,11 @@ public class AuthController {
                 "Your Loan Application Portal password reset code",
                 "Use this OTP code to reset your Loan Application Portal password."
             );
+            boolean staffAccount = member.isStaffAccessActive()
+                && ("staff".equalsIgnoreCase(accountType) || "system-admin".equalsIgnoreCase(accountType));
             auditIdentityEvent(member.getId(), "PASSWORD_RESET_REQUEST", "Password reset request",
-                member.isStaffAccessActive() && "staff".equalsIgnoreCase(accountType) ? "STAFF" : "MEMBER",
-                (member.isStaffAccessActive() && "staff".equalsIgnoreCase(accountType) ? "Staff " : "Member ")
+                staffAccount ? "STAFF" : "MEMBER",
+                (staffAccount ? "Staff " : "Member ")
                     + displayLoginNumber(member, accountType),
                 member.getSaccoId(), member.getStationId(), Map.of("loginNo", displayLoginNumber(member, accountType)));
             return ResponseEntity.ok(Map.of(
@@ -276,6 +279,7 @@ public class AuthController {
 
         Member matchedAccount = memberDirectoryService.findByEmail(normalizedEmail)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .orElse(null);
         if (matchedAccount != null && !matchedAccount.isMemberAccess()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -330,6 +334,7 @@ public class AuthController {
         try {
             Member member = memberDirectoryService.findByEmail(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+                .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
                 .orElseThrow(() -> new IllegalStateException("No member account was found for that email address. Please register yourself first."));
             if (!member.isMemberAccess()) {
                 throw new IllegalStateException("You are not registered as a member. Sign in through Staff instead.");
@@ -367,6 +372,7 @@ public class AuthController {
             .findByEmail(normalizedEmail)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
+            .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .orElse(null);
         if (user == null) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -420,6 +426,7 @@ public class AuthController {
                 .findByEmail(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(Member::isStaffAccessActive)
+                .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
                 .orElseThrow(() -> new IllegalStateException("No active staff account matches that email address."));
             ensureSaccoAccessAllowed(user);
             emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.STAFF_LOGIN, otpCode);
@@ -562,14 +569,22 @@ public class AuthController {
 
     private Member findPasswordResetAccount(String normalizedUsername, String accountType) {
         String normalizedType = accountType == null ? "" : accountType.trim().toLowerCase();
-        if ("staff".equals(normalizedType)) {
-            return memberDirectoryService.findByStaffNo(normalizedUsername)
+        if ("system-admin".equals(normalizedType)) {
+            return memberDirectoryService.findPlatformAdminLoginAccount(normalizedUsername)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(Member::isStaffAccessActive)
+                .orElseThrow(() -> new IllegalStateException("No active System Admin account was found for that ID."));
+        }
+        if ("staff".equals(normalizedType)) {
+            return memberDirectoryService.findStaffLoginAccount(normalizedUsername)
+                .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+                .filter(Member::isStaffAccessActive)
+                .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
                 .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff number."));
         }
         Member member = memberDirectoryService.findByMemberNo(normalizedUsername)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .orElseThrow(() -> new IllegalStateException("No active account was found for that member number."));
         if (!member.isMemberAccess()) {
             throw new IllegalStateException("No active member account was found for that member number.");

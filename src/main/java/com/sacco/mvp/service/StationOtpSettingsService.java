@@ -37,13 +37,29 @@ public class StationOtpSettingsService {
 
     @Transactional(readOnly = true)
     public boolean requiresApprovalOtp(UUID memberId, String saccoId, String stationId) {
-        OtpSelectionPolicy policy = selectionPolicy(saccoId, stationId);
+        return requiresApprovalOtp(memberId, saccoId, stationId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean requiresApprovalOtp(UUID memberId,
+                                       String saccoId,
+                                       String stationId,
+                                       boolean platformIdentity) {
+        OtpSelectionPolicy policy = selectionPolicy(saccoId, stationId, platformIdentity);
         return policy == OtpSelectionPolicy.BOTH || userSettingsService.requiresApprovalOtp(memberId);
     }
 
     @Transactional(readOnly = true)
     public boolean requiresLoginMfa(UUID memberId, String saccoId, String stationId) {
-        OtpSelectionPolicy policy = selectionPolicy(saccoId, stationId);
+        return requiresLoginMfa(memberId, saccoId, stationId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean requiresLoginMfa(UUID memberId,
+                                    String saccoId,
+                                    String stationId,
+                                    boolean platformIdentity) {
+        OtpSelectionPolicy policy = selectionPolicy(saccoId, stationId, platformIdentity);
         if (policy == OtpSelectionPolicy.BOTH) {
             return true;
         }
@@ -55,6 +71,13 @@ public class StationOtpSettingsService {
     @Transactional(readOnly = true)
     public OtpSelectionPolicy selectionPolicy(String saccoId, String stationId) {
         return configuration(saccoId, stationId).selectionPolicy();
+    }
+
+    @Transactional(readOnly = true)
+    public OtpSelectionPolicy selectionPolicy(String saccoId,
+                                               String stationId,
+                                               boolean platformIdentity) {
+        return platformIdentity ? OtpSelectionPolicy.NONE : selectionPolicy(saccoId, stationId);
     }
 
     @Transactional(readOnly = true)

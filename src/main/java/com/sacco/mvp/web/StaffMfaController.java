@@ -41,6 +41,7 @@ public class StaffMfaController {
         }
         model.addAttribute("maskedEmail", maskEmail(staffMfaService.pendingEmail(session)));
         model.addAttribute("deliveryMessage", staffMfaService.pendingDeliveryMessage(session));
+        model.addAttribute("platformAdminChallenge", staffMfaService.isPlatformAdminChallenge(session));
         return "auth/staff-mfa";
     }
 
@@ -168,8 +169,9 @@ public class StaffMfaController {
 
     @PostMapping({"/login/mfa/cancel", "/login/staff/mfa/cancel"})
     public String cancel(HttpServletRequest request) {
+        boolean platformAdminChallenge = staffMfaService.isPlatformAdminChallenge(request.getSession(false));
         staffMfaService.clear(request);
-        return "redirect:/login";
+        return platformAdminChallenge ? "redirect:/system-admin/login" : "redirect:/login";
     }
 
     private String maskEmail(String email) {
@@ -218,7 +220,7 @@ public class StaffMfaController {
     private ResponseEntity<Map<String, Object>> completedChallengeResponse(StaffMfaService.ChallengeCompletion completion) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("valid", true);
-        payload.put("message", "Sign-in verification is no longer required for this station.");
+        payload.put("message", "Sign-in verification is no longer required.");
         payload.put("redirectUrl", redirectUrl(completion));
         return ResponseEntity.ok(payload);
     }

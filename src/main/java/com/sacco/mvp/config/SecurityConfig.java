@@ -89,7 +89,7 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider(userDetailsService, passwordEncoder))
             .authorizeHttpRequests(auth -> {
                 auth.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
+                .requestMatchers("/login", "/system-admin/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
                 if (publicActuatorMetrics) {
                     auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
                 }
@@ -166,10 +166,13 @@ public class SecurityConfig {
                     Member auditMember = null;
                     if (username != null && !username.isBlank()) {
                         boolean staffPasswordLogin = "staff-password".equals(loginType);
+                        boolean systemAdminPasswordLogin = "system-admin-password".equals(loginType);
                         String normalizedUsername = username.trim().toUpperCase(java.util.Locale.ROOT);
-                        java.util.Optional<Member> matchedMember = staffPasswordLogin
-                            ? memberDirectoryService.findByStaffNo(normalizedUsername)
-                            : memberDirectoryService.findByMemberNo(normalizedUsername);
+                        java.util.Optional<Member> matchedMember = systemAdminPasswordLogin
+                            ? memberDirectoryService.findPlatformAdminLoginAccount(normalizedUsername)
+                            : staffPasswordLogin
+                                ? memberDirectoryService.findStaffLoginAccount(normalizedUsername)
+                                : memberDirectoryService.findByMemberNo(normalizedUsername);
                         auditMember = matchedMember.orElse(null);
                         message = matchedMember
                             .map(member -> {
@@ -190,6 +193,9 @@ public class SecurityConfig {
                                 if (suspensionReason != null && !member.getActiveStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)) {
                                     return suspensionReason;
                                 }
+                                if (systemAdminPasswordLogin) {
+                                    return "Invalid System Admin ID or password.";
+                                }
                                 if (staffPasswordLogin) {
                                     if (member.isStaffAccessPendingAcknowledgement()) {
                                         return "Staff access is pending acknowledgement. Sign in through Members to activate it.";
@@ -204,11 +210,15 @@ public class SecurityConfig {
                                 }
                                 return "Invalid member number or password.";
                             })
-                            .orElse(staffPasswordLogin
-                                ? "No active staff account was found for that staff number."
-                                : "No member account was found for that member number. Please register yourself first.");
+                            .orElse(systemAdminPasswordLogin
+                                ? "Invalid System Admin ID or password."
+                                : staffPasswordLogin
+                                    ? "No active staff account was found for that staff number."
+                                    : "No member account was found for that member number. Please register yourself first.");
                     }
-                    if ("staff-password".equals(loginType)) {
+                    if ("system-admin-password".equals(loginType)) {
+                        redirectTarget = "/system-admin/login?error";
+                    } else if ("staff-password".equals(loginType)) {
                         redirectTarget = "/login?error&tab=staff";
                     }
                     auditLogin(auditService, auditMember, null, AuditEventStatus.FAIL, "Password login", message);
@@ -221,24 +231,29 @@ public class SecurityConfig {
                         : null;
                     String loginType = request.getParameter("loginType");
                     boolean staffPasswordLogin = "staff-password".equals(loginType);
+                    boolean systemAdminPasswordLogin = "system-admin-password".equals(loginType);
+                    boolean staffSessionLogin = staffPasswordLogin || systemAdminPasswordLogin;
                     boolean isSuperAdmin = principal != null && principal.isPlatformIdentity();
                     boolean isMinorAdmin = principal != null && principal.isWorkspaceAdminScope();
-                    String savedTarget = savedRequestTarget(request);
+                    String savedTarget = systemAdminPasswordLogin ? null : savedRequestTarget(request);
 
                     // Apply the authenticated user's login OTP preference before the
                     // SecurityContext is persisted. The local minor-admin bypass remains
                     // available only for explicitly configured development environments.
-                    boolean requireLoginMfa = requiresPasswordLoginMfa(principal, staffPasswordLogin, isMinorAdmin, stationOtpSettingsService);
+                    boolean requireLoginMfa = requiresPasswordLoginMfa(
+                        principal, staffPasswordLogin, isSuperAdmin, isMinorAdmin, stationOtpSettingsService);
                     if (requireLoginMfa) {
                         if (principal != null) {
-                            String landing = savedTarget == null ? landingFor(principal, staffPasswordLogin) : savedTarget;
+                            String landing = savedTarget == null ? landingFor(principal, staffSessionLogin) : savedTarget;
                             try {
                                 staffMfaService.startChallenge(principal, landing, loginType, request);
                             } catch (IllegalStateException ex) {
                                 auditLogin(auditService, null, principal, AuditEventStatus.FAIL, "Password login", ex.getMessage());
                                 clearAuthenticationContext(request);
                                 request.getSession(true).setAttribute("loginErrorMessage", ex.getMessage());
-                                response.sendRedirect("/login?error" + (staffPasswordLogin ? "&tab=staff" : ""));
+                                response.sendRedirect(systemAdminPasswordLogin
+                                    ? "/system-admin/login?error"
+                                    : "/login?error" + (staffPasswordLogin ? "&tab=staff" : ""));
                                 return;
                             }
                             clearAuthenticationContext(request);
@@ -266,7 +281,7 @@ public class SecurityConfig {
                         response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
                     }
-                    if (principal != null && (staffPasswordLogin || !principal.getStaffRoles().isEmpty())) {
+                    if (principal != null && (staffSessionLogin || !principal.getStaffRoles().isEmpty())) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                         response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
@@ -275,7 +290,14 @@ public class SecurityConfig {
                     response.sendRedirect(WorkspaceLanding.memberDashboardAfterLogin());
                 })
                 .permitAll())
-            .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout"))
+            .logout(logout -> logout
+                .logoutUrl("/logout")
+                .logoutSuccessHandler((request, response, authentication) -> {
+                    boolean platformAdmin = authentication != null
+                        && authentication.getPrincipal() instanceof AppUserPrincipal principal
+                        && principal.isPlatformIdentity();
+                    response.sendRedirect(platformAdmin ? "/system-admin/login?logout" : "/login?logout");
+                }))
             .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
             .csrf(Customizer.withDefaults())
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
@@ -303,6 +325,13 @@ public class SecurityConfig {
                         auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "No active SACCO account is linked to that Google email.");
                         request.getSession(true).setAttribute("loginErrorMessage", "No active SACCO account is linked to that Google email.");
                         response.sendRedirect("/login?error");
+                        return;
+                    }
+                    if (ssoMember.getActiveStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)) {
+                        String message = "Use the separate System Admin login.";
+                        auditLogin(auditService, ssoMember, null, AuditEventStatus.FAIL, "Google SSO", message);
+                        request.getSession(true).setAttribute("loginErrorMessage", message);
+                        response.sendRedirect("/system-admin/login?error");
                         return;
                     }
                     boolean ssoStaffSession = !ssoMember.isMemberAccess();
@@ -388,6 +417,9 @@ public class SecurityConfig {
         org.springframework.security.core.userdetails.UserDetailsService loginUserDetailsService = username -> {
             String loginType = resolveCurrentLoginType();
             String normalizedUsername = username == null ? "" : username.trim().toUpperCase(java.util.Locale.ROOT);
+            if ("system-admin-password".equals(loginType)) {
+                return userDetailsService.loadPlatformAdminByLoginId(normalizedUsername);
+            }
             if ("staff-password".equals(loginType)) {
                 return userDetailsService.loadStaffByStaffNo(normalizedUsername);
             }
@@ -402,7 +434,16 @@ public class SecurityConfig {
                     return;
                 }
                 String loginType = resolveCurrentLoginType();
+                if ("system-admin-password".equals(loginType)) {
+                    if (!principal.isPlatformIdentity()) {
+                        throw new AuthenticationServiceException("This login is restricted to the System Admin.");
+                    }
+                    return;
+                }
                 if ("staff-password".equals(loginType)) {
+                    if (principal.isPlatformIdentity()) {
+                        throw new AuthenticationServiceException("Use the separate System Admin login.");
+                    }
                     if (principal.getStaffRoles() == null || principal.getStaffRoles().isEmpty()) {
                         throw new AuthenticationServiceException("This account has no staff access. Sign in through Members instead.");
                     }
@@ -483,6 +524,7 @@ public class SecurityConfig {
 
     private boolean requiresPasswordLoginMfa(AppUserPrincipal principal,
                                              boolean staffPasswordLogin,
+                                             boolean isSuperAdmin,
                                              boolean isMinorAdmin,
                                              StationOtpSettingsService stationOtpSettingsService) {
         if (principal == null) {
@@ -490,7 +532,7 @@ public class SecurityConfig {
         }
         return !(staffPasswordLogin && isMinorAdmin && localDevMinorAdminPasswordLoginEnabled)
             && stationOtpSettingsService.requiresLoginMfa(
-                principal.getMemberId(), principal.getSaccoId(), principal.getStationId());
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), isSuperAdmin);
     }
 
     private String landingFor(AppUserPrincipal principal, boolean staffPasswordLogin) {

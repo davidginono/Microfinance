@@ -82,7 +82,12 @@
             </form>
         </div>
 
-        <p class="mt-5 text-xs leading-5 text-slate-500">This second verification step follows your station's OTP settings.</p>
+        <p class="mt-5 text-xs leading-5 text-slate-500">
+            <c:choose>
+                <c:when test="${platformAdminChallenge}">This verification step follows your personal OTP setting.</c:when>
+                <c:otherwise>This verification step follows your station's OTP settings.</c:otherwise>
+            </c:choose>
+        </p>
     </div>
 </main>
 

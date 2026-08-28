@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -60,7 +61,10 @@ public class StaffMfaService {
             member.getStationId(),
             member.getPhone()
         );
-        session.setAttribute(PENDING_DELIVERY_MESSAGE_ATTR, deliveryMessage(delivery, "We sent a one-time verification code using the station delivery policy."));
+        String fallbackMessage = principal.isPlatformIdentity()
+            ? "We sent a one-time verification code using your personal OTP preference."
+            : "We sent a one-time verification code using the station delivery policy.";
+        session.setAttribute(PENDING_DELIVERY_MESSAGE_ATTR, deliveryMessage(delivery, fallbackMessage));
     }
 
     public boolean hasPendingChallenge(HttpSession session) {
@@ -97,6 +101,10 @@ public class StaffMfaService {
         }
         Object value = session.getAttribute(PENDING_DELIVERY_MESSAGE_ATTR);
         return value instanceof String message ? message : null;
+    }
+
+    public boolean isPlatformAdminChallenge(HttpSession session) {
+        return "system-admin-password".equals(pendingLoginType(session));
     }
 
     public void resendChallenge(HttpServletRequest request) {
@@ -157,7 +165,7 @@ public class StaffMfaService {
         HttpSession session = request.getSession(false);
         UUID memberId = pendingMemberId(session);
         String email = pendingEmail(session);
-        boolean staffLogin = "staff-password".equals(pendingLoginType(session));
+        boolean staffLogin = isStaffSessionLogin(pendingLoginType(session));
         if (memberId == null) {
             throw new IllegalStateException("Your sign-in session expired. Start again from the login page.");
         }
@@ -177,7 +185,7 @@ public class StaffMfaService {
         if (memberId == null) {
             return null;
         }
-        boolean staffLogin = "staff-password".equals(pendingLoginType(session));
+        boolean staffLogin = isStaffSessionLogin(pendingLoginType(session));
         Member member = memberRepository.findById(memberId)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
@@ -222,6 +230,10 @@ public class StaffMfaService {
         return loginType instanceof String value ? value : "";
     }
 
+    private boolean isStaffSessionLogin(String loginType) {
+        return "staff-password".equals(loginType) || "system-admin-password".equals(loginType);
+    }
+
     private void storePendingChallenge(HttpSession session, Member member, String landingUrl, String loginType) {
         session.setAttribute(PENDING_MEMBER_ID_ATTR, member.getId());
         session.setAttribute(PENDING_EMAIL_ATTR, member.getEmail());
@@ -256,7 +268,10 @@ public class StaffMfaService {
             return true;
         }
         return stationOtpSettingsService.requiresLoginMfa(
-            member.getId(), member.getSaccoId(), member.getStationId());
+            member.getId(),
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getActiveStaffRolesResolved().contains(Position.ADMIN));
     }
 
     private void clearPending(HttpSession session) {

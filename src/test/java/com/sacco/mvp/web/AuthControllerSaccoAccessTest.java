@@ -84,17 +84,18 @@ class AuthControllerSaccoAccessTest {
     }
 
     @Test
-    void platformAdminOtpRequestBypassesSuspendedSacco() {
+    void ordinaryStaffOtpLoginRejectsPlatformAdminIdentity() {
         Member admin = staff(Position.ADMIN);
         when(memberDirectoryService.findByEmail("admin@example.com")).thenReturn(Optional.of(admin));
 
         ResponseEntity<Map<String, Object>> response = controller().requestStaffLoginOtp("admin@example.com");
 
-        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-        verify(emailOtpService).issueOtp(
-            org.mockito.ArgumentMatchers.eq("admin@example.com"),
-            org.mockito.ArgumentMatchers.eq(EmailOtpPurpose.STAFF_LOGIN),
-            org.mockito.ArgumentMatchers.eq(admin.getId()),
+        assertThat(response.getStatusCode().is4xxClientError()).isTrue();
+        assertThat(response.getBody()).containsEntry("valid", false);
+        verify(emailOtpService, never()).issueOtp(
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.anyString()
         );

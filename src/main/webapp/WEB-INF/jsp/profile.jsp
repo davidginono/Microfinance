@@ -29,6 +29,41 @@
     <h1 class="erp-page-title"><spring:message code="profile.page.title" text="Profile" /></h1>
 </div>
 
+<c:if test="${isPlatformAdminIdentity}">
+    <section class="erp-panel aws-settings-panel" aria-labelledby="systemAdminContactTitle">
+        <div class="aws-settings-header">
+            <h2 id="systemAdminContactTitle" class="aws-settings-title">Contact details</h2>
+            <p class="aws-settings-description">Used for your own account notifications and OTP delivery.</p>
+        </div>
+        <form action="/profile/contact" method="post" class="aws-settings-form">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <div class="grid gap-3 md:grid-cols-2">
+                <label class="aws-settings-field" for="profileContactEmail">
+                    Email
+                    <input id="profileContactEmail" name="email" type="email" maxlength="160" required
+                           autocomplete="email" class="aws-control"
+                           value="<c:out value='${profileMember.email}' />" />
+                </label>
+                <label class="aws-settings-field" for="profileContactPhone">
+                    Phone number
+                    <input id="profileContactPhone" name="phone" type="tel" inputmode="numeric"
+                           pattern="255[0-9]{9}" minlength="12" maxlength="12"
+                           autocomplete="tel" placeholder="255712345678" class="aws-control"
+                           value="<c:out value='${profileMember.phone}' />" />
+                </label>
+            </div>
+            <label class="aws-settings-field mt-3" for="profileContactPassword">
+                Current password
+                <input id="profileContactPassword" name="currentPassword" type="password" required
+                       autocomplete="current-password" class="aws-control" />
+            </label>
+            <div class="aws-settings-footer">
+                <button type="submit" class="app-btn btn-primary">Save Contact Details</button>
+            </div>
+        </form>
+    </section>
+</c:if>
+
 <section class="erp-panel profile-page-panel">
     <div class="profile-page-panel-header">
         <h2><spring:message code="profile.photo.title" text="Passport Photo" /></h2>
@@ -91,12 +126,14 @@
                             <dd>${profileMember.staffNo}</dd>
                 </div>
                     </c:if>
-                    <c:if test="${not empty profileMember.email}">
-                        <div>
-                            <dt><spring:message code="common.email" text="Email" /></dt>
-                            <dd>${profileMember.email}</dd>
-        </div>
-                    </c:if>
+                    <div>
+                        <dt><spring:message code="common.email" text="Email" /></dt>
+                        <dd><c:out value="${empty profileMember.email ? 'Not set' : profileMember.email}" /></dd>
+                    </div>
+                    <div>
+                        <dt><spring:message code="register.member.phone" text="Phone" /></dt>
+                        <dd><c:out value="${empty profileMember.phone ? 'Not set' : profileMember.phone}" /></dd>
+                    </div>
                     </dl>
     </div>
                 <div class="profile-page-actions">

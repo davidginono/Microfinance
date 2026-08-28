@@ -46,6 +46,7 @@ public class AppUserDetailsService implements UserDetailsService {
         return memberDirectoryService.findByMemberNo(username)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isMemberAccess)
+            .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .map(member -> ensureStationAllowed(member, false))
             .map(member -> new AppUserPrincipal(
                 member,
@@ -56,10 +57,24 @@ public class AppUserDetailsService implements UserDetailsService {
     }
 
     public UserDetails loadStaffByStaffNo(String staffNo) throws UsernameNotFoundException {
-        return memberDirectoryService.findByStaffNo(staffNo)
+        return memberDirectoryService.findStaffLoginAccount(staffNo)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
+            .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .map(member -> ensureStationAllowed(member, true))
+            .map(member -> new AppUserPrincipal(
+                member,
+                userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()),
+                true
+            ))
+            .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+    }
+
+    public UserDetails loadPlatformAdminByLoginId(String loginId) throws UsernameNotFoundException {
+        return memberDirectoryService.findPlatformAdminLoginAccount(loginId)
+            .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
+            .filter(Member::isStaffAccessActive)
+            .filter(member -> member.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .map(member -> new AppUserPrincipal(
                 member,
                 userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()),

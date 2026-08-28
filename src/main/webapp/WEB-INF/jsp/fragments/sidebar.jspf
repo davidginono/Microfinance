@@ -246,7 +246,7 @@
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/saccos' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg></span>
                             <spring:message code="menu.admin.stationRegistry" text="Station Registry" />
                         </a>
-                        <c:set var="adminSettingsActive" value="${requestUri eq '/admin/settings-controls' or requestUri eq '/admin/loan-products' or requestUri eq '/profile'}" />
+                        <c:set var="adminSettingsActive" value="${requestUri eq '/admin/settings-controls' or requestUri eq '/admin/loan-products' or requestUri eq '/account/security' or requestUri eq '/profile'}" />
                         <div class="shell-sidebar-group space-y-1">
                             <button type="button"
                                     id="adminSettingsToggle"
@@ -264,6 +264,7 @@
                                 <a href="/admin/settings-controls?section=guarantor" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'guarantor' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.applicantGuarantor" text="Applicant & Guarantor Settings" /></a>
                                 <a href="/admin/settings-controls?section=otp" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="admin.settings.otp.title" text="OTP Delivery" /></a>
                                 <a href="/admin/settings-controls?section=language" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'language' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.languagePreference" text="Language Preference" /></a>
+                                <a href="/account/security" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/account/security' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">OTP Security</a>
                                 <a href="/profile" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/profile' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.profile" text="Profile" /></a>
                             </div>
                         </div>
