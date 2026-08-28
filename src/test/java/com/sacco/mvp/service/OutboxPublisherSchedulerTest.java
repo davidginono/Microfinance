@@ -17,6 +17,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -119,11 +120,11 @@ class OutboxPublisherSchedulerTest {
         assertThat(duplicate.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
         verify(notificationRepository, times(1)).save(any(Notification.class));
         verify(deliveryService, times(1)).deliver(
+            eq("SACCO-1"),
+            eq("AR704"),
             any(),
-            any(),
-            any(),
-            any(),
-            any(),
+            eq(recipientId),
+            eq("LOAN_READY_FOR_MANAGER"),
             any(NotificationDeliveryService.DeliveryContent.class)
         );
         verify(notificationRepository, times(2)).existsDeliveredStaffReviewDuplicate(

@@ -72,6 +72,17 @@ public class NotificationDeliveryService {
                             Member recipient,
                             String eventType,
                             DeliveryContent content) {
+        if (recipient.getPhoneVerifiedAt() == null) {
+            log.info("SMS notification blocked for member {} and event {}: recipient phone is not verified",
+                recipient.getId(), eventType);
+            return false;
+        }
+        String normalizedPhone = TanzaniaPhoneNumber.normalizeOptional(recipient.getPhone());
+        if (normalizedPhone == null) {
+            log.info("SMS notification blocked for member {} and event {}: recipient phone is missing or invalid",
+                recipient.getId(), eventType);
+            return false;
+        }
         SmsUnitTransactionService.ReservationResult reservation =
             smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType);
         if (reservation.alertStatus() != null) {
@@ -87,7 +98,7 @@ public class NotificationDeliveryService {
 
         SmsSendResult result;
         try {
-            result = smsGateway.send(recipient.getPhone(), smsText(content));
+            result = smsGateway.send(normalizedPhone, smsText(content));
         } catch (RuntimeException ex) {
             result = SmsSendResult.acceptanceUnknown("SMS gateway call ended unexpectedly");
             log.warn("SMS gateway call ended unexpectedly for member {} and event {}", recipient.getId(), eventType, ex);
