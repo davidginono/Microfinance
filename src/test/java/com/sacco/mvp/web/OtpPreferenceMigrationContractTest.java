@@ -13,6 +13,7 @@ class OtpPreferenceMigrationContractTest {
     void usersOwnOtpRequirementsWhileAdminsRetainDeliveryConfiguration() throws Exception {
         String security = read("src/main/webapp/WEB-INF/jsp/account/security.jsp");
         String adminSettings = read("src/main/webapp/WEB-INF/jsp/admin/settings-controls.jsp");
+        String adminController = read("src/main/java/com/sacco/mvp/web/AdminController.java");
         String sidebar = read("src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf");
 
         assertThat(security)
@@ -26,8 +27,21 @@ class OtpPreferenceMigrationContractTest {
             .contains("name=\"otpSelectionPolicy\"")
             .contains("value=\"AT_LEAST_ONE\"")
             .contains("value=\"BOTH\"")
+            .contains("data-clearable-otp-policy")
+            .contains("policy.checked = false")
             .doesNotContain("name=\"otpRequirementMode\"")
             .doesNotContain("stationOtpRequirementMode");
+        assertThat(adminController)
+            .contains("@RequestParam(required = false) OtpSelectionPolicy otpSelectionPolicy");
+    }
+
+    @Test
+    void clearingTheAdminSelectionPersistsAnExplicitNoMinimumPolicy() throws Exception {
+        String migration = read("src/main/resources/db/migration/V37__allow_no_user_otp_obligation.sql");
+
+        assertThat(migration)
+            .contains("DROP CONSTRAINT chk_sacco_stations_user_otp_selection_policy")
+            .contains("('NONE', 'AT_LEAST_ONE', 'BOTH')");
     }
 
     @Test

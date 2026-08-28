@@ -72,10 +72,11 @@
             </div>
             <div class="mt-5 border-t border-slate-200 pt-5">
                 <h3 class="aws-settings-title">User OTP obligation</h3>
-                <p class="aws-settings-description">Set the minimum OTP protection each user must keep enabled.</p>
+                <p class="aws-settings-description">Select a minimum, or clear the selected option to set no minimum.</p>
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
                     <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                         <input name="otpSelectionPolicy" type="radio" value="AT_LEAST_ONE" class="mt-1"
+                               data-clearable-otp-policy
                                ${stationOtpSelectionPolicy eq 'AT_LEAST_ONE' ? 'checked' : ''} />
                         <span>
                             <span class="block font-semibold text-slate-900">At least one</span>
@@ -84,6 +85,7 @@
                     </label>
                     <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                         <input name="otpSelectionPolicy" type="radio" value="BOTH" class="mt-1"
+                               data-clearable-otp-policy
                                ${stationOtpSelectionPolicy eq 'BOTH' ? 'checked' : ''} />
                         <span>
                             <span class="block font-semibold text-slate-900">Both required</span>
@@ -98,6 +100,29 @@
             </div>
         </form>
     </section>
+    <script>
+        (() => {
+            const policies = document.querySelectorAll("[data-clearable-otp-policy]");
+            policies.forEach((policy) => {
+                let clearOnClick = false;
+                const rememberSelection = () => {
+                    clearOnClick = policy.checked;
+                };
+                policy.addEventListener("pointerdown", rememberSelection);
+                policy.addEventListener("keydown", (event) => {
+                    if (event.key === " " || event.key === "Enter") {
+                        rememberSelection();
+                    }
+                });
+                policy.addEventListener("click", () => {
+                    if (clearOnClick) {
+                        policy.checked = false;
+                    }
+                    clearOnClick = false;
+                });
+            });
+        })();
+    </script>
 </c:if>
 
 <c:if test="${settingsSection eq 'board'}">

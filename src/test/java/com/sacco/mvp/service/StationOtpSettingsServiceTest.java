@@ -54,6 +54,18 @@ class StationOtpSettingsServiceTest {
     }
 
     @Test
+    void noMinimumPolicyAllowsBothUserPreferencesToRemainDisabled() {
+        UUID memberId = UUID.randomUUID();
+        StationOtpSettingsService service = serviceWithPolicy(OtpSelectionPolicy.NONE);
+        when(userSettingsService.otpPreferences(memberId))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+        when(userSettingsService.requiresApprovalOtp(memberId)).thenReturn(false);
+
+        assertThat(service.requiresLoginMfa(memberId, SACCO_ID, STATION_ID)).isFalse();
+        assertThat(service.requiresApprovalOtp(memberId, SACCO_ID, STATION_ID)).isFalse();
+    }
+
+    @Test
     void adminUpdatePersistsAndAuditsDeliveryAndSelectionPolicy() {
         UUID actorMemberId = UUID.randomUUID();
         SaccoStation station = SaccoStation.builder()
@@ -88,6 +100,28 @@ class StationOtpSettingsServiceTest {
             any(),
             any()
         );
+    }
+
+    @Test
+    void clearingAdminSelectionPersistsNoMinimumPolicy() {
+        UUID actorMemberId = UUID.randomUUID();
+        SaccoStation station = SaccoStation.builder()
+            .id(UUID.randomUUID())
+            .active(true)
+            .otpDeliveryChannel(OtpDeliveryChannel.EMAIL)
+            .userOtpSelectionPolicy(OtpSelectionPolicy.AT_LEAST_ONE)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        when(stationRepository.findBySaccoIdAndStationIdAndActiveTrue(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.of(station));
+        when(stationRepository.save(station)).thenReturn(station);
+        StationOtpSettingsService service =
+            new StationOtpSettingsService(stationRepository, userSettingsService, auditService);
+
+        service.update(SACCO_ID, STATION_ID, OtpDeliveryChannel.EMAIL, null, actorMemberId);
+
+        assertThat(station.getUserOtpSelectionPolicy()).isEqualTo(OtpSelectionPolicy.NONE);
     }
 
     private StationOtpSettingsService serviceWithPolicy(OtpSelectionPolicy policy) {

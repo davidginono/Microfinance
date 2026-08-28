@@ -49,7 +49,7 @@ public class StationOtpSettingsService {
         }
         UserSettingsService.OtpPreferences preferences = userSettingsService.otpPreferences(memberId);
         return preferences.loginOtpEnabled()
-            || !preferences.approvalOtpEnabled();
+            || (policy == OtpSelectionPolicy.AT_LEAST_ONE && !preferences.approvalOtpEnabled());
     }
 
     @Transactional(readOnly = true)
@@ -73,14 +73,14 @@ public class StationOtpSettingsService {
         if (channel == null) {
             throw new IllegalArgumentException("Select an OTP delivery channel.");
         }
-        if (selectionPolicy == null) {
-            throw new IllegalArgumentException("Select a user OTP obligation.");
-        }
+        OtpSelectionPolicy resolvedSelectionPolicy = selectionPolicy == null
+            ? OtpSelectionPolicy.NONE
+            : selectionPolicy;
         SaccoStation station = requireStation(saccoId, stationId);
         OtpDeliveryChannel before = station.getResolvedOtpDeliveryChannel();
         OtpSelectionPolicy beforePolicy = station.getResolvedUserOtpSelectionPolicy();
         station.setOtpDeliveryChannel(channel);
-        station.setUserOtpSelectionPolicy(selectionPolicy);
+        station.setUserOtpSelectionPolicy(resolvedSelectionPolicy);
         station.setUpdatedAt(OffsetDateTime.now());
         SaccoStation saved = stationRepository.save(station);
         auditService.log(
@@ -94,7 +94,7 @@ public class StationOtpSettingsService {
             ),
             Map.of(
                 "otpDeliveryChannel", channel.name(),
-                "userOtpSelectionPolicy", selectionPolicy.name(),
+                "userOtpSelectionPolicy", resolvedSelectionPolicy.name(),
                 "saccoId", saccoId,
                 "stationId", stationId
             )

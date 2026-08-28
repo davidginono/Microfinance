@@ -15,8 +15,11 @@
             <c:when test="${otpSelectionPolicy eq 'BOTH'}">
                 <p class="aws-settings-description">Your SACCO requires OTP for both login and approvals.</p>
             </c:when>
-            <c:otherwise>
+            <c:when test="${otpSelectionPolicy eq 'AT_LEAST_ONE'}">
                 <p class="aws-settings-description">Your SACCO requires login OTP, approval OTP, or both.</p>
+            </c:when>
+            <c:otherwise>
+                <p class="aws-settings-description">Choose either option, both options, or neither.</p>
             </c:otherwise>
         </c:choose>
     </div>

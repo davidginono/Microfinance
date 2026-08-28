@@ -109,7 +109,9 @@ public class UserOtpPreferenceService {
         if (policy == OtpSelectionPolicy.BOTH) {
             return new UserSettingsService.OtpPreferences(true, true);
         }
-        if (!preferences.loginOtpEnabled() && !preferences.approvalOtpEnabled()) {
+        if (policy == OtpSelectionPolicy.AT_LEAST_ONE
+            && !preferences.loginOtpEnabled()
+            && !preferences.approvalOtpEnabled()) {
             return new UserSettingsService.OtpPreferences(true, false);
         }
         return preferences;
@@ -121,7 +123,7 @@ public class UserOtpPreferenceService {
         if (policy == OtpSelectionPolicy.BOTH && (!loginOtpEnabled || !approvalOtpEnabled)) {
             throw new IllegalArgumentException("Your SACCO requires OTP for both login and approvals.");
         }
-        if (!loginOtpEnabled && !approvalOtpEnabled) {
+        if (policy == OtpSelectionPolicy.AT_LEAST_ONE && !loginOtpEnabled && !approvalOtpEnabled) {
             throw new IllegalArgumentException("Select login OTP, approval OTP, or both.");
         }
     }

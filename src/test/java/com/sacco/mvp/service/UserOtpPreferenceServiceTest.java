@@ -116,6 +116,24 @@ class UserOtpPreferenceServiceTest {
     }
 
     @Test
+    void noMinimumPolicyAllowsNeitherOption() {
+        UUID memberId = UUID.randomUUID();
+        Member member = member(memberId, "encoded-password");
+        UserOtpPreferenceService service = service();
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
+        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId()))
+            .thenReturn(OtpSelectionPolicy.NONE);
+        when(userSettingsService.otpPreferences(memberId))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+        when(userSettingsService.updateOtpPreferences(memberId, false, false))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+
+        service.update(memberId, false, false, "", "");
+
+        verify(userSettingsService).updateOtpPreferences(memberId, false, false);
+    }
+
+    @Test
     void bothPolicyRejectsAUserSelectingOnlyOneOption() {
         UUID memberId = UUID.randomUUID();
         Member member = member(memberId, "encoded-password");

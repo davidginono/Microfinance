@@ -1314,7 +1314,7 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateOtpDelivery(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam OtpDeliveryChannel otpDeliveryChannel,
-                                    @RequestParam OtpSelectionPolicy otpSelectionPolicy,
+                                    @RequestParam(required = false) OtpSelectionPolicy otpSelectionPolicy,
                                     RedirectAttributes ra) {
         try {
             stationOtpSettingsService.update(
