@@ -2284,8 +2284,7 @@ public class LoanPresentationService {
             List<String[]> rows = new ArrayList<>();
             rows.add(new String[]{"Application Reference", app.getApplicationNumber() == null ? "-" : app.getApplicationNumber().toString(), "Loan Reference", sanitizePdfText(app.getLoanId())});
             rows.add(new String[]{"Applicant", sanitizePdfText(applicant.getFullName()), "Member Number", sanitizePdfText(applicant.getMemberNo())});
-            rows.add(new String[]{"Requested Facility", humanizeValue(app.getLoanType()), "Requested Amount", formatMoney(app.getAmount())});
-            rows.add(new String[]{"Current State", humanizeValue(app.getStatus()), "Submitted", sanitizePdfText(formatTimestamp(app.getSubmittedAt()))});
+            rows.add(new String[]{"Requested Amount", formatMoney(app.getAmount()), "Current State", humanizeValue(app.getStatus())});
             drawRowsWithoutHeader(
                 new float[]{contentWidth() * 0.20f, contentWidth() * 0.30f, contentWidth() * 0.20f, contentWidth() * 0.30f},
                 rows,

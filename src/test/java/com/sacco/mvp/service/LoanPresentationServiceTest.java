@@ -846,6 +846,39 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void printablePdfOmitsRequestedFacilityFromApplicationSummary() throws IOException {
+        LoanApplication app = basicPrintableApplication();
+        Member applicant = basicApplicant();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text)
+                .contains("Application Summary")
+                .contains("Requested Amount")
+                .contains("Current State")
+                .doesNotContain("Requested Facility")
+                .doesNotContain("Education Loan");
+        }
+    }
+
+    @Test
     void printablePdfIncludesGeneratedAndCalculatedSchedulesForDisbursedLoan() throws IOException {
         LoanApplication app = LoanApplication.builder()
             .id(UUID.randomUUID())
