@@ -81,6 +81,25 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void createdLoanProductClosesModalShowsToastAndScrollsToItsCard() throws Exception {
+        String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
+        String workflowScript = read(JSP_ROOT.resolve("fragments/loan-product-workflow-script.jspf"));
+        String controller = read(Path.of("src/main/java/com/sacco/mvp/web/AdminController.java"));
+
+        assertThat(controller)
+            .contains("ra.addFlashAttribute(\"createdLoanProductId\", product.getId())")
+            .contains("return \"redirect:/admin/settings-controls?section=loan\"");
+        assertThat(settings)
+            .contains("id=\"loan-product-${product.id}\"")
+            .contains("data-created-loan-product-target=\"${createdLoanProductId eq product.id}\"");
+        assertThat(workflowScript)
+            .contains("closeAllProductModals()")
+            .contains("window.SaccosUiState?.clearOpenModal()")
+            .contains("window.setTimeout(revealCreatedProduct, 180)")
+            .contains("createdLoanProductTarget.focus({ preventScroll: true })");
+    }
+
+    @Test
     void loanProductVersionHistoryIsRemovedAcrossUiApplicationAndSchema() throws Exception {
         String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
         String controller = read(Path.of("src/main/java/com/sacco/mvp/web/AdminController.java"));

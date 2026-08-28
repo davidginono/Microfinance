@@ -1259,7 +1259,9 @@ public class AdminController {
                 productStatus
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
-            ra.addFlashAttribute("message", "Loan product added.");
+            ra.addFlashAttribute("message", "Loan product created successfully.");
+            ra.addFlashAttribute("createdLoanProductId", product.getId());
+            return "redirect:/admin/settings-controls?section=loan";
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
             attachLoanProductFormDraft(ra, request);

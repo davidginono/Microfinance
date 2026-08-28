@@ -1240,6 +1240,25 @@
             }
         }
 
+        const createdLoanProductTarget = document.querySelector('[data-created-loan-product-target="true"]');
+        if (createdLoanProductTarget) {
+            window.addEventListener('load', () => {
+                closeAllProductModals();
+                window.SaccosUiState?.clearOpenModal();
+                const revealCreatedProduct = () => {
+                    const navHeightValue = window.getComputedStyle(document.documentElement)
+                        .getPropertyValue('--shell-nav-height');
+                    const navHeight = Number.parseFloat(navHeightValue) || 52;
+                    const targetTop = window.scrollY + createdLoanProductTarget.getBoundingClientRect().top - navHeight - 12;
+                    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+                    window.scrollTo({ top: Math.max(0, targetTop), behavior });
+                    createdLoanProductTarget.setAttribute('tabindex', '-1');
+                    createdLoanProductTarget.focus({ preventScroll: true });
+                };
+                window.setTimeout(revealCreatedProduct, 180);
+            }, { once: true });
+        }
+
         document.querySelectorAll('[data-product-card-toggle]').forEach((button) => {
             const card = button.closest('[data-product-config-card]');
             const label = button.querySelector('[data-product-card-toggle-label]');

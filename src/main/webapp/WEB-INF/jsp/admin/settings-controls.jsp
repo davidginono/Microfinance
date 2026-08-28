@@ -248,7 +248,10 @@
             <c:set var="productLoanOfficerEnabled"
                    value="${product.loanOfficerReviewRequired == true || (product.loanOfficerReviewRequired == null && settings.loanOfficerReviewRequired)}" />
             <c:set var="productWorkflowStartStage"><c:out value="${product.resolvedWorkflowStartStage}" /></c:set>
-            <article class="erp-panel product-config-card" data-product-config-card>
+            <article id="loan-product-${product.id}"
+                     class="erp-panel product-config-card"
+                     data-product-config-card
+                     data-created-loan-product-target="${createdLoanProductId eq product.id}">
                 <div class="product-config-card-header">
                     <div class="product-config-card-heading">
                         <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.single" text="Loan Product" /></p>

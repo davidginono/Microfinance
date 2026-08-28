@@ -1,6 +1,10 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.config.SecurityConfig;
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
+import com.sacco.mvp.domain.InterestMethod;
+import com.sacco.mvp.domain.LoanProductSetting;
+import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.PlatformSessionSettings;
@@ -61,6 +65,7 @@ import org.springframework.web.servlet.ViewResolver;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
+import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
@@ -336,6 +341,50 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(status().isForbidden());
 
         verify(saccoRegistryService, never()).updateLoanTopUpFeature(any(), anyBoolean(), any());
+    }
+
+    @Test
+    void createLoanProductSuccessClosesModalAndTargetsCreatedProductCard() throws Exception {
+        UUID productId = UUID.randomUUID();
+        AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
+        LoanProductSetting createdProduct = LoanProductSetting.builder().id(productId).build();
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
+        when(adminService.createLoanProduct(
+            "SACCO-01", principal.getMemberId(), null, "School Fees Booster", "Created product", 5,
+            new BigDecimal("0"), new BigDecimal("500000"), 2, new BigDecimal("3.000000"), false,
+            new BigDecimal("15000"), new BigDecimal("0.015000"), new BigDecimal("0.000000"),
+            new BigDecimal("0.100000"), InterestMethod.FLAT_RATE, 1, 12, false, false, true, false,
+            ApprovalWorkflowStage.MANAGER, 1, 2, false, null, null, false, null, null, false, null,
+            null, null, null, false, null, false, false, false, false, null, LoanProductStatus.ACTIVE
+        )).thenReturn(createdProduct);
+
+        mockMvc.perform(post("/admin/settings-controls/loan-products")
+                .param("modalKey", "create-product")
+                .param("productName", "School Fees Booster")
+                .param("productDescription", "Created product")
+                .param("displayOrder", "5")
+                .param("minimumAmount", "0")
+                .param("maximumAmount", "500000")
+                .param("guarantorsRequired", "2")
+                .param("maxLoanSavingsPercent", "300")
+                .param("applicationFee", "15000")
+                .param("insurancePercent", "1.5")
+                .param("processingFeePercent", "0")
+                .param("annualInterestPercent", "10")
+                .param("minRepaymentMonths", "1")
+                .param("maxRepaymentMonths", "12")
+                .param("managerReviewRequired", "true")
+                .param("managerPriority", "1")
+                .param("accountantReviewRequired", "false")
+                .param("disbursementOfficerRequired", "false")
+                .param("disbursementProofRequired", "false")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/settings-controls?section=loan"))
+            .andExpect(flash().attribute("message", "Loan product created successfully."))
+            .andExpect(flash().attribute("createdLoanProductId", productId));
     }
 
     @Test
