@@ -2962,7 +2962,7 @@ public class AdminService {
         }
         normalized = normalized.toUpperCase().replace(' ', '_');
         if (!normalized.matches("[A-Z0-9_-]{3,64}")) {
-            throw new IllegalStateException("Loan product code must be 3-64 characters using letters, numbers, hyphen, or underscore.");
+            throw new IllegalStateException("Loan product name must be 3-64 characters using letters, numbers, hyphen, or underscore.");
         }
         boolean duplicate = existingId == null
             ? loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCase(saccoId, normalized)
