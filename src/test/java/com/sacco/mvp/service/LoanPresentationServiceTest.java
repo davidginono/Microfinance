@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.context.support.StaticMessageSource;
 
@@ -960,6 +961,41 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void printablePdfAlignsSaccoTitleWithLogo() throws IOException {
+        LoanApplication app = basicPrintableApplication();
+        Member applicant = basicApplicant();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            null,
+            sampleLogoPng(),
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            java.awt.image.BufferedImage pageImage = new PDFRenderer(document).renderImageWithDPI(0, 72);
+            Bounds logoBounds = detectHeaderLogoBounds(pageImage);
+            Bounds titleBounds = detectHeaderTitleBounds(pageImage, logoBounds);
+
+            assertThat(Math.abs(titleBounds.centerY() - logoBounds.centerY())).isLessThanOrEqualTo(2.5f);
+            assertThat(titleBounds.left).isGreaterThan(logoBounds.right);
+            assertThat(titleBounds.left - logoBounds.right).isBetween(6f, 16f);
+        }
+    }
+
+    @Test
     void printablePdfDrawsDefaultWatermarkWhenNoSaccoLogoIsSupplied() throws IOException {
         LoanApplication app = basicPrintableApplication();
         Member applicant = basicApplicant();
@@ -1608,6 +1644,76 @@ class LoanPresentationServiceTest {
         java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(image, "png", output);
         return output.toByteArray();
+    }
+
+    private Bounds detectHeaderLogoBounds(java.awt.image.BufferedImage image) {
+        int minX = image.getWidth();
+        int minY = image.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+        int headerWidth = Math.min(image.getWidth(), 130);
+        int headerHeight = Math.min(image.getHeight(), 95);
+        for (int y = 0; y < headerHeight; y++) {
+            for (int x = 0; x < headerWidth; x++) {
+                int rgb = image.getRGB(x, y);
+                int red = (rgb >> 16) & 0xff;
+                int green = (rgb >> 8) & 0xff;
+                int blue = rgb & 0xff;
+                if (red < 80 && green < 95 && blue > 95 && blue > red + 25 && blue > green + 20) {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                }
+            }
+        }
+        assertThat(maxX).as("header logo pixels were rendered").isGreaterThanOrEqualTo(0);
+        return new Bounds(minX, minY, maxX + 1f, maxY + 1f);
+    }
+
+    private Bounds detectHeaderTitleBounds(java.awt.image.BufferedImage image, Bounds logoBounds) {
+        int minX = image.getWidth();
+        int minY = image.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+        int startX = Math.min(image.getWidth(), (int) Math.ceil(logoBounds.right) + 4);
+        int endX = Math.min(image.getWidth(), 280);
+        int startY = Math.max(0, (int) Math.floor(logoBounds.top) - 24);
+        int endY = Math.min(image.getHeight(), (int) Math.ceil(logoBounds.bottom) + 24);
+        for (int y = startY; y < endY; y++) {
+            for (int x = startX; x < endX; x++) {
+                int rgb = image.getRGB(x, y);
+                int red = (rgb >> 16) & 0xff;
+                int green = (rgb >> 8) & 0xff;
+                int blue = rgb & 0xff;
+                if (red < 145 && green < 155 && blue < 170) {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                }
+            }
+        }
+        assertThat(maxX).as("header title pixels were rendered").isGreaterThanOrEqualTo(0);
+        return new Bounds(minX, minY, maxX + 1f, maxY + 1f);
+    }
+
+    private static final class Bounds {
+        private final float left;
+        private final float top;
+        private final float right;
+        private final float bottom;
+
+        private Bounds(float left, float top, float right, float bottom) {
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
+        }
+
+        private float centerY() {
+            return top + ((bottom - top) / 2f);
+        }
     }
 
     private int countOccurrences(String text, String token) {

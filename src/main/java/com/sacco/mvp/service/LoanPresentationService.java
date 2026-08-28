@@ -1973,6 +1973,9 @@ public class LoanPresentationService {
         private static final float SECTION_SIZE = 11.5f;
         private static final float BODY_SIZE = 9.2f;
         private static final float SMALL_SIZE = 8.1f;
+        private static final float BRAND_LOGO_SIZE = 34f;
+        private static final float BRAND_TITLE_SIZE = 16f;
+        private static final float BRAND_TITLE_GAP = 8f;
         private static final float LINE_GAP = 3f;
         private static final float CELL_PADDING_X = 7f;
         private static final float CELL_PADDING_Y = 7f;
@@ -2109,14 +2112,18 @@ public class LoanPresentationService {
             float profileSize = 78f;
             float profileX = pageWidth - MARGIN - profileSize;
             float profileY = headerTop - 150f;
-            float logoSize = 34f;
+            float logoY = headerTop - 67f;
 
             String saccoLabel = sanitizePdfText(saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim());
-            boolean logoDrawn = drawSaccoLogo(MARGIN, headerTop - 67f, logoSize);
-            float titleX = logoDrawn ? MARGIN + logoSize + 10f : MARGIN;
-            writeText(saccoLabel.toUpperCase(Locale.ROOT), titleX, headerTop - 42f, bold, 16f, TEXT_COLOR);
-            writeText("Official Loan Application document", titleX, headerTop - 59f, regular, META_SIZE, MUTED_COLOR);
-            writeRightAligned("Generated: " + LocalDate.now(), pageWidth - MARGIN, headerTop - 42f, regular, META_SIZE, MUTED_COLOR);
+            LogoBounds logoBounds = drawSaccoLogo(MARGIN, logoY, BRAND_LOGO_SIZE);
+            float brandCenterY = logoBounds == null ? logoY + (BRAND_LOGO_SIZE / 2f) : logoBounds.centerY();
+            float brandBaselineGap = BRAND_TITLE_SIZE + 1f;
+            float titleBaselineY = brandTitleBaselineForCenter(brandCenterY, brandBaselineGap);
+            float subtitleBaselineY = titleBaselineY - brandBaselineGap;
+            float titleX = logoBounds == null ? MARGIN : logoBounds.right() + BRAND_TITLE_GAP;
+            writeText(saccoLabel.toUpperCase(Locale.ROOT), titleX, titleBaselineY, bold, BRAND_TITLE_SIZE, TEXT_COLOR);
+            writeText("Official Loan Application document", titleX, subtitleBaselineY, regular, META_SIZE, MUTED_COLOR);
+            writeRightAligned("Generated: " + LocalDate.now(), pageWidth - MARGIN, titleBaselineY, regular, META_SIZE, MUTED_COLOR);
             drawApplicantProfileImage(profileX, profileY, profileSize);
 
             stream.setStrokingColor(BORDER_COLOR);
@@ -2143,10 +2150,10 @@ public class LoanPresentationService {
             );
         }
 
-        private boolean drawSaccoLogo(float x, float y, float size) throws IOException {
+        private LogoBounds drawSaccoLogo(float x, float y, float size) throws IOException {
             BufferedImage image = readSaccoLogoImage();
             if (image == null) {
-                return false;
+                return null;
             }
             PDImageXObject pdfImage = LosslessFactory.createFromImage(document, image);
             float scale = Math.min(size / image.getWidth(), size / image.getHeight());
@@ -2155,7 +2162,35 @@ public class LoanPresentationService {
             float targetX = x + ((size - targetWidth) / 2f);
             float targetY = y + ((size - targetHeight) / 2f);
             stream.drawImage(pdfImage, targetX, targetY, targetWidth, targetHeight);
-            return true;
+            return new LogoBounds(targetX, targetY, targetWidth, targetHeight);
+        }
+
+        private float brandTitleBaselineForCenter(float centerY, float baselineGap) {
+            float titleCapHeight = bold.getFontDescriptor().getCapHeight() / 1000f * BRAND_TITLE_SIZE;
+            float subtitleDescent = Math.abs(regular.getFontDescriptor().getDescent()) / 1000f * META_SIZE;
+            return centerY - ((titleCapHeight - baselineGap - subtitleDescent) / 2f);
+        }
+
+        private final class LogoBounds {
+            private final float x;
+            private final float y;
+            private final float width;
+            private final float height;
+
+            private LogoBounds(float x, float y, float width, float height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+            }
+
+            private float right() {
+                return x + width;
+            }
+
+            private float centerY() {
+                return y + (height / 2f);
+            }
         }
 
         private BufferedImage readSaccoLogoImage() {
