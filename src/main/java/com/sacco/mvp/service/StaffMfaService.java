@@ -252,14 +252,10 @@ public class StaffMfaService {
     }
 
     private boolean stillRequiresLoginMfa(Member member) {
-        if (member == null
-            || member.getSaccoId() == null
-            || member.getSaccoId().isBlank()
-            || member.getStationId() == null
-            || member.getStationId().isBlank()) {
+        if (member == null) {
             return true;
         }
-        return stationOtpSettingsService.requiresLoginMfa(member.getSaccoId(), member.getStationId());
+        return stationOtpSettingsService.requiresLoginMfa(member.getId());
     }
 
     private void clearPending(HttpSession session) {

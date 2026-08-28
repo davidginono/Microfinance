@@ -7,7 +7,6 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
-import com.sacco.mvp.domain.OtpRequirementMode;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.UserClaim;
@@ -950,12 +949,7 @@ public class AdminController {
             "stationOtpDeliveryChannel",
             stationOtpSettingsService.channel(saccoId, adminScopeService.currentStationId(principal))
         );
-        model.addAttribute(
-            "stationOtpRequirementMode",
-            stationOtpSettingsService.requirementMode(saccoId, adminScopeService.currentStationId(principal))
-        );
         model.addAttribute("otpDeliveryChannels", OtpDeliveryChannel.values());
-        model.addAttribute("otpRequirementModes", OtpRequirementMode.values());
         model.addAttribute("currentStationPolicy", stationPolicy);
         model.addAttribute("policyStationId", adminScopeService.currentStationId(principal));
         model.addAttribute("policyApplicantMaxDefaultedLoans", stationPolicy == null ? settings.getApplicantMaxDefaultedLoans() : stationPolicy.getApplicantMaxDefaultedLoans());
@@ -1294,17 +1288,15 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateOtpDelivery(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam OtpDeliveryChannel otpDeliveryChannel,
-                                    @RequestParam(defaultValue = "LOGIN_MFA_ONLY") OtpRequirementMode otpRequirementMode,
                                     RedirectAttributes ra) {
         try {
             stationOtpSettingsService.update(
                 adminScopeService.currentSaccoId(principal),
                 adminScopeService.currentStationId(principal),
                 otpDeliveryChannel,
-                otpRequirementMode,
                 principal.getMemberId()
             );
-            ra.addFlashAttribute("message", "OTP settings updated for this station.");
+            ra.addFlashAttribute("message", "OTP delivery updated for this station.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

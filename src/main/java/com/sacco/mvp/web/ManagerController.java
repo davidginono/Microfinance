@@ -285,7 +285,7 @@ public class ManagerController {
         model.addAttribute("approveActionLabel", message("review.manager.approveLoan"));
         model.addAttribute("rejectActionLabel", message("review.manager.rejectLoan"));
         model.addAttribute("showReviewDecisionForm", app.getStatus() == LoanStatus.READY_FOR_MANAGER);
-        model.addAttribute("staffDecisionOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
+        model.addAttribute("staffDecisionOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId()));
         model.addAttribute("showManagerReversalRequests", true);
         model.addAttribute("showDisbursementForm", false);
         model.addAttribute("disbursementNotesLabel", message("review.manager.notes"));
@@ -375,7 +375,7 @@ public class ManagerController {
                          RedirectAttributes ra) {
         try {
             LoanApplication app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
-            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())
                 ? validateStaffDecisionOtp(principal.getMemberId(), managerDecisionOtpCode)
                 : null;
             Member manager = requireMemberWithSavedSignature(
@@ -415,8 +415,8 @@ public class ManagerController {
             if (application.getStatus() != LoanStatus.READY_FOR_MANAGER) {
                 throw new IllegalStateException("This application is no longer waiting for manager review.");
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
-                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member manager = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a manager decision OTP.");
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
@@ -449,10 +449,10 @@ public class ManagerController {
             if (application.getStatus() != LoanStatus.READY_FOR_MANAGER) {
                 throw new IllegalStateException("This application is no longer waiting for manager review.");
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
-                    "message", "OTP verification is disabled for approval actions at this station."
+                    "message", "OTP verification is disabled for approval actions on your account."
                 ));
             }
             validateStaffDecisionOtp(principal.getMemberId(), otpCode);

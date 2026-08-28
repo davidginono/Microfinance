@@ -40,13 +40,13 @@ class StaffMfaServiceTest {
     }
 
     @Test
-    void continuesPendingChallengeWhenStationLoginMfaWasDisabled() {
+    void continuesPendingChallengeWhenUserLoginMfaWasDisabled() {
         UUID memberId = UUID.randomUUID();
         StaffMfaService service = service();
         MockHttpServletRequest request = requestWithPendingChallenge(memberId);
         Member member = staffMember(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.requiresLoginMfa("SACCO-01", "ST-01")).thenReturn(false);
+        when(stationOtpSettingsService.requiresLoginMfa(memberId)).thenReturn(false);
         when(userClaimService.effectiveClaims(eq(memberId), anyCollection(), eq(false)))
             .thenReturn(Set.of(UserClaim.MANAGER_QUEUE_VIEW));
 
@@ -64,13 +64,13 @@ class StaffMfaServiceTest {
     }
 
     @Test
-    void keepsPendingChallengeWhenStationLoginMfaStillRequired() {
+    void keepsPendingChallengeWhenUserLoginMfaStillRequired() {
         UUID memberId = UUID.randomUUID();
         StaffMfaService service = service();
         MockHttpServletRequest request = requestWithPendingChallenge(memberId);
         Member member = staffMember(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.requiresLoginMfa("SACCO-01", "ST-01")).thenReturn(true);
+        when(stationOtpSettingsService.requiresLoginMfa(memberId)).thenReturn(true);
 
         StaffMfaService.ChallengeCompletion completion =
             service.continueWithoutChallengeIfNoLongerRequired(request);

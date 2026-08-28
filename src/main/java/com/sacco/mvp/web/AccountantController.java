@@ -318,7 +318,7 @@ public class AccountantController {
         model.addAttribute("approveActionLabel", message("review.accountant.approveForDisbursement"));
         model.addAttribute("rejectActionLabel", message("review.manager.rejectLoan"));
         model.addAttribute("showReviewDecisionForm", app.getStatus() == LoanStatus.AWAITING_ACCOUNTANT);
-        model.addAttribute("staffDecisionOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
+        model.addAttribute("staffDecisionOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId()));
         model.addAttribute("showManagerReversalRequests", false);
         model.addAttribute("showDisbursementForm", false);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
@@ -401,7 +401,7 @@ public class AccountantController {
                          RedirectAttributes ra) {
         try {
             LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
-            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())
                 ? validateAccountantDecisionOtp(principal.getMemberId(), managerDecisionOtpCode)
                 : null;
             Member accountant = requireMemberWithSavedSignature(
@@ -430,8 +430,8 @@ public class AccountantController {
             if (application.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
                 throw new IllegalStateException("This application is no longer waiting for accountant review.");
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
-                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member accountant = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting an accountant decision OTP.");
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
@@ -464,10 +464,10 @@ public class AccountantController {
             if (application.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
                 throw new IllegalStateException("This application is no longer waiting for accountant review.");
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
-                    "message", "OTP verification is disabled for approval actions at this station."
+                    "message", "OTP verification is disabled for approval actions on your account."
                 ));
             }
             validateAccountantDecisionOtp(principal.getMemberId(), otpCode);

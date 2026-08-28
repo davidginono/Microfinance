@@ -1274,7 +1274,9 @@ public class AppController {
 
     @GetMapping("/loan-applications/{id}")
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @authz.isLoanOwner(#id, principal)")
-    public String viewMine(@PathVariable UUID id, Model model) {
+    public String viewMine(@AuthenticationPrincipal AppUserPrincipal principal,
+                           @PathVariable UUID id,
+                           Model model) {
         LoanApplication app = loanWorkflowService.findApplication(id)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId())
@@ -1359,7 +1361,7 @@ public class AppController {
             app.getFinalDueDate() == null ? null : Math.max(0, java.time.temporal.ChronoUnit.MONTHS.between(java.time.LocalDate.now().withDayOfMonth(1), app.getFinalDueDate().withDayOfMonth(1))));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(app.getApplicantMemberId()));
         model.addAttribute("applicantApprovalOtpEnabled",
-            stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
+            stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId()));
         model.addAttribute("canPrint",
             app.getFinancialSnapshot() != null
                 && !app.getFinancialSnapshot().isBlank()
@@ -1836,26 +1838,20 @@ public class AppController {
         List<GuarantorRequest> requests = loanWorkflowService.myActiveGuarantorRequests(principal.getMemberId());
         model.addAttribute("requests", requests);
         addGuaranteeActionContext(requests, model);
-        model.addAttribute("guarantorRequestOtpEnabled", guarantorRequestOtpEnabled(requests));
+        model.addAttribute("guarantorRequestOtpEnabled",
+            guarantorRequestOtpEnabled(requests, principal.getMemberId()));
         model.addAttribute("guarantorSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         return "app/guarantee-requests";
     }
 
-    private Map<UUID, Boolean> guarantorRequestOtpEnabled(List<GuarantorRequest> requests) {
+    private Map<UUID, Boolean> guarantorRequestOtpEnabled(List<GuarantorRequest> requests, UUID memberId) {
         Map<UUID, Boolean> enabled = new LinkedHashMap<>();
         if (requests == null || requests.isEmpty()) {
             return enabled;
         }
-        Set<UUID> loanIds = requests.stream()
-            .map(GuarantorRequest::getLoanApplicationId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-        Map<UUID, LoanApplication> loans = loanWorkflowService.findApplications(loanIds).stream()
-            .collect(Collectors.toMap(LoanApplication::getId, loan -> loan));
+        boolean otpEnabled = stationOtpSettingsService.requiresApprovalOtp(memberId);
         for (GuarantorRequest request : requests) {
-            LoanApplication loan = loans.get(request.getLoanApplicationId());
-            enabled.put(request.getId(), loan == null
-                || stationOtpSettingsService.requiresApprovalOtp(loan.getSaccoId(), loan.getStationId()));
+            enabled.put(request.getId(), otpEnabled);
         }
         return enabled;
     }
@@ -1915,7 +1911,7 @@ public class AppController {
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             LoanApplication application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())
                 ? emailOtpService.validateOtp(guarantor.getEmail(), EmailOtpPurpose.GUARANTOR_SIGNATURE, guarantorSignatureOtpCode)
                 : null;
             loanWorkflowService.approveGuarantorRequest(
@@ -1945,20 +1941,17 @@ public class AppController {
                 "Add an email address to your member profile before requesting a guarantor OTP.",
                 "Register your signature first before approving guarantor requests."
             );
-            LoanApplication workflowApplication = null;
             if (requestId != null) {
                 GuarantorRequest request = loanWorkflowService.findGuarantorRequestForGuarantor(requestId, principal.getMemberId())
                     .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
                 if (request.getStatus() != GuarantorRequestStatus.PENDING) {
                     throw new IllegalStateException("Request already decided");
                 }
-                workflowApplication = loanWorkflowService.findApplication(request.getLoanApplicationId())
+                loanWorkflowService.findApplication(request.getLoanApplicationId())
                     .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
             }
-            String otpSaccoId = workflowApplication == null ? member.getSaccoId() : workflowApplication.getSaccoId();
-            String otpStationId = workflowApplication == null ? member.getStationId() : workflowApplication.getStationId();
-            if (!stationOtpSettingsService.requiresApprovalOtp(otpSaccoId, otpStationId)) {
-                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
@@ -1966,8 +1959,8 @@ public class AppController {
                 member.getId(),
                 "Your Loan Application Portal guarantor confirmation code",
                 "Use this OTP code to confirm your guarantor signature and approve the request.",
-                otpSaccoId,
-                otpStationId,
+                member.getSaccoId(),
+                member.getStationId(),
                 member.getPhone()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, "We sent a guarantor confirmation code using the station OTP delivery policy."));
@@ -1993,10 +1986,10 @@ public class AppController {
             }
             LoanApplication application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
-                    "message", "OTP verification is disabled for approval actions at this station."
+                    "message", "OTP verification is disabled for approval actions on your account."
                 ));
             }
             Member guarantor = requireMemberWithSavedSignature(
@@ -2026,8 +2019,8 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
-                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member member = requireMemberWithSavedSignature(principal.getMemberId());
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
@@ -2058,10 +2051,10 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
-            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
-                    "message", "OTP verification is disabled for approval actions at this station."
+                    "message", "OTP verification is disabled for approval actions on your account."
                 ));
             }
             validateApplicantSignatureOtp(principal.getMemberId(), otpCode);
@@ -3000,7 +2993,7 @@ public class AppController {
         }
         boolean requiresOtp = app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED
             || (app.getStatus() == LoanStatus.DRAFT && (app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0));
-        requiresOtp = requiresOtp && stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId());
+        requiresOtp = requiresOtp && stationOtpSettingsService.requiresApprovalOtp(memberId);
         if (!requiresOtp) {
             return null;
         }

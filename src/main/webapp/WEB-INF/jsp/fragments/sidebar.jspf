@@ -62,7 +62,7 @@
                         </span>
                         <spring:message code="menu.reports" />
                     </a>
-                    <c:set var="memberSettingsActive" value="${requestUri eq '/app/settings' or requestUri eq '/profile'}" />
+                    <c:set var="memberSettingsActive" value="${requestUri eq '/app/settings' or requestUri eq '/account/security' or requestUri eq '/profile'}" />
                     <div class="shell-sidebar-group space-y-1">
                         <button type="button"
                                 id="memberSettingsToggle"
@@ -85,6 +85,11 @@
                             </a>
                             <a href="/app/settings?section=payment-details#payment-details" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/settings' and param.section eq 'payment-details' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 <spring:message code="menu.settings.paymentDetails" text="Financial Details for Disbursement Deposit" />
+                            </a>
+                            <a href="/account/security"
+                               class="shell-sidebar-subitem ${requestUri eq '/account/security' ? 'shell-nav-active' : ''}"
+                               <c:if test="${requestUri eq '/account/security'}">aria-current="page"</c:if>>
+                                <span class="shell-sidebar-subitem-label">OTP Security</span>
                             </a>
                             <a href="/profile" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/profile' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 <spring:message code="menu.profile" text="Profile" />
@@ -390,7 +395,7 @@
                         </a>
                     </div>
                 </c:if>
-                <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings' or requestUri eq '/profile'}" />
+                <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings' or requestUri eq '/account/security' or requestUri eq '/profile'}" />
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="staffSettingsToggle"
@@ -410,6 +415,11 @@
                            class="shell-sidebar-subitem ${requestUri eq '/staff/settings' ? 'shell-nav-active' : ''}"
                            <c:if test="${requestUri eq '/staff/settings'}">aria-current="page"</c:if>>
                             <span class="shell-sidebar-subitem-label"><spring:message code="menu.settings.language" text="Language &amp; Preferences" /></span>
+                        </a>
+                        <a href="/account/security"
+                           class="shell-sidebar-subitem ${requestUri eq '/account/security' ? 'shell-nav-active' : ''}"
+                           <c:if test="${requestUri eq '/account/security'}">aria-current="page"</c:if>>
+                            <span class="shell-sidebar-subitem-label">OTP Security</span>
                         </a>
                         <a href="/profile"
                            class="shell-sidebar-subitem ${requestUri eq '/profile' ? 'shell-nav-active' : ''}"

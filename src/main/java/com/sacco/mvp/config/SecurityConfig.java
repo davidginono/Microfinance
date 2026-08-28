@@ -225,11 +225,9 @@ public class SecurityConfig {
                     boolean isMinorAdmin = principal != null && principal.isWorkspaceAdminScope();
                     String savedTarget = savedRequestTarget(request);
 
-                    // Layer 2a — Step-up MFA. Privileged staff (ADMIN, MINOR_ADMIN) must
-                    // present an email OTP before the authenticated SecurityContext is
-                    // persisted. Password alone cannot grant admin access.
-                    // Super admins now bypass this challenge; only MINOR_ADMIN can still
-                    // be routed through staff MFA when the local dev bypass is off.
+                    // Apply the authenticated user's login OTP preference before the
+                    // SecurityContext is persisted. The local minor-admin bypass remains
+                    // available only for explicitly configured development environments.
                     boolean requireLoginMfa = requiresPasswordLoginMfa(principal, staffPasswordLogin, isMinorAdmin, stationOtpSettingsService);
                     if (requireLoginMfa) {
                         if (principal != null) {
@@ -490,17 +488,8 @@ public class SecurityConfig {
         if (principal == null) {
             return false;
         }
-        if (hasStationScope(principal)) {
-            return stationOtpSettingsService.requiresLoginMfa(principal.getSaccoId(), principal.getStationId());
-        }
-        return staffPasswordLogin && isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled;
-    }
-
-    private boolean hasStationScope(AppUserPrincipal principal) {
-        return principal.getSaccoId() != null
-            && !principal.getSaccoId().isBlank()
-            && principal.getStationId() != null
-            && !principal.getStationId().isBlank();
+        return !(staffPasswordLogin && isMinorAdmin && localDevMinorAdminPasswordLoginEnabled)
+            && stationOtpSettingsService.requiresLoginMfa(principal.getMemberId());
     }
 
     private String landingFor(AppUserPrincipal principal, boolean staffPasswordLogin) {

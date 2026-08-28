@@ -30,6 +30,14 @@ public class UserSettings {
     @Column(name = "notification_prefs", nullable = false, columnDefinition = "jsonb")
     private String notificationPrefs;
 
+    @Builder.Default
+    @Column(name = "login_otp_enabled", nullable = false)
+    private boolean loginOtpEnabled = true;
+
+    @Builder.Default
+    @Column(name = "approval_otp_enabled", nullable = false)
+    private boolean approvalOtpEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

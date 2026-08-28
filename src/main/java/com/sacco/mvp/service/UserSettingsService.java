@@ -35,6 +35,20 @@ public class UserSettingsService {
         return find(memberId).map(UserSettings::getNotificationPrefs);
     }
 
+    public OtpPreferences otpPreferences(UUID memberId) {
+        return find(memberId)
+            .map(settings -> new OtpPreferences(settings.isLoginOtpEnabled(), settings.isApprovalOtpEnabled()))
+            .orElseGet(OtpPreferences::defaults);
+    }
+
+    public boolean requiresLoginOtp(UUID memberId) {
+        return otpPreferences(memberId).loginOtpEnabled();
+    }
+
+    public boolean requiresApprovalOtp(UUID memberId) {
+        return otpPreferences(memberId).approvalOtpEnabled();
+    }
+
     @Transactional
     public String updateLanguage(UUID memberId, String language) {
         OffsetDateTime now = OffsetDateTime.now();
@@ -54,6 +68,18 @@ public class UserSettingsService {
         UserSettings settings = findOrNew(memberId, now);
         settings.setNotificationPrefs(prefsUpdater.apply(settings.getNotificationPrefs()));
         normalizeAndSave(settings, now);
+    }
+
+    @Transactional
+    public OtpPreferences updateOtpPreferences(UUID memberId,
+                                               boolean loginOtpEnabled,
+                                               boolean approvalOtpEnabled) {
+        OffsetDateTime now = OffsetDateTime.now();
+        UserSettings settings = findOrNew(memberId, now);
+        settings.setLoginOtpEnabled(loginOtpEnabled);
+        settings.setApprovalOtpEnabled(approvalOtpEnabled);
+        normalizeAndSave(settings, now);
+        return new OtpPreferences(loginOtpEnabled, approvalOtpEnabled);
     }
 
     private Optional<UserSettings> find(UUID memberId) {
@@ -82,5 +108,11 @@ public class UserSettingsService {
         }
         settings.setUpdatedAt(now);
         userSettingsRepository.save(settings);
+    }
+
+    public record OtpPreferences(boolean loginOtpEnabled, boolean approvalOtpEnabled) {
+        private static OtpPreferences defaults() {
+            return new OtpPreferences(true, false);
+        }
     }
 }
