@@ -1361,7 +1361,8 @@ public class AppController {
             app.getFinalDueDate() == null ? null : Math.max(0, java.time.temporal.ChronoUnit.MONTHS.between(java.time.LocalDate.now().withDayOfMonth(1), app.getFinalDueDate().withDayOfMonth(1))));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(app.getApplicantMemberId()));
         model.addAttribute("applicantApprovalOtpEnabled",
-            stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId()));
+            stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
         model.addAttribute("canPrint",
             app.getFinancialSnapshot() != null
                 && !app.getFinancialSnapshot().isBlank()
@@ -1839,17 +1840,21 @@ public class AppController {
         model.addAttribute("requests", requests);
         addGuaranteeActionContext(requests, model);
         model.addAttribute("guarantorRequestOtpEnabled",
-            guarantorRequestOtpEnabled(requests, principal.getMemberId()));
+            guarantorRequestOtpEnabled(
+                requests, principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
         model.addAttribute("guarantorSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         return "app/guarantee-requests";
     }
 
-    private Map<UUID, Boolean> guarantorRequestOtpEnabled(List<GuarantorRequest> requests, UUID memberId) {
+    private Map<UUID, Boolean> guarantorRequestOtpEnabled(List<GuarantorRequest> requests,
+                                                          UUID memberId,
+                                                          String saccoId,
+                                                          String stationId) {
         Map<UUID, Boolean> enabled = new LinkedHashMap<>();
         if (requests == null || requests.isEmpty()) {
             return enabled;
         }
-        boolean otpEnabled = stationOtpSettingsService.requiresApprovalOtp(memberId);
+        boolean otpEnabled = stationOtpSettingsService.requiresApprovalOtp(memberId, saccoId, stationId);
         for (GuarantorRequest request : requests) {
             enabled.put(request.getId(), otpEnabled);
         }
@@ -1911,7 +1916,8 @@ public class AppController {
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             LoanApplication application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())
                 ? emailOtpService.validateOtp(guarantor.getEmail(), EmailOtpPurpose.GUARANTOR_SIGNATURE, guarantorSignatureOtpCode)
                 : null;
             loanWorkflowService.approveGuarantorRequest(
@@ -1950,7 +1956,8 @@ public class AppController {
                 loanWorkflowService.findApplication(request.getLoanApplicationId())
                     .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
@@ -1986,7 +1993,8 @@ public class AppController {
             }
             LoanApplication application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
                     "message", "OTP verification is disabled for approval actions on your account."
@@ -2019,7 +2027,8 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member member = requireMemberWithSavedSignature(principal.getMemberId());
@@ -2051,7 +2060,8 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
                     "message", "OTP verification is disabled for approval actions on your account."
@@ -2993,7 +3003,8 @@ public class AppController {
         }
         boolean requiresOtp = app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED
             || (app.getStatus() == LoanStatus.DRAFT && (app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0));
-        requiresOtp = requiresOtp && stationOtpSettingsService.requiresApprovalOtp(memberId);
+        requiresOtp = requiresOtp && stationOtpSettingsService.requiresApprovalOtp(
+            memberId, app.getSaccoId(), app.getStationId());
         if (!requiresOtp) {
             return null;
         }

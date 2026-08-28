@@ -310,7 +310,8 @@ public class BoardController {
         model.addAttribute("boardStatusBadgeClass", boardLoanStatusBadgeClass(app));
         model.addAttribute("boardSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         model.addAttribute("reviewApprovalOtpEnabled",
-            stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId()));
+            stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
         model.addAttribute("boardAssessors", boardReviews.stream()
             .map(review -> {
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -428,7 +429,8 @@ public class BoardController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException(reviewDecisionAlreadySubmittedMessage(myReview.getReviewStage()));
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
@@ -469,7 +471,8 @@ public class BoardController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException(reviewDecisionAlreadySubmittedMessage(myReview.getReviewStage()));
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
                     "message", "OTP verification is disabled for approval actions on your account."
@@ -503,7 +506,8 @@ public class BoardController {
             BoardReview myReview = resolveMyReview(id, principal);
             Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
             UUID otpTokenId = null;
-            if (stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 otpTokenId = emailOtpService.validateOtp(
                     boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
             }

@@ -46,7 +46,7 @@ class StaffMfaServiceTest {
         MockHttpServletRequest request = requestWithPendingChallenge(memberId);
         Member member = staffMember(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.requiresLoginMfa(memberId)).thenReturn(false);
+        when(stationOtpSettingsService.requiresLoginMfa(memberId, "SACCO-01", "ST-01")).thenReturn(false);
         when(userClaimService.effectiveClaims(eq(memberId), anyCollection(), eq(false)))
             .thenReturn(Set.of(UserClaim.MANAGER_QUEUE_VIEW));
 
@@ -70,7 +70,7 @@ class StaffMfaServiceTest {
         MockHttpServletRequest request = requestWithPendingChallenge(memberId);
         Member member = staffMember(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(stationOtpSettingsService.requiresLoginMfa(memberId)).thenReturn(true);
+        when(stationOtpSettingsService.requiresLoginMfa(memberId, "SACCO-01", "ST-01")).thenReturn(true);
 
         StaffMfaService.ChallengeCompletion completion =
             service.continueWithoutChallengeIfNoLongerRequired(request);

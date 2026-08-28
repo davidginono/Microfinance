@@ -489,7 +489,8 @@ public class SecurityConfig {
             return false;
         }
         return !(staffPasswordLogin && isMinorAdmin && localDevMinorAdminPasswordLoginEnabled)
-            && stationOtpSettingsService.requiresLoginMfa(principal.getMemberId());
+            && stationOtpSettingsService.requiresLoginMfa(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId());
     }
 
     private String landingFor(AppUserPrincipal principal, boolean staffPasswordLogin) {

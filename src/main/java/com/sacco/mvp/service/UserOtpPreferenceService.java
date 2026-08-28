@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.OtpSelectionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,14 +18,17 @@ public class UserOtpPreferenceService {
     private static final String OTP_ONLY_PASSWORD = "OTP_ONLY_LOGIN";
 
     private final UserSettingsService userSettingsService;
+    private final StationOtpSettingsService stationOtpSettingsService;
     private final MemberDirectoryService memberDirectoryService;
     private final EmailOtpService emailOtpService;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public UserSettingsService.OtpPreferences current(UUID memberId) {
-        return userSettingsService.otpPreferences(memberId);
+    public OtpSecuritySettings current(UUID memberId) {
+        Member member = requireMember(memberId);
+        OtpSelectionPolicy policy = selectionPolicy(member);
+        return new OtpSecuritySettings(effectivePreferences(memberId, policy), policy);
     }
 
     @Transactional
@@ -50,7 +54,9 @@ public class UserOtpPreferenceService {
                                                      String currentPassword,
                                                      String otpCode) {
         Member member = requireMember(memberId);
-        UserSettingsService.OtpPreferences before = userSettingsService.otpPreferences(memberId);
+        OtpSelectionPolicy policy = selectionPolicy(member);
+        validateSelection(policy, loginOtpEnabled, approvalOtpEnabled);
+        UserSettingsService.OtpPreferences before = effectivePreferences(memberId, policy);
         boolean disablingProtection = (before.loginOtpEnabled() && !loginOtpEnabled)
             || (before.approvalOtpEnabled() && !approvalOtpEnabled);
 
@@ -94,6 +100,32 @@ public class UserOtpPreferenceService {
             .orElseThrow(() -> new IllegalStateException("Your user account is unavailable."));
     }
 
+    private OtpSelectionPolicy selectionPolicy(Member member) {
+        return stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId());
+    }
+
+    private UserSettingsService.OtpPreferences effectivePreferences(UUID memberId, OtpSelectionPolicy policy) {
+        UserSettingsService.OtpPreferences preferences = userSettingsService.otpPreferences(memberId);
+        if (policy == OtpSelectionPolicy.BOTH) {
+            return new UserSettingsService.OtpPreferences(true, true);
+        }
+        if (!preferences.loginOtpEnabled() && !preferences.approvalOtpEnabled()) {
+            return new UserSettingsService.OtpPreferences(true, false);
+        }
+        return preferences;
+    }
+
+    private void validateSelection(OtpSelectionPolicy policy,
+                                   boolean loginOtpEnabled,
+                                   boolean approvalOtpEnabled) {
+        if (policy == OtpSelectionPolicy.BOTH && (!loginOtpEnabled || !approvalOtpEnabled)) {
+            throw new IllegalArgumentException("Your SACCO requires OTP for both login and approvals.");
+        }
+        if (!loginOtpEnabled && !approvalOtpEnabled) {
+            throw new IllegalArgumentException("Select login OTP, approval OTP, or both.");
+        }
+    }
+
     private String requireEmail(Member member) {
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException("Add an email address to your profile before requesting a confirmation OTP.");
@@ -117,5 +149,9 @@ public class UserOtpPreferenceService {
         state.put("saccoId", member.getSaccoId());
         state.put("stationId", member.getStationId());
         return state;
+    }
+
+    public record OtpSecuritySettings(UserSettingsService.OtpPreferences preferences,
+                                      OtpSelectionPolicy selectionPolicy) {
     }
 }

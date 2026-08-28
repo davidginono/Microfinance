@@ -25,7 +25,10 @@ public class AccountSecurityController {
 
     @GetMapping
     public String security(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("otpPreferences", userOtpPreferenceService.current(principal.getMemberId()));
+        UserOtpPreferenceService.OtpSecuritySettings settings =
+            userOtpPreferenceService.current(principal.getMemberId());
+        model.addAttribute("otpPreferences", settings.preferences());
+        model.addAttribute("otpSelectionPolicy", settings.selectionPolicy());
         return "account/security";
     }
 

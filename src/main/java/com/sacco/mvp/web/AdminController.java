@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
+import com.sacco.mvp.domain.OtpSelectionPolicy;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.UserClaim;
@@ -962,11 +963,13 @@ public class AdminController {
         var settings = adminService.settings(saccoId);
         var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
         model.addAttribute("settings", settings);
-        model.addAttribute(
-            "stationOtpDeliveryChannel",
-            stationOtpSettingsService.channel(saccoId, adminScopeService.currentStationId(principal))
+        var stationOtpConfiguration = stationOtpSettingsService.configuration(
+            saccoId,
+            adminScopeService.currentStationId(principal)
         );
+        model.addAttribute("stationOtpDeliveryChannel", stationOtpConfiguration.deliveryChannel());
         model.addAttribute("otpDeliveryChannels", OtpDeliveryChannel.values());
+        model.addAttribute("stationOtpSelectionPolicy", stationOtpConfiguration.selectionPolicy());
         model.addAttribute("currentStationPolicy", stationPolicy);
         model.addAttribute("policyStationId", adminScopeService.currentStationId(principal));
         model.addAttribute("policyApplicantMaxDefaultedLoans", stationPolicy == null ? settings.getApplicantMaxDefaultedLoans() : stationPolicy.getApplicantMaxDefaultedLoans());
@@ -1311,15 +1314,17 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateOtpDelivery(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam OtpDeliveryChannel otpDeliveryChannel,
+                                    @RequestParam OtpSelectionPolicy otpSelectionPolicy,
                                     RedirectAttributes ra) {
         try {
             stationOtpSettingsService.update(
                 adminScopeService.currentSaccoId(principal),
                 adminScopeService.currentStationId(principal),
                 otpDeliveryChannel,
+                otpSelectionPolicy,
                 principal.getMemberId()
             );
-            ra.addFlashAttribute("message", "OTP delivery updated for this station.");
+            ra.addFlashAttribute("message", "OTP settings updated for this station.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

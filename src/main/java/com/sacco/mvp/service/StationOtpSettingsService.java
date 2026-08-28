@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.OtpDeliveryChannel;
+import com.sacco.mvp.domain.OtpSelectionPolicy;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,20 +21,40 @@ public class StationOtpSettingsService {
 
     @Transactional(readOnly = true)
     public OtpDeliveryChannel channel(String saccoId, String stationId) {
+        return configuration(saccoId, stationId).deliveryChannel();
+    }
+
+    @Transactional(readOnly = true)
+    public OtpConfiguration configuration(String saccoId, String stationId) {
         return stationRepository.findBySaccoIdAndStationIdAndActiveTrue(saccoId, stationId)
             .filter(station -> !station.isAccessSuspended())
-            .map(SaccoStation::getResolvedOtpDeliveryChannel)
-            .orElse(OtpDeliveryChannel.EMAIL);
+            .map(station -> new OtpConfiguration(
+                station.getResolvedOtpDeliveryChannel(),
+                station.getResolvedUserOtpSelectionPolicy()
+            ))
+            .orElseGet(OtpConfiguration::defaults);
     }
 
     @Transactional(readOnly = true)
-    public boolean requiresApprovalOtp(UUID memberId) {
-        return userSettingsService.requiresApprovalOtp(memberId);
+    public boolean requiresApprovalOtp(UUID memberId, String saccoId, String stationId) {
+        OtpSelectionPolicy policy = selectionPolicy(saccoId, stationId);
+        return policy == OtpSelectionPolicy.BOTH || userSettingsService.requiresApprovalOtp(memberId);
     }
 
     @Transactional(readOnly = true)
-    public boolean requiresLoginMfa(UUID memberId) {
-        return userSettingsService.requiresLoginOtp(memberId);
+    public boolean requiresLoginMfa(UUID memberId, String saccoId, String stationId) {
+        OtpSelectionPolicy policy = selectionPolicy(saccoId, stationId);
+        if (policy == OtpSelectionPolicy.BOTH) {
+            return true;
+        }
+        UserSettingsService.OtpPreferences preferences = userSettingsService.otpPreferences(memberId);
+        return preferences.loginOtpEnabled()
+            || !preferences.approvalOtpEnabled();
+    }
+
+    @Transactional(readOnly = true)
+    public OtpSelectionPolicy selectionPolicy(String saccoId, String stationId) {
+        return configuration(saccoId, stationId).selectionPolicy();
     }
 
     @Transactional(readOnly = true)
@@ -47,23 +68,44 @@ public class StationOtpSettingsService {
     public SaccoStation update(String saccoId,
                                String stationId,
                                OtpDeliveryChannel channel,
+                               OtpSelectionPolicy selectionPolicy,
                                UUID actorMemberId) {
         if (channel == null) {
             throw new IllegalArgumentException("Select an OTP delivery channel.");
         }
+        if (selectionPolicy == null) {
+            throw new IllegalArgumentException("Select a user OTP obligation.");
+        }
         SaccoStation station = requireStation(saccoId, stationId);
         OtpDeliveryChannel before = station.getResolvedOtpDeliveryChannel();
+        OtpSelectionPolicy beforePolicy = station.getResolvedUserOtpSelectionPolicy();
         station.setOtpDeliveryChannel(channel);
+        station.setUserOtpSelectionPolicy(selectionPolicy);
         station.setUpdatedAt(OffsetDateTime.now());
         SaccoStation saved = stationRepository.save(station);
         auditService.log(
             "SACCO_STATION",
             saved.getId(),
-            "MINOR_ADMIN_UPDATE_OTP_DELIVERY_CHANNEL",
+            "MINOR_ADMIN_UPDATE_OTP_SETTINGS",
             actorMemberId,
-            Map.of("otpDeliveryChannel", before.name()),
-            Map.of("otpDeliveryChannel", channel.name(), "saccoId", saccoId, "stationId", stationId)
+            Map.of(
+                "otpDeliveryChannel", before.name(),
+                "userOtpSelectionPolicy", beforePolicy.name()
+            ),
+            Map.of(
+                "otpDeliveryChannel", channel.name(),
+                "userOtpSelectionPolicy", selectionPolicy.name(),
+                "saccoId", saccoId,
+                "stationId", stationId
+            )
         );
         return saved;
+    }
+
+    public record OtpConfiguration(OtpDeliveryChannel deliveryChannel,
+                                   OtpSelectionPolicy selectionPolicy) {
+        private static OtpConfiguration defaults() {
+            return new OtpConfiguration(OtpDeliveryChannel.EMAIL, OtpSelectionPolicy.AT_LEAST_ONE);
+        }
     }
 }

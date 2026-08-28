@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
+import com.sacco.mvp.domain.OtpSelectionPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserOtpPreferenceServiceTest {
     @Mock private UserSettingsService userSettingsService;
+    @Mock private StationOtpSettingsService stationOtpSettingsService;
     @Mock private MemberDirectoryService memberDirectoryService;
     @Mock private EmailOtpService emailOtpService;
     @Mock private PasswordEncoder passwordEncoder;
@@ -55,12 +57,12 @@ class UserOtpPreferenceServiceTest {
         when(userSettingsService.otpPreferences(memberId))
             .thenReturn(new UserSettingsService.OtpPreferences(true, false));
         when(passwordEncoder.matches("correct-password", "encoded-password")).thenReturn(true);
-        when(userSettingsService.updateOtpPreferences(memberId, false, false))
-            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+        when(userSettingsService.updateOtpPreferences(memberId, false, true))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, true));
 
-        service.update(memberId, false, false, "correct-password", "");
+        service.update(memberId, false, true, "correct-password", "");
 
-        verify(userSettingsService).updateOtpPreferences(memberId, false, false);
+        verify(userSettingsService).updateOtpPreferences(memberId, false, true);
         verify(emailOtpService, never()).validateOtp(any(), any(), any(), any());
         verify(auditService).log(
             eq("USER_SETTINGS"),
@@ -87,14 +89,46 @@ class UserOtpPreferenceServiceTest {
             memberId,
             "123456"
         )).thenReturn(otpTokenId);
-        when(userSettingsService.updateOtpPreferences(memberId, false, false))
-            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+        when(userSettingsService.updateOtpPreferences(memberId, true, false))
+            .thenReturn(new UserSettingsService.OtpPreferences(true, false));
 
-        service.update(memberId, false, false, "OTP_ONLY_LOGIN", "123456");
+        service.update(memberId, true, false, "OTP_ONLY_LOGIN", "123456");
 
         verify(passwordEncoder, never()).matches(any(), any());
         verify(emailOtpService).consumeOtpById(otpTokenId);
-        verify(userSettingsService).updateOtpPreferences(memberId, false, false);
+        verify(userSettingsService).updateOtpPreferences(memberId, true, false);
+    }
+
+    @Test
+    void atLeastOnePolicyRejectsNeitherOption() {
+        UUID memberId = UUID.randomUUID();
+        Member member = member(memberId, "encoded-password");
+        UserOtpPreferenceService service = service();
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
+        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId()))
+            .thenReturn(OtpSelectionPolicy.AT_LEAST_ONE);
+
+        assertThatThrownBy(() -> service.update(memberId, false, false, "correct-password", ""))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Select login OTP, approval OTP, or both");
+
+        verify(userSettingsService, never()).updateOtpPreferences(any(), anyBoolean(), anyBoolean());
+    }
+
+    @Test
+    void bothPolicyRejectsAUserSelectingOnlyOneOption() {
+        UUID memberId = UUID.randomUUID();
+        Member member = member(memberId, "encoded-password");
+        UserOtpPreferenceService service = service();
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
+        when(stationOtpSettingsService.selectionPolicy(member.getSaccoId(), member.getStationId()))
+            .thenReturn(OtpSelectionPolicy.BOTH);
+
+        assertThatThrownBy(() -> service.update(memberId, true, false, "", ""))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("requires OTP for both");
+
+        verify(userSettingsService, never()).updateOtpPreferences(any(), anyBoolean(), anyBoolean());
     }
 
     @Test
@@ -131,6 +165,7 @@ class UserOtpPreferenceServiceTest {
     private UserOtpPreferenceService service() {
         return new UserOtpPreferenceService(
             userSettingsService,
+            stationOtpSettingsService,
             memberDirectoryService,
             emailOtpService,
             passwordEncoder,

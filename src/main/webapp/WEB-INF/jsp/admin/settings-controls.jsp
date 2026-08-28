@@ -70,9 +70,31 @@
                     </span>
                 </label>
             </div>
+            <div class="mt-5 border-t border-slate-200 pt-5">
+                <h3 class="aws-settings-title">User OTP obligation</h3>
+                <p class="aws-settings-description">Set the minimum OTP protection each user must keep enabled.</p>
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                        <input name="otpSelectionPolicy" type="radio" value="AT_LEAST_ONE" class="mt-1"
+                               ${stationOtpSelectionPolicy eq 'AT_LEAST_ONE' ? 'checked' : ''} />
+                        <span>
+                            <span class="block font-semibold text-slate-900">At least one</span>
+                            <span class="mt-1 block text-xs text-slate-500">Users select login OTP, approval OTP, or both.</span>
+                        </span>
+                    </label>
+                    <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                        <input name="otpSelectionPolicy" type="radio" value="BOTH" class="mt-1"
+                               ${stationOtpSelectionPolicy eq 'BOTH' ? 'checked' : ''} />
+                        <span>
+                            <span class="block font-semibold text-slate-900">Both required</span>
+                            <span class="mt-1 block text-xs text-slate-500">All users must use OTP for login and approvals.</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
             <div class="relative mt-5 flex flex-row items-center justify-between gap-2 flex-wrap">
                 <p class="text-sm text-slate-500"><spring:message code="admin.settings.otp.reserveNotice" text="The three reserved SMS alert units are never used for OTP codes." /></p>
-                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.otp.save" text="Save OTP Delivery" /></button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.otp.save" text="Save OTP Settings" /></button>
             </div>
         </form>
     </section>

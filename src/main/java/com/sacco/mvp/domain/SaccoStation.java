@@ -53,6 +53,11 @@ public class SaccoStation {
     private OtpRequirementMode otpRequirementMode = OtpRequirementMode.LOGIN_MFA_ONLY;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "user_otp_selection_policy", nullable = false)
+    @Builder.Default
+    private OtpSelectionPolicy userOtpSelectionPolicy = OtpSelectionPolicy.AT_LEAST_ONE;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "access_status")
     @Builder.Default
     private SaccoAccessStatus accessStatus = SaccoAccessStatus.ACTIVE;
@@ -89,5 +94,9 @@ public class SaccoStation {
 
     public OtpRequirementMode getResolvedOtpRequirementMode() {
         return otpRequirementMode == null ? OtpRequirementMode.LOGIN_MFA_ONLY : otpRequirementMode;
+    }
+
+    public OtpSelectionPolicy getResolvedUserOtpSelectionPolicy() {
+        return userOtpSelectionPolicy == null ? OtpSelectionPolicy.AT_LEAST_ONE : userOtpSelectionPolicy;
     }
 }

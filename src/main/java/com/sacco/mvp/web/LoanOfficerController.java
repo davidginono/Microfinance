@@ -304,7 +304,8 @@ public class LoanOfficerController {
         model.addAttribute("boardStatusBadgeClass", boardLoanStatusBadgeClass(app));
         model.addAttribute("boardSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         model.addAttribute("reviewApprovalOtpEnabled",
-            stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId()));
+            stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
         model.addAttribute("boardAssessors", stageReviews.stream()
             .map(review -> {
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -420,7 +421,8 @@ public class LoanOfficerController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your loan officer decision.");
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
@@ -459,7 +461,8 @@ public class LoanOfficerController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your loan officer decision.");
             }
-            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())) {
+            if (!stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 return ResponseEntity.ok(Map.of(
                     "valid", true,
                     "message", "OTP verification is disabled for approval actions on your account."
@@ -491,7 +494,8 @@ public class LoanOfficerController {
             LoanApplication app = boardService.findLoan(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
-            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId())
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())
                 ? emailOtpService.validateOtp(reviewer.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode)
                 : null;
             requireSavedSignature(reviewer);

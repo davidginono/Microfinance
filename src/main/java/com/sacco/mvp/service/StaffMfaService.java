@@ -255,7 +255,8 @@ public class StaffMfaService {
         if (member == null) {
             return true;
         }
-        return stationOtpSettingsService.requiresLoginMfa(member.getId());
+        return stationOtpSettingsService.requiresLoginMfa(
+            member.getId(), member.getSaccoId(), member.getStationId());
     }
 
     private void clearPending(HttpSession session) {

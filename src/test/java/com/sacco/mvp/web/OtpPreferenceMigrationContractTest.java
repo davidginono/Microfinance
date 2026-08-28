@@ -23,8 +23,20 @@ class OtpPreferenceMigrationContractTest {
         assertThat(sidebar).contains("href=\"/account/security\"");
         assertThat(adminSettings)
             .contains("name=\"otpDeliveryChannel\"")
+            .contains("name=\"otpSelectionPolicy\"")
+            .contains("value=\"AT_LEAST_ONE\"")
+            .contains("value=\"BOTH\"")
             .doesNotContain("name=\"otpRequirementMode\"")
             .doesNotContain("stationOtpRequirementMode");
+    }
+
+    @Test
+    void stationPolicyMigrationRequiresAtLeastOneOptionByDefault() throws Exception {
+        String migration = read("src/main/resources/db/migration/V36__add_user_otp_selection_policy.sql");
+
+        assertThat(migration)
+            .contains("user_otp_selection_policy varchar(32) NOT NULL DEFAULT 'AT_LEAST_ONE'")
+            .contains("CHECK (user_otp_selection_policy IN ('AT_LEAST_ONE', 'BOTH'))");
     }
 
     @Test
