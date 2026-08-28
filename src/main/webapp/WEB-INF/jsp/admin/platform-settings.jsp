@@ -285,6 +285,72 @@
 
 <section class="erp-panel aws-settings-panel overflow-hidden">
     <div class="aws-settings-header">
+        <p class="aws-settings-kicker">SACCO Features</p>
+        <h2 class="aws-settings-title">Loan Top-Up Access</h2>
+        <p class="aws-settings-description">Allow or block loan top-up requests for each SACCO.</p>
+    </div>
+    <div class="erp-panel-body">
+        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading SACCO feature settings...">
+            <div class="erp-table-scroll">
+                <table class="erp-table">
+                    <thead>
+                    <tr>
+                        <th>SACCO</th>
+                        <th>Stations</th>
+                        <th>Status</th>
+                        <th>Loan Top-Up</th>
+                        <th class="text-right">Action</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <c:choose>
+                        <c:when test="${empty registeredSaccos}">
+                            <tr>
+                                <td colspan="5" class="text-slate-500">No SACCOs registered.</td>
+                            </tr>
+                        </c:when>
+                        <c:otherwise>
+                            <c:forEach var="sacco" items="${registeredSaccos}">
+                                <tr>
+                                    <td>
+                                        <span class="font-bold text-slate-900"><c:out value="${sacco.saccoName}" /></span>
+                                        <span class="block text-xs text-slate-500"><c:out value="${sacco.saccoId}" /></span>
+                                    </td>
+                                    <td><c:out value="${sacco.stationListLabel}" /></td>
+                                    <td>
+                                        <span class="app-badge ${sacco.accessBadgeClass}"><c:out value="${sacco.accessStatusLabel}" /></span>
+                                    </td>
+                                    <td>
+                                        <span class="app-badge ${sacco.loanTopUpEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-700'}">
+                                            <c:out value="${sacco.loanTopUpEnabled ? 'Enabled' : 'Disabled'}" />
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <form action="/admin/platform-settings/sacco-loan-top-up" method="post" class="flex flex-wrap items-center justify-end gap-2">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                            <input type="hidden" name="saccoId" value="${sacco.saccoId}" />
+                                            <label class="aws-settings-checkbox-row m-0">
+                                                <input class="aws-settings-checkbox" name="loanTopUpEnabled" type="checkbox" value="true" ${sacco.loanTopUpEnabled ? 'checked' : ''} />
+                                                <span class="aws-settings-checkbox-copy">
+                                                    <span class="aws-settings-checkbox-title">Allow</span>
+                                                </span>
+                                            </label>
+                                            <button type="submit" class="app-btn btn-primary">Save</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </c:otherwise>
+                    </c:choose>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="erp-panel aws-settings-panel overflow-hidden">
+    <div class="aws-settings-header">
         <p class="aws-settings-kicker">Branding</p>
         <h2 class="aws-settings-title">Logo Upload Rules</h2>
         <p class="aws-settings-description">These limits apply to every SACCO logo uploaded from registration or station registry.</p>

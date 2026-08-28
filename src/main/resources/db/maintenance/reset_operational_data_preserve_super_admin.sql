@@ -153,6 +153,9 @@ CREATE INDEX IF NOT EXISTS idx_member_access_claims_claim_name
 ALTER TABLE IF EXISTS public.sacco_settings
     ADD COLUMN IF NOT EXISTS portfolio_at_risk_days integer NOT NULL DEFAULT 30;
 
+ALTER TABLE IF EXISTS public.sacco_settings
+    ADD COLUMN IF NOT EXISTS loan_top_up_enabled boolean NOT NULL DEFAULT true;
+
 ALTER TABLE IF EXISTS public.sacco_station_policies
     ADD COLUMN IF NOT EXISTS portfolio_at_risk_days integer;
 

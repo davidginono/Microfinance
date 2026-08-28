@@ -66,23 +66,30 @@ public class SaccoRegistryService {
         if (saccos.isEmpty()) {
             return List.of();
         }
+        List<String> saccoIds = saccos.stream().map(RegisteredSacco::getSaccoId).toList();
         Map<String, List<SaccoStation>> stationsBySacco = saccoStationRepository
             .findBySaccoIdInAndActiveTrueOrderBySaccoIdAscStationIdAsc(
-                saccos.stream().map(RegisteredSacco::getSaccoId).toList())
+                saccoIds)
             .stream()
             .collect(Collectors.groupingBy(SaccoStation::getSaccoId, LinkedHashMap::new, Collectors.toList()));
+        Map<String, SaccoSettings> settingsBySacco = saccoSettingsRepository.findBySaccoIdIn(saccoIds).stream()
+            .collect(Collectors.toMap(SaccoSettings::getSaccoId, settings -> settings, (left, right) -> left, LinkedHashMap::new));
         return saccos.stream()
-            .map(sacco -> toRegisteredSaccoView(sacco, stationsBySacco.getOrDefault(sacco.getSaccoId(), List.of())))
+            .map(sacco -> toRegisteredSaccoView(
+                sacco,
+                stationsBySacco.getOrDefault(sacco.getSaccoId(), List.of()),
+                settingsBySacco.get(sacco.getSaccoId())))
             .toList();
     }
 
     private RegisteredSaccoView toRegisteredSaccoView(RegisteredSacco sacco) {
         return toRegisteredSaccoView(
             sacco,
-            saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId()));
+            saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId()),
+            saccoSettingsRepository.findById(sacco.getSaccoId()).orElse(null));
     }
 
-    private RegisteredSaccoView toRegisteredSaccoView(RegisteredSacco sacco, List<SaccoStation> stations) {
+    private RegisteredSaccoView toRegisteredSaccoView(RegisteredSacco sacco, List<SaccoStation> stations, SaccoSettings settings) {
         return new RegisteredSaccoView(
             sacco.getSaccoId(),
             sacco.getSaccoName(),
@@ -91,7 +98,8 @@ public class SaccoRegistryService {
                 .toList(),
             saccoLogoStorageService.hasLogo(sacco.getSaccoId()),
             saccoLogoStorageService.publicLogoUrl(sacco.getSaccoId(), sacco.getUpdatedAt()),
-            aggregateStationAccess(stations)
+            aggregateStationAccess(stations),
+            settings == null || settings.isLoanTopUpEnabled()
         );
     }
 
@@ -291,6 +299,36 @@ public class SaccoRegistryService {
     }
 
     @Transactional
+    public void updateLoanTopUpFeature(String saccoId, boolean enabled, UUID actorMemberId) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        if (normalizedSaccoId == null) {
+            throw new IllegalStateException("SACCO ID is required.");
+        }
+        RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
+            .filter(RegisteredSacco::isActive)
+            .orElseThrow(() -> new IllegalStateException("SACCO not found."));
+        OffsetDateTime now = OffsetDateTime.now();
+        SaccoSettings settings = saccoSettingsRepository.findById(normalizedSaccoId)
+            .orElseGet(() -> newDefaultSettings(
+                normalizedSaccoId,
+                sacco.getSaccoName(),
+                saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(normalizedSaccoId).stream()
+                    .map(SaccoStation::getStationId)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Add at least one active station before updating SACCO settings.")),
+                now
+            ));
+        boolean before = settings.isLoanTopUpEnabled();
+        settings.setLoanTopUpEnabled(enabled);
+        settings.setUpdatedAt(now);
+        saccoSettingsRepository.save(settings);
+        invalidateRegisteredSaccoCache();
+        auditService.log("SACCO_SETTINGS", null, "SACCO_LOAN_TOP_UP_FEATURE_UPDATED", actorMemberId,
+            Map.of("saccoId", normalizedSaccoId, "loanTopUpEnabled", before),
+            Map.of("saccoId", normalizedSaccoId, "loanTopUpEnabled", enabled));
+    }
+
+    @Transactional
     public void removeLogoOnly(String saccoId, UUID actorMemberId) {
         String normalizedSaccoId = normalizeSaccoId(saccoId);
         if (normalizedSaccoId == null) {
@@ -401,22 +439,29 @@ public class SaccoRegistryService {
         }
 
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId)
-            .orElseGet(() -> SaccoSettings.builder()
-                .saccoId(saccoId)
-                .requiredGuarantors(3)
-                .boardSize(3)
-                .boardQuorum(2)
-                .maxLoanSavingsRatio(new BigDecimal("0.3333"))
-                .applicationFee(new BigDecimal("15000.00"))
-                .defaultLanguage("en")
-                .createdAt(now)
-                .build());
+            .orElseGet(() -> newDefaultSettings(saccoId, saccoName, stationIds.iterator().next(), now));
         settings.setExternalSaccoName(saccoName);
         if (settings.getExternalStationId() == null || !requestedStations.contains(settings.getExternalStationId())) {
             settings.setExternalStationId(stationIds.iterator().next());
         }
         settings.setUpdatedAt(now);
         saccoSettingsRepository.save(settings);
+    }
+
+    private SaccoSettings newDefaultSettings(String saccoId, String saccoName, String stationId, OffsetDateTime now) {
+        return SaccoSettings.builder()
+            .saccoId(saccoId)
+            .externalSaccoName(saccoName)
+            .externalStationId(stationId)
+            .requiredGuarantors(3)
+            .boardSize(3)
+            .boardQuorum(2)
+            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+            .applicationFee(new BigDecimal("15000.00"))
+            .loanTopUpEnabled(true)
+            .defaultLanguage("en")
+            .createdAt(now)
+            .build();
     }
 
     private String nextGeneratedSaccoId() {
@@ -528,7 +573,8 @@ public class SaccoRegistryService {
         List<StationView> stations,
         boolean hasLogo,
         String logoUrl,
-        SaccoAccessStatus accessStatus
+        SaccoAccessStatus accessStatus,
+        boolean loanTopUpEnabled
     ) {
         public String getSaccoId() {
             return saccoId;
@@ -562,6 +608,10 @@ public class SaccoRegistryService {
 
         public SaccoAccessStatus getAccessStatus() {
             return accessStatus == null ? SaccoAccessStatus.ACTIVE : accessStatus;
+        }
+
+        public boolean isLoanTopUpEnabled() {
+            return loanTopUpEnabled;
         }
 
         public boolean isAccessSuspended() {

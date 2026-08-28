@@ -59,4 +59,15 @@ class SessionTimeoutUiContractTest {
         assertThat(jsp).doesNotContain("name=\"password\" value=");
         assertThat(jsp).doesNotContain("name=\"apiKey\" value=");
     }
+
+    @Test
+    void platformSettingsRendersSaccoLoanTopUpFeatureToggle() throws Exception {
+        String jsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
+
+        assertThat(jsp)
+            .contains("/admin/platform-settings/sacco-loan-top-up")
+            .contains("name=\"loanTopUpEnabled\"")
+            .contains("${sacco.loanTopUpEnabled ? 'checked' : ''}")
+            .contains("Loan Top-Up Access");
+    }
 }

@@ -601,6 +601,7 @@ CREATE TABLE public.sacco_settings (
     loan_fee_payment_method character varying(120),
     loan_fee_payment_payee character varying(160),
     guarantor_with_active_loan_allowed boolean,
+    loan_top_up_enabled boolean DEFAULT true NOT NULL,
     notification_delivery_prefs jsonb DEFAULT '{"LOAN_STATUS": {"sms": false, "email": true}, "GUARANTEE_REQUEST": {"sms": false, "email": true}, "REPAYMENT_REMINDER": {"sms": false, "email": true}}'::jsonb NOT NULL,
     CONSTRAINT sacco_settings_access_status_check CHECK (((access_status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'PAYMENT_DUE'::character varying, 'SUSPENDED'::character varying])::text[])))
 );

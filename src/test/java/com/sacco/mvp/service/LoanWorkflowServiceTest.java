@@ -266,6 +266,42 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
+    void canRequestTopUpReturnsFalseWhenSaccoFeatureIsDisabled() {
+        UUID loanId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId(saccoId)
+            .status(LoanStatus.DISBURSED)
+            .build();
+        when(saccoSettingsRepository.findById(saccoId)).thenReturn(Optional.of(SaccoSettings.builder()
+            .saccoId(saccoId)
+            .loanTopUpEnabled(false)
+            .build()));
+
+        assertThat(loanWorkflowService.canRequestTopUp(app)).isFalse();
+
+        verify(loanApplicationRepository, never()).countByTopUpSourceLoanIdAndStatusIn(any(), any());
+    }
+
+    @Test
+    void requireAllowedTopUpSourceLoanRejectsWhenSaccoFeatureIsDisabled() {
+        UUID memberId = UUID.randomUUID();
+        UUID sourceLoanId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        when(saccoSettingsRepository.findById(saccoId)).thenReturn(Optional.of(SaccoSettings.builder()
+            .saccoId(saccoId)
+            .loanTopUpEnabled(false)
+            .build()));
+
+        assertThatThrownBy(() -> loanWorkflowService.requireAllowedTopUpSourceLoan(saccoId, memberId, sourceLoanId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Loan top-up is disabled for this SACCO.");
+
+        verify(loanApplicationRepository, never()).findByIdAndApplicantMemberId(any(), any());
+    }
+
+    @Test
     void guarantorWorkspaceListsUseFocusedRepositoryQueries() {
         UUID memberId = UUID.randomUUID();
         GuarantorRequest request = GuarantorRequest.builder().id(UUID.randomUUID()).build();

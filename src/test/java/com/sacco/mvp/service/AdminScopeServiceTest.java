@@ -112,7 +112,8 @@ class AdminScopeServiceTest {
             List.of(new SaccoRegistryService.StationView(stationId, null)),
             false,
             null,
-            SaccoAccessStatus.ACTIVE
+            SaccoAccessStatus.ACTIVE,
+            true
         );
     }
 }

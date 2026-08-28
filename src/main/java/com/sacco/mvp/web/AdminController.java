@@ -220,6 +220,7 @@ public class AdminController {
         model.addAttribute("emailDeliveryStatus", platformEmailSettingsService.resolvedConfig());
         model.addAttribute("platformSmsGatewaySettings", platformSmsGatewaySettingsService.settings());
         model.addAttribute("smsGatewayStatus", platformSmsGatewaySettingsService.resolvedConfig());
+        model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccosFresh());
         return "admin/platform-settings";
     }
 
@@ -387,6 +388,21 @@ public class AdminController {
             ra.addFlashAttribute("error", ex.getMessage());
         } catch (Exception ex) {
             ra.addFlashAttribute("error", PlatformSmsGatewaySettingsService.describeTestSendFailure(ex));
+        }
+        return "redirect:/admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/sacco-loan-top-up")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String updateSaccoLoanTopUp(@AuthenticationPrincipal AppUserPrincipal principal,
+                                       @RequestParam String saccoId,
+                                       @RequestParam(defaultValue = "false") boolean loanTopUpEnabled,
+                                       RedirectAttributes ra) {
+        try {
+            saccoRegistryService.updateLoanTopUpFeature(saccoId, loanTopUpEnabled, principal.getMemberId());
+            ra.addFlashAttribute("message", "Loan top-up access updated for " + saccoId + ".");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/admin/platform-settings";
     }

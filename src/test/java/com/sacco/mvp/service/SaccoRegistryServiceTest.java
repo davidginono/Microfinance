@@ -26,6 +26,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -395,6 +398,114 @@ class SaccoRegistryServiceTest {
         verify(saccoStationRepository).save(argThat(station -> station != null
             && "STN002".equals(station.getStationId())
             && "Arusha CBD".equals(station.getAddressLocation())));
+    }
+
+    @Test
+    void listRegisteredSaccosIncludesLoanTopUpFeatureFlag() {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(AuditService.class),
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
+        );
+
+        OffsetDateTime now = OffsetDateTime.now();
+        RegisteredSacco sacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId("SACCO-1")
+            .externalStationId("STN001")
+            .externalSaccoName("Example Sacco")
+            .requiredGuarantors(3)
+            .boardSize(3)
+            .boardQuorum(2)
+            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+            .loanTopUpEnabled(false)
+            .defaultLanguage("en")
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        when(registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc()).thenReturn(List.of(sacco));
+        when(saccoStationRepository.findBySaccoIdInAndActiveTrueOrderBySaccoIdAscStationIdAsc(List.of("SACCO-1")))
+            .thenReturn(List.of());
+        when(saccoSettingsRepository.findBySaccoIdIn(List.of("SACCO-1"))).thenReturn(List.of(settings));
+
+        List<SaccoRegistryService.RegisteredSaccoView> saccos = service.listRegisteredSaccos();
+
+        assertThat(saccos).singleElement()
+            .extracting(SaccoRegistryService.RegisteredSaccoView::isLoanTopUpEnabled)
+            .isEqualTo(false);
+    }
+
+    @Test
+    void updateLoanTopUpFeaturePersistsFlagAndAuditsChange() {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
+        AuditService auditService = Mockito.mock(AuditService.class);
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class),
+            auditService,
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
+        );
+
+        OffsetDateTime now = OffsetDateTime.now();
+        RegisteredSacco sacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId("SACCO-1")
+            .externalStationId("STN001")
+            .externalSaccoName("Example Sacco")
+            .requiredGuarantors(3)
+            .boardSize(3)
+            .boardQuorum(2)
+            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+            .loanTopUpEnabled(true)
+            .defaultLanguage("en")
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        UUID actorId = UUID.randomUUID();
+
+        when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(sacco));
+        when(saccoSettingsRepository.findById("SACCO-1")).thenReturn(Optional.of(settings));
+
+        service.updateLoanTopUpFeature("sacco-1", false, actorId);
+
+        verify(saccoSettingsRepository).save(argThat(saved -> saved != null && !saved.isLoanTopUpEnabled()));
+        verify(auditService).log(
+            eq("SACCO_SETTINGS"),
+            isNull(),
+            eq("SACCO_LOAN_TOP_UP_FEATURE_UPDATED"),
+            eq(actorId),
+            argThat(before -> before instanceof Map<?, ?> map && Boolean.TRUE.equals(map.get("loanTopUpEnabled"))),
+            argThat(after -> after instanceof Map<?, ?> map && Boolean.FALSE.equals(map.get("loanTopUpEnabled")))
+        );
     }
 
     private byte[] pngBytes(int width, int height) throws IOException {

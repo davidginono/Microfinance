@@ -326,8 +326,18 @@ public class LoanWorkflowService {
         if (app == null) {
             return false;
         }
-        return isAllowedTopUpSource(app)
+        return isLoanTopUpEnabled(app.getSaccoId())
+            && isAllowedTopUpSource(app)
             && countBlockingTopUpApplications(app.getId(), null) == 0;
+    }
+
+    public boolean isLoanTopUpEnabled(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return false;
+        }
+        return saccoSettingsRepository.findById(saccoId)
+            .map(SaccoSettings::isLoanTopUpEnabled)
+            .orElse(true);
     }
 
     public LoanApplication requireAllowedTopUpSourceLoan(String saccoId, UUID applicantId, UUID topUpSourceLoanId) {
@@ -338,6 +348,9 @@ public class LoanWorkflowService {
                                                          UUID excludedApplicationId) {
         if (topUpSourceLoanId == null) {
             return null;
+        }
+        if (!isLoanTopUpEnabled(saccoId)) {
+            throw new IllegalStateException("Loan top-up is disabled for this SACCO.");
         }
         LoanApplication sourceLoan = loanApplicationRepository.findByIdAndApplicantMemberId(topUpSourceLoanId, applicantId)
             .orElseThrow(() -> new IllegalArgumentException("Selected top-up source loan was not found."));

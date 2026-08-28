@@ -70,6 +70,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -90,6 +91,7 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private AdminService adminService;
     @Autowired private AdminScopeService adminScopeService;
     @Autowired private SaccoStationRepository saccoStationRepository;
+    @Autowired private SaccoRegistryService saccoRegistryService;
     @Autowired private PlatformSessionSettingsService platformSessionSettingsService;
     @Autowired private PlatformEmailSettingsService platformEmailSettingsService;
     @Autowired private PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
@@ -99,7 +101,7 @@ class AdminControllerUserAccessSecurityTest {
     @BeforeEach
     void setUp() {
         Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
-            platformEmailSettingsService, platformSmsGatewaySettingsService);
+            platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService);
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -306,6 +308,34 @@ class AdminControllerUserAccessSecurityTest {
         verify(platformSmsGatewaySettingsService, never()).updateSettings(
             any(Boolean.class), any(), any(), any(), any(), any(), any(Integer.class), any(Integer.class), any()
         );
+    }
+
+    @Test
+    void updateSaccoLoanTopUpAllowsPlatformAdminWithUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+
+        mockMvc.perform(post("/admin/platform-settings/sacco-loan-top-up")
+                .param("saccoId", "SACCO-01")
+                .param("loanTopUpEnabled", "true")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"));
+
+        verify(saccoRegistryService).updateLoanTopUpFeature("SACCO-01", true, principal.getMemberId());
+    }
+
+    @Test
+    void updateSaccoLoanTopUpDeniesPlatformAdminWithoutUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+
+        mockMvc.perform(post("/admin/platform-settings/sacco-loan-top-up")
+                .param("saccoId", "SACCO-01")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+
+        verify(saccoRegistryService, never()).updateLoanTopUpFeature(any(), anyBoolean(), any());
     }
 
     @Test

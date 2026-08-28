@@ -108,11 +108,13 @@ class JspRecordAccessorCompatibilityTest {
             List.of(station),
             false,
             null,
-            SaccoAccessStatus.PAYMENT_DUE
+            SaccoAccessStatus.PAYMENT_DUE,
+            true
         );
         assertElProperty("sacco", sacco, "accessBadgeClass", sacco.getAccessBadgeClass());
         assertElProperty("sacco", sacco, "accessStatusLabel", sacco.getAccessStatusLabel());
         assertElProperty("sacco", sacco, "stationIdsText", sacco.getStationIdsText());
+        assertElProperty("sacco", sacco, "loanTopUpEnabled", sacco.isLoanTopUpEnabled());
 
         AdminService.AdminDashboard adminDashboard = new AdminService.AdminDashboard(
             memberCounts(),

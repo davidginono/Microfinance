@@ -57,6 +57,10 @@ public class SaccoSettings {
     @Column(name = "guarantor_with_active_loan_allowed")
     private Boolean guarantorWithActiveLoanAllowed;
 
+    @Builder.Default
+    @Column(name = "loan_top_up_enabled", nullable = false)
+    private boolean loanTopUpEnabled = true;
+
     @Column(name = "guarantor_max_guaranteed_loan_amount", precision = 18, scale = 2)
     private BigDecimal guarantorMaxGuaranteedLoanAmount;
 
