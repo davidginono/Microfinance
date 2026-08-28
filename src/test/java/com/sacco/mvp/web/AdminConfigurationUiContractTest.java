@@ -56,6 +56,31 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void loanProductFormsRestoreSubmittedDraftAfterValidationError() throws Exception {
+        String productEdit = read(JSP_ROOT.resolve("admin/loan-product-edit.jsp"));
+        String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
+        String workflowScript = read(JSP_ROOT.resolve("fragments/loan-product-workflow-script.jspf"));
+        String controller = read(Path.of("src/main/java/com/sacco/mvp/web/AdminController.java"));
+
+        assertThat(productEdit)
+            .contains("data-loan-product-form-draft")
+            .contains("data-loan-product-form-value=\"${fn:escapeXml(draftField.key)}\"");
+        assertThat(settings)
+            .contains("openProductModalKey eq 'create-product' and not empty loanProductFormDraft")
+            .contains("data-loan-product-form-draft")
+            .contains("data-loan-product-form-value=\"${fn:escapeXml(draftField.key)}\"");
+        assertThat(workflowScript)
+            .contains("restoreLoanProductFormDraft(form)")
+            .contains("restoreLoanProductAttachmentRows(form, valuesByName)")
+            .contains("const checkboxes = fields.filter((field) => field.type === 'checkbox')")
+            .contains("field.checked = values.includes(field.value)");
+        assertThat(controller)
+            .contains("LOAN_PRODUCT_BOOLEAN_FIELDS")
+            .contains("\"committeeReviewRequired\"")
+            .contains("attachLoanProductFormDraft(ra, request)");
+    }
+
+    @Test
     void loanProductVersionHistoryIsRemovedAcrossUiApplicationAndSchema() throws Exception {
         String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
         String controller = read(Path.of("src/main/java/com/sacco/mvp/web/AdminController.java"));

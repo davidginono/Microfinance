@@ -127,6 +127,78 @@
             return parts.length > 1 ? grouped + '.' + parts.slice(1).join('') : grouped;
         }
 
+        function loanProductDraftValues(form) {
+            const draft = form.querySelector('[data-loan-product-form-draft]');
+            const valuesByName = new Map();
+            if (!draft) {
+                return valuesByName;
+            }
+            draft.querySelectorAll('[data-loan-product-form-value]').forEach((node) => {
+                const name = node.getAttribute('data-loan-product-form-value');
+                if (!name) {
+                    return;
+                }
+                const values = valuesByName.get(name) || [];
+                values.push(node.textContent || '');
+                valuesByName.set(name, values);
+            });
+            return valuesByName;
+        }
+
+        function restoreLoanProductAttachmentRows(form, valuesByName) {
+            const list = form.querySelector('[data-required-attachments-list]');
+            const attachmentNames = valuesByName.get('requiredAttachmentName') || [];
+            if (!list || !attachmentNames.length) {
+                return;
+            }
+            const attachmentSizes = valuesByName.get('requiredAttachmentMaxSizeMb') || [];
+            list.innerHTML = '';
+            attachmentNames.forEach((name, index) => {
+                list.appendChild(requiredAttachmentRow(name, attachmentSizes[index] || '5.00'));
+            });
+        }
+
+        function restoreLoanProductFormDraft(form) {
+            const valuesByName = loanProductDraftValues(form);
+            if (!valuesByName.size) {
+                return;
+            }
+            restoreLoanProductAttachmentRows(form, valuesByName);
+            valuesByName.forEach((values, name) => {
+                const fields = Array.from(form.elements).filter((field) => field.name === name);
+                if (!fields.length) {
+                    return;
+                }
+                const checkboxes = fields.filter((field) => field.type === 'checkbox');
+                if (checkboxes.length) {
+                    checkboxes.forEach((field) => {
+                        field.checked = values.includes(field.value);
+                    });
+                    return;
+                }
+                const radios = fields.filter((field) => field.type === 'radio');
+                if (radios.length) {
+                    radios.forEach((field) => {
+                        field.checked = values.includes(field.value);
+                    });
+                    return;
+                }
+                fields.forEach((field, index) => {
+                    if (field.type === 'file') {
+                        return;
+                    }
+                    field.value = values[index] !== undefined ? values[index] : (values[0] || '');
+                });
+            });
+        }
+
+        document.querySelectorAll('[data-loan-product-form-draft]').forEach((draft) => {
+            const form = draft.closest('form');
+            if (form) {
+                restoreLoanProductFormDraft(form);
+            }
+        });
+
         function syncMoneyInput(input, trimDecimals) {
             input.value = formatMoneyValue(input.value, trimDecimals);
         }

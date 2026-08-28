@@ -88,6 +88,15 @@
                 <input type="hidden" name="modalKey" value="product-${product.id}" />
                 <input type="hidden" name="productCode" value="${fn:escapeXml(product.displayCode)}" data-product-code-field />
                 <input type="hidden" name="workflowStartStage" value="${product.resolvedWorkflowStartStage}" data-workflow-start-stage-field />
+                <c:if test="${not empty loanProductFormDraft}">
+                    <div hidden data-loan-product-form-draft>
+                        <c:forEach items="${loanProductFormDraft}" var="draftField">
+                            <c:forEach items="${draftField.value}" var="draftValue">
+                                <span data-loan-product-form-value="${fn:escapeXml(draftField.key)}"><c:out value="${draftValue}" /></span>
+                            </c:forEach>
+                        </c:forEach>
+                    </div>
+                </c:if>
                 <c:if test="${not empty message}">
                     <span hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></span>
                 </c:if>

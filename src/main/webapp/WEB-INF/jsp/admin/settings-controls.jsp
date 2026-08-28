@@ -576,6 +576,15 @@
                     <input type="hidden" name="modalKey" value="create-product" />
                     <input type="hidden" name="productCode" value="" data-product-code-field data-product-code-generated="true" />
                     <input type="hidden" name="workflowStartStage" value="MANAGER" data-workflow-start-stage-field />
+                    <c:if test="${openProductModalKey eq 'create-product' and not empty loanProductFormDraft}">
+                        <div hidden data-loan-product-form-draft>
+                            <c:forEach items="${loanProductFormDraft}" var="draftField">
+                                <c:forEach items="${draftField.value}" var="draftValue">
+                                    <span data-loan-product-form-value="${fn:escapeXml(draftField.key)}"><c:out value="${draftValue}" /></span>
+                                </c:forEach>
+                            </c:forEach>
+                        </div>
+                    </c:if>
 
                     <c:if test="${openProductModalKey eq 'create-product' and not empty message}">
                         <div class="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
@@ -1017,6 +1026,15 @@
                 <input type="hidden" name="productCode" value="${fn:escapeXml(product.displayCode)}" data-product-code-field />
                 <input type="hidden" name="workflowStartStage" value="${product.resolvedWorkflowStartStage}" data-workflow-start-stage-field />
                 <c:set var="productModalKey" value="product-${product.id}" />
+                <c:if test="${openProductModalKey eq productModalKey and not empty loanProductFormDraft}">
+                    <div hidden data-loan-product-form-draft>
+                        <c:forEach items="${loanProductFormDraft}" var="draftField">
+                            <c:forEach items="${draftField.value}" var="draftValue">
+                                <span data-loan-product-form-value="${fn:escapeXml(draftField.key)}"><c:out value="${draftValue}" /></span>
+                            </c:forEach>
+                        </c:forEach>
+                    </div>
+                </c:if>
 
                 <c:if test="${openProductModalKey eq productModalKey and not empty message}">
                     <div class="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>

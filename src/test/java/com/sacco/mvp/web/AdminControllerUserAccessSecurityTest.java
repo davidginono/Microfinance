@@ -339,6 +339,77 @@ class AdminControllerUserAccessSecurityTest {
     }
 
     @Test
+    void createLoanProductValidationErrorPreservesSubmittedDraft() throws Exception {
+        AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+
+        mockMvc.perform(post("/admin/settings-controls/loan-products")
+                .param("modalKey", "create-product")
+                .param("productName", "School Fees Booster")
+                .param("productDescription", "Submitted text should remain visible")
+                .param("displayOrder", "5")
+                .param("minimumAmount", "0")
+                .param("maximumAmount", "500000")
+                .param("guarantorsRequired", "2")
+                .param("maxLoanSavingsPercent", "300")
+                .param("applicationFee", "15000")
+                .param("insurancePercent", "1.5")
+                .param("processingFeePercent", "0")
+                .param("annualInterestPercent", "10")
+                .param("minRepaymentMonths", "1")
+                .param("maxRepaymentMonths", "12")
+                .param("managerReviewRequired", "true")
+                .param("managerPriority", "0")
+                .param("accountantReviewRequired", "false")
+                .param("disbursementOfficerRequired", "false")
+                .param("disbursementProofRequired", "false")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/settings-controls?section=loan&modal=create-product"))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productName", List.of("School Fees Booster"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productDescription", List.of("Submitted text should remain visible"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("committeeReviewRequired", List.of("false"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("accountantReviewRequired", List.of("false"))));
+    }
+
+    @Test
+    void updateLoanProductValidationErrorPreservesSubmittedDraft() throws Exception {
+        UUID productId = UUID.randomUUID();
+        AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_UPDATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+
+        mockMvc.perform(post("/admin/settings-controls/{id}", productId)
+                .param("modalKey", "product-" + productId)
+                .param("productName", "Emergency Loan")
+                .param("productDescription", "Edited text should remain visible")
+                .param("displayOrder", "2")
+                .param("minimumAmount", "10000")
+                .param("maximumAmount", "300000")
+                .param("guarantorsRequired", "1")
+                .param("maxLoanSavingsPercent", "250")
+                .param("applicationFee", "10000")
+                .param("insurancePercent", "1")
+                .param("processingFeePercent", "0")
+                .param("annualInterestPercent", "12")
+                .param("minRepaymentMonths", "1")
+                .param("maxRepaymentMonths", "6")
+                .param("managerReviewRequired", "true")
+                .param("managerPriority", "0")
+                .param("accountantReviewRequired", "false")
+                .param("disbursementOfficerRequired", "false")
+                .param("disbursementProofRequired", "false")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/" + productId + "/edit"))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productName", List.of("Emergency Loan"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productDescription", List.of("Edited text should remain visible"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("committeeReviewRequired", List.of("false"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("accountantReviewRequired", List.of("false"))));
+    }
+
+    @Test
     void sendTestEmailRedirectsWithSuccessFlash() throws Exception {
         AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
 

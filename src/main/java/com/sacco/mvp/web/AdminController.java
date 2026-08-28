@@ -53,6 +53,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +65,22 @@ import java.util.UUID;
 @RequestMapping("/admin")
 @PreAuthorize("@access.canAccessAdminArea(principal)")
 public class AdminController {
+    private static final List<String> LOAN_PRODUCT_BOOLEAN_FIELDS = List.of(
+        "savingsLimitCheckRequired",
+        "allowApplicationWithActiveLoan",
+        "freshFinancialDataRequired",
+        "managerReviewRequired",
+        "loanOfficerReviewRequired",
+        "chairpersonReviewRequired",
+        "boardReviewRequired",
+        "committeeReviewRequired",
+        "accountantReviewRequired",
+        "disbursementOfficerRequired",
+        "disbursementProofRequired",
+        "applicantAttachmentRequired",
+        "guarantorMinSavingsCheckRequired"
+    );
+
     private final AdminService adminService;
     private final ApplicationClock applicationClock;
     private final AdminScopeService adminScopeService;
@@ -1028,6 +1045,7 @@ public class AdminController {
                                     @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                     @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
                                     @RequestParam(required = false) String modalKey,
+                                    HttpServletRequest request,
                                     RedirectAttributes ra) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "product-" + id : normalizeLoanSettingsModalKey(modalKey);
         try {
@@ -1054,6 +1072,7 @@ public class AdminController {
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
+            attachLoanProductFormDraft(ra, request);
         }
         return "redirect:/admin/settings-controls/loan-products/" + id + "/edit";
     }
@@ -1182,6 +1201,7 @@ public class AdminController {
                                               @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                               @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
                                               @RequestParam(required = false) String modalKey,
+                                              HttpServletRequest request,
                                               RedirectAttributes ra) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
@@ -1242,6 +1262,7 @@ public class AdminController {
             ra.addFlashAttribute("message", "Loan product added.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
+            attachLoanProductFormDraft(ra, request);
         }
         return loanSettingsRedirect(resolvedModalKey);
     }
@@ -1429,6 +1450,39 @@ public class AdminController {
         }
         ra.addFlashAttribute("error", "Please correct the highlighted fields below.");
         ra.addFlashAttribute("loanSettingsFieldErrors", fieldErrors);
+    }
+
+    private void attachLoanProductFormDraft(RedirectAttributes ra, HttpServletRequest request) {
+        if (request == null) {
+            return;
+        }
+        Map<String, List<String>> draft = new LinkedHashMap<>();
+        request.getParameterMap().forEach((name, values) -> {
+            if (name == null || name.isBlank() || "_csrf".equals(name) || values == null || values.length == 0) {
+                return;
+            }
+            List<String> submittedValues = new ArrayList<>(values.length);
+            for (String value : values) {
+                submittedValues.add(value == null ? "" : value);
+            }
+            draft.put(name, submittedValues);
+        });
+        LOAN_PRODUCT_BOOLEAN_FIELDS.forEach(name ->
+            draft.put(name, List.of(Boolean.toString(requestHasTruthyParameter(request, name)))));
+        ra.addFlashAttribute("loanProductFormDraft", draft);
+    }
+
+    private boolean requestHasTruthyParameter(HttpServletRequest request, String name) {
+        String[] values = request.getParameterValues(name);
+        if (values == null) {
+            return false;
+        }
+        for (String value : values) {
+            if ("true".equalsIgnoreCase(value) || "on".equalsIgnoreCase(value) || "1".equals(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Map<String, String> resolveLoanSettingsFieldErrors(String message) {
