@@ -25,15 +25,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class LoanNotificationFormatter {
-    private static final Set<String> STAFF_ACTION_EVENTS = Set.of(
-        "LOAN_READY_FOR_MANAGER",
-        "LOAN_OFFICER_REVIEW_ASSIGNED",
-        "CHAIRPERSON_REVIEW_ASSIGNED",
-        "BOARD_REVIEW_ASSIGNED",
-        "CREDIT_COMMITTEE_REVIEW_ASSIGNED",
-        "LOAN_READY_FOR_ACCOUNTANT",
-        "LOAN_READY_FOR_DISBURSEMENT"
-    );
     private static final Set<String> APPLICANT_STATUS_EVENTS = Set.of(
         "MANAGER_REJECTED",
         "MANAGER_ACCEPTED",
@@ -75,7 +66,7 @@ public class LoanNotificationFormatter {
             return fallback;
         }
         String eventType = event.getEventType();
-        boolean staffAction = STAFF_ACTION_EVENTS.contains(eventType);
+        boolean staffAction = LoanStaffNotificationEvents.isReviewAssignmentEvent(eventType);
         boolean applicantStatus = isApplicantStatusEvent(eventType);
         if (!staffAction && !applicantStatus) {
             return fallback;
@@ -316,16 +307,7 @@ public class LoanNotificationFormatter {
     }
 
     private ApprovalWorkflowStage reviewStage(String eventType) {
-        return switch (eventType) {
-            case "LOAN_READY_FOR_MANAGER" -> ApprovalWorkflowStage.MANAGER;
-            case "LOAN_OFFICER_REVIEW_ASSIGNED" -> ApprovalWorkflowStage.LOAN_OFFICER;
-            case "CHAIRPERSON_REVIEW_ASSIGNED" -> ApprovalWorkflowStage.CHAIRPERSON;
-            case "BOARD_REVIEW_ASSIGNED" -> ApprovalWorkflowStage.BOARD;
-            case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
-            case "LOAN_READY_FOR_ACCOUNTANT" -> ApprovalWorkflowStage.ACCOUNTANT;
-            case "LOAN_READY_FOR_DISBURSEMENT" -> ApprovalWorkflowStage.DISBURSEMENT_OFFICER;
-            default -> null;
-        };
+        return LoanStaffNotificationEvents.reviewStage(eventType);
     }
 
     private String staffDetailPath(ApprovalWorkflowStage stage, LoanApplication app) {

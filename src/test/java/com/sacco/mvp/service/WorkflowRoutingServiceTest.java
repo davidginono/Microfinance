@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.LoanProductBoardReviewer;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.OutboxEvent;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
@@ -20,10 +21,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,5 +173,42 @@ class WorkflowRoutingServiceTest {
             .containsOnly(ApprovalWorkflowStage.CREDIT_COMMITTEE);
         verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerOne), eq(actorId), eq("SACCO-1"), eq("AR704"), any());
         verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerTwo), eq(actorId), eq("SACCO-1"), eq("AR704"), any());
+    }
+
+    @Test
+    void everyReviewAssignmentEventUsesStaffNotificationIdempotencyContract() {
+        ApprovalFlowService flow = new ApprovalFlowService();
+        LoanApplication app = LoanApplication.builder().id(UUID.randomUUID()).build();
+        UUID reviewerId = UUID.randomUUID();
+        ObjectMapper objectMapper = new ObjectMapper();
+        Set<String> eventTypes = new LinkedHashSet<>();
+
+        for (ApprovalWorkflowStage stage : ApprovalWorkflowStage.values()) {
+            String eventType = flow.reviewAssignedEventType(stage);
+            eventTypes.add(eventType);
+            Map<String, Object> details = LoanStaffNotificationEvents.reviewAssignmentDetails(app, stage, reviewerId);
+            OutboxEvent event = OutboxEvent.builder()
+                .aggregateType("LOAN")
+                .aggregateId(app.getId())
+                .eventType(eventType)
+                .build();
+
+            LoanStaffNotificationEvents.ReviewAssignmentContext context =
+                LoanStaffNotificationEvents.reviewAssignmentContext(
+                    event,
+                    objectMapper.valueToTree(Map.of("details", details)),
+                    reviewerId
+                );
+
+            assertThat(LoanStaffNotificationEvents.reviewStage(eventType)).isEqualTo(stage);
+            assertThat(details)
+                .containsEntry("loanId", app.getId().toString())
+                .containsEntry("reviewStage", stage.name())
+                .containsEntry("reviewerMemberId", reviewerId.toString());
+            assertThat(context).isNotNull();
+            assertThat(context.loanId()).isEqualTo(app.getId().toString());
+            assertThat(context.reviewStage()).isEqualTo(stage.name());
+        }
+        assertThat(eventTypes).hasSize(ApprovalWorkflowStage.values().length);
     }
 }

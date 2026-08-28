@@ -8,6 +8,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.NotificationRepository;
 import com.sacco.mvp.repository.OutboxEventRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -46,7 +47,7 @@ class OutboxPublisherSchedulerTest {
 
         OutboxPublisherScheduler scheduler = new OutboxPublisherScheduler(
             new OutboxPublishService(outboxRepository),
-            notificationRepository,
+            new NotificationPublishService(notificationRepository, mock(JdbcTemplate.class)),
             objectMapper,
             mock(AdminAlertService.class),
             new NotificationViewService(
@@ -99,7 +100,7 @@ class OutboxPublisherSchedulerTest {
 
         OutboxPublisherScheduler scheduler = new OutboxPublisherScheduler(
             new OutboxPublishService(outboxRepository),
-            notificationRepository,
+            new NotificationPublishService(notificationRepository, mock(JdbcTemplate.class)),
             objectMapper,
             mock(AdminAlertService.class),
             new NotificationViewService(

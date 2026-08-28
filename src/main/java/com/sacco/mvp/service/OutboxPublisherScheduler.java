@@ -3,9 +3,7 @@ package com.sacco.mvp.service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
-import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.domain.OutboxEvent;
-import com.sacco.mvp.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,8 +11,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -23,7 +21,7 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "app.outbox.scheduler-enabled", havingValue = "true", matchIfMissing = true)
 public class OutboxPublisherScheduler {
     private final OutboxPublishService outboxPublishService;
-    private final NotificationRepository notificationRepository;
+    private final NotificationPublishService notificationPublishService;
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
     private final NotificationViewService notificationViewService;
@@ -50,22 +48,19 @@ public class OutboxPublisherScheduler {
                 String saccoId = textOrNull(payload, "saccoId");
                 String stationId = textOrNull(payload, "stationId");
 
-                if (isDuplicateDelivery(recipientId, event, payload)) {
+                Optional<Notification> notification = notificationPublishService.createFromOutboxIfAbsent(
+                    event,
+                    recipientId,
+                    payload
+                );
+                if (notification.isEmpty()) {
                     log.info("Skipping duplicate notification delivery for outbox event {}", event.getId());
                     outboxPublishService.markPublished(event);
                     continue;
                 }
 
-                Notification notification = notificationRepository.save(Notification.builder()
-                    .id(UUID.randomUUID())
-                    .recipientMemberId(recipientId)
-                    .type(event.getEventType())
-                    .payload(event.getPayload())
-                    .status(NotificationStatus.SENT)
-                    .createdAt(OffsetDateTime.now())
-                    .sentAt(OffsetDateTime.now())
-                    .build());
-                NotificationViewService.NotificationView view = notificationViewService.toView(notification);
+                Notification savedNotification = notification.get();
+                NotificationViewService.NotificationView view = notificationViewService.toView(savedNotification);
                 NotificationDeliveryService.DeliveryContent content = loanNotificationFormatter.format(
                     event,
                     payload,
@@ -74,7 +69,7 @@ public class OutboxPublisherScheduler {
                 notificationDeliveryService.deliver(
                     saccoId,
                     stationId,
-                    notification.getId(),
+                    savedNotification.getId(),
                     recipientId,
                     event.getEventType(),
                     content
@@ -102,32 +97,6 @@ public class OutboxPublisherScheduler {
 
     private String textOrNull(JsonNode payload, String field) {
         JsonNode value = payload == null ? null : payload.get(field);
-        String text = value == null || value.isNull() ? null : value.asString();
-        return text == null || text.isBlank() ? null : text;
-    }
-
-    private boolean isDuplicateDelivery(UUID recipientId, OutboxEvent event, JsonNode payload) {
-        String loanId = detailTextOrNull(payload, "loanId");
-        String reviewStage = detailTextOrNull(payload, "reviewStage");
-        String reviewerMemberId = detailTextOrNull(payload, "reviewerMemberId");
-        if ("LOAN".equals(event.getAggregateType())
-            && loanId != null
-            && reviewStage != null
-            && reviewerMemberId != null
-            && notificationRepository.existsDeliveredStaffReviewDuplicate(
-                recipientId,
-                event.getEventType(),
-                loanId,
-                reviewStage
-            )) {
-            return true;
-        }
-        return notificationRepository.existsDeliveredDuplicate(recipientId, event.getEventType(), event.getPayload());
-    }
-
-    private String detailTextOrNull(JsonNode payload, String field) {
-        JsonNode details = payload == null ? null : payload.get("details");
-        JsonNode value = details == null || details.isNull() ? null : details.get(field);
         String text = value == null || value.isNull() ? null : value.asString();
         return text == null || text.isBlank() ? null : text;
     }

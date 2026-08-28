@@ -86,17 +86,24 @@ public class NotificationEmailService {
         }
 
         PlatformEmailSettingsService.ResolvedEmailConfig config = emailSettingsService.resolvedConfig();
+        MimeMessage mail;
         try {
-            MimeMessage mail = mailSender.createMimeMessage();
+            mail = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
             helper.setTo(resolveRecipient(email, config));
             helper.setFrom(config.fromAddress());
             helper.setSubject(subject);
             helper.setText(text == null ? "" : text, html);
+        } catch (Exception ex) {
+            log.warn("Unable to prepare HTML notification email to {}: {}", email, ex.getMessage());
+            sendDirectEmail(email, subject, text);
+            return;
+        }
+
+        try {
             mailSender.send(mail);
         } catch (Exception ex) {
             log.warn("Unable to send HTML notification email to {}: {}", email, ex.getMessage());
-            sendDirectEmail(email, subject, text);
         }
     }
 

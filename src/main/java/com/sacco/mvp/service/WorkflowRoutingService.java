@@ -140,11 +140,7 @@ public class WorkflowRoutingService {
         reviewNotificationRecipients(app, stage, assignedReviewers)
             .forEach(reviewerId -> outboxService.enqueue("LOAN", app.getId(), eventType, reviewerId,
                 actorMemberId, app.getSaccoId(), app.getStationId(),
-                Map.of(
-                    "loanId", app.getId().toString(),
-                    "reviewStage", stage.name(),
-                    "reviewerMemberId", reviewerId.toString()
-                )));
+                LoanStaffNotificationEvents.reviewAssignmentDetails(app, stage, reviewerId)));
     }
 
     private void enqueueApplicantStatusChangedEvent(LoanApplication app, LoanStatus status, UUID actorMemberId) {

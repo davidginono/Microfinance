@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,6 +75,29 @@ class NotificationEmailServiceTest {
         assertThat(message.getValue().getRecipients(Message.RecipientType.TO)[0].toString()).isEqualTo("audit@example.com");
         assertThat(message.getValue().getSubject()).isEqualTo("Loan update");
         assertThat(message.getValue().getContent().toString()).contains("MimeMultipart");
+    }
+
+    @Test
+    void htmlNotificationDoesNotSendPlainFallbackAfterSmtpSendFailure() {
+        UUID memberId = UUID.randomUUID();
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(
+            com.sacco.mvp.domain.Member.builder()
+                .id(memberId)
+                .email("member@example.com")
+                .build()
+        ));
+        doThrow(new MailSendException("SMTP unavailable"))
+            .when(mailSender).send(any(MimeMessage.class));
+        NotificationEmailService service = service(memberRepository, mailSender, "");
+
+        service.sendNotificationEmail(memberId, "Loan update", "Plain body", "<strong>HTML body</strong>");
+
+        verify(mailSender).send(any(MimeMessage.class));
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
 
     @Test
