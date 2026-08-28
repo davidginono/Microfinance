@@ -1602,6 +1602,7 @@
             const msgValidGuarantorSearch = "<spring:message code='newloan.js.validGuarantorSearch' text='Ready to search.' />";
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
+            const msgMemberDirectoryUnavailable = "<spring:message code='newloan.js.memberDirectoryUnavailable' text='Member directory is unavailable right now. Please try again later.' />";
             const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
             const msgDirectOtpSearchModeChanged = "<spring:message code='newloan.js.directOtpSearchModeChanged' text='Select guarantors again for this approval mode.' />";
             const modeNumberLabel = "<spring:message code='newloan.guarantors.modeNumber' />";
@@ -2009,12 +2010,14 @@
                 hideDropdown();
             }
 
-            function showResults(items) {
+            function showResults(items, emptyMessage, emptyIsError) {
                 dropdown.innerHTML = "";
                 if (!items.length) {
                     const empty = document.createElement("div");
-                    empty.className = "px-4 py-3 text-sm text-slate-500";
-                    empty.textContent = msgNoMatches;
+                    empty.className = emptyIsError
+                        ? "px-4 py-3 text-sm text-rose-700 bg-rose-50"
+                        : "px-4 py-3 text-sm text-slate-500";
+                    empty.textContent = emptyMessage || msgNoMatches;
                     dropdown.appendChild(empty);
                 } else {
                     items.forEach(function (item) {
@@ -2058,15 +2061,18 @@
                 setSearchLoading(true);
                 const query = new URLSearchParams({ q: term, searchBy: mode, loanProductId: "${loanProductId}", loanType: "${loanType}" });
                 const endpoint = approvalMode === "DIRECT_OTP" ? "/app/guarantors/direct-otp/search" : "/app/guarantors/search";
+                const unavailableMessage = approvalMode === "DIRECT_OTP" ? msgMemberDirectoryUnavailable : msgUnableSearchGuarantors;
                 try {
                     const response = await fetch(endpoint + "?" + query.toString(), {
                         headers: {"X-Requested-With":"XMLHttpRequest"
                         }
                     });
-                    const payload = await response.json().catch(function () { return approvalMode === "DIRECT_OTP" ? { items: [] } : []; });
+                    const payload = await response.json().catch(function () { return approvalMode === "DIRECT_OTP" ? { items: [], message: unavailableMessage } : []; });
                     if (!response.ok) {
-                        hint.textContent = payload.message || msgUnableSearchGuarantors;
-                        showResults([]);
+                        const message = payload.message || unavailableMessage;
+                        hint.textContent = message;
+                        showResults([], message, true);
+                        window.showToast?.("error", message);
                         return;
                     }
                     const data = Array.isArray(payload) ? payload : (payload.items || []);
@@ -2080,8 +2086,10 @@
 
             searchButton.addEventListener("click", function () {
                 runSearch().catch(function () {
-                    hint.textContent = msgUnableSearchGuarantors;
-                    hideDropdown();
+                    const message = currentApprovalMode() === "DIRECT_OTP" ? msgMemberDirectoryUnavailable : msgUnableSearchGuarantors;
+                    hint.textContent = message;
+                    showResults([], message, true);
+                    window.showToast?.("error", message);
                 });
             });
 

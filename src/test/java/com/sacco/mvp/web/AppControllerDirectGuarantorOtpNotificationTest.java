@@ -5,12 +5,15 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
+import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.MemberDirectoryService;
@@ -40,6 +43,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AppControllerDirectGuarantorOtpNotificationTest {
     @Mock private LoanWorkflowService loanWorkflowService;
+    @Mock private FormSchemaService formSchemaService;
     @Mock private EmailOtpService emailOtpService;
     @Mock private LoanProductDisplayService loanProductDisplayService;
     @Mock private MemberDirectoryService memberDirectoryService;
@@ -47,6 +51,47 @@ class AppControllerDirectGuarantorOtpNotificationTest {
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks private AppController controller;
+
+    @Test
+    void directOtpSearchReportsMemberDirectoryOutage() {
+        UUID applicantId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(productId)
+            .saccoId("SACCO-1")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .active(true)
+            .build();
+
+        when(principal.getSaccoId()).thenReturn("SACCO-1");
+        when(principal.getStationId()).thenReturn("ST-1");
+        when(principal.getMemberId()).thenReturn(applicantId);
+        when(formSchemaService.getSchema("SACCO-1", productId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(loanWorkflowService.searchDirectOtpGuarantorCandidates(
+            "SACCO-1",
+            "ST-1",
+            applicantId,
+            "tahasaccos@gmail.com",
+            "email",
+            product
+        )).thenThrow(new UpstreamAvailabilityException(
+            "Member directory is unavailable right now. Please try again later.",
+            null
+        ));
+
+        var response = controller.searchDirectOtpGuarantors(
+            principal,
+            "tahasaccos@gmail.com",
+            "email",
+            productId,
+            LoanType.DEVELOPMENT_LOAN
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody())
+            .containsEntry("items", java.util.List.of())
+            .containsEntry("message", "Member directory is unavailable right now. Please try again later.");
+    }
 
     @Test
     void directGuarantorOtpNotificationNamesApplicantAndExactLoanProduct() {

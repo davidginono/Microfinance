@@ -30,6 +30,19 @@ class DirectOtpGuarantorSearchViewContractTest {
     }
 
     @Test
+    void directOtpSearchShowsMemberDirectoryOutageInsteadOfNoMatches() throws Exception {
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+
+        assertThat(source)
+            .contains("const msgMemberDirectoryUnavailable")
+            .contains("function showResults(items, emptyMessage, emptyIsError)")
+            .contains("const unavailableMessage = approvalMode === \"DIRECT_OTP\" ? msgMemberDirectoryUnavailable : msgUnableSearchGuarantors;")
+            .contains("const message = payload.message || unavailableMessage;")
+            .contains("showResults([], message, true)")
+            .contains("empty.textContent = emptyMessage || msgNoMatches;");
+    }
+
+    @Test
     void guarantorSearchShowsInlineFormatVerificationOnlyAfterSearchClick() throws Exception {
         String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
         String styles = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));

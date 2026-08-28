@@ -915,7 +915,7 @@ public class LoanWorkflowService {
             return List.of();
         }
         if (!lookup.isFound()) {
-            throw new IllegalStateException("External member profile is unavailable right now.");
+            throw new UpstreamAvailabilityException("Member directory is unavailable right now. Please try again later.", null);
         }
         ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
         DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(
@@ -981,7 +981,7 @@ public class LoanWorkflowService {
         }
         ForesightDirectoryService.MemberProfileLookupResult lookup = lookupDirectOtpProfile(mode, lookupValue);
         if (!lookup.isFound()) {
-            throw new IllegalStateException("External member profile is unavailable right now.");
+            throw new UpstreamAvailabilityException("Member directory is unavailable right now. Please try again later.", null);
         }
         ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
         List<ForesightLoanPaymentSummary> summaries = foresightDirectoryService.fetchLoanPaymentSummary(
@@ -1032,7 +1032,7 @@ public class LoanWorkflowService {
             throw new IllegalArgumentException("Foresight member profile was not found.");
         }
         if (!lookup.isFound()) {
-            throw new IllegalStateException("External member profile is unavailable right now.");
+            throw new UpstreamAvailabilityException("Member directory is unavailable right now. Please try again later.", null);
         }
         ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
         DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(

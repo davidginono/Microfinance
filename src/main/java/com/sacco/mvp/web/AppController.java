@@ -29,6 +29,7 @@ import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserSettingsService;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
+import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.service.dto.FormModel;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -39,6 +40,7 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -1624,6 +1626,11 @@ public class AppController {
                 .map(this::directOtpCandidateRow)
                 .toList();
             return ResponseEntity.ok(Map.of("items", items));
+        } catch (UpstreamAvailabilityException ex) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "items", List.of(),
+                "message", ex.getMessage()
+            ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "items", List.of(),
@@ -1644,6 +1651,12 @@ public class AppController {
             return ResponseEntity.ok(Map.of(
                 "summaries", details.summaries().stream().map(this::directOtpPaymentSummaryRow).toList(),
                 "transactions", details.transactions().stream().map(this::directOtpPaymentTransactionRow).toList()
+            ));
+        } catch (UpstreamAvailabilityException ex) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", ex.getMessage(),
+                "summaries", List.of(),
+                "transactions", List.of()
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
