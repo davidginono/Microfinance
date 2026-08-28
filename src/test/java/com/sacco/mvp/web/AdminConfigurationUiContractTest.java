@@ -102,7 +102,18 @@ class AdminConfigurationUiContractTest {
             .contains("name=\"guarantorWithActiveLoanAllowed\"")
             .contains("name=\"guarantorMaxGuaranteedLoanAmount\"")
             .contains("name=\"guarantorMaxDefaultedLoans\"")
+            .contains("id=\"portfolio-risk-policy-title\"")
+            .contains("class=\"aws-settings-group aws-qualification-risk-group\"")
+            .contains("name=\"portfolioAtRiskDays\"")
             .doesNotContain("settings-action-bar settings-action-bar--split");
+        int guarantorHeaderIndex = settings.indexOf("id=\"guarantor-policy-title\"");
+        int portfolioHeaderIndex = settings.indexOf("id=\"portfolio-risk-policy-title\"");
+        int portfolioInputIndex = settings.indexOf("name=\"portfolioAtRiskDays\"");
+        assertThat(guarantorHeaderIndex).isGreaterThanOrEqualTo(0);
+        assertThat(portfolioHeaderIndex).isGreaterThan(guarantorHeaderIndex);
+        assertThat(portfolioInputIndex).isGreaterThan(portfolioHeaderIndex);
+        assertThat(settings.substring(guarantorHeaderIndex, portfolioHeaderIndex))
+            .doesNotContain("name=\"portfolioAtRiskDays\"");
         assertThat(consoleCss)
             .contains(".aws-qualification-settings .aws-settings-commandbar")
             .contains("grid-template-columns: minmax(0, 1fr) auto")
@@ -111,6 +122,9 @@ class AdminConfigurationUiContractTest {
             .contains(".aws-settings-checkbox-row")
             .contains("grid-template-columns: 16px minmax(0, 1fr)")
             .contains(".aws-settings-policy-grid")
+            .contains(".aws-qualification-risk-group")
+            .contains("grid-column: 1 / -1")
+            .contains(".aws-settings-risk-body")
             .contains(".aws-settings-checkbox-row:focus-within")
             .contains("outline: none")
             .contains(".aws-settings-checkbox-row:has(.aws-settings-checkbox:focus-visible)")

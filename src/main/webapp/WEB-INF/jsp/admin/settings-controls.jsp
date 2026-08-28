@@ -161,12 +161,12 @@
     <section class="erp-panel aws-settings-panel aws-qualification-settings mb-4" aria-labelledby="qualification-settings-title">
         <div class="aws-settings-header">
             <p class="aws-settings-kicker"><spring:message code="admin.settings.qualification.eyebrow" text="Qualification Policies" /></p>
-            <h2 id="qualification-settings-title" class="aws-settings-title"><spring:message code="admin.settings.qualification.title" text="Applicant And Guarantor Controls" /></h2>
+            <h2 id="qualification-settings-title" class="aws-settings-title"><spring:message code="admin.settings.qualification.title" text="Qualification Controls" /></h2>
         </div>
         <form action="/admin/settings-controls/qualification-policies" method="post" class="aws-settings-form aws-qualification-form">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="aws-settings-commandbar">
-                <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
+                <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="Set applicant, guarantor, and portfolio risk rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
                 <button type="submit" class="app-btn btn-primary aws-settings-save-action"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
             </div>
             <div class="aws-settings-grid aws-qualification-grid">
@@ -201,16 +201,23 @@
                             Max Guarantees
                             <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" max="15" step="1" data-number-range-max="15" class="aws-control" value="${policyGuarantorMaxGuarantees}" />
                         </label>
-                        <label class="aws-settings-field aws-settings-field--compact">
-                            Portfolio At Risk Days
-                            <input name="portfolioAtRiskDays" type="number" min="1" max="365" step="1" data-number-range-max="365" class="aws-control" value="${policyPortfolioAtRiskDays}" />
-                        </label>
                         <label class="aws-settings-checkbox-row">
                             <input class="aws-settings-checkbox" name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
                             <span class="aws-settings-checkbox-copy">
                                 <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.blockDefaultedGuarantors" text="Block guarantors with defaulted loans" /></span>
                                 <span class="aws-settings-help"><spring:message code="admin.settings.blockDefaultedGuarantorsHelp" text="If checked, one defaulted loan blocks guarantee approvals." /></span>
                             </span>
+                        </label>
+                    </div>
+                </section>
+                <section class="aws-settings-group aws-qualification-risk-group" aria-labelledby="portfolio-risk-policy-title">
+                    <div class="aws-settings-group-header">
+                        <h3 id="portfolio-risk-policy-title"><spring:message code="admin.settings.portfolioRisk" text="Portfolio Risk" /></h3>
+                    </div>
+                    <div class="aws-settings-group-body aws-settings-risk-body">
+                        <label class="aws-settings-field aws-settings-field--compact">
+                            <spring:message code="admin.settings.portfolioAtRiskDays" text="Portfolio At Risk Days" />
+                            <input name="portfolioAtRiskDays" type="number" min="1" max="365" step="1" data-number-range-max="365" class="aws-control" value="${policyPortfolioAtRiskDays}" />
                         </label>
                     </div>
                 </section>

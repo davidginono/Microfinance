@@ -1086,6 +1086,12 @@ body {
         grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
         align-items: start;
     }
+    .aws-qualification-risk-group {
+        grid-column: 1 / -1;
+    }
+    .aws-settings-risk-body {
+        grid-template-columns: minmax(10rem, 14rem);
+    }
     .aws-settings-checkbox-row {
         display: grid;
         grid-template-columns: 16px minmax(0, 1fr);
