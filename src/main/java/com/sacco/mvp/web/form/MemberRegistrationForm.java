@@ -22,6 +22,7 @@ public class MemberRegistrationForm {
     private String phone;
 
     @NotBlank(message = "Enter your full names.")
+    @Pattern(regexp = "^\\s*\\S+(?:\\s+\\S+){2}\\s*$", message = "Enter exactly three names.")
     private String fullName;
 
     @NotBlank(message = "Select a SACCO ID.")

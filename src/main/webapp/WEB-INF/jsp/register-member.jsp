@@ -69,6 +69,8 @@
                                         cssClass="registration-field uppercase"
                                         autocapitalize="characters"
                                         spellcheck="false"
+                                        pattern="\s*\S+(?:\s+\S+){2}\s*"
+                                        title="Enter exactly three names."
                                         data-uppercase-input="true" />
                             <form:errors path="fullName" cssClass="mt-1 block text-xs text-rose-600" />
                         </div>
