@@ -537,7 +537,10 @@ public class AdminService {
             throw new IllegalStateException("Only super admins can update Super Admin accounts.");
         }
         enforceUserStatusTransition(member.getStatus(), status);
-        LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
+        LinkedHashSet<Position> staffRoles = member.isMemberAccess()
+            && (positions == null || positions.isEmpty())
+            ? new LinkedHashSet<>()
+            : validateStaffRoles(actorRoles, positions);
         if (staffRoles.contains(Position.MINOR_ADMIN)) {
             String slotStationId = normalizedStationId != null ? normalizedStationId : member.getStationId();
             ensureMinorAdminSlotAvailable(saccoId, slotStationId, accountId);
@@ -545,7 +548,9 @@ public class AdminService {
         if (staffRoles.contains(Position.CHAIRPERSON)) {
             ensureChairpersonSlotAvailable(saccoId, accountId);
         }
-        List<UserClaim> normalizedClaims = normalizeAssignableClaims(staffRoles, member.isMemberAccess(), claims);
+        List<UserClaim> normalizedClaims = staffRoles.isEmpty()
+            ? new ArrayList<>(userClaimService.defaultClaims(List.of(), true))
+            : normalizeAssignableClaims(staffRoles, member.isMemberAccess(), claims);
         validateRequiredAccessClaims(staffRoles, normalizedClaims);
         boolean memberAccess = member.isMemberAccess();
         Position primaryRole = Position.primaryRole(staffRoles, memberAccess);
@@ -775,10 +780,7 @@ public class AdminService {
     }
 
     public int activeLoanOfficerCount(String saccoId) {
-        return (int) roleDirectoryService.countActiveByAnyClaim(saccoId, List.of(
-            UserClaim.LOAN_OFFICER_QUEUE_ASSIGN,
-            UserClaim.LOAN_OFFICER_QUEUE_APPROVE
-        ));
+        return (int) roleDirectoryService.countActiveByClaim(saccoId, UserClaim.LOAN_OFFICER_QUEUE_APPROVE);
     }
 
     public int activeAccountantCount(String saccoId) {
@@ -1107,8 +1109,10 @@ public class AdminService {
         product.setAllowApplicationWithActiveLoan(allowApplicationWithActiveLoan);
         product.setFreshFinancialDataRequired(freshFinancialDataRequired);
         List<UUID> normalizedChairpersonReviewerIds = singleChairpersonReviewerIds(saccoId, chairpersonReviewRequired);
-        List<UUID> normalizedBoardReviewerIds = normalizeReviewerIds(saccoId, boardReviewerIds, Position.BOARD);
-        List<UUID> normalizedCreditCommitteeReviewerIds = normalizeReviewerIds(saccoId, creditCommitteeReviewerIds, Position.CREDIT_COMMITTEE);
+        List<UUID> normalizedBoardReviewerIds = boardReviewRequired
+            ? normalizeReviewerIds(saccoId, boardReviewerIds, Position.BOARD) : List.of();
+        List<UUID> normalizedCreditCommitteeReviewerIds = committeeReviewRequired
+            ? normalizeReviewerIds(saccoId, creditCommitteeReviewerIds, Position.CREDIT_COMMITTEE) : List.of();
         Integer assignedCreditCommitteeReviewerCount = committeeReviewRequired ? normalizedCreditCommitteeReviewerIds.size() : 0;
         WorkflowPriorityPlan priorityPlan = normalizeWorkflowPriorities(
             managerReviewRequired,
@@ -1417,8 +1421,10 @@ public class AdminService {
                                                           LoanProductStatus productStatus) {
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         List<UUID> normalizedChairpersonReviewerIds = singleChairpersonReviewerIds(saccoId, chairpersonReviewRequired);
-        List<UUID> normalizedBoardReviewerIds = normalizeReviewerIds(saccoId, boardReviewerIds, Position.BOARD);
-        List<UUID> normalizedCreditCommitteeReviewerIds = normalizeReviewerIds(saccoId, creditCommitteeReviewerIds, Position.CREDIT_COMMITTEE);
+        List<UUID> normalizedBoardReviewerIds = boardReviewRequired
+            ? normalizeReviewerIds(saccoId, boardReviewerIds, Position.BOARD) : List.of();
+        List<UUID> normalizedCreditCommitteeReviewerIds = committeeReviewRequired
+            ? normalizeReviewerIds(saccoId, creditCommitteeReviewerIds, Position.CREDIT_COMMITTEE) : List.of();
         Integer assignedCreditCommitteeReviewerCount = committeeReviewRequired ? normalizedCreditCommitteeReviewerIds.size() : 0;
         WorkflowPriorityPlan priorityPlan = normalizeWorkflowPriorities(
             managerReviewRequired,
@@ -3312,6 +3318,12 @@ public class AdminService {
         if (workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER && !loanOfficerReviewRequired) {
             throw new IllegalStateException("Loan Officer must be enabled before it can be selected as the start stage.");
         }
+        if (managerReviewRequired && roleDirectoryService.countActiveByClaim(saccoId, UserClaim.MANAGER_QUEUE_APPROVE) <= 0) {
+            throw new IllegalStateException("Manager review requires an active staff user with Manager approval permission. Confirm staff access and permissions in Users & Roles.");
+        }
+        if (accountantReviewRequired && activeAccountantCount(saccoId) <= 0) {
+            throw new IllegalStateException("Accountant review requires an active staff user with Accountant approval permission. Confirm staff access and permissions in Users & Roles.");
+        }
         if (loanOfficerReviewRequired && activeLoanOfficerCount(saccoId) <= 0) {
             throw new IllegalStateException("No active loan officers are configured for this SACCO yet.");
         }
@@ -3414,9 +3426,9 @@ public class AdminService {
             return;
         }
         UserClaim reviewerClaim = reviewerClaimForRole(role);
-        int activeReviewerClaimHolders = roleDirectoryService.activeByClaim(saccoId, reviewerClaim).size();
+        long activeReviewerClaimHolders = roleDirectoryService.countActiveByClaim(saccoId, reviewerClaim);
         if (activeReviewerClaimHolders <= 0) {
-            throw new IllegalStateException("No active " + roleLabel + "s have the required access claim for this SACCO yet.");
+            throw new IllegalStateException("No eligible " + roleLabel + " is available in this SACCO. The account must be active, staff access confirmed, and approval permission enabled in Users & Roles.");
         }
         if (assignedReviewerCount <= 0) {
             throw new IllegalStateException("Assign at least one active " + roleLabel + " before using this stage.");

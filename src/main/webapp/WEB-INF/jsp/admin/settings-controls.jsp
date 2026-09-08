@@ -613,13 +613,6 @@
                       class="app-modal-body product-builder-form"
                       data-inline-validation-form="loan-settings"
                       data-product-workflow-builder="true"
-                      data-active-loan-officers="${activeLoanOfficerCount}"
-                      data-active-chairpersons="${activeChairpersonCount}"
-                      data-active-board-members="${activeBoardMemberCount}"
-                      data-active-credit-committee-members="${activeCreditCommitteeMemberCount}"
-                      data-active-accountants="${activeAccountantCount}"
-                      data-active-disbursement-officers="${activeDisbursementOfficerCount}"
-                      data-active-disbursement-claim-holders="${activeDisbursementClaimHolderCount}"
                       data-tenant-loan-officer-enabled="${settings.loanOfficerReviewRequired}"
                       data-tenant-board-enabled="${settings.boardReviewRequired}">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -1062,13 +1055,6 @@
                   data-inline-validation-form="loan-settings"
                   data-product-workflow-builder="true"
                   data-product-edit-mode="true"
-                  data-active-loan-officers="${activeLoanOfficerCount}"
-                  data-active-chairpersons="${activeChairpersonCount}"
-                  data-active-board-members="${activeBoardMemberCount}"
-                  data-active-credit-committee-members="${activeCreditCommitteeMemberCount}"
-                  data-active-accountants="${activeAccountantCount}"
-                  data-active-disbursement-officers="${activeDisbursementOfficerCount}"
-                  data-active-disbursement-claim-holders="${activeDisbursementClaimHolderCount}"
                   data-tenant-loan-officer-enabled="${settings.loanOfficerReviewRequired}"
                   data-tenant-board-enabled="${settings.boardReviewRequired}">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />

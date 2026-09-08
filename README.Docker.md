@@ -48,6 +48,12 @@ sudo mount /dev/nvme1n1 /mnt/saccos-data
 sudo mkdir -p /mnt/saccos-data/postgres /mnt/saccos-data/uploads /mnt/saccos-data/saccos
 ```
 
+## Redeploying UI changes
+
+The Docker build installs the locked frontend dependencies and regenerates Tailwind before packaging `ROOT.war`. Shared JSP asset links use content hashes, so changed CSS and JavaScript get new URLs on the next page load. Keep long-lived caching for those versioned assets; do not cache authenticated HTML at the proxy/CDN.
+
+Use the deployment script or `docker compose ... up --build -d` to rebuild and replace the running app. Copying source files or restarting the existing image does not rebuild it. For a manually packaged WAR, run `npm ci`, `npm run tailwind:build`, then `mvn clean package` before uploading the new `target/ROOT.war` and restarting the app.
+
 ## Production compose
 
 Colocates the app (~1150 MB cgroup) and Postgres (~512 MB). Postgres is not published on the host. No Mailpit in prod.

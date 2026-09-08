@@ -8,6 +8,7 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.i18n.SessionLocaleResolver;
+import org.springframework.web.servlet.resource.ResourceUrlEncodingFilter;
 
 import java.util.Locale;
 
@@ -20,6 +21,11 @@ public class WebConfig implements WebMvcConfigurer {
                      MemberLocaleInterceptor memberLocaleInterceptor) {
         this.adminScopeInterceptor = adminScopeInterceptor;
         this.memberLocaleInterceptor = memberLocaleInterceptor;
+    }
+
+    @Bean
+    public ResourceUrlEncodingFilter resourceUrlEncodingFilter() {
+        return new ResourceUrlEncodingFilter();
     }
 
     @Bean

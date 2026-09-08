@@ -426,6 +426,116 @@ class AdminServiceTest {
             .toList();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = StaffAccessStatus.class,
+        names = {"ACTIVE", "PENDING_ACKNOWLEDGEMENT", "NONE"})
+    void existingMemberCanReturnToMemberOnlyWithoutRetainingStaffClaims(StaffAccessStatus accessStatus) {
+        UUID id = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .memberNo("MEMBER-1").memberAccount(true).position(Position.CHAIRPERSON)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.CHAIRPERSON)))
+            .staffNo("12345").staffAccessStatus(accessStatus).status(MemberStatus.ACTIVE)
+            .staffAccessAssignedAt(OffsetDateTime.now().minusDays(1))
+            .staffAccessActivatedAt(OffsetDateTime.now().minusHours(1)).build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+        when(userSettingsRepository.existsById(id)).thenReturn(true);
+
+        adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN),
+            id, null, MemberStatus.ACTIVE, List.of(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
+
+        assertThat(member.getPosition()).isEqualTo(Position.MEMBER);
+        assertThat(member.getStaffRolesResolved()).isEmpty();
+        assertThat(member.isMemberAccess()).isTrue();
+        assertThat(member.getMemberNo()).isEqualTo("MEMBER-1");
+        assertThat(member.getStationId()).isEqualTo("ST-1");
+        assertThat(member.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.NONE);
+        assertThat(member.getStaffAccessAssignedAt()).isNull();
+        assertThat(member.getStaffAccessActivatedAt()).isNull();
+        verify(memberAccessClaimRepository).deleteByMemberId(id);
+        verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
+        for (UserClaim claim : UserClaim.defaultClaims(List.of(), true)) {
+            verify(memberAccessClaimRepository).save(claimNamed(claim));
+        }
+    }
+
+    @Test
+    void staffOnlyAccountCannotBecomeMemberByClearingRoles() {
+        UUID id = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .memberAccount(false).position(Position.CHAIRPERSON).status(MemberStatus.ACTIVE).build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+        assertThatThrownBy(() -> adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN), id, List.of(), MemberStatus.ACTIVE, null))
+            .hasMessage("Select at least one staff role for the user.");
+        verify(memberRepository, never()).save(any());
+        verifyNoInteractions(memberAccessClaimRepository);
+    }
+
+    @Test
+    void memberAdministratorCannotRemoveOwnLastAdminRole() {
+        UUID id = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .memberAccount(true).position(Position.MINOR_ADMIN).status(MemberStatus.ACTIVE).build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+        assertThatThrownBy(() -> adminService.updateUser("SACCO-01", "ST-1", id,
+            Set.of(Position.MINOR_ADMIN), id, List.of(), MemberStatus.ACTIVE, null))
+            .hasMessage("You cannot remove your own admin workspace access.");
+        verify(memberRepository, never()).save(any());
+    }
+
+    private LoanProductSetting createProductWithStage(ApprovalWorkflowStage stage, List<UUID> reviewers) {
+        return adminService.createLoanProduct("SACCO-01", UUID.randomUUID(), "ELIGIBILITY", "Eligibility Loan",
+            "Workflow eligibility", 1, new BigDecimal("100"), new BigDecimal("1000"), 0,
+            BigDecimal.ONE, false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+            InterestMethod.FLAT_RATE, 1, 12, false, false,
+            stage == ApprovalWorkflowStage.MANAGER, stage == ApprovalWorkflowStage.LOAN_OFFICER,
+            ApprovalWorkflowStage.MANAGER, 1, 2,
+            stage == ApprovalWorkflowStage.CHAIRPERSON, 3, List.of(),
+            stage == ApprovalWorkflowStage.BOARD, 4, reviewers,
+            stage == ApprovalWorkflowStage.CREDIT_COMMITTEE, 5, 1, 1,
+            reviewers,
+            stage == ApprovalWorkflowStage.ACCOUNTANT, 6, true, true, false, false,
+            BigDecimal.ZERO, LoanProductStatus.ACTIVE);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ApprovalWorkflowStage.class,
+        names = {"MANAGER", "LOAN_OFFICER", "CHAIRPERSON", "BOARD", "CREDIT_COMMITTEE", "ACCOUNTANT"})
+    void enabledWorkflowStageRejectsMissingApprover(ApprovalWorkflowStage stage) {
+        Member teller = Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Teller")
+            .position(Position.DISBURSEMENT_OFFICER).status(MemberStatus.ACTIVE)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        stubActiveRoleDirectory("SACCO-01", List.of(teller));
+        assertThatThrownBy(() -> createProductWithStage(stage, List.of()))
+            .isInstanceOf(IllegalStateException.class);
+        verify(loanProductSettingRepository, never()).save(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ApprovalWorkflowStage.class,
+        names = {"MANAGER", "LOAN_OFFICER", "CHAIRPERSON", "BOARD", "CREDIT_COMMITTEE", "ACCOUNTANT"})
+    void enabledWorkflowStageAcceptsActiveApproverAndIgnoresDisabledStageSelections(ApprovalWorkflowStage stage) {
+        Position role = Position.valueOf(stage.name());
+        Member approver = Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Approver")
+            .position(role).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        Member teller = Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Teller")
+            .position(Position.DISBURSEMENT_OFFICER).status(MemberStatus.ACTIVE)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        stubActiveRoleDirectory("SACCO-01", List.of(approver, teller));
+        when(loanProductSettingRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        assertThat(createProductWithStage(stage, List.of(approver.getId()))).isNotNull();
+        verify(loanProductSettingRepository).save(any());
+    }
+
+    @Test
+    void loanOfficerAssignmentPermissionAloneDoesNotQualifyForReview() {
+        when(memberRepository.countActiveMembersWithAnyClaimInStation(
+            "SACCO-01", null, List.of(UserClaim.LOAN_OFFICER_QUEUE_APPROVE.name()))).thenReturn(0L);
+        assertThat(adminService.activeLoanOfficerCount("SACCO-01")).isZero();
+        verify(memberRepository).countActiveMembersWithAnyClaimInStation(
+            "SACCO-01", null, List.of(UserClaim.LOAN_OFFICER_QUEUE_APPROVE.name()));
+    }
+
     @Test
     void platformSupportIncidentsExcludeSystemAlerts() {
         AdminIncident supportIncident = AdminIncident.builder()
@@ -1792,6 +1902,9 @@ class AdminServiceTest {
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_GROWTH", productId)).thenReturn(false);
         stubActiveRoleDirectory("SACCO-01", List.of(
+            Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Workflow Approver")
+                .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.ACCOUNTANT)))
+                .status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),
             Member.builder()
                 .id(UUID.randomUUID())
                 .saccoId("SACCO-01")
@@ -1884,6 +1997,9 @@ class AdminServiceTest {
         UUID boardReviewerId = UUID.randomUUID();
         UUID creditCommitteeReviewerId = UUID.randomUUID();
         stubActiveRoleDirectory("SACCO-01", List.of(
+            Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Workflow Approver")
+                .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.ACCOUNTANT)))
+                .status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),
             Member.builder()
                 .id(UUID.randomUUID())
                 .saccoId("SACCO-01")
@@ -1998,6 +2114,9 @@ class AdminServiceTest {
     @Test
     void createCustomizedLoanProductCompactsDuplicateManagerAndLoanOfficerPriorities() {
         stubActiveRoleDirectory("SACCO-01", List.of(
+            Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Workflow Approver")
+                .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.ACCOUNTANT)))
+                .status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),
             Member.builder()
                 .id(UUID.randomUUID())
                 .saccoId("SACCO-01")

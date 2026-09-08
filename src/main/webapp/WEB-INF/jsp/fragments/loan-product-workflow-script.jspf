@@ -486,13 +486,6 @@
 
             const tenantLoanOfficerEnabled = form.dataset.tenantLoanOfficerEnabled === 'true';
             const tenantBoardEnabled = form.dataset.tenantBoardEnabled === 'true';
-            const activeLoanOfficers = Number(form.dataset.activeLoanOfficers || '0');
-            const activeChairpersons = Number(form.dataset.activeChairpersons || '0');
-            const activeBoardMembers = Number(form.dataset.activeBoardMembers || '0');
-            const activeCreditCommitteeMembers = Number(form.dataset.activeCreditCommitteeMembers || '0');
-            const activeAccountants = Number(form.dataset.activeAccountants || '0');
-            const activeDisbursementOfficers = Number(form.dataset.activeDisbursementOfficers || '0');
-            const activeDisbursementClaimHolders = Number(form.dataset.activeDisbursementClaimHolders || '0');
 
             function selectedBoardReviewerCount() {
                 return boardReviewerInputs.filter((input) => input.checked).length;
@@ -770,38 +763,16 @@
                 if (!managerEnabled && !loanOfficerEnabled && !chairpersonEnabled && !boardEnabled && !committeeEnabled && !accountantEnabled) {
                     warnings.push(workflowWarning('danger', productSettingsText.warningNoReviewStage));
                 }
-                if (loanOfficerEnabled && activeLoanOfficers <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoLoanOfficers));
-                }
                 if (duplicatePriorities.length > 0) {
                     warnings.push(workflowWarning('danger', productSettingsText.warningDuplicatePriorities));
                 }
 
-                if (chairpersonEnabled && activeChairpersons <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoChairpersons));
-                }
-
-                if (boardEnabled && activeBoardMembers <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoBoardReviewers));
-                }
                 if (boardEnabled && assignedBoardReviewers <= 0) {
                     warnings.push(workflowWarning('danger', productSettingsText.validationAssignBoardReviewer));
                 }
 
-                if (committeeEnabled && activeCreditCommitteeMembers <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoCommitteeReviewers));
-                }
                 if (committeeEnabled && assignedCreditCommitteeReviewers <= 0) {
                     warnings.push(workflowWarning('danger', productSettingsText.validationAssignCommitteeReviewer));
-                }
-                if (accountantEnabled && activeAccountants <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoAccountants));
-                }
-                if (disbursementOfficerRequired && activeDisbursementOfficers <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoDisbursementOfficers));
-                }
-                if (!disbursementOfficerRequired && activeDisbursementClaimHolders <= 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningNoDisbursementClaimHolders));
                 }
                 if (loadedFinancialRequired) {
                     warnings.push(workflowWarning('info', productSettingsText.warningLoadedFinancialRequired));
@@ -967,45 +938,20 @@
                     if (loanOfficerPriorityValue === null || Number.isNaN(loanOfficerPriorityValue) || loanOfficerPriorityValue < 1 || loanOfficerPriorityValue > activePriorityCount) {
                         addValidationError(errors, 'loanOfficerPriority', productSettingsText.validationLoanOfficerPriority);
                     }
-                    if (activeLoanOfficers <= 0) {
-                        addValidationError(errors, 'loanOfficerReviewRequired', productSettingsText.validationAssignLoanOfficer);
-                    }
-                }
-
-                if (chairpersonEnabled) {
-                    if (activeChairpersons <= 0) {
-                        addValidationError(errors, 'chairpersonReviewRequired', productSettingsText.validationAssignChairperson);
-                    }
                 }
 
                 if (boardEnabled) {
-                    if (activeBoardMembers <= 0) {
-                        addValidationError(errors, 'boardReviewRequired', productSettingsText.validationAssignBoardReviewer);
-                    }
                     if (selectedBoardReviewerCount() <= 0) {
                         addValidationError(errors, 'boardReviewerIds', productSettingsText.validationAssignBoardReviewer);
                     }
                 }
 
                 if (committeeEnabled) {
-                    if (activeCreditCommitteeMembers <= 0) {
-                        addValidationError(errors, 'committeeReviewRequired', productSettingsText.validationAssignCommitteeReviewer);
-                    }
                     if (selectedCreditCommitteeReviewerCount() <= 0) {
                         addValidationError(errors, 'creditCommitteeReviewerIds', productSettingsText.validationAssignCommitteeReviewer);
                     }
                 }
 
-                if (accountantEnabled && activeAccountants <= 0) {
-                    addValidationError(errors, 'accountantReviewRequired', productSettingsText.validationAssignAccountant);
-                }
-
-                if (disbursementOfficerRequired && activeDisbursementOfficers <= 0) {
-                    addValidationError(errors, 'disbursementOfficerRequired', productSettingsText.validationAssignDisbursementOfficer);
-                }
-                if (!disbursementOfficerRequired && activeDisbursementClaimHolders <= 0) {
-                    addValidationError(errors, 'disbursementOfficerRequired', productSettingsText.validationAssignDisbursementClaims);
-                }
 
                 return errors;
             }
@@ -1069,6 +1015,7 @@
             form.addEventListener('submit', (event) => {
                 clearFieldErrors(form);
                 applyRules();
+                // Staff eligibility is validated on the server at save time; page-load counts can be stale.
                 const errors = validateBeforeSubmit();
                 if (!errors.length) {
                     return;

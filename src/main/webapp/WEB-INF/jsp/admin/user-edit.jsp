@@ -77,6 +77,9 @@
     <section class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header">
             <h2>Staff Roles</h2>
+            <c:if test="${user.memberAccess}">
+                <p>Clear all staff roles to keep member access only.</p>
+            </c:if>
         </div>
         <div class="admin-role-grid">
             <c:forEach items="${staffPositions}" var="position">

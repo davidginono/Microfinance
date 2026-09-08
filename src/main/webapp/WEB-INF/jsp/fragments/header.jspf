@@ -12,10 +12,10 @@
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-mark-light-green.png?v=20260826-clean' />" />
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-400.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260824-minor-admin-action-v46' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260826-modal-toast-v47' />" />
+    <link rel="stylesheet" href="<c:url value='/css/open-sans.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -280,4 +280,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260826-modal-toast-v24' />" defer></script>
+<script src="<c:url value='/js/shell.js' />" defer></script>

@@ -49,6 +49,11 @@ spring:
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:25MB}
   web:
     resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /**
       cache:
         period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:0}
   mail:

@@ -5,6 +5,14 @@
 # The JVM assumes a ~1.15g cgroup (see docker-compose.prod.yml).
 # Optional Graviton only: docker build --platform linux/arm64 -t sacco-lms .
 
+FROM node:22-alpine AS styles
+WORKDIR /workspace
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY tailwind.config.js ./
+COPY src ./src
+RUN npm run tailwind:build
+
 FROM maven:3.9.11-eclipse-temurin-25 AS build
 
 WORKDIR /workspace
@@ -14,6 +22,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -Dmaven.test.skip=true dependency:go-offline
 
 COPY src ./src
+COPY --from=styles /workspace/src/main/resources/static/css/tailwind.css ./src/main/resources/static/css/tailwind.css
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -Dmaven.test.skip=true package
 

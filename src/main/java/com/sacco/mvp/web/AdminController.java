@@ -982,15 +982,12 @@ public class AdminController {
             : stationPolicy.getPortfolioAtRiskDays();
         model.addAttribute("policyPortfolioAtRiskDays", portfolioAtRiskDays == null ? 30 : portfolioAtRiskDays);
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
-        model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
-        model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
         model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
-        model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
         model.addAttribute("activeDisbursementClaimHolderCount", adminService.activeDisbursementClaimHolderCount(saccoId));
         model.addAttribute("approvalFlowStageLabels", settings.resolvedApprovalFlow().stream()
             .map(ApprovalWorkflowStage::getDisplayLabel)
@@ -1092,17 +1089,10 @@ public class AdminController {
         model.addAttribute("settings", settings);
         model.addAttribute("requiredAttachments", requiredAttachmentService.activeForProduct(id));
         model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
-        model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
-        model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
-        model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
-        model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
-        model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
-        model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
-        model.addAttribute("activeDisbursementClaimHolderCount", adminService.activeDisbursementClaimHolderCount(saccoId));
         model.addAttribute("suppressToastMessages", true);
         return "admin/loan-product-edit";
     }
@@ -1497,6 +1487,17 @@ public class AdminController {
         if (message == null || message.isBlank()) {
             return fieldErrors;
         }
+        if (message.startsWith("No eligible chairperson ")) {
+            fieldErrors.put("chairpersonReviewRequired", message);
+        } else if (message.startsWith("No eligible board member ")) {
+            fieldErrors.put("boardReviewerIds", message);
+        } else if (message.startsWith("No eligible credit committee member ")) {
+            fieldErrors.put("creditCommitteeReviewerIds", message);
+        } else if (message.startsWith("Manager review requires ")) {
+            fieldErrors.put("managerReviewRequired", message);
+        } else if (message.startsWith("Accountant review requires ")) {
+            fieldErrors.put("accountantReviewRequired", message);
+        }
         switch (message) {
             case "Enter the loan product name." ->
                 fieldErrors.put("productName", "Enter a loan product name.");
@@ -1627,7 +1628,8 @@ public class AdminController {
             case "No active credit committee members are configured for this SACCO yet.",
                  "Assign at least one active credit committee member before using this stage." ->
                 fieldErrors.put("creditCommitteeReviewerIds", "Assign at least one active credit committee member for this product.");
-            case "Selected reviewer is not active in the required role for this SACCO." -> {
+            case "Selected reviewer is not active in the required role for this SACCO.",
+                 "Selected reviewer does not have the required access claim for this SACCO." -> {
                 fieldErrors.put("chairpersonReviewerIds", "Only active reviewers in the selected role can be assigned.");
                 fieldErrors.put("boardReviewerIds", "Only active reviewers in the selected role can be assigned.");
                 fieldErrors.put("creditCommitteeReviewerIds", "Only active reviewers in the selected role can be assigned.");
