@@ -23,6 +23,8 @@ import com.sacco.mvp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -38,6 +40,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -164,6 +167,41 @@ class LoanWorkflowServiceTest {
         assertThat(applications.currentApplications()).containsExactly(currentLoan);
         assertThat(applications.archiveCount()).isEqualTo(5L);
         verify(loanApplicationRepository, never()).findByApplicantMemberIdOrderByCreatedAtDesc(memberId);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = LoanStatus.class, names = {
+        "DRAFT", "SUBMITTED", "AWAITING_GUARANTORS", "ALL_GUARANTORS_APPROVED",
+        "READY_FOR_MANAGER", "MANAGER_ACCEPTED", "AWAITING_LOAN_OFFICER", "LOAN_OFFICER_APPROVED",
+        "AWAITING_CHAIRPERSON", "CHAIRPERSON_APPROVED", "AWAITING_BOARD", "BOARD_APPROVED",
+        "AWAITING_CREDIT_COMMITTEE", "CREDIT_COMMITTEE_APPROVED", "AWAITING_ACCOUNTANT",
+        "ACCOUNTANT_APPROVED", "READY_FOR_DISBURSEMENT"
+    })
+    void approvalStagesRemainVisibleAndInProgress(LoanStatus status) {
+        UUID memberId = UUID.randomUUID();
+        LoanApplication loan = LoanApplication.builder()
+            .id(UUID.randomUUID()).applicantMemberId(memberId).status(status).build();
+        LoanApplicationRepository.StatusCountProjection count = mock(LoanApplicationRepository.StatusCountProjection.class);
+        when(count.getStatus()).thenReturn(status);
+        when(count.getTotal()).thenReturn(1L);
+        when(loanApplicationRepository.countByStatusForApplicant(memberId)).thenReturn(List.of(count));
+        when(loanApplicationRepository.findVisibleCurrentForApplicant(eq(memberId), any(), any()))
+            .thenAnswer(invocation -> invocation.<Collection<LoanStatus>>getArgument(1).contains(status)
+                ? List.of(loan) : List.of());
+        when(loanApplicationRepository.findLatestVisibleCurrentForApplicant(eq(memberId), any(), any(), eq(PageRequest.of(0, 1))))
+            .thenAnswer(invocation -> invocation.<Collection<LoanStatus>>getArgument(1).contains(status)
+                ? List.of(loan) : List.of());
+        when(loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+            .thenAnswer(invocation -> invocation.<Collection<LoanStatus>>getArgument(1).contains(status)
+                ? Optional.of(loan) : Optional.empty());
+
+        LoanWorkflowService.MemberApplicationListData applications = loanWorkflowService.memberApplicationList(memberId);
+
+        assertThat(applications.currentApplications()).containsExactly(loan);
+        assertThat(applications.latestCurrentApplication()).isSameAs(loan);
+        assertThat(applications.archiveCount()).isZero();
+        assertThat(loanWorkflowService.memberDashboard(memberId).latestCurrentApplication()).isSameAs(loan);
+        assertThat(loanWorkflowService.findApplicationInProgress(memberId)).contains(loan);
     }
 
     @Test

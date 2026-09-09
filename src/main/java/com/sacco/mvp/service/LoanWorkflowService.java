@@ -52,9 +52,12 @@ public class LoanWorkflowService {
         LoanStatus.MANAGER_ACCEPTED,
         LoanStatus.AWAITING_LOAN_OFFICER,
         LoanStatus.LOAN_OFFICER_APPROVED,
+        LoanStatus.AWAITING_CHAIRPERSON,
+        LoanStatus.CHAIRPERSON_APPROVED,
         LoanStatus.AWAITING_BOARD,
         LoanStatus.AWAITING_CREDIT_COMMITTEE,
         LoanStatus.BOARD_APPROVED,
+        LoanStatus.CREDIT_COMMITTEE_APPROVED,
         LoanStatus.AWAITING_ACCOUNTANT,
         LoanStatus.ACCOUNTANT_APPROVED,
         LoanStatus.READY_FOR_DISBURSEMENT
