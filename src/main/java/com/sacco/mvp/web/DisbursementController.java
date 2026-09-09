@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/disbursement")
 @PreAuthorize("@access.canAccessDisbursementArea(principal)")
 public class DisbursementController {
+    private final com.sacco.mvp.service.ArchivedLoanDeletionService archivedLoanDeletionService;
     private final ManagerService managerService;
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
@@ -191,6 +192,7 @@ public class DisbursementController {
             .toList());
         Map<com.sacco.mvp.domain.LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
 
+        model.addAttribute("canDeleteArchivedLoans", access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE"));
         model.addAttribute("archiveRows", entries.stream()
             .map(entry -> {
                 Map<String, String> row = new LinkedHashMap<>();
@@ -202,6 +204,7 @@ public class DisbursementController {
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("disbursedAt", entry.review().getCreatedAt() == null ? "-" : entry.review().getCreatedAt().toLocalDate().toString());
                 row.put("currentStatusLabel", workflowStatusPresentationService.dashboardStatusLabel(entry.loan().getStatus()));
+                row.put("disbursed", String.valueOf(entry.loan().getStatus() == LoanStatus.DISBURSED));
                 return row;
             })
             .toList());
@@ -212,6 +215,32 @@ public class DisbursementController {
         model.addAttribute("fromDate", dateRange.fromDate());
         model.addAttribute("toDate", dateRange.toDate());
         return "disbursement/archive";
+    }
+
+    @GetMapping("/archive/{id}/delete-eligibility")
+    @ResponseBody
+    public Map<String, Object> deleteEligibility(@PathVariable UUID id,
+                                               @AuthenticationPrincipal AppUserPrincipal principal) {
+        try {
+            boolean eligible = archivedLoanDeletionService.canDelete(id, principal);
+            return Map.of("eligible", eligible, "message", eligible
+                ? "Loan not found in Foresight." : "This loan exists in Foresight and cannot be deleted.");
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            return Map.of("eligible", false, "message", "Unable to confirm that this loan is missing from Foresight. Please retry later.");
+        }
+    }
+
+    @PostMapping("/archive/{id}/delete")
+    public String deleteArchivedLoan(@PathVariable UUID id,
+                                     @AuthenticationPrincipal AppUserPrincipal principal,
+                                     RedirectAttributes redirectAttributes) {
+        try {
+            archivedLoanDeletionService.delete(id, principal);
+            redirectAttributes.addFlashAttribute("success", "Loan and related records deleted.");
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", "Loan was not deleted. " + ex.getMessage());
+        }
+        return "redirect:/disbursement/archive";
     }
 
     @GetMapping("/reports")

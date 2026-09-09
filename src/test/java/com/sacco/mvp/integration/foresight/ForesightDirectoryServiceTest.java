@@ -17,6 +17,45 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ForesightDirectoryServiceTest {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"200,[]", "404,missing"})
+    void missingLoanAllowsDeletionCheck(int status, String body) throws Exception {
+        HttpServer server = server(status, body, new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            assertThat(service("http://localhost:" + server.getAddress().getPort())
+                .isLoanPaymentSummaryMissing("001", "AR704", "04050860484983")).isTrue();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"200,null", "200,invalid", "401,[]", "403,[]", "500,[]"})
+    void failedOrInvalidLoanLookupNeverAllowsDeletion(int status, String body) throws Exception {
+        HttpServer server = server(status, body, new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            assertThatThrownBy(() -> service("http://localhost:" + server.getAddress().getPort())
+                .isLoanPaymentSummaryMissing("001", "AR704", "04050860484983"))
+                .isInstanceOf(RuntimeException.class);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void nonemptyLoanResponseDoesNotAllowDeletion() throws Exception {
+        HttpServer server = server(200, "[{}]", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            assertThat(service("http://localhost:" + server.getAddress().getPort())
+                .isLoanPaymentSummaryMissing("001", "AR704", "04050860484983")).isFalse();
+        } finally {
+            server.stop(0);
+        }
+    }
+
     @Test
     void phoneLookupReturnsFoundForValidMemberProfile() throws Exception {
         AtomicReference<String> path = new AtomicReference<>();

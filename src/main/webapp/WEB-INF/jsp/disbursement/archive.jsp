@@ -93,7 +93,20 @@
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>${row.disbursedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
+                <td>
+                    <a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a>
+                    <c:if test="${canDeleteArchivedLoans and row.disbursed eq 'true'}">
+                        <form method="post" action="/disbursement/archive/${row.id}/delete" class="inline-block"
+                              data-archive-delete data-check-url="/disbursement/archive/${row.id}/delete-eligibility"
+                              data-confirm-title="Delete loan ${fn:escapeXml(row.loanId)}?"
+                              data-confirm-message="Permanently delete Loan ID ${fn:escapeXml(row.loanId)} and its reviews, guarantor requests, notifications and attachments from all archives? The audit record will remain."
+                              data-confirm-proceed="Delete loan">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                            <button type="button" class="app-btn btn-danger" data-check-delete>Delete loan</button>
+                            <span class="block text-sm" role="status" aria-live="polite" data-delete-status></span>
+                        </form>
+                    </c:if>
+                </td>
             </tr>
         </c:forEach>
         <c:if test="${empty archiveRows}">
@@ -136,4 +149,6 @@
     </div>
 </c:if>
 
+<script src="${pageContext.request.contextPath}/js/archived-loan-delete.js" defer></script>
+<%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

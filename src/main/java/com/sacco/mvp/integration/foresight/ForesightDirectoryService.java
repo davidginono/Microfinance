@@ -182,6 +182,18 @@ public class ForesightDirectoryService {
         }
     }
 
+    public boolean isLoanPaymentSummaryMissing(String memberNumber, String stationId, String loanId) {
+        try {
+            return fetchLoanPaymentSummary(memberNumber, stationId, loanId).isEmpty();
+        } catch (IllegalStateException ex) {
+            if (ex.getCause() instanceof RestClientResponseException response
+                && response.getStatusCode().value() == 404) {
+                return true;
+            }
+            throw ex;
+        }
+    }
+
     public List<ForesightLoanPaymentSummary> fetchLoanPaymentSummary(String memberNumber, String stationId, String loanId) {
         try {
             URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
@@ -199,7 +211,10 @@ public class ForesightDirectoryService {
             log.info("Foresight loan-payment-summary lookup completed: loanId={}, rows={}",
                 loanId,
                 summaries == null ? 0 : summaries.size());
-            return summaries == null ? List.of() : summaries;
+            if (summaries == null) {
+                throw new IllegalStateException("External loan payment summary returned no JSON body.");
+            }
+            return summaries;
         } catch (RestClientResponseException ex) {
             log.warn("Foresight loan-payment-summary lookup failed with status {}. Response body: {}",
                 ex.getStatusCode(), ex.getResponseBodyAsString());
