@@ -57,6 +57,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Controller
+@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/disbursement")
 @PreAuthorize("@access.canAccessDisbursementArea(principal)")
@@ -225,8 +226,11 @@ public class DisbursementController {
             boolean eligible = archivedLoanDeletionService.canDelete(id, principal);
             return Map.of("eligible", eligible, "message", eligible
                 ? "Loan not found in Foresight." : "This loan exists in Foresight and cannot be deleted.");
+        } catch (com.sacco.mvp.service.ArchivedLoanDeletionService.EligibilityException ex) {
+            return Map.of("eligible", false, "message", ex.getMessage());
         } catch (IllegalStateException | IllegalArgumentException ex) {
-            return Map.of("eligible", false, "message", "Unable to confirm that this loan is missing from Foresight. Please retry later.");
+            log.warn("Archived loan eligibility check failed for application {}", id, ex);
+            return Map.of("eligible", false, "message", "The application could not check this loan. Contact support with the Loan ID.");
         }
     }
 
@@ -236,9 +240,12 @@ public class DisbursementController {
                                      RedirectAttributes redirectAttributes) {
         try {
             archivedLoanDeletionService.delete(id, principal);
-            redirectAttributes.addFlashAttribute("success", "Loan and related records deleted.");
-        } catch (IllegalStateException | IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("message", "Loan and related records deleted.");
+        } catch (com.sacco.mvp.service.ArchivedLoanDeletionService.EligibilityException ex) {
             redirectAttributes.addFlashAttribute("error", "Loan was not deleted. " + ex.getMessage());
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            log.warn("Archived loan deletion failed for application {}", id, ex);
+            redirectAttributes.addFlashAttribute("error", "Loan was not deleted. Contact support with the Loan ID.");
         }
         return "redirect:/disbursement/archive";
     }

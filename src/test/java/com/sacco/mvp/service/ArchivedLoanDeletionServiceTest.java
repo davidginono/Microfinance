@@ -95,6 +95,34 @@ class ArchivedLoanDeletionServiceTest {
     }
 
     @Test
+    void missingMemberNumberExplainsWhyLookupIsBlocked() {
+        when(members.findById(loan.getApplicantMemberId())).thenReturn(Optional.of(new Member()));
+        assertThatThrownBy(() -> service.canDelete(id, actor))
+            .isInstanceOf(ArchivedLoanDeletionService.EligibilityException.class)
+            .hasMessageContaining("member number is missing");
+        verifyNoInteractions(foresight);
+    }
+
+    @Test
+    void connectionFailureIsReportedWithoutExposingInternalDetails() {
+        when(foresight.isLoanPaymentSummaryMissing(anyString(), anyString(), anyString()))
+            .thenThrow(new IllegalStateException("internal details",
+                new org.springframework.web.client.ResourceAccessException("connection refused")));
+        assertThatThrownBy(() -> service.canDelete(id, actor))
+            .isInstanceOf(ArchivedLoanDeletionService.EligibilityException.class)
+            .hasMessage("The server could not reach Foresight or the request timed out. Please retry later.");
+    }
+
+    @Test
+    void topUpBlockIsReportedBeforeExternalLookup() {
+        loan.setTopUpSourceLoanId(UUID.randomUUID());
+        assertThatThrownBy(() -> service.canDelete(id, actor))
+            .isInstanceOf(ArchivedLoanDeletionService.EligibilityException.class)
+            .hasMessage("This loan is linked to a top-up and cannot be deleted.");
+        verifyNoInteractions(foresight);
+    }
+
+    @Test
     void confirmedMissingLoanDeletesRelatedRecordsInTransaction() {
         when(foresight.isLoanPaymentSummaryMissing(anyString(), anyString(), anyString())).thenReturn(true);
         var transaction = new org.springframework.transaction.support.SimpleTransactionStatus();

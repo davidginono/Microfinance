@@ -17,6 +17,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class ArchivedLoanDeletionService {
     private final EntityManager entityManager;
     private final MemberRepository memberRepository;
@@ -28,12 +29,29 @@ public class ArchivedLoanDeletionService {
 
     public boolean canDelete(UUID id, AppUserPrincipal actor) {
         LoanApplication loan = load(id, actor, false);
-        Member member = memberRepository.findById(loan.getApplicantMemberId()).orElseThrow();
+        Member member = memberRepository.findById(loan.getApplicantMemberId())
+            .orElseThrow(() -> new EligibilityException("The applicant member record is missing. Contact support."));
         if (member.getMemberNo() == null || member.getMemberNo().isBlank()) {
-            throw new IllegalStateException("Applicant member number is missing.");
+            throw new EligibilityException("Applicant member number is missing. Update the member details before checking Foresight.");
         }
-        return foresightDirectoryService.isLoanPaymentSummaryMissing(
-            member.getMemberNo().trim(), loan.getStationId(), loan.getLoanId());
+        try {
+            return foresightDirectoryService.isLoanPaymentSummaryMissing(
+                member.getMemberNo().trim(), loan.getStationId(), loan.getLoanId());
+        } catch (RuntimeException ex) {
+            log.warn("Foresight deletion eligibility lookup failed for application {}", id, ex);
+            for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+                if (cause instanceof org.springframework.web.client.RestClientResponseException response) {
+                    int status = response.getStatusCode().value();
+                    throw new EligibilityException(status == 401 || status == 403
+                        ? "Foresight refused access to the loan check. Contact support to check the integration credentials."
+                        : "Foresight returned an error (HTTP " + status + "). Please retry later.");
+                }
+                if (cause instanceof org.springframework.web.client.ResourceAccessException) {
+                    throw new EligibilityException("The server could not reach Foresight or the request timed out. Please retry later.");
+                }
+            }
+            throw new EligibilityException("Foresight returned an unreadable or empty response. Deletion is blocked; contact support.");
+        }
     }
 
     public void delete(UUID id, AppUserPrincipal actor) {
@@ -41,13 +59,13 @@ public class ArchivedLoanDeletionService {
         String checkedLoanId = checked.getLoanId();
         UUID checkedMemberId = checked.getApplicantMemberId();
         if (!canDelete(id, actor)) {
-            throw new IllegalStateException("This loan exists in Foresight and cannot be deleted.");
+            throw new EligibilityException("This loan exists in Foresight and cannot be deleted.");
         }
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             LoanApplication loan = load(id, actor, true);
             if (!Objects.equals(checkedLoanId, loan.getLoanId())
                 || !Objects.equals(checkedMemberId, loan.getApplicantMemberId())) {
-                throw new IllegalStateException("The loan changed. Please check it again.");
+                throw new EligibilityException("The loan changed. Please check it again.");
             }
             for (String entity : new String[]{"ReversalRequest", "GuarantorRequest", "BoardReview", "ManagerReview"}) {
                 entityManager.createQuery("delete from " + entity + " r where r.loanApplicationId = :id")
@@ -84,21 +102,27 @@ public class ArchivedLoanDeletionService {
             .setParameter("sacco", actor.getSaccoId()).setParameter("station", actor.getStationId());
         if (lock) query.setLockMode(LockModeType.PESSIMISTIC_WRITE);
         LoanApplication loan = query.getResultList().stream().findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Loan not found in this station."));
+            .orElseThrow(() -> new EligibilityException("Loan not found in this station."));
         if (lock) entityManager.refresh(loan, LockModeType.PESSIMISTIC_WRITE);
         if (!Objects.equals(loan.getSaccoId(), actor.getSaccoId())
             || loan.getStationId() == null || !loan.getStationId().equalsIgnoreCase(actor.getStationId())) {
             throw new org.springframework.security.access.AccessDeniedException("Loan is outside this station.");
         }
         if (loan.getStatus() != LoanStatus.DISBURSED || loan.getLoanId() == null || loan.getLoanId().isBlank()) {
-            throw new IllegalStateException("Only archived disbursed loans can be deleted.");
+            throw new EligibilityException("Only archived disbursed loans with a Loan ID can be deleted.");
         }
         Long references = entityManager.createQuery(
             "select count(l) from LoanApplication l where l.topUpSourceLoanId = :id", Long.class)
             .setParameter("id", id).getSingleResult();
         if (references > 0 || loan.getTopUpSourceLoanId() != null) {
-            throw new IllegalStateException("This loan is linked to a top-up and cannot be deleted.");
+            throw new EligibilityException("This loan is linked to a top-up and cannot be deleted.");
         }
         return loan;
+    }
+
+    public static class EligibilityException extends IllegalStateException {
+        public EligibilityException(String message) {
+            super(message);
+        }
     }
 }
