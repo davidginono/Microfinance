@@ -412,7 +412,9 @@ public class SecurityConfig {
         };
     }
 
-    private DaoAuthenticationProvider authenticationProvider(AppUserDetailsService userDetailsService,
+    // Register the strict provider globally so Spring cannot create an unrestricted fallback.
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider(AppUserDetailsService userDetailsService,
                                                              PasswordEncoder passwordEncoder) {
         org.springframework.security.core.userdetails.UserDetailsService loginUserDetailsService = username -> {
             String loginType = resolveCurrentLoginType();
