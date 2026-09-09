@@ -70,7 +70,7 @@
                             <c:otherwise>-</c:otherwise>
                         </c:choose>
                     </td>
-                    <td class="px-3 py-2">${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</td>
+                    <td class="px-3 py-2"><c:out value="${appTime:format(app.createdAt)}" /></td>
                     <td class="erp-table-action-column">
                         <div class="erp-table-actions">
                             <a href="${pageContext.request.contextPath}/app/loan-applications/${app.id}"

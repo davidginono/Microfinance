@@ -6,6 +6,9 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.service.LoanProductWorkflowService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -16,13 +19,28 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@ResourceLock("java.util.TimeZone.default")
 class AppControllerWorkflowProgressTest {
+    private TimeZone previousTimeZone;
+
+    @BeforeEach
+    void useApplicationTimeZone() {
+        previousTimeZone = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Africa/Nairobi"));
+    }
+
+    @AfterEach
+    void restoreTimeZone() {
+        TimeZone.setDefault(previousTimeZone);
+    }
+
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
     @Mock private LoanWorkflowService loanWorkflowService;
 
@@ -106,7 +124,7 @@ class AppControllerWorkflowProgressTest {
             .requiredGuarantors(0)
             .createdAt(OffsetDateTime.parse("2026-07-14T10:29:00+03:00"))
             .submittedAt(OffsetDateTime.parse("2026-07-14T10:29:00+03:00"))
-            .updatedAt(OffsetDateTime.parse("2026-07-29T07:05:00+03:00"))
+            .updatedAt(OffsetDateTime.parse("2026-07-29T04:05:00Z"))
             .build();
     }
 

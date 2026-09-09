@@ -459,7 +459,7 @@
                                 <td class="px-3 py-2"><c:out value="${file.sizeLabel}" /></td>
                                 <td class="px-3 py-2">
                                     <c:choose>
-                                        <c:when test="${not empty file.uploadedAt}">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</c:when>
+                                        <c:when test="${not empty file.uploadedAt}"><c:out value="${appTime:format(file.uploadedAt)}" /></c:when>
                                         <c:otherwise>-</c:otherwise>
                                     </c:choose>
                                 </td>

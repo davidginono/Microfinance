@@ -38,7 +38,7 @@
                 <td class="px-3 py-2">
                     <span class="${item.readBySuperAdmin ? 'rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700' : 'rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600'}">${item.readLabel}</span>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap">${item.createdAt}</td>
+                <td class="px-3 py-2 whitespace-nowrap"><c:out value="${appTime:format(item.createdAt)}" /></td>
             </tr>
         </c:forEach>
         <c:if test="${empty supportArchive}">

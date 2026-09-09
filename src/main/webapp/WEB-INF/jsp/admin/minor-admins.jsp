@@ -162,7 +162,7 @@
                                     <c:when test="${minorAdmin.invitationState == 'INVITED'}">
                                         <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800"><spring:message code="admin.minorAdmins.awaitingActivation" text="Awaiting activation" /></span>
                                         <c:if test="${not empty minorAdmin.invitationExpiresAt}">
-                                            <div class="text-[11px] text-slate-500"><spring:message code="admin.minorAdmins.expires" text="expires" /> ${minorAdmin.invitationExpiresAt}</div>
+                                            <div class="text-[11px] text-slate-500"><spring:message code="admin.minorAdmins.expires" text="expires" /> <c:out value="${appTime:format(minorAdmin.invitationExpiresAt)}" /></div>
                                         </c:if>
                                     </c:when>
                                     <c:when test="${minorAdmin.invitationState == 'EXPIRED'}">

@@ -40,7 +40,7 @@
                 </td>
                 <td class="px-3 py-2">${incidentMeta.category}</td>
                 <td class="px-3 py-2">${incidentMeta.status}</td>
-                <td class="px-3 py-2">${incidentMeta.createdAt}</td>
+                <td class="px-3 py-2"><c:out value="${appTime:format(incidentMeta.createdAt)}" /></td>
                 <td class="px-3 py-2"><a href="/admin/messages/${item.id}/open" class="app-btn btn-primary">Open</a></td>
             </tr>
         </c:forEach>

@@ -67,7 +67,7 @@
                 </td>
                 <td class="px-3 py-2">${incident.category}</td>
                 <td class="px-3 py-2">${incident.status}</td>
-                <td class="px-3 py-2">${incident.createdAt}</td>
+                <td class="px-3 py-2"><c:out value="${appTime:format(incident.createdAt)}" /></td>
                 <td class="px-3 py-2"><a href="/admin/incidents/${incident.id}" class="app-btn btn-primary">Open</a></td>
             </tr>
         </c:forEach>

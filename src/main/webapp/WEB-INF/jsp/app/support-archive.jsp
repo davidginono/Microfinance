@@ -43,7 +43,7 @@
                         </c:choose>
                     </span>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap">${item.createdAt}</td>
+                <td class="px-3 py-2 whitespace-nowrap"><c:out value="${appTime:format(item.createdAt)}" /></td>
             </tr>
         </c:forEach>
         <c:if test="${empty supportArchive}">

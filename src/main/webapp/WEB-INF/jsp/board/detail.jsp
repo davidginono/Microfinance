@@ -189,7 +189,7 @@
                     </td>
                     <td class="px-3 py-2 text-slate-700">
                         <c:choose>
-                            <c:when test="${not empty assessor.decidedAt}">${fn:replace(fn:substring(assessor.decidedAt, 0, 16), 'T', ' ')}</c:when>
+                            <c:when test="${not empty assessor.decidedAt}"><c:out value="${appTime:format(assessor.decidedAt)}" /></c:when>
                             <c:otherwise>-</c:otherwise>
                         </c:choose>
                     </td>
@@ -198,7 +198,7 @@
                             <c:when test="${not empty assessor.signatureText}">
                                 <div class="aws-signature-text text-xl text-slate-900">${assessor.signatureText}</div>
                                 <c:if test="${not empty assessor.signatureVerifiedAt}">
-                                    <div class="mt-1 text-xs text-slate-500">${fn:replace(fn:substring(assessor.signatureVerifiedAt, 0, 16), 'T', ' ')}</div>
+                                    <div class="mt-1 text-xs text-slate-500"><c:out value="${appTime:format(assessor.signatureVerifiedAt)}" /></div>
                                 </c:if>
                             </c:when>
                             <c:otherwise>-</c:otherwise>
@@ -234,7 +234,7 @@
                 <tr>
                     <td class="px-3 py-2">${file.originalName}</td>
                     <td class="px-3 py-2">${file.sizeLabel}</td>
-                    <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
+                    <td class="px-3 py-2"><c:out value="${appTime:format(file.uploadedAt)}" /></td>
                     <td class="px-3 py-2">
                         <div class="flex flex-wrap gap-2">
                             <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral"><spring:message code="common.view" text="View" /></a>
@@ -269,7 +269,7 @@
             <tr>
                 <td class="px-3 py-2">${file.originalName}</td>
                 <td class="px-3 py-2">${file.sizeLabel}</td>
-                <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
+                <td class="px-3 py-2"><c:out value="${appTime:format(file.uploadedAt)}" /></td>
                 <td class="px-3 py-2"><a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary" data-download-action="true"><spring:message code="common.download" text="Download" /></a></td>
             </tr>
         </c:forEach>
@@ -316,8 +316,8 @@
                 <td class="px-3 py-2">${req.status}</td>
                 <td class="px-3 py-2">
                     <c:choose>
-                        <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16), 'T', ' ')}</c:when>
-                        <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                        <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>
+                        <c:otherwise><c:out value="${appTime:format(req.createdAt)}" /></c:otherwise>
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">

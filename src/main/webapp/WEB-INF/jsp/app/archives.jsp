@@ -82,8 +82,8 @@
                             <td>${req.status}</td>
                             <td>
                                 <c:choose>
-                                <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16), 'T', ' ')}</c:when>
-                                <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                                <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>
+                                <c:otherwise><c:out value="${appTime:format(req.createdAt)}" /></c:otherwise>
                             </c:choose>
                             </td>
                         </tr>
@@ -173,8 +173,8 @@
                             <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
                             <td>
                                 <c:choose>
-                                    <c:when test="${app.status eq 'PAID' and not empty app.paidAt}">${fn:replace(fn:substring(app.paidAt, 0, 16), 'T', ' ')}</c:when>
-                                    <c:otherwise>${fn:replace(fn:substring(app.updatedAt, 0, 16), 'T', ' ')}</c:otherwise>
+                                    <c:when test="${app.status eq 'PAID' and not empty app.paidAt}"><c:out value="${appTime:format(app.paidAt)}" /></c:when>
+                                    <c:otherwise><c:out value="${appTime:format(app.updatedAt)}" /></c:otherwise>
                                 </c:choose>
                             </td>
                             <td class="erp-table-action-column">

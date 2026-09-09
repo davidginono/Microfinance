@@ -206,7 +206,7 @@ public class ManagerController {
                     && !entry.review().getReasons().isBlank()
                     ? entry.review().getReasons()
                     : "-");
-                row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : REPORT_DATE_TIME.format(entry.review().getCreatedAt()));
+                row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : REPORT_DATE_TIME.format(com.sacco.mvp.service.ApplicationTimestamps.zoned(entry.review().getCreatedAt())));
                 row.put("currentStatusLabel", entry.currentStatusLabel());
                 return row;
             })

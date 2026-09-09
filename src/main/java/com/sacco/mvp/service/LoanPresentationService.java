@@ -47,7 +47,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1481,7 +1480,7 @@ public class LoanPresentationService {
         }
         if (app.getApplicantSignatureVerifiedAt() != null) {
             html.append("<p class=\"meta\"><strong>Verified At:</strong> ")
-                .append(esc(app.getApplicantSignatureVerifiedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))))
+                .append(esc(ApplicationTimestamps.format(app.getApplicantSignatureVerifiedAt())))
                 .append("</p>");
         }
         html.append("</div>");
@@ -1785,7 +1784,7 @@ public class LoanPresentationService {
     }
 
     private String formatTimestamp(java.time.OffsetDateTime timestamp) {
-        return timestamp == null ? "-" : timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        return timestamp == null ? "-" : ApplicationTimestamps.format(timestamp);
     }
 
     private String stageLabel(ApprovalWorkflowStage stage) {
@@ -1820,7 +1819,7 @@ public class LoanPresentationService {
             return "-";
         }
         String value = String.valueOf(uploadedAt);
-        return value.length() >= 16 ? value.substring(0, 16).replace('T', ' ') : value.replace('T', ' ');
+        return ApplicationTimestamps.format(value);
     }
 
     private String formatNullableMoney(BigDecimal amount) {

@@ -72,7 +72,7 @@
                             <c:choose><c:when test="${not empty row.latestDecision}">
                                 <span class="font-semibold"><spring:message code="chairperson.decision.${row.latestDecision.decision}" text="${row.latestDecision.decision}" /></span>
                                 <div class="text-xs text-slate-500"><c:out value="${row.latestDecision.stageLabel}" /> &middot; <c:out value="${row.latestDecision.reviewerName}" /></div>
-                                <div class="text-xs text-slate-500">${fn:replace(fn:substring(row.latestDecision.decidedAt, 0, 16), 'T', ' ')}</div>
+                                <div class="text-xs text-slate-500"><c:out value="${appTime:format(row.latestDecision.decidedAt)}" /></div>
                             </c:when><c:otherwise><span class="text-slate-500"><spring:message code="chairperson.awaitingDecision" text="Awaiting staff decision" /></span></c:otherwise></c:choose>
                         </td>
                         <td><c:out value="${row.decisionCount}" /></td>

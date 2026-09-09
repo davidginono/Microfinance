@@ -760,7 +760,7 @@ public class PlatformAdminService {
         }
 
         public String getAccessSuspendedAtLabel() {
-            return accessSuspendedAt == null ? "Not suspended" : accessSuspendedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
+            return accessSuspendedAt == null ? "Not suspended" : ApplicationTimestamps.zoned(accessSuspendedAt).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
         }
 
         public String accessSuspendedAtLabel() {
@@ -972,7 +972,7 @@ public class PlatformAdminService {
         }
 
         public String getUpdatedAtLabel() {
-            return updatedAt == null ? "—" : updatedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
+            return updatedAt == null ? "—" : ApplicationTimestamps.zoned(updatedAt).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
         }
 
         public String updatedAtLabel() {

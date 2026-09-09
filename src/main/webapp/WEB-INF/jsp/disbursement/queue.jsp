@@ -69,7 +69,7 @@
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty app.disbursementDate}">${app.disbursementDate}</c:when>
-                        <c:otherwise>${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                        <c:otherwise><c:out value="${appTime:format(app.createdAt)}" /></c:otherwise>
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">

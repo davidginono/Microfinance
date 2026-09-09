@@ -168,7 +168,7 @@
                     <tr>
                         <td>${event.eventType}</td>
                         <td>${event.aggregateType}</td>
-                        <td>${event.createdAt}</td>
+                        <td><c:out value="${appTime:format(event.createdAt)}" /></td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty dashboard.failedOutboxEvents}">

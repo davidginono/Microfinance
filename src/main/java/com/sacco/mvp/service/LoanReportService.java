@@ -1357,7 +1357,7 @@ public class LoanReportService {
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .limit(6)
             .map(loan -> new ActivityRow(
-                loan.getCreatedAt() == null ? "-" : HUMAN_DATE_FORMATTER.format(loan.getCreatedAt().toLocalDate()),
+                loan.getCreatedAt() == null ? "-" : HUMAN_DATE_FORMATTER.format(applicationClock.zoned(loan.getCreatedAt()).toLocalDate()),
                 activityLabel(loan),
                 loanProductName(loan, productNames),
                 moneyPlain(loan.getAmount()),

@@ -966,7 +966,7 @@ public class AppController {
         if (timestamp == null) {
             return "";
         }
-        return timestamp.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH));
+        return com.sacco.mvp.service.ApplicationTimestamps.zoned(timestamp).format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH));
     }
 
     private String formatDashboardWorkflowDate(LocalDate date) {
@@ -3487,7 +3487,7 @@ public class AppController {
     }
 
     private String formatReversalWindowExpiry(OffsetDateTime referenceAt) {
-        return referenceAt.plusHours(REVERSAL_WINDOW_HOURS).format(REVERSAL_WINDOW_FORMATTER);
+        return com.sacco.mvp.service.ApplicationTimestamps.zoned(referenceAt.plusHours(REVERSAL_WINDOW_HOURS)).format(REVERSAL_WINDOW_FORMATTER);
     }
 
     private boolean hasRepaymentTimeframeEnded(LoanApplication app) {

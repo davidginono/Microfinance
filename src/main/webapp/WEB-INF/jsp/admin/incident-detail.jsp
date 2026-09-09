@@ -22,9 +22,9 @@
         </div>
         <dl class="mt-5 grid gap-3 md:grid-cols-2">
             <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Source</dt><dd class="mt-1 break-words text-sm text-slate-800">${incident.source}</dd></div>
-            <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</dt><dd class="mt-1 break-all text-sm text-slate-800">${incident.createdAt}</dd></div>
-            <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</dt><dd class="mt-1 break-all text-sm text-slate-800">${incident.updatedAt}</dd></div>
-            <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Resolved</dt><dd class="mt-1 break-all text-sm text-slate-800">${empty incident.resolvedAt ? '-' : incident.resolvedAt}</dd></div>
+            <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</dt><dd class="mt-1 break-all text-sm text-slate-800"><c:out value="${appTime:format(incident.createdAt)}" /></dd></div>
+            <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated</dt><dd class="mt-1 break-all text-sm text-slate-800"><c:out value="${appTime:format(incident.updatedAt)}" /></dd></div>
+            <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Resolved</dt><dd class="mt-1 break-all text-sm text-slate-800"><c:out value="${empty incident.resolvedAt ? '-' : appTime:format(incident.resolvedAt)}" /></dd></div>
             <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Reporter</dt><dd class="mt-1 break-all text-sm text-slate-800">${empty incident.reportedByMemberId ? '-' : incident.reportedByMemberId}</dd></div>
             <div class="min-w-0"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Related Notification</dt><dd class="mt-1 break-all text-sm text-slate-800">${empty incident.relatedNotificationId ? '-' : incident.relatedNotificationId}</dd></div>
         </dl>

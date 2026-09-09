@@ -107,7 +107,7 @@
                         <c:otherwise><spring:message code="review.rejected" text="Rejected" /></c:otherwise>
                     </c:choose>
                 </td>
-                <td>${fn:replace(fn:substring(entry.review.createdAt, 0, 16), 'T', ' ')}</td>
+                <td><c:out value="${appTime:format(entry.review.createdAt)}" /></td>
                 <td><spring:message code="loan.status.${entry.loan.status}" text="${entry.loan.status}" /></td>
                 <td><a href="/accountant/loan-applications/${entry.loan.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>

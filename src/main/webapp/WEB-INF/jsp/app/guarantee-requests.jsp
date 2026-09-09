@@ -34,8 +34,8 @@
             <td>${req.status}</td>
             <td>
                 <c:choose>
-                    <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16), 'T', ' ')}</c:when>
-                    <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                    <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>
+                    <c:otherwise><c:out value="${appTime:format(req.createdAt)}" /></c:otherwise>
                 </c:choose>
             </td>
             <td>

@@ -117,8 +117,8 @@
                     </c:if>
                     <td class="px-3 py-2">
                         <c:choose>
-                            <c:when test="${not empty myDecisionDates[app.id]}">${fn:replace(fn:substring(myDecisionDates[app.id], 0, 16), 'T', ' ')}</c:when>
-                            <c:otherwise>${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                            <c:when test="${not empty myDecisionDates[app.id]}"><c:out value="${appTime:format(myDecisionDates[app.id])}" /></c:when>
+                            <c:otherwise><c:out value="${appTime:format(app.createdAt)}" /></c:otherwise>
                         </c:choose>
                     </td>
                     <td class="px-3 py-2">

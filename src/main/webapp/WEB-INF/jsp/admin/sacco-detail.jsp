@@ -436,7 +436,7 @@
                             <tbody>
                             <c:forEach items="${smsHistory.content}" var="entry">
                                 <tr>
-                                    <td class="whitespace-nowrap">${entry.createdAt}</td>
+                                    <td class="whitespace-nowrap"><c:out value="${appTime:format(entry.createdAt)}" /></td>
                                     <td>${empty entry.eventType ? '-' : entry.eventType}</td>
                                     <td class="font-semibold text-slate-900">${entry.outcome}</td>
                                     <td>${entry.unitChange}</td>

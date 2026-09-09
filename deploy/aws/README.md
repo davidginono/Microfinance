@@ -23,6 +23,12 @@ Run from the repository root:
 .\deploy\aws\deploy-lightsail.ps1
 ```
 
+Keep `APP_TIME_ZONE=Africa/Nairobi` in the deployment environment. The application
+sets the JVM default timezone from this setting before creating application beans,
+and converts timestamp displays to that zone. Rebuild and recreate the app
+container to apply the code change. Existing timestamps with an offset are
+converted for display; do not add three hours to stored database values.
+
 The script creates or reuses:
 
 - Lightsail instance `saccos-lms-prod`
