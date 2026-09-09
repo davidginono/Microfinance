@@ -185,7 +185,7 @@
                 "<div class=\"erp-table-scroll repayment-schedule-modal-table-scroll\">",
                 "<" + "table class=\"erp-table loan-repayment-schedule-table\">",
                 "<thead><tr>",
-                "<th>Pmt No.</th><th>Month</th><th>Beginning Balance</th><th>Amount to Pay</th><th>Loan Amount</th><th>Interest</th><th>Ending Balance</th>",
+                "<th>Pmt No.</th><th>Month</th><th>Beginning Balance</th><th>Amount to Pay</th><th>Principal</th><th>Interest</th><th>Ending Balance</th>",
                 "</tr></thead>",
                 "<tbody class=\"divide-y divide-slate-100\" data-repayment-schedule-body></tbody>",
                 "</" + "table>",

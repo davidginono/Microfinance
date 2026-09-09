@@ -173,7 +173,7 @@
                             <th><spring:message code="repayment.month" text="Month" /></th>
                             <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
                             <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
-                            <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                            <th><spring:message code="repayment.principal" text="Principal" /></th>
                             <th><spring:message code="repayment.interest" text="Interest" /></th>
                             <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
                         </tr>
