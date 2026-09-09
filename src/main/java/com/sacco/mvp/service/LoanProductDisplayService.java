@@ -79,6 +79,30 @@ public class LoanProductDisplayService {
         return displayName(app.getLoanType(), namesForSacco(app.getSaccoId()));
     }
 
+    public Map<UUID, String> namesForApplications(String saccoId, List<LoanApplication> applications) {
+        if (saccoId == null || saccoId.isBlank() || applications.isEmpty()) {
+            return Map.of();
+        }
+        List<LoanApplication> scoped = applications.stream()
+            .filter(app -> saccoId.equals(app.getSaccoId()))
+            .toList();
+        List<UUID> productIds = scoped.stream()
+            .map(LoanApplication::getLoanProductSettingId)
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .toList();
+        Map<UUID, String> names = productIds.isEmpty() ? Map.of()
+            : loanProductSettingRepository.findBySaccoIdAndIdIn(saccoId, productIds).stream()
+                .collect(Collectors.toMap(LoanProductSetting::getId, LoanProductSetting::getDisplayName));
+        Map<UUID, String> result = new LinkedHashMap<>();
+        for (LoanApplication app : scoped) {
+            String name = app.getLoanProductSettingId() == null ? null : names.get(app.getLoanProductSettingId());
+            result.put(app.getId(), name == null || name.isBlank()
+                ? displayName(app.getLoanType(), Map.of()) : name);
+        }
+        return result;
+    }
+
     public String displayName(LoanApplication app, Map<LoanType, String> productNames) {
         if (app == null) {
             return "-";
@@ -106,8 +130,7 @@ public class LoanProductDisplayService {
         if (productId == null || app.getSaccoId() == null || app.getSaccoId().isBlank()) {
             return null;
         }
-        return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, app.getSaccoId())
-            .filter(LoanProductSetting::isAvailableForApplications)
+        return loanProductSettingRepository.findByIdAndSaccoId(productId, app.getSaccoId())
             .map(LoanProductSetting::getDisplayName)
             .filter(name -> !name.isBlank())
             .orElse(null);

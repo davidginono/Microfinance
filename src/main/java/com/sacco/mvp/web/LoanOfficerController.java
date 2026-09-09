@@ -645,7 +645,7 @@ public class LoanOfficerController {
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
-        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
+        model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("myDecisions", myDecisions);
         model.addAttribute("myDecisionDates", myDecisionDates);
         model.addAttribute("myDecisionReasons", myDecisionReasons);

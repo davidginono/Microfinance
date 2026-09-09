@@ -20,6 +20,8 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
 
     Optional<LoanProductSetting> findByIdAndSaccoId(UUID id, String saccoId);
 
+    List<LoanProductSetting> findBySaccoIdAndIdIn(String saccoId, java.util.Collection<UUID> ids);
+
     @Query("""
         select p from LoanProductSetting p
         where p.saccoId = :saccoId
@@ -50,4 +52,3 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
 
     boolean existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot(String saccoId, String productCode, UUID id);
 }
-

@@ -138,7 +138,7 @@ public class ManagerController {
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
-        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
+        model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
