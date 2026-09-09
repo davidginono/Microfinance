@@ -52,6 +52,11 @@
                 <span class="admin-user-badge ${user.status eq 'INVITED' ? 'is-warning' : user.status eq 'ACTIVE' ? 'is-success' : 'is-neutral'}">
                     <c:out value="${user.displayStatus}" />
                 </span>
+                <c:if test="${not empty user.acknowledgementStatus}">
+                    <span class="admin-user-badge ${user.acknowledgementStatus eq 'Pending Acknowledgement' ? 'is-warning' : 'is-neutral'}">
+                        <c:out value="${user.acknowledgementStatus}" />
+                    </span>
+                </c:if>
             </div>
         </div>
         <dl class="admin-user-detail-grid">

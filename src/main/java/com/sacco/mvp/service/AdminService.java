@@ -2526,6 +2526,10 @@ public class AdminService {
             .claims(userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), memberAccess))
             .status(member.getStatus())
             .displayStatus(displayUserStatus(member.getStatus()))
+            .acknowledgementStatus(member.getStaffRolesResolved().isEmpty() ? null
+                : member.isStaffAccessPendingAcknowledgement() ? "Pending Acknowledgement"
+                : !memberAccess ? "Not Required"
+                : member.getStaffAccessActivatedAt() != null ? "Acknowledged" : "Not Recorded")
             .membershipLabel(resolveMembershipLabel(member))
             .memberAccess(memberAccess)
             .canDeleteStaffRecord(canDeleteStaffRecord(member))
@@ -2647,13 +2651,15 @@ public class AdminService {
         StaffAccessStatus currentStatus = member.getStaffAccessStatus() == null
             ? StaffAccessStatus.NONE
             : member.getStaffAccessStatus();
-        if (currentStatus == StaffAccessStatus.ACTIVE) {
+        boolean rolesAdded = !member.getStaffRolesResolved().containsAll(staffRoles);
+        if (currentStatus == StaffAccessStatus.ACTIVE && !rolesAdded) {
             return UserUpdateResult.noPending(member.getStaffNo());
         }
 
-        boolean newlyPending = currentStatus != StaffAccessStatus.PENDING_ACKNOWLEDGEMENT;
+        boolean newlyPending = rolesAdded || currentStatus != StaffAccessStatus.PENDING_ACKNOWLEDGEMENT;
         member.setStaffAccessStatus(StaffAccessStatus.PENDING_ACKNOWLEDGEMENT);
-        member.setStaffAccessAssignedAt(member.getStaffAccessAssignedAt() == null ? now : member.getStaffAccessAssignedAt());
+        member.setStaffAccessAssignedAt(newlyPending || member.getStaffAccessAssignedAt() == null
+            ? now : member.getStaffAccessAssignedAt());
         member.setStaffAccessActivatedAt(null);
         return new UserUpdateResult(newlyPending, member.getStaffNo());
     }
@@ -3558,6 +3564,7 @@ public class AdminService {
         private Set<UserClaim> claims = new LinkedHashSet<>();
         private MemberStatus status;
         private String displayStatus;
+        private String acknowledgementStatus;
         private String membershipLabel;
         private boolean memberAccess;
         private boolean canDeleteStaffRecord;

@@ -326,6 +326,61 @@ class AdminServiceTest {
     }
 
     @Test
+    void addedRoleRequiresAcknowledgementAndStatusUpdatesAfterConfirmation() {
+        UUID id = UUID.randomUUID();
+        OffsetDateTime previous = OffsetDateTime.now().minusDays(2);
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .memberNo("MEMBER-1").memberAccount(true).position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .staffNo("12345").staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
+            .staffAccessAssignedAt(previous).staffAccessActivatedAt(previous).build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+        when(memberRepository.findUserAccessByScope("SACCO-01", "ST-1", id)).thenReturn(Optional.of(member));
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userSettingsRepository.existsById(id)).thenReturn(true);
+
+        AdminService.UserUpdateResult result = adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN), id, List.of(Position.MANAGER, Position.CHAIRPERSON), MemberStatus.ACTIVE);
+
+        assertThat(result.isStaffAccessPending()).isTrue();
+        assertThat(member.getStaffAccessAssignedAt()).isAfter(previous);
+        assertThat(member.getStaffAccessActivatedAt()).isNull();
+        assertThat(member.getActiveStaffRolesResolved()).isEmpty();
+        assertThat(adminService.userAccess("SACCO-01", "ST-1", id).getAcknowledgementStatus())
+            .isEqualTo("Pending Acknowledgement");
+        verify(notificationRepository).save(any(Notification.class));
+
+        new StaffAccessService(memberRepository).acknowledgeStaffAccess(id);
+
+        assertThat(member.getActiveStaffRolesResolved()).contains(Position.MANAGER, Position.CHAIRPERSON);
+        assertThat(adminService.userAccess("SACCO-01", "ST-1", id).getAcknowledgementStatus())
+            .isEqualTo("Acknowledged");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void unchangedOrReducedRolesKeepAcknowledgement(boolean removeRole) {
+        UUID id = UUID.randomUUID();
+        OffsetDateTime acknowledgedAt = OffsetDateTime.now().minusDays(2);
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .memberNo("MEMBER-1").memberAccount(true).position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.BOARD)))
+            .staffNo("12345").staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
+            .staffAccessAssignedAt(acknowledgedAt).staffAccessActivatedAt(acknowledgedAt).build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+        when(userSettingsRepository.existsById(id)).thenReturn(true);
+
+        AdminService.UserUpdateResult result = adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN), id,
+            removeRole ? List.of(Position.MANAGER) : List.of(Position.MANAGER, Position.BOARD), MemberStatus.ACTIVE);
+
+        assertThat(result.isStaffAccessPending()).isFalse();
+        assertThat(member.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.ACTIVE);
+        assertThat(member.getStaffAccessActivatedAt()).isEqualTo(acknowledgedAt);
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
     void userAccessRejectsUsersOutsideSaccoOrStationScope() {
         UUID accountId = UUID.randomUUID();
         when(memberRepository.findUserAccessByScope("SACCO-1", "ST-1", accountId))

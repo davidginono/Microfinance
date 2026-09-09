@@ -120,6 +120,9 @@
                             <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : user.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
                                 <c:out value="${user.displayStatus}" />
                             </span>
+                            <c:if test="${not empty user.acknowledgementStatus}">
+                                <div class="text-xs mt-1"><c:out value="${user.acknowledgementStatus}" /></div>
+                            </c:if>
                         </td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <c:choose>
