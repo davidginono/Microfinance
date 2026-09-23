@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
+import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.OtpSelectionPolicy;
@@ -135,6 +136,10 @@ public class AdminController {
                            @RequestParam(required = false) String stationId,
                            @RequestParam(required = false) SmsUnitStatus status,
                            @RequestParam(required = false) UUID accountId,
+                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                           @RequestParam(required = false) LoanStatus loanStatus,
+                           @RequestParam(required = false) List<UUID> applicantIds,
                            @RequestParam(defaultValue = "0") int page,
                            @RequestParam(defaultValue = "0") int historyPage,
                            @RequestParam(defaultValue = "0") int loanUsagePage,
@@ -151,17 +156,27 @@ public class AdminController {
             var registeredSaccos = saccoRegistryService.listRegisteredSaccos();
             String selectedSaccoId = normalizeTextParam(saccoId);
             String selectedStationId = normalizeTextParam(stationId);
-            String requestedSaccoId = selectedSaccoId;
-            var selectedSacco = registeredSaccos.stream()
-                .filter(sacco -> sacco.getSaccoId().equals(requestedSaccoId))
-                .findFirst()
-                .orElse(null);
-            if (selectedSacco == null) {
-                selectedSaccoId = "";
-                selectedStationId = "";
-            } else if (!selectedSacco.getStationIds().contains(selectedStationId)) {
-                selectedStationId = "";
+            if (!selectedSaccoId.isBlank()) {
+                String requestedSaccoId = selectedSaccoId;
+                var selectedSacco = registeredSaccos.stream()
+                    .filter(sacco -> sacco.getSaccoId().equals(requestedSaccoId))
+                    .findFirst()
+                    .orElse(null);
+                if (selectedSacco == null) {
+                    selectedSaccoId = "";
+                    selectedStationId = "";
+                } else if (!selectedSacco.getStationIds().contains(selectedStationId)) {
+                    selectedStationId = "";
+                }
             }
+            var loanUsageCriteria = smsUsageManagementService.loanUsageCriteria(
+                selectedSaccoId.isBlank() ? null : selectedSaccoId,
+                selectedStationId.isBlank() ? null : selectedStationId,
+                fromDate,
+                toDate,
+                loanStatus,
+                applicantIds
+            );
             var accounts = smsUsageManagementService.accounts(
                 selectedSaccoId.isBlank() ? null : selectedSaccoId,
                 selectedStationId.isBlank() ? null : selectedStationId,
@@ -177,10 +192,10 @@ public class AdminController {
                 ? Page.empty(PageRequest.of(safeHistoryPage, 25))
                 : smsUsageManagementService.historyRows(selectedAccount.getId(), PageRequest.of(safeHistoryPage, 25)));
             model.addAttribute("loanSmsUsage", smsUsageManagementService.loanUsageRows(
-                selectedSaccoId.isBlank() ? null : selectedSaccoId,
-                selectedStationId.isBlank() ? null : selectedStationId,
+                loanUsageCriteria,
                 PageRequest.of(safeLoanUsagePage, 25)
             ));
+            populateLoanSmsUsageFilters(model, loanUsageCriteria);
             model.addAttribute("registeredSaccos", registeredSaccos);
             model.addAttribute("selectedSaccoId", selectedSaccoId);
             model.addAttribute("selectedStationId", selectedStationId);
@@ -188,6 +203,14 @@ public class AdminController {
         } else {
             String scopedSaccoId = adminScopeService.currentSaccoId(principal);
             String scopedStationId = adminScopeService.currentStationId(principal);
+            var loanUsageCriteria = smsUsageManagementService.loanUsageCriteria(
+                scopedSaccoId,
+                scopedStationId,
+                fromDate,
+                toDate,
+                loanStatus,
+                applicantIds
+            );
             var selectedAccount = smsUsageManagementService.account(scopedSaccoId, scopedStationId);
             model.addAttribute("selectedAccount", selectedAccount);
             model.addAttribute("selectedOtpDeliveryChannel", stationOtpSettingsService.channel(scopedSaccoId, scopedStationId));
@@ -197,15 +220,36 @@ public class AdminController {
                 PageRequest.of(safeHistoryPage, 25)
             ));
             model.addAttribute("loanSmsUsage", smsUsageManagementService.loanUsageRows(
-                scopedSaccoId,
-                scopedStationId,
+                loanUsageCriteria,
                 PageRequest.of(safeLoanUsagePage, 25)
             ));
+            populateLoanSmsUsageFilters(model, loanUsageCriteria);
             model.addAttribute("selectedSaccoId", scopedSaccoId);
             model.addAttribute("selectedStationId", scopedStationId);
             model.addAttribute("selectedSmsStatus", "");
         }
         return "admin/sms-usage";
+    }
+
+    @GetMapping("/sms-usage/applicants/search")
+    @ResponseBody
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SMS_USAGE_VIEW')")
+    public List<SmsUsageManagementService.ApplicantFilterOption> searchSmsUsageApplicants(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                                          @RequestParam(required = false) String q,
+                                                                                          @RequestParam(required = false) String saccoId,
+                                                                                          @RequestParam(required = false) String stationId) {
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
+        String scopedSaccoId;
+        String scopedStationId;
+        if (superAdmin) {
+            SmsUsageScope scope = normalizePlatformSmsUsageScope(saccoId, stationId, saccoRegistryService.listRegisteredSaccos());
+            scopedSaccoId = scope.saccoId();
+            scopedStationId = scope.stationId();
+        } else {
+            scopedSaccoId = adminScopeService.currentSaccoId(principal);
+            scopedStationId = adminScopeService.currentStationId(principal);
+        }
+        return smsUsageManagementService.searchLoanUsageApplicants(scopedSaccoId, scopedStationId, q);
     }
 
     @PostMapping("/sms-usage/allocations")
@@ -2371,6 +2415,40 @@ public class AdminController {
         model.addAttribute("selectedSaccoId", selectedSaccoId);
         model.addAttribute("selectedStationId", selectedStationId);
         model.addAttribute("selectedStationOptions", stationOptions);
+    }
+
+    private void populateLoanSmsUsageFilters(Model model, SmsUsageManagementService.LoanSmsUsageCriteria criteria) {
+        var selectedApplicants = smsUsageManagementService.selectedLoanUsageApplicants(criteria);
+        model.addAttribute("loanStatuses", smsUsageManagementService.loanStatusOptions());
+        model.addAttribute("selectedLoanFromDate", criteria.fromDate() == null ? "" : criteria.fromDate().toString());
+        model.addAttribute("selectedLoanToDate", criteria.toDate() == null ? "" : criteria.toDate().toString());
+        model.addAttribute("selectedLoanStatus", criteria.loanStatus() == null ? "" : criteria.loanStatus().name());
+        model.addAttribute("selectedApplicantIds", selectedApplicants.stream().map(SmsUsageManagementService.ApplicantFilterOption::id).toList());
+        model.addAttribute("selectedApplicantFilters", selectedApplicants);
+    }
+
+    private SmsUsageScope normalizePlatformSmsUsageScope(String saccoId,
+                                                         String stationId,
+                                                         List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos) {
+        String selectedSaccoId = normalizeTextParam(saccoId);
+        String selectedStationId = normalizeTextParam(stationId);
+        if (selectedSaccoId.isBlank()) {
+            return new SmsUsageScope("", "");
+        }
+        var selectedSacco = registeredSaccos.stream()
+            .filter(sacco -> sacco.saccoId().equals(selectedSaccoId))
+            .findFirst()
+            .orElse(null);
+        if (selectedSacco == null) {
+            return new SmsUsageScope("", "");
+        }
+        if (!selectedSacco.stationIds().contains(selectedStationId)) {
+            return new SmsUsageScope(selectedSaccoId, "");
+        }
+        return new SmsUsageScope(selectedSaccoId, selectedStationId);
+    }
+
+    private record SmsUsageScope(String saccoId, String stationId) {
     }
 
     private Map<String, String> registeredSaccoNamesById(List<SaccoRegistryService.RegisteredSaccoView> saccos) {

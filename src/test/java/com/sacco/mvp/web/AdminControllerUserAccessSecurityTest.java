@@ -100,13 +100,14 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private PlatformSessionSettingsService platformSessionSettingsService;
     @Autowired private PlatformEmailSettingsService platformEmailSettingsService;
     @Autowired private PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
+    @Autowired private SmsUsageManagementService smsUsageManagementService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
-            platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService);
+            platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService);
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -528,6 +529,47 @@ class AdminControllerUserAccessSecurityTest {
                 "Test SMS could not be sent. The SMS gateway could not be reached."
             ))
             .andExpect(flash().attribute("message", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void smsApplicantSearchRequiresSmsUsageViewClaim() throws Exception {
+        AppUserPrincipal principal = principal(Set.of(UserClaim.USER_ACCESS_VIEW));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+
+        mockMvc.perform(get("/admin/sms-usage/applicants/search")
+                .param("q", "ali")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+
+        verify(smsUsageManagementService, never()).searchLoanUsageApplicants(any(), any(), any());
+    }
+
+    @Test
+    void workspaceSmsApplicantSearchUsesCurrentScopeInsteadOfRequestedScope() throws Exception {
+        AppUserPrincipal principal = principal(Set.of(UserClaim.SMS_USAGE_VIEW));
+        UUID applicantId = UUID.randomUUID();
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
+        when(adminScopeService.currentStationId(any(AppUserPrincipal.class))).thenReturn("ST-1");
+        when(smsUsageManagementService.searchLoanUsageApplicants("SACCO-01", "ST-1", "ali"))
+            .thenReturn(List.of(new SmsUsageManagementService.ApplicantFilterOption(
+                applicantId,
+                "Alice Member (MEM-1)",
+                "MEM-1",
+                "-",
+                "SACCO-01",
+                "ST-1"
+            )));
+
+        mockMvc.perform(get("/admin/sms-usage/applicants/search")
+                .param("q", "ali")
+                .param("saccoId", "OTHER")
+                .param("stationId", "OTHER")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isOk());
+
+        verify(smsUsageManagementService).searchLoanUsageApplicants("SACCO-01", "ST-1", "ali");
+        verify(smsUsageManagementService, never()).searchLoanUsageApplicants("OTHER", "OTHER", "ali");
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {

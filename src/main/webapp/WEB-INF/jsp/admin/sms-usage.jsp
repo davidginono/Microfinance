@@ -1,5 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -17,6 +18,10 @@
     <c:param name="accountId" value="${selectedAccount.id}" />
     <c:param name="historyPage" value="${usageHistory.number}" />
     <c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" />
+    <c:param name="toDate" value="${selectedLoanToDate}" />
+    <c:param name="loanStatus" value="${selectedLoanStatus}" />
+    <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
 <c:if test="${superAdmin}">
@@ -73,10 +78,12 @@
     <c:url var="accountPreviousUrl" value="/admin/sms-usage">
         <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" />
         <c:param name="page" value="${accounts.number - 1}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+        <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
     </c:url>
     <c:url var="accountNextUrl" value="/admin/sms-usage">
         <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" />
         <c:param name="page" value="${accounts.number + 1}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+        <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
     </c:url>
 
     <section class="erp-table-wrap mt-3" aria-label="Station SMS balances">
@@ -103,7 +110,7 @@
                 <thead><tr><th>SACCO</th><th>Station</th><th>Available</th><th>Alert Reserve</th><th>Baseline</th><th>Depleted Alerts</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                 <c:forEach items="${accounts.content}" var="account">
-                    <c:url var="accountHistoryUrl" value="/admin/sms-usage"><c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${accounts.number}" /><c:param name="accountId" value="${account.id}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" /></c:url>
+                    <c:url var="accountHistoryUrl" value="/admin/sms-usage"><c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${accounts.number}" /><c:param name="accountId" value="${account.id}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" /><c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach></c:url>
                     <tr class="${selectedAccount.id eq account.id ? 'bg-sky-50' : ''}">
                         <td class="font-semibold text-sacco-ink"><c:out value="${account.saccoId}" /></td>
                         <td class="whitespace-nowrap"><c:out value="${account.stationId}" /></td>
@@ -147,16 +154,31 @@
 
 <c:url var="historyPreviousUrl" value="/admin/sms-usage">
     <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number - 1}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 <c:url var="historyNextUrl" value="/admin/sms-usage">
     <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number + 1}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
 <c:url var="loanUsagePreviousUrl" value="/admin/sms-usage">
     <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number - 1}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 <c:url var="loanUsageNextUrl" value="/admin/sms-usage">
     <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number + 1}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
+</c:url>
+
+<c:url var="loanUsagePdfUrl" value="/documents/reports/sms-usage.pdf">
+    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" />
+    <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
+</c:url>
+<c:url var="loanUsageExcelUrl" value="/documents/reports/sms-usage.xlsx">
+    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" />
+    <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
 <section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage">
@@ -167,11 +189,55 @@
         </div>
         <div class="app-table-toolbar">
             <a class="app-icon-button" href="${smsRefreshUrl}" aria-label="Refresh loan application SMS usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg></a>
+            <a class="app-btn btn-neutral" href="${loanUsagePdfUrl}" data-download-action="true">PDF</a>
+            <a class="app-btn btn-neutral" href="${loanUsageExcelUrl}" data-download-action="true">Excel</a>
             <span class="admin-register-count">Page ${loanSmsUsage.number + 1} of ${loanSmsUsage.totalPages gt 0 ? loanSmsUsage.totalPages : 1}</span>
             <c:choose><c:when test="${loanSmsUsage.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${loanUsagePreviousUrl}" aria-label="Previous loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
             <c:choose><c:when test="${loanSmsUsage.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${loanUsageNextUrl}" aria-label="Next loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>
         </div>
     </div>
+    <form method="get" action="/admin/sms-usage" class="aws-filter-toolbar sms-usage-filter-toolbar" data-aws-filter-toolbar data-sms-applicant-filter>
+        <input type="hidden" name="saccoId" value="${selectedSaccoId}" data-sms-filter-sacco />
+        <input type="hidden" name="stationId" value="${selectedStationId}" data-sms-filter-station />
+        <input type="hidden" name="status" value="${selectedSmsStatus}" />
+        <input type="hidden" name="page" value="${superAdmin ? accounts.number : 0}" />
+        <input type="hidden" name="accountId" value="${selectedAccount.id}" />
+        <input type="hidden" name="historyPage" value="${usageHistory.number}" />
+        <input type="hidden" name="loanUsagePage" value="0" />
+        <label class="min-w-[9rem] flex-[0_1_10rem] text-xs font-semibold text-slate-700">
+            From
+            <input type="date" name="fromDate" value="${selectedLoanFromDate}" class="fcms-control mt-1 w-full" />
+        </label>
+        <label class="min-w-[9rem] flex-[0_1_10rem] text-xs font-semibold text-slate-700">
+            To
+            <input type="date" name="toDate" value="${selectedLoanToDate}" class="fcms-control mt-1 w-full" />
+        </label>
+        <label class="min-w-[13rem] flex-[1_1_14rem] text-xs font-semibold text-slate-700">
+            Loan Status
+            <select name="loanStatus" class="fcms-control mt-1 w-full">
+                <option value="">All loan statuses</option>
+                <c:forEach items="${loanStatuses}" var="loanStatusOption">
+                    <option value="${loanStatusOption.value}" ${selectedLoanStatus eq loanStatusOption.value ? 'selected' : ''}><c:out value="${loanStatusOption.label}" /></option>
+                </c:forEach>
+            </select>
+        </label>
+        <div class="sms-applicant-picker min-w-[18rem] flex-[2_1_26rem]" data-search-url="/admin/sms-usage/applicants/search">
+            <label class="text-xs font-semibold text-slate-700" for="smsApplicantSearch">Applicants</label>
+            <input id="smsApplicantSearch" type="search" autocomplete="off" class="fcms-control mt-1 w-full" placeholder="Search name or member no." data-sms-applicant-search />
+            <div class="sms-applicant-results" data-sms-applicant-results hidden></div>
+            <div class="sms-applicant-chips" data-sms-applicant-selected>
+                <c:forEach items="${selectedApplicantFilters}" var="applicant">
+                    <span class="sms-applicant-chip" data-sms-selected-applicant="${applicant.id}">
+                        <span><c:out value="${applicant.label}" /></span>
+                        <button type="button" aria-label="Remove applicant" data-sms-remove-applicant>&times;</button>
+                    </span>
+                    <input type="hidden" name="applicantIds" value="${applicant.id}" data-sms-applicant-input />
+                </c:forEach>
+            </div>
+        </div>
+        <button type="submit" class="app-btn btn-primary shrink-0">Apply</button>
+        <a href="/admin/sms-usage" class="app-btn btn-neutral shrink-0">Reset</a>
+    </form>
     <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading loan application SMS usage...">
         <table class="erp-table">
             <thead><tr><th>Applicant</th><th>Member No.</th><th>Loan ID</th><th>Application No.</th><th>Status</th><th>SACCO</th><th>Station</th><th>SMS Events</th><th>Units Used</th><th>Last SMS</th></tr></thead>
@@ -230,6 +296,151 @@
         </table>
     </div>
 </section>
+
+<script>
+    (function () {
+        const form = document.querySelector('[data-sms-applicant-filter]');
+        if (!form) {
+            return;
+        }
+        const search = form.querySelector('[data-sms-applicant-search]');
+        const results = form.querySelector('[data-sms-applicant-results]');
+        const selected = form.querySelector('[data-sms-applicant-selected]');
+        const saccoField = form.querySelector('[data-sms-filter-sacco]');
+        const stationField = form.querySelector('[data-sms-filter-station]');
+        const searchUrl = form.querySelector('[data-search-url]') ? form.querySelector('[data-search-url]').dataset.searchUrl : form.dataset.searchUrl;
+        let timer = null;
+
+        function selectedIds() {
+            return new Set(Array.from(form.querySelectorAll('[data-sms-applicant-input]')).map((input) => input.value));
+        }
+
+        function hideResults() {
+            if (results) {
+                results.hidden = true;
+                results.innerHTML = '';
+            }
+        }
+
+        function addApplicant(id, label) {
+            if (!id || selectedIds().has(id)) {
+                return;
+            }
+            const chip = document.createElement('span');
+            chip.className = 'sms-applicant-chip';
+            chip.dataset.smsSelectedApplicant = id;
+
+            const text = document.createElement('span');
+            text.textContent = label || id;
+            chip.appendChild(text);
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.setAttribute('aria-label', 'Remove applicant');
+            remove.dataset.smsRemoveApplicant = 'true';
+            remove.innerHTML = '&times;';
+            chip.appendChild(remove);
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'applicantIds';
+            input.value = id;
+            input.dataset.smsApplicantInput = 'true';
+
+            selected.appendChild(chip);
+            selected.appendChild(input);
+            hideResults();
+            search.value = '';
+        }
+
+        function removeApplicant(id) {
+            form.querySelectorAll('[data-sms-selected-applicant="' + id + '"]').forEach((chip) => chip.remove());
+            form.querySelectorAll('[data-sms-applicant-input]').forEach((input) => {
+                if (input.value === id) {
+                    input.remove();
+                }
+            });
+        }
+
+        selected.addEventListener('click', function (event) {
+            const button = event.target.closest('[data-sms-remove-applicant]');
+            if (!button) {
+                return;
+            }
+            const chip = button.closest('[data-sms-selected-applicant]');
+            if (chip) {
+                removeApplicant(chip.dataset.smsSelectedApplicant);
+            }
+        });
+
+        function renderResults(items) {
+            results.innerHTML = '';
+            if (!items.length) {
+                const empty = document.createElement('div');
+                empty.className = 'sms-applicant-result-empty';
+                empty.textContent = 'No applicants found';
+                results.appendChild(empty);
+                results.hidden = false;
+                return;
+            }
+            items.forEach(function (item) {
+                if (!item || !item.id || selectedIds().has(item.id)) {
+                    return;
+                }
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'sms-applicant-result';
+                option.dataset.applicantId = item.id;
+                option.dataset.applicantLabel = item.label || item.id;
+                const label = document.createElement('span');
+                label.textContent = item.label || item.id;
+                const scope = document.createElement('small');
+                scope.textContent = (item.saccoId || '-') + ' / ' + (item.stationId || '-');
+                option.appendChild(label);
+                option.appendChild(scope);
+                results.appendChild(option);
+            });
+            results.hidden = results.children.length === 0;
+        }
+
+        results.addEventListener('click', function (event) {
+            const option = event.target.closest('[data-applicant-id]');
+            if (!option) {
+                return;
+            }
+            addApplicant(option.dataset.applicantId, option.dataset.applicantLabel);
+        });
+
+        search.addEventListener('input', function () {
+            window.clearTimeout(timer);
+            const term = search.value.trim();
+            if (term.length < 2) {
+                hideResults();
+                return;
+            }
+            timer = window.setTimeout(function () {
+                const params = new URLSearchParams();
+                params.set('q', term);
+                if (saccoField && saccoField.value) {
+                    params.set('saccoId', saccoField.value);
+                }
+                if (stationField && stationField.value) {
+                    params.set('stationId', stationField.value);
+                }
+                fetch(searchUrl + '?' + params.toString(), {headers: {'Accept': 'application/json'}})
+                    .then((response) => response.ok ? response.json() : [])
+                    .then((items) => renderResults(Array.isArray(items) ? items : []))
+                    .catch(hideResults);
+            }, 220);
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!form.contains(event.target)) {
+                hideResults();
+            }
+        });
+    })();
+</script>
 
 <c:if test="${superAdmin}">
     <script>

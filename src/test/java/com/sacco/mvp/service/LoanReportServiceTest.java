@@ -701,6 +701,62 @@ class LoanReportServiceTest {
         }
     }
 
+    @Test
+    void smsUsageExportsContainFiltersHeadersAndFilteredRows() throws Exception {
+        UUID applicantId = UUID.randomUUID();
+        SmsUsageManagementService.LoanSmsUsageRow row = new SmsUsageManagementService.LoanSmsUsageRow(
+            UUID.randomUUID(),
+            1001L,
+            "LN-1001",
+            "On Review By Manager",
+            "READY_FOR_MANAGER",
+            "IAA",
+            "AR704",
+            applicantId,
+            "Asha Nyerere",
+            "MEM-100",
+            2,
+            4,
+            "23 Sep 2026, 10:30"
+        );
+        SmsUsageManagementService.LoanSmsUsageExportReport report = new SmsUsageManagementService.LoanSmsUsageExportReport(
+            "IAA",
+            "AR704",
+            LocalDate.of(2026, 9, 1),
+            LocalDate.of(2026, 9, 23),
+            "On Review By Manager",
+            "Asha Nyerere (MEM-100)",
+            "Admin User",
+            LocalDate.of(2026, 9, 23),
+            List.of(row),
+            2,
+            4
+        );
+        when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
+
+        byte[] workbookBytes = loanReportService.buildSmsUsageExcel(report);
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+            assertThat(workbook.getSheet("SMS Usage")).isNotNull();
+            assertThat(sheetContains(workbook, "SMS Usage", "SMS USAGE BY LOAN APPLICATION")).isTrue();
+            assertThat(sheetContains(workbook, "SMS Usage", "REPORT DETAILS")).isTrue();
+            assertThat(sheetContains(workbook, "SMS Usage", "Asha Nyerere (MEM-100)")).isTrue();
+            assertThat(sheetContains(workbook, "SMS Usage", "SMS Events")).isTrue();
+            assertThat(sheetContains(workbook, "SMS Usage", "Units Used")).isTrue();
+            assertThat(sheetContains(workbook, "SMS Usage", "Asha Nyerere")).isTrue();
+            assertThat(sheetContains(workbook, "SMS Usage", "LN-1001")).isTrue();
+        }
+
+        byte[] pdf = loanReportService.buildSmsUsagePdf(report);
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text)
+                .contains("SMS Usage By Loan Application")
+                .contains("Asha Nyerere")
+                .contains("LN-1001")
+                .contains("SMS Usage Report");
+        }
+    }
+
     private LoanReportService.AnalyticsExportReport exportReport(LoanReportService.ReportKind kind) {
         LoanAnalyticsService.MemberLoanAnalytics analytics = new LoanAnalyticsService.MemberLoanAnalytics(
             0, 4, 0, 0, 5, 4, new BigDecimal("772000.00"));

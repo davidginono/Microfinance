@@ -512,6 +512,42 @@ public class LoanReportService {
         }
     }
 
+    public byte[] buildSmsUsagePdf(SmsUsageManagementService.LoanSmsUsageExportReport report) {
+        return renderStaffReviewPdf(
+            report.saccoId(),
+            "SMS Usage By Loan Application",
+            smsUsageScopeLabel(report),
+            "Rows: " + report.rows().size()
+                + " | SMS Events: " + report.totalSmsEvents()
+                + " | Units Used: " + report.totalUnitsUsed(),
+            new String[]{"Applicant", "Member No.", "Loan ID", "App No.", "Status", "SACCO", "Station", "Events", "Units", "Last SMS"},
+            new float[]{96, 54, 54, 48, 72, 44, 44, 38, 38, 58},
+            smsUsageRows(report),
+            "No SMS usage matched the selected filters.",
+            "SMS Usage Report",
+            report.fromDate(),
+            report.toDate()
+        );
+    }
+
+    public byte[] buildSmsUsageExcel(SmsUsageManagementService.LoanSmsUsageExportReport report) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ExcelStyles styles = new ExcelStyles(workbook);
+            XSSFSheet sheet = workbook.createSheet("SMS Usage");
+            int row = titleRows(sheet, smsUsageWorkbookTitle(report), "SMS USAGE BY LOAN APPLICATION", styles);
+            row = writeSmsUsageReportDetails(sheet, row, report, styles);
+            writeTable(sheet, row + 1, "SMS USAGE",
+                new String[]{"Applicant", "Member No.", "Loan ID", "Application No.", "Status", "SACCO", "Station", "SMS Events", "Units Used", "Last SMS"},
+                smsUsageRows(report),
+                styles);
+            autosize(sheet, 10);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to generate SMS usage Excel report.", ex);
+        }
+    }
+
     public byte[] buildMemberPdf(MemberLoanReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             MemberPdfRenderer renderer = new MemberPdfRenderer(
@@ -1590,6 +1626,23 @@ public class LoanReportService {
         ), styles);
     }
 
+    private int writeSmsUsageReportDetails(XSSFSheet sheet,
+                                           int startRow,
+                                           SmsUsageManagementService.LoanSmsUsageExportReport report,
+                                           ExcelStyles styles) {
+        return writeKeyValueBlock(sheet, startRow, "REPORT DETAILS", List.of(
+            new String[]{"Period", smsUsagePeriodLabel(report)},
+            new String[]{"Scope", smsUsageScopeLabel(report)},
+            new String[]{"Loan Status", report.loanStatusLabel()},
+            new String[]{"Applicants", report.applicantSummary()},
+            new String[]{"Prepared By", report.preparedBy()},
+            new String[]{"Generated Date", DATE_FORMATTER.format(report.generatedDate())},
+            new String[]{"Rows", String.valueOf(report.rows().size())},
+            new String[]{"SMS Events", String.valueOf(report.totalSmsEvents())},
+            new String[]{"Units Used", String.valueOf(report.totalUnitsUsed())}
+        ), styles);
+    }
+
     private int writeKeyValueBlock(XSSFSheet sheet, int startRow, String title, List<String[]> rows, ExcelStyles styles) {
         Row titleRow = sheet.createRow(startRow++);
         Cell titleCell = titleRow.createCell(0);
@@ -1902,6 +1955,46 @@ public class LoanReportService {
         return startRow;
     }
 
+    private String smsUsageWorkbookTitle(SmsUsageManagementService.LoanSmsUsageExportReport report) {
+        if (report.saccoId() == null || report.saccoId().isBlank()) {
+            return "All SACCOs";
+        }
+        return saccoReportTitle(report.saccoId());
+    }
+
+    private String smsUsageScopeLabel(SmsUsageManagementService.LoanSmsUsageExportReport report) {
+        String sacco = report.saccoId() == null || report.saccoId().isBlank()
+            ? "All SACCOs"
+            : saccoReportTitle(report.saccoId());
+        String station = report.stationId() == null || report.stationId().isBlank()
+            ? "All stations"
+            : report.stationId();
+        return sacco + " / " + station + " | " + report.loanStatusLabel() + " | " + report.applicantSummary();
+    }
+
+    private String smsUsagePeriodLabel(SmsUsageManagementService.LoanSmsUsageExportReport report) {
+        String from = report.fromDate() == null ? "All" : DATE_FORMATTER.format(report.fromDate());
+        String to = report.toDate() == null ? "All" : DATE_FORMATTER.format(report.toDate());
+        return from + " to " + to;
+    }
+
+    private List<String[]> smsUsageRows(SmsUsageManagementService.LoanSmsUsageExportReport report) {
+        return report.rows().stream()
+            .map(row -> new String[]{
+                row.applicantName(),
+                row.applicantMemberNo(),
+                row.loanId(),
+                row.applicationNumber() == null ? "-" : row.applicationNumber().toString(),
+                row.loanStatusLabel(),
+                row.saccoId(),
+                row.stationId(),
+                String.valueOf(row.smsEventCount()),
+                String.valueOf(row.unitsUsed()),
+                row.lastSmsAtLabel()
+            })
+            .toList();
+    }
+
     private void writeCell(Row row, int column, String value, CellStyle style) {
         Cell cell = row.createCell(column);
         cell.setCellValue(value == null ? "" : value);
@@ -2109,7 +2202,7 @@ public class LoanReportService {
                 saccoReportTitle(saccoId),
                 title,
                 subtitle,
-                "Period: " + DATE_FORMATTER.format(fromDate) + " to " + DATE_FORMATTER.format(toDate),
+                "Period: " + reportPeriodLabel(fromDate, toDate),
                 summaryLine,
                 DATE_FORMATTER.format(applicationClock.today()),
                 footerTitle,
@@ -2124,6 +2217,12 @@ public class LoanReportService {
         } catch (IOException ex) {
             throw new IllegalStateException("Unable to generate PDF report.", ex);
         }
+    }
+
+    private String reportPeriodLabel(LocalDate fromDate, LocalDate toDate) {
+        String from = fromDate == null ? "All" : DATE_FORMATTER.format(fromDate);
+        String to = toDate == null ? "All" : DATE_FORMATTER.format(toDate);
+        return from + " to " + to;
     }
 
     private String saccoReportTitle(String saccoId) {

@@ -226,11 +226,20 @@ class AdminConfigurationUiContractTest {
         String smsUsage = read(JSP_ROOT.resolve("admin/sms-usage.jsp"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
         String shellScript = read(Path.of("src/main/resources/static/js/shell.js"));
+        String smsIndex = read(Path.of("src/main/resources/db/migration/V39__sms_usage_report_filter_index.sql"));
 
         assertThat(smsUsage)
             .contains("Station SMS Balances")
             .contains("app-table-titlebar")
             .contains("aws-filter-toolbar")
+            .contains("data-sms-applicant-filter")
+            .contains("name=\"fromDate\"")
+            .contains("name=\"toDate\"")
+            .contains("name=\"loanStatus\"")
+            .contains("/admin/sms-usage/applicants/search")
+            .contains("/documents/reports/sms-usage.pdf")
+            .contains("/documents/reports/sms-usage.xlsx")
+            .contains("sms-applicant-chip")
             .contains("erp-table-scroll")
             .contains("class=\"erp-table\"")
             .contains("aws-pagination-chevron")
@@ -245,11 +254,20 @@ class AdminConfigurationUiContractTest {
             .contains("padding-top: 0 !important")
             .contains("overflow-x: clip !important")
             .contains("overflow-y: visible !important")
-            .contains(".erp-page-subtitle");
+            .contains(".erp-page-subtitle")
+            .contains(".aws-console .sms-usage-filter-toolbar")
+            .contains(".aws-console .sms-applicant-results")
+            .contains(".aws-console .sms-applicant-chip");
         assertThat(shellScript)
             .contains("enhancePageBreadcrumbs")
             .contains("separator.textContent = '>'")
             .contains("breadcrumb.remove()");
+        assertThat(smsIndex)
+            .contains("idx_sms_usage_ledger_loan_report_filters")
+            .contains("created_at desc")
+            .contains("applicant_member_id")
+            .contains("loan_application_id is not null")
+            .contains("outcome in ('ACCEPTED', 'ACCEPTANCE_UNKNOWN')");
     }
 
     @Test

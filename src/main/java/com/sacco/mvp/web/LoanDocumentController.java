@@ -20,6 +20,8 @@ import com.sacco.mvp.service.MemberProfileImageService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.AccessControlService;
+import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.SmsUsageManagementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -59,6 +61,8 @@ public class LoanDocumentController {
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final AuditService auditService;
     private final AccessControlService access;
+    private final AdminScopeService adminScopeService;
+    private final SmsUsageManagementService smsUsageManagementService;
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal) and @access.has(principal, 'LOAN_DOCUMENTS_EXPORT')")
@@ -325,6 +329,52 @@ public class LoanDocumentController {
             .body(workbook);
     }
 
+    @GetMapping("/documents/reports/sms-usage.pdf")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SMS_USAGE_VIEW')")
+    public ResponseEntity<byte[]> downloadSmsUsagePdf(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                      @RequestParam(required = false) String saccoId,
+                                                      @RequestParam(required = false) String stationId,
+                                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                      @RequestParam(required = false) LoanStatus loanStatus,
+                                                      @RequestParam(required = false) List<UUID> applicantIds) {
+        try {
+            SmsUsageManagementService.LoanSmsUsageCriteria criteria = smsUsageCriteria(principal, saccoId, stationId, fromDate, toDate, loanStatus, applicantIds);
+            SmsUsageManagementService.LoanSmsUsageExportReport report = smsUsageManagementService.loanUsageExport(criteria, principal == null ? "System" : principal.getFullName());
+            byte[] pdf = loanReportService.buildSmsUsagePdf(report);
+            auditReportExport(principal, "sms-usage", "PDF", fromDate, toDate);
+            return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + smsUsageFilename("pdf", fromDate, toDate))
+                .body(pdf);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return plainExportError(ex.getMessage());
+        }
+    }
+
+    @GetMapping("/documents/reports/sms-usage.xlsx")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SMS_USAGE_VIEW')")
+    public ResponseEntity<byte[]> downloadSmsUsageExcel(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                        @RequestParam(required = false) String saccoId,
+                                                        @RequestParam(required = false) String stationId,
+                                                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                        @RequestParam(required = false) LoanStatus loanStatus,
+                                                        @RequestParam(required = false) List<UUID> applicantIds) {
+        try {
+            SmsUsageManagementService.LoanSmsUsageCriteria criteria = smsUsageCriteria(principal, saccoId, stationId, fromDate, toDate, loanStatus, applicantIds);
+            SmsUsageManagementService.LoanSmsUsageExportReport report = smsUsageManagementService.loanUsageExport(criteria, principal == null ? "System" : principal.getFullName());
+            byte[] workbook = loanReportService.buildSmsUsageExcel(report);
+            auditReportExport(principal, "sms-usage", "XLSX", fromDate, toDate);
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + smsUsageFilename("xlsx", fromDate, toDate))
+                .body(workbook);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return plainExportError(ex.getMessage());
+        }
+    }
+
     @GetMapping("/documents/reports/manager-loans.pdf")
     @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'MANAGER_QUEUE_EXPORT')")
     public ResponseEntity<byte[]> downloadManagerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -438,6 +488,75 @@ public class LoanDocumentController {
             principal == null ? null : principal.getStationId(),
             details
         );
+    }
+
+    private SmsUsageManagementService.LoanSmsUsageCriteria smsUsageCriteria(AppUserPrincipal principal,
+                                                                            String saccoId,
+                                                                            String stationId,
+                                                                            LocalDate fromDate,
+                                                                            LocalDate toDate,
+                                                                            LoanStatus loanStatus,
+                                                                            List<UUID> applicantIds) {
+        if (principal != null && principal.isPlatformIdentity()) {
+            SmsUsageScope scope = normalizePlatformSmsUsageScope(saccoId, stationId);
+            return smsUsageManagementService.loanUsageCriteria(
+                scope.saccoId().isBlank() ? null : scope.saccoId(),
+                scope.stationId().isBlank() ? null : scope.stationId(),
+                fromDate,
+                toDate,
+                loanStatus,
+                applicantIds
+            );
+        }
+        return smsUsageManagementService.loanUsageCriteria(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            fromDate,
+            toDate,
+            loanStatus,
+            applicantIds
+        );
+    }
+
+    private SmsUsageScope normalizePlatformSmsUsageScope(String saccoId, String stationId) {
+        String selectedSaccoId = normalizeTextParam(saccoId);
+        String selectedStationId = normalizeTextParam(stationId);
+        if (selectedSaccoId.isBlank()) {
+            return new SmsUsageScope("", "");
+        }
+        var selectedSacco = saccoRegistryService.listRegisteredSaccos().stream()
+            .filter(sacco -> sacco.saccoId().equals(selectedSaccoId))
+            .findFirst()
+            .orElse(null);
+        if (selectedSacco == null) {
+            return new SmsUsageScope("", "");
+        }
+        if (!selectedSacco.stationIds().contains(selectedStationId)) {
+            return new SmsUsageScope(selectedSaccoId, "");
+        }
+        return new SmsUsageScope(selectedSaccoId, selectedStationId);
+    }
+
+    private ResponseEntity<byte[]> plainExportError(String message) {
+        String safeMessage = message == null || message.isBlank()
+            ? "Unable to generate the SMS usage export."
+            : message;
+        return ResponseEntity.badRequest()
+            .contentType(MediaType.TEXT_PLAIN)
+            .body(safeMessage.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String smsUsageFilename(String extension, LocalDate fromDate, LocalDate toDate) {
+        String from = fromDate == null ? "all" : fromDate.toString();
+        String to = toDate == null ? "all" : toDate.toString();
+        return "sms-usage-" + from + "-to-" + to + "." + extension;
+    }
+
+    private String normalizeTextParam(String raw) {
+        return raw == null ? "" : raw.trim();
+    }
+
+    private record SmsUsageScope(String saccoId, String stationId) {
     }
 
     private ApprovalWorkflowStage boardReportStage(AppUserPrincipal principal) {

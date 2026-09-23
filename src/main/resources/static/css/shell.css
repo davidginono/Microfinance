@@ -6131,6 +6131,112 @@ body.aws-console,
     max-height: none !important;
 }
 
+.aws-console .sms-usage-filter-toolbar {
+    align-items: flex-end;
+}
+
+.aws-console .sms-applicant-picker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.aws-console .sms-applicant-picker > input[type="search"] {
+    width: 100%;
+}
+
+.aws-console .sms-applicant-results {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 16rem;
+    overflow-y: auto;
+    border: 1px solid var(--sacco-line);
+    background: var(--sacco-panel);
+    box-shadow: var(--sacco-shadow);
+}
+
+.aws-console .sms-applicant-result,
+.aws-console .sms-applicant-result-empty {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 7px 9px;
+    border: 0;
+    border-bottom: 1px solid var(--sacco-line);
+    background: #fff;
+    color: var(--sacco-ink);
+    font-size: 12px;
+    line-height: 16px;
+    text-align: left;
+}
+
+.aws-console .sms-applicant-result:hover,
+.aws-console .sms-applicant-result:focus {
+    background: var(--sacco-panel-muted);
+    outline: none;
+}
+
+.aws-console .sms-applicant-result small {
+    color: var(--sacco-muted);
+    font-size: 11px;
+}
+
+.aws-console .sms-applicant-result-empty {
+    color: var(--sacco-muted);
+}
+
+.aws-console .sms-applicant-chips {
+    display: flex;
+    min-height: 0;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.aws-console .sms-applicant-chip {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 6px;
+    border: 1px solid var(--sacco-line);
+    border-radius: 2px;
+    background: var(--sacco-panel-muted);
+    color: var(--sacco-ink);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.aws-console .sms-applicant-chip > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.aws-console .sms-applicant-chip button {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--sacco-muted);
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.aws-console .sms-applicant-chip button:hover,
+.aws-console .sms-applicant-chip button:focus {
+    color: var(--sacco-danger);
+    outline: 1px solid var(--sacco-blue);
+}
+
 .aws-console .erp-stat-grid,
 .aws-console .staff-metric-grid {
     display: grid;
