@@ -89,6 +89,9 @@ public class AppController {
     private static final String GUARANTOR_APPROVAL_MODE_FIELD = "guarantorApprovalMode";
     private static final String GUARANTOR_APPROVAL_MODE_LOGIN = "LOGIN";
     private static final String GUARANTOR_APPROVAL_MODE_DIRECT_OTP = "DIRECT_OTP";
+    private static final String DIRECT_GUARANTOR_OTP_TERMS = "Guarantorship terms: By sharing this OTP, you confirm "
+        + "that you are willing to guarantee this loan, accept responsibility for recoveries and penalties if the applicant "
+        + "defaults, and agree to the guarantor terms and conditions in the SACCO bylaws and loan contract.";
     private final LoanWorkflowService loanWorkflowService;
     private final LoanAnalyticsService loanAnalyticsService;
     private final LoanQualificationPolicyService loanQualificationPolicyService;
@@ -3119,7 +3122,9 @@ public class AppController {
             + " only if you approve being listed as guarantor for this loan application."
             + System.lineSeparator()
             + "Request summary: "
-            + requestSummary;
+            + requestSummary
+            + System.lineSeparator()
+            + DIRECT_GUARANTOR_OTP_TERMS;
     }
 
     private String directOtpApplicantName(LoanApplication application) {

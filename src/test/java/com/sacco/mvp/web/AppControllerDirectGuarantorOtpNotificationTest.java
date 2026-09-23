@@ -186,6 +186,9 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             .contains("Amount: TSh 200,000")
             .contains("Tenure: 2 month(s)")
             .contains("Loan Product: Watumishi Emergency Loan")
+            .contains("Guarantorship terms:")
+            .contains("accept responsibility for recoveries and penalties if the applicant defaults")
+            .contains("agree to the guarantor terms and conditions in the SACCO bylaws and loan contract")
             .doesNotContain("Product: Loan Product");
     }
 
