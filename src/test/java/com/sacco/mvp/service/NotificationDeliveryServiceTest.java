@@ -203,4 +203,102 @@ class NotificationDeliveryServiceTest {
         verify(unitService, never()).reserve(any(), any(), any(), any());
         verify(smsGateway, never()).send(any(), any());
     }
+
+    @Test
+    void directContactSmsUsesProvidedPhoneAndLoanContext() {
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        NotificationEmailService emailService = mock(NotificationEmailService.class);
+        SmsGateway smsGateway = mock(SmsGateway.class);
+        SmsUnitTransactionService unitService = mock(SmsUnitTransactionService.class);
+        SmsUsageAlertService alertService = mock(SmsUsageAlertService.class);
+        StationOtpSettingsService stationOtpSettingsService = mock(StationOtpSettingsService.class);
+        NotificationDeliveryService service = new NotificationDeliveryService(
+            memberRepository,
+            emailService,
+            smsGateway,
+            unitService,
+            alertService,
+            stationOtpSettingsService
+        );
+        UUID notificationId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        UUID ledgerId = UUID.randomUUID();
+        SmsUnitTransactionService.SmsUsageContext context =
+            new SmsUnitTransactionService.SmsUsageContext(loanId, applicantId, guarantorId);
+        NotificationDeliveryService.DeliveryContent content = new NotificationDeliveryService.DeliveryContent(
+            "Guarantor confirmation recorded",
+            "Plain notification body",
+            null,
+            "Confirmed"
+        );
+
+        when(stationOtpSettingsService.channel("SACCO-1", "ST-1")).thenReturn(OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK);
+        when(unitService.reserve("SACCO-1", "ST-1", notificationId, "DIRECT_GUARANTOR_OTP_CONFIRMED", context))
+            .thenReturn(new SmsUnitTransactionService.ReservationResult(true, accountId, ledgerId, null, false, null, 9));
+        when(smsGateway.send("255700000002", "Confirmed")).thenReturn(SmsSendResult.sent("message-id"));
+        when(unitService.complete(accountId, ledgerId, SmsSendResult.sent("message-id")))
+            .thenReturn(new SmsUnitTransactionService.CompletionResult(SmsUnitStatus.HEALTHY, 9, null));
+
+        service.deliverDirectContact(
+            "SACCO-1",
+            "ST-1",
+            notificationId,
+            "guarantor@example.com",
+            "+255700000002",
+            "DIRECT_GUARANTOR_OTP_CONFIRMED",
+            content,
+            context
+        );
+
+        verify(memberRepository, never()).findById(any());
+        verify(emailService, never()).sendDirectEmail(any(), any(), any());
+        verify(unitService).reserve("SACCO-1", "ST-1", notificationId, "DIRECT_GUARANTOR_OTP_CONFIRMED", context);
+        verify(smsGateway).send("255700000002", "Confirmed");
+    }
+
+    @Test
+    void directContactSmsFallbackEmailsWhenPhoneIsInvalid() {
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        NotificationEmailService emailService = mock(NotificationEmailService.class);
+        SmsGateway smsGateway = mock(SmsGateway.class);
+        SmsUnitTransactionService unitService = mock(SmsUnitTransactionService.class);
+        SmsUsageAlertService alertService = mock(SmsUsageAlertService.class);
+        StationOtpSettingsService stationOtpSettingsService = mock(StationOtpSettingsService.class);
+        NotificationDeliveryService service = new NotificationDeliveryService(
+            memberRepository,
+            emailService,
+            smsGateway,
+            unitService,
+            alertService,
+            stationOtpSettingsService
+        );
+        NotificationDeliveryService.DeliveryContent content = NotificationDeliveryService.DeliveryContent.plain(
+            "Guarantor confirmation recorded",
+            "Plain notification body"
+        );
+
+        when(stationOtpSettingsService.channel("SACCO-1", "ST-1")).thenReturn(OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK);
+
+        service.deliverDirectContact(
+            "SACCO-1",
+            "ST-1",
+            UUID.randomUUID(),
+            "guarantor@example.com",
+            "not-a-phone",
+            "DIRECT_GUARANTOR_OTP_CONFIRMED",
+            content,
+            new SmsUnitTransactionService.SmsUsageContext(UUID.randomUUID(), UUID.randomUUID(), null)
+        );
+
+        verify(emailService).sendDirectEmail(
+            "guarantor@example.com",
+            "Guarantor confirmation recorded",
+            "Plain notification body"
+        );
+        verify(unitService, never()).reserve(any(), any(), any(), any(), any());
+        verify(smsGateway, never()).send(any(), any());
+    }
 }

@@ -112,6 +112,39 @@ public class NotificationDeliveryService {
         );
     }
 
+    public void deliverDirectContact(String saccoId,
+                                     String stationId,
+                                     UUID notificationId,
+                                     String email,
+                                     String phone,
+                                     String eventType,
+                                     DeliveryContent content,
+                                     SmsUnitTransactionService.SmsUsageContext usageContext) {
+        DeliveryContent resolvedContent = content == null ? DeliveryContent.plain("", "") : content;
+        try {
+            OtpDeliveryChannel channel = stationOtpSettingsService.channel(saccoId, stationId);
+            if (channel == OtpDeliveryChannel.EMAIL) {
+                notificationEmailService.sendDirectEmail(email, resolvedContent.subject(), resolvedContent.plainText());
+                return;
+            }
+
+            boolean smsSent = sendDirectSms(
+                saccoId,
+                stationId,
+                notificationId == null ? UUID.randomUUID() : notificationId,
+                phone,
+                eventType,
+                resolvedContent,
+                usageContext
+            );
+            if (!smsSent && channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
+                notificationEmailService.sendDirectEmail(email, resolvedContent.subject(), resolvedContent.plainText());
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Direct contact notification failed for event {}: {}", eventType, ex.getMessage());
+        }
+    }
+
     private void deliver(String saccoId,
                          String stationId,
                          UUID notificationId,
@@ -195,6 +228,50 @@ public class NotificationDeliveryService {
         }
         if (!result.sent()) {
             log.info("SMS notification outcome for member {} and event {}: {}", recipient.getId(), eventType, result.message());
+        }
+        return result.sent();
+    }
+
+    private boolean sendDirectSms(String saccoId,
+                                  String stationId,
+                                  UUID notificationId,
+                                  String phone,
+                                  String eventType,
+                                  DeliveryContent content,
+                                  SmsUnitTransactionService.SmsUsageContext usageContext) {
+        String normalizedPhone = TanzaniaPhoneNumber.normalizeOptional(phone);
+        if (normalizedPhone == null) {
+            log.info("Direct SMS notification blocked for event {}: recipient phone is missing or invalid", eventType);
+            return false;
+        }
+        SmsUnitTransactionService.ReservationResult reservation = isEmptyContext(usageContext)
+            ? smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType)
+            : smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType, usageContext);
+        if (reservation.alertStatus() != null) {
+            smsUsageAlertService.alertStatus(saccoId, stationId, reservation.alertStatus(), reservation.availableUnits());
+        }
+        if (!reservation.reserved()) {
+            if (reservation.invalidScope()) {
+                smsUsageAlertService.alertInvalidScope(saccoId, stationId, eventType, reservation.reason());
+            }
+            log.info("Direct SMS notification blocked for event {}: {}", eventType, reservation.reason());
+            return false;
+        }
+
+        SmsSendResult result;
+        try {
+            result = smsGateway.send(normalizedPhone, smsText(content));
+        } catch (RuntimeException ex) {
+            result = SmsSendResult.acceptanceUnknown("SMS gateway call ended unexpectedly");
+            log.warn("SMS gateway call ended unexpectedly for direct contact event {}", eventType, ex);
+        }
+        SmsUnitTransactionService.CompletionResult completion =
+            smsUnitTransactionService.complete(reservation.accountId(), reservation.ledgerId(), result);
+        if (completion.alertStatus() != null) {
+            smsUsageAlertService.alertStatus(saccoId, stationId, completion.alertStatus(), completion.availableUnits());
+        }
+        if (!result.sent()) {
+            log.info("Direct SMS notification outcome for event {}: {}", eventType, result.message());
         }
         return result.sent();
     }

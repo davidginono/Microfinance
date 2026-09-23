@@ -17,6 +17,8 @@ import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.MemberDirectoryService;
+import com.sacco.mvp.service.NotificationDeliveryService;
+import com.sacco.mvp.service.SmsUnitTransactionService;
 import com.sacco.mvp.service.StationOtpDeliveryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -47,6 +50,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
     @Mock private EmailOtpService emailOtpService;
     @Mock private LoanProductDisplayService loanProductDisplayService;
     @Mock private MemberDirectoryService memberDirectoryService;
+    @Mock private NotificationDeliveryService notificationDeliveryService;
     @Mock private AppUserPrincipal principal;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -276,5 +280,109 @@ class AppControllerDirectGuarantorOtpNotificationTest {
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsEntry("valid", true);
+    }
+
+    @Test
+    void directOtpConfirmationNotifiesGuarantorThatLoanObligationIsRecorded() {
+        UUID loanId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        UUID otpTokenId = UUID.randomUUID();
+        LoanApplication application = LoanApplication.builder()
+            .id(loanId)
+            .applicationNumber(100403L)
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .applicantMemberId(applicantId)
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .loanProductSettingId(UUID.randomUUID())
+            .amount(new BigDecimal("350000"))
+            .tenorMonths(4)
+            .status(LoanStatus.AWAITING_GUARANTORS)
+            .requiredGuarantors(1)
+            .formData("{\"guarantorApprovalMode\":\"DIRECT_OTP\"}")
+            .build();
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(requestId)
+            .loanApplicationId(loanId)
+            .guarantorMemberId(guarantorId)
+            .status(GuarantorRequestStatus.PENDING)
+            .build();
+        Member applicant = Member.builder()
+            .id(applicantId)
+            .fullName("Asha Applicant")
+            .build();
+        Member guarantor = Member.builder()
+            .id(guarantorId)
+            .fullName("George Guarantor")
+            .memberNo("M-22")
+            .email("guarantor@example.com")
+            .phone("+255700000002")
+            .build();
+
+        when(principal.getMemberId()).thenReturn(applicantId);
+        when(loanWorkflowService.getMine(loanId, applicantId)).thenReturn(application);
+        when(loanWorkflowService.findGuarantorRequest(requestId)).thenReturn(Optional.of(request));
+        when(memberDirectoryService.find(guarantorId)).thenReturn(Optional.of(guarantor));
+        when(memberDirectoryService.find(applicantId)).thenReturn(Optional.of(applicant));
+        when(loanProductDisplayService.displayName(application)).thenReturn("Watumishi Emergency Loan");
+        when(emailOtpService.validateOtp(
+            "guarantor@example.com",
+            EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
+            guarantorId,
+            "123456"
+        )).thenReturn(otpTokenId);
+
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        String view = controller.confirmApplicantGuarantorOtp(
+            loanId,
+            requestId,
+            principal,
+            "123456",
+            redirectAttributes
+        );
+
+        assertThat(view).isEqualTo("redirect:/app/loan-applications/" + loanId);
+        assertThat(redirectAttributes.getFlashAttributes().get("message"))
+            .isEqualTo("Guarantor approval confirmed.");
+        verify(loanWorkflowService).approveDirectOtpGuarantorRequest(
+            eq(requestId),
+            eq(applicantId),
+            eq("Approved by guarantor OTP"),
+            any(OffsetDateTime.class)
+        );
+        verify(emailOtpService).consumeOtpById(otpTokenId);
+
+        ArgumentCaptor<NotificationDeliveryService.DeliveryContent> contentCaptor =
+            ArgumentCaptor.forClass(NotificationDeliveryService.DeliveryContent.class);
+        ArgumentCaptor<SmsUnitTransactionService.SmsUsageContext> contextCaptor =
+            ArgumentCaptor.forClass(SmsUnitTransactionService.SmsUsageContext.class);
+        verify(notificationDeliveryService).deliverDirectContact(
+            eq("SACCO-1"),
+            eq("ST-1"),
+            any(UUID.class),
+            eq("guarantor@example.com"),
+            eq("+255700000002"),
+            eq("DIRECT_GUARANTOR_OTP_CONFIRMED"),
+            contentCaptor.capture(),
+            contextCaptor.capture()
+        );
+
+        NotificationDeliveryService.DeliveryContent content = contentCaptor.getValue();
+        assertThat(content.subject()).isEqualTo("Guarantor confirmation recorded");
+        assertThat(content.plainText())
+            .contains("Your guarantor OTP has been entered by Asha Applicant.")
+            .contains("successfully chosen as guarantor")
+            .contains("obligated to this loan")
+            .contains("Application #100403")
+            .contains("Amount: TSh 350,000")
+            .contains("Loan Product: Watumishi Emergency Loan");
+        assertThat(content.smsText())
+            .contains("Asha Applicant")
+            .contains("successfully chosen as guarantor")
+            .contains("obligated to this loan");
+        assertThat(contextCaptor.getValue())
+            .isEqualTo(new SmsUnitTransactionService.SmsUsageContext(loanId, applicantId, guarantorId));
     }
 }

@@ -24,8 +24,10 @@ import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.LoanProductWorkflowService;
 import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.NotificationDeliveryService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.ReversalRequestService;
+import com.sacco.mvp.service.SmsUnitTransactionService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserSettingsService;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
@@ -89,6 +91,7 @@ public class AppController {
     private static final String GUARANTOR_APPROVAL_MODE_FIELD = "guarantorApprovalMode";
     private static final String GUARANTOR_APPROVAL_MODE_LOGIN = "LOGIN";
     private static final String GUARANTOR_APPROVAL_MODE_DIRECT_OTP = "DIRECT_OTP";
+    private static final String DIRECT_GUARANTOR_OTP_CONFIRMED_EVENT = "DIRECT_GUARANTOR_OTP_CONFIRMED";
     private static final String DIRECT_GUARANTOR_OTP_TERMS = "Guarantorship terms: By sharing this OTP, you confirm "
         + "that you are willing to guarantee this loan, accept responsibility for recoveries and penalties if the applicant "
         + "defaults, and agree to the guarantor terms and conditions in the SACCO bylaws and loan contract.";
@@ -111,6 +114,7 @@ public class AppController {
     private final EmailOtpService emailOtpService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
+    private final NotificationDeliveryService notificationDeliveryService;
     private final ReversalRequestService reversalRequestService;
     private final PaymentDetailsService paymentDetailsService;
     private final MemberDirectoryService memberDirectoryService;
@@ -2197,6 +2201,7 @@ public class AppController {
                 OffsetDateTime.now()
             );
             emailOtpService.consumeOtpById(otpTokenId);
+            notifyDirectGuarantorOtpConfirmed(application, recipient);
             ra.addFlashAttribute("message", "Guarantor approval confirmed.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
@@ -3094,6 +3099,57 @@ public class AppController {
             application.getId(),
             application.getApplicantMemberId()
         );
+    }
+
+    private void notifyDirectGuarantorOtpConfirmed(LoanApplication application,
+                                                   DirectGuarantorOtpRecipient recipient) {
+        notificationDeliveryService.deliverDirectContact(
+            application.getSaccoId(),
+            application.getStationId(),
+            UUID.randomUUID(),
+            recipient.email(),
+            recipient.phone(),
+            DIRECT_GUARANTOR_OTP_CONFIRMED_EVENT,
+            directGuarantorOtpConfirmedContent(application),
+            new SmsUnitTransactionService.SmsUsageContext(
+                application.getId(),
+                application.getApplicantMemberId(),
+                recipient.memberId()
+            )
+        );
+    }
+
+    private NotificationDeliveryService.DeliveryContent directGuarantorOtpConfirmedContent(LoanApplication application) {
+        String subject = "Guarantor confirmation recorded";
+        String applicantName = directOtpApplicantName(application);
+        String applicantLabel = applicantName == null ? "the applicant" : applicantName;
+        List<String> summary = new ArrayList<>();
+        if (application.getApplicationNumber() != null) {
+            summary.add("Application #" + application.getApplicationNumber());
+        }
+        if (application.getAmount() != null) {
+            summary.add("Amount: " + formatTzs(application.getAmount()));
+        }
+        String loanProductName = directOtpLoanProductName(application);
+        if (loanProductName != null) {
+            summary.add("Loan Product: " + loanProductName);
+        }
+        StringBuilder message = new StringBuilder()
+            .append("Your guarantor OTP has been entered by ")
+            .append(applicantLabel)
+            .append(".")
+            .append(System.lineSeparator())
+            .append("You have been successfully chosen as guarantor and are obligated to this loan.");
+        if (!summary.isEmpty()) {
+            message.append(System.lineSeparator())
+                .append("Loan summary: ")
+                .append(String.join("; ", summary))
+                .append(".");
+        }
+        String smsText = "SACCO: Your guarantor OTP for "
+            + applicantLabel
+            + "'s loan has been confirmed. You are successfully chosen as guarantor and obligated to this loan.";
+        return new NotificationDeliveryService.DeliveryContent(subject, message.toString(), null, smsText);
     }
 
     private String directGuarantorOtpIntro(LoanApplication application) {
