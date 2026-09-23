@@ -20,8 +20,27 @@ public class ErrorPageController implements ErrorController {
 
     @GetMapping("/error/403")
     public String forbidden(HttpServletRequest request, Model model) {
-        String requestUri = request.getHeader("Referer");
+        String requestUri = originalRequestPath(request);
         return renderError(model, 403, requestUri);
+    }
+
+    private String originalRequestPath(HttpServletRequest request) {
+        String uri = attributeValue(request, RequestDispatcher.ERROR_REQUEST_URI);
+        String query = attributeValue(request, RequestDispatcher.ERROR_QUERY_STRING);
+        if (uri == null || uri.isBlank()) {
+            uri = attributeValue(request, RequestDispatcher.FORWARD_REQUEST_URI);
+            query = attributeValue(request, RequestDispatcher.FORWARD_QUERY_STRING);
+        }
+        if (uri == null || uri.isBlank()) {
+            uri = request.getRequestURI();
+            query = request.getQueryString();
+        }
+        return query == null || query.isBlank() ? uri : uri + "?" + query;
+    }
+
+    private String attributeValue(HttpServletRequest request, String name) {
+        Object value = request.getAttribute(name);
+        return value instanceof String text ? text : null;
     }
 
     private String renderError(Model model, Integer statusCode, String requestUri) {

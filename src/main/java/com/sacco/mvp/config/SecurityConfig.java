@@ -40,8 +40,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -298,7 +301,7 @@ public class SecurityConfig {
                         && principal.isPlatformIdentity();
                     response.sendRedirect(platformAdmin ? "/system-admin/login?logout" : "/login?logout");
                 }))
-            .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
+            .exceptionHandling(ex -> ex.accessDeniedHandler(loginAwareAccessDeniedHandler()))
             .csrf(Customizer.withDefaults())
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
             .addFilterAfter(new SessionTimeoutPolicyFilter(platformSessionSettingsService), AuthorizationFilter.class)
@@ -605,5 +608,48 @@ public class SecurityConfig {
             && !googleClientId.isBlank()
             && googleClientSecret != null
             && !googleClientSecret.isBlank();
+    }
+
+    private AccessDeniedHandler loginAwareAccessDeniedHandler() {
+        AccessDeniedHandlerImpl fallback = new AccessDeniedHandlerImpl();
+        fallback.setErrorPage("/error/403");
+        return (request, response, exception) -> {
+            if (isExpiredLoginSubmission(request, exception)) {
+                request.getSession(true).setAttribute(
+                    "loginErrorMessage",
+                    "Your sign-in page expired. Please try logging in again."
+                );
+                response.sendRedirect(response.encodeRedirectURL(request.getContextPath() + loginRedirectTarget(request)));
+                return;
+            }
+            fallback.handle(request, response, exception);
+        };
+    }
+
+    private boolean isExpiredLoginSubmission(HttpServletRequest request,
+                                             org.springframework.security.access.AccessDeniedException exception) {
+        return exception instanceof CsrfException
+            && "POST".equalsIgnoreCase(request.getMethod())
+            && "/login".equals(pathWithinApplication(request));
+    }
+
+    private String pathWithinApplication(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && requestUri.startsWith(contextPath)) {
+            return requestUri.substring(contextPath.length());
+        }
+        return requestUri;
+    }
+
+    private String loginRedirectTarget(HttpServletRequest request) {
+        String loginType = request.getParameter("loginType");
+        if ("system-admin-password".equals(loginType)) {
+            return "/system-admin/login?error";
+        }
+        if ("staff-password".equals(loginType)) {
+            return "/login?error&tab=staff";
+        }
+        return "/login?error";
     }
 }
