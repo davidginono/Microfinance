@@ -7,11 +7,13 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.PlatformSessionSettings;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.domain.StaffAccessStatus;
+import com.sacco.mvp.domain.StationSmsAccount;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
@@ -76,6 +78,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -86,6 +89,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -101,13 +105,15 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private PlatformEmailSettingsService platformEmailSettingsService;
     @Autowired private PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
     @Autowired private SmsUsageManagementService smsUsageManagementService;
+    @Autowired private StationOtpSettingsService stationOtpSettingsService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
-            platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService);
+            platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService,
+            stationOtpSettingsService);
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -572,6 +578,36 @@ class AdminControllerUserAccessSecurityTest {
         verify(smsUsageManagementService, never()).searchLoanUsageApplicants("OTHER", "OTHER", "ali");
     }
 
+    @Test
+    void workspaceSmsUsagePageProvidesAccountsModelForJspUrls() throws Exception {
+        AppUserPrincipal principal = principal(Set.of(UserClaim.SMS_USAGE_VIEW));
+        var criteria = new SmsUsageManagementService.LoanSmsUsageCriteria(
+            "SACCO-01",
+            "ST-1",
+            null,
+            null,
+            null,
+            List.of()
+        );
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
+        when(adminScopeService.currentStationId(any(AppUserPrincipal.class))).thenReturn("ST-1");
+        when(smsUsageManagementService.loanUsageCriteria("SACCO-01", "ST-1", null, null, null, null))
+            .thenReturn(criteria);
+        when(smsUsageManagementService.account("SACCO-01", "ST-1")).thenReturn(smsAccount());
+        when(stationOtpSettingsService.channel("SACCO-01", "ST-1")).thenReturn(OtpDeliveryChannel.SMS);
+        when(smsUsageManagementService.historyRows(eq("SACCO-01"), eq("ST-1"), any())).thenReturn(new PageImpl<>(List.of()));
+        when(smsUsageManagementService.loanUsageRows(eq(criteria), any())).thenReturn(new PageImpl<>(List.of()));
+        when(smsUsageManagementService.selectedLoanUsageApplicants(criteria)).thenReturn(List.of());
+        when(smsUsageManagementService.loanStatusOptions()).thenReturn(List.of());
+
+        mockMvc.perform(get("/admin/sms-usage")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isOk())
+            .andExpect(view().name("admin/sms-usage"))
+            .andExpect(model().attributeExists("accounts"));
+    }
+
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {
         return new UsernamePasswordAuthenticationToken(principal, principal.getPassword(), principal.getAuthorities());
     }
@@ -593,6 +629,20 @@ class AdminControllerUserAccessSecurityTest {
             .createdAt(OffsetDateTime.now())
             .build();
         return new AppUserPrincipal(member, claims, true);
+    }
+
+    private StationSmsAccount smsAccount() {
+        return StationSmsAccount.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .availableUnits(100)
+            .alertReservedUnits(0)
+            .warningBaseline(100)
+            .status(com.sacco.mvp.domain.SmsUnitStatus.HEALTHY)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
     }
 
     private AppUserPrincipal platformPrincipal(Set<UserClaim> claims) {

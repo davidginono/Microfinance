@@ -212,6 +212,7 @@ public class AdminController {
                 applicantIds
             );
             var selectedAccount = smsUsageManagementService.account(scopedSaccoId, scopedStationId);
+            model.addAttribute("accounts", Page.empty(PageRequest.of(0, 25)));
             model.addAttribute("selectedAccount", selectedAccount);
             model.addAttribute("selectedOtpDeliveryChannel", stationOtpSettingsService.channel(scopedSaccoId, scopedStationId));
             model.addAttribute("usageHistory", smsUsageManagementService.historyRows(
