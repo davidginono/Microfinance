@@ -4628,6 +4628,34 @@ html.session-timeout-active,
         animation: session-timeout-progress-sweep 900ms ease-in-out infinite;
     }
 
+    .session-timeout-password-input {
+        width: 100%;
+        height: 2.5rem;
+        box-sizing: border-box;
+        border: 1px solid #879596;
+        border-radius: 0.25rem;
+        background: #ffffff;
+        padding: 0 0.75rem;
+        color: #172033;
+        font: inherit;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .session-timeout-password-input:focus {
+        border-color: #0972d3;
+        outline: 2px solid rgba(9, 114, 211, 0.28);
+        outline-offset: 1px;
+    }
+
+    .session-timeout-error {
+        margin-top: 0.5rem;
+        color: #d13212;
+        font-size: 0.875rem;
+        font-weight: 700;
+        line-height: 1.25rem;
+    }
+
     .session-timeout-actions {
         display: flex;
         flex-wrap: wrap;

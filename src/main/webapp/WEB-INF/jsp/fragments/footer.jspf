@@ -503,7 +503,7 @@
 </script>
 <spring:message code="session.timeout.progressLabel" text="Session time remaining" var="sessionTimeoutProgressLabel" />
 <spring:message code="session.timeout.refreshed" text="Session refreshed." var="sessionTimeoutRefreshedMessage" />
-<spring:message code="session.timeout.refreshFailed" text="We could not refresh your session. Please sign in again if this continues." var="sessionTimeoutRefreshFailedMessage" />
+<spring:message code="session.timeout.refreshFailed" text="We could not verify your password. Please try again or log out." var="sessionTimeoutRefreshFailedMessage" />
 <div id="sessionInactivityPrompt"
      class="session-timeout-overlay hidden"
      role="alertdialog"
@@ -527,11 +527,11 @@
             </span>
             <div class="min-w-0 flex-1">
                 <p class="erp-widget-title"><spring:message code="session.timeout.eyebrow" text="Session Security" /></p>
-                <h2 id="sessionInactivityTitle" class="mt-1 text-base font-bold text-sacco-ink"><spring:message code="session.timeout.title" text="Are you still there?" /></h2>
+                <h2 id="sessionInactivityTitle" class="mt-1 text-base font-bold text-sacco-ink"><spring:message code="session.timeout.title" text="Verify to continue" /></h2>
             </div>
         </div>
         <div class="session-timeout-body">
-            <p id="sessionInactivityMessage" class="text-sm leading-5 text-slate-600"><spring:message code="session.timeout.message" text="We have not detected recent activity. For your security, you will be automatically logged out in:" /></p>
+            <p id="sessionInactivityMessage" class="text-sm leading-5 text-slate-600"><spring:message code="session.timeout.message" text="For your security, enter your current password before this session continues. Otherwise, you will be automatically logged out in:" /></p>
             <div class="mt-4 text-center" aria-live="polite" aria-atomic="true">
                 <p id="sessionInactivityCountdown" class="session-timeout-countdown font-display">--</p>
                 <p class="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="session.timeout.seconds" text="Seconds" /></p>
@@ -544,14 +544,23 @@
                  aria-valuenow="100">
                 <div id="sessionInactivityProgress" class="session-timeout-progress-fill h-full w-full rounded-sm bg-sky-600 transition-[width] duration-200 ease-linear"></div>
             </div>
-            <p class="mt-3 text-center text-xs leading-5 text-slate-500"><spring:message code="session.timeout.helper" text="Select Stay Logged In to continue your session, or Logout Now to end it." /></p>
+            <div class="mt-4">
+                <label for="sessionInactivityPassword" class="mb-1.5 block text-xs font-bold text-slate-700"><spring:message code="session.timeout.password" text="Current password" /></label>
+                <input id="sessionInactivityPassword"
+                       type="password"
+                       autocomplete="current-password"
+                       class="session-timeout-password-input"
+                       required />
+                <p id="sessionInactivityError" class="session-timeout-error hidden" aria-live="assertive"></p>
+            </div>
+            <p class="mt-3 text-center text-xs leading-5 text-slate-500"><spring:message code="session.timeout.helper" text="Verify to stay logged in, or log out if this is not you." /></p>
         </div>
         <div class="session-timeout-actions">
             <form id="sessionInactivityLogoutForm" action="/logout" method="post" class="shrink-0 max-sm:w-full">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <button type="submit" class="app-btn btn-reject min-w-[8rem] max-sm:w-full"><spring:message code="session.timeout.logout" text="Logout Now" /></button>
             </form>
-            <button id="sessionInactivityStayButton" type="button" class="app-btn btn-primary min-w-[8rem] shrink-0 max-sm:w-full"><spring:message code="session.timeout.stay" text="Stay Logged In" /></button>
+            <button id="sessionInactivityStayButton" type="button" class="app-btn btn-primary min-w-[8rem] shrink-0 max-sm:w-full"><spring:message code="session.timeout.stay" text="Verify &amp; Stay Logged In" /></button>
         </div>
     </div>
 </div>

@@ -1771,7 +1771,9 @@
         const logoutForm = document.getElementById('sessionInactivityLogoutForm');
         const countdown = document.getElementById('sessionInactivityCountdown');
         const progress = document.getElementById('sessionInactivityProgress');
-        if (!stayButton || !logoutForm || !countdown || !progress) {
+        const passwordInput = document.getElementById('sessionInactivityPassword');
+        const errorBox = document.getElementById('sessionInactivityError');
+        if (!stayButton || !logoutForm || !countdown || !progress || !passwordInput || !errorBox) {
             return;
         }
 
@@ -1792,13 +1794,11 @@
             : 60000;
         const timeoutMs = Math.max(configuredTimeoutMs, warningMs + 1000);
         const progressShell = progress.parentElement;
-        const activityEvents = ['click', 'keydown', 'mousedown', 'mousemove', 'pointerdown', 'touchstart', 'scroll', 'wheel'];
         let checkTimer = null;
         let countdownTimer = null;
         let deadline = 0;
         let keepalivePending = false;
         let cycleStartedAt = Date.now();
-        let activityInCycle = false;
         let audioContext = null;
         let audioUnlocked = false;
         let stopwatchTickTimer = null;
@@ -1813,6 +1813,15 @@
             const clamped = Math.max(0, Math.min(100, percent));
             progress.style.width = clamped.toFixed(1) + '%';
             progressShell?.setAttribute('aria-valuenow', String(Math.round(clamped)));
+        };
+
+        const setPromptError = function (message) {
+            errorBox.textContent = message || '';
+            errorBox.classList.toggle('hidden', !message);
+        };
+
+        const clearPromptError = function () {
+            setPromptError('');
         };
 
         const stopStopwatchTicks = function () {
@@ -2003,6 +2012,8 @@
             deadline = 0;
             countdown.textContent = '--';
             setProgress(100);
+            passwordInput.value = '';
+            clearPromptError();
         };
 
         const showPrompt = function () {
@@ -2034,9 +2045,9 @@
             });
             window.setTimeout(function () {
                 try {
-                    stayButton.focus({ preventScroll: true });
+                    passwordInput.focus({ preventScroll: true });
                 } catch (ignored) {
-                    stayButton.focus();
+                    passwordInput.focus();
                 }
             }, 0);
         };
@@ -2058,6 +2069,7 @@
             stayButton.disabled = pending;
             stayButton.classList.toggle('opacity-60', pending);
             stayButton.classList.toggle('cursor-not-allowed', pending);
+            passwordInput.disabled = pending;
         };
 
         const finalCheckAt = function () {
@@ -2078,46 +2090,70 @@
 
         const startSessionCycle = function () {
             cycleStartedAt = Date.now();
-            activityInCycle = false;
             scheduleFinalMinuteCheck();
         };
 
-        const refreshSession = function (silent) {
+        const refreshSession = function () {
             if (keepalivePending) {
                 return;
             }
-            keepalivePending = true;
-            if (!silent) {
-                setStayPending(true);
+            const password = passwordInput.value || '';
+            if (!password.trim()) {
+                setPromptError('Enter your current password to continue.');
+                passwordInput.focus();
+                return;
             }
+            keepalivePending = true;
+            setStayPending(true);
+            clearPromptError();
+            const body = new URLSearchParams();
+            body.set('password', password);
             fetch(prompt.getAttribute('data-keepalive-url') || '/session/keepalive', {
                 method: 'POST',
-                headers: keepaliveHeaders(),
-                credentials: 'same-origin'
+                headers: Object.assign(keepaliveHeaders(), {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                }),
+                credentials: 'same-origin',
+                body: body.toString()
             })
                 .then(function (response) {
-                    if (!response.ok || response.redirected) {
-                        throw new Error('Session keepalive failed');
-                    }
+                    return response.json()
+                        .catch(function () {
+                            return {};
+                        })
+                        .then(function (payload) {
+                            if (!response.ok || response.redirected || payload.refreshed !== true) {
+                                const error = new Error(payload.message || prompt.getAttribute('data-refresh-error-message') || 'We could not verify your password. Please try again or log out.');
+                                error.status = response.redirected ? 401 : response.status;
+                                throw error;
+                            }
+                            return payload;
+                        });
+                })
+                .then(function () {
+                    passwordInput.value = '';
                     hidePrompt();
                     startSessionCycle();
-                    if (!silent && typeof window.showToast === 'function') {
+                    if (typeof window.showToast === 'function') {
                         window.showToast('success', prompt.getAttribute('data-refresh-success-message') || 'Session refreshed.');
                     }
                 })
-                .catch(function () {
-                    if (silent && !promptVisible()) {
-                        showPrompt();
+                .catch(function (error) {
+                    if (error && error.status === 401) {
+                        expireSession();
+                        return;
                     }
-                    if (!silent && typeof window.showToast === 'function') {
-                        window.showToast('error', prompt.getAttribute('data-refresh-error-message') || 'We could not refresh your session. Please sign in again if this continues.');
+                    setPromptError(error && error.message ? error.message : 'We could not verify your password. Please try again or log out.');
+                    try {
+                        passwordInput.focus({ preventScroll: true });
+                        passwordInput.select();
+                    } catch (ignored) {
+                        passwordInput.focus();
                     }
                 })
                 .finally(function () {
                     keepalivePending = false;
-                    if (!silent) {
-                        setStayPending(false);
-                    }
+                    setStayPending(false);
                 });
         };
 
@@ -2138,19 +2174,8 @@
                 scheduleFinalMinuteCheck();
                 return;
             }
-            if (activityInCycle) {
-                refreshSession(true);
-                return;
-            }
             showPrompt();
         }
-
-        const handleActivity = function () {
-            if (promptVisible()) {
-                return;
-            }
-            activityInCycle = true;
-        };
 
         const handleWake = function () {
             if (promptVisible()) {
@@ -2169,14 +2194,10 @@
             scheduleFinalMinuteCheck();
         };
 
-        activityEvents.forEach(function (eventName) {
-            window.addEventListener(eventName, handleActivity, { passive: true });
-        });
         ['click', 'keydown', 'mousedown', 'pointerdown', 'touchstart'].forEach(function (eventName) {
             window.addEventListener(eventName, unlockSessionAudio, { passive: true });
         });
         window.addEventListener('focus', function () {
-            handleActivity();
             handleWake();
         }, { passive: true });
         document.addEventListener('visibilitychange', function () {
@@ -2185,7 +2206,13 @@
             }
         });
         stayButton.addEventListener('click', function () {
-            refreshSession(false);
+            refreshSession();
+        });
+        passwordInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                refreshSession();
+            }
         });
         logoutForm.addEventListener('submit', clearCountdown);
         startSessionCycle();
