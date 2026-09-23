@@ -6133,11 +6133,30 @@ body.aws-console,
 
 .aws-console .sms-usage-filter-toolbar {
     align-items: flex-end;
+    flex-flow: row wrap !important;
+    overflow: visible !important;
+}
+
+.aws-console .sms-usage-filter-toolbar > label {
+    min-width: min(100%, 11rem) !important;
+    flex: 1 1 12rem !important;
+    max-width: 15rem;
+}
+
+.aws-console .sms-usage-filter-toolbar > label:has(select) {
+    flex-basis: 14rem !important;
+    max-width: 16rem;
+}
+
+.aws-console .sms-usage-filter-toolbar > button:first-of-type {
+    margin-left: 0 !important;
 }
 
 .aws-console .sms-applicant-picker {
     position: relative;
     display: flex;
+    min-width: min(100%, 18rem) !important;
+    flex: 1 1 18rem !important;
     flex-direction: column;
     gap: 4px;
 }
@@ -6157,6 +6176,13 @@ body.aws-console,
     border: 1px solid var(--sacco-line);
     background: var(--sacco-panel);
     box-shadow: var(--sacco-shadow);
+}
+
+.aws-console .erp-table-wrap:has(.sms-applicant-results:not([hidden])),
+.aws-console .sms-usage-filter-toolbar:has(.sms-applicant-results:not([hidden])) {
+    overflow: visible !important;
+    position: relative;
+    z-index: 70;
 }
 
 .aws-console .sms-applicant-result,

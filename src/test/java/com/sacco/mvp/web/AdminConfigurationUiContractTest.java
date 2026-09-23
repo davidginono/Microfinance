@@ -256,7 +256,10 @@ class AdminConfigurationUiContractTest {
             .contains("overflow-y: visible !important")
             .contains(".erp-page-subtitle")
             .contains(".aws-console .sms-usage-filter-toolbar")
+            .contains("flex-flow: row wrap !important")
+            .contains(".aws-console .sms-usage-filter-toolbar > button:first-of-type")
             .contains(".aws-console .sms-applicant-results")
+            .contains(".aws-console .erp-table-wrap:has(.sms-applicant-results:not([hidden]))")
             .contains(".aws-console .sms-applicant-chip");
         assertThat(shellScript)
             .contains("enhancePageBreadcrumbs")
