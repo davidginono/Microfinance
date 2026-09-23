@@ -277,6 +277,24 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void systemAdminSaccoLoanPortfolioShowsOnlyRequestedLoanSummary() throws Exception {
+        String saccoDetail = read(JSP_ROOT.resolve("admin/sacco-detail.jsp"));
+
+        assertThat(saccoDetail)
+            .contains("Loan Portfolio")
+            .contains("Total Applied")
+            .contains("Disbursed Principal")
+            .contains("Loan Applications by Status")
+            .contains("No disbursed or rejected loan applications found for this SACCO.")
+            .doesNotContain("Paid Loans")
+            .doesNotContain("Overdue Unpaid")
+            .doesNotContain("Recent Loan Activity")
+            .doesNotContain("saccoDetail.recentLoans")
+            .doesNotContain("saccoDetail.paidLoanCount")
+            .doesNotContain("saccoDetail.overdueLoanCount");
+    }
+
+    @Test
     void smsUsageLoanReportQueryCastsNullableFiltersForPostgresql() throws Exception {
         String repository = read(Path.of("src/main/java/com/sacco/mvp/repository/SmsUsageLedgerRepository.java"));
 

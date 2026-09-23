@@ -3,7 +3,6 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.AuditLog;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
-import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoAccessStatus;
@@ -35,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +46,15 @@ public class PlatformAdminService {
     private static final BigDecimal GREEN_DEFAULT_THRESHOLD = new BigDecimal("8.00");
     private static final BigDecimal RED_DEFAULT_THRESHOLD = new BigDecimal("12.00");
     private static final DateTimeFormatter DATE_LABEL = DateTimeFormatter.ofPattern("dd MMM yyyy");
+    private static final List<LoanStatus> REJECTED_LOAN_STATUSES = List.of(
+        LoanStatus.MANAGER_REJECTED,
+        LoanStatus.LOAN_OFFICER_REJECTED,
+        LoanStatus.CHAIRPERSON_REJECTED,
+        LoanStatus.BOARD_REJECTED,
+        LoanStatus.CREDIT_COMMITTEE_REJECTED,
+        LoanStatus.ACCOUNTANT_REJECTED,
+        LoanStatus.REJECTED
+    );
 
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoStationRepository saccoStationRepository;
@@ -115,16 +122,11 @@ public class PlatformAdminService {
         LoanStats loanStats = loanApplicationRepository.summarizeLoansForScope(normalizedSaccoId, normalizedStationId)
             .map(this::toLoanStats)
             .orElse(LoanStats.empty());
-        List<LoanStatusCount> loanStatusCounts = loanStatusCountsFor(normalizedSaccoId, normalizedStationId);
-        long totalLoanApplicationCount = loanStatusCounts.stream()
-            .mapToLong(LoanStatusCount::count)
+        Map<LoanStatus, Long> loanStatusCountsByStatus = loanStatusCountsFor(normalizedSaccoId, normalizedStationId);
+        long totalLoanApplicationCount = loanStatusCountsByStatus.values().stream()
+            .mapToLong(Long::longValue)
             .sum();
-        List<LoanApplication> recentLoanEntities = loanApplicationRepository.findRecentForScope(
-            normalizedSaccoId, normalizedStationId, PageRequest.of(0, 10));
-        Map<UUID, Member> recentApplicantsById = memberRepository.findAllById(recentLoanEntities.stream()
-                .map(LoanApplication::getApplicantMemberId)
-                .collect(Collectors.toSet())).stream()
-            .collect(Collectors.toMap(Member::getId, member -> member));
+        List<LoanStatusCount> loanStatusCounts = visibleLoanStatusCounts(loanStatusCountsByStatus);
         SaccoSettings settings = saccoSettingsRepository.findById(normalizedSaccoId).orElse(null);
         SaccoSummary summary = buildSummary(
             sacco,
@@ -136,17 +138,6 @@ public class PlatformAdminService {
             resolveStationAccess(activeStations, normalizedStationId)
         );
 
-        List<LoanItem> recentLoans = recentLoanEntities.stream()
-            .map(loan -> new LoanItem(
-                loan.getId(),
-                resolveApplicantName(loan.getApplicantMemberId(), recentApplicantsById),
-                loan.getStatus(),
-                safeAmount(loan.getAmount()),
-                loan.getUpdatedAt(),
-                loan.getFinalDueDate()
-            ))
-            .toList();
-
         List<AuditItem> relatedAudit = auditLogRepository.searchEventLogViewScoped(
                 null, null, null, normalizedSaccoId, normalizedStationId, PageRequest.of(0, 12))
             .getContent().stream()
@@ -156,12 +147,9 @@ public class PlatformAdminService {
         return new SaccoDetailView(
             sacco.getSaccoId(),
             summary,
-            recentLoans,
             loanStatusCounts,
             totalLoanApplicationCount,
             relatedAudit,
-            loanStats.paidLoanCount(),
-            loanStats.overdueLoanCount(),
             stationOptions,
             normalizedStationId
         );
@@ -357,11 +345,6 @@ public class PlatformAdminService {
         );
     }
 
-    private String resolveApplicantName(UUID applicantMemberId, Map<UUID, Member> membersById) {
-        Member applicant = membersById.get(applicantMemberId);
-        return applicant == null ? "Member " + shortId(applicantMemberId) : applicant.getFullName();
-    }
-
     private StatusMeta resolveStatus(BigDecimal totalDisbursed, BigDecimal defaultPercent, BigDecimal liquidityRatio) {
         if (totalDisbursed == null || totalDisbursed.signum() == 0) {
             return new StatusMeta("New", "amber", "No disbursed portfolio yet.");
@@ -410,19 +393,27 @@ public class PlatformAdminService {
         );
     }
 
-    private List<LoanStatusCount> loanStatusCountsFor(String saccoId, String stationId) {
+    private Map<LoanStatus, Long> loanStatusCountsFor(String saccoId, String stationId) {
         Map<LoanStatus, Long> counts = new EnumMap<>(LoanStatus.class);
         loanApplicationRepository.countByStatusForScope(saccoId, stationId).forEach(row -> {
             if (row.getStatus() != null) {
                 counts.put(row.getStatus(), row.getTotal());
             }
         });
+        return counts;
+    }
+
+    private List<LoanStatusCount> visibleLoanStatusCounts(Map<LoanStatus, Long> counts) {
         List<LoanStatusCount> rows = new ArrayList<>();
-        for (LoanStatus status : LoanStatus.values()) {
-            long count = counts.getOrDefault(status, 0L);
-            if (count > 0) {
-                rows.add(new LoanStatusCount(status, formatLoanStatusLabel(status), count));
-            }
+        long disbursed = counts.getOrDefault(LoanStatus.DISBURSED, 0L);
+        if (disbursed > 0) {
+            rows.add(new LoanStatusCount(LoanStatus.DISBURSED, formatLoanStatusLabel(LoanStatus.DISBURSED), disbursed));
+        }
+        long rejected = REJECTED_LOAN_STATUSES.stream()
+            .mapToLong(status -> counts.getOrDefault(status, 0L))
+            .sum();
+        if (rejected > 0) {
+            rows.add(new LoanStatusCount(LoanStatus.REJECTED, formatLoanStatusLabel(LoanStatus.REJECTED), rejected));
         }
         return rows;
     }
@@ -437,10 +428,6 @@ public class PlatformAdminService {
 
     private static String normalizeOptional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private static String shortId(UUID id) {
-        return id == null ? "N/A" : id.toString().substring(0, 8).toUpperCase(Locale.ROOT);
     }
 
     private static String formatCompactMoney(BigDecimal amount) {
@@ -601,12 +588,9 @@ public class PlatformAdminService {
     public record SaccoDetailView(
         String saccoId,
         SaccoSummary summary,
-        List<LoanItem> recentLoans,
         List<LoanStatusCount> loanStatusCounts,
         long totalLoanApplicationCount,
         List<AuditItem> recentAuditEntries,
-        long paidLoanCount,
-        long overdueLoanCount,
         List<String> stationOptions,
         String selectedStationId
     ) {
@@ -616,10 +600,6 @@ public class PlatformAdminService {
 
         public SaccoSummary getSummary() {
             return summary;
-        }
-
-        public List<LoanItem> getRecentLoans() {
-            return recentLoans;
         }
 
         public List<LoanStatusCount> getLoanStatusCounts() {
@@ -636,14 +616,6 @@ public class PlatformAdminService {
 
         public List<AuditItem> getRecentAuditEntries() {
             return recentAuditEntries;
-        }
-
-        public long getPaidLoanCount() {
-            return paidLoanCount;
-        }
-
-        public long getOverdueLoanCount() {
-            return overdueLoanCount;
         }
 
         public List<String> getStationOptions() {
@@ -1003,79 +975,6 @@ public class PlatformAdminService {
 
         public String toneCardClass() {
             return getToneCardClass();
-        }
-    }
-
-    public record LoanItem(
-        UUID loanId,
-        String applicantName,
-        LoanStatus status,
-        BigDecimal amount,
-        OffsetDateTime updatedAt,
-        LocalDate finalDueDate
-    ) {
-        public UUID getLoanId() {
-            return loanId;
-        }
-
-        public String getApplicantName() {
-            return applicantName;
-        }
-
-        public LoanStatus getStatus() {
-            return status;
-        }
-
-        public BigDecimal getAmount() {
-            return amount;
-        }
-
-        public OffsetDateTime getUpdatedAt() {
-            return updatedAt;
-        }
-
-        public LocalDate getFinalDueDate() {
-            return finalDueDate;
-        }
-
-        public String getLoanReference() {
-            return PlatformAdminService.shortId(loanId);
-        }
-
-        public String loanReference() {
-            return getLoanReference();
-        }
-
-        public String getAmountLabel() {
-            return PlatformAdminService.formatCompactMoney(amount);
-        }
-
-        public String amountLabel() {
-            return getAmountLabel();
-        }
-
-        public String getStatusLabel() {
-            return PlatformAdminService.formatLoanStatusLabel(status);
-        }
-
-        public String statusLabel() {
-            return getStatusLabel();
-        }
-
-        public String getUpdatedAtLabel() {
-            return updatedAt == null ? "—" : ApplicationTimestamps.zoned(updatedAt).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
-        }
-
-        public String updatedAtLabel() {
-            return getUpdatedAtLabel();
-        }
-
-        public String getFinalDueDateLabel() {
-            return finalDueDate == null ? "—" : finalDueDate.format(DATE_LABEL);
-        }
-
-        public String finalDueDateLabel() {
-            return getFinalDueDateLabel();
         }
     }
 

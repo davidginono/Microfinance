@@ -69,12 +69,9 @@ class JspRecordAccessorCompatibilityTest {
         PlatformAdminService.SaccoDetailView detail = new PlatformAdminService.SaccoDetailView(
             "1001",
             summary(),
-            List.of(),
             List.of(new PlatformAdminService.LoanStatusCount(LoanStatus.READY_FOR_MANAGER, "On Review By Manager", 2)),
             2,
             List.of(),
-            0,
-            0,
             List.of("STN001"),
             "STN001"
         );
@@ -92,18 +89,6 @@ class JspRecordAccessorCompatibilityTest {
         assertElProperty("summary", summary, "stationListLabel", summary.getStationListLabel());
         assertElProperty("summary", summary, "totalDisbursedPrincipalFullLabel",
             summary.getTotalDisbursedPrincipalFullLabel());
-
-        PlatformAdminService.LoanItem loan = new PlatformAdminService.LoanItem(
-            UUID.fromString("00000000-0000-0000-0000-000000000123"),
-            "Jane Member",
-            LoanStatus.DISBURSED,
-            new BigDecimal("900000"),
-            OffsetDateTime.parse("2026-07-21T09:00:00+03:00"),
-            LocalDate.of(2026, 8, 21)
-        );
-        assertElProperty("loan", loan, "loanReference", loan.getLoanReference());
-        assertElProperty("loan", loan, "statusLabel", loan.getStatusLabel());
-        assertElProperty("loan", loan, "amountLabel", loan.getAmountLabel());
 
         SaccoRegistryService.StationView station = new SaccoRegistryService.StationView("STN001", null);
         assertElProperty("station", station, "addressLocationLabel", station.getAddressLocationLabel());

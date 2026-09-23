@@ -86,12 +86,13 @@ class PlatformAdminServiceTest {
         when(loanApplicationRepository.summarizeLoansForScope("SACCO-1", "ST-1")).thenReturn(Optional.empty());
         when(loanApplicationRepository.countByStatusForScope("SACCO-1", "ST-1"))
             .thenReturn(List.of(
+                statusCount(LoanStatus.DISBURSED, 5),
+                statusCount(LoanStatus.MANAGER_REJECTED, 2),
+                statusCount(LoanStatus.CREDIT_COMMITTEE_REJECTED, 4),
                 statusCount(LoanStatus.PAID, 1),
+                statusCount(LoanStatus.DEFAULTED, 6),
                 statusCount(LoanStatus.READY_FOR_MANAGER, 3)
             ));
-        when(loanApplicationRepository.findRecentForScope(eq("SACCO-1"), eq("ST-1"), any()))
-            .thenReturn(List.of());
-        when(memberRepository.findAllById(any())).thenReturn(List.of());
         when(saccoSettingsRepository.findById("SACCO-1")).thenReturn(Optional.empty());
         when(auditLogRepository.searchEventLogViewScoped(
             isNull(), isNull(), isNull(), eq("SACCO-1"), eq("ST-1"), any()))
@@ -99,7 +100,7 @@ class PlatformAdminServiceTest {
 
         PlatformAdminService.SaccoDetailView detail = platformAdminService.saccoDetail(" sacco-1 ", "ST-1");
 
-        assertThat(detail.getTotalLoanApplicationCount()).isEqualTo(4);
+        assertThat(detail.getTotalLoanApplicationCount()).isEqualTo(21);
         assertThat(detail.getLoanStatusCounts())
             .extracting(
                 PlatformAdminService.LoanStatusCount::getStatus,
@@ -107,8 +108,8 @@ class PlatformAdminServiceTest {
                 PlatformAdminService.LoanStatusCount::getCount
             )
             .containsExactly(
-                tuple(LoanStatus.READY_FOR_MANAGER, "On Review By Manager", 3L),
-                tuple(LoanStatus.PAID, "Paid", 1L)
+                tuple(LoanStatus.DISBURSED, "Disbursed", 5L),
+                tuple(LoanStatus.REJECTED, "Rejected", 6L)
             );
         verify(loanApplicationRepository).countByStatusForScope("SACCO-1", "ST-1");
     }

@@ -574,17 +574,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                                               @Param("stationId") String stationId);
 
     @Query("""
-        select l
-        from LoanApplication l
-        where l.saccoId = :saccoId
-          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
-        order by l.updatedAt desc
-        """)
-    List<LoanApplication> findRecentForScope(@Param("saccoId") String saccoId,
-                                             @Param("stationId") String stationId,
-                                             Pageable pageable);
-
-    @Query("""
         select l.id as id,
                l.applicationNumber as applicationNumber,
                l.loanId as loanId,

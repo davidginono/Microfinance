@@ -162,7 +162,7 @@
                 <p class="erp-panel-title">Loan Portfolio</p>
             </div>
             <div class="erp-panel-body space-y-4">
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="grid gap-3 sm:grid-cols-2">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Applied</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></p>
@@ -170,14 +170,6 @@
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Disbursed Principal</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalDisbursedPrincipalFullLabel}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Paid Loans</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.paidLoanCount}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Overdue Unpaid</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.overdueLoanCount}</p>
                     </div>
                 </div>
                 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
@@ -200,46 +192,12 @@
                                 </tr>
                             </c:forEach>
                             <c:if test="${empty saccoDetail.loanStatusCounts}">
-                                <tr><td colspan="2" class="text-slate-500">No loan applications found for this SACCO.</td></tr>
+                                <tr><td colspan="2" class="text-slate-500">No disbursed or rejected loan applications found for this SACCO.</td></tr>
                             </c:if>
                             </tbody>
                         </table>
                     </div>
                 </div>
-                <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
-                    <div class="app-table-titlebar">
-                        <div class="app-table-heading"><h2>Recent Loan Activity</h2></div>
-                    </div>
-                    <div class="erp-table-scroll">
-                    <table class="erp-table min-w-[760px]">
-                        <thead>
-                        <tr>
-                            <th>Loan ID</th>
-                            <th>Applicant</th>
-                            <th>Status</th>
-                            <th>Amount</th>
-                            <th>Final Due Date</th>
-                            <th>Updated</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <c:forEach items="${saccoDetail.recentLoans}" var="loan">
-                            <tr>
-                                <td class="font-semibold text-slate-900">${loan.loanReference}</td>
-                                <td>${loan.applicantName}</td>
-                                <td>${loan.statusLabel}</td>
-                                <td>${loan.amountLabel}</td>
-                                <td>${loan.finalDueDateLabel}</td>
-                                <td>${loan.updatedAtLabel}</td>
-                            </tr>
-                        </c:forEach>
-                        <c:if test="${empty saccoDetail.recentLoans}">
-                            <tr><td colspan="6" class="text-slate-500">No loan activity found for this SACCO.</td></tr>
-                        </c:if>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
             </div>
         </section>
     </c:when>
