@@ -29,6 +29,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -114,6 +115,10 @@ public class PlatformAdminService {
         LoanStats loanStats = loanApplicationRepository.summarizeLoansForScope(normalizedSaccoId, normalizedStationId)
             .map(this::toLoanStats)
             .orElse(LoanStats.empty());
+        List<LoanStatusCount> loanStatusCounts = loanStatusCountsFor(normalizedSaccoId, normalizedStationId);
+        long totalLoanApplicationCount = loanStatusCounts.stream()
+            .mapToLong(LoanStatusCount::count)
+            .sum();
         List<LoanApplication> recentLoanEntities = loanApplicationRepository.findRecentForScope(
             normalizedSaccoId, normalizedStationId, PageRequest.of(0, 10));
         Map<UUID, Member> recentApplicantsById = memberRepository.findAllById(recentLoanEntities.stream()
@@ -152,6 +157,8 @@ public class PlatformAdminService {
             sacco.getSaccoId(),
             summary,
             recentLoans,
+            loanStatusCounts,
+            totalLoanApplicationCount,
             relatedAudit,
             loanStats.paidLoanCount(),
             loanStats.overdueLoanCount(),
@@ -403,6 +410,23 @@ public class PlatformAdminService {
         );
     }
 
+    private List<LoanStatusCount> loanStatusCountsFor(String saccoId, String stationId) {
+        Map<LoanStatus, Long> counts = new EnumMap<>(LoanStatus.class);
+        loanApplicationRepository.countByStatusForScope(saccoId, stationId).forEach(row -> {
+            if (row.getStatus() != null) {
+                counts.put(row.getStatus(), row.getTotal());
+            }
+        });
+        List<LoanStatusCount> rows = new ArrayList<>();
+        for (LoanStatus status : LoanStatus.values()) {
+            long count = counts.getOrDefault(status, 0L);
+            if (count > 0) {
+                rows.add(new LoanStatusCount(status, formatLoanStatusLabel(status), count));
+            }
+        }
+        return rows;
+    }
+
     private static BigDecimal safeAmount(BigDecimal amount) {
         return amount == null ? BigDecimal.ZERO : amount;
     }
@@ -455,6 +479,41 @@ public class PlatformAdminService {
             return "—";
         }
         return ratio.setScale(2, RoundingMode.HALF_UP).toPlainString() + "x";
+    }
+
+    private static String formatLoanStatusLabel(LoanStatus status) {
+        if (status == null) {
+            return "Unknown";
+        }
+        return switch (status) {
+            case SUBMITTED -> "Submitted";
+            case READY_FOR_MANAGER -> "On Review By Manager";
+            case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
+            case AWAITING_CHAIRPERSON -> "On Review By Chairperson";
+            case AWAITING_BOARD -> "On Review By Board";
+            case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
+            case AWAITING_ACCOUNTANT -> "On Review By Accountant";
+            case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Ready for Disbursement";
+            case DISBURSED -> "Disbursed";
+            case PAR -> "Portfolio At Risk";
+            case DEFAULTED -> "Defaulted / Not Paid";
+            case PAID -> "Paid";
+            case MANAGER_REJECTED -> "Manager Rejected";
+            case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
+            case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
+            case BOARD_REJECTED -> "Board Rejected";
+            case CREDIT_COMMITTEE_REJECTED -> "Credit Committee Rejected";
+            case ACCOUNTANT_REJECTED -> "Accountant Rejected";
+            case REJECTED -> "Rejected";
+            case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
+            case AWAITING_GUARANTORS -> "Awaiting Guarantors";
+            case BOARD_APPROVED -> "Reviewed By Board";
+            case CREDIT_COMMITTEE_APPROVED -> "Reviewed By Credit Committee";
+            case CHAIRPERSON_APPROVED -> "Reviewed By Chairperson";
+            case LOAN_OFFICER_APPROVED -> "Reviewed By Loan Officer";
+            case ACCOUNTANT_APPROVED -> "Reviewed By Accountant";
+            case DRAFT -> "Draft";
+        };
     }
 
     private static String initialsForName(String name) {
@@ -543,6 +602,8 @@ public class PlatformAdminService {
         String saccoId,
         SaccoSummary summary,
         List<LoanItem> recentLoans,
+        List<LoanStatusCount> loanStatusCounts,
+        long totalLoanApplicationCount,
         List<AuditItem> recentAuditEntries,
         long paidLoanCount,
         long overdueLoanCount,
@@ -559,6 +620,18 @@ public class PlatformAdminService {
 
         public List<LoanItem> getRecentLoans() {
             return recentLoans;
+        }
+
+        public List<LoanStatusCount> getLoanStatusCounts() {
+            return loanStatusCounts;
+        }
+
+        public long getTotalLoanApplicationCount() {
+            return totalLoanApplicationCount;
+        }
+
+        public long totalLoanApplicationCount() {
+            return getTotalLoanApplicationCount();
         }
 
         public List<AuditItem> getRecentAuditEntries() {
@@ -587,6 +660,24 @@ public class PlatformAdminService {
 
         public boolean stationScoped() {
             return isStationScoped();
+        }
+    }
+
+    public record LoanStatusCount(
+        LoanStatus status,
+        String statusLabel,
+        long count
+    ) {
+        public LoanStatus getStatus() {
+            return status;
+        }
+
+        public String getStatusLabel() {
+            return statusLabel;
+        }
+
+        public long getCount() {
+            return count;
         }
     }
 
@@ -964,7 +1055,7 @@ public class PlatformAdminService {
         }
 
         public String getStatusLabel() {
-            return status == null ? "Unknown" : status.name().replace('_', ' ');
+            return PlatformAdminService.formatLoanStatusLabel(status);
         }
 
         public String statusLabel() {

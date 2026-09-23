@@ -127,8 +127,8 @@
                 <p class="mt-1 text-sm text-slate-500">Active: ${saccoDetail.summary.activeMembers} | Inactive: ${saccoDetail.summary.inactiveMembers}</p>
             </div>
             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Loans</p>
-                <p class="mt-2 text-2xl font-semibold text-slate-900">${saccoDetail.summary.totalDisbursedPrincipalLabel}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Loan Applications</p>
+                <p class="mt-2 text-2xl font-semibold text-slate-900"><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></p>
                 <p class="mt-1 text-sm text-slate-500">Active loans: ${saccoDetail.summary.activeLoanCount}</p>
             </div>
             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
@@ -162,7 +162,11 @@
                 <p class="erp-panel-title">Loan Portfolio</p>
             </div>
             <div class="erp-panel-body space-y-4">
-                <div class="grid gap-3 sm:grid-cols-3">
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Applied</p>
+                        <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></p>
+                    </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Disbursed Principal</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalDisbursedPrincipalFullLabel}</p>
@@ -176,7 +180,36 @@
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.overdueLoanCount}</p>
                     </div>
                 </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                    <div class="app-table-titlebar">
+                        <div class="app-table-heading"><h2>Loan Applications by Status</h2></div>
+                    </div>
+                    <div class="erp-table-scroll">
+                        <table class="erp-table min-w-[420px]">
+                            <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th class="text-right">Applications</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <c:forEach items="${saccoDetail.loanStatusCounts}" var="statusCount">
+                                <tr>
+                                    <td class="font-semibold text-slate-900">${statusCount.statusLabel}</td>
+                                    <td class="text-right font-semibold text-slate-900"><fmt:formatNumber value="${statusCount.count}" /></td>
+                                </tr>
+                            </c:forEach>
+                            <c:if test="${empty saccoDetail.loanStatusCounts}">
+                                <tr><td colspan="2" class="text-slate-500">No loan applications found for this SACCO.</td></tr>
+                            </c:if>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                    <div class="app-table-titlebar">
+                        <div class="app-table-heading"><h2>Recent Loan Activity</h2></div>
+                    </div>
                     <div class="erp-table-scroll">
                     <table class="erp-table min-w-[760px]">
                         <thead>

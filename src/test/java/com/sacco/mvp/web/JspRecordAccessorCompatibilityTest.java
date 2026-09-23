@@ -70,6 +70,8 @@ class JspRecordAccessorCompatibilityTest {
             "1001",
             summary(),
             List.of(),
+            List.of(new PlatformAdminService.LoanStatusCount(LoanStatus.READY_FOR_MANAGER, "On Review By Manager", 2)),
+            2,
             List.of(),
             0,
             0,
@@ -77,6 +79,10 @@ class JspRecordAccessorCompatibilityTest {
             "STN001"
         );
         assertElProperty("detail", detail, "stationScoped", detail.isStationScoped());
+        assertElProperty("detail", detail, "totalLoanApplicationCount",
+            detail.getTotalLoanApplicationCount());
+        assertElProperty("statusCount", detail.getLoanStatusCounts().get(0), "statusLabel",
+            detail.getLoanStatusCounts().get(0).getStatusLabel());
 
         PlatformAdminService.SaccoSummary summary = summary();
         assertElProperty("summary", summary, "logoFallbackText", summary.getLogoFallbackText());
