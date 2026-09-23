@@ -79,7 +79,17 @@
                 </svg>
                 <input id="consoleNavigationSearch"
                        type="search"
-                       autocomplete="off"
+                       name="console-navigation-search"
+                       autocomplete="new-password"
+                       autocapitalize="none"
+                       autocorrect="off"
+                       spellcheck="false"
+                       inputmode="search"
+                       aria-autocomplete="none"
+                       data-1p-ignore
+                       data-bwignore
+                       data-lpignore="true"
+                       data-form-type="other"
                        placeholder="<spring:message code='common.search' text='Search' /> navigation"
                        aria-label="<spring:message code='common.search' text='Search' /> navigation" />
             </label>

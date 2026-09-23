@@ -325,9 +325,16 @@ class AwsConsoleViewContractTest {
             .contains("app-profile-control")
             .contains("shellPageBreadcrumbRailText")
             .contains("pageSubmitPreloader")
-            .contains("app-global-search");
+            .contains("app-global-search")
+            .contains("id=\"consoleNavigationSearch\"")
+            .contains("name=\"console-navigation-search\"")
+            .contains("autocomplete=\"new-password\"")
+            .contains("data-form-type=\"other\"")
+            .contains("data-lpignore=\"true\"");
         assertThat(footer)
             .contains("item.dataset.sidebarLabel = label")
+            .contains("id=\"sessionInactivityUsername\"")
+            .contains("autocomplete=\"username\"")
             .doesNotContain("item.setAttribute(\"title\", label)");
         assertThat(fontCss)
             .contains("font-family: \"Open Sans\"")
