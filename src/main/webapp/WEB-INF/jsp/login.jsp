@@ -71,6 +71,9 @@
                     <c:if test="${not empty message}">
                         <div hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></div>
                     </c:if>
+                    <c:if test="${param.loginPageExpired != null}">
+                        <div hidden data-toast-message="Your sign-in page was refreshed for security. Please enter your password again." data-toast-type="info"></div>
+                    </c:if>
 
                     <c:choose>
                     <c:when test="${systemAdminLogin}">
@@ -426,7 +429,35 @@
             }
 
             let locked = false;
+            const loginPageIssuedAtMs = Date.now();
+            const loginPageTimeoutSeconds = Number('${pageContext.session.maxInactiveInterval}');
+            const loginPageTimeoutMs = Number.isFinite(loginPageTimeoutSeconds) && loginPageTimeoutSeconds > 0
+                ? loginPageTimeoutSeconds * 1000
+                : Number.POSITIVE_INFINITY;
+            const loginPageRefreshMarginMs = Number.isFinite(loginPageTimeoutMs)
+                ? Math.min(60000, Math.max(5000, loginPageTimeoutMs * 0.1))
+                : 0;
+            const loginPageFreshMs = Number.isFinite(loginPageTimeoutMs)
+                ? Math.max(10000, loginPageTimeoutMs - loginPageRefreshMarginMs)
+                : Number.POSITIVE_INFINITY;
             const lockButtons = Array.from(document.querySelectorAll('[data-login-tab-toggle], [data-forgot-password-open]'));
+
+            const isLoginPageStale = () => Date.now() - loginPageIssuedAtMs >= loginPageFreshMs;
+
+            const refreshExpiredLoginPage = (form) => {
+                const url = new URL(window.location.href);
+                const loginType = form.querySelector('input[name="loginType"]')?.value || '';
+                url.searchParams.set('loginPageExpired', '1');
+                url.searchParams.delete('error');
+                url.searchParams.delete('logout');
+                url.searchParams.delete('claimed');
+                if (loginType === 'staff-password') {
+                    url.searchParams.set('tab', 'staff');
+                } else if (loginType !== 'system-admin-password') {
+                    url.searchParams.delete('tab');
+                }
+                window.location.replace(url.toString());
+            };
 
             const resetSubmitting = () => {
                 locked = false;
@@ -489,6 +520,11 @@
                     if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
                         return;
                     }
+                    if (isLoginPageStale()) {
+                        event.preventDefault();
+                        refreshExpiredLoginPage(form);
+                        return;
+                    }
                     setSubmitting(form);
                 });
             });
@@ -496,6 +532,12 @@
         }
 
         bindPasswordLoginSubmitGuard();
+
+        if (new URL(window.location.href).searchParams.has('loginPageExpired')) {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('loginPageExpired');
+            window.history.replaceState(window.history.state, '', cleanUrl);
+        }
 
         const toggles = document.querySelectorAll('[data-login-tab-toggle]');
         const tabs = document.querySelectorAll('[data-login-tab]');

@@ -23,6 +23,9 @@ class SystemAdminLoginContractTest {
         assertThat(login)
             .contains("System Admin Login")
             .contains("name=\"loginType\" value=\"system-admin-password\"")
-            .contains("data-forgot-password-open=\"system-admin\"");
+            .contains("data-forgot-password-open=\"system-admin\"")
+            .contains("loginPageExpired")
+            .contains("pageContext.session.maxInactiveInterval")
+            .contains("refreshExpiredLoginPage(form)");
     }
 }
