@@ -271,6 +271,19 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void smsUsageLoanReportQueryCastsNullableFiltersForPostgresql() throws Exception {
+        String repository = read(Path.of("src/main/java/com/sacco/mvp/repository/SmsUsageLedgerRepository.java"));
+
+        assertThat(repository)
+            .contains("cast(:fromAt as timestamp) is null")
+            .contains("cast(:toAt as timestamp) is null")
+            .contains("cast(:loanStatus as string) is null")
+            .doesNotContain(":fromAt is null")
+            .doesNotContain(":toAt is null")
+            .doesNotContain(":loanStatus is null");
+    }
+
+    @Test
     void sidebarShowsOneActiveStaffRailAndUsesOrangeEmblemWithExistingWordmark() throws Exception {
         String sidebar = read(JSP_ROOT.resolve("fragments/sidebar.jspf"));
         String supportContact = read(JSP_ROOT.resolve("fragments/platform-support-contact-sidebar.jspf"));

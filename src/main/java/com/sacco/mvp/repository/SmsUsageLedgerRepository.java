@@ -68,9 +68,9 @@ public interface SmsUsageLedgerRepository extends JpaRepository<SmsUsageLedger, 
             where ledger.loanApplicationId is not null
               and ledger.unitChange < 0
               and ledger.outcome in :outcomes
-              and (:fromAt is null or ledger.createdAt >= :fromAt)
-              and (:toAt is null or ledger.createdAt < :toAt)
-              and (:loanStatus is null or app.status = :loanStatus)
+              and (cast(:fromAt as timestamp) is null or ledger.createdAt >= :fromAt)
+              and (cast(:toAt as timestamp) is null or ledger.createdAt < :toAt)
+              and (cast(:loanStatus as string) is null or app.status = :loanStatus)
               and (:applicantFilterActive = false or app.applicantMemberId in :applicantIds)
               and (cast(:saccoId as string) is null or ledger.saccoId = :saccoId)
               and (cast(:stationId as string) is null or lower(ledger.stationId) = lower(cast(:stationId as string)))
@@ -91,9 +91,9 @@ public interface SmsUsageLedgerRepository extends JpaRepository<SmsUsageLedger, 
             where ledger.loanApplicationId is not null
               and ledger.unitChange < 0
               and ledger.outcome in :outcomes
-              and (:fromAt is null or ledger.createdAt >= :fromAt)
-              and (:toAt is null or ledger.createdAt < :toAt)
-              and (:loanStatus is null or exists (
+              and (cast(:fromAt as timestamp) is null or ledger.createdAt >= :fromAt)
+              and (cast(:toAt as timestamp) is null or ledger.createdAt < :toAt)
+              and (cast(:loanStatus as string) is null or exists (
                   select 1 from LoanApplication app
                   where app.id = ledger.loanApplicationId
                     and app.status = :loanStatus
@@ -136,9 +136,9 @@ public interface SmsUsageLedgerRepository extends JpaRepository<SmsUsageLedger, 
         where ledger.loanApplicationId is not null
           and ledger.unitChange < 0
           and ledger.outcome in :outcomes
-          and (:fromAt is null or ledger.createdAt >= :fromAt)
-          and (:toAt is null or ledger.createdAt < :toAt)
-          and (:loanStatus is null or app.status = :loanStatus)
+          and (cast(:fromAt as timestamp) is null or ledger.createdAt >= :fromAt)
+          and (cast(:toAt as timestamp) is null or ledger.createdAt < :toAt)
+          and (cast(:loanStatus as string) is null or app.status = :loanStatus)
           and (:applicantFilterActive = false or app.applicantMemberId in :applicantIds)
           and (cast(:saccoId as string) is null or ledger.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(ledger.stationId) = lower(cast(:stationId as string)))
