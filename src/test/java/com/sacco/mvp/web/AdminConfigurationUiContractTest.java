@@ -260,7 +260,12 @@ class AdminConfigurationUiContractTest {
             .contains(".erp-page-subtitle")
             .contains(".aws-console .sms-usage-filter-toolbar")
             .contains("flex-flow: row wrap !important")
+            .contains("flex-flow: row nowrap !important")
+            .contains("overflow-x: auto !important")
+            .contains(".aws-console .sms-usage-filter-toolbar .sms-applicant-picker")
+            .contains("flex: 0 0 18rem !important")
             .contains(".aws-console .sms-usage-filter-toolbar > button:first-of-type")
+            .contains(".aws-console .sms-usage-filter-toolbar > a")
             .contains(".aws-console .sms-applicant-results")
             .contains(".aws-console .erp-table-wrap:has(.sms-applicant-results:not([hidden]))")
             .contains(".aws-console .sms-applicant-chip");

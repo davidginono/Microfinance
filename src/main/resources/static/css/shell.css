@@ -6415,3 +6415,41 @@ body.aws-console,
         flex-basis: 100%;
     }
 }
+
+@media (max-width: 767px) {
+    .aws-console .sms-usage-filter-toolbar {
+        flex-flow: row nowrap !important;
+        align-items: flex-end !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: thin;
+    }
+
+    .aws-console .sms-usage-filter-toolbar > label {
+        min-width: 9.5rem !important;
+        flex: 0 0 9.5rem !important;
+        max-width: none !important;
+    }
+
+    .aws-console .sms-usage-filter-toolbar > label:has(select) {
+        min-width: 13rem !important;
+        flex-basis: 13rem !important;
+        max-width: none !important;
+    }
+
+    .aws-console .sms-usage-filter-toolbar .sms-applicant-picker {
+        min-width: 18rem !important;
+        flex: 0 0 18rem !important;
+    }
+
+    .aws-console .sms-usage-filter-toolbar > button,
+    .aws-console .sms-usage-filter-toolbar > a {
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
+    }
+
+    .aws-console .erp-table-wrap:has(.sms-applicant-results:not([hidden])),
+    .aws-console .sms-usage-filter-toolbar:has(.sms-applicant-results:not([hidden])) {
+        overflow: visible !important;
+    }
+}
