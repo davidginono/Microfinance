@@ -15,8 +15,6 @@
     <c:param name="stationId" value="${selectedStationId}" />
     <c:param name="status" value="${selectedSmsStatus}" />
     <c:param name="page" value="${superAdmin ? accounts.number : 0}" />
-    <c:param name="accountId" value="${selectedAccount.id}" />
-    <c:param name="historyPage" value="${usageHistory.number}" />
     <c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
     <c:param name="fromDate" value="${selectedLoanFromDate}" />
     <c:param name="toDate" value="${selectedLoanToDate}" />
@@ -77,12 +75,12 @@
     <c:set var="accountEnd" value="${accountTotal == 0 ? 0 : (accounts.number * accounts.size) + accounts.numberOfElements}" />
     <c:url var="accountPreviousUrl" value="/admin/sms-usage">
         <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" />
-        <c:param name="page" value="${accounts.number - 1}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+        <c:param name="page" value="${accounts.number - 1}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
         <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
     </c:url>
     <c:url var="accountNextUrl" value="/admin/sms-usage">
         <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" />
-        <c:param name="page" value="${accounts.number + 1}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
+        <c:param name="page" value="${accounts.number + 1}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
         <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
     </c:url>
 
@@ -107,11 +105,10 @@
         </form>
         <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading station SMS balances...">
             <table class="erp-table">
-                <thead><tr><th>SACCO</th><th>Station</th><th>Available</th><th>Alert Reserve</th><th>Baseline</th><th>Depleted Alerts</th><th>Status</th><th>Action</th></tr></thead>
+                <thead><tr><th>SACCO</th><th>Station</th><th>Available</th><th>Alert Reserve</th><th>Baseline</th><th>Depleted Alerts</th><th>Status</th></tr></thead>
                 <tbody>
                 <c:forEach items="${accounts.content}" var="account">
-                    <c:url var="accountHistoryUrl" value="/admin/sms-usage"><c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${accounts.number}" /><c:param name="accountId" value="${account.id}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" /><c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach></c:url>
-                    <tr class="${selectedAccount.id eq account.id ? 'bg-sky-50' : ''}">
+                    <tr>
                         <td class="font-semibold text-sacco-ink"><c:out value="${account.saccoId}" /></td>
                         <td class="whitespace-nowrap"><c:out value="${account.stationId}" /></td>
                         <td class="whitespace-nowrap"><fmt:formatNumber value="${account.availableUnits}" /></td>
@@ -119,10 +116,9 @@
                         <td class="whitespace-nowrap"><fmt:formatNumber value="${account.warningBaseline}" /></td>
                         <td class="whitespace-nowrap"><fmt:formatNumber value="${account.depletedAlertSmsSentCount}" /></td>
                         <td><span class="rounded-sm border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
-                        <td class="whitespace-nowrap"><a class="app-btn btn-neutral" href="${accountHistoryUrl}">View History</a></td>
                     </tr>
                 </c:forEach>
-                <c:if test="${empty accounts.content}"><tr><td colspan="8" class="text-center text-slate-500">No station SMS accounts match the filters.</td></tr></c:if>
+                <c:if test="${empty accounts.content}"><tr><td colspan="7" class="text-center text-slate-500">No station SMS accounts match the filters.</td></tr></c:if>
                 </tbody>
             </table>
         </div>
@@ -152,21 +148,12 @@
     </section>
 </c:if>
 
-<c:url var="historyPreviousUrl" value="/admin/sms-usage">
-    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number - 1}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
-    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
-</c:url>
-<c:url var="historyNextUrl" value="/admin/sms-usage">
-    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number + 1}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number}" />
-    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
-</c:url>
-
 <c:url var="loanUsagePreviousUrl" value="/admin/sms-usage">
-    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number - 1}" />
+    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number - 1}" />
     <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 <c:url var="loanUsageNextUrl" value="/admin/sms-usage">
-    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="accountId" value="${selectedAccount.id}" /><c:param name="historyPage" value="${usageHistory.number}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number + 1}" />
+    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" /><c:param name="status" value="${selectedSmsStatus}" /><c:param name="page" value="${superAdmin ? accounts.number : 0}" /><c:param name="loanUsagePage" value="${loanSmsUsage.number + 1}" />
     <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
@@ -201,8 +188,6 @@
         <input type="hidden" name="stationId" value="${selectedStationId}" data-sms-filter-station />
         <input type="hidden" name="status" value="${selectedSmsStatus}" />
         <input type="hidden" name="page" value="${superAdmin ? accounts.number : 0}" />
-        <input type="hidden" name="accountId" value="${selectedAccount.id}" />
-        <input type="hidden" name="historyPage" value="${usageHistory.number}" />
         <input type="hidden" name="loanUsagePage" value="0" />
         <label class="min-w-[9rem] flex-[0_1_10rem] text-xs font-semibold text-slate-700">
             From
@@ -257,41 +242,6 @@
                 </tr>
             </c:forEach>
             <c:if test="${empty loanSmsUsage.content}"><tr><td colspan="10" class="text-center text-slate-500">No loan application SMS usage has been recorded for this scope.</td></tr></c:if>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<section class="erp-table-wrap mt-3" aria-label="SMS usage history">
-    <div class="app-table-titlebar">
-        <div class="app-table-heading">
-            <h2>Usage History<c:if test="${not empty selectedAccount}">: ${selectedAccount.saccoId} / ${selectedAccount.stationId}</c:if></h2>
-            <span>${usageHistory.numberOfElements} of ${usageHistory.totalElements}</span>
-        </div>
-        <div class="app-table-toolbar">
-            <a class="app-icon-button" href="${smsRefreshUrl}" aria-label="Refresh SMS usage history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg></a>
-            <span class="admin-register-count">Page ${usageHistory.number + 1} of ${usageHistory.totalPages gt 0 ? usageHistory.totalPages : 1}</span>
-            <c:choose><c:when test="${empty selectedAccount or usageHistory.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${historyPreviousUrl}" aria-label="Previous SMS history page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
-            <c:choose><c:when test="${empty selectedAccount or usageHistory.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${historyNextUrl}" aria-label="Next SMS history page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>
-        </div>
-    </div>
-    <div class="erp-table-scroll erp-table-scroll-lg" data-aws-table-region data-loading-label="Loading SMS usage history...">
-        <table class="erp-table">
-            <thead><tr><th>First Seen</th><th>Last Seen</th><th>Event</th><th>Outcome</th><th>Count</th><th>Unit Change</th><th>Provider Reference</th><th>Note</th></tr></thead>
-            <tbody>
-            <c:forEach items="${usageHistory.content}" var="entry">
-                <tr>
-                    <td class="whitespace-nowrap"><c:out value="${entry.createdAtLabel}" /></td>
-                    <td class="whitespace-nowrap"><c:out value="${entry.lastOccurredAtLabel}" /></td>
-                    <td class="whitespace-nowrap"><c:out value="${empty entry.eventType ? '-' : entry.eventType}" /></td>
-                    <td class="font-semibold"><c:out value="${entry.outcome}" /></td>
-                    <td><fmt:formatNumber value="${entry.eventCount}" /></td>
-                    <td>${entry.unitChange}</td>
-                    <td><c:out value="${empty entry.providerReference ? '-' : entry.providerReference}" /></td>
-                    <td><c:out value="${empty entry.note ? '-' : entry.note}" /></td>
-                </tr>
-            </c:forEach>
-            <c:if test="${empty usageHistory.content}"><tr><td colspan="8" class="text-center text-slate-500">${empty selectedAccount ? 'Select View History for a station.' : 'No SMS usage has been recorded for this station.'}</td></tr></c:if>
             </tbody>
         </table>
     </div>

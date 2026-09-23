@@ -135,18 +135,15 @@ public class AdminController {
                            @RequestParam(required = false) String saccoId,
                            @RequestParam(required = false) String stationId,
                            @RequestParam(required = false) SmsUnitStatus status,
-                           @RequestParam(required = false) UUID accountId,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                            @RequestParam(required = false) LoanStatus loanStatus,
                            @RequestParam(required = false) List<UUID> applicantIds,
                            @RequestParam(defaultValue = "0") int page,
-                           @RequestParam(defaultValue = "0") int historyPage,
                            @RequestParam(defaultValue = "0") int loanUsagePage,
                            Model model) {
         boolean superAdmin = principal != null && principal.isPlatformIdentity();
         int safePage = Math.max(0, page);
-        int safeHistoryPage = Math.max(0, historyPage);
         int safeLoanUsagePage = Math.max(0, loanUsagePage);
         model.addAttribute("superAdmin", superAdmin);
         model.addAttribute("smsStatuses", SmsUnitStatus.values());
@@ -183,14 +180,7 @@ public class AdminController {
                 status,
                 PageRequest.of(safePage, 25)
             );
-            var selectedAccount = accountId == null ? null : smsUsageManagementService.account(accountId);
             model.addAttribute("accounts", accounts);
-            model.addAttribute("selectedAccount", selectedAccount);
-            model.addAttribute("selectedOtpDeliveryChannel", selectedAccount == null ? null
-                : stationOtpSettingsService.channel(selectedAccount.getSaccoId(), selectedAccount.getStationId()));
-            model.addAttribute("usageHistory", selectedAccount == null
-                ? Page.empty(PageRequest.of(safeHistoryPage, 25))
-                : smsUsageManagementService.historyRows(selectedAccount.getId(), PageRequest.of(safeHistoryPage, 25)));
             model.addAttribute("loanSmsUsage", smsUsageManagementService.loanUsageRows(
                 loanUsageCriteria,
                 PageRequest.of(safeLoanUsagePage, 25)
@@ -215,11 +205,6 @@ public class AdminController {
             model.addAttribute("accounts", Page.empty(PageRequest.of(0, 25)));
             model.addAttribute("selectedAccount", selectedAccount);
             model.addAttribute("selectedOtpDeliveryChannel", stationOtpSettingsService.channel(scopedSaccoId, scopedStationId));
-            model.addAttribute("usageHistory", smsUsageManagementService.historyRows(
-                scopedSaccoId,
-                scopedStationId,
-                PageRequest.of(safeHistoryPage, 25)
-            ));
             model.addAttribute("loanSmsUsage", smsUsageManagementService.loanUsageRows(
                 loanUsageCriteria,
                 PageRequest.of(safeLoanUsagePage, 25)

@@ -243,7 +243,10 @@ class AdminConfigurationUiContractTest {
             .contains("erp-table-scroll")
             .contains("class=\"erp-table\"")
             .contains("aws-pagination-chevron")
-            .contains("entry.createdAtLabel")
+            .doesNotContain("Usage History")
+            .doesNotContain("usageHistory")
+            .doesNotContain("historyPage")
+            .doesNotContain("View History")
             .doesNotContain("erp-page-subtitle");
         assertThat(shellCss)
             .contains(".erp-page-header[data-aws-page-header]")

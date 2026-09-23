@@ -596,7 +596,6 @@ class AdminControllerUserAccessSecurityTest {
             .thenReturn(criteria);
         when(smsUsageManagementService.account("SACCO-01", "ST-1")).thenReturn(smsAccount());
         when(stationOtpSettingsService.channel("SACCO-01", "ST-1")).thenReturn(OtpDeliveryChannel.SMS);
-        when(smsUsageManagementService.historyRows(eq("SACCO-01"), eq("ST-1"), any())).thenReturn(new PageImpl<>(List.of()));
         when(smsUsageManagementService.loanUsageRows(eq(criteria), any())).thenReturn(new PageImpl<>(List.of()));
         when(smsUsageManagementService.selectedLoanUsageApplicants(criteria)).thenReturn(List.of());
         when(smsUsageManagementService.loanStatusOptions()).thenReturn(List.of());

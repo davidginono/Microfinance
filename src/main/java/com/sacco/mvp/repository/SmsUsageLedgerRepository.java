@@ -44,8 +44,6 @@ public interface SmsUsageLedgerRepository extends JpaRepository<SmsUsageLedger, 
 
     Optional<SmsUsageLedger> findByIdAndAccountId(UUID id, UUID accountId);
 
-    Page<SmsUsageLedger> findBySaccoIdAndStationIdOrderByCreatedAtDesc(String saccoId, String stationId, Pageable pageable);
-
     Page<SmsUsageLedger> findByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
 
     @Query(

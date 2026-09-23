@@ -81,20 +81,8 @@ public class SmsUsageManagementService {
             .orElseThrow(() -> new IllegalArgumentException("SMS unit account not found."));
     }
 
-    public Page<SmsUsageLedger> history(String saccoId, String stationId, Pageable pageable) {
-        return ledgerRepository.findBySaccoIdAndStationIdOrderByCreatedAtDesc(saccoId, stationId, pageable);
-    }
-
     public Page<SmsUsageLedger> history(UUID accountId, Pageable pageable) {
         return ledgerRepository.findByAccountIdOrderByCreatedAtDesc(accountId, pageable);
-    }
-
-    public Page<SmsUsageRow> historyRows(String saccoId, String stationId, Pageable pageable) {
-        return history(saccoId, stationId, pageable).map(this::toUsageRow);
-    }
-
-    public Page<SmsUsageRow> historyRows(UUID accountId, Pageable pageable) {
-        return history(accountId, pageable).map(this::toUsageRow);
     }
 
     public Page<LoanSmsUsageRow> loanUsageRows(String saccoId, String stationId, Pageable pageable) {
@@ -267,19 +255,6 @@ public class SmsUsageManagementService {
         return stationId == null || (member.getStationId() != null && member.getStationId().equalsIgnoreCase(stationId));
     }
 
-    private SmsUsageRow toUsageRow(SmsUsageLedger entry) {
-        return new SmsUsageRow(
-            formatTimestamp(entry.getCreatedAt()),
-            formatTimestamp(entry.getLastOccurredAt() == null ? entry.getCreatedAt() : entry.getLastOccurredAt()),
-            entry.getEventType(),
-            entry.getOutcome(),
-            entry.getEventCount(),
-            entry.getUnitChange(),
-            entry.getProviderReference(),
-            entry.getNote()
-        );
-    }
-
     private String formatTimestamp(OffsetDateTime timestamp) {
         return timestamp == null ? "-" : applicationClock.zoned(timestamp).format(USAGE_TIMESTAMP);
     }
@@ -342,18 +317,6 @@ public class SmsUsageManagementService {
             return applicants.get(0).label();
         }
         return applicants.size() + " selected applicants";
-    }
-
-    public record SmsUsageRow(
-        String createdAtLabel,
-        String lastOccurredAtLabel,
-        String eventType,
-        com.sacco.mvp.domain.SmsUsageOutcome outcome,
-        long eventCount,
-        long unitChange,
-        String providerReference,
-        String note
-    ) {
     }
 
     public record LoanSmsUsageRow(
