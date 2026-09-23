@@ -4,14 +4,13 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class NotificationDeliveryService {
     private final MemberRepository memberRepository;
@@ -21,6 +20,23 @@ public class NotificationDeliveryService {
     private final SmsUsageAlertService smsUsageAlertService;
     private final StationOtpSettingsService stationOtpSettingsService;
     private final LoanApplicationRepository loanApplicationRepository;
+
+    @Autowired
+    public NotificationDeliveryService(MemberRepository memberRepository,
+                                       NotificationEmailService notificationEmailService,
+                                       SmsGateway smsGateway,
+                                       SmsUnitTransactionService smsUnitTransactionService,
+                                       SmsUsageAlertService smsUsageAlertService,
+                                       StationOtpSettingsService stationOtpSettingsService,
+                                       LoanApplicationRepository loanApplicationRepository) {
+        this.memberRepository = memberRepository;
+        this.notificationEmailService = notificationEmailService;
+        this.smsGateway = smsGateway;
+        this.smsUnitTransactionService = smsUnitTransactionService;
+        this.smsUsageAlertService = smsUsageAlertService;
+        this.stationOtpSettingsService = stationOtpSettingsService;
+        this.loanApplicationRepository = loanApplicationRepository;
+    }
 
     public NotificationDeliveryService(MemberRepository memberRepository,
                                        NotificationEmailService notificationEmailService,
