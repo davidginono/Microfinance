@@ -434,7 +434,7 @@ public class BoardController {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
                 boardMember.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 boardMember.getId(),
@@ -442,7 +442,9 @@ public class BoardController {
                 reviewOtpBody(myReview.getReviewStage()),
                 app.getSaccoId(),
                 app.getStationId(),
-                boardMember.getPhone()
+                boardMember.getPhone(),
+                app.getId(),
+                app.getApplicantMemberId()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, reviewOtpSentMessage(myReview.getReviewStage())));
         } catch (IllegalArgumentException | IllegalStateException ex) {

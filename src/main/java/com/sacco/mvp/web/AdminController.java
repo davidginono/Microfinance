@@ -137,10 +137,12 @@ public class AdminController {
                            @RequestParam(required = false) UUID accountId,
                            @RequestParam(defaultValue = "0") int page,
                            @RequestParam(defaultValue = "0") int historyPage,
+                           @RequestParam(defaultValue = "0") int loanUsagePage,
                            Model model) {
         boolean superAdmin = principal != null && principal.isPlatformIdentity();
         int safePage = Math.max(0, page);
         int safeHistoryPage = Math.max(0, historyPage);
+        int safeLoanUsagePage = Math.max(0, loanUsagePage);
         model.addAttribute("superAdmin", superAdmin);
         model.addAttribute("smsStatuses", SmsUnitStatus.values());
         model.addAttribute("smsSettings", smsUsageManagementService.settings());
@@ -174,6 +176,11 @@ public class AdminController {
             model.addAttribute("usageHistory", selectedAccount == null
                 ? Page.empty(PageRequest.of(safeHistoryPage, 25))
                 : smsUsageManagementService.historyRows(selectedAccount.getId(), PageRequest.of(safeHistoryPage, 25)));
+            model.addAttribute("loanSmsUsage", smsUsageManagementService.loanUsageRows(
+                selectedSaccoId.isBlank() ? null : selectedSaccoId,
+                selectedStationId.isBlank() ? null : selectedStationId,
+                PageRequest.of(safeLoanUsagePage, 25)
+            ));
             model.addAttribute("registeredSaccos", registeredSaccos);
             model.addAttribute("selectedSaccoId", selectedSaccoId);
             model.addAttribute("selectedStationId", selectedStationId);
@@ -189,6 +196,14 @@ public class AdminController {
                 scopedStationId,
                 PageRequest.of(safeHistoryPage, 25)
             ));
+            model.addAttribute("loanSmsUsage", smsUsageManagementService.loanUsageRows(
+                scopedSaccoId,
+                scopedStationId,
+                PageRequest.of(safeLoanUsagePage, 25)
+            ));
+            model.addAttribute("selectedSaccoId", scopedSaccoId);
+            model.addAttribute("selectedStationId", scopedStationId);
+            model.addAttribute("selectedSmsStatus", "");
         }
         return "admin/sms-usage";
     }

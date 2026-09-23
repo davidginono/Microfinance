@@ -72,7 +72,9 @@ public class OutboxPublisherScheduler {
                     savedNotification.getId(),
                     recipientId,
                     event.getEventType(),
-                    content
+                    content,
+                    event.getAggregateType(),
+                    event.getAggregateId()
                 );
 
                 outboxPublishService.markPublished(event);

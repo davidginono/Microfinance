@@ -1947,20 +1947,21 @@ public class AppController {
                 "Add an email address to your member profile before requesting a guarantor OTP.",
                 "Register your signature first before approving guarantor requests."
             );
+            LoanApplication application = null;
             if (requestId != null) {
                 GuarantorRequest request = loanWorkflowService.findGuarantorRequestForGuarantor(requestId, principal.getMemberId())
                     .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
                 if (request.getStatus() != GuarantorRequestStatus.PENDING) {
                     throw new IllegalStateException("Request already decided");
                 }
-                loanWorkflowService.findApplication(request.getLoanApplicationId())
+                application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                     .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
             }
             if (!stationOtpSettingsService.requiresApprovalOtp(
                 principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.GUARANTOR_SIGNATURE,
                 member.getId(),
@@ -1968,7 +1969,9 @@ public class AppController {
                 "Use this OTP code to confirm your guarantor signature and approve the request.",
                 member.getSaccoId(),
                 member.getStationId(),
-                member.getPhone()
+                member.getPhone(),
+                application == null ? null : application.getId(),
+                application == null ? null : application.getApplicantMemberId()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, "We sent a guarantor confirmation code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -2032,7 +2035,7 @@ public class AppController {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member member = requireMemberWithSavedSignature(principal.getMemberId());
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.APPLICANT_SIGNATURE,
                 member.getId(),
@@ -2040,7 +2043,9 @@ public class AppController {
                 "Use this OTP code to confirm your signature and submit your loan application.",
                 application.getSaccoId(),
                 application.getStationId(),
-                member.getPhone()
+                member.getPhone(),
+                application.getId(),
+                application.getApplicantMemberId()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, "We sent a submission code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -3060,7 +3065,7 @@ public class AppController {
         if (recipient.memberId() != null
             && recipient.email() != null
             && recipient.tokenKey().equalsIgnoreCase(recipient.email().trim())) {
-            return emailOtpService.issueOtpWithMetadata(
+            return emailOtpService.issueLoanOtpWithMetadata(
                 recipient.email(),
                 EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
                 recipient.memberId(),
@@ -3068,10 +3073,12 @@ public class AppController {
                 directGuarantorOtpIntro(application),
                 application.getSaccoId(),
                 application.getStationId(),
-                recipient.phone()
+                recipient.phone(),
+                application.getId(),
+                application.getApplicantMemberId()
             );
         }
-        return emailOtpService.issueOtpWithDeliveryContact(
+        return emailOtpService.issueLoanOtpWithDeliveryContact(
             recipient.tokenKey(),
             recipient.email(),
             EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
@@ -3080,7 +3087,9 @@ public class AppController {
             directGuarantorOtpIntro(application),
             application.getSaccoId(),
             application.getStationId(),
-            recipient.phone()
+            recipient.phone(),
+            application.getId(),
+            application.getApplicantMemberId()
         );
     }
 

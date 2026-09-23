@@ -137,7 +137,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
         when(memberDirectoryService.find(guarantorId)).thenReturn(Optional.of(guarantor));
         when(memberDirectoryService.find(applicantId)).thenReturn(Optional.of(applicant));
         when(loanProductDisplayService.displayName(application)).thenReturn("Watumishi Emergency Loan");
-        when(emailOtpService.issueOtpWithMetadata(
+        when(emailOtpService.issueLoanOtpWithMetadata(
             anyString(),
             eq(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION),
             any(),
@@ -145,7 +145,9 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             anyString(),
             anyString(),
             anyString(),
-            anyString()
+            anyString(),
+            eq(loanId),
+            eq(applicantId)
         )).thenReturn(new EmailOtpService.OtpIssueResult(
             true,
             new StationOtpDeliveryService.DeliveryReceipt(
@@ -163,7 +165,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
         var response = controller.requestApplicantGuarantorConfirmationOtpJson(loanId, requestId, principal);
 
         ArgumentCaptor<String> introCaptor = ArgumentCaptor.forClass(String.class);
-        verify(emailOtpService).issueOtpWithMetadata(
+        verify(emailOtpService).issueLoanOtpWithMetadata(
             eq("guarantor@example.com"),
             eq(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION),
             eq(guarantorId),
@@ -171,7 +173,9 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             introCaptor.capture(),
             eq("SACCO-1"),
             eq("ST-1"),
-            eq("+255700000002")
+            eq("+255700000002"),
+            eq(loanId),
+            eq(applicantId)
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsEntry("valid", true);
@@ -226,7 +230,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
         when(loanWorkflowService.findGuarantorRequest(requestId)).thenReturn(Optional.of(request));
         when(memberDirectoryService.find(applicantId)).thenReturn(Optional.of(applicant));
         when(loanProductDisplayService.displayName(application)).thenReturn("Development Loan");
-        when(emailOtpService.issueOtpWithDeliveryContact(
+        when(emailOtpService.issueLoanOtpWithDeliveryContact(
             anyString(),
             anyString(),
             eq(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION),
@@ -235,7 +239,9 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             anyString(),
             anyString(),
             anyString(),
-            anyString()
+            anyString(),
+            eq(loanId),
+            eq(applicantId)
         )).thenReturn(new EmailOtpService.OtpIssueResult(
             true,
             new StationOtpDeliveryService.DeliveryReceipt(
@@ -252,7 +258,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
 
         var response = controller.requestApplicantGuarantorConfirmationOtpJson(loanId, requestId, principal);
 
-        verify(emailOtpService).issueOtpWithDeliveryContact(
+        verify(emailOtpService).issueLoanOtpWithDeliveryContact(
             eq("guarantor-request:" + requestId),
             eq("asha@example.com"),
             eq(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION),
@@ -261,7 +267,9 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             anyString(),
             eq("SACCO-1"),
             eq("ST-1"),
-            eq("+255700000003")
+            eq("+255700000003"),
+            eq(loanId),
+            eq(applicantId)
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsEntry("valid", true);

@@ -36,16 +36,26 @@ public class SmsUnitTransactionService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReservationResult reserve(String saccoId, String stationId, UUID notificationId, String eventType) {
+        return reserve(saccoId, stationId, notificationId, eventType, SmsUsageContext.none());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ReservationResult reserve(String saccoId,
+                                     String stationId,
+                                     UUID notificationId,
+                                     String eventType,
+                                     SmsUsageContext context) {
+        SmsUsageContext usageContext = context == null ? SmsUsageContext.none() : context;
         String normalizedSaccoId = normalize(saccoId);
         String normalizedStationId = normalize(stationId);
         if (normalizedSaccoId == null || normalizedStationId == null) {
-            writeBlocked(null, normalizedSaccoId, normalizedStationId, notificationId, eventType, "Missing originating SACCO-station scope");
+            writeBlocked(null, normalizedSaccoId, normalizedStationId, notificationId, eventType, usageContext, "Missing originating SACCO-station scope");
             return ReservationResult.blocked("Missing originating SACCO-station scope", true, null, 0);
         }
 
         SaccoStation station = stationRepository.findBySaccoIdAndStationIdAndActiveTrue(normalizedSaccoId, normalizedStationId).orElse(null);
         if (station == null || station.isAccessSuspended()) {
-            writeBlocked(null, normalizedSaccoId, normalizedStationId, notificationId, eventType, "Originating station is missing or inactive");
+            writeBlocked(null, normalizedSaccoId, normalizedStationId, notificationId, eventType, usageContext, "Originating station is missing or inactive");
             return ReservationResult.blocked("Originating station is missing or inactive", true, null, 0);
         }
 
@@ -56,7 +66,7 @@ public class SmsUnitTransactionService {
             SmsUnitStatus alertStatus = markAlertIfNeeded(account, SmsUnitStatus.DEPLETED);
             account.setUpdatedAt(OffsetDateTime.now());
             accountRepository.save(account);
-            writeBlocked(account.getId(), normalizedSaccoId, normalizedStationId, notificationId, eventType, SMS_UNITS_DEPLETED);
+            writeBlocked(account.getId(), normalizedSaccoId, normalizedStationId, notificationId, eventType, usageContext, SMS_UNITS_DEPLETED);
             return ReservationResult.blocked(SMS_UNITS_DEPLETED, false, alertStatus, account.getAvailableUnits());
         }
 
@@ -72,6 +82,9 @@ public class SmsUnitTransactionService {
             .saccoId(account.getSaccoId())
             .stationId(account.getStationId())
             .notificationId(notificationId)
+            .loanApplicationId(usageContext.loanApplicationId())
+            .applicantMemberId(usageContext.applicantMemberId())
+            .recipientMemberId(usageContext.recipientMemberId())
             .eventType(eventType)
             .unitChange(-1)
             .outcome(SmsUsageOutcome.RESERVED)
@@ -287,9 +300,16 @@ public class SmsUnitTransactionService {
             .build());
     }
 
-    private void writeBlocked(UUID accountId, String saccoId, String stationId, UUID notificationId, String eventType, String reason) {
+    private void writeBlocked(UUID accountId,
+                              String saccoId,
+                              String stationId,
+                              UUID notificationId,
+                              String eventType,
+                              SmsUsageContext context,
+                              String reason) {
+        SmsUsageContext usageContext = context == null ? SmsUsageContext.none() : context;
         OffsetDateTime now = OffsetDateTime.now();
-        if (accountId != null && SMS_UNITS_DEPLETED.equals(reason)) {
+        if (accountId != null && usageContext.loanApplicationId() == null && SMS_UNITS_DEPLETED.equals(reason)) {
             OffsetDateTime bucketStart = now.toLocalDate().atStartOfDay().atOffset(now.getOffset());
             var existing = ledgerRepository
                 .findFirstByAccountIdAndEventTypeAndOutcomeAndNoteAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
@@ -315,6 +335,9 @@ public class SmsUnitTransactionService {
             .saccoId(saccoId)
             .stationId(stationId)
             .notificationId(notificationId)
+            .loanApplicationId(usageContext.loanApplicationId())
+            .applicantMemberId(usageContext.applicantMemberId())
+            .recipientMemberId(usageContext.recipientMemberId())
             .eventType(eventType)
             .unitChange(0)
             .eventCount(1)
@@ -453,5 +476,11 @@ public class SmsUnitTransactionService {
     }
 
     public record StatusAlert(String saccoId, String stationId, SmsUnitStatus status, long availableUnits) {
+    }
+
+    public record SmsUsageContext(UUID loanApplicationId, UUID applicantMemberId, UUID recipientMemberId) {
+        static SmsUsageContext none() {
+            return new SmsUsageContext(null, null, null);
+        }
     }
 }

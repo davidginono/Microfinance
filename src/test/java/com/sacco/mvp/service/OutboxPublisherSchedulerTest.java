@@ -135,7 +135,9 @@ class OutboxPublisherSchedulerTest {
             any(),
             eq(recipientId),
             eq("LOAN_READY_FOR_MANAGER"),
-            any(NotificationDeliveryService.DeliveryContent.class)
+            any(NotificationDeliveryService.DeliveryContent.class),
+            eq("LOAN"),
+            eq(loanId)
         );
         verify(notificationRepository, times(2)).existsDeliveredStaffReviewDuplicate(
             recipientId,

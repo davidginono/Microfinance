@@ -437,7 +437,7 @@ public class AccountantController {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member accountant = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting an accountant decision OTP.");
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
                 accountant.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 accountant.getId(),
@@ -445,7 +445,9 @@ public class AccountantController {
                 "Use this OTP code to confirm your accountant decision on the loan application.",
                 application.getSaccoId(),
                 application.getStationId(),
-                accountant.getPhone()
+                accountant.getPhone(),
+                application.getId(),
+                application.getApplicantMemberId()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, "We sent an accountant decision code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {

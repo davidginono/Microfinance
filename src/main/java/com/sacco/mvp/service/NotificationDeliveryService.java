@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
+import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,24 @@ public class NotificationDeliveryService {
     private final SmsUnitTransactionService smsUnitTransactionService;
     private final SmsUsageAlertService smsUsageAlertService;
     private final StationOtpSettingsService stationOtpSettingsService;
+    private final LoanApplicationRepository loanApplicationRepository;
+
+    public NotificationDeliveryService(MemberRepository memberRepository,
+                                       NotificationEmailService notificationEmailService,
+                                       SmsGateway smsGateway,
+                                       SmsUnitTransactionService smsUnitTransactionService,
+                                       SmsUsageAlertService smsUsageAlertService,
+                                       StationOtpSettingsService stationOtpSettingsService) {
+        this(
+            memberRepository,
+            notificationEmailService,
+            smsGateway,
+            smsUnitTransactionService,
+            smsUsageAlertService,
+            stationOtpSettingsService,
+            null
+        );
+    }
 
     public void deliver(String saccoId,
                         String stationId,
@@ -36,6 +55,54 @@ public class NotificationDeliveryService {
                         UUID recipientId,
                         String eventType,
                         DeliveryContent content) {
+        deliver(saccoId, stationId, notificationId, recipientId, eventType, content, SmsUnitTransactionService.SmsUsageContext.none());
+    }
+
+    public void deliver(String saccoId,
+                        String stationId,
+                        UUID notificationId,
+                        UUID recipientId,
+                        String eventType,
+                        DeliveryContent content,
+                        String aggregateType,
+                        UUID aggregateId) {
+        deliver(
+            saccoId,
+            stationId,
+            notificationId,
+            recipientId,
+            eventType,
+            content,
+            contextFromAggregate(aggregateType, aggregateId, recipientId)
+        );
+    }
+
+    public void deliverForLoan(String saccoId,
+                               String stationId,
+                               UUID notificationId,
+                               UUID recipientId,
+                               String eventType,
+                               DeliveryContent content,
+                               UUID loanApplicationId,
+                               UUID applicantMemberId) {
+        deliver(
+            saccoId,
+            stationId,
+            notificationId,
+            recipientId,
+            eventType,
+            content,
+            new SmsUnitTransactionService.SmsUsageContext(loanApplicationId, applicantMemberId, recipientId)
+        );
+    }
+
+    private void deliver(String saccoId,
+                         String stationId,
+                         UUID notificationId,
+                         UUID recipientId,
+                         String eventType,
+                         DeliveryContent content,
+                         SmsUnitTransactionService.SmsUsageContext usageContext) {
         if (recipientId == null) {
             return;
         }
@@ -55,7 +122,7 @@ public class NotificationDeliveryService {
             return;
         }
 
-        boolean smsSent = sendSms(saccoId, stationId, notificationId, recipient, eventType, resolvedContent);
+        boolean smsSent = sendSms(saccoId, stationId, notificationId, recipient, eventType, resolvedContent, usageContext);
         if (!smsSent && channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
             notificationEmailService.sendNotificationEmail(
                 recipientId,
@@ -71,7 +138,8 @@ public class NotificationDeliveryService {
                             UUID notificationId,
                             Member recipient,
                             String eventType,
-                            DeliveryContent content) {
+                            DeliveryContent content,
+                            SmsUnitTransactionService.SmsUsageContext usageContext) {
         if (recipient.getPhoneVerifiedAt() == null) {
             log.info("SMS notification blocked for member {} and event {}: recipient phone is not verified",
                 recipient.getId(), eventType);
@@ -83,8 +151,9 @@ public class NotificationDeliveryService {
                 recipient.getId(), eventType);
             return false;
         }
-        SmsUnitTransactionService.ReservationResult reservation =
-            smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType);
+        SmsUnitTransactionService.ReservationResult reservation = isEmptyContext(usageContext)
+            ? smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType)
+            : smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType, usageContext);
         if (reservation.alertStatus() != null) {
             smsUsageAlertService.alertStatus(saccoId, stationId, reservation.alertStatus(), reservation.availableUnits());
         }
@@ -112,6 +181,26 @@ public class NotificationDeliveryService {
             log.info("SMS notification outcome for member {} and event {}: {}", recipient.getId(), eventType, result.message());
         }
         return result.sent();
+    }
+
+    private SmsUnitTransactionService.SmsUsageContext contextFromAggregate(String aggregateType, UUID aggregateId, UUID recipientId) {
+        if (!"LOAN".equals(aggregateType) || aggregateId == null) {
+            return SmsUnitTransactionService.SmsUsageContext.none();
+        }
+        if (loanApplicationRepository == null) {
+            return new SmsUnitTransactionService.SmsUsageContext(aggregateId, null, recipientId);
+        }
+        UUID applicantMemberId = loanApplicationRepository.findById(aggregateId)
+            .map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId)
+            .orElse(null);
+        return new SmsUnitTransactionService.SmsUsageContext(aggregateId, applicantMemberId, recipientId);
+    }
+
+    private boolean isEmptyContext(SmsUnitTransactionService.SmsUsageContext usageContext) {
+        return usageContext == null
+            || (usageContext.loanApplicationId() == null
+                && usageContext.applicantMemberId() == null
+                && usageContext.recipientMemberId() == null);
     }
 
     private String smsMessage(String subject, String message) {

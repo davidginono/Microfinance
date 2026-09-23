@@ -27,6 +27,21 @@ public class StationOtpDeliveryService {
                                    String introMessage,
                                    String code,
                                    int ttlMinutes) {
+        return deliver(saccoId, stationId, email, phone, purpose, subject, introMessage, code, ttlMinutes, null, null, null);
+    }
+
+    public DeliveryReceipt deliver(String saccoId,
+                                   String stationId,
+                                   String email,
+                                   String phone,
+                                   EmailOtpPurpose purpose,
+                                   String subject,
+                                   String introMessage,
+                                   String code,
+                                   int ttlMinutes,
+                                   UUID loanApplicationId,
+                                   UUID applicantMemberId,
+                                   UUID recipientMemberId) {
         OtpDeliveryChannel channel = stationOtpSettingsService.channel(saccoId, stationId);
         String message = introMessage + System.lineSeparator() + System.lineSeparator()
             + "Your OTP code is: " + code + System.lineSeparator()
@@ -36,7 +51,16 @@ public class StationOtpDeliveryService {
             return new DeliveryReceipt(OtpDeliveryChannel.EMAIL, "We sent an OTP code to your registered email.");
         }
 
-        SmsAttempt smsAttempt = sendSms(saccoId, stationId, phone, purpose, introMessage, code, ttlMinutes);
+        SmsAttempt smsAttempt = sendSms(
+            saccoId,
+            stationId,
+            phone,
+            purpose,
+            introMessage,
+            code,
+            ttlMinutes,
+            new SmsUnitTransactionService.SmsUsageContext(loanApplicationId, applicantMemberId, recipientMemberId)
+        );
         if (smsAttempt.delivered()) {
             return new DeliveryReceipt(OtpDeliveryChannel.SMS, "We sent an OTP code to your registered phone.");
         }
@@ -65,15 +89,17 @@ public class StationOtpDeliveryService {
                                EmailOtpPurpose purpose,
                                String introMessage,
                                String code,
-                               int ttlMinutes) {
+                               int ttlMinutes,
+                               SmsUnitTransactionService.SmsUsageContext usageContext) {
         String normalizedPhone = TanzaniaPhoneNumber.normalizeOptional(phone);
         if (normalizedPhone == null) {
             return SmsAttempt.failed("This account has no valid phone number for SMS OTP delivery.");
         }
         UUID notificationId = UUID.randomUUID();
         String eventType = "OTP_" + purpose.name();
-        SmsUnitTransactionService.ReservationResult reservation =
-            smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType);
+        SmsUnitTransactionService.ReservationResult reservation = isEmptyContext(usageContext)
+            ? smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType)
+            : smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType, usageContext);
         if (reservation.alertStatus() != null) {
             smsUsageAlertService.alertStatus(saccoId, stationId, reservation.alertStatus(), reservation.availableUnits());
         }
@@ -111,6 +137,13 @@ public class StationOtpDeliveryService {
             return "Your SACCO OTP code is " + code + ". It expires in " + ttlMinutes + " minutes.";
         }
         return "OTP: " + code + ". Expires in " + ttlMinutes + " minutes. " + intro;
+    }
+
+    private boolean isEmptyContext(SmsUnitTransactionService.SmsUsageContext usageContext) {
+        return usageContext == null
+            || (usageContext.loanApplicationId() == null
+                && usageContext.applicantMemberId() == null
+                && usageContext.recipientMemberId() == null);
     }
 
     private void sendEmail(String email, String subject, String message) {

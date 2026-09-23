@@ -47,6 +47,15 @@ public class SmsUsageLedger {
     @Column(name = "notification_id")
     private UUID notificationId;
 
+    @Column(name = "loan_application_id")
+    private UUID loanApplicationId;
+
+    @Column(name = "applicant_member_id")
+    private UUID applicantMemberId;
+
+    @Column(name = "recipient_member_id")
+    private UUID recipientMemberId;
+
     @Column(name = "event_type")
     private String eventType;
 

@@ -471,7 +471,7 @@ public class DisbursementController {
                 throw new IllegalStateException("This loan is no longer ready for disbursement.");
             }
             Member officer = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a disbursement OTP.");
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
                 officer.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 officer.getId(),
@@ -479,7 +479,9 @@ public class DisbursementController {
                 "Use this OTP code to confirm the loan disbursement action.",
                 app.getSaccoId(),
                 app.getStationId(),
-                officer.getPhone()
+                officer.getPhone(),
+                app.getId(),
+                app.getApplicantMemberId()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, "We sent a disbursement code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {

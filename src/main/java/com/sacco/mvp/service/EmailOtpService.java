@@ -76,7 +76,34 @@ public class EmailOtpService {
                                                String saccoId,
                                                String stationId,
                                                String phone) {
-        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false);
+        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false, null, null);
+    }
+
+    @Transactional
+    public OtpIssueResult issueLoanOtpWithMetadata(String email,
+                                                   EmailOtpPurpose purpose,
+                                                   UUID memberId,
+                                                   String subject,
+                                                   String introMessage,
+                                                   String saccoId,
+                                                   String stationId,
+                                                   String phone,
+                                                   UUID loanApplicationId,
+                                                   UUID applicantMemberId) {
+        return issueOtpWithMetadata(
+            email,
+            email,
+            purpose,
+            memberId,
+            subject,
+            introMessage,
+            saccoId,
+            stationId,
+            phone,
+            false,
+            loanApplicationId,
+            applicantMemberId
+        );
     }
 
     @Transactional
@@ -89,7 +116,35 @@ public class EmailOtpService {
                                                       String saccoId,
                                                       String stationId,
                                                       String phone) {
-        return issueOtpWithMetadata(tokenKey, deliveryEmail, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false);
+        return issueOtpWithMetadata(tokenKey, deliveryEmail, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false, null, null);
+    }
+
+    @Transactional
+    public OtpIssueResult issueLoanOtpWithDeliveryContact(String tokenKey,
+                                                          String deliveryEmail,
+                                                          EmailOtpPurpose purpose,
+                                                          UUID memberId,
+                                                          String subject,
+                                                          String introMessage,
+                                                          String saccoId,
+                                                          String stationId,
+                                                          String phone,
+                                                          UUID loanApplicationId,
+                                                          UUID applicantMemberId) {
+        return issueOtpWithMetadata(
+            tokenKey,
+            deliveryEmail,
+            purpose,
+            memberId,
+            subject,
+            introMessage,
+            saccoId,
+            stationId,
+            phone,
+            false,
+            loanApplicationId,
+            applicantMemberId
+        );
     }
 
     @Transactional
@@ -98,7 +153,7 @@ public class EmailOtpService {
                                                                      UUID memberId,
                                                                      String subject,
                                                                      String introMessage) {
-        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, null, null, null, true).deliveryReceipt();
+        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, null, null, null, true, null, null).deliveryReceipt();
     }
 
     private OtpIssueResult issueOtpWithMetadata(String tokenKey,
@@ -110,7 +165,9 @@ public class EmailOtpService {
                                                 String saccoId,
                                                 String stationId,
                                                 String phone,
-                                                boolean emailOnly) {
+                                                boolean emailOnly,
+                                                UUID loanApplicationId,
+                                                UUID applicantMemberId) {
         String normalizedTokenKey = normalizeEmail(tokenKey);
         String normalizedDeliveryEmail = normalizeEmail(deliveryEmail);
         OffsetDateTime now = OffsetDateTime.now();
@@ -145,15 +202,17 @@ public class EmailOtpService {
                 .build();
             emailOtpTokenRepository.save(token);
 
-            StationOtpDeliveryService.DeliveryReceipt receipt = emailOnly
-                ? stationOtpDeliveryService.deliverEmailOnly(
+            StationOtpDeliveryService.DeliveryReceipt receipt;
+            if (emailOnly) {
+                receipt = stationOtpDeliveryService.deliverEmailOnly(
                     normalizedDeliveryEmail,
                     subject,
                     introMessage,
                     code,
                     Math.max(1, otpTtlMinutes)
-                )
-                : stationOtpDeliveryService.deliver(
+                );
+            } else if (loanApplicationId == null && applicantMemberId == null) {
+                receipt = stationOtpDeliveryService.deliver(
                     saccoId,
                     stationId,
                     normalizedDeliveryEmail,
@@ -164,6 +223,22 @@ public class EmailOtpService {
                     code,
                     Math.max(1, otpTtlMinutes)
                 );
+            } else {
+                receipt = stationOtpDeliveryService.deliver(
+                    saccoId,
+                    stationId,
+                    normalizedDeliveryEmail,
+                    phone,
+                    purpose,
+                    subject,
+                    introMessage,
+                    code,
+                    Math.max(1, otpTtlMinutes),
+                    loanApplicationId,
+                    applicantMemberId,
+                    memberId
+                );
+            }
             log.info("Issued {} OTP for {}", purpose, normalizedTokenKey);
             return OtpIssueResult.issued(receipt, expiresAt, secondsUntil(now, expiresAt), resendCount);
         } catch (DataAccessException ex) {

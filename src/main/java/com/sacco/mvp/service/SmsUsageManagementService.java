@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.PlatformSmsSettings;
+import com.sacco.mvp.domain.SmsUsageOutcome;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.SmsUsageLedger;
 import com.sacco.mvp.domain.StationSmsAccount;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -30,6 +32,7 @@ public class SmsUsageManagementService {
     private final StationSmsAccountRepository accountRepository;
     private final SmsUsageLedgerRepository ledgerRepository;
     private final ApplicationClock applicationClock;
+    private final WorkflowStatusPresentationService statusPresentationService;
 
     public Page<StationSmsAccount> accounts(String saccoId, String stationId, SmsUnitStatus status, Pageable pageable) {
         String normalizedSaccoId = blankToNull(saccoId);
@@ -77,6 +80,15 @@ public class SmsUsageManagementService {
         return history(accountId, pageable).map(this::toUsageRow);
     }
 
+    public Page<LoanSmsUsageRow> loanUsageRows(String saccoId, String stationId, Pageable pageable) {
+        return ledgerRepository.summarizeLoanSmsUsage(
+            blankToNull(saccoId),
+            blankToNull(stationId),
+            List.of(SmsUsageOutcome.ACCEPTED, SmsUsageOutcome.ACCEPTANCE_UNKNOWN),
+            pageable
+        ).map(this::toLoanUsageRow);
+    }
+
     public PlatformSmsSettings settings() {
         return transactionService.settings();
     }
@@ -111,6 +123,28 @@ public class SmsUsageManagementService {
         return timestamp == null ? "-" : applicationClock.zoned(timestamp).format(USAGE_TIMESTAMP);
     }
 
+    private LoanSmsUsageRow toLoanUsageRow(SmsUsageLedgerRepository.LoanSmsUsageProjection entry) {
+        return new LoanSmsUsageRow(
+            entry.getLoanApplicationId(),
+            entry.getApplicationNumber(),
+            blankToDash(entry.getLoanId()),
+            entry.getLoanStatus() == null ? "-" : statusPresentationService.dashboardStatusLabel(entry.getLoanStatus()),
+            entry.getLoanStatus() == null ? "" : entry.getLoanStatus().name(),
+            blankToDash(entry.getSaccoId()),
+            blankToDash(entry.getStationId()),
+            entry.getApplicantMemberId(),
+            blankToDash(entry.getApplicantName()),
+            blankToDash(entry.getApplicantMemberNo()),
+            entry.getSmsEventCount(),
+            entry.getUnitsUsed(),
+            formatTimestamp(entry.getLastSmsAt())
+        );
+    }
+
+    private String blankToDash(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
     public record SmsUsageRow(
         String createdAtLabel,
         String lastOccurredAtLabel,
@@ -120,6 +154,23 @@ public class SmsUsageManagementService {
         long unitChange,
         String providerReference,
         String note
+    ) {
+    }
+
+    public record LoanSmsUsageRow(
+        UUID loanApplicationId,
+        Long applicationNumber,
+        String loanId,
+        String loanStatusLabel,
+        String loanStatus,
+        String saccoId,
+        String stationId,
+        UUID applicantMemberId,
+        String applicantName,
+        String applicantMemberNo,
+        long smsEventCount,
+        long unitsUsed,
+        String lastSmsAtLabel
     ) {
     }
 }

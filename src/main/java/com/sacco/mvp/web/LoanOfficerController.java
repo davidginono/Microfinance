@@ -426,7 +426,7 @@ public class LoanOfficerController {
                 throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
                 reviewer.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 reviewer.getId(),
@@ -434,7 +434,9 @@ public class LoanOfficerController {
                 "Use this OTP code to confirm your assigned loan officer review decision.",
                 app.getSaccoId(),
                 app.getStationId(),
-                reviewer.getPhone()
+                reviewer.getPhone(),
+                app.getId(),
+                app.getApplicantMemberId()
             );
             return ResponseEntity.ok(otpIssueResponse(otp, "We sent a loan officer decision code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {

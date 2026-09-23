@@ -5031,6 +5031,9 @@ body.aws-console,
     overflow: visible;
     padding: 14px 10px 10px !important;
 }
+.aws-console .loan-simple-progress-pill {
+    transform: translateY(-50%) !important;
+}
 .aws-console .member-dashboard-flow-list {
     display: flex;
     width: 100%;
