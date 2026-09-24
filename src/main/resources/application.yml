@@ -154,9 +154,9 @@ app:
     read-timeout: ${APP_SMS_READ_TIMEOUT:8s}
     benter:
       base-url: ${APP_SMS_BENTER_BASE_URL:https://api.bentergroup.com}
-      send-path: ${APP_SMS_BENTER_SEND_PATH:/version2/messaging/legacy}
+      send-path: ${APP_SMS_BENTER_SEND_PATH:/version1/messaging/bulk}
       client-id: ${APP_SMS_BENTER_CLIENT_ID:foresight}
-      api-key: ${APP_SMS_BENTER_API_KEY:oR28OxFnV49KBsTXiSUEMdfD1atI6WQu7zCYvHgkA53Zwj0P}
+      api-key: ${APP_SMS_BENTER_API_KEY:}
       sender-id: ${APP_SMS_BENTER_SENDER_ID:FORESIGHT}
   retention:
     cleanup-enabled: ${APP_RETENTION_CLEANUP_ENABLED:true}

@@ -31,7 +31,7 @@ public class BenterSmsGateway implements SmsGateway {
         if (!config.enabled()) {
             return SmsSendResult.skipped("SMS is disabled");
         }
-        if (config.clientId().isBlank() || config.apiKey().isBlank()) {
+        if (config.username().isBlank() || config.apiKey().isBlank()) {
             return SmsSendResult.skipped("Benter Group credentials are not configured");
         }
         if (config.senderId().isBlank()) {
@@ -46,9 +46,8 @@ public class BenterSmsGateway implements SmsGateway {
 
         BenterSendRequest payload = new BenterSendRequest(
             config.senderId(),
-            List.of(new BenterMessage(normalizedPhone, trimMessage(message))),
-            config.apiKey(),
-            config.clientId()
+            config.username(),
+            List.of(new BenterMessage(normalizedPhone, trimMessage(message)))
         );
 
         try {
@@ -57,12 +56,13 @@ public class BenterSmsGateway implements SmsGateway {
                 .uri(config.sendPath())
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .header("apikey", config.apiKey())
                 .body(jsonBody)
                 .retrieve()
                 .body(String.class);
             return resultFromResponse(response);
         } catch (RestClientResponseException ex) {
-            log.warn("Benter Group SMS failed with status {}: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            log.warn("Benter Group SMS failed with status {}", ex.getStatusCode());
             return SmsSendResult.rejected("The SMS gateway returned an error.");
         } catch (ResourceAccessException ex) {
             log.warn("Benter Group SMS request failed: {}", ex.getMessage());
@@ -95,22 +95,21 @@ public class BenterSmsGateway implements SmsGateway {
             return SmsSendResult.acceptanceUnknown("Benter Group SMS returned an empty response");
         }
         JsonNode root = objectMapper.readTree(response);
-        String errorCode = root.path("ErrorCode").asString();
-        if (!"0".equals(errorCode) && !"000".equals(errorCode)) {
-            String errorDescription = root.path("ErrorDescription").asString("Unknown Benter Group SMS error");
-            return SmsSendResult.rejected("Benter Group SMS failed: " + errorDescription);
-        }
-        JsonNode firstMessage = root.path("Data").isArray() && root.path("Data").size() > 0
-            ? root.path("Data").get(0)
+        JsonNode firstMessage = root.path("data").isArray() && root.path("data").size() > 0
+            ? root.path("data").get(0)
             : null;
         if (firstMessage == null) {
             return SmsSendResult.acceptanceUnknown("Benter Group SMS returned no message result");
         }
-        if (firstMessage.path("MessageErrorCode").asInt(-1) != 0) {
-            String description = firstMessage.path("MessageErrorDescription").asString("Unknown Benter Group SMS message error");
+        int statusCode = firstMessage.path("statusCode").asInt(-1);
+        if (statusCode != 200) {
+            String description = firstMessage.path("description").asString("Unknown Benter Group SMS message error");
             return SmsSendResult.rejected("Benter Group SMS failed: " + description);
         }
-        String messageId = firstMessage.path("MessageId").asString(response);
+        String messageId = firstMessage.path("messageId").asString();
+        if (messageId == null || messageId.isBlank()) {
+            return SmsSendResult.acceptanceUnknown("Benter Group SMS accepted without a message id");
+        }
         return SmsSendResult.sent(messageId);
     }
 
@@ -137,16 +136,15 @@ public class BenterSmsGateway implements SmsGateway {
     }
 
     private record BenterSendRequest(
-        @JsonProperty("SenderId") String senderId,
-        @JsonProperty("MessageParameters") List<BenterMessage> messageParameters,
-        @JsonProperty("ApiKey") String apiKey,
-        @JsonProperty("ClientId") String clientId
+        @JsonProperty("senderid") String senderId,
+        @JsonProperty("username") String username,
+        @JsonProperty("content") List<BenterMessage> content
     ) {
     }
 
     private record BenterMessage(
-        @JsonProperty("Number") String number,
-        @JsonProperty("Text") String text
+        @JsonProperty("msisdn") String msisdn,
+        @JsonProperty("message") String message
     ) {
     }
 }

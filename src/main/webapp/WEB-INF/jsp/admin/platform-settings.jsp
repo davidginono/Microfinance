@@ -228,12 +228,12 @@
             </label>
             <label class="platform-settings-field">
                 Send path
-                <input name="sendPath" maxlength="255" placeholder="/version2/messaging/legacy"
+                <input name="sendPath" maxlength="255" placeholder="/version1/messaging/bulk"
                        class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
                        value="${fn:escapeXml(platformSmsGatewaySettings.sendPath)}" />
             </label>
             <label class="platform-settings-field">
-                Client ID
+                API username
                 <input name="clientId" maxlength="120"
                        class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
                        value="${fn:escapeXml(platformSmsGatewaySettings.clientId)}" />

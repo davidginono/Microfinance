@@ -31,7 +31,7 @@ class PlatformSmsGatewaySettingsServiceTest {
         PlatformSmsGatewaySettingsService service = service(repository, secretService(), gatewayProvider());
         ReflectionTestUtils.setField(service, "envEnabled", true);
         ReflectionTestUtils.setField(service, "envBaseUrl", "https://api.bentergroup.com");
-        ReflectionTestUtils.setField(service, "envSendPath", "/version2/messaging/legacy");
+        ReflectionTestUtils.setField(service, "envSendPath", "/version1/messaging/bulk");
         ReflectionTestUtils.setField(service, "envClientId", "foresight");
         ReflectionTestUtils.setField(service, "envApiKey", "env-key");
         ReflectionTestUtils.setField(service, "envSenderId", "FORESIGHT");
@@ -105,7 +105,7 @@ class PlatformSmsGatewaySettingsServiceTest {
         PlatformSmsGatewaySettings saved = service.updateSettings(
             true,
             " https://api.bentergroup.com ",
-            " /version2/messaging/legacy ",
+            " /version1/messaging/bulk ",
             " foresight ",
             "new-key",
             " FORESIGHT ",
@@ -115,7 +115,7 @@ class PlatformSmsGatewaySettingsServiceTest {
         );
 
         assertEquals("https://api.bentergroup.com", saved.getBaseUrl());
-        assertEquals("/version2/messaging/legacy", saved.getSendPath());
+        assertEquals("/version1/messaging/bulk", saved.getSendPath());
         assertEquals("enc:v1:new-key", saved.getApiKeyEncrypted());
         verify(auditService).log(eq("PLATFORM_SMS_GATEWAY_SETTINGS"), isNull(), eq("ADMIN_UPDATE_SMS_GATEWAY_SETTINGS"), eq(actorId), any(), any());
     }

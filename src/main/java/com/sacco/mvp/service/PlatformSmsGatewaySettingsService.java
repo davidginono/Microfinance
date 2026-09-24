@@ -22,7 +22,7 @@ import java.util.UUID;
 public class PlatformSmsGatewaySettingsService {
     private static final int URL_MAX = 255;
     private static final int PATH_MAX = 255;
-    private static final int CLIENT_ID_MAX = 120;
+    private static final int API_USERNAME_MAX = 120;
     private static final int SENDER_ID_MAX = 40;
     private static final int MIN_TIMEOUT_SECONDS = 1;
     private static final int MAX_TIMEOUT_SECONDS = 60;
@@ -84,13 +84,13 @@ public class PlatformSmsGatewaySettingsService {
                                                      UUID actorMemberId) {
         String normalizedBaseUrl = normalizeText(baseUrl, "Base URL", URL_MAX);
         String normalizedSendPath = normalizeText(sendPath, "Send path", PATH_MAX);
-        String normalizedClientId = normalizeText(clientId, "Client ID", CLIENT_ID_MAX);
+        String normalizedClientId = normalizeText(clientId, "API username", API_USERNAME_MAX);
         String normalizedSenderId = normalizeText(senderId, "Sender ID", SENDER_ID_MAX);
         validateTimeout(connectTimeoutSeconds, "Connect timeout");
         validateTimeout(readTimeoutSeconds, "Read timeout");
         if (enabled && (normalizedBaseUrl.isBlank() || normalizedSendPath.isBlank()
             || normalizedClientId.isBlank() || normalizedSenderId.isBlank())) {
-            throw new IllegalArgumentException("Enter the SMS gateway URL, send path, client ID, and sender ID before enabling the gateway.");
+            throw new IllegalArgumentException("Enter the SMS gateway URL, send path, API username, and sender ID before enabling the gateway.");
         }
 
         PlatformSmsGatewaySettings settings = settings();
@@ -335,7 +335,7 @@ public class PlatformSmsGatewaySettingsService {
         data.put("enabled", settings.isEnabled());
         data.put("baseUrl", settings.getBaseUrl());
         data.put("sendPath", settings.getSendPath());
-        data.put("clientId", settings.getClientId());
+        data.put("username", settings.getClientId());
         data.put("apiKeyConfigured", settings.hasStoredApiKey());
         data.put("senderId", settings.getSenderId());
         data.put("connectTimeoutSeconds", settings.getConnectTimeoutSeconds());
@@ -347,7 +347,7 @@ public class PlatformSmsGatewaySettingsService {
         boolean enabled,
         String baseUrl,
         String sendPath,
-        String clientId,
+        String username,
         String apiKey,
         String senderId,
         int connectTimeoutSeconds,

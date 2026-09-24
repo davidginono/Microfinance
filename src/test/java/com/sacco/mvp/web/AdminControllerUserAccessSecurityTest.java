@@ -280,7 +280,7 @@ class AdminControllerUserAccessSecurityTest {
         mockMvc.perform(post("/admin/platform-settings/sms-gateway")
                 .param("enabled", "true")
                 .param("baseUrl", "https://api.bentergroup.com")
-                .param("sendPath", "/version2/messaging/legacy")
+                .param("sendPath", "/version1/messaging/bulk")
                 .param("clientId", "foresight")
                 .param("apiKey", "api-key")
                 .param("senderId", "FORESIGHT")
@@ -294,7 +294,7 @@ class AdminControllerUserAccessSecurityTest {
         verify(platformSmsGatewaySettingsService).updateSettings(
             true,
             "https://api.bentergroup.com",
-            "/version2/messaging/legacy",
+            "/version1/messaging/bulk",
             "foresight",
             "api-key",
             "FORESIGHT",
@@ -310,7 +310,7 @@ class AdminControllerUserAccessSecurityTest {
 
         mockMvc.perform(post("/admin/platform-settings/sms-gateway")
                 .param("baseUrl", "https://api.bentergroup.com")
-                .param("sendPath", "/version2/messaging/legacy")
+                .param("sendPath", "/version1/messaging/bulk")
                 .param("connectTimeoutSeconds", "3")
                 .param("readTimeoutSeconds", "8")
                 .with(csrf())
