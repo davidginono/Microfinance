@@ -1,0 +1,17 @@
+services:
+  app:
+    mem_limit: ${APP_MEMORY_LIMIT:-1024m}
+    environment:
+      SPRING_PROFILES_ACTIVE: benchmark
+      SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-100}
+      SERVER_TOMCAT_THREADS_MIN_SPARE: ${SERVER_TOMCAT_THREADS_MIN_SPARE:-10}
+      SERVER_TOMCAT_MAX_CONNECTIONS: ${SERVER_TOMCAT_MAX_CONNECTIONS:-1000}
+      SERVER_TOMCAT_ACCEPT_COUNT: ${SERVER_TOMCAT_ACCEPT_COUNT:-500}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:-20}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:-2}
+      APP_OUTBOX_SCHEDULER_ENABLED: ${APP_OUTBOX_SCHEDULER_ENABLED:-false}
+      APP_RETENTION_CLEANUP_ENABLED: ${APP_RETENTION_CLEANUP_ENABLED:-false}
+      APP_SMS_ENABLED: ${APP_SMS_ENABLED:-false}
+      JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--XX:+UseSerialGC -XX:MaxRAMPercentage=55.0 -XX:InitialRAMPercentage=10.0 -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=48m -Xss512k -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/load-tests/results -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Xlog:gc*:file=/app/load-tests/results/gc.log:time,uptime,level,tags}"
+    volumes:
+      - ./load-tests/results:/app/load-tests/results

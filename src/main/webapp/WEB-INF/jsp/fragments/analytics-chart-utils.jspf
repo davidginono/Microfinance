@@ -1,0 +1,21 @@
+<script>
+function integerChartAxis(maxValue, maxIntervals) {
+    const dataMax = Math.max(0, Math.ceil(Number(maxValue) || 0));
+    if (dataMax <= 1) {
+        return { max: 1, ticks: [0, 1] };
+    }
+
+    const intervalLimit = Math.max(1, Math.min(Number(maxIntervals) || 4, dataMax));
+    const rawStep = dataMax / intervalLimit;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const normalizedStep = rawStep / magnitude;
+    const niceStep = normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 5 ? 5 : 10;
+    const step = Math.max(1, niceStep * magnitude);
+    const axisMax = Math.ceil(dataMax / step) * step;
+    const ticks = [];
+    for (let value = 0; value <= axisMax; value += step) {
+        ticks.push(value);
+    }
+    return { max: axisMax, ticks: ticks };
+}
+</script>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<taglib xmlns="https://jakarta.ee/xml/ns/jakartaee" version="3.0">
+    <tlib-version>1.0</tlib-version>
+    <short-name>appTime</short-name>
+    <uri>https://sacco.local/tags/time</uri>
+    <function>
+        <name>format</name>
+        <function-class>com.sacco.mvp.service.ApplicationTimestamps</function-class>
+        <function-signature>java.lang.String format(java.lang.Object)</function-signature>
+    </function>
+</taglib>

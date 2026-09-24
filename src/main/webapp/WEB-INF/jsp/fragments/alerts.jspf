@@ -1,0 +1,9 @@
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<c:if test="${not suppressToastMessages}">
+    <c:if test="${not empty message}">
+        <div hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></div>
+    </c:if>
+    <c:if test="${not empty error}">
+        <div hidden data-toast-message="${fn:escapeXml(error)}" data-toast-type="error"></div>
+    </c:if>
+</c:if>

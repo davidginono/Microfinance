@@ -1,0 +1,181 @@
+spring:
+  config:
+    import: optional:file:./application-local.yml
+  sql:
+    init:
+      mode: never
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/test}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:qwerty1!}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:30}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:8000}
+      idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:600000}
+      leak-detection-threshold: ${SPRING_DATASOURCE_HIKARI_LEAK_DETECTION_THRESHOLD:20000}
+  jpa:
+    generate-ddl: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        show_sql: false
+        # Collapses per-row collection/proxy initialisation into grouped IN loads.
+        default_batch_fetch_size: ${HIBERNATE_DEFAULT_BATCH_FETCH_SIZE:64}
+        jdbc:
+          batch_size: ${HIBERNATE_JDBC_BATCH_SIZE:50}
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        query:
+          # Buckets IN-list sizes so PostgreSQL reuses prepared plans across status filters.
+          in_clause_parameter_padding: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: baseline current schema
+  mvc:
+    view:
+      prefix: /WEB-INF/jsp/
+      suffix: .jsp
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:25MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:25MB}
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /**
+      cache:
+        period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:0}
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.stackmail.com}
+    port: ${SPRING_MAIL_PORT:465}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          connectiontimeout: ${SPRING_MAIL_CONNECTION_TIMEOUT_MS:10000}
+          timeout: ${SPRING_MAIL_READ_TIMEOUT_MS:10000}
+          writetimeout: ${SPRING_MAIL_WRITE_TIMEOUT_MS:10000}
+          ssl:
+            enable: true
+          starttls:
+            enable: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:rwexcfvghbj}
+            client-secret: ${GOOGLE_CLIENT_SECRET:werxtcfvghbj}
+            scope: openid,email,profile
+  devtools:
+    restart:
+      enabled: ${SPRING_DEVTOOLS_RESTART_ENABLED:true}
+    livereload:
+      enabled: ${SPRING_DEVTOOLS_LIVERELOAD_ENABLED:true}
+
+server:
+  port: ${SERVER_PORT:8085}
+  shutdown: graceful
+  compression:
+    enabled: ${SERVER_COMPRESSION_ENABLED:true}
+    min-response-size: ${SERVER_COMPRESSION_MIN_RESPONSE_SIZE:2KB}
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:100}
+      min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:20}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:10000}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:1000}
+    max-swallow-size: ${SERVER_TOMCAT_MAX_SWALLOW_SIZE:-1}
+  servlet:
+    session:
+      timeout: ${SERVER_SERVLET_SESSION_TIMEOUT:11m}
+      cookie:
+        http-only: true
+        secure: ${SERVER_SERVLET_SESSION_COOKIE_SECURE:false}
+        same-site: lax
+    jsp:
+      init-parameters:
+        development: ${SERVER_SERVLET_JSP_DEVELOPMENT:true}
+
+logging:
+  level:
+    org.springframework.security: INFO
+    com.sacco.mvp: INFO
+
+management:
+  health:
+    mail:
+      enabled: false
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+  time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
+  secrets:
+    encryption-key: ${APP_SECRETS_ENCRYPTION_KEY:}
+  mail:
+    from-address: ${APP_MAIL_FROM_ADDRESS:${SPRING_MAIL_USERNAME:no-reply@sacco.local}}
+    override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
+  uploads:
+    legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
+    files-root: ${APP_UPLOADS_FILES_ROOT:stored-uploads}
+    database-to-file-migration-enabled: ${APP_UPLOADS_DATABASE_TO_FILE_MIGRATION_ENABLED:false}
+    database-to-file-migration-batch-size: ${APP_UPLOADS_DATABASE_TO_FILE_MIGRATION_BATCH_SIZE:100}
+  outbox:
+    scheduler-enabled: ${APP_OUTBOX_SCHEDULER_ENABLED:true}
+    batch-size: ${APP_OUTBOX_BATCH_SIZE:250}
+    fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:500}
+  reports:
+    max-concurrent-exports: ${APP_REPORTS_MAX_CONCURRENT_EXPORTS:2}
+  db-utilization:
+    sample-ms: ${APP_DB_UTILIZATION_SAMPLE_MS:15000}
+  application-numbers:
+    block-size: ${APP_APPLICATION_NUMBERS_BLOCK_SIZE:100}
+  upload-migration:
+    enabled: ${APP_UPLOAD_MIGRATION_ENABLED:false}
+    loan-root: ${APP_UPLOAD_MIGRATION_LOAN_ROOT:loan-uploads/applications}
+  saccos:
+    files-root: ${APP_SACCOS_FILES_ROOT:registered-saccos}
+  sms:
+    enabled: ${APP_SMS_ENABLED:true}
+    connect-timeout: ${APP_SMS_CONNECT_TIMEOUT:3s}
+    read-timeout: ${APP_SMS_READ_TIMEOUT:8s}
+    benter:
+      base-url: ${APP_SMS_BENTER_BASE_URL:https://api.bentergroup.com}
+      send-path: ${APP_SMS_BENTER_SEND_PATH:/version1/messaging/bulk}
+      client-id: ${APP_SMS_BENTER_CLIENT_ID:foresight}
+      api-key: ${APP_SMS_BENTER_API_KEY:}
+      sender-id: ${APP_SMS_BENTER_SENDER_ID:FORESIGHT}
+  retention:
+    cleanup-enabled: ${APP_RETENTION_CLEANUP_ENABLED:true}
+    cleanup-cron: "${APP_RETENTION_CLEANUP_CRON:0 30 2 * * *}"
+    audit-log-days: ${APP_RETENTION_AUDIT_LOG_DAYS:365}
+    outbox-days: ${APP_RETENTION_OUTBOX_DAYS:70}
+    read-notification-days: ${APP_RETENTION_READ_NOTIFICATION_DAYS:180}
+  auth:
+    google-sso:
+      enabled: ${APP_AUTH_GOOGLE_SSO_ENABLED:false}
+    otp:
+      ttl-minutes: ${APP_AUTH_OTP_TTL_MINUTES:10}
+    invitation:
+      ttl-hours: ${APP_AUTH_INVITATION_TTL_HOURS:72}
+    local-dev-minor-admin-password-login-enabled: ${APP_AUTH_LOCAL_DEV_MINOR_ADMIN_PASSWORD_LOGIN_ENABLED:true}
+    local-dev-minor-admin-password: ${APP_AUTH_LOCAL_DEV_MINOR_ADMIN_PASSWORD:DevMinor123!}
+
+external:
+  foresight:
+    base-url: ${EXTERNAL_FORESIGHT_BASE_URL:https://api.foresightfin.app}
+    loan-payment-summary-sync-cron: "${EXTERNAL_FORESIGHT_LOAN_PAYMENT_SUMMARY_SYNC_CRON:0 15 2 * * *}"
+    loan-payment-summary-sync-batch-size: ${EXTERNAL_FORESIGHT_LOAN_PAYMENT_SUMMARY_SYNC_BATCH_SIZE:100}

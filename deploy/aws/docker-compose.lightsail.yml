@@ -1,0 +1,109 @@
+services:
+  app:
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: final
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 1150m
+    cpus: "1.25"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Africa/Nairobi}
+      TZ: ${APP_TIME_ZONE:-Africa/Nairobi}
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-sacco}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sacco}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      APP_BASE_URL: https://${APP_PUBLIC_DOMAIN:?set APP_PUBLIC_DOMAIN}
+      APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:-}
+      APP_UPLOADS_FILES_ROOT: /var/lib/saccos-lms/uploads
+      APP_SACCOS_FILES_ROOT: /var/lib/saccos-lms/saccos
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-465}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-}
+      APP_SMS_ENABLED: ${APP_SMS_ENABLED:-true}
+      APP_SMS_BENTER_BASE_URL: ${APP_SMS_BENTER_BASE_URL:-}
+      APP_SMS_BENTER_CLIENT_ID: ${APP_SMS_BENTER_CLIENT_ID:-}
+      APP_SMS_BENTER_API_KEY: ${APP_SMS_BENTER_API_KEY:-}
+      APP_SMS_BENTER_SENDER_ID: ${APP_SMS_BENTER_SENDER_ID:-}
+      EXTERNAL_FORESIGHT_BASE_URL: ${EXTERNAL_FORESIGHT_BASE_URL:-https://api.foresightfin.app}
+      EXTERNAL_MEMBERPORTAL_BASE_URL: ${EXTERNAL_MEMBERPORTAL_BASE_URL:-https://api.foresightfin.app}
+    expose:
+      - "8080"
+    volumes:
+      - /mnt/saccos-data/uploads:/var/lib/saccos-lms/uploads
+      - /mnt/saccos-data/saccos:/var/lib/saccos-lms/saccos
+    logging:
+      driver: json-file
+      options:
+        max-size: "8m"
+        max-file: "3"
+
+  db:
+    image: postgres:16-alpine
+    platform: linux/amd64
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: "0.6"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sacco}
+      POSTGRES_USER: ${POSTGRES_USER:-sacco}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      TZ: ${APP_TIME_ZONE:-Africa/Nairobi}
+      PGTZ: ${APP_TIME_ZONE:-Africa/Nairobi}
+    command:
+      - postgres
+      - -c
+      - timezone=${APP_TIME_ZONE:-Africa/Nairobi}
+      - -c
+      - shared_buffers=96MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - wal_buffers=4MB
+    volumes:
+      - /mnt/saccos-data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sacco} -d ${POSTGRES_DB:-sacco}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "8m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      APP_PUBLIC_DOMAIN: ${APP_PUBLIC_DOMAIN:?set APP_PUBLIC_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.lightsail:/etc/caddy/Caddyfile:ro
+      - /mnt/saccos-data/caddy-data:/data
+      - /mnt/saccos-data/caddy-config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "8m"
+        max-file: "3"

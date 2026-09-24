@@ -1,0 +1,41 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+
+<div class="mt-5 loan-financial-section-grid">
+    <c:forEach items="${financialFieldSections}" var="section" varStatus="sectionLoop">
+        <section class="erp-table-wrap loan-financial-section"
+                 aria-label="${fn:escapeXml(section.key)}"
+                 data-aws-table-region
+                 data-aws-no-titlebar="true"
+                 data-aws-no-refresh="true">
+            <div class="loan-financial-section__header">
+                <h5><c:out value="${section.key}" /></h5>
+            </div>
+            <div class="erp-table-scroll erp-table-scroll-sm"
+                 data-view-position-key="loan-financial-section-${sectionLoop.index}">
+                <table class="erp-table">
+                    <thead>
+                    <tr>
+                        <th><spring:message code="common.attribute" text="Attribute" /></th>
+                        <th><spring:message code="common.value" text="Value" /></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <c:forEach items="${section.value}" var="entry">
+                        <tr>
+                            <td><c:out value="${entry.key}" /></td>
+                            <td><c:out value="${entry.value}" /></td>
+                        </tr>
+                    </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </c:forEach>
+    <c:if test="${empty financialFieldSections}">
+        <div class="loan-view-summary-card px-4 py-4 text-sm text-slate-500">
+            <spring:message code="loan.view.noFinancialDetails" text="Financial details have not been loaded for this application yet." />
+        </div>
+    </c:if>
+</div>

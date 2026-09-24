@@ -1,0 +1,50 @@
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<div class="loan-view-summary-card mt-5 px-5 py-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <c:choose>
+                    <c:when test="${reviewBasePath eq '/disbursement'}">
+                        <spring:message code="applicant.paymentDetails.disbursementTitle" text="Applicant Bank/Mobile Account Details for Disbursement Deposit" />
+                    </c:when>
+                    <c:otherwise>
+                        <spring:message code="applicant.paymentDetails.title" text="Applicant Financial Details for Disbursement Deposit" />
+                    </c:otherwise>
+                </c:choose>
+            </p>
+            <p class="mt-1 text-sm text-slate-600"><spring:message code="applicant.paymentDetails.help" text="Account where the authorized disbursement/teller officer will deposit approved loan funds." /></p>
+        </div>
+        <c:if test="${paymentDetails.available}">
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                <c:out value="${paymentDetails.sourceLabel}" />
+            </span>
+        </c:if>
+    </div>
+    <c:choose>
+        <c:when test="${paymentDetails.available}">
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="member.settings.payment.type" text="Payment Method" /></div>
+                    <div class="applicant-info-value"><c:out value="${paymentDetails.destinationTypeLabel}" /></div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="member.settings.payment.provider" text="Bank or Provider" /></div>
+                    <div class="applicant-info-value"><c:out value="${paymentDetails.provider}" /></div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="member.settings.payment.holder" text="Account Holder Name" /></div>
+                    <div class="applicant-info-value"><c:out value="${paymentDetails.accountHolderName}" /></div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="member.settings.payment.identifier" text="Account or Payment Number" /></div>
+                    <div class="applicant-info-value"><c:out value="${paymentDetails.accountIdentifier}" /></div>
+                </div>
+            </div>
+        </c:when>
+        <c:otherwise>
+            <div class="mt-4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <spring:message code="applicant.paymentDetails.empty" text="The applicant has not provided financial details for the disbursement deposit yet." />
+            </div>
+        </c:otherwise>
+    </c:choose>
+</div>

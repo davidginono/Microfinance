@@ -1,0 +1,417 @@
+
+<section class="erp-panel min-w-0 overflow-hidden" data-admin-usage-analytics data-show-sacco-column="${usageShowSaccoColumn}">
+    <div class="erp-panel-header">
+        <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <p class="erp-panel-title">App Usage</p>
+                <p class="mt-1 text-sm text-slate-500">Live users and authenticated app activity.</p>
+            </div>
+            <div class="aws-usage-range-picker relative text-xs font-semibold uppercase tracking-wide text-slate-500" data-usage-range-picker>
+                <span>Timeline</span>
+                <button type="button" class="mt-1 flex h-10 w-full items-center justify-between gap-3 border border-slate-300 bg-slate-50 px-2.5 pl-3 text-sm font-semibold normal-case tracking-normal text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-200" data-usage-range-button aria-expanded="false">
+                    <span data-usage-range-label>Today</span>
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 transition-transform" data-usage-range-caret aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <path d="M6 9l6 6 6-6"></path>
+                        </svg>
+                    </span>
+                </button>
+                <div class="absolute right-0 top-full z-20 mt-1 hidden w-full overflow-hidden border border-slate-200 bg-white text-sm font-semibold normal-case tracking-normal text-slate-700" data-usage-range-menu>
+                    <button type="button" class="block w-full px-3 py-2 text-left hover:bg-slate-50" data-usage-range-option data-value="today">Today</button>
+                    <button type="button" class="block w-full px-3 py-2 text-left hover:bg-slate-50" data-usage-range-option data-value="7d">Last 7 Days</button>
+                    <button type="button" class="block w-full px-3 py-2 text-left hover:bg-slate-50" data-usage-range-option data-value="30d">Last 30 Days</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="erp-panel-body min-w-0 space-y-4">
+        <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="border border-slate-200 bg-slate-50 p-4">
+                <p class="erp-widget-title">Online Users</p>
+                <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="activeUsers">-</p>
+                <p class="mt-1 text-xs text-slate-500">Unique users active now</p>
+            </div>
+            <div class="border border-slate-200 bg-slate-50 p-4">
+                <p class="erp-widget-title">Active Sessions</p>
+                <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="activeSessions">-</p>
+                <p class="mt-1 text-xs text-slate-500">Sessions active in 5 minutes</p>
+            </div>
+            <div class="border border-slate-200 bg-slate-50 p-4">
+                <p class="erp-widget-title">Page Views</p>
+                <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="pageViews">-</p>
+                <p class="mt-1 text-xs text-slate-500">Authenticated page requests</p>
+            </div>
+            <div class="border border-slate-200 bg-slate-50 p-4">
+                <p class="erp-widget-title">Logins</p>
+                <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="logins">-</p>
+                <p class="mt-1 text-xs text-slate-500">For the selected period</p>
+            </div>
+        </div>
+
+        <div class="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(260px,0.65fr)]">
+            <div class="min-w-0 overflow-hidden border border-slate-200 bg-white p-3 sm:p-4">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p class="font-semibold text-slate-900">Logged in Users</p>
+                    <span class="text-xs text-slate-500">Updated <span data-usage-updated>-</span></span>
+                </div>
+                <canvas data-usage-chart class="block max-w-full" height="260"></canvas>
+            </div>
+            <div class="aws-usage-chart-panel flex min-h-0 flex-col overflow-hidden border border-slate-200 bg-white">
+                <div class="admin-usage-scroll min-h-0 flex-1 p-3 sm:p-4">
+                    <div class="mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <p class="font-semibold text-slate-900">Devices</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Visitors</p>
+                    </div>
+                    <div data-usage-devices class="space-y-2 text-sm"></div>
+                    <div class="my-4 border-t border-slate-100"></div>
+                    <div class="mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <p class="font-semibold text-slate-900">Browsers</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Visitors</p>
+                    </div>
+                    <div data-usage-browsers class="space-y-2 text-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-2">
+            <div class="aws-usage-table-panel flex min-h-0 flex-col overflow-hidden border border-slate-200 bg-white">
+                <div class="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <p class="font-semibold text-slate-900">Top Pages</p>
+                </div>
+                <div class="admin-usage-scroll admin-usage-table-scroll erp-table-scroll min-h-0 flex-1">
+                    <table class="erp-table min-w-full table-fixed">
+                        <colgroup>
+                            <c:choose>
+                                <c:when test="${usageShowSaccoColumn}">
+                                    <col class="aws-col-48" />
+                                    <col class="aws-col-34" />
+                                    <col class="aws-col-18" />
+                                </c:when>
+                                <c:otherwise>
+                                    <col class="aws-col-78" />
+                                    <col class="aws-col-22" />
+                                </c:otherwise>
+                            </c:choose>
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th>Page</th>
+                            <c:if test="${usageShowSaccoColumn}"><th>SACCO</th></c:if>
+                            <th class="text-right">Views</th>
+                        </tr>
+                        </thead>
+                        <tbody data-usage-top-pages>
+                        <tr><td colspan="${usageShowSaccoColumn ? 3 : 2}" class="text-slate-500">Loading usage data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="aws-usage-table-panel flex min-h-0 flex-col overflow-hidden border border-slate-200 bg-white">
+                <div class="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <p class="font-semibold text-slate-900">Active Users</p>
+                </div>
+                <div class="admin-usage-scroll admin-usage-table-scroll erp-table-scroll min-h-0 flex-1">
+                    <table class="erp-table min-w-full table-fixed">
+                        <colgroup>
+                            <c:choose>
+                                <c:when test="${usageShowSaccoColumn}">
+                                    <col class="aws-col-22" />
+                                    <col class="aws-col-24" />
+                                    <col class="aws-col-18" />
+                                    <col class="aws-col-22" />
+                                    <col class="aws-col-14" />
+                                </c:when>
+                                <c:otherwise>
+                                    <col class="aws-col-26" />
+                                    <col class="aws-col-24" />
+                                    <col class="aws-col-32" />
+                                    <col class="aws-col-18" />
+                                </c:otherwise>
+                            </c:choose>
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th>User</th>
+                            <c:if test="${usageShowSaccoColumn}"><th>SACCO</th></c:if>
+                            <th>Role</th>
+                            <th>Page</th>
+                            <th>Last Activity</th>
+                        </tr>
+                        </thead>
+                        <tbody data-usage-active-users>
+                        <tr><td colspan="${usageShowSaccoColumn ? 5 : 4}" class="text-slate-500">Loading active users...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+    (function () {
+        const root = document.querySelector('[data-admin-usage-analytics]');
+        if (!root) {
+            return;
+        }
+        const rangePicker = root.querySelector('[data-usage-range-picker]');
+        const rangeButton = root.querySelector('[data-usage-range-button]');
+        const rangeMenu = root.querySelector('[data-usage-range-menu]');
+        const rangeCaret = root.querySelector('[data-usage-range-caret]');
+        const rangeLabel = root.querySelector('[data-usage-range-label]');
+        const showSaccoColumn = root.getAttribute('data-show-sacco-column') === 'true';
+        let selectedRange = 'today';
+        const chart = root.querySelector('[data-usage-chart]');
+        const ctx = chart.getContext('2d');
+
+        function text(selector, value) {
+            const el = root.querySelector(selector);
+            if (el) {
+                el.textContent = value;
+            }
+        }
+
+        function formatNumber(value) {
+            return Number(value || 0).toLocaleString();
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function niceTickStep(value) {
+            const exponent = Math.floor(Math.log10(value));
+            const fraction = value / Math.pow(10, exponent);
+            let niceFraction = 1;
+            if (fraction > 5) {
+                niceFraction = 10;
+            } else if (fraction > 2) {
+                niceFraction = 5;
+            } else if (fraction > 1) {
+                niceFraction = 2;
+            }
+            return niceFraction * Math.pow(10, exponent);
+        }
+
+        function buildYAxis(maxValue) {
+            const rawMax = Math.max(1, Math.ceil(Number(maxValue || 0)));
+            let step;
+            if (rawMax <= 6) {
+                step = 1;
+            } else {
+                step = niceTickStep(rawMax / 4);
+            }
+            const axisMax = Math.max(step, Math.ceil(rawMax / step) * step);
+            const ticks = [];
+            for (let value = 0; value <= axisMax + (step / 2); value += step) {
+                ticks.push(Math.round(value));
+            }
+            return { max: axisMax, ticks: ticks };
+        }
+
+        function drawChart(rows) {
+            const dpr = window.devicePixelRatio || 1;
+            const parentWidth = chart.parentElement ? chart.parentElement.clientWidth : chart.clientWidth;
+            const cssWidth = Math.max(240, Math.floor(parentWidth || 320));
+            const cssHeight = 260;
+            chart.width = cssWidth * dpr;
+            chart.height = cssHeight * dpr;
+            chart.style.width = cssWidth + 'px';
+            chart.style.height = cssHeight + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+            const data = rows || [];
+            if (!data.length) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px "Open Sans", Helvetica, Arial, sans-serif';
+                ctx.fillText('No logins in this period yet.', 16, 28);
+                return;
+            }
+
+            const compact = cssWidth < 520;
+            const maxValue = Math.max(1, ...data.map(function (row) { return Number(row.total || 0); }));
+            const axis = buildYAxis(maxValue);
+            let padding = { top: 20, right: compact ? 10 : 20, bottom: compact ? 54 : 42, left: compact ? 34 : 44 };
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
+            padding.left = Math.max(padding.left, Math.ceil(ctx.measureText(formatNumber(axis.max)).width) + 14);
+            const width = cssWidth - padding.left - padding.right;
+            const height = cssHeight - padding.top - padding.bottom;
+
+            function x(index) {
+                return data.length === 1 ? padding.left + width / 2 : padding.left + width * index / (data.length - 1);
+            }
+
+            function y(value) {
+                return padding.top + height - ((Number(value || 0) / axis.max) * height);
+            }
+
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = '#64748b';
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
+            ctx.textAlign = 'right';
+            axis.ticks.forEach(function (tick) {
+                const gridY = y(tick);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, gridY);
+                ctx.lineTo(padding.left + width, gridY);
+                ctx.stroke();
+                ctx.fillText(formatNumber(tick), padding.left - 8, gridY + 4);
+            });
+
+            ctx.beginPath();
+            data.forEach(function (row, index) {
+                const px = x(index);
+                const py = y(row.total);
+                if (index === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            });
+            ctx.strokeStyle = '#0f766e';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.lineTo(x(data.length - 1), padding.top + height);
+            ctx.lineTo(x(0), padding.top + height);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(20, 184, 166, 0.12)';
+            ctx.fill();
+
+            ctx.fillStyle = '#64748b';
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            const targetLabels = compact ? 5 : 9;
+            const step = Math.max(1, Math.ceil(data.length / targetLabels));
+            data.forEach(function (row, index) {
+                if (index % step === 0 || index === data.length - 1) {
+                    if (compact) {
+                        ctx.save();
+                        ctx.translate(x(index), padding.top + height + 34);
+                        ctx.rotate(-Math.PI / 5);
+                        ctx.fillText(row.label, 0, 0);
+                        ctx.restore();
+                    } else {
+                        ctx.fillText(row.label, x(index), padding.top + height + 24);
+                    }
+                }
+            });
+        }
+
+        function renderBreakdown(container, rows) {
+            if (!rows || !rows.length) {
+                container.innerHTML = '<p class="text-slate-500">No usage yet.</p>';
+                return;
+            }
+            container.innerHTML = rows.map(function (row) {
+                return '<div class="space-y-1">'
+                    + '<div class="flex items-center justify-between gap-3">'
+                    + '<span class="font-semibold text-slate-700">' + escapeHtml(row.label) + '</span>'
+                    + '<span class="font-bold text-slate-900">' + formatNumber(row.percent) + '%</span>'
+                    + '</div>'
+                    + '<progress class="aws-usage-progress" max="100" value="' + Number(row.percent || 0) + '" aria-label="' + escapeHtml(row.label || 'Usage') + '"></progress>'
+                    + '</div>';
+            }).join('');
+        }
+
+        function renderTopPages(rows) {
+            const body = root.querySelector('[data-usage-top-pages]');
+            const colspan = showSaccoColumn ? 3 : 2;
+            if (!rows || !rows.length) {
+                body.innerHTML = '<tr><td colspan="' + colspan + '" class="text-slate-500">No page views in this period.</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(function (row) {
+                const saccoCell = showSaccoColumn ? '<td class="break-words text-slate-600">' + escapeHtml(row.saccoId) + '</td>' : '';
+                return '<tr><td class="break-words font-medium text-slate-800">' + escapeHtml(row.label)
+                    + '</td>' + saccoCell + '<td class="text-right font-semibold">' + formatNumber(row.total) + '</td></tr>';
+            }).join('');
+        }
+
+        function renderActiveUsers(rows) {
+            const body = root.querySelector('[data-usage-active-users]');
+            const colspan = showSaccoColumn ? 5 : 4;
+            if (!rows || !rows.length) {
+                body.innerHTML = '<tr><td colspan="' + colspan + '" class="text-slate-500">No users active in the last 5 minutes.</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(function (row) {
+                const saccoCell = showSaccoColumn ? '<td class="break-words text-slate-600">' + escapeHtml(row.saccoId) + '</td>' : '';
+                return '<tr>'
+                    + '<td class="break-words font-medium text-slate-800">' + escapeHtml(row.displayName) + '</td>'
+                    + saccoCell
+                    + '<td class="break-words">' + escapeHtml(row.roles) + '</td>'
+                    + '<td class="break-words">' + escapeHtml(row.currentPage) + '</td>'
+                    + '<td class="break-words">' + escapeHtml(row.lastActivityLabel) + '</td>'
+                    + '</tr>';
+            }).join('');
+        }
+
+        function render(payload) {
+            text('[data-usage-metric="activeUsers"]', formatNumber(payload.activeUsers));
+            text('[data-usage-metric="activeSessions"]', formatNumber(payload.activeSessions));
+            text('[data-usage-metric="pageViews"]', formatNumber(payload.pageViews));
+            text('[data-usage-metric="logins"]', formatNumber(payload.logins));
+            text('[data-usage-updated]', payload.capturedAtLabel || '-');
+            drawChart(payload.timeline);
+            renderBreakdown(root.querySelector('[data-usage-devices]'), payload.devices);
+            renderBreakdown(root.querySelector('[data-usage-browsers]'), payload.browsers);
+            renderTopPages(payload.topPages);
+            renderActiveUsers(payload.activeUserRows);
+        }
+
+        function closeRangeMenu() {
+            rangeMenu.classList.add('hidden');
+            rangeCaret.classList.remove('rotate-180');
+            rangeButton.setAttribute('aria-expanded', 'false');
+        }
+
+        function openRangeMenu() {
+            rangeMenu.classList.remove('hidden');
+            rangeCaret.classList.add('rotate-180');
+            rangeButton.setAttribute('aria-expanded', 'true');
+        }
+
+        function loadUsage() {
+            fetch('/admin/dashboard/usage-activity?range=' + encodeURIComponent(selectedRange), {
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function (response) { return response.json(); })
+                .then(render)
+                .catch(function () {
+                    text('[data-usage-updated]', 'unavailable');
+                });
+        }
+
+        rangeButton.addEventListener('click', function () {
+            if (rangeMenu.classList.contains('hidden')) {
+                openRangeMenu();
+            } else {
+                closeRangeMenu();
+            }
+        });
+        root.querySelectorAll('[data-usage-range-option]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                selectedRange = button.getAttribute('data-value') || 'today';
+                rangeLabel.textContent = button.textContent;
+                closeRangeMenu();
+                loadUsage();
+            });
+        });
+        document.addEventListener('click', function (event) {
+            if (!rangePicker.contains(event.target)) {
+                closeRangeMenu();
+            }
+        });
+        window.addEventListener('resize', function () { loadUsage(); });
+        loadUsage();
+        window.setInterval(loadUsage, 30000);
+    }());
+</script>

@@ -1,0 +1,161 @@
+<script>
+    (() => {
+        const LIVE_ACCOUNT_STATUS_TIMEOUT_MS = 10000;
+        const activeRequests = new WeakMap();
+
+        function setStatusBoxState(box, state, statusMessage) {
+            if (!box) {
+                return;
+            }
+            const hidden = state === "available";
+            box.hidden = hidden;
+            box.classList.toggle("hidden", hidden);
+            box.classList.toggle("is-loading", state === "loading");
+            box.classList.toggle("is-unavailable", state === "unavailable");
+            box.setAttribute("aria-hidden", hidden ? "true" : "false");
+            const message = box.querySelector("[data-live-account-status-message]");
+            if (message) {
+                message.textContent = statusMessage || "";
+            }
+        }
+
+        function applyLiveAccountStatus(container, payload) {
+            if (!container || !payload) {
+                return;
+            }
+            const savings = container.querySelector("[data-live-account-status-savings]");
+            const shares = container.querySelector("[data-live-account-status-shares]");
+            const message = container.querySelector("[data-live-account-status-message]");
+            const box = container.querySelector("[data-live-account-status-box]");
+
+            if (savings) {
+                savings.textContent = payload.savingsLabel || "-";
+            }
+            if (shares) {
+                shares.textContent = payload.sharesLabel || "-";
+            }
+            if (message) {
+                message.textContent = payload.statusMessage || "";
+            }
+            if (payload.available) {
+                setStatusBoxState(box, "available", "");
+                return;
+            }
+            setStatusBoxState(
+                box,
+                payload.pending ? "loading" : "unavailable",
+                payload.statusMessage || "Live balances are unavailable right now."
+            );
+        }
+
+        function cancelLiveAccountStatusRequest(container) {
+            const request = activeRequests.get(container);
+            if (request) {
+                request.cancel();
+            }
+        }
+
+        function hydrateLiveAccountStatus(container) {
+            const url = container.getAttribute("data-live-account-status-url");
+            if (!url) {
+                return;
+            }
+            cancelLiveAccountStatusRequest(container);
+            const controller = typeof AbortController === "function" ? new AbortController() : null;
+            let settled = false;
+            let timeoutId = null;
+
+            const cancel = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (timeoutId !== null) {
+                    window.clearTimeout(timeoutId);
+                }
+                if (controller) {
+                    controller.abort();
+                }
+                activeRequests.delete(container);
+            };
+            const finish = (payload) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (timeoutId !== null) {
+                    window.clearTimeout(timeoutId);
+                }
+                activeRequests.delete(container);
+                applyLiveAccountStatus(container, payload);
+            };
+
+            activeRequests.set(container, { cancel });
+            timeoutId = window.setTimeout(() => {
+                if (controller) {
+                    controller.abort();
+                }
+                finish({
+                    available: false,
+                    pending: false,
+                    savingsLabel: "-",
+                    sharesLabel: "-",
+                    statusMessage: "Live balances are taking too long to load. Try again later."
+                });
+            }, LIVE_ACCOUNT_STATUS_TIMEOUT_MS);
+
+            fetch(url, {
+                headers: {
+                    "Accept": "application/json"
+                },
+                credentials: "same-origin",
+                signal: controller ? controller.signal : undefined
+            })
+                .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+                .then(({ ok, payload }) => {
+                    if (!ok) {
+                        throw new Error((payload && payload.message) || "Live balances are unavailable right now.");
+                    }
+                    finish(payload);
+                })
+                .catch((error) => {
+                    if (settled) {
+                        return;
+                    }
+                    finish({
+                        available: false,
+                        pending: false,
+                        savingsLabel: "-",
+                        sharesLabel: "-",
+                        statusMessage: error && error.message
+                            ? error.message
+                            : "Live balances are unavailable right now."
+                    });
+                });
+        }
+
+        function hydrateAllLiveAccountStatuses() {
+            document.querySelectorAll("[data-live-account-status-url]").forEach(hydrateLiveAccountStatus);
+        }
+
+        window.SaccosLiveAccountStatus = {
+            hydrate: hydrateLiveAccountStatus,
+            hydrateAll: hydrateAllLiveAccountStatuses,
+            cancel: cancelLiveAccountStatusRequest
+        };
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", hydrateAllLiveAccountStatuses, { once: true });
+        } else {
+            hydrateAllLiveAccountStatuses();
+        }
+        window.addEventListener("pagehide", () => {
+            document.querySelectorAll("[data-live-account-status-url]").forEach(cancelLiveAccountStatusRequest);
+        });
+        window.addEventListener("pageshow", (event) => {
+            if (event.persisted) {
+                hydrateAllLiveAccountStatuses();
+            }
+        });
+    })();
+</script>

@@ -1,0 +1,294 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+<!DOCTYPE html>
+<html lang="${pageContext.response.locale.language}" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="google" content="notranslate" />
+    <title><spring:message code="app.title" /></title>
+    <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-mark-light-green.png?v=20260826-clean' />" />
+    <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-400.woff2' />" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="<c:url value='/css/open-sans.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
+<%@ include file="select-enhancer.jspf" %>
+</head>
+<body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
+<a class="aws-skip-link" href="#main-content"><spring:message code="common.skipToContent" text="Skip to main content" /></a>
+<script>
+    try {
+        if (window.localStorage.getItem("shell:desktopSidebarCollapsed") === "true"
+            && window.matchMedia("(min-width: 1024px)").matches) {
+            document.documentElement.classList.add("shell-sidebar-collapsed");
+        }
+    } catch (ignored) {
+        // Local storage can be unavailable in strict browser modes.
+    }
+</script>
+<div class="aws-console-root min-h-screen w-full max-w-full">
+<nav id="shellTopNav" class="app-topbar fixed inset-x-0 top-0 z-50">
+    <div class="app-topbar-inner flex items-center justify-between gap-2 px-2.5 py-0 sm:gap-3 sm:px-3 lg:px-4">
+        <div class="app-topbar-left flex min-w-0 items-center gap-2 sm:gap-2.5">
+            <button id="sidebarToggle" type="button" class="aws-mobile-menu-button inline-flex h-10 w-10 items-center justify-center rounded border text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden" aria-label="Open menu">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'LOAN_OFFICER' ? '/loan-officer/queue' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/queue' : (currentMember.position eq 'CREDIT_COMMITTEE' ? '/credit-committee/queue' : (currentMember.position eq 'BOARD' ? '/board/queue' : (currentMember.position eq 'ACCOUNTANT' ? '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT' : (currentMember.position eq 'DISBURSEMENT_OFFICER' ? '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT' : '/app/dashboard')))))))}" class="app-global-brand inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
+                <c:choose>
+                    <c:when test="${not empty activeSaccoLogoUrl}">
+                        <span class="app-global-logo inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
+                            <img src="${activeSaccoLogoUrl}"
+                                 alt="${not empty activeSaccoName ? activeSaccoName : 'SACCO'} logo"
+                                 class="app-global-logo-image h-full w-full object-contain p-1" />
+                        </span>
+                    </c:when>
+                    <c:otherwise>
+                        <span class="app-global-logo app-global-logo-fallback inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/35 bg-white/95 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-800 shadow-sm sm:h-9 sm:w-9 sm:text-[0.68rem]">
+                            ${activeSaccoLogoText}
+                        </span>
+                    </c:otherwise>
+                </c:choose>
+                <div class="min-w-0 leading-tight">
+                    <p class="break-words font-display text-[0.92rem] font-semibold tracking-tight text-white sm:text-base">
+                        <c:choose>
+                            <c:when test="${not empty activeSaccoName}">${activeSaccoName}</c:when>
+                            <c:otherwise><spring:message code="app.title" /></c:otherwise>
+                        </c:choose>
+                    </p>
+                    <p class="hidden text-[11px] font-semibold uppercase tracking-[0.17em] text-cyan-50/90 md:block">
+                        <c:choose>
+                            <c:when test="${not empty activeSaccoId}">${activeSaccoId} &middot; Loan Application Portal</c:when>
+                            <c:otherwise><spring:message code="app.title" /></c:otherwise>
+                        </c:choose>
+                    </p>
+                </div>
+            </a>
+            <label class="app-global-search" aria-label="<spring:message code='common.search' text='Search' />">
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="m20 20-3.5-3.5"></path>
+                </svg>
+                <input id="consoleNavigationSearch"
+                       type="search"
+                       name="console-navigation-search"
+                       autocomplete="new-password"
+                       autocapitalize="none"
+                       autocorrect="off"
+                       spellcheck="false"
+                       inputmode="search"
+                       aria-autocomplete="none"
+                       data-1p-ignore
+                       data-bwignore
+                       data-lpignore="true"
+                       data-form-type="other"
+                       placeholder="<spring:message code='common.search' text='Search' /> navigation"
+                       aria-label="<spring:message code='common.search' text='Search' /> navigation" />
+            </label>
+        </div>
+
+        <div class="app-topbar-actions erp-mobile-compact flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
+            <c:if test="${not empty headerStation}">
+                <div class="app-station-selector hidden min-[520px]:flex max-w-[13rem] items-center gap-2 border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
+                    <span class="app-station-icon inline-flex h-7 w-7 shrink-0 items-center justify-center bg-white/15 text-cyan-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
+                    </span>
+                    <div class="app-station-copy min-w-0">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-50/85"><spring:message code="header.currentStation" text="Current Station" /></p>
+                        <p class="break-words text-xs font-semibold text-white">${headerStation.stationId}</p>
+                        <p class="break-words text-[10px] font-medium text-cyan-50/85">${headerStation.stationAddressLocation}</p>
+                    </div>
+                </div>
+                <div class="app-station-mobile flex min-[520px]:hidden items-center border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                    ${headerStation.stationId}
+                </div>
+            </c:if>
+            <div class="app-notification-control relative">
+                <button id="notificationToggle" type="button" class="erp-icon-btn" aria-label="<spring:message code='notifications.title' text='Notifications' />" aria-controls="notificationPanel" aria-expanded="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 2a4 4 0 00-4 4v1.172c0 .53-.211 1.039-.586 1.414L4.293 9.707A1 1 0 004 10.414V12a2 2 0 002 2h8a2 2 0 002-2v-1.586a1 1 0 00-.293-.707l-1.121-1.121A2 2 0 0114 7.172V6a4 4 0 00-4-4zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z"/>
+                    </svg>
+                </button>
+                <span id="notificationBadge" class="app-notification-badge hidden"></span>
+                <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50" role="region" aria-label="<spring:message code='notifications.title' text='Notifications' />">
+                    <div class="erp-dropdown-header">
+                        <div class="erp-dropdown-heading">
+                            <p class="erp-dropdown-title"><spring:message code="notifications.title" text="Notifications" /></p>
+                        </div>
+                        <a id="notificationViewAll" href="#" class="erp-dropdown-link"><spring:message code="common.viewAll" text="View all" /></a>
+                    </div>
+                    <div id="notificationPanelBody" class="erp-notification-body">
+                        <div class="erp-notification-empty"><spring:message code="common.loading" text="Loading..." /></div>
+                    </div>
+                </div>
+            </div>
+            <div class="app-account-copy hidden lg:flex items-center px-2 py-0 text-right">
+                <div class="min-w-0">
+                    <p class="break-words text-sm font-semibold text-white">
+                        <c:choose>
+                            <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
+                            <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
+                        </c:choose>
+                    </p>
+                    <p class="mt-0.5 text-xs font-medium text-white/85">
+                        <c:choose>
+                            <c:when test="${not empty currentMember and currentMember.staffSession}">
+                                <spring:message code="profile.staffMemberNo" text="Staff Number" />
+                            </c:when>
+                            <c:when test="${not empty currentMember and currentMember.memberAccess}">
+                                <spring:message code="profile.memberNo" />
+                            </c:when>
+                            <c:otherwise><spring:message code="profile.userId" text="User ID" /></c:otherwise>
+                        </c:choose>:
+                        <span class="font-semibold text-white">
+                            <c:choose>
+                                <c:when test="${not empty currentMember and currentMember.staffSession and not empty currentMember.staffNo}">${currentMember.staffNo}</c:when>
+                                <c:when test="${not empty currentMember and not empty currentMember.memberNo}">${currentMember.memberNo}</c:when>
+                                <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
+                            </c:choose>
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div class="app-profile-control relative">
+                <button id="profileToggle" type="button" class="erp-icon-btn profile-icon-btn" aria-label="<spring:message code='profile.openDetails' text='Open profile details' />" aria-controls="profilePanel" aria-expanded="false">
+                    <img src="<c:url value='/profile/image/me' />"
+                         alt=""
+                         class="profile-avatar-img h-full w-full rounded-full object-cover"
+                         onload="this.classList.remove('hidden'); if (this.nextElementSibling) { this.nextElementSibling.classList.add('hidden'); }"
+                         onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="hidden text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 21a8 8 0 0 0-16 0"/>
+                        <circle cx="12" cy="8" r="4"/>
+                    </svg>
+                </button>
+                <div id="profilePanel" class="profile-panel erp-dropdown absolute right-0 top-[calc(100%+0.55rem)] z-50 w-[16.5rem] max-w-[calc(100vw-1rem)] sm:w-[19rem] max-[374px]:right-[-0.2rem] max-[374px]:w-[15rem]">
+                    <div class="erp-dropdown-header">
+                        <div class="erp-dropdown-heading">
+                            <p class="erp-dropdown-title"><spring:message code="profile.title" text="Profile" /></p>
+                            <p class="erp-dropdown-subtitle"><spring:message code="profile.accountDetails" text="Your account details" /></p>
+                        </div>
+                    </div>
+                    <div class="p-3">
+                    <div class="flex items-start gap-3">
+                        <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-500">
+                            <img src="<c:url value='/profile/image/me' />"
+                                 alt=""
+                                 class="profile-avatar-img h-full w-full rounded-full object-cover"
+                                 onload="this.classList.remove('hidden'); if (this.nextElementSibling) { this.nextElementSibling.classList.add('hidden'); }"
+                                 onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');" />
+                            <svg xmlns="http://www.w3.org/2000/svg" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 21a8 8 0 0 0-16 0"/>
+                                <circle cx="12" cy="8" r="4"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-slate-900">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
+                                    <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
+                                </c:choose>
+                            </p>
+                            <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and not empty currentMember.displayRole}">${currentMember.displayRole}</c:when>
+                                    <c:otherwise><sec:authentication property="principal.position" /></c:otherwise>
+                                </c:choose>
+                            </p>
+                            <c:if test="${not empty currentMember and not empty currentMember.email}">
+                                <p class="mt-1 break-words text-xs text-slate-500">${currentMember.email}</p>
+                            </c:if>
+                            <c:if test="${not isPlatformAdminIdentity and not empty adminScope}">
+                                <p class="mt-1 text-[11px] font-medium text-slate-500">${adminScope.saccoId} / ${adminScope.stationId}</p>
+                            </c:if>
+                        </div>
+                    </div>
+                    <div class="mt-3 grid gap-3 border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <div class="flex items-center justify-between gap-4">
+                            <span class="text-slate-500">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and currentMember.staffSession}">
+                                        <spring:message code="profile.staffMemberNo" text="Staff Number" />
+                                    </c:when>
+                                    <c:when test="${not empty currentMember and currentMember.memberAccess}">
+                                        <spring:message code="profile.memberNo" />
+                                    </c:when>
+                                    <c:otherwise><spring:message code="profile.userId" text="User ID" /></c:otherwise>
+                                </c:choose>
+                            </span>
+                            <span class="font-semibold text-slate-800">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and currentMember.staffSession and not empty currentMember.staffNo}">${currentMember.staffNo}</c:when>
+                                    <c:when test="${not empty currentMember and not empty currentMember.memberNo}">${currentMember.memberNo}</c:when>
+                                    <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
+                                </c:choose>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-4">
+                            <span class="text-slate-500"><spring:message code="profile.role" /></span>
+                            <span class="font-semibold text-slate-800">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and not empty currentMember.displayRole}">${currentMember.displayRole}</c:when>
+                                    <c:otherwise><sec:authentication property="principal.position" /></c:otherwise>
+                                </c:choose>
+                            </span>
+                        </div>
+                        <c:if test="${not empty currentMember and currentMember.memberAccess}">
+                            <div class="flex items-center justify-between gap-4">
+                                <span class="text-slate-500"><spring:message code="profile.memberId" /></span>
+                                <span class="font-semibold text-slate-800">${currentMember.memberNo}</span>
+                            </div>
+                        </c:if>
+                        <c:if test="${not empty currentMember and not empty currentMember.staffNo}">
+                            <div class="flex items-center justify-between gap-4">
+                                <span class="text-slate-500"><spring:message code="profile.staffMemberNo" text="Staff Number" /></span>
+                                <span class="font-semibold text-slate-800">${currentMember.staffNo}</span>
+                            </div>
+                        </c:if>
+                    </div>
+                    <a href="/profile" class="mt-3 inline-flex w-full items-center justify-center border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                        <spring:message code="profile.photo.edit" text="Edit Profile Photo" />
+                    </a>
+                    </div>
+                </div>
+            </div>
+            <form action="/logout" method="post" class="app-logout-control m-0 shrink-0">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <button type="submit" class="app-btn erp-topbar-btn btn-primary px-3 text-[0.78rem] sm:px-4 max-[374px]:px-2.5 max-[374px]:text-[0.72rem]"><spring:message code="nav.logout" /></button>
+            </form>
+        </div>
+    </div>
+</nav>
+<div id="shellPageTitleRail" class="shell-page-title-rail" aria-label="Current workspace location">
+    <div class="shell-page-title-rail__inner">
+        <p class="shell-page-title-rail__text">
+            <strong id="shellPageTitleRailText"></strong>
+            <span id="shellPageBreadcrumbRailText" class="shell-page-title-rail__path"></span>
+        </p>
+    </div>
+</div>
+<div id="appToastContainer" class="pointer-events-none fixed right-4 top-[calc(var(--shell-nav-height)+0.75rem)] z-[140] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-[calc(var(--shell-nav-height)+1rem)]" aria-live="polite" aria-atomic="false"></div>
+<div id="pageSubmitPreloader" class="page-submit-preloader" aria-hidden="true">
+    <div class="page-submit-preloader__panel" role="status" aria-live="polite" aria-label="Loading page">
+        <div class="page-submit-preloader__spinner" aria-hidden="true">
+            <span class="page-submit-preloader__ring"></span>
+            <span class="page-submit-preloader__ring"></span>
+            <span class="page-submit-preloader__ring"></span>
+        </div>
+        <span class="page-submit-preloader__text"><spring:message code="common.processing" text="Processing..." /></span>
+    </div>
+</div>
+
+<div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/45 lg:hidden"></div>
+<div class="aws-app-shell relative min-h-screen">
+<script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
+<script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
+<script src="<c:url value='/js/shell.js' />" defer></script>

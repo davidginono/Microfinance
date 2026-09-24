@@ -1,0 +1,182 @@
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<div id="guarantorFinancialModal" class="app-modal-overlay" aria-hidden="true">
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="guarantorFinancialModalTitle" tabindex="-1">
+        <div class="app-modal-scroll">
+            <div class="app-modal-header">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400"><spring:message code="loan.guarantor" text="Guarantor" /></p>
+                    <h2 id="guarantorFinancialModalTitle" class="mt-0.5 text-lg font-semibold text-slate-900" data-gf-modal-name><spring:message code="financial.status" text="Financial Status" /></h2>
+                </div>
+                <button type="button" class="app-modal-close" data-gf-modal-close aria-label="<spring:message code='common.close' text='Close' />">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M4.22 4.22a.75.75 0 011.06 0L10 8.94l4.72-4.72a.75.75 0 111.06 1.06L11.06 10l4.72 4.72a.75.75 0 11-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 01-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="app-modal-body">
+                <div class="app-modal-section space-y-3" data-gf-modal-ready>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="financial.savings" text="Savings" /></span>
+                        <span class="text-base font-semibold text-slate-900" data-gf-modal-savings>-</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="financial.shares" text="Shares" /></span>
+                        <span class="text-base font-semibold text-slate-900" data-gf-modal-shares>-</span>
+                    </div>
+                    <p class="m-0 text-sm text-slate-500" data-gf-modal-note></p>
+                </div>
+                <div class="app-modal-section hidden items-center justify-center py-8 text-sm text-slate-500" data-gf-modal-loading>
+                    <spring:message code="financial.loadingStatus" text="Loading financial status..." />
+                </div>
+                <div class="app-modal-section hidden border-rose-200 bg-rose-50 text-sm text-rose-700" data-gf-modal-error>
+                    <spring:message code="financial.unableLoadStatus" text="Unable to load status." />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var triggers = document.querySelectorAll('.guarantor-financial-trigger');
+    if (!triggers.length) {
+        return;
+    }
+    var modal = document.getElementById('guarantorFinancialModal');
+    if (!modal) {
+        return;
+    }
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    var dialog = modal.querySelector('[role="dialog"]');
+    var closeButton = modal.querySelector('[data-gf-modal-close]');
+    var activeTrigger = null;
+    var nameEl = modal.querySelector('[data-gf-modal-name]');
+    var readyEl = modal.querySelector('[data-gf-modal-ready]');
+    var loadingEl = modal.querySelector('[data-gf-modal-loading]');
+    var errorEl = modal.querySelector('[data-gf-modal-error]');
+    var savingsEl = modal.querySelector('[data-gf-modal-savings]');
+    var sharesEl = modal.querySelector('[data-gf-modal-shares]');
+    var noteEl = modal.querySelector('[data-gf-modal-note]');
+    var msgLoading = '<spring:message code="common.loading" text="Loading..." />';
+    var msgLoadStatus = '<spring:message code="financial.loadStatus" text="Load Status" />';
+    var msgViewStatus = '<spring:message code="financial.viewStatus" text="View Status" />';
+    var msgGuarantor = '<spring:message code="loan.guarantor" text="Guarantor" />';
+    var msgUnableLoadStatus = '<spring:message code="financial.unableLoadStatus" text="Unable to load status." />';
+    var msgNetworkError = '<spring:message code="financial.networkError" text="Network error while loading status." />';
+
+    function show(el) { if (el) el.classList.remove('hidden'); }
+    function hide(el) { if (el) el.classList.add('hidden'); }
+
+    function openModal() {
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+        (closeButton || dialog)?.focus();
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('overflow-hidden');
+        activeTrigger?.focus();
+        activeTrigger = null;
+    }
+
+    function setState(state) {
+        if (state === 'loading') {
+            show(loadingEl); hide(readyEl); hide(errorEl);
+        } else if (state === 'ready') {
+            hide(loadingEl); show(readyEl); hide(errorEl);
+        } else if (state === 'error') {
+            hide(loadingEl); hide(readyEl); show(errorEl);
+        }
+    }
+
+    function setButtonBusy(btn, busy) {
+        var spinner = btn.querySelector('[data-financial-spinner]');
+        var label = btn.querySelector('[data-financial-label]');
+        if (spinner) spinner.classList.toggle('hidden', !busy);
+        if (label) label.textContent = busy ? msgLoading : msgViewStatus;
+        btn.disabled = busy;
+    }
+
+    function guarantorNameFor(btn) {
+        var row = btn.closest('tr');
+        if (!row) return msgGuarantor;
+        var firstCell = row.querySelector('td');
+        if (!firstCell) return msgGuarantor;
+        return (firstCell.textContent || '').trim() || msgGuarantor;
+    }
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.closest('[data-gf-modal-close]')) {
+            closeModal();
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            closeModal();
+        }
+    });
+
+    triggers.forEach(function (btn) {
+        // Keep the inline savings/share cards in sync with the modal.
+        var legacy = btn.parentElement ? btn.parentElement.querySelector('.guarantor-financial-result') : null;
+        var label = btn.querySelector('[data-financial-label]');
+        if (label && label.textContent.trim() === msgLoadStatus) {
+            label.textContent = msgViewStatus;
+        }
+
+        btn.addEventListener('click', function () {
+            var url = btn.getAttribute('data-url');
+            if (!url) return;
+            activeTrigger = btn;
+            if (nameEl) nameEl.textContent = guarantorNameFor(btn);
+            setState('loading');
+            openModal();
+            setButtonBusy(btn, true);
+
+            fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function (response) {
+                    return response.json().then(function (payload) {
+                        return { ok: response.ok, payload: payload };
+                    });
+                })
+                .then(function (result) {
+                    if (result.ok) {
+                        var data = result.payload || {};
+                        if (savingsEl) savingsEl.textContent = data.savingsLabel || '-';
+                        if (sharesEl) sharesEl.textContent = data.sharesLabel || '-';
+                        if (noteEl) noteEl.textContent = data.statusMessage || '';
+                        if (legacy) {
+                            var inlineSavings = legacy.querySelector('[data-financial-savings]');
+                            var inlineShares = legacy.querySelector('[data-financial-shares]');
+                            var inlineNote = legacy.querySelector('[data-financial-note]');
+                            if (inlineSavings) inlineSavings.textContent = data.savingsLabel || '-';
+                            if (inlineShares) inlineShares.textContent = data.sharesLabel || '-';
+                            if (inlineNote) inlineNote.textContent = data.statusMessage || '';
+                            legacy.classList.remove('hidden');
+                        }
+                        setState('ready');
+                    } else {
+                        if (errorEl) errorEl.textContent = (result.payload && result.payload.message) || msgUnableLoadStatus;
+                        setState('error');
+                    }
+                })
+                .catch(function () {
+                    if (errorEl) errorEl.textContent = msgNetworkError;
+                    setState('error');
+                })
+                .finally(function () {
+                    setButtonBusy(btn, false);
+                });
+        });
+    });
+})();
+</script>

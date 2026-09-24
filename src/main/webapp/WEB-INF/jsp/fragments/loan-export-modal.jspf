@@ -1,0 +1,101 @@
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<div id="loanExportModal" class="app-modal-overlay" aria-hidden="true">
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="loanExportModalTitle">
+        <div class="app-modal-header">
+            <div>
+                <p class="erp-widget-title"><spring:message code="loan.export.title" text="Export Loan Application" /></p>
+                <h2 id="loanExportModalTitle" class="erp-panel-title"><spring:message code="loan.export.chooseType" text="Choose document type" /></h2>
+            </div>
+            <button type="button" class="app-modal-close" data-loan-export-close aria-label="<spring:message code='loan.export.close' text='Close export options' />">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="app-modal-body space-y-3">
+            <div class="loan-export-option app-modal-section">
+                <span class="loan-export-option-title block font-semibold text-slate-900"><spring:message code="loan.export.systemSigned" text="System Signed" /></span>
+                <span class="mt-1 block text-sm text-slate-500"><spring:message code="loan.export.systemSignedHelp" text="Includes signatures already recorded in the approval workflow." /></span>
+                <div class="mt-3 flex flex-wrap justify-end gap-2">
+                    <a href="#" data-loan-export-signed data-download-action="true" class="app-btn btn-primary">
+                        <span class="loan-document-action-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
+                        </span>
+                        <spring:message code="common.export" text="Export" />
+                    </a>
+                    <a href="#" data-loan-print-signed data-print-action="true" class="app-btn btn-neutral">
+                        <span class="loan-document-action-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                        </span>
+                        <spring:message code="common.print" text="Print" />
+                    </a>
+                </div>
+            </div>
+            <div class="loan-export-option app-modal-section">
+                <span class="loan-export-option-title block font-semibold text-slate-900"><spring:message code="loan.export.physicalSigned" text="Physically Signed (with empty signature slots)" /></span>
+                <span class="mt-1 block text-sm text-slate-500"><spring:message code="loan.export.physicalSignedHelp" text="Leaves staff signature spaces empty for signing on paper." /></span>
+                <div class="mt-3 flex flex-wrap justify-end gap-2">
+                    <a href="#" data-loan-export-unsigned data-download-action="true" class="app-btn btn-primary">
+                        <span class="loan-document-action-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
+                        </span>
+                        <spring:message code="common.export" text="Export" />
+                    </a>
+                    <a href="#" data-loan-print-unsigned data-print-action="true" class="app-btn btn-neutral">
+                        <span class="loan-document-action-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                        </span>
+                        <spring:message code="common.print" text="Print" />
+                    </a>
+                </div>
+            </div>
+            <div class="app-modal-actions">
+                <button type="button" class="app-btn btn-neutral" data-loan-export-close><spring:message code="common.cancel" text="Cancel" /></button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const modal = document.getElementById("loanExportModal");
+        if (!modal || modal.dataset.bound === "true") {
+            return;
+        }
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        const signedLink = modal.querySelector("[data-loan-export-signed]");
+        const unsignedLink = modal.querySelector("[data-loan-export-unsigned]");
+        const signedPrintLink = modal.querySelector("[data-loan-print-signed]");
+        const unsignedPrintLink = modal.querySelector("[data-loan-print-unsigned]");
+
+        function closeModal() {
+            modal.classList.remove("is-open");
+            modal.setAttribute("aria-hidden", "true");
+        }
+
+        document.querySelectorAll("[data-loan-export-url]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const baseUrl = button.dataset.loanExportUrl;
+                const signedUrl = baseUrl + "?signatureMode=signed";
+                const unsignedUrl = baseUrl + "?signatureMode=unsigned";
+                signedLink.href = signedUrl;
+                signedPrintLink.href = signedUrl;
+                unsignedLink.href = unsignedUrl;
+                unsignedPrintLink.href = unsignedUrl;
+                modal.classList.add("is-open");
+                modal.setAttribute("aria-hidden", "false");
+                signedLink.focus();
+            });
+        });
+        [signedLink, signedPrintLink, unsignedLink, unsignedPrintLink].forEach((link) => link.addEventListener("click", closeModal));
+
+        modal.querySelectorAll("[data-loan-export-close]").forEach((button) => button.addEventListener("click", closeModal));
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && modal.classList.contains("is-open")) {
+                closeModal();
+            }
+        });
+        modal.dataset.bound = "true";
+    })();
+</script>

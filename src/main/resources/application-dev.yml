@@ -1,0 +1,13 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  web:
+    resources:
+      cache:
+        period: 0
+  servlet:
+    jsp:
+      init-parameters:
+        development: true
+

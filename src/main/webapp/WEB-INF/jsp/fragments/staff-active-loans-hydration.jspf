@@ -1,0 +1,233 @@
+<script>
+    (function () {
+        function escapeHtml(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function valueOrDash(value) {
+            var text = String(value == null ? "" : value).trim();
+            return text ? text : "-";
+        }
+
+        function activeLoanCountLabel(count) {
+            return count + " active loan" + (count === 1 ? "" : "s");
+        }
+
+        function tableRegion(section) {
+            return section ? section.querySelector("[data-aws-table-region]") : null;
+        }
+
+        function refreshButton(section) {
+            return section ? section.querySelector("[data-staff-active-loans-refresh]") : null;
+        }
+
+        function showLoading(section, label) {
+            var region = tableRegion(section);
+            if (!region || region.classList.contains("is-loading")) {
+                return;
+            }
+            if (!region.hasAttribute("data-staff-active-loans-loading-label")) {
+                region.setAttribute("data-staff-active-loans-loading-label", region.getAttribute("data-loading-label") || "");
+            }
+            if (label) {
+                region.setAttribute("data-loading-label", label);
+            }
+            region.classList.add("is-loading");
+            region.setAttribute("aria-busy", "true");
+            region.setAttribute("data-aws-async-table-loading", "true");
+            var loader = document.createElement("div");
+            loader.className = "aws-table-loader";
+            loader.setAttribute("role", "status");
+            loader.setAttribute("aria-label", region.getAttribute("data-loading-label") || "Loading results...");
+            var spinner = document.createElement("span");
+            spinner.className = "aws-table-loader__spinner";
+            spinner.setAttribute("aria-hidden", "true");
+            loader.appendChild(spinner);
+            region.appendChild(loader);
+        }
+
+        function hideLoading(section) {
+            var region = tableRegion(section);
+            if (region) {
+                region.classList.remove("is-loading");
+                region.setAttribute("aria-busy", "false");
+                region.removeAttribute("data-aws-async-table-loading");
+                var originalLabel = region.getAttribute("data-staff-active-loans-loading-label");
+                if (originalLabel !== null) {
+                    region.setAttribute("data-loading-label", originalLabel || "Loading results...");
+                    region.removeAttribute("data-staff-active-loans-loading-label");
+                }
+                Array.prototype.forEach.call(region.querySelectorAll(".aws-table-loader"), function (loader) {
+                    loader.remove();
+                });
+            }
+        }
+
+        function scheduleButtonHtml(row, section) {
+            if (!row || !row.scheduleAvailable) {
+                return "<span class=\"text-sm font-semibold text-slate-500\">-</span>";
+            }
+            var loanId = valueOrDash(row.scheduleLoanId || row.loanId || row.shortId);
+            if (loanId === "-") {
+                return "<span class=\"text-sm font-semibold text-slate-500\">-</span>";
+            }
+            var baseUrl = section ? String(section.getAttribute("data-active-loans-url") || "") : "";
+            if (!baseUrl) {
+                return "<span class=\"text-sm font-semibold text-slate-500\">-</span>";
+            }
+            var url = baseUrl.replace(/\/$/, "") + "/" + encodeURIComponent(loanId) + "/repayment-schedule";
+            return [
+                "<button type=\"button\" class=\"app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm\"",
+                " data-open-repayment-schedule data-schedule-url=\"", escapeHtml(url), "\"",
+                " data-schedule-title=\"Repayment Schedule ", escapeHtml(loanId), "\">",
+                "View Schedule",
+                "</button>"
+            ].join("");
+        }
+
+        function rowHtml(row, section) {
+            var frequency = String(row.repaymentFrequency || "").trim();
+            var countdown = String(row.countdown || "").trim();
+            return [
+                "<tr>",
+                "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.shortId)), "</div></td>",
+                "<td class=\"px-3 py-2 text-slate-700\">", escapeHtml(valueOrDash(row.loanTypeLabel)), "</td>",
+                "<td class=\"px-3 py-2 font-medium text-slate-900\">", escapeHtml(valueOrDash(row.amount)), "</td>",
+                "<td class=\"px-3 py-2 font-medium text-slate-900\" data-active-loan-outstanding=\"", escapeHtml(valueOrDash(row.id)), "\">",
+                escapeHtml(valueOrDash(row.outstandingBalance)),
+                "</td>",
+                "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.installmentAmount)), "</div>",
+                frequency ? "<div class=\"mt-1 text-xs uppercase tracking-wide text-slate-500\">" + escapeHtml(frequency) + "</div>" : "",
+                "</td>",
+                "<td class=\"px-3 py-2 text-slate-700\">", escapeHtml(valueOrDash(row.disbursedAt)), "</td>",
+                "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.finalDueDate)), "</div>",
+                countdown ? "<div class=\"mt-1 text-xs text-slate-500\">" + escapeHtml(countdown) + "</div>" : "",
+                "</td>",
+                "<td class=\"px-3 py-2\">", scheduleButtonHtml(row, section), "</td>",
+                "</tr>"
+            ].join("");
+        }
+
+        function emptyRowHtml() {
+            return [
+                "<tr data-staff-active-loans-empty>",
+                "<td colspan=\"8\" class=\"px-3 py-4 text-center text-sm text-slate-600\">",
+                "<spring:message code='review.noActiveApplicantLoans' text='This applicant has no other active disbursed loans at the moment.' javaScriptEscape='true' />",
+                "</td>",
+                "</tr>"
+            ].join("");
+        }
+
+        function applyPayload(section, payload) {
+            if (!payload || !Array.isArray(payload.rows)) {
+                return;
+            }
+            var count = typeof payload.count === "number" ? payload.count : payload.rows.length;
+            var totalExposure = payload.totalExposure || "TSh 0";
+            var countLabel = section.querySelector("[data-staff-active-loans-count-label]");
+            var totalLabel = section.querySelector("[data-staff-active-loans-total-label]");
+            var countValue = section.querySelector("[data-staff-active-loans-count]");
+            var totalValue = section.querySelector("[data-staff-active-loans-total]");
+            var body = section.querySelector("[data-staff-active-loans-body]");
+
+            if (countLabel) {
+                countLabel.textContent = activeLoanCountLabel(count);
+            }
+            if (totalLabel) {
+                totalLabel.textContent = "Total exposure " + totalExposure;
+            }
+            if (countValue) {
+                countValue.textContent = String(count);
+            }
+            if (totalValue) {
+                totalValue.textContent = totalExposure;
+            }
+            if (body) {
+                body.innerHTML = payload.rows.length
+                    ? payload.rows.map(function (row) {
+                        return rowHtml(row, section);
+                    }).join("")
+                    : emptyRowHtml();
+            }
+        }
+
+        function hydrate(section, force) {
+            if (section.getAttribute("data-staff-active-loans-loading") === "true"
+                || (!force && section.getAttribute("data-staff-active-loans-ready") === "true")) {
+                return;
+            }
+            var url = section.getAttribute("data-active-loans-url");
+            if (!url) {
+                return;
+            }
+            var button = refreshButton(section);
+            var originalButtonLabel = button ? button.getAttribute("aria-label") : "";
+            var loadingLabel = button ? (button.getAttribute("data-loading-label") || "Refreshing active loans...") : "";
+            section.setAttribute("data-staff-active-loans-loading", "true");
+            if (button) {
+                button.disabled = true;
+                button.setAttribute("aria-busy", "true");
+                button.setAttribute("aria-label", loadingLabel);
+            }
+            showLoading(section, force ? loadingLabel : null);
+            fetch(url, {
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Active loans could not load.");
+                    }
+                    return response.json();
+                })
+                .then(function (payload) {
+                    applyPayload(section, payload);
+                    section.setAttribute("data-staff-active-loans-ready", "true");
+                })
+                .catch(function () {
+                    if (!force) {
+                        section.removeAttribute("data-staff-active-loans-ready");
+                    }
+                    if (force && button && typeof window.showToast === "function") {
+                        window.showToast("error", button.getAttribute("data-error-message") || "Applicant active loans could not load. Please retry again later.");
+                    }
+                })
+                .finally(function () {
+                    section.removeAttribute("data-staff-active-loans-loading");
+                    if (button) {
+                        button.disabled = false;
+                        button.setAttribute("aria-busy", "false");
+                        button.setAttribute("aria-label", originalButtonLabel || "Refresh applicant active loans");
+                    }
+                    hideLoading(section);
+                });
+        }
+
+        function init() {
+            document.querySelectorAll("[data-staff-active-loans-section=\"true\"]").forEach(function (section) {
+                hydrate(section, false);
+                var button = refreshButton(section);
+                if (button && button.getAttribute("data-staff-active-loans-refresh-ready") !== "true") {
+                    button.setAttribute("data-staff-active-loans-refresh-ready", "true");
+                    button.addEventListener("click", function () {
+                        hydrate(section, true);
+                    });
+                }
+            });
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", init, { once: true });
+        } else {
+            init();
+        }
+    }());
+</script>

@@ -1,0 +1,28 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+
+<section class="loan-simple-progress" aria-labelledby="loanApplicationProgressTitle">
+    <h3 id="loanApplicationProgressTitle"><spring:message code="loan.progress" text="Progress" /></h3>
+    <div class="loan-simple-progress-list">
+        <c:forEach items="${loanProgressItems}" var="item">
+            <div class="loan-simple-progress-item is-${item.state}">
+                <span class="loan-simple-progress-dot" aria-hidden="true"></span>
+                <span class="loan-simple-progress-content">
+                    <span class="loan-simple-progress-label"><c:out value="${item.label}" /></span>
+                    <span class="loan-simple-progress-state">
+                        <c:choose>
+                            <c:when test="${item.state eq 'rejected'}"><spring:message code="loan.progress.rejected" text="Rejected" /></c:when>
+                            <c:when test="${item.state eq 'closed'}"><spring:message code="loan.progress.closed" text="Closed" /></c:when>
+                            <c:when test="${item.state eq 'current'}"><spring:message code="loan.progress.inProgress" text="In Progress" /></c:when>
+                            <c:when test="${item.state eq 'completed'}"><spring:message code="loan.progress.completed" text="Completed" /></c:when>
+                            <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
+                        </c:choose>
+                    </span>
+                    <c:if test="${item.current}">
+                        <span class="loan-simple-progress-pill"><spring:message code="loan.progress.currentStatus" text="Current Status" /></span>
+                    </c:if>
+                </span>
+            </div>
+        </c:forEach>
+    </div>
+</section>

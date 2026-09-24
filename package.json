@@ -1,0 +1,11 @@
+{
+  "name": "sacco-loan-mvp",
+  "private": true,
+  "scripts": {
+    "tailwind:build": "tailwindcss -c tailwind.config.js -i ./src/main/resources/tailwind/app.css -o ./src/main/resources/static/css/tailwind.css --minify",
+    "tailwind:watch": "tailwindcss -c tailwind.config.js -i ./src/main/resources/tailwind/app.css -o ./src/main/resources/static/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

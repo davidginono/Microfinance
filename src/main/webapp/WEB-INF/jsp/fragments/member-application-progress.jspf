@@ -1,0 +1,81 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<div class="member-dashboard-mobile-flow mt-6 space-y-4">
+    <c:forEach items="${currentWorkflowSteps}" var="step" varStatus="loop">
+        <div class="member-dashboard-mobile-step">
+            <div class="member-dashboard-mobile-rail">
+                <div class="member-dashboard-mobile-node ${step.nodeClasses}" aria-hidden="true"></div>
+                <c:if test="${not loop.last}">
+                    <div class="member-dashboard-mobile-line ${step.connectorClasses eq 'member-dashboard-flow-connector--completed' ? 'member-dashboard-mobile-line--completed' : (step.connectorClasses eq 'member-dashboard-flow-connector--current' ? 'member-dashboard-mobile-line--current' : '')}"></div>
+                </c:if>
+            </div>
+            <div class="member-dashboard-mobile-body">
+                <p class="member-dashboard-mobile-step-number">Step ${step.stepNumber}</p>
+                <p class="member-dashboard-mobile-title">${step.label}</p>
+                <c:if test="${not empty step.detailLabel}">
+                    <p class="member-dashboard-mobile-detail">${step.detailLabel}</p>
+                </c:if>
+                <p class="member-dashboard-mobile-status ${step.textClasses}">${step.stateLabel}</p>
+                <c:if test="${not empty step.metaLabel}">
+                    <p class="member-dashboard-mobile-meta ${step.metaClasses}">${step.metaLabel}</p>
+                </c:if>
+                <c:if test="${not empty step.dateLabel}">
+                    <p class="member-dashboard-mobile-date">${step.dateLabel}</p>
+                </c:if>
+            </div>
+        </div>
+    </c:forEach>
+</div>
+
+<div class="member-dashboard-flow-shell member-dashboard-flow-shell--desktop mt-6">
+    <div class="member-dashboard-flow-track">
+        <div class="member-dashboard-flow-list">
+            <c:forEach items="${currentWorkflowSteps}" var="step" varStatus="loop">
+                <div class="member-dashboard-flow-step-wrap">
+                    <div class="member-dashboard-flow-step">
+                        <div class="member-dashboard-flow-node-wrap">
+                            <div class="member-dashboard-flow-node ${step.nodeClasses}" aria-hidden="true"></div>
+                        </div>
+                        <p class="member-dashboard-flow-number ${step.numberClasses}">Step ${step.stepNumber}</p>
+                        <p class="member-dashboard-flow-label">${step.label}</p>
+                        <c:if test="${not empty step.detailLabel}">
+                            <p class="member-dashboard-flow-detail">${step.detailLabel}</p>
+                        </c:if>
+                        <p class="member-dashboard-flow-status ${step.textClasses}">${step.stateLabel}</p>
+                        <c:if test="${not empty step.metaLabel}">
+                            <p class="member-dashboard-flow-meta ${step.metaClasses}">${step.metaLabel}</p>
+                        </c:if>
+                        <c:if test="${not empty step.dateLabel}">
+                            <p class="member-dashboard-flow-date">${step.dateLabel}</p>
+                        </c:if>
+                    </div>
+                    <c:if test="${not loop.last}">
+                        <div class="member-dashboard-flow-connector ${step.connectorClasses}"></div>
+                    </c:if>
+                </div>
+            </c:forEach>
+        </div>
+    </div>
+</div>
+
+<div class="member-dashboard-flow-legend mt-6 border-t border-slate-200 pt-4">
+    <span class="member-dashboard-flow-legend-item">
+        <span class="member-dashboard-flow-dot member-dashboard-flow-dot--completed"></span>
+        Completed
+    </span>
+    <span class="member-dashboard-flow-legend-item">
+        <span class="member-dashboard-flow-dot member-dashboard-flow-dot--current"></span>
+        In Progress
+    </span>
+    <span class="member-dashboard-flow-legend-item">
+        <span class="member-dashboard-flow-dot member-dashboard-flow-dot--pending"></span>
+        Pending
+    </span>
+    <span class="member-dashboard-flow-legend-item">
+        <span class="member-dashboard-flow-dot member-dashboard-flow-dot--closed"></span>
+        Closed
+    </span>
+    <span class="member-dashboard-flow-legend-item">
+        <span class="member-dashboard-flow-dot member-dashboard-flow-dot--not-started"></span>
+        Not Started
+    </span>
+</div>

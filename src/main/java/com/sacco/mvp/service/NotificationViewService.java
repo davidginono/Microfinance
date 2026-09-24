@@ -1,0 +1,563 @@
+package com.sacco.mvp.service;
+
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.Notification;
+import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.repository.MemberRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class NotificationViewService {
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private final ObjectMapper objectMapper;
+    private final MemberRepository memberRepository;
+    private final AccessControlService access;
+    private final ApplicationClock applicationClock;
+
+    public List<NotificationView> toViews(List<Notification> notifications) {
+        if (notifications == null) {
+            return Collections.emptyList();
+        }
+        Map<UUID, String> memberLabels = memberLabelsFor(notifications);
+        return notifications.stream()
+            .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
+            .map(notification -> toView(notification, memberLabels))
+            .toList();
+    }
+
+    public List<NotificationView> toViewsForPrincipal(List<Notification> notifications, AppUserPrincipal principal) {
+        return toViews(notifications).stream()
+            .filter(view -> isVisibleToPrincipal(view.type(), principal))
+            .toList();
+    }
+
+    public List<HeaderNotificationView> toHeaderViewsForPrincipal(List<Notification> notifications, AppUserPrincipal principal) {
+        if (notifications == null) {
+            return Collections.emptyList();
+        }
+        return notifications.stream()
+            .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
+            .filter(notification -> isVisibleToPrincipal(notification.getType(), principal))
+            .map(this::toHeaderView)
+            .toList();
+    }
+
+    public List<HeaderNotificationView> toIncidentHeaderViews(List<Notification> notifications) {
+        if (notifications == null) {
+            return Collections.emptyList();
+        }
+        return notifications.stream()
+            .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
+            .filter(notification -> "SUPPORT_MESSAGE".equals(notification.getType()))
+            .map(this::toHeaderView)
+            .filter(view -> view.incidentId() != null)
+            .toList();
+    }
+
+    public boolean isVisibleToPrincipal(Notification notification, AppUserPrincipal principal) {
+        return notification != null
+            && !isObsoleteRepaymentSyncNotification(notification)
+            && isVisibleToPrincipal(notification.getType(), principal);
+    }
+
+    public boolean isObsoleteRepaymentSyncNotification(Notification notification) {
+        return notification != null
+            && isObsoleteRepaymentSyncNotification(notification.getPayload());
+    }
+
+    public boolean isObsoleteRepaymentSyncNotification(String payloadJson) {
+        Map<String, Object> details = toMap(parse(payloadJson).get("details"));
+        return "SYNC".equalsIgnoreCase(stringValue(details.get("source")));
+    }
+
+    public boolean isVisibleToPrincipal(String type, AppUserPrincipal principal) {
+        if (principal == null) {
+            return false;
+        }
+        if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
+            return true;
+        }
+        if (isMemberSidePrincipal(principal)) {
+            return !"SYSTEM_ALERT".equals(type) && !"SUPPORT_MESSAGE".equals(type);
+        }
+        return true;
+    }
+
+    public boolean isMemberSidePrincipal(AppUserPrincipal principal) {
+        return principal != null
+            && (access.canAccessMemberArea(principal)
+                || access.canAccessManagerArea(principal)
+                || access.canAccessAccountantArea(principal)
+                || access.canAccessDisbursementArea(principal)
+                || access.canAccessBoardArea(principal)
+                || access.canAccessChairpersonArea(principal)
+                || access.canAccessCreditCommitteeArea(principal)
+                || access.canAccessLoanOfficerArea(principal));
+    }
+
+    public NotificationView toView(Notification notification) {
+        return toView(notification, memberLabelsFor(notification == null ? List.of() : List.of(notification)));
+    }
+
+    private NotificationView toView(Notification notification, Map<UUID, String> memberLabels) {
+        Map<String, Object> payload = parse(notification.getPayload());
+        String subject = stringValue(payload.get("subject"));
+        String message = stringValue(payload.get("message"));
+        String source = stringValue(payload.get("source"));
+        String senderName = stringValue(payload.get("senderName"));
+        UUID senderId = parseUuid(payload.get("senderId"));
+        UUID incidentId = parseIncidentId(payload.get("details"));
+
+        if (subject.isBlank()) {
+            subject = humanizeType(notification.getType());
+        }
+        if (message.isBlank()) {
+            message = fallbackMessage(notification.getType(), payload);
+        }
+        if (source.isBlank()) {
+            source = senderName.isBlank() ? "System" : senderName;
+        }
+
+        return new NotificationView(
+            notification.getId(),
+            notification.getType(),
+            humanizeType(notification.getType()),
+            subject,
+            message,
+            source,
+            senderName,
+            senderId,
+            incidentId,
+            flattenDetails(notification.getType(), payload.get("details"), memberLabels),
+            notification.getStatus().name(),
+            notification.getCreatedAt() == null ? "" : notification.getCreatedAt().toString(),
+            formatCreatedAt(notification.getCreatedAt()),
+            notification.getReadAt() == null
+        );
+    }
+
+    private HeaderNotificationView toHeaderView(Notification notification) {
+        Map<String, Object> payload = parse(notification.getPayload());
+        String subject = stringValue(payload.get("subject"));
+        String message = stringValue(payload.get("message"));
+        String source = stringValue(payload.get("source"));
+        String senderName = stringValue(payload.get("senderName"));
+        if (subject.isBlank()) {
+            subject = humanizeType(notification.getType());
+        }
+        if (message.isBlank()) {
+            message = fallbackMessage(notification.getType(), payload);
+        }
+        if (source.isBlank()) {
+            source = senderName.isBlank() ? "System" : senderName;
+        }
+        return new HeaderNotificationView(
+            notification.getId(),
+            subject,
+            message,
+            source,
+            parseIncidentId(payload.get("details")),
+            formatCreatedAt(notification.getCreatedAt())
+        );
+    }
+
+    private Map<String, Object> parse(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private UUID parseUuid(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(String.valueOf(value));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private UUID parseIncidentId(Object detailsObject) {
+        Map<String, Object> details = toMap(detailsObject);
+        return parseUuid(details.get("incidentId"));
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String humanizeType(String type) {
+        if (type == null || type.isBlank()) {
+            return "Notification";
+        }
+        if (type.startsWith("LOAN_STATUS_")) {
+            return "Loan Status Updated";
+        }
+        return switch (type) {
+            case "SUPPORT_MESSAGE" -> "Support Message";
+            case "ADMIN_REPLY" -> "Admin Reply";
+            case "ADMIN_BROADCAST" -> "Admin Broadcast";
+            case "SYSTEM_ALERT" -> "System Alert";
+            case "REPAYMENT_REMINDER" -> "Repayment Reminder";
+            case "MANAGER_REJECTED" -> "Manager Rejected";
+            case "LOAN_OFFICER_REVIEW_ASSIGNED" -> "Loan Officer Review Assigned";
+            case "LOAN_OFFICER_REJECTED" -> "Loan Officer Rejected";
+            case "CHAIRPERSON_REVIEW_ASSIGNED" -> "Chairperson Review Assigned";
+            case "BOARD_APPROVED" -> "Board Approved";
+            case "BOARD_REJECTED" -> "Board Rejected";
+            case "ACCOUNTANT_REJECTED" -> "Accountant Rejected";
+            case "DISBURSED" -> "Disbursed";
+            case "DEFAULTED" -> "Loan Defaulted";
+            case "PAID" -> "Loan Marked As Paid";
+            case "REJECTED" -> "Loan Rejected";
+            case "LOAN_READY_FOR_MANAGER" -> "Manager Review Assigned";
+            case "LOAN_READY_FOR_ACCOUNTANT" -> "Accountant Review Assigned";
+            case "LOAN_READY_FOR_BOARD" -> "On Review By Board";
+            case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> "Credit Committee Review Assigned";
+            case "LOAN_READY_FOR_DISBURSEMENT" -> "Disbursement Assigned";
+            case "LOAN_GUARANTORS_APPROVED" -> "All Guarantors Approved";
+            case "GUARANTOR_REQUEST_ASSIGNED" -> "Guarantor Request";
+            case "GUARANTOR_REQUEST_APPROVED" -> "Guarantor Request Approved";
+            case "GUARANTOR_REQUEST_REJECTED" -> "Guarantor Request Rejected";
+            case "BOARD_REVIEW_ASSIGNED" -> "Board Review Assigned";
+            case "GUARANTOR_UNDO_REQUESTED" -> "Guarantor Removal Requested";
+            case "GUARANTOR_UNDO_APPROVED" -> "Guarantor Removal Approved";
+            case "GUARANTOR_UNDO_REJECTED" -> "Guarantor Removal Rejected";
+            case "MANAGER_REVERSAL_REQUESTED" -> "Application Removal Requested";
+            case "MANAGER_REVERSAL_APPROVED" -> "Application Removal Approved";
+            case "MANAGER_REVERSAL_REJECTED" -> "Application Removal Rejected";
+            default -> type.replace('_', ' ');
+        };
+    }
+
+    private String fallbackMessage(String type, Map<String, Object> payload) {
+        Map<String, Object> details = toMap(payload.get("details"));
+        if (type != null && type.startsWith("LOAN_STATUS_")) {
+            return "Your loan application status changed to " + humanizeKey(type.substring("LOAN_STATUS_".length())) + ".";
+        }
+        return switch (type) {
+            case "MANAGER_REJECTED" -> {
+                String reasons = stringValue(details.get("reasons"));
+                yield reasons.isBlank() ? "Your application was rejected by the manager." : "Manager reason: " + reasons;
+            }
+            case "LOAN_OFFICER_REJECTED" -> "Your application was rejected at loan officer review.";
+            case "CHAIRPERSON_REJECTED" -> "Your application was rejected at chairperson review.";
+            case "BOARD_APPROVED" -> "Your application has passed board review.";
+            case "BOARD_REJECTED" -> "Your application was rejected at board review.";
+            case "CREDIT_COMMITTEE_REJECTED" -> "Your application was rejected at credit committee review.";
+            case "ACCOUNTANT_REJECTED" -> "Your application was rejected during accountant review.";
+            case "DISBURSED" -> {
+                String finalDueDate = stringValue(details.get("finalDueDate"));
+                String firstRepaymentDate = stringValue(details.get("firstRepaymentDate"));
+                yield finalDueDate.isBlank()
+                    ? "Your loan application has been disbursed."
+                    : "Your loan has been disbursed. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
+            }
+            case "PAID" -> "Your manager marked this disbursed loan as fully paid.";
+            case "DEFAULTED" -> "Your loan has passed the final due date and remains unpaid.";
+            case "REJECTED" -> "Your loan application has been rejected.";
+            case "LOAN_READY_FOR_MANAGER" -> "A loan application requires your manager review.";
+            case "LOAN_READY_FOR_ACCOUNTANT" -> "A loan application requires your accountant review.";
+            case "LOAN_READY_FOR_BOARD" -> "A loan application requires committee review.";
+            case "LOAN_READY_FOR_DISBURSEMENT" -> "A loan application is ready for disbursement.";
+            case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to continue the review workflow.";
+            case "GUARANTOR_REQUEST_ASSIGNED" -> "You have a new guarantor request waiting for a decision.";
+            case "GUARANTOR_REQUEST_APPROVED" -> "A selected guarantor approved your guarantee request.";
+            case "GUARANTOR_REQUEST_REJECTED" -> {
+                String reasons = stringValue(details.get("reasons"));
+                yield reasons.isBlank()
+                    ? "A selected guarantor rejected your guarantee request."
+                    : "A selected guarantor rejected your guarantee request. Reason: " + reasons;
+            }
+            case "BOARD_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for board review.";
+            case "CHAIRPERSON_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for chairperson review.";
+            case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for credit committee review.";
+            case "LOAN_OFFICER_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for loan officer review.";
+            case "GUARANTOR_UNDO_REQUESTED" -> "A guarantor asked to be removed from your loan application.";
+            case "GUARANTOR_UNDO_APPROVED" -> "The applicant approved your request to be removed from this loan.";
+            case "GUARANTOR_UNDO_REJECTED" -> "The applicant kept you on the loan as an active guarantor.";
+            case "MANAGER_REVERSAL_REQUESTED" -> "An applicant asked for manager approval to remove a loan that is still under manager review.";
+            case "MANAGER_REVERSAL_APPROVED" -> "The manager approved your request and removed the application from review.";
+            case "MANAGER_REVERSAL_REJECTED" -> "The manager declined your application removal request.";
+            case "REPAYMENT_REMINDER" -> {
+                String daysLeft = stringValue(details.get("daysLeft"));
+                String dueDate = stringValue(details.get("finalDueDate"));
+                yield daysLeft.isBlank()
+                    ? "Your loan repayment timeline has an upcoming reminder."
+                    : "Final repayment due in " + daysLeft + " day(s). Due date: " + dueDate;
+            }
+            default -> "Notification received.";
+        };
+    }
+
+    private String flattenDetails(String notificationType, Object value, Map<UUID, String> memberLabels) {
+        Map<String, Object> details = toMap(value);
+        if (details.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, Object> entry : details.entrySet()) {
+            if (builder.length() > 0) {
+                builder.append(" | ");
+            }
+            builder.append(formatDetailLabel(notificationType, entry.getKey(), entry.getValue()))
+                .append(": ")
+                .append(formatDetailValue(entry.getKey(), entry.getValue(), memberLabels));
+        }
+        return builder.toString();
+    }
+
+    public List<String> detailItems(String details) {
+        if (details == null || details.isBlank()) {
+            return Collections.emptyList();
+        }
+        return java.util.Arrays.stream(details.split("\\s\\|\\s"))
+            .map(String::trim)
+            .filter(item -> !item.isBlank())
+            .toList();
+    }
+
+    private String formatDetailLabel(String notificationType, String key, Object value) {
+        return switch (key) {
+            case "managerId" -> "Manager";
+            case "reviewerMemberId" -> "Reviewer";
+            case "applicationId" -> "Loan Application ID";
+            case "loanId" -> isUuidText(value) && !"DISBURSED".equals(notificationType) && !"PAID".equals(notificationType) && !"DEFAULTED".equals(notificationType)
+                ? "Loan Application ID"
+                : "Loan ID";
+            case "finalDueDate" -> "Final Due Date";
+            case "firstRepaymentDate" -> "First Repayment Date";
+            case "disbursementAmount" -> "Disbursed Principal";
+            case "depositAmount" -> "Deposit Amount";
+            case "installmentAmount" -> "Installment Amount";
+            case "repaymentFrequency" -> "Repayment Frequency";
+            case "incidentId" -> "Incident";
+            case "reasons" -> "Reason";
+            default -> humanizeKey(key);
+        };
+    }
+
+    private boolean isUuidText(Object value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            UUID.fromString(String.valueOf(value));
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    private String formatDetailValue(String key, Object value, Map<UUID, String> memberLabels) {
+        if (value == null) {
+            return "";
+        }
+        String text = String.valueOf(value);
+        return switch (key) {
+            case "managerId", "senderId", "boardMemberId", "recipientMemberId", "reviewerMemberId" ->
+                resolveMemberLabel(text, memberLabels);
+            case "loanId", "incidentId" -> shortenUuid(text);
+            case "disbursementAmount", "depositAmount", "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
+            case "repaymentFrequency" -> humanizeKey(text);
+            default -> text;
+        };
+    }
+
+    private Map<UUID, String> memberLabelsFor(List<Notification> notifications) {
+        java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+        for (Notification notification : notifications) {
+            if (notification == null) {
+                continue;
+            }
+            Map<String, Object> payload = parse(notification.getPayload());
+            collectMemberId(ids, payload.get("senderId"));
+            Map<String, Object> details = toMap(payload.get("details"));
+            collectMemberId(ids, details.get("managerId"));
+            collectMemberId(ids, details.get("senderId"));
+            collectMemberId(ids, details.get("boardMemberId"));
+            collectMemberId(ids, details.get("recipientMemberId"));
+            collectMemberId(ids, details.get("reviewerMemberId"));
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> labels = new LinkedHashMap<>();
+        memberRepository.findAllById(ids).forEach(member ->
+            labels.put(member.getId(), member.getMemberNo() + " - " + member.getFullName()));
+        return labels;
+    }
+
+    private void collectMemberId(java.util.Set<UUID> ids, Object value) {
+        UUID id = parseUuid(value);
+        if (id != null) {
+            ids.add(id);
+        }
+    }
+
+    private String resolveMemberLabel(String value, Map<UUID, String> memberLabels) {
+        try {
+            UUID id = UUID.fromString(value);
+            String label = memberLabels == null ? null : memberLabels.get(id);
+            return label != null ? label : shortenUuid(value);
+        } catch (Exception ex) {
+            return value;
+        }
+    }
+
+    private String shortenUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.length() >= 8 ? "#" + value.substring(0, 8) : value;
+    }
+
+    private String humanizeKey(String key) {
+        String normalized = key.replace('_', ' ')
+            .replaceAll("(?<=[a-z0-9])(?=[A-Z])", " ");
+        String[] parts = normalized.split("\\s+");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            String lower = part.toLowerCase(Locale.ROOT);
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            builder.append(Character.toUpperCase(lower.charAt(0)));
+            if (lower.length() > 1) {
+                builder.append(lower.substring(1));
+            }
+        }
+        return builder.toString();
+    }
+
+    private String formatCreatedAt(OffsetDateTime createdAt) {
+        return createdAt == null ? "" : DATE_TIME_FORMATTER.format(applicationClock.zoned(createdAt));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toMap(Object value) {
+        if (value instanceof Map<?, ?> raw) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            raw.forEach((key, val) -> result.put(String.valueOf(key), val));
+            return result;
+        }
+        return Collections.emptyMap();
+    }
+
+    public record NotificationView(
+        UUID id,
+        String type,
+        String typeLabel,
+        String subject,
+        String message,
+        String source,
+        String senderName,
+        UUID senderId,
+        UUID incidentId,
+        String details,
+        String status,
+        String createdAt,
+        String createdAtLabel,
+        boolean unread
+    ) {
+        public UUID getId() {
+            return id;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public String getTypeLabel() {
+            return typeLabel;
+        }
+
+        public String getSubject() {
+            return subject;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public String getSource() {
+            return source;
+        }
+
+        public String getSenderName() {
+            return senderName;
+        }
+
+        public UUID getSenderId() {
+            return senderId;
+        }
+
+        public UUID getIncidentId() {
+            return incidentId;
+        }
+
+        public String getDetails() {
+            return details;
+        }
+
+        public List<String> getDetailItems() {
+            return details == null || details.isBlank()
+                ? Collections.emptyList()
+                : java.util.Arrays.stream(details.split("\\s\\|\\s"))
+                    .map(String::trim)
+                    .filter(item -> !item.isBlank())
+                    .toList();
+        }
+
+        public List<String> detailItems() {
+            return getDetailItems();
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public String getCreatedAt() {
+            return createdAt;
+        }
+
+        public String getCreatedAtLabel() {
+            return createdAtLabel;
+        }
+
+        public boolean isUnread() {
+            return unread;
+        }
+    }
+
+    public record HeaderNotificationView(
+        UUID id,
+        String subject,
+        String message,
+        String source,
+        UUID incidentId,
+        String createdAtLabel
+    ) {
+    }
+}

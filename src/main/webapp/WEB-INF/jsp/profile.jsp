@@ -1,0 +1,427 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ include file="fragments/header.jspf" %>
+<%@ include file="fragments/sidebar.jspf" %>
+<%@ include file="fragments/alerts.jspf" %>
+
+
+<c:choose>
+    <c:when test="${memberWorkspace}">
+        <c:set var="profileWorkspaceHome" value="/app/dashboard" />
+        <c:set var="profileWorkspaceLabel" value="Member Workspace" />
+    </c:when>
+    <c:when test="${isPlatformAdminIdentity or not empty adminScope}">
+        <c:set var="profileWorkspaceHome" value="/admin/dashboard" />
+        <c:set var="profileWorkspaceLabel" value="Admin Tools" />
+    </c:when>
+    <c:when test="${not empty staffDashboardHref}">
+        <c:set var="profileWorkspaceHome" value="${staffDashboardHref}" />
+        <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
+    </c:when>
+    <c:otherwise>
+        <c:set var="profileWorkspaceHome" value="/staff/analytics" />
+        <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
+    </c:otherwise>
+</c:choose>
+
+<div class="erp-page-header" data-aws-page-header>
+    <p class="erp-breadcrumb" data-breadcrumb-root-href="${profileWorkspaceHome}">${profileWorkspaceLabel} / <spring:message code="profile.page.title" text="Profile" /></p>
+    <h1 class="erp-page-title"><spring:message code="profile.page.title" text="Profile" /></h1>
+</div>
+
+<c:if test="${isPlatformAdminIdentity}">
+    <section class="erp-panel aws-settings-panel" aria-labelledby="systemAdminContactTitle">
+        <div class="aws-settings-header">
+            <h2 id="systemAdminContactTitle" class="aws-settings-title">Contact details</h2>
+            <p class="aws-settings-description">Used for your own account notifications and OTP delivery.</p>
+        </div>
+        <form action="/profile/contact" method="post" class="aws-settings-form">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <div class="grid gap-3 md:grid-cols-2">
+                <label class="aws-settings-field" for="profileContactEmail">
+                    Email
+                    <input id="profileContactEmail" name="email" type="email" maxlength="160" required
+                           autocomplete="email" class="aws-control"
+                           value="<c:out value='${profileMember.email}' />" />
+                </label>
+                <label class="aws-settings-field" for="profileContactPhone">
+                    Phone number
+                    <input id="profileContactPhone" name="phone" type="tel" inputmode="numeric"
+                           pattern="255[0-9]{9}" minlength="12" maxlength="12"
+                           autocomplete="tel" placeholder="255712345678" class="aws-control"
+                           value="<c:out value='${profileMember.phone}' />" />
+                </label>
+            </div>
+            <label class="aws-settings-field mt-3" for="profileContactPassword">
+                Current password
+                <input id="profileContactPassword" name="currentPassword" type="password" required
+                       autocomplete="current-password" class="aws-control" />
+            </label>
+            <div class="aws-settings-footer">
+                <button type="submit" class="app-btn btn-primary">Save Contact Details</button>
+            </div>
+        </form>
+    </section>
+</c:if>
+
+<section class="erp-panel profile-page-panel">
+    <div class="profile-page-panel-header">
+        <h2><spring:message code="profile.photo.title" text="Passport Photo" /></h2>
+    </div>
+    <div class="erp-panel-body profile-page-body">
+        <div class="profile-page-layout">
+            <div class="profile-photo-preview">
+                <div id="profilePhotoFrame" class="profile-photo-frame">
+                    <img id="profilePhotoPreview"
+                         src="<c:url value='/profile/image/me' />"
+                         alt="<spring:message code='profile.photo.currentAlt' text='Current profile photo' />"
+                         onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');" />
+                    <div id="profilePhotoFallback" class="profile-photo-fallback hidden flex items-center justify-center rounded-full bg-slate-50 text-slate-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M20 21a8 8 0 0 0-16 0" />
+                            <circle cx="12" cy="8" r="4" />
+                        </svg>
+                    </div>
+                    <span class="profile-photo-crop-border" aria-hidden="true"></span>
+                </div>
+                <div class="profile-photo-frame-label"><spring:message code="profile.photo.frameLabel" text="Rounded profile crop area" /></div>
+                <div id="profilePhotoEditor" class="profile-photo-editor hidden border border-slate-200 bg-slate-50 px-3 py-2 text-left">
+                    <label for="profilePhotoZoom" class="block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                        <spring:message code="profile.photo.zoom" text="Zoom" />
+                    </label>
+                    <input id="profilePhotoZoom" type="range" min="1" max="3" step="0.01" value="1" class="mt-2" />
+                    <button id="profilePhotoCenter" type="button" class="app-btn btn-neutral mt-2 w-full">
+                        <spring:message code="profile.photo.center" text="Center Photo" />
+                    </button>
+                </div>
+            </div>
+
+            <form id="profilePhotoForm" action="/profile/image" method="post" enctype="multipart/form-data" class="profile-photo-form">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <label id="profilePhotoDropzone" class="profile-photo-dropzone aws-file-dropzone">
+                    <span class="aws-file-dropzone-title"><spring:message code="profile.photo.dropTitle" text="Drop your profile photo here" /></span>
+                    <span class="aws-file-dropzone-help"><spring:message code="profile.photo.dropHelp" text="or choose a PNG/JPEG image up to 2 MB. Drag and zoom it to fill the rounded crop area." /></span>
+                    <span class="aws-file-picker-control profile-photo-picker">
+                        <input id="profileImageInput"
+                               type="file"
+                               name="profileImage"
+                               accept="image/png,image/jpeg"
+                               class="aws-file-picker-input"
+                               data-file-picker-input
+                               required />
+                        <span class="aws-file-picker-button"><spring:message code="attachments.dropzone.chooseOne" text="Choose file" /></span>
+                        <span class="aws-file-picker-name" data-file-picker-name><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
+                    </span>
+                </label>
+                <div class="profile-identity-panel">
+                    <h3>${profileMember.fullName}</h3>
+                    <dl>
+                    <div>
+                        <dt><spring:message code="profile.memberNumber" text="Member Number" /></dt>
+                        <dd>${profileMember.memberNo}</dd>
+                </div>
+                    <c:if test="${not empty profileMember.staffNo}">
+                        <div>
+                            <dt><spring:message code="profile.staffNumber" text="Staff Number" /></dt>
+                            <dd>${profileMember.staffNo}</dd>
+                </div>
+                    </c:if>
+                    <div>
+                        <dt><spring:message code="common.email" text="Email" /></dt>
+                        <dd><c:out value="${empty profileMember.email ? 'Not set' : profileMember.email}" /></dd>
+                    </div>
+                    <div>
+                        <dt><spring:message code="register.member.phone" text="Phone" /></dt>
+                        <dd><c:out value="${empty profileMember.phone ? 'Not set' : profileMember.phone}" /></dd>
+                    </div>
+                    </dl>
+    </div>
+                <div class="profile-page-actions">
+                    <a href="${profileWorkspaceHome}" class="app-btn btn-neutral"><spring:message code="common.back" text="Back" /></a>
+                    <c:if test="${hasProfileImage}">
+                        <button type="submit"
+                                class="app-btn btn-reject"
+                                formaction="/profile/image/delete"
+                                formmethod="post"
+                                formnovalidate>
+                            <spring:message code="profile.photo.remove" text="Remove Photo" />
+                        </button>
+                    </c:if>
+                    <button type="submit" class="app-btn btn-primary"><spring:message code="profile.photo.save" text="Save Photo" /></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<script>
+    (function () {
+        var dropzone = document.getElementById('profilePhotoDropzone');
+        var form = document.getElementById('profilePhotoForm');
+        var input = document.getElementById('profileImageInput');
+        var frame = document.getElementById('profilePhotoFrame');
+        var preview = document.getElementById('profilePhotoPreview');
+        var fallback = document.getElementById('profilePhotoFallback');
+        var editor = document.getElementById('profilePhotoEditor');
+        var zoomInput = document.getElementById('profilePhotoZoom');
+        var centerButton = document.getElementById('profilePhotoCenter');
+        var avatarImages = document.querySelectorAll('.profile-avatar-img');
+        var selectedObjectUrl = null;
+        var submittingCroppedPhoto = false;
+        var avatarPreviewFrame = null;
+        var crop = {
+            fileName: '',
+            mimeType: 'image/jpeg',
+            naturalWidth: 0,
+            naturalHeight: 0,
+            zoom: 1,
+            offsetX: 0,
+            offsetY: 0,
+            dragging: false,
+            dragX: 0,
+            dragY: 0,
+            startOffsetX: 0,
+            startOffsetY: 0
+        };
+        if (!dropzone || !form || !input || !frame || !preview) {
+            return;
+        }
+        if (preview.complete && !preview.classList.contains('hidden') && preview.naturalWidth) {
+            initializeCrop('profile-photo.jpg');
+        } else {
+            preview.addEventListener('load', function () {
+                if (!crop.fileName && !preview.classList.contains('hidden')) {
+                    initializeCrop('profile-photo.jpg');
+                }
+            }, { once: true });
+        }
+        ['dragenter', 'dragover'].forEach(function (eventName) {
+            dropzone.addEventListener(eventName, function (event) {
+                event.preventDefault();
+                dropzone.classList.add('is-dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function (eventName) {
+            dropzone.addEventListener(eventName, function (event) {
+                event.preventDefault();
+                dropzone.classList.remove('is-dragover');
+            });
+        });
+        dropzone.addEventListener('drop', function (event) {
+            if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length) {
+                input.files = event.dataTransfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+        input.addEventListener('change', function () {
+            updatePreview(input.files && input.files.length ? input.files[0] : null);
+        });
+        if (zoomInput) {
+            zoomInput.addEventListener('input', function () {
+                crop.zoom = Number(zoomInput.value) || 1;
+                clampOffsets();
+                renderCropPreview();
+            });
+        }
+        if (centerButton) {
+            centerButton.addEventListener('click', function () {
+                crop.offsetX = 0;
+                crop.offsetY = 0;
+                renderCropPreview();
+            });
+        }
+        frame.addEventListener('pointerdown', function (event) {
+            if (!crop.naturalWidth || preview.classList.contains('hidden')) {
+                return;
+            }
+            event.preventDefault();
+            crop.dragging = true;
+            crop.dragX = event.clientX;
+            crop.dragY = event.clientY;
+            crop.startOffsetX = crop.offsetX;
+            crop.startOffsetY = crop.offsetY;
+            preview.classList.add('is-dragging');
+            if (typeof frame.setPointerCapture === 'function') {
+                frame.setPointerCapture(event.pointerId);
+            }
+        });
+        frame.addEventListener('pointermove', function (event) {
+            if (!crop.dragging) {
+                return;
+            }
+            crop.offsetX = crop.startOffsetX + event.clientX - crop.dragX;
+            crop.offsetY = crop.startOffsetY + event.clientY - crop.dragY;
+            clampOffsets();
+            renderCropPreview();
+        });
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (eventName) {
+            frame.addEventListener(eventName, function () {
+                crop.dragging = false;
+                preview.classList.remove('is-dragging');
+            });
+        });
+        form.addEventListener('submit', function (event) {
+            if (submittingCroppedPhoto || !crop.fileName || !crop.naturalWidth) {
+                return;
+            }
+            event.preventDefault();
+            prepareCroppedUpload(function (file) {
+                if (!file) {
+                    form.submit();
+                    return;
+                }
+                if (typeof DataTransfer !== 'function') {
+                    form.submit();
+                    return;
+                }
+                var transfer = new DataTransfer();
+                transfer.items.add(file);
+                input.files = transfer.files;
+                submittingCroppedPhoto = true;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        });
+
+        function updatePreview(file) {
+            if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+                return;
+            }
+            if (selectedObjectUrl) {
+                URL.revokeObjectURL(selectedObjectUrl);
+            }
+            selectedObjectUrl = URL.createObjectURL(file);
+            crop.fileName = file.name || 'profile-photo.jpg';
+            crop.mimeType = file.type || 'image/jpeg';
+            preview.onload = function () {
+                initializeCrop(crop.fileName);
+            };
+            preview.src = selectedObjectUrl;
+            preview.classList.remove('hidden');
+            if (fallback) {
+                fallback.classList.add('hidden');
+            }
+        }
+        function initializeCrop(fileName) {
+            crop.fileName = fileName || crop.fileName || 'profile-photo.jpg';
+            crop.naturalWidth = preview.naturalWidth || 0;
+            crop.naturalHeight = preview.naturalHeight || 0;
+            crop.zoom = 1;
+            crop.offsetX = 0;
+            crop.offsetY = 0;
+            input.required = false;
+            if (zoomInput) {
+                zoomInput.value = '1';
+            }
+            if (editor) {
+                editor.classList.remove('hidden');
+            }
+            renderCropPreview();
+        }
+        function frameSize() {
+            return {
+                width: frame.clientWidth || 144,
+                height: frame.clientHeight || 180
+            };
+        }
+        function displaySize() {
+            var size = frameSize();
+            if (!crop.naturalWidth || !crop.naturalHeight) {
+                return { width: size.width, height: size.height };
+            }
+            var baseScale = Math.max(size.width / crop.naturalWidth, size.height / crop.naturalHeight);
+            return {
+                width: crop.naturalWidth * baseScale * crop.zoom,
+                height: crop.naturalHeight * baseScale * crop.zoom
+            };
+        }
+        function clampOffsets() {
+            var size = frameSize();
+            var display = displaySize();
+            var maxX = Math.max((display.width - size.width) / 2, 0);
+            var maxY = Math.max((display.height - size.height) / 2, 0);
+            crop.offsetX = Math.min(maxX, Math.max(-maxX, crop.offsetX));
+            crop.offsetY = Math.min(maxY, Math.max(-maxY, crop.offsetY));
+        }
+        function renderCropPreview() {
+            var size = frameSize();
+            var display = displaySize();
+            clampOffsets();
+            preview.style.width = display.width + 'px';
+            preview.style.height = display.height + 'px';
+            preview.style.left = ((size.width - display.width) / 2 + crop.offsetX) + 'px';
+            preview.style.top = ((size.height - display.height) / 2 + crop.offsetY) + 'px';
+            queueAvatarPreview();
+        }
+        function drawCropToCanvas(canvas) {
+            var size = frameSize();
+            var display = displaySize();
+            var scale = canvas.width / size.width;
+            var left = (size.width - display.width) / 2 + crop.offsetX;
+            var top = (size.height - display.height) / 2 + crop.offsetY;
+            var context = canvas.getContext('2d');
+            if (!context) {
+                return false;
+            }
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(preview, left * scale, top * scale, display.width * scale, display.height * scale);
+            return true;
+        }
+        function queueAvatarPreview() {
+            if (!avatarImages.length || !crop.naturalWidth || avatarPreviewFrame) {
+                return;
+            }
+            avatarPreviewFrame = window.requestAnimationFrame(function () {
+                avatarPreviewFrame = null;
+                var canvas = document.createElement('canvas');
+                canvas.width = 96;
+                canvas.height = 96;
+                try {
+                    if (!drawCropToCanvas(canvas)) {
+                        return;
+                    }
+                    var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    avatarImages.forEach(function (image) {
+                        image.src = dataUrl;
+                        image.classList.remove('hidden');
+                        if (image.nextElementSibling) {
+                            image.nextElementSibling.classList.add('hidden');
+                        }
+                    });
+                } catch (error) {
+                    // Keep the server-rendered avatar if the browser blocks canvas reads.
+                }
+            });
+        }
+        function prepareCroppedUpload(done) {
+            var outputWidth = 600;
+            var outputHeight = 600;
+            var canvas = document.createElement('canvas');
+            canvas.width = outputWidth;
+            canvas.height = outputHeight;
+            try {
+                if (!drawCropToCanvas(canvas)) {
+                    done(null);
+                    return;
+                }
+            } catch (error) {
+                done(null);
+                return;
+            }
+            canvas.toBlob(function (blob) {
+                if (!blob) {
+                    done(null);
+                    return;
+                }
+                var safeName = crop.fileName.replace(/\.[^.]+$/, '') || 'profile-photo';
+                done(new File([blob], safeName + '-cropped.jpg', { type: 'image/jpeg' }));
+            }, 'image/jpeg', 0.9);
+        }
+    })();
+</script>
+
+<%@ include file="fragments/footer.jspf" %>

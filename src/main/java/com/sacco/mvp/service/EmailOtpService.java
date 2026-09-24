@@ -1,0 +1,365 @@
+package com.sacco.mvp.service;
+
+import com.sacco.mvp.domain.EmailOtpPurpose;
+import com.sacco.mvp.domain.EmailOtpToken;
+import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.repository.EmailOtpTokenRepository;
+import com.sacco.mvp.repository.MemberRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class EmailOtpService {
+    private static final SecureRandom RANDOM = new SecureRandom();
+    public static final int MAX_RESENDS_PER_OTP = 3;
+
+    private final EmailOtpTokenRepository emailOtpTokenRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final MemberRepository memberRepository;
+    private final StationOtpDeliveryService stationOtpDeliveryService;
+
+    @Value("${app.auth.otp.ttl-minutes:10}")
+    private int otpTtlMinutes;
+
+    @Transactional
+    public StationOtpDeliveryService.DeliveryReceipt issueOtp(String email,
+                                                              EmailOtpPurpose purpose,
+                                                              UUID memberId,
+                                                              String subject,
+                                                              String introMessage) {
+        Member member = memberId == null ? null : memberRepository.findById(memberId).orElse(null);
+        if (member == null || purpose == EmailOtpPurpose.CLAIM_ACCOUNT || purpose == EmailOtpPurpose.CLAIM_PHONE) {
+            return issueOtp(email, purpose, memberId, subject, introMessage, null, null, null);
+        }
+        return issueOtp(
+            email,
+            purpose,
+            memberId,
+            subject,
+            introMessage,
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getPhone()
+        );
+    }
+
+    @Transactional
+    public StationOtpDeliveryService.DeliveryReceipt issueOtp(String email,
+                                                              EmailOtpPurpose purpose,
+                                                              UUID memberId,
+                                                              String subject,
+                                                              String introMessage,
+                                                              String saccoId,
+                                                              String stationId,
+                                                              String phone) {
+        return issueOtpWithMetadata(email, purpose, memberId, subject, introMessage, saccoId, stationId, phone).deliveryReceipt();
+    }
+
+    @Transactional
+    public OtpIssueResult issueOtpWithMetadata(String email,
+                                               EmailOtpPurpose purpose,
+                                               UUID memberId,
+                                               String subject,
+                                               String introMessage,
+                                               String saccoId,
+                                               String stationId,
+                                               String phone) {
+        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false, null, null);
+    }
+
+    @Transactional
+    public OtpIssueResult issueLoanOtpWithMetadata(String email,
+                                                   EmailOtpPurpose purpose,
+                                                   UUID memberId,
+                                                   String subject,
+                                                   String introMessage,
+                                                   String saccoId,
+                                                   String stationId,
+                                                   String phone,
+                                                   UUID loanApplicationId,
+                                                   UUID applicantMemberId) {
+        return issueOtpWithMetadata(
+            email,
+            email,
+            purpose,
+            memberId,
+            subject,
+            introMessage,
+            saccoId,
+            stationId,
+            phone,
+            false,
+            loanApplicationId,
+            applicantMemberId
+        );
+    }
+
+    @Transactional
+    public OtpIssueResult issueOtpWithDeliveryContact(String tokenKey,
+                                                      String deliveryEmail,
+                                                      EmailOtpPurpose purpose,
+                                                      UUID memberId,
+                                                      String subject,
+                                                      String introMessage,
+                                                      String saccoId,
+                                                      String stationId,
+                                                      String phone) {
+        return issueOtpWithMetadata(tokenKey, deliveryEmail, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false, null, null);
+    }
+
+    @Transactional
+    public OtpIssueResult issueLoanOtpWithDeliveryContact(String tokenKey,
+                                                          String deliveryEmail,
+                                                          EmailOtpPurpose purpose,
+                                                          UUID memberId,
+                                                          String subject,
+                                                          String introMessage,
+                                                          String saccoId,
+                                                          String stationId,
+                                                          String phone,
+                                                          UUID loanApplicationId,
+                                                          UUID applicantMemberId) {
+        return issueOtpWithMetadata(
+            tokenKey,
+            deliveryEmail,
+            purpose,
+            memberId,
+            subject,
+            introMessage,
+            saccoId,
+            stationId,
+            phone,
+            false,
+            loanApplicationId,
+            applicantMemberId
+        );
+    }
+
+    @Transactional
+    public StationOtpDeliveryService.DeliveryReceipt issueOtpToEmail(String email,
+                                                                     EmailOtpPurpose purpose,
+                                                                     UUID memberId,
+                                                                     String subject,
+                                                                     String introMessage) {
+        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, null, null, null, true, null, null).deliveryReceipt();
+    }
+
+    private OtpIssueResult issueOtpWithMetadata(String tokenKey,
+                                                String deliveryEmail,
+                                                EmailOtpPurpose purpose,
+                                                UUID memberId,
+                                                String subject,
+                                                String introMessage,
+                                                String saccoId,
+                                                String stationId,
+                                                String phone,
+                                                boolean emailOnly,
+                                                UUID loanApplicationId,
+                                                UUID applicantMemberId) {
+        String normalizedTokenKey = normalizeEmail(tokenKey);
+        String normalizedDeliveryEmail = normalizeEmail(deliveryEmail);
+        OffsetDateTime now = OffsetDateTime.now();
+        try {
+            java.util.List<EmailOtpToken> activeTokens = activeTokens(normalizedTokenKey, purpose, memberId);
+            EmailOtpToken existingToken = activeTokens.stream()
+                .filter(token -> token.getExpiresAt() != null && token.getExpiresAt().isAfter(now))
+                .max(java.util.Comparator.comparing(EmailOtpToken::getCreatedAt))
+                .orElse(null);
+            int resendCount = 0;
+            if (existingToken != null) {
+                resendCount = resolvedResendCount(existingToken);
+                if (resendCount >= MAX_RESENDS_PER_OTP) {
+                    throw new IllegalStateException("OTP resend limit reached. Use the latest code or request a new one after it expires.");
+                }
+                resendCount += 1;
+            }
+
+            activeTokens.forEach(token -> token.setConsumedAt(now));
+
+            String code = generateCode();
+            OffsetDateTime expiresAt = now.plusMinutes(Math.max(1, otpTtlMinutes));
+            EmailOtpToken token = EmailOtpToken.builder()
+                .id(UUID.randomUUID())
+                .email(normalizedTokenKey)
+                .purpose(purpose)
+                .memberId(memberId)
+                .codeHash(passwordEncoder.encode(code))
+                .createdAt(now)
+                .expiresAt(expiresAt)
+                .resendCount(resendCount)
+                .build();
+            emailOtpTokenRepository.save(token);
+
+            StationOtpDeliveryService.DeliveryReceipt receipt;
+            if (emailOnly) {
+                receipt = stationOtpDeliveryService.deliverEmailOnly(
+                    normalizedDeliveryEmail,
+                    subject,
+                    introMessage,
+                    code,
+                    Math.max(1, otpTtlMinutes)
+                );
+            } else if (loanApplicationId == null && applicantMemberId == null) {
+                receipt = stationOtpDeliveryService.deliver(
+                    saccoId,
+                    stationId,
+                    normalizedDeliveryEmail,
+                    phone,
+                    purpose,
+                    subject,
+                    introMessage,
+                    code,
+                    Math.max(1, otpTtlMinutes)
+                );
+            } else {
+                receipt = stationOtpDeliveryService.deliver(
+                    saccoId,
+                    stationId,
+                    normalizedDeliveryEmail,
+                    phone,
+                    purpose,
+                    subject,
+                    introMessage,
+                    code,
+                    Math.max(1, otpTtlMinutes),
+                    loanApplicationId,
+                    applicantMemberId,
+                    memberId
+                );
+            }
+            log.info("Issued {} OTP for {}", purpose, normalizedTokenKey);
+            return OtpIssueResult.issued(receipt, expiresAt, secondsUntil(now, expiresAt), resendCount);
+        } catch (DataAccessException ex) {
+            log.error("Unable to issue {} OTP for {} due to a data access problem", purpose, normalizedTokenKey, ex);
+            throw new IllegalStateException(
+                "OTP setup needs a quick application restart before this action can continue. Restart the app once, then try again."
+            );
+        }
+    }
+
+    @Transactional
+    public void consumeOtp(String email, EmailOtpPurpose purpose, String code) {
+        EmailOtpToken token = requireValidOtp(email, purpose, null, code);
+        token.setConsumedAt(OffsetDateTime.now());
+    }
+
+    @Transactional
+    public void consumeOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
+        EmailOtpToken token = requireValidOtp(email, purpose, memberId, code);
+        token.setConsumedAt(OffsetDateTime.now());
+    }
+
+    @Transactional(readOnly = true)
+    public UUID validateOtp(String email, EmailOtpPurpose purpose, String code) {
+        return requireValidOtp(email, purpose, null, code).getId();
+    }
+
+    @Transactional(readOnly = true)
+    public UUID validateOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
+        return requireValidOtp(email, purpose, memberId, code).getId();
+    }
+
+    @Transactional
+    public void consumeOtpById(UUID tokenId) {
+        EmailOtpToken token = emailOtpTokenRepository.findById(tokenId)
+            .orElseThrow(() -> new IllegalStateException("No active OTP code was found. Request a new code."));
+        token.setConsumedAt(OffsetDateTime.now());
+    }
+
+    private EmailOtpToken requireValidOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
+        String normalizedEmail = normalizeEmail(email);
+        String normalizedCode = code == null ? "" : code.trim();
+        EmailOtpToken token = latestToken(normalizedEmail, purpose, memberId)
+            .orElseThrow(() -> new IllegalStateException("No active OTP code was found. Request a new code."));
+
+        OffsetDateTime now = OffsetDateTime.now();
+        if (token.getExpiresAt() == null || token.getExpiresAt().isBefore(now)) {
+            throw new IllegalStateException("That OTP code has expired. Request a new code.");
+        }
+        if (normalizedCode.isBlank() || !passwordEncoder.matches(normalizedCode, token.getCodeHash())) {
+            throw new IllegalStateException("The OTP code is invalid.");
+        }
+        return token;
+    }
+
+    private java.util.List<EmailOtpToken> activeTokens(String normalizedEmail, EmailOtpPurpose purpose, UUID memberId) {
+        if (memberId == null) {
+            return emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndConsumedAtIsNull(normalizedEmail, purpose);
+        }
+        return emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNull(normalizedEmail, purpose, memberId);
+    }
+
+    private java.util.Optional<EmailOtpToken> latestToken(String normalizedEmail, EmailOtpPurpose purpose, UUID memberId) {
+        if (memberId == null) {
+            return emailOtpTokenRepository.findTopByEmailIgnoreCaseAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(normalizedEmail, purpose);
+        }
+        return emailOtpTokenRepository.findTopByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNullOrderByCreatedAtDesc(normalizedEmail, purpose, memberId);
+    }
+
+    private String generateCode() {
+        int value = RANDOM.nextInt(900000) + 100000;
+        return String.valueOf(value);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private long secondsUntil(OffsetDateTime now, OffsetDateTime expiresAt) {
+        if (expiresAt == null || !expiresAt.isAfter(now)) {
+            return 0L;
+        }
+        return Math.max(0L, Duration.between(now, expiresAt).getSeconds());
+    }
+
+    private int resolvedResendCount(EmailOtpToken token) {
+        return token.getResendCount() == null ? 0 : Math.max(0, token.getResendCount());
+    }
+
+    public record OtpIssueResult(
+        boolean issued,
+        StationOtpDeliveryService.DeliveryReceipt deliveryReceipt,
+        OffsetDateTime expiresAt,
+        long secondsUntilExpiry,
+        OffsetDateTime resendAvailableAt,
+        int resendCount,
+        int maxResends,
+        int resendAttemptsRemaining
+    ) {
+        static OtpIssueResult issued(StationOtpDeliveryService.DeliveryReceipt receipt,
+                                     OffsetDateTime expiresAt,
+                                     long secondsUntilExpiry,
+                                     int resendCount) {
+            int safeCount = Math.max(0, resendCount);
+            return new OtpIssueResult(
+                true,
+                receipt,
+                expiresAt,
+                secondsUntilExpiry,
+                OffsetDateTime.now(),
+                safeCount,
+                MAX_RESENDS_PER_OTP,
+                Math.max(0, MAX_RESENDS_PER_OTP - safeCount)
+            );
+        }
+
+        public String messageOrDefault(String fallback) {
+            if (deliveryReceipt != null && deliveryReceipt.userMessage() != null && !deliveryReceipt.userMessage().isBlank()) {
+                return deliveryReceipt.userMessage();
+            }
+            return fallback;
+        }
+    }
+}

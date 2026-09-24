@@ -1,0 +1,383 @@
+<script>
+    (function () {
+        if (window.__neoSelectEnhancerLoaded) {
+            return;
+        }
+        window.__neoSelectEnhancerLoaded = true;
+
+        const enhancedStates = new WeakMap();
+        let globalObserver = null;
+        let globalHandlersBound = false;
+
+        function closeEnhancedSelect(state) {
+            if (!state || !state.wrapper.classList.contains('neo-select--open')) {
+                return;
+            }
+            state.wrapper.classList.remove('neo-select--open');
+            state.button.setAttribute('aria-expanded', 'false');
+            state.menu.classList.remove('is-open');
+        }
+
+        function closeAllEnhancedSelects(exceptState) {
+            document.querySelectorAll('.neo-select').forEach(function (wrapper) {
+                const nativeSelect = wrapper.querySelector('select[data-neo-enhanced="true"]');
+                if (!nativeSelect) {
+                    return;
+                }
+                const state = enhancedStates.get(nativeSelect);
+                if (state && state !== exceptState) {
+                    closeEnhancedSelect(state);
+                }
+            });
+        }
+
+        function focusOption(state, direction) {
+            const items = Array.from(state.menu.querySelectorAll('.neo-select-option:not(.is-disabled)'));
+            if (!items.length) {
+                return;
+            }
+            const selectedItem = state.menu.querySelector('.neo-select-option.is-selected:not(.is-disabled)');
+            let index = selectedItem ? items.indexOf(selectedItem) : 0;
+            if (direction === 'first') {
+                index = 0;
+            } else if (direction === 'last') {
+                index = items.length - 1;
+            } else if (direction === 'next') {
+                index = Math.min(index + 1, items.length - 1);
+            } else if (direction === 'prev') {
+                index = Math.max(index - 1, 0);
+            }
+            const target = items[index];
+            if (target) {
+                target.focus({ preventScroll: true });
+                target.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function dispatchSelectionEvents(select) {
+            select.dispatchEvent(new Event('input', { bubbles: true }));
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function renderEnhancedSelect(select) {
+            const state = enhancedStates.get(select);
+            if (!state) {
+                return;
+            }
+
+            const options = Array.from(select.options);
+            const selectedOption = options[select.selectedIndex] || options.find(function (option) {
+                return option.selected;
+            }) || options[0] || null;
+            const selectedLabel = selectedOption ? selectedOption.textContent.trim() : '';
+            const placeholderSelected = selectedOption != null && selectedOption.value === '' && !select.value;
+            const visibleOptions = options.filter(function (option) {
+                return option.dataset.placeholder !== 'true';
+            });
+
+            state.button.classList.toggle('is-placeholder', placeholderSelected);
+            state.button.classList.toggle('is-disabled', select.disabled);
+            state.button.disabled = select.disabled;
+            state.buttonText.textContent = selectedLabel || 'Select an option';
+            state.button.title = selectedLabel || 'Select an option';
+            state.menu.innerHTML = '';
+
+            if (!visibleOptions.length) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'neo-select-empty';
+                emptyState.textContent = 'No options available';
+                state.menu.appendChild(emptyState);
+                if (state.wrapper.classList.contains('neo-select--open')) {
+                    positionMenu(state);
+                }
+                return;
+            }
+
+            visibleOptions.forEach(function (option) {
+                const index = options.indexOf(option);
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'neo-select-option';
+                item.setAttribute('role', 'option');
+                item.setAttribute('data-option-index', String(index));
+                item.textContent = option.textContent.trim();
+                item.disabled = option.disabled;
+                if (option.disabled) {
+                    item.classList.add('is-disabled');
+                }
+                if (option.selected) {
+                    item.classList.add('is-selected');
+                    item.setAttribute('aria-selected', 'true');
+                } else {
+                    item.setAttribute('aria-selected', 'false');
+                }
+                item.addEventListener('click', function () {
+                    if (option.disabled) {
+                        return;
+                    }
+                    select.selectedIndex = index;
+                    state.wrapper.classList.remove('neo-select--invalid');
+                    renderEnhancedSelect(select);
+                    dispatchSelectionEvents(select);
+                    closeEnhancedSelect(state);
+                    state.button.focus({ preventScroll: true });
+                });
+                item.addEventListener('keydown', function (event) {
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        focusOption(state, 'next');
+                    } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        focusOption(state, 'prev');
+                    } else if (event.key === 'Home') {
+                        event.preventDefault();
+                        focusOption(state, 'first');
+                    } else if (event.key === 'End') {
+                        event.preventDefault();
+                        focusOption(state, 'last');
+                    } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        closeEnhancedSelect(state);
+                        state.button.focus({ preventScroll: true });
+                    }
+                });
+                state.menu.appendChild(item);
+            });
+
+            if (state.wrapper.classList.contains('neo-select--open')) {
+                positionMenu(state);
+            }
+        }
+
+        function positionMenu(state) {
+            if (!state || !state.wrapper.isConnected || !state.button.isConnected) {
+                return;
+            }
+
+            const viewportPadding = 8;
+            const maxVisibleRows = 6;
+            const compactRowHeight = 30;
+            const rect = state.button.getBoundingClientRect();
+            const availableBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding);
+            const visibleRows = Math.max(1, Math.min(maxVisibleRows, state.menu.children.length || 1));
+            const contentHeight = visibleRows * compactRowHeight + 2;
+            const desiredHeight = Math.min(state.menu.scrollHeight || contentHeight, contentHeight);
+            const menuHeight = Math.min(desiredHeight, Math.max(compactRowHeight + 2, availableBelow));
+
+            state.menu.style.maxHeight = menuHeight + 'px';
+            state.menu.style.overflowY = state.menu.scrollHeight > menuHeight + 1 ? 'auto' : 'hidden';
+        }
+
+        function makeRoomBelow(state) {
+            const rect = state.button.getBoundingClientRect();
+            const availableBelow = window.innerHeight - rect.bottom - 8;
+            const desiredHeight = Math.min(state.menu.scrollHeight || 182, 182);
+            if (availableBelow < Math.min(desiredHeight, 120)) {
+                state.button.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+            }
+        }
+
+        function positionAllOpenMenus() {
+            document.querySelectorAll('.neo-select.neo-select--open').forEach(function (wrapper) {
+                const nativeSelect = wrapper.querySelector('select[data-neo-enhanced="true"]');
+                if (!nativeSelect) {
+                    return;
+                }
+                const state = enhancedStates.get(nativeSelect);
+                if (state) {
+                    positionMenu(state);
+                }
+            });
+        }
+
+        function openEnhancedSelect(state) {
+            if (!state || state.button.disabled) {
+                return;
+            }
+            closeAllEnhancedSelects(state);
+            state.wrapper.classList.add('neo-select--open');
+            state.button.setAttribute('aria-expanded', 'true');
+            state.menu.classList.add('is-open');
+            makeRoomBelow(state);
+            window.requestAnimationFrame(function () {
+                positionMenu(state);
+                focusOption(state, 'selected');
+            });
+        }
+
+        function toggleEnhancedSelect(state) {
+            if (!state) {
+                return;
+            }
+            if (state.wrapper.classList.contains('neo-select--open')) {
+                closeEnhancedSelect(state);
+                return;
+            }
+            openEnhancedSelect(state);
+        }
+
+        function enhanceSelect(select) {
+            if (!select || select.dataset.neoEnhanced === 'true' || select.multiple || select.size > 1 || select.closest('.neo-select') || select.type === 'hidden' || select.dataset.nativeSelect === 'true') {
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'neo-select';
+            select.parentNode.insertBefore(wrapper, select);
+            wrapper.appendChild(select);
+
+            select.dataset.neoEnhanced = 'true';
+            select.classList.add('neo-select-native');
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'neo-select-button';
+            button.setAttribute('aria-haspopup', 'listbox');
+            button.setAttribute('aria-expanded', 'false');
+            button.innerHTML =
+                '<span class="neo-select-button-text"></span>' +
+                '<svg class="neo-select-chevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">' +
+                    '<path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path>' +
+                '</svg>';
+
+            const menu = document.createElement('div');
+            menu.className = 'neo-select-menu';
+            menu.setAttribute('role', 'listbox');
+            menu.setAttribute('data-neo-select-menu', 'true');
+
+            wrapper.appendChild(button);
+            wrapper.appendChild(menu);
+
+            const state = {
+                select: select,
+                wrapper: wrapper,
+                button: button,
+                buttonText: button.querySelector('.neo-select-button-text'),
+                menu: menu
+            };
+            enhancedStates.set(select, state);
+
+            if (select.id) {
+                document.querySelectorAll('label[for="' + select.id + '"]').forEach(function (label) {
+                    label.addEventListener('click', function (event) {
+                        if (event.target.closest('.neo-select')) {
+                            return;
+                        }
+                        event.preventDefault();
+                        if (!button.disabled) {
+                            button.focus({ preventScroll: true });
+                            toggleEnhancedSelect(state);
+                        }
+                    });
+                });
+            }
+
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                toggleEnhancedSelect(state);
+            });
+            button.addEventListener('keydown', function (event) {
+                if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openEnhancedSelect(state);
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    openEnhancedSelect(state);
+                    window.requestAnimationFrame(function () {
+                        focusOption(state, 'last');
+                    });
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeEnhancedSelect(state);
+                }
+            });
+
+            select.addEventListener('change', function () {
+                state.wrapper.classList.remove('neo-select--invalid');
+                renderEnhancedSelect(select);
+            });
+            select.addEventListener('invalid', function (event) {
+                event.preventDefault();
+                state.wrapper.classList.add('neo-select--invalid');
+                state.button.focus({ preventScroll: true });
+            });
+
+            const observer = new MutationObserver(function () {
+                renderEnhancedSelect(select);
+            });
+            observer.observe(select, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['disabled', 'label', 'selected', 'value']
+            });
+            state.observer = observer;
+
+            renderEnhancedSelect(select);
+        }
+
+        function initEnhancedSelects(root) {
+            const scope = root || document;
+            scope.querySelectorAll('select').forEach(function (select) {
+                enhanceSelect(select);
+            });
+        }
+
+        function bindGlobalHandlers() {
+            if (globalHandlersBound) {
+                return;
+            }
+            globalHandlersBound = true;
+
+            document.addEventListener('click', function (event) {
+                if (!event.target.closest('.neo-select') && !event.target.closest('[data-neo-select-menu="true"]')) {
+                    closeAllEnhancedSelects();
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeAllEnhancedSelects();
+                }
+            });
+
+            window.addEventListener('resize', positionAllOpenMenus);
+            window.addEventListener('scroll', positionAllOpenMenus, true);
+        }
+
+        function observeNewSelects() {
+            if (globalObserver || !document.body) {
+                return;
+            }
+            globalObserver = new MutationObserver(function (records) {
+                records.forEach(function (record) {
+                    record.addedNodes.forEach(function (node) {
+                        if (!(node instanceof HTMLElement)) {
+                            return;
+                        }
+                        if (node.matches && node.matches('select')) {
+                            enhanceSelect(node);
+                        }
+                        if (node.querySelectorAll) {
+                            initEnhancedSelects(node);
+                        }
+                    });
+                });
+            });
+            globalObserver.observe(document.body, { childList: true, subtree: true });
+        }
+
+        window.refreshEnhancedSelects = function (root) {
+            initEnhancedSelects(root || document);
+            document.querySelectorAll('select[data-neo-enhanced="true"]').forEach(function (select) {
+                renderEnhancedSelect(select);
+            });
+        };
+
+        window.addEventListener('load', function () {
+            bindGlobalHandlers();
+            initEnhancedSelects(document);
+            observeNewSelects();
+        });
+    }());
+</script>

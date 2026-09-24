@@ -1,0 +1,62 @@
+package com.sacco.mvp.domain;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "stored_uploads")
+@Getter
+@Setter
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class StoredUpload {
+    @Id
+    private UUID id;
+
+    @Column(name = "owner_type", nullable = false, length = 60)
+    private String ownerType;
+
+    @Column(name = "owner_id", nullable = false, length = 255)
+    private String ownerId;
+
+    @Column(nullable = false, length = 80)
+    private String category;
+
+    @Column(name = "original_name", nullable = false, length = 500)
+    private String originalName;
+
+    @Column(name = "content_type", nullable = false, length = 255)
+    private String contentType;
+
+    @Column(name = "size_bytes", nullable = false)
+    private long sizeBytes;
+
+    @Column(name = "sha256", nullable = false, length = 64)
+    private String sha256Checksum;
+
+    @Column(name = "storage_backend", nullable = false, length = 40)
+    private String storageBackend;
+
+    @Column(name = "storage_key", length = 1024)
+    private String storageKey;
+
+    @Column(columnDefinition = "bytea")
+    private byte[] content;
+
+    @Column(name = "created_at", nullable = false)
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
+}

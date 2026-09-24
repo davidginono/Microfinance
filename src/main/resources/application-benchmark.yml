@@ -1,0 +1,62 @@
+spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+  web:
+    resources:
+      cache:
+        period: 7d
+  datasource:
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:20}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:2}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:5000}
+  jpa:
+    properties:
+      hibernate:
+        generate_statistics: ${HIBERNATE_GENERATE_STATISTICS:false}
+
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:100}
+      min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:10}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:1000}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:500}
+  servlet:
+    jsp:
+      init-parameters:
+        development: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: saccos-lms
+
+logging:
+  level:
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    com.sacco.mvp: INFO
+
+app:
+  benchmark:
+    public-actuator-metrics: ${APP_BENCHMARK_PUBLIC_ACTUATOR_METRICS:true}
+  outbox:
+    scheduler-enabled: ${APP_OUTBOX_SCHEDULER_ENABLED:false}
+  retention:
+    cleanup-enabled: ${APP_RETENTION_CLEANUP_ENABLED:false}
+  sms:
+    enabled: ${APP_SMS_ENABLED:false}

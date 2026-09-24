@@ -1,0 +1,38 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<c:if test="${not empty platformSupportContact}">
+    <div class="shell-support-contact">
+        <p class="shell-support-contact__eyebrow"><spring:message code="support.platformContact" text="Contact Details" /></p>
+        <p class="shell-support-contact__name"><c:out value="${platformSupportContact.displayName}" /></p>
+        <c:if test="${not empty platformSupportContact.displayRole}">
+            <p class="shell-support-contact__role"><c:out value="${platformSupportContact.displayRole}" /></p>
+        </c:if>
+        <c:choose>
+            <c:when test="${platformSupportContact.visible}">
+                <div class="shell-support-contact__channels">
+                    <c:if test="${not empty platformSupportContact.phone}">
+                        <a href="${platformSupportContact.phoneHref}" class="shell-support-contact__link">
+                            <span class="shell-support-contact__label"><spring:message code="support.platformContact.phone" text="Phone" />:</span>
+                            <span class="shell-support-contact__value"><c:out value="${platformSupportContact.phone}" /></span>
+                        </a>
+                    </c:if>
+                    <c:if test="${not empty platformSupportContact.email}">
+                        <a href="${platformSupportContact.emailHref}" class="shell-support-contact__link">
+                            <span class="shell-support-contact__label"><spring:message code="support.platformContact.email" text="Email" />:</span>
+                            <span class="shell-support-contact__value"><c:out value="${platformSupportContact.email}" /></span>
+                        </a>
+                    </c:if>
+                </div>
+            </c:when>
+            <c:otherwise>
+                <p class="shell-support-contact__meta"><spring:message code="support.platformContact.notConfigured" text="Contact details are not configured yet." /></p>
+            </c:otherwise>
+        </c:choose>
+        <c:if test="${not empty platformSupportContact.officeHours and platformSupportContact.officeHours ne '-'}">
+            <p class="shell-support-contact__meta"><strong><spring:message code="support.platformContact.hours" text="Hours" />:</strong> <c:out value="${platformSupportContact.officeHours}" /></p>
+        </c:if>
+        <c:if test="${not empty platformSupportContact.supportNote and platformSupportContact.supportNote ne '-'}">
+            <p class="shell-support-contact__meta"><c:out value="${platformSupportContact.supportNote}" /></p>
+        </c:if>
+    </div>
+</c:if>

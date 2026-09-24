@@ -1,0 +1,255 @@
+package com.sacco.mvp.security;
+
+import com.sacco.mvp.domain.*;
+import com.sacco.mvp.repository.BoardReviewRepository;
+import com.sacco.mvp.repository.GuarantorRequestRepository;
+import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.service.AccessControlService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class AuthzServiceTest {
+
+    @Mock private LoanApplicationRepository loanApplicationRepository;
+    @Mock private GuarantorRequestRepository guarantorRequestRepository;
+    @Mock private BoardReviewRepository boardReviewRepository;
+
+    private AuthzService authzService;
+
+    @BeforeEach
+    void setUp() {
+        authzService = new AuthzService(
+            loanApplicationRepository,
+            guarantorRequestRepository,
+            boardReviewRepository,
+            new AccessControlService()
+        );
+    }
+
+    @Test
+    void ownershipAndAssignmentsAreEnforced() {
+        UUID memberId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        UUID loanId = UUID.randomUUID();
+        UUID reqId = UUID.randomUUID();
+
+        Member member = Member.builder().id(memberId).saccoId(saccoId).memberNo("MEM1").fullName("A")
+            .status(MemberStatus.ACTIVE).position(Position.BOARD)
+            .staffNo("BOARD-1")
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.BOARD)))
+            .passwordHash("x").createdAt(OffsetDateTime.now()).build();
+        AppUserPrincipal principal = new AppUserPrincipal(member, java.util.Set.of(
+            UserClaim.MEMBER_LOANS_VIEW,
+            UserClaim.GUARANTOR_REQUESTS_VIEW,
+            UserClaim.BOARD_QUEUE_VIEW
+        ));
+
+        LoanApplication app = LoanApplication.builder().id(loanId).saccoId(saccoId).applicantMemberId(memberId)
+            .loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN).tenorMonths(1).status(LoanStatus.DRAFT)
+            .formData("{}").requiredGuarantors(3).policySnapshot("{}").createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now()).version(0).build();
+
+        GuarantorRequest req = GuarantorRequest.builder().id(reqId).loanApplicationId(loanId).guarantorMemberId(memberId)
+            .status(GuarantorRequestStatus.PENDING).createdAt(OffsetDateTime.now()).version(0).build();
+
+        BoardReview boardReview = BoardReview.builder().id(UUID.randomUUID()).loanApplicationId(loanId)
+            .boardMemberId(memberId).decision(BoardDecision.PENDING).createdAt(OffsetDateTime.now()).build();
+
+        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
+        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(reqId, memberId)).thenReturn(Optional.of(req));
+        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
+            loanId, memberId, ApprovalWorkflowStage.BOARD)).thenReturn(Optional.of(boardReview));
+
+        assertThat(authzService.isLoanOwner(loanId, principal)).isTrue();
+        assertThat(authzService.isGuarantorAssignee(reqId, principal)).isTrue();
+        assertThat(authzService.isBoardAssignee(loanId, principal)).isTrue();
+    }
+
+    @Test
+    void minorAdminDisbursementClaimDoesNotGrantLoanVisibility() {
+        UUID adminId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        Member admin = Member.builder()
+            .id(adminId)
+            .saccoId(saccoId)
+            .stationId("ST-1")
+            .memberNo("ADM1")
+            .fullName("SACCOS Admin")
+            .status(MemberStatus.ACTIVE)
+            .position(Position.MINOR_ADMIN)
+            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
+            .passwordHash("x")
+            .createdAt(OffsetDateTime.now())
+            .build();
+        AppUserPrincipal principal = new AppUserPrincipal(admin, java.util.Set.of(UserClaim.DISBURSEMENT_QUEUE_VIEW));
+
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId(saccoId)
+            .stationId("ST-1")
+            .applicantMemberId(applicantId)
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(BigDecimal.TEN)
+            .tenorMonths(1)
+            .status(LoanStatus.READY_FOR_DISBURSEMENT)
+            .formData("{}")
+            .requiredGuarantors(0)
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+
+        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
+
+        assertThat(authzService.canViewLoan(loanId, principal)).isFalse();
+        assertThat(authzService.notAdminClass(principal)).isFalse();
+    }
+
+    @Test
+    void staffAnalyticsAccessIsLimitedToWorkspaceStaffRoles() {
+        assertThat(authzService.staffAnalyticsAccess(
+            principalWithClaims(List.of(Position.MANAGER), false, java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW))
+        )).isTrue();
+        assertThat(authzService.staffAnalyticsAccess(
+            principalWithClaims(List.of(Position.DISBURSEMENT_OFFICER), false, java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW))
+        )).isTrue();
+
+        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MANAGER, false))).isFalse();
+        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MEMBER, true))).isFalse();
+        assertThat(authzService.staffAnalyticsAccess(
+            principalWithClaims(List.of(Position.ADMIN), false, java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW))
+        )).isFalse();
+
+        Member claimOnlyMember = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId("CIRCLE-1001")
+            .memberNo("MEM2")
+            .fullName("Claim Only")
+            .memberAccount(true)
+            .status(MemberStatus.ACTIVE)
+            .position(Position.MEMBER)
+            .passwordHash("x")
+            .createdAt(OffsetDateTime.now())
+            .build();
+        AppUserPrincipal claimOnlyPrincipal = new AppUserPrincipal(
+            claimOnlyMember,
+            java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW)
+        );
+
+        assertThat(authzService.staffAnalyticsAccess(claimOnlyPrincipal)).isFalse();
+        assertThat(authzService.staffAnalyticsAccess(null)).isFalse();
+    }
+
+    @Test
+    void processedLoanAttachmentsRequireBothClaimsAndExactScope() {
+        UUID loanId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder().id(loanId).saccoId("CIRCLE-1001").stationId("ST-1")
+            .applicantMemberId(UUID.randomUUID()).loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN)
+            .tenorMonths(1).status(LoanStatus.READY_FOR_MANAGER).formData("{}").requiredGuarantors(0)
+            .policySnapshot("{}").createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).version(0).build();
+        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
+
+        AppUserPrincipal both = scopedPrincipal("CIRCLE-1001", "ST-1",
+            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
+        AppUserPrincipal processedOnly = scopedPrincipal("CIRCLE-1001", "ST-1",
+            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW));
+        AppUserPrincipal otherStation = scopedPrincipal("CIRCLE-1001", "ST-2",
+            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
+
+        assertThat(authzService.canViewLoan(loanId, both)).isTrue();
+        assertThat(authzService.canViewLoan(loanId, processedOnly)).isFalse();
+        assertThat(authzService.canViewLoan(loanId, otherStation)).isFalse();
+    }
+
+    private LoanApplicationRepository.LoanAccessRow accessRow(LoanApplication app) {
+        return new LoanApplicationRepository.LoanAccessRow() {
+            @Override
+            public UUID getId() {
+                return app.getId();
+            }
+
+            @Override
+            public UUID getApplicantMemberId() {
+                return app.getApplicantMemberId();
+            }
+
+            @Override
+            public String getSaccoId() {
+                return app.getSaccoId();
+            }
+
+            @Override
+            public String getStationId() {
+                return app.getStationId();
+            }
+
+            @Override
+            public LoanStatus getStatus() {
+                return app.getStatus();
+            }
+        };
+    }
+
+    private AppUserPrincipal scopedPrincipal(String saccoId, String stationId, java.util.Set<UserClaim> claims) {
+        Member member = Member.builder().id(UUID.randomUUID()).saccoId(saccoId).stationId(stationId)
+            .memberNo("MEM").staffNo("STAFF").fullName("Scoped Staff").memberAccount(false)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).position(Position.MANAGER)
+            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.MANAGER))).passwordHash("x")
+            .createdAt(OffsetDateTime.now()).build();
+        return new AppUserPrincipal(member, claims, true);
+    }
+
+    private AppUserPrincipal principalWith(Position position, boolean memberAccess) {
+        java.util.LinkedHashSet<Position> staffRoles = new java.util.LinkedHashSet<>();
+        if (position != null && position.isStaffRole()) {
+            staffRoles.add(position);
+        }
+        return principalWithRoles(staffRoles.stream().toList(), memberAccess);
+    }
+
+    private AppUserPrincipal principalWithRoles(List<Position> positions, boolean memberAccess) {
+        return principalWithClaims(positions, memberAccess, Collections.emptySet());
+    }
+
+    private AppUserPrincipal principalWithClaims(List<Position> positions, boolean memberAccess, java.util.Set<UserClaim> claims) {
+        java.util.LinkedHashSet<Position> staffRoles = new java.util.LinkedHashSet<>();
+        if (positions != null) {
+            positions.stream()
+                .filter(position -> position != null && position.isStaffRole())
+                .forEach(staffRoles::add);
+        }
+        Position position = Position.primaryRole(staffRoles, memberAccess);
+        Member member = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId("CIRCLE-1001")
+            .memberNo(position == null ? "USER" : position.name())
+            .fullName("Test User")
+            .memberAccount(memberAccess)
+            .status(MemberStatus.ACTIVE)
+            .position(position)
+            .staffRoles(staffRoles)
+            .passwordHash("x")
+            .createdAt(OffsetDateTime.now())
+            .build();
+        return new AppUserPrincipal(member, claims == null ? Collections.emptySet() : claims);
+    }
+}

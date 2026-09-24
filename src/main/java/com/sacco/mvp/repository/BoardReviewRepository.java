@@ -1,0 +1,152 @@
+package com.sacco.mvp.repository;
+
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
+import com.sacco.mvp.domain.BoardDecision;
+import com.sacco.mvp.domain.BoardReview;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> {
+    List<BoardReview> findByLoanApplicationId(UUID loanApplicationId);
+
+    List<BoardReview> findByLoanApplicationIdIn(Collection<UUID> loanApplicationIds);
+
+    List<BoardReview> findByLoanApplicationIdInOrderByCreatedAtDesc(Collection<UUID> loanApplicationIds);
+
+    List<BoardReview> findByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
+
+    long countByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
+
+    void deleteByLoanApplicationId(UUID loanApplicationId);
+
+    void deleteByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
+
+    long countByLoanApplicationIdAndDecision(UUID loanApplicationId, BoardDecision decision);
+
+    long countByLoanApplicationIdAndReviewStageAndDecision(UUID loanApplicationId, ApprovalWorkflowStage reviewStage, BoardDecision decision);
+
+    List<BoardReview> findByBoardMemberIdAndDecision(UUID boardMemberId, BoardDecision decision);
+
+    List<BoardReview> findByBoardMemberIdAndReviewStageAndDecision(UUID boardMemberId,
+                                                                   ApprovalWorkflowStage reviewStage,
+                                                                   BoardDecision decision);
+
+    List<BoardReview> findTop100ByBoardMemberIdAndReviewStageAndDecisionOrderByCreatedAtDesc(UUID boardMemberId,
+                                                                                              ApprovalWorkflowStage reviewStage,
+                                                                                              BoardDecision decision);
+
+    List<BoardReview> findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
+
+    List<BoardReview> findTop100ByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
+
+    Optional<BoardReview> findByLoanApplicationIdAndBoardMemberId(UUID loanApplicationId, UUID boardMemberId);
+
+    Optional<BoardReview> findByLoanApplicationIdAndBoardMemberIdAndReviewStage(UUID loanApplicationId,
+                                                                                 UUID boardMemberId,
+                                                                                 ApprovalWorkflowStage reviewStage);
+
+    @Query(
+        value = """
+            select r.*
+            from board_reviews r
+            join loan_applications l on l.id = r.loan_application_id
+            where r.board_member_id = :reviewerId
+              and r.review_stage in (:reviewStages)
+              and r.decision <> 'PENDING'
+              and l.sacco_id = :saccoId
+              and lower(l.station_id) = lower(:stationId)
+              and (cast(:reviewedFrom as timestamp) is null or coalesce(r.decided_at, r.created_at) >= :reviewedFrom)
+              and (cast(:reviewedToExclusive as timestamp) is null or coalesce(r.decided_at, r.created_at) < :reviewedToExclusive)
+              and (:filterDecision = false or r.decision = :decision)
+              and (:filterStatuses = false or l.status in (:statuses))
+              and (
+                :searchTerm = ''
+                or cast(l.application_number as text) like concat('%', :searchTerm, '%')
+                or lower(coalesce(l.loan_id, '')) like concat('%', lower(:searchTerm), '%')
+              )
+            order by coalesce(r.decided_at, r.created_at) desc
+            """,
+        countQuery = """
+            select count(*)
+            from board_reviews r
+            join loan_applications l on l.id = r.loan_application_id
+            where r.board_member_id = :reviewerId
+              and r.review_stage in (:reviewStages)
+              and r.decision <> 'PENDING'
+              and l.sacco_id = :saccoId
+              and lower(l.station_id) = lower(:stationId)
+              and (cast(:reviewedFrom as timestamp) is null or coalesce(r.decided_at, r.created_at) >= :reviewedFrom)
+              and (cast(:reviewedToExclusive as timestamp) is null or coalesce(r.decided_at, r.created_at) < :reviewedToExclusive)
+              and (:filterDecision = false or r.decision = :decision)
+              and (:filterStatuses = false or l.status in (:statuses))
+              and (
+                :searchTerm = ''
+                or cast(l.application_number as text) like concat('%', :searchTerm, '%')
+                or lower(coalesce(l.loan_id, '')) like concat('%', lower(:searchTerm), '%')
+              )
+            """,
+        nativeQuery = true
+    )
+    Page<BoardReview> findArchivePage(@Param("reviewerId") UUID reviewerId,
+                                      @Param("reviewStages") Collection<String> reviewStages,
+                                      @Param("saccoId") String saccoId,
+                                      @Param("stationId") String stationId,
+                                      @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                      @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive,
+                                      @Param("filterDecision") boolean filterDecision,
+                                      @Param("decision") String decision,
+                                      @Param("filterStatuses") boolean filterStatuses,
+                                      @Param("statuses") Collection<String> statuses,
+                                      @Param("searchTerm") String searchTerm,
+                                      Pageable pageable);
+
+    @Query("""
+        select r
+        from BoardReview r, LoanApplication l
+        where r.loanApplicationId = l.id
+          and r.boardMemberId = :reviewerId
+          and r.reviewStage = :reviewStage
+          and r.decision <> com.sacco.mvp.domain.BoardDecision.PENDING
+          and l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (cast(:decision as string) is null or r.decision = :decision)
+          and coalesce(r.decidedAt, r.createdAt) >= :reviewedFrom
+          and coalesce(r.decidedAt, r.createdAt) < :reviewedToExclusive
+        order by coalesce(r.decidedAt, r.createdAt) desc
+        """)
+    List<BoardReview> findForWorkflowReport(@Param("reviewerId") UUID reviewerId,
+                                            @Param("reviewStage") ApprovalWorkflowStage reviewStage,
+                                            @Param("saccoId") String saccoId,
+                                            @Param("stationId") String stationId,
+                                            @Param("decision") BoardDecision decision,
+                                            @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                            @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive);
+
+    @Query("""
+        select r
+        from BoardReview r, LoanApplication l
+        where r.loanApplicationId = l.id
+          and r.boardMemberId = :boardMemberId
+          and r.reviewStage = :reviewStage
+          and l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (cast(:createdFrom as timestamp) is null or coalesce(r.decidedAt, r.createdAt) >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or coalesce(r.decidedAt, r.createdAt) < :createdToExclusive)
+        order by coalesce(r.decidedAt, r.createdAt) desc
+        """)
+    List<BoardReview> findForAnalytics(@Param("boardMemberId") UUID boardMemberId,
+                                       @Param("reviewStage") ApprovalWorkflowStage reviewStage,
+                                       @Param("saccoId") String saccoId,
+                                       @Param("stationId") String stationId,
+                                       @Param("createdFrom") OffsetDateTime createdFrom,
+                                       @Param("createdToExclusive") OffsetDateTime createdToExclusive);
+}

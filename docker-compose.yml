@@ -1,0 +1,54 @@
+services:
+  app:
+    build:
+      context: .
+      target: final
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/sacco
+      SPRING_DATASOURCE_USERNAME: sacco
+      SPRING_DATASOURCE_PASSWORD: sacco_dev_password
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 1
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      SPRING_MAIL_USERNAME: no-reply@sacco.local
+      SPRING_MAIL_PASSWORD: sacco_dev_password
+      SPRING_MAIL_SMTP_AUTH: true
+      SPRING_MAIL_SMTP_STARTTLS: false
+      APP_MAIL_OVERRIDE_RECIPIENT: ginonodavid625@gmail.com
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    environment:
+      MP_UI_AUTH: no-reply@sacco.local:sacco_dev_password
+      MP_SMTP_AUTH: no-reply@sacco.local:sacco_dev_password
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sacco
+      POSTGRES_USER: sacco
+      POSTGRES_PASSWORD: sacco_dev_password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sacco -d sacco"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:

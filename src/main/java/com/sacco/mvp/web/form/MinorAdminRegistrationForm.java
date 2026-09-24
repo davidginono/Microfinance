@@ -1,0 +1,14 @@
+package com.sacco.mvp.web.form;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class MinorAdminRegistrationForm {
+    private String saccoId;
+    private String stationId;
+    private String fullName;
+    private String email;
+    private String phone;
+}
