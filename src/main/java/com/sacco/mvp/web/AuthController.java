@@ -66,7 +66,7 @@ public class AuthController {
     @GetMapping("/")
     public String root(@org.springframework.security.core.annotation.AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal == null) {
-            return "redirect:/login";
+            return "landing";
         }
         return "redirect:" + WorkspaceLanding.authenticatedDefault(principal);
     }

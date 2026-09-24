@@ -92,7 +92,7 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider(userDetailsService, passwordEncoder))
             .authorizeHttpRequests(auth -> {
                 auth.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/system-admin/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
+                .requestMatchers("/", "/login", "/system-admin/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
                 if (publicActuatorMetrics) {
                     auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
                 }

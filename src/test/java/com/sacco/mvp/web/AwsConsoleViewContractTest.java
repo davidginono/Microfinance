@@ -17,7 +17,7 @@ class AwsConsoleViewContractTest {
     void everyRouteUsesTheAwsConsoleOrAuthShell() throws Exception {
         List<Path> routes = routeViews();
 
-        assertThat(routes).hasSize(74);
+        assertThat(routes).hasSize(75);
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
             assertThat(view)

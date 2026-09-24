@@ -65,3 +65,45 @@ A separate crop was not required because the topbar and full sidebar remain clea
 - None required for the requested SIMS sidebar and topbar restoration.
 
 final result: passed
+
+---
+
+# Landing Page Design QA
+
+**Comparison target**
+
+- Source: user-provided landing-page reference, 1672 x 941 pixels.
+- Implementation: `http://localhost:8085/`, captured at a 1672 x 941 CSS-pixel viewport with device scale factor 1.
+- State: anonymous visitor, default desktop state.
+
+**Findings**
+
+- No P0, P1, or P2 differences remain.
+- [P3] The lead mark uses the closest Tabler file/invoice icon rather than the reference's bespoke document-and-coins mark. This keeps the asset crisp and licensed while preserving the intended finance-document meaning.
+
+**Required fidelity surfaces**
+
+- Fonts and typography: passed. Local Open Sans 400/700 matches the product system; title, supporting copy, button labels, and wrapping preserve the reference hierarchy.
+- Spacing and layout rhythm: passed. The 650px two-column action row begins at approximately the same vertical position as the source; mobile changes to a single column with no page overflow.
+- Colors and visual tokens: passed. Navy overlay, white foregrounds, orange launch action, neutral bordered registration action, and blue focus ring have appropriate contrast and semantic roles.
+- Image quality and asset fidelity: passed. The generated 1672 x 941 hero is sharp, full-bleed, and follows the reference composition without embedded interface text. UI icons are local Tabler SVG assets.
+- Copy and content: passed. Heading, introductory sentence, actions, and helper labels match the selected reference.
+
+**Interaction and responsive checks**
+
+- Login navigates to `/login`.
+- Register navigates to `/register/member`.
+- Visible keyboard focus is present on both actions.
+- No browser console warnings or errors.
+- No document overflow at 360, 390, 768, 1024, 1440, or 1920px widths.
+
+**Implementation checklist**
+
+- [x] Public root route
+- [x] Authenticated root redirect preserved
+- [x] Responsive desktop and mobile layouts
+- [x] Accessible HTML links and focus states
+- [x] Local image and icon assets
+- [x] Existing login and registration flows reused
+
+final result: passed

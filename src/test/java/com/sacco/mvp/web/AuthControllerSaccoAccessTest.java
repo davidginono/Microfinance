@@ -36,6 +36,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerSaccoAccessTest {
+
+    @Test
+    void anonymousRootShowsPublicLandingPage() {
+        assertThat(controller().root(null)).isEqualTo("landing");
+    }
+
     @Mock private MemberRegistrationService memberRegistrationService;
     @Mock private EmailOtpService emailOtpService;
     @Mock private MemberDirectoryService memberDirectoryService;
