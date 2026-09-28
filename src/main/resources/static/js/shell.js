@@ -20,9 +20,9 @@
     let exportPrintActive = false;
     const exportDownloadTimeoutMs = 60 * 1000;
     const exportPrintFrameCleanupDelayMs = 2 * 60 * 1000;
-    const legacyScrollRestoreStorageKey = 'saccos:restore-scroll';
-    const scrollRestoreStorageKeyPrefix = 'saccos:restore-scroll:';
-    const modalRestoreStorageKey = 'saccos:open-modal';
+    const legacyScrollRestoreStorageKey = 'Saccos:restore-scroll';
+    const scrollRestoreStorageKeyPrefix = 'Saccos:restore-scroll:';
+    const modalRestoreStorageKey = 'Saccos:open-modal';
     const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
     let scrollStateSaveTimer = null;
     const normalizeBreadcrumbSegment = function (value) {
@@ -43,6 +43,22 @@
         const match = path.match(/^\/(manager|chairperson|credit-committee|board|loan-officer|accountant|disbursement)(?:\/|$)/);
         return match ? '/' + match[1] + '/dashboard' : '/staff/analytics';
     };
+    const memberWorkspaceRoutes = {
+        'application detail': '/app/loan-applications',
+        'application progress': '/app/loan-applications',
+        'archives': '/app/archives',
+        'guarantee archive': '/app/archives?section=guarantors',
+        'guarantee requests': '/app/guarantee-requests',
+        'guarantees': '/app/guaranteed-loans',
+        'guarantor selection': '/app/loan-applications',
+        'loan products': '/app/loan-products',
+        'notifications': '/app/notifications',
+        'reports & analytics': '/app/reports',
+        'replies': '/app/support/replies',
+        'sent archive': '/app/support/archive',
+        'settings': '/app/settings',
+        'support': '/app/support'
+    };
     const breadcrumbRouteGroups = {
         'admin tools': {
             'audit log': '/admin/events',
@@ -55,6 +71,9 @@
             'platform dashboard': '/admin/dashboard',
             'platform settings': '/admin/platform-settings',
             'reports': '/admin/reports',
+            'institution registration': '/admin/saccos/registry',
+            'institution workspace': '/admin/scope/select',
+            'institutions': '/admin/saccos',
             'sacco registration': '/admin/saccos/registry',
             'sacco workspace': '/admin/scope/select',
             'saccos': '/admin/saccos',
@@ -63,22 +82,8 @@
             'support': '/admin/support',
             'users & roles': '/admin/users'
         },
-        'member workspace': {
-            'application detail': '/app/loan-applications',
-            'application progress': '/app/loan-applications',
-            'archives': '/app/archives',
-            'guarantee archive': '/app/archives?section=guarantors',
-            'guarantee requests': '/app/guarantee-requests',
-            'guarantees': '/app/guaranteed-loans',
-            'guarantor selection': '/app/loan-applications',
-            'loan products': '/app/loan-products',
-            'notifications': '/app/notifications',
-            'reports & analytics': '/app/reports',
-            'replies': '/app/support/replies',
-            'sent archive': '/app/support/archive',
-            'settings': '/app/settings',
-            'support': '/app/support'
-        },
+        'member workspace': memberWorkspaceRoutes,
+        'client workspace': memberWorkspaceRoutes,
         'staff workspace': {
             'settings': '/staff/settings',
             'staff reports and analytics': '/staff/analytics'
@@ -144,7 +149,7 @@
         if (root === 'admin tools') {
             return '/admin/dashboard';
         }
-        if (root === 'member workspace') {
+        if (root === 'member workspace' || root === 'client workspace') {
             return '/app/dashboard';
         }
         if (root === 'staff workspace') {
@@ -529,7 +534,7 @@
             const applySearch = function () {
                 const query = input.value.trim().toLocaleLowerCase();
                 let visibleCount = 0;
-                body.querySelector('.aws-client-table-empty')?.remove();
+                body.querySelector('.aws-Member-table-empty')?.remove();
                 rows.forEach(function (row) {
                     const visible = !query || (row.textContent || '').toLocaleLowerCase().includes(query);
                     row.hidden = !visible;
@@ -539,7 +544,7 @@
                 });
                 if (query && visibleCount === 0) {
                     const emptyRow = document.createElement('tr');
-                    emptyRow.className = 'aws-client-table-empty';
+                    emptyRow.className = 'aws-Member-table-empty';
                     const cell = document.createElement('td');
                     cell.className = 'erp-table-empty';
                     cell.colSpan = Math.max(table.tHead?.rows?.[0]?.cells?.length || 1, 1);
@@ -1365,7 +1370,7 @@
         });
     };
 
-    const rememberScrollForReload = function () {
+    const reMemberscrollForReload = function () {
         try {
             window.sessionStorage.setItem(currentScrollRestoreStorageKey(), JSON.stringify({
                 path: currentScrollRestorePath(),
@@ -1426,7 +1431,7 @@
         }
         scrollStateSaveTimer = window.setTimeout(function () {
             scrollStateSaveTimer = null;
-            rememberScrollForReload();
+            reMemberscrollForReload();
         }, 120);
     };
 
@@ -1512,7 +1517,7 @@
         }
     };
 
-    const rememberCurrentOpenModal = function () {
+    const reMemberCurrentOpenModal = function () {
         const openModal = Array.from(document.querySelectorAll('.app-modal-overlay')).find(isModalOpen);
         if (openModal) {
             rememberOpenModal(openModal);
@@ -1614,7 +1619,7 @@
     };
 
     window.SaccosUiState = Object.assign({}, window.SaccosUiState, {
-        rememberScrollForReload: rememberScrollForReload,
+        reMemberscrollForReload: reMemberscrollForReload,
         rememberOpenModal: rememberOpenModal,
         clearOpenModal: clearOpenModal,
         restoreOpenModal: restoreModalAfterReload
@@ -1641,7 +1646,7 @@
         const exportUrl = resolveExportFormUrl(form, event.submitter);
         if (exportUrl) {
             event.preventDefault();
-            rememberScrollForReload();
+            reMemberscrollForReload();
             if (isConsolePrintAction(event.submitter)) {
                 void printWithPagePreloader(exportUrl);
             } else {
@@ -1654,7 +1659,7 @@
         }
         window.setTimeout(function () {
             if (!event.defaultPrevented) {
-                rememberScrollForReload();
+                reMemberscrollForReload();
                 showPageSubmitPreloader(form);
             }
         }, 0);
@@ -1669,7 +1674,7 @@
             const printUrl = resolvePrintControlUrl(printControl);
             if (printUrl) {
                 event.preventDefault();
-                rememberScrollForReload();
+                reMemberscrollForReload();
                 void printWithPagePreloader(printUrl);
                 return;
             }
@@ -1691,11 +1696,11 @@
             || isConsoleDownloadAction(link)
             || /\.(?:csv|pdf|xlsx?)(?:$|\?)/i.test(target.pathname + target.search)) {
             event.preventDefault();
-            rememberScrollForReload();
+            reMemberscrollForReload();
             void downloadWithPagePreloader(target.toString());
             return;
         }
-        rememberScrollForReload();
+        reMemberscrollForReload();
         window.setTimeout(function () {
             if (!event.defaultPrevented) {
                 showPageSubmitPreloader(null);
@@ -1703,12 +1708,12 @@
         }, 0);
     });
 
-    document.addEventListener('click', rememberScrollForReload, { capture: true, passive: true });
+    document.addEventListener('click', reMemberscrollForReload, { capture: true, passive: true });
 
     document.addEventListener('change', function (event) {
         const target = event.target;
         if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
-            rememberScrollForReload();
+            reMemberscrollForReload();
         }
     }, { capture: true });
 
@@ -1721,17 +1726,17 @@
     }, { capture: true, passive: true });
 
     window.addEventListener('pagehide', function () {
-        rememberScrollForReload();
-        rememberCurrentOpenModal();
+        reMemberscrollForReload();
+        reMemberCurrentOpenModal();
     });
     window.addEventListener('beforeunload', function () {
-        rememberScrollForReload();
-        rememberCurrentOpenModal();
+        reMemberscrollForReload();
+        reMemberCurrentOpenModal();
     });
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
-            rememberScrollForReload();
-            rememberCurrentOpenModal();
+            reMemberscrollForReload();
+            reMemberCurrentOpenModal();
         }
     });
 
@@ -2393,8 +2398,8 @@
 
     window.addEventListener('load', function () {
         const adminScopeOptionsNode = document.getElementById('adminScopeOptionsData');
-        const adminScopeSaccoSelect = document.getElementById('adminScopeSaccoSelect');
-        const adminScopeStationSelect = document.getElementById('adminScopeStationSelect');
+        const adminScopeSaccoSelect = document.getElementById('adminScopesaccoSelect');
+        const adminScopeStationSelect = document.getElementById('adminScopestationSelect');
         if (!adminScopeOptionsNode || !adminScopeSaccoSelect || !adminScopeStationSelect) {
             return;
         }
@@ -2403,7 +2408,7 @@
             const selectedSacco = adminScopeSaccoSelect.value;
             const scopeOption = adminScopeOptions.find(function (option) { return option.saccoId === selectedSacco; });
             const stations = scopeOption && Array.isArray(scopeOption.stationIds) ? scopeOption.stationIds : [];
-        const currentStation = adminScopeStationSelect.value || window.currentAdminScopeStation || '';
+            const currentStation = adminScopeStationSelect.value || window.currentAdminScopeStation || '';
             adminScopeStationSelect.innerHTML = '';
             stations.forEach(function (stationId) {
                 const option = document.createElement('option');

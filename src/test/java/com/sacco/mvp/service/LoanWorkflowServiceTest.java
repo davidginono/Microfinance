@@ -1,7 +1,6 @@
 package com.sacco.mvp.service;
 
 import tools.jackson.databind.ObjectMapper;
-import com.sacco.mvp.domain.ExternalGuarantorRegistry;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
@@ -14,11 +13,6 @@ import com.sacco.mvp.domain.ReversalRequest;
 import com.sacco.mvp.domain.ReversalRequestStatus;
 import com.sacco.mvp.domain.ReversalRequestType;
 import com.sacco.mvp.domain.SaccoSettings;
-import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
-import com.sacco.mvp.integration.foresight.ForesightActiveLoan;
-import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
-import com.sacco.mvp.integration.foresight.ForesightMemberProfile;
-import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,7 +68,6 @@ class LoanWorkflowServiceTest {
     @Mock private LoanProductRequiredAttachmentService requiredAttachmentService;
     @Mock private FinancialDetailsService financialDetailsService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
-    @Mock private ForesightDirectoryService foresightDirectoryService;
     @Mock private SaccoConfigurationService saccoConfigurationService;
     @Mock private ApplicationNumberService applicationNumberService;
     @Mock private RoleDirectoryService roleDirectoryService;
@@ -399,7 +392,8 @@ class LoanWorkflowServiceTest {
         when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
         when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
             .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(memberId), eq(product),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
         when(eligibilityService.policySnapshotJson(any(), anyInt(), any())).thenReturn("{}");
@@ -515,7 +509,8 @@ class LoanWorkflowServiceTest {
             return Optional.of(activeMember(memberId, saccoId, "ST01"));
         });
         stubActiveMemberBatchLookup(saccoId);
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -566,7 +561,8 @@ class LoanWorkflowServiceTest {
             return Optional.of(activeMember(memberId, saccoId, "ST01"));
         });
         stubActiveMemberBatchLookup(saccoId);
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -827,7 +823,7 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
-    void directOtpSearchReturnsLmsCandidateWhenForesightMemberNumberMatchesLocalMember() {
+    void directOtpSearchReturnsLocalCandidateFromClientDirectory() {
         UUID applicantId = UUID.randomUUID();
         UUID guarantorId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -838,26 +834,16 @@ class LoanWorkflowServiceTest {
             .formSchema("{}")
             .active(true)
             .build();
-        ForesightMemberProfile profile = new ForesightMemberProfile(
-            "Mushi",
-            "Jane",
-            "0101",
-            "ST01",
-            "Demo SACCO",
-            "+255676423992",
-            "jane@example.com"
-        );
         Member localGuarantor = activeMember(guarantorId, saccoId, "ST01");
         localGuarantor.setMemberNo("0101");
         localGuarantor.setFullName("Jane Mushi");
+        localGuarantor.setPhone("+255676423992");
+        localGuarantor.setEmail("jane@example.com");
 
-        when(foresightDirectoryService.lookupMemberProfileByPhone("+255676423992"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(profile));
-        stubDirectOtpFinancialProfile("0101", "ST01", new BigDecimal("250000.00"), List.of(), List.of(
-            new ForesightActiveLoan("2001", LocalDate.of(2023, 2, 15), "Paid Loan",
-                new BigDecimal("400000.00"), new BigDecimal("420000.00"), BigDecimal.TEN, new BigDecimal("20000.00"))
-        ));
+        when(memberRepository.findByPhone("+255676423992")).thenReturn(Optional.of(localGuarantor));
         when(memberRepository.findByMemberNoIgnoreCase("0101")).thenReturn(Optional.of(localGuarantor));
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(guarantorId), any()))
+            .thenReturn(List.of());
         when(loanQualificationPolicyService.guarantorFailureReason(saccoId, guarantorId, null, product))
             .thenReturn(Optional.empty());
 
@@ -877,12 +863,12 @@ class LoanWorkflowServiceTest {
         assertThat(candidate.localMemberId()).isEqualTo(guarantorId);
         assertThat(candidate.memberNo()).isEqualTo("0101");
         assertThat(candidate.fullName()).isEqualTo("Jane Mushi");
-        assertThat(candidate.paidLoanCount()).isEqualTo(1);
+        assertThat(candidate.paidLoanCount()).isZero();
         assertThat(candidate.selectionToken()).contains("\"id\":\"" + guarantorId + "\"");
     }
 
     @Test
-    void directOtpSearchHandlesMissingAndInvalidProfileResponses() {
+    void directOtpSearchReturnsEmptyWhenLocalClientIsMissing() {
         String saccoId = "CIRCLE-1001";
         UUID applicantId = UUID.randomUUID();
         LoanProductSetting product = LoanProductSetting.builder()
@@ -892,175 +878,9 @@ class LoanWorkflowServiceTest {
             .active(true)
             .build();
 
-        when(foresightDirectoryService.lookupMemberProfileByEmail("missing@example.com"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
+        when(memberRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(Optional.empty());
         assertThat(loanWorkflowService.searchDirectOtpGuarantorCandidates(
             saccoId, "ST01", applicantId, "missing@example.com", "email", product)).isEmpty();
-
-        when(foresightDirectoryService.lookupMemberProfileByEmail("broken@example.com"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
-                new ForesightMemberProfile("Missing", "Station", "0101", "", "Demo", null, "broken@example.com")
-            ));
-        assertThatThrownBy(() -> loanWorkflowService.searchDirectOtpGuarantorCandidates(
-            saccoId, "ST01", applicantId, "broken@example.com", "email", product))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("missing member number or station");
-
-        when(foresightDirectoryService.lookupMemberProfileByEmail("down@example.com"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.unavailable());
-        assertThatThrownBy(() -> loanWorkflowService.searchDirectOtpGuarantorCandidates(
-            saccoId, "ST01", applicantId, "down@example.com", "email", product))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("unavailable");
-    }
-
-    @Test
-    void submitCreatesForesightOnlyDirectOtpGuarantorRequest() {
-        UUID appId = UUID.randomUUID();
-        UUID applicantId = UUID.randomUUID();
-        String saccoId = "CIRCLE-1001";
-        LoanApplication app = directOtpDraft(appId, applicantId, saccoId,
-            "[{\"source\":\"FORESIGHT\",\"lookupBy\":\"phone\",\"lookupValue\":\"0676423992\"}]");
-        LoanProductSetting product = directOtpProduct(saccoId);
-        ForesightMemberProfile profile = new ForesightMemberProfile(
-            "Mtei",
-            "Asha",
-            "EXT-77",
-            "ST01",
-            "Demo SACCO",
-            "+255676423992",
-            "asha@example.com"
-        );
-
-        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, applicantId)).thenReturn(Optional.of(app));
-        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
-        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
-        when(financialDetailsService.generateSnapshot(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
-            .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
-            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, new BigDecimal("500000"), new BigDecimal("500000")));
-        when(foresightDirectoryService.lookupMemberProfileByPhone("+255676423992"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(profile));
-        stubDirectOtpFinancialProfile("EXT-77", "ST01", new BigDecimal("300000.00"), List.of(), List.of());
-        when(memberRepository.findByMemberNoIgnoreCase("EXT-77")).thenReturn(Optional.empty());
-        when(loanQualificationPolicyService.guarantorFailureReasonForExternal(
-            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(0), eq(0), eq(new BigDecimal("100000")), eq(product)))
-            .thenReturn(Optional.empty());
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        loanWorkflowService.submit(appId, applicantId);
-
-        verify(guarantorRequestRepository).save(argThat(request ->
-            request.getGuarantorMemberId() == null
-                && "FORESIGHT".equals(request.getGuarantorSource())
-                && "EXT-77".equals(request.getExternalMemberNo())
-                && "ST01".equals(request.getExternalStationId())
-                && "Asha Mtei".equals(request.getExternalFullName())
-                && request.getExternalFinancialSnapshot() != null
-                && request.getExternalFinancialSnapshot().contains("300000.00")
-        ));
-    }
-
-    @Test
-    void submitRejectsForesightOnlyDirectOtpGuarantorWhenExternalPolicyFails() {
-        UUID appId = UUID.randomUUID();
-        UUID applicantId = UUID.randomUUID();
-        String saccoId = "CIRCLE-1001";
-        LoanApplication app = directOtpDraft(appId, applicantId, saccoId,
-            "[{\"source\":\"FORESIGHT\",\"lookupBy\":\"email\",\"lookupValue\":\"guarantor@example.com\"}]");
-        LoanProductSetting product = directOtpProduct(saccoId);
-        ForesightMemberProfile profile = new ForesightMemberProfile(
-            "Mtei",
-            "Asha",
-            "EXT-77",
-            "ST01",
-            "Demo SACCO",
-            "+255676423992",
-            "guarantor@example.com"
-        );
-        ForesightActiveLoan activeLoan = new ForesightActiveLoan("3001", LocalDate.now(), "Active Loan",
-            new BigDecimal("100000.00"), new BigDecimal("110000.00"), BigDecimal.TEN, new BigDecimal("10000.00"));
-
-        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, applicantId)).thenReturn(Optional.of(app));
-        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
-        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
-        when(financialDetailsService.generateSnapshot(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
-            .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
-            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, new BigDecimal("500000"), new BigDecimal("500000")));
-        when(foresightDirectoryService.lookupMemberProfileByEmail("guarantor@example.com"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(profile));
-        stubDirectOtpFinancialProfile("EXT-77", "ST01", new BigDecimal("300000.00"), List.of(activeLoan), List.of());
-        when(memberRepository.findByMemberNoIgnoreCase("EXT-77")).thenReturn(Optional.empty());
-        when(loanQualificationPolicyService.guarantorFailureReasonForExternal(
-            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(1), eq(0), eq(new BigDecimal("100000")), eq(product)))
-            .thenReturn(Optional.of("Disabled: active loans are not allowed for guarantors under the station policy."));
-
-        assertThatThrownBy(() -> loanWorkflowService.submit(appId, applicantId))
-            .isInstanceOf(LoanWorkflowService.GuarantorValidationException.class)
-            .hasMessageContaining("active loans are not allowed");
-
-        verify(guarantorRequestRepository, never()).save(any());
-    }
-
-    @Test
-    void directOtpApprovalUpsertsRegistryForForesightOnlyGuarantor() {
-        UUID appId = UUID.randomUUID();
-        UUID applicantId = UUID.randomUUID();
-        UUID requestId = UUID.randomUUID();
-        String saccoId = "CIRCLE-1001";
-        LoanApplication app = directOtpDraft(appId, applicantId, saccoId,
-            "[{\"source\":\"FORESIGHT\",\"lookupBy\":\"phone\",\"lookupValue\":\"+255676423992\"}]");
-        app.setStatus(LoanStatus.AWAITING_GUARANTORS);
-        GuarantorRequest request = GuarantorRequest.builder()
-            .id(requestId)
-            .loanApplicationId(appId)
-            .guarantorMemberId(null)
-            .status(GuarantorRequestStatus.PENDING)
-            .createdAt(OffsetDateTime.now())
-            .build();
-        request.setGuarantorSource("FORESIGHT");
-        request.setExternalMemberNo("EXT-77");
-        request.setExternalStationId("ST01");
-        request.setExternalFullName("Asha Mtei");
-        request.setExternalEmail("asha@example.com");
-        request.setExternalPhone("+255676423992");
-        request.setExternalFinancialSnapshot("{\"savingsBalance\":\"300000.00\"}");
-        LoanProductSetting product = directOtpProduct(saccoId);
-
-        when(guarantorRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
-        when(loanApplicationRepository.findById(appId)).thenReturn(Optional.of(app));
-        when(externalGuarantorRegistryRepository.findBySaccoIdAndExternalStationIdIgnoreCaseAndExternalMemberNoIgnoreCase(
-            saccoId, "ST01", "EXT-77"))
-            .thenReturn(Optional.empty());
-        when(externalGuarantorRegistryRepository.save(any(ExternalGuarantorRegistry.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
-        when(guarantorRequestRepository.save(any(GuarantorRequest.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
-        when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(appId, GuarantorRequestStatus.APPROVED)).thenReturn(1L);
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
-            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, new BigDecimal("500000"), new BigDecimal("500000")));
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        loanWorkflowService.approveDirectOtpGuarantorRequest(
-            requestId,
-            applicantId,
-            "Asha Mtei",
-            OffsetDateTime.parse("2026-08-24T12:00:00+03:00")
-        );
-
-        verify(externalGuarantorRegistryRepository).save(argThat(registry ->
-            saccoId.equals(registry.getSaccoId())
-                && "ST01".equals(registry.getStationId())
-                && "ST01".equals(registry.getExternalStationId())
-                && "EXT-77".equals(registry.getExternalMemberNo())
-                && "Asha Mtei".equals(registry.getFullName())
-                && registry.getLastApprovedAt() != null
-        ));
-        verify(guarantorRequestRepository).save(argThat(saved ->
-            saved.getExternalGuarantorRegistryId() != null
-                && saved.getStatus() == GuarantorRequestStatus.APPROVED
-        ));
     }
 
     @Test
@@ -1151,7 +971,8 @@ class LoanWorkflowServiceTest {
         when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
         when(financialDetailsService.generateSnapshot(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
             .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -1225,7 +1046,8 @@ class LoanWorkflowServiceTest {
         when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
         when(financialDetailsService.generateSnapshot(saccoId, applicantId, product, new BigDecimal("100000"), 6, null))
             .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
-        when(eligibilityService.check(saccoId, applicantId, product, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
         when(eligibilityService.policySnapshotJson(any(), anyInt(), any())).thenReturn("{}");
@@ -1329,7 +1151,7 @@ class LoanWorkflowServiceTest {
         when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
         when(financialDetailsService.generateSnapshot(eq(saccoId), eq(applicantId), eq(product), any(BigDecimal.class), eq(6), eq(sourceLoanId)))
             .thenReturn(topUpSnapshot);
-        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product), any(BigDecimal.class)))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product), any(BigDecimal.class), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
         when(eligibilityService.policySnapshotJson(any(), anyInt(), any())).thenReturn("{}");
@@ -1390,7 +1212,8 @@ class LoanWorkflowServiceTest {
         when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(loanId, GuarantorRequestStatus.APPROVED)).thenReturn(1L);
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(LoanType.DEVELOPMENT_LOAN),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.TEN));
 
         loanWorkflowService.approveGuarantorRequest(requestId, guarantorId);
@@ -1437,7 +1260,8 @@ class LoanWorkflowServiceTest {
         when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(loanId, GuarantorRequestStatus.APPROVED)).thenReturn(0L);
-        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(LoanType.DEVELOPMENT_LOAN),
+            eq(new BigDecimal("100000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.TEN));
 
         loanWorkflowService.rejectGuarantorRequest(requestId, guarantorId, "Savings committed elsewhere");
@@ -1490,26 +1314,6 @@ class LoanWorkflowServiceTest {
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .build();
-    }
-
-    private void stubDirectOtpFinancialProfile(String memberNo,
-                                               String stationId,
-                                               BigDecimal savingsBalance,
-                                               List<ForesightActiveLoan> activeLoans,
-                                               List<ForesightActiveLoan> paidLoans) {
-        when(foresightDirectoryService.fetchAccountSummary(memberNo, stationId))
-            .thenReturn(new ForesightAccountSummary(
-                savingsBalance,
-                new BigDecimal("50000.00"),
-                new BigDecimal("125000.00"),
-                List.of()
-            ));
-        when(foresightDirectoryService.fetchInvestments(eq(memberNo), eq(stationId), anyInt()))
-            .thenReturn(List.of());
-        when(foresightDirectoryService.fetchActiveLoans(memberNo, stationId))
-            .thenReturn(activeLoans);
-        when(foresightDirectoryService.fetchPaidLoans(memberNo, stationId))
-            .thenReturn(paidLoans);
     }
 
     private void stubActiveMemberBatchLookup(String saccoId) {
@@ -1633,7 +1437,8 @@ class LoanWorkflowServiceTest {
                 "principalAmount", new BigDecimal("51000.00"),
                 "principalPlusInterest", new BigDecimal("56100.00")
             )));
-        when(eligibilityService.check(saccoId, memberId, product, new BigDecimal("51000.00")))
+        when(eligibilityService.check(eq(saccoId), eq(memberId), eq(product),
+            eq(new BigDecimal("51000.00")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("200000"),
                 new BigDecimal("66660.00")));
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -1659,7 +1464,8 @@ class LoanWorkflowServiceTest {
         assertThat(saved.getTopUpSourceLoanId()).isEqualTo(sourceLoanId);
         assertThat(saved.getAmount()).isEqualByComparingTo("51000.00");
         assertThat(saved.getFinancialSnapshot()).contains("topUpRequestedAmount", "topUpSettlementAmount", "principalAmount");
-        verify(eligibilityService).check(saccoId, memberId, product, new BigDecimal("51000.00"));
+        verify(eligibilityService).check(eq(saccoId), eq(memberId), eq(product),
+            eq(new BigDecimal("51000.00")), anyMap(), anyMap());
     }
 
     @Test
@@ -1690,7 +1496,8 @@ class LoanWorkflowServiceTest {
             .build();
 
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
-        when(eligibilityService.check(saccoId, memberId, LoanType.LOAN_ADVANCE, new BigDecimal("1000")))
+        when(eligibilityService.check(eq(saccoId), eq(memberId), eq(LoanType.LOAN_ADVANCE),
+            eq(new BigDecimal("1000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("9000"),
                 new BigDecimal("2999.70")));
         when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.LOAN_ADVANCE, new BigDecimal("1000"), 3, null))
@@ -1740,7 +1547,8 @@ class LoanWorkflowServiceTest {
         when(loanApplicationRepository.findById(appId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(appId, GuarantorRequestStatus.APPROVED))
             .thenReturn(2L);
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("90000")))
+        when(eligibilityService.check(eq(saccoId), eq(memberId), eq(LoanType.DEVELOPMENT_LOAN),
+            eq(new BigDecimal("90000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("300000"),
                 new BigDecimal("99990.00")));
 
@@ -1779,7 +1587,8 @@ class LoanWorkflowServiceTest {
         when(loanApplicationRepository.findById(appId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(appId, GuarantorRequestStatus.APPROVED))
             .thenReturn(3L);
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("90000")))
+        when(eligibilityService.check(eq(saccoId), eq(memberId), eq(LoanType.DEVELOPMENT_LOAN),
+            eq(new BigDecimal("90000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("300000"),
                 new BigDecimal("99990.00")));
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -1870,11 +1679,8 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
-    void submitBlocksWhenFreshFinancialDataIsRequiredAndUpstreamIsUnavailable() {
-        // Scenario: products that require fresh upstream financial data must fail closed when the provider is unavailable.
-        // Given a draft loan whose product requires a live financial refresh
-        // When the upstream account service cannot respond
-        // Then submission is blocked and the stale draft is not saved.
+    void submitBlocksWhenCreditAssessmentSnapshotIsMissing() {
+        // Scenario: applicants must calculate local affordability before a draft can move forward.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -1889,40 +1695,19 @@ class LoanWorkflowServiceTest {
             .tenorMonths(6)
             .status(LoanStatus.DRAFT)
             .requiredGuarantors(0)
-            .financialSnapshot("{\"requestedAmount\":150000}")
+            .financialSnapshot(null)
             .formData("{}")
             .policySnapshot("{}")
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .version(0)
             .build();
-        LoanProductSetting product = LoanProductSetting.builder()
-            .id(UUID.randomUUID())
-            .saccoId(saccoId)
-            .loanType(LoanType.DEVELOPMENT_LOAN)
-            .freshFinancialDataRequired(true)
-            .managerReviewRequired(true)
-            .committeeReviewRequired(false)
-            .createdAt(OffsetDateTime.now())
-            .updatedAt(OffsetDateTime.now())
-            .build();
-        Member member = Member.builder()
-            .id(memberId)
-            .memberNo("MEM001")
-            .stationId("ST01")
-            .build();
 
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
-        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
-        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000"), 6, null))
-            .thenReturn(Map.of("interestMethod", "FLAT_RATE", "interestRate", new BigDecimal("0.1000")));
-        when(foresightDirectoryService.fetchAccountSummary("MEM001", "ST01"))
-            .thenThrow(new UpstreamAvailabilityException("down", null));
 
         assertThatThrownBy(() -> loanWorkflowService.submit(appId, memberId))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Fresh financial data is required for this loan product, but the upstream financial service is unavailable right now. Try again later.");
+            .hasMessage("Calculate the loan affordability before submitting the application.");
 
         verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
     }
@@ -1969,7 +1754,8 @@ class LoanWorkflowServiceTest {
         when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
         when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000"), 6, null))
             .thenReturn(Map.of("interestMethod", "REDUCING_BALANCE", "interestRate", new BigDecimal("0.1200")));
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000")))
+        when(eligibilityService.check(eq(saccoId), eq(memberId), eq(product),
+            eq(new BigDecimal("150000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("600000"),
                 new BigDecimal("199980.00")));
         doAnswer(invocation -> {

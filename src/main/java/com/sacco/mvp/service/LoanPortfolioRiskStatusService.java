@@ -108,7 +108,7 @@ public class LoanPortfolioRiskStatusService {
         }
         BigDecimal outstanding = syncedOutstandingBalance(loan);
         if (outstanding == null) {
-            return StatusDecision.skipped("Synced Foresight outstanding balance is missing.");
+            return StatusDecision.skipped("Synced outstanding balance is missing.");
         }
         if (outstanding.compareTo(BigDecimal.ZERO) <= 0) {
             return StatusDecision.to(LoanStatus.PAID, null, outstanding, resolvedPortfolioAtRiskDays(loan));
@@ -209,8 +209,8 @@ public class LoanPortfolioRiskStatusService {
 
     private Optional<BigDecimal> paidTotalFromSnapshot(LoanApplication loan) {
         Map<String, Object> snapshot = financialSnapshot(loan);
-        BigDecimal principalPaid = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID));
-        BigDecimal interestPaid = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID));
+        BigDecimal principalPaid = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_PRINCIPAL_PAID));
+        BigDecimal interestPaid = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_INTEREST_PAID));
         if (principalPaid == null && interestPaid == null) {
             return Optional.empty();
         }
@@ -220,7 +220,7 @@ public class LoanPortfolioRiskStatusService {
     }
 
     private BigDecimal syncedOutstandingBalance(LoanApplication loan) {
-        return readBigDecimal(financialSnapshot(loan).get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING));
+        return readBigDecimal(financialSnapshot(loan).get(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING));
     }
 
     private Map<String, Object> financialSnapshot(LoanApplication loan) {

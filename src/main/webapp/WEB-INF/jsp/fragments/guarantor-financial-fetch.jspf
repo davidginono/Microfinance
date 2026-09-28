@@ -16,11 +16,11 @@
             <div class="app-modal-body">
                 <div class="app-modal-section space-y-3" data-gf-modal-ready>
                     <div class="flex items-center justify-between gap-3">
-                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="financial.savings" text="Savings" /></span>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="financial.savings" text="Disposable Income" /></span>
                         <span class="text-base font-semibold text-slate-900" data-gf-modal-savings>-</span>
                     </div>
                     <div class="flex items-center justify-between gap-3">
-                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="financial.shares" text="Shares" /></span>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="financial.shares" text="Risk History" /></span>
                         <span class="text-base font-semibold text-slate-900" data-gf-modal-shares>-</span>
                     </div>
                     <p class="m-0 text-sm text-slate-500" data-gf-modal-note></p>
@@ -122,7 +122,7 @@
     });
 
     triggers.forEach(function (btn) {
-        // Keep the inline savings/share cards in sync with the modal.
+        // Keep the inline Disposable Income/share cards in sync with the modal.
         var legacy = btn.parentElement ? btn.parentElement.querySelector('.guarantor-financial-result') : null;
         var label = btn.querySelector('[data-financial-label]');
         if (label && label.textContent.trim() === msgLoadStatus) {

@@ -1,6 +1,6 @@
 # AWS deployment
 
-This folder contains two deployment paths for SACCOS LMS.
+This folder contains two deployment paths for Microfinance LMS.
 
 ## Recommended budget path: Lightsail
 
@@ -8,7 +8,7 @@ Use this path for the practical lowest-cost public web deployment:
 
 - one Amazon Lightsail Linux 2 GB instance with public IPv4
 - app and PostgreSQL colocated with Docker Compose
-- Caddy HTTPS for `lms.foresight.co.tz`
+- Caddy HTTPS for `microfinance.example.com`
 - local persistent data under `/mnt/saccos-data`
 
 The AWS CLI must be authenticated as IAM user `david`:
@@ -57,8 +57,8 @@ If `POSTGRES_PASSWORD` or `APP_SECRETS_ENCRYPTION_KEY` is omitted, the script
 generates a strong value for this deployment. Keep the generated server `.env`
 safe because it is needed for future recovery.
 
-DNS for `lms.foresight.co.tz` is currently outside Route53. After the script
-prints the static IP, update the Cloudflare A record for `lms.foresight.co.tz`
+DNS for `microfinance.example.com` is currently outside Route53. After the script
+prints the static IP, update the Cloudflare A record for `microfinance.example.com`
 to that IP and keep the record proxied. Caddy uses an internal origin
 certificate so Cloudflare can complete the origin TLS handshake without public
 ACME challenges being redirected by the proxy.
@@ -70,7 +70,7 @@ deployment because it uses:
 
 - one EC2 Docker host
 - one private RDS PostgreSQL database
-- Caddy HTTPS using `lms.foresight.co.tz`
+- Caddy HTTPS using `microfinance.example.com`
 - configuration in AWS Systems Manager Parameter Store under
   `/saccos-lms/prod/`
 
@@ -80,7 +80,7 @@ Run from the repository root:
 .\deploy\aws\deploy.ps1
 ```
 
-Redeploys default to `lms.foresight.co.tz` so Caddy and `APP_BASE_URL`
+Redeploys default to `microfinance.example.com` so Caddy and `APP_BASE_URL`
 stay aligned with the production hostname:
 
 ```powershell

@@ -5,7 +5,7 @@ param(
     [string]$BundleId = "small_3_0",
     [string]$BlueprintId = "amazon_linux_2023",
     [string]$AvailabilityZone = "",
-    [string]$PublicDomain = "lms.foresight.co.tz",
+    [string]$PublicDomain = "microfinance.example.com",
     [string]$AcmeEmail = "davidginono625@gmail.com",
     [string]$KeyPairName = "saccos-lms-prod-key",
     [string]$KeyFile = "",
@@ -22,9 +22,7 @@ param(
     [string]$AppSmsBenterBaseUrl = $env:APP_SMS_BENTER_BASE_URL,
     [string]$AppSmsBenterClientId = $env:APP_SMS_BENTER_CLIENT_ID,
     [string]$AppSmsBenterApiKey = $env:APP_SMS_BENTER_API_KEY,
-    [string]$AppSmsBenterSenderId = $env:APP_SMS_BENTER_SENDER_ID,
-    [string]$ExternalForesightBaseUrl = $env:EXTERNAL_FORESIGHT_BASE_URL,
-    [string]$ExternalMemberPortalBaseUrl = $env:EXTERNAL_MEMBERPORTAL_BASE_URL
+    [string]$AppSmsBenterSenderId = $env:APP_SMS_BENTER_SENDER_ID
 )
 
 $ErrorActionPreference = "Stop"
@@ -178,13 +176,6 @@ if ([string]::IsNullOrWhiteSpace($AppTimeZone)) {
 if ([string]::IsNullOrWhiteSpace($AppSmsEnabled)) {
     $AppSmsEnabled = "true"
 }
-if ([string]::IsNullOrWhiteSpace($ExternalForesightBaseUrl)) {
-    $ExternalForesightBaseUrl = "https://api.foresightfin.app"
-}
-if ([string]::IsNullOrWhiteSpace($ExternalMemberPortalBaseUrl)) {
-    $ExternalMemberPortalBaseUrl = $ExternalForesightBaseUrl
-}
-
 $identity = Invoke-AwsJson @("sts", "get-caller-identity", "--region", $Region)
 if ($identity.Arn -notlike "*:user/david") {
     throw "AWS CLI is authenticated as '$($identity.Arn)', not IAM user 'david'."
@@ -308,8 +299,6 @@ Write-EnvLine $envBuilder "APP_SMS_BENTER_BASE_URL" $AppSmsBenterBaseUrl
 Write-EnvLine $envBuilder "APP_SMS_BENTER_CLIENT_ID" $AppSmsBenterClientId
 Write-EnvLine $envBuilder "APP_SMS_BENTER_API_KEY" $AppSmsBenterApiKey
 Write-EnvLine $envBuilder "APP_SMS_BENTER_SENDER_ID" $AppSmsBenterSenderId
-Write-EnvLine $envBuilder "EXTERNAL_FORESIGHT_BASE_URL" $ExternalForesightBaseUrl
-Write-EnvLine $envBuilder "EXTERNAL_MEMBERPORTAL_BASE_URL" $ExternalMemberPortalBaseUrl
 Write-EnvLine $envBuilder "SERVER_SERVLET_SESSION_COOKIE_SECURE" "true"
 Write-EnvLine $envBuilder "SERVER_FORWARD_HEADERS_STRATEGY" "framework"
 

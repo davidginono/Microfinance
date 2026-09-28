@@ -223,7 +223,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
+    <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Borrower Dashboard</h1>
     <p class="mt-1 text-lg font-semibold text-sacco-ink">
         <spring:message code="dashboard.welcome" text="Welcome" />,
         <c:choose>

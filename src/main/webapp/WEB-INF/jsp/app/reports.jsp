@@ -10,7 +10,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <div>
-        <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Member Workspace / Reports & Analytics" /></p>
+        <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Borrower Workspace / Reports & Analytics" /></p>
         <h1 class="erp-page-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
     </div>
 </div>
@@ -99,7 +99,7 @@
 <section class="erp-panel loan-risk-card">
     <div class="loan-risk-head">
         <p class="loan-metric-title"><spring:message code="reports.riskEligibilitySummary" text="Risk / Eligibility Summary" /></p>
-        <span class="loan-risk-badge"><spring:message code="staff.analytics.memberView" text="Member View" /></span>
+        <span class="loan-risk-badge"><spring:message code="staff.analytics.memberView" text="Client View" /></span>
     </div>
     <div class="loan-risk-grid text-sm">
         <div class="loan-risk-cell">

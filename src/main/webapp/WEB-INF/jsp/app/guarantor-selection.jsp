@@ -5,7 +5,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Member Workspace / Guarantor Selection" /></p>
+    <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Borrower Workspace / Guarantor Selection" /></p>
     <h1 class="erp-page-title"><spring:message code="guarantor.select" text="Select Guarantor" /></h1>
 </div>
 <form method="post" action="/app/loan-applications/${app.id}/guarantors" class="erp-form-wrap guarantor-selection-page">
@@ -22,7 +22,7 @@
         </div>
 
         <div class="loan-guarantor-search-row">
-            <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='guarantor.selection.searchPlaceholder' text='Search by member number or name' />"
+            <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='guarantor.selection.searchPlaceholder' text='Search by Client Number or name' />"
                    class="fcms-control loan-guarantor-search-input" />
             <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
         </div>
@@ -61,10 +61,10 @@
         const selected = new Map();
         const msgSelectedSuffix = "<spring:message code='newloan.js.selectedSuffix' text='selected' />";
         const msgTypeTwo = "<spring:message code='guarantor.selection.typeTwo' text='Type at least 2 characters to search.' />";
-        const msgNoMatches = "<spring:message code='newloan.js.noMatches' text='No matching members found.' />";
+        const msgNoMatches = "<spring:message code='newloan.js.noMatches' text='No matching clients found.' />";
         const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' text='You can only select {0} guarantors.' />";
         const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' text='Guarantor selected.' />";
-        const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' text='matching member(s) found.' />";
+        const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' text='matching client(s) found.' />";
         let debounceHandle;
 
         function updateCounter() {

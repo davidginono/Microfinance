@@ -13,13 +13,13 @@
     <div class="erp-stat-card erp-stat-blue">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label"><spring:message code="admin.dashboard.members" text="Members" /></p>
+                <p class="erp-stat-label"><spring:message code="admin.dashboard.members" text="Clients" /></p>
                 <p class="erp-stat-value">${dashboard.totalMembers}</p>
                 <p class="erp-stat-meta"><spring:message code="admin.dashboard.active" text="Active" />: ${dashboard.activeMemberCount} | <spring:message code="admin.dashboard.inactive" text="Inactive" />: ${dashboard.inactiveMemberCount}</p>
             </div>
             <span class="erp-stat-icon">M</span>
         </div>
-        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.usersInSacco" text="Users in SACCO" /></span><span>${dashboard.totalMembers}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.usersInSacco" text="Users in Institution" /></span><span>${dashboard.totalMembers}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-green">
         <div class="erp-stat-main">
@@ -36,7 +36,7 @@
             <div>
                 <p class="erp-stat-label"><spring:message code="admin.dashboard.smsUnits" text="SMS Units" /></p>
                 <p class="erp-stat-value">${dashboard.smsBalance.availableUnits}</p>
-                <p class="erp-stat-meta"><spring:message code="admin.dashboard.station" text="Station" />: ${dashboard.smsBalance.stationId}</p>
+                <p class="erp-stat-meta"><spring:message code="admin.dashboard.station" text="Branch" />: ${dashboard.smsBalance.stationId}</p>
             </div>
             <span class="erp-stat-icon">U</span>
         </div>

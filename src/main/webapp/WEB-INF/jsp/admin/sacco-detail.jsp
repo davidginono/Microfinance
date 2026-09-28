@@ -6,22 +6,22 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb">Admin Tools / SACCOs / Detail</p>
+    <p class="erp-breadcrumb">Admin Tools / Institutions / Detail</p>
     <h1 class="erp-page-title">${saccoDetail.summary.saccoName}</h1>
 </div>
 
 <section class="erp-panel mb-4 overflow-hidden">
     <div class="erp-panel-header">
-        <p class="erp-panel-title">Station Scope</p>
+        <p class="erp-panel-title">Branch Scope</p>
     </div>
 <form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end aws-filter-toolbar" data-aws-filter-toolbar>
         <input type="hidden" name="section" value="${selectedSection}" />
         <label class="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Station
+            Branch
             <select name="stationId" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800">
-                <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}>All stations</option>
-                <c:forEach items="${saccoDetail.stationOptions}" var="station">
-                    <option value="${station}" ${saccoDetail.selectedStationId eq station ? 'selected' : ''}>${station}</option>
+                <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}>All Branches</option>
+                <c:forEach items="${saccoDetail.stationOptions}" var="Station">
+                    <option value="${Station}" ${saccoDetail.selectedStationId eq Station ? 'selected' : ''}>${Station}</option>
                 </c:forEach>
             </select>
         </label>
@@ -51,7 +51,7 @@
                 <div class="min-w-0">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">${saccoDetail.summary.saccoId}</p>
                     <h2 class="mt-1 text-2xl font-semibold text-slate-900">${saccoDetail.summary.saccoName}</h2>
-                    <p class="mt-2 text-sm text-slate-600">Stations: ${saccoDetail.summary.stationListLabel}</p>
+                    <p class="mt-2 text-sm text-slate-600">Branches: ${saccoDetail.summary.stationListLabel}</p>
                 </div>
             </div>
             <span class="inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 text-sm font-semibold ${saccoDetail.summary.toneBadgeClass}">
@@ -63,7 +63,7 @@
         <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
             <div class="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(32rem,2fr)] lg:items-start">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Station Access</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Branch Access</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                         <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${saccoDetail.summary.accessBadgeClass}">
                             ${saccoDetail.summary.accessStatusLabel}
@@ -81,7 +81,7 @@
                     <c:choose>
                         <c:when test="${not saccoDetail.stationScoped}">
                             <div class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
-                                Select one station above to suspend or restore access.
+                                Select one Branch above to suspend or restore access.
                             </div>
                         </c:when>
                         <c:when test="${saccoDetail.summary.accessSuspended}">
@@ -95,8 +95,8 @@
                             <form action="/admin/saccos/${saccoDetail.saccoId}/access/suspend"
                                   method="post"
                                   data-confirm-eyebrow="Confirm Suspension"
-                                  data-confirm-title="Suspend Station Access"
-                                  data-confirm-message="Suspend access for station ${saccoDetail.selectedStationId}? Users at this station will lose workspace access until it is restored."
+                                  data-confirm-title="Suspend Branch Access"
+                                  data-confirm-message="Suspend access for Branch ${saccoDetail.selectedStationId}? Users at this Branch will lose workspace access until it is restored."
                                   data-confirm-proceed="Suspend Access">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
@@ -122,7 +122,7 @@
 
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Members</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Clients</p>
                 <p class="mt-2 text-2xl font-semibold text-slate-900">${saccoDetail.summary.totalMembers}</p>
                 <p class="mt-1 text-sm text-slate-500">Active: ${saccoDetail.summary.activeMembers} | Inactive: ${saccoDetail.summary.inactiveMembers}</p>
             </div>
@@ -149,7 +149,7 @@
 <div class="mt-4 flex flex-wrap gap-2">
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=overview${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'overview' ? 'is-active' : ''}">Overview</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=loans${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'loans' ? 'is-active' : ''}">Loans</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'members' ? 'is-active' : ''}">Members</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'members' ? 'is-active' : ''}">Clients</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=financials${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'financials' ? 'is-active' : ''}">Financials</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=sms${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'sms' ? 'is-active' : ''}">SMS Units</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=audit${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'audit' ? 'is-active' : ''}">Audit</a>
@@ -192,7 +192,7 @@
                                 </tr>
                             </c:forEach>
                             <c:if test="${empty saccoDetail.loanStatusCounts}">
-                                <tr><td colspan="2" class="text-slate-500">No disbursed or rejected loan applications found for this SACCO.</td></tr>
+                                <tr><td colspan="2" class="text-slate-500">No disbursed or rejected loan applications found for this institution.</td></tr>
                             </c:if>
                             </tbody>
                         </table>
@@ -204,49 +204,49 @@
     <c:when test="${selectedSection eq 'members'}">
         <section class="erp-panel mt-4">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Member Summary</p>
+                <p class="erp-panel-title">Client Summary</p>
                     </div>
             <div class="erp-panel-body space-y-4">
                 <div class="grid gap-3 sm:grid-cols-3">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Members</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Clients</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalMembers}</p>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Members</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Clients</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.activeMembers}</p>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inactive Members</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inactive Clients</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.inactiveMembers}</p>
                 </div>
                         </div>
                 <div class="rounded border border-slate-200 bg-slate-50 px-4 py-4">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
-                            <p class="erp-widget-title">Member List</p>
-                            <p class="mt-1 text-sm text-slate-500">Search by User ID, member number, or name.</p>
+                            <p class="erp-widget-title">Client List</p>
+                            <p class="mt-1 text-sm text-slate-500">Search by User ID, client number, or name.</p>
                         </div>
                         <div class="inline-flex flex-wrap items-center gap-2 border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
                             <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Current Slice</span>
-                            <c:set var="memberTotal" value="${saccoMembersPage.totalElements}" />
-                            <c:set var="memberSliceStart" value="${memberTotal == 0 ? 0 : (saccoMembersPage.number * saccoMembersPage.size) + 1}" />
-                            <c:set var="memberSliceEndRaw" value="${(saccoMembersPage.number * saccoMembersPage.size) + fn:length(saccoMembers)}" />
-                            <c:set var="memberSliceEnd" value="${memberTotal == 0 ? 0 : memberSliceEndRaw}" />
-                            <span>Showing <span class="font-semibold text-slate-800">${memberSliceStart}-${memberSliceEnd}</span> of <span class="font-semibold text-slate-800">${memberTotal}</span> accounts</span>
+                            <c:set var="MemberTotal" value="${saccoMembersPage.totalElements}" />
+                            <c:set var="MembersliceStart" value="${MemberTotal == 0 ? 0 : (saccoMembersPage.number * saccoMembersPage.size) + 1}" />
+                            <c:set var="MembersliceEndRaw" value="${(saccoMembersPage.number * saccoMembersPage.size) + fn:length(saccoMembers)}" />
+                            <c:set var="MembersliceEnd" value="${MemberTotal == 0 ? 0 : MembersliceEndRaw}" />
+                            <span>Showing <span class="font-semibold text-slate-800">${MembersliceStart}-${MembersliceEnd}</span> of <span class="font-semibold text-slate-800">${MemberTotal}</span> accounts</span>
                     </div>
                         </div>
 <form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3 aws-filter-toolbar" data-aws-filter-toolbar>
                         <input type="hidden" name="section" value="members" />
                         <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
                         <label class="block min-w-[16rem] flex-[1_1_22rem]">
-                            <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search Member</span>
+                            <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search Client</span>
                             <input type="text"
                                    name="memberQuery"
                                    value="${selectedMemberQuery}"
                                    class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
-                                   placeholder="User ID, member number, or name"
-                                   title="User ID, member number, or name" />
+                                   placeholder="User ID, client number, or name"
+                                   title="User ID, client number, or name" />
                         </label>
                         <label class="block min-w-[10rem] flex-[0_1_12rem]">
                             <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Rows Per Page</span>
@@ -268,7 +268,7 @@
                         <thead>
                         <tr>
                             <th class="whitespace-nowrap">User ID</th>
-                            <th class="whitespace-nowrap">Member Number</th>
+                            <th class="whitespace-nowrap">Client Number</th>
                             <th class="whitespace-nowrap">Name</th>
                             <th class="whitespace-nowrap">Account Type</th>
                             <th class="whitespace-nowrap">Staff Roles</th>
@@ -282,30 +282,30 @@
                                     <td colspan="6" class="text-slate-500">
                                         <c:choose>
                                             <c:when test="${not empty selectedMemberQuery}">
-                                                No members matched <span class="font-semibold text-slate-700">${selectedMemberQuery}</span>.
+                                                No clients matched <span class="font-semibold text-slate-700">${selectedMemberQuery}</span>.
                                             </c:when>
                                             <c:otherwise>
-                                                No members are available for this view.
+                                                No clients are available for this view.
                                             </c:otherwise>
                                         </c:choose>
                                     </td>
                                 </tr>
                             </c:when>
                             <c:otherwise>
-                                <c:forEach items="${saccoMembers}" var="member">
+                                <c:forEach items="${saccoMembers}" var="Member">
                                     <tr>
-                                        <td class="align-top whitespace-nowrap font-medium text-slate-700">${member.userIdLabel}</td>
-                                        <td class="align-top whitespace-nowrap">${member.loginId}</td>
-                                        <td class="align-top font-semibold text-slate-900">${member.fullName}</td>
+                                        <td class="align-top whitespace-nowrap font-medium text-slate-700">${Member.userIdLabel}</td>
+                                        <td class="align-top whitespace-nowrap">${Member.loginId}</td>
+                                        <td class="align-top font-semibold text-slate-900">${Member.fullName}</td>
                                         <td class="align-top whitespace-nowrap">
-                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${member.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
-                                                ${member.membershipLabel}
+                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${Member.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
+                                                ${Member.membershipLabel}
                                             </span>
                                         </td>
-                                        <td class="align-top whitespace-nowrap">${empty member.roleSummary ? '-' : member.roleSummary}</td>
+                                        <td class="align-top whitespace-nowrap">${empty Member.roleSummary ? '-' : Member.roleSummary}</td>
                                         <td class="align-top whitespace-nowrap">
-                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${member.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : member.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
-                                                ${member.displayStatus}
+                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${Member.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : Member.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
+                                                ${Member.displayStatus}
                                             </span>
                                         </td>
                                     </tr>
@@ -317,7 +317,7 @@
                         </div>
                 </div>
                 <div class="flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-sm text-slate-600">The table is server-paged to keep large member lists manageable.</p>
+                    <p class="text-sm text-slate-600">The table is server-paged to keep large Client Lists manageable.</p>
                     <c:if test="${saccoMembersPage.totalPages gt 1}">
                         <div class="flex flex-wrap items-center justify-end gap-2">
                             <c:choose>
@@ -353,7 +353,7 @@
             <div class="erp-panel-body">
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Savings Total</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Exposure Total</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalSavingsFullLabel}</p>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
@@ -380,7 +380,7 @@
                     <div class="erp-panel-header">
                         <div>
                             <p class="erp-panel-title">SMS Units: ${saccoDetail.selectedStationId}</p>
-                            <p class="mt-1 text-sm text-slate-500">Current station balance and usage status.</p>
+                            <p class="mt-1 text-sm text-slate-500">Current Branch balance and usage status.</p>
                             </div>
                         <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}&stationId=${saccoDetail.selectedStationId}" class="app-btn btn-neutral">Manage SMS Units</a>
                             </div>
@@ -436,7 +436,7 @@
                                 </tr>
                             </c:forEach>
                             <c:if test="${empty smsHistory.content}">
-                                <tr><td colspan="6" class="text-slate-500">No SMS usage has been recorded for this station.</td></tr>
+                                <tr><td colspan="6" class="text-slate-500">No SMS usage has been recorded for this Branch.</td></tr>
                             </c:if>
                             </tbody>
                         </table>
@@ -452,7 +452,7 @@
             <c:otherwise>
                 <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results...">
                     <div class="app-table-titlebar">
-                        <div class="app-table-heading"><h2>Station SMS Balances</h2></div>
+                        <div class="app-table-heading"><h2>Branch SMS Balances</h2></div>
                         <div class="app-table-toolbar">
                         <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}" class="app-btn btn-neutral">Manage SMS Units</a>
                             </div>
@@ -461,7 +461,7 @@
                         <table class="erp-table min-w-[680px]">
                             <thead>
                             <tr>
-                                <th>Station</th>
+                                <th>Branch</th>
                                 <th>Available Units</th>
                                 <th>Alert Reserve</th>
                                 <th>Warning Baseline</th>
@@ -481,7 +481,7 @@
                                 </tr>
                             </c:forEach>
                             <c:if test="${empty smsAccounts.content}">
-                                <tr><td colspan="6" class="text-slate-500">No station SMS accounts were found for this SACCO.</td></tr>
+                                <tr><td colspan="6" class="text-slate-500">No Branch SMS accounts were found for this institution.</td></tr>
                             </c:if>
                             </tbody>
                         </table>
@@ -515,7 +515,7 @@
             </div>
                     </c:forEach>
                     <c:if test="${empty saccoDetail.recentAuditEntries}">
-                        <p class="text-sm text-slate-500">No recent audit entries were matched to this SACCO.</p>
+                        <p class="text-sm text-slate-500">No recent audit entries were matched to this institution.</p>
                     </c:if>
             </div>
                     </div>
@@ -529,13 +529,13 @@
                     <div class="erp-panel-body">
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Stations</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Branches</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.stationCount}</p>
                         <p class="mt-1 text-sm text-slate-500">${saccoDetail.summary.stationListLabel}</p>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Savings</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalSavingsLabel}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Disposable Income</p>
+                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalsavingsLabel}</p>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Exposure</p>

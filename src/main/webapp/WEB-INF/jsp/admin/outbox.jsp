@@ -24,20 +24,20 @@
     <form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
-                SACCO
+                Institution
                 <select name="saccoId" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none">
-                    <option value="">All SACCOs</option>
-                    <c:forEach items="${registeredSaccos}" var="sacco">
-                        <option value="${sacco.saccoId}" ${selectedSaccoId eq sacco.saccoId ? 'selected' : ''}>${sacco.saccoName}</option>
+                    <option value="">All Institutions</option>
+                    <c:forEach items="${registeredSaccos}" var="Sacco">
+                        <option value="${Sacco.saccoId}" ${selectedSaccoId eq Sacco.saccoId ? 'selected' : ''}>${Sacco.saccoName}</option>
                     </c:forEach>
                 </select>
             </label>
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
-                Station
+                Branch
                 <select name="stationId" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none">
-                    <option value="">All stations</option>
-                    <c:forEach items="${selectedStationOptions}" var="station">
-                        <option value="${station}" ${selectedStationId eq station ? 'selected' : ''}>${station}</option>
+                    <option value="">All Branches</option>
+                    <c:forEach items="${selectedStationOptions}" var="Station">
+                        <option value="${Station}" ${selectedStationId eq Station ? 'selected' : ''}>${Station}</option>
                     </c:forEach>
                 </select>
             </label>

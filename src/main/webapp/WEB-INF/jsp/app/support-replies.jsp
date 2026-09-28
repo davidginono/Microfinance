@@ -5,13 +5,13 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="support.replies.breadcrumb" text="Member Workspace / Support / Replies" /></p>
+    <p class="erp-breadcrumb"><spring:message code="support.replies.breadcrumb" text="Borrower Workspace / Support / Replies" /></p>
     <h1 class="erp-page-title"><spring:message code="support.replies.title" text="Support Replies" /></h1>
 </div>
 
 <section class="erp-panel">
     <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3">
-        <p class="erp-panel-title"><spring:message code="support.replies.fromStationAdmin" text="Replies From Station Admin" /></p>
+        <p class="erp-panel-title"><spring:message code="support.replies.fromStationAdmin" text="Replies From Branch Admin" /></p>
         <form action="/app/support/replies/mark-all-read" method="post">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <button type="submit" class="app-btn btn-neutral"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
@@ -51,7 +51,7 @@
 </section>
 
 <section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="support.broadcasts.title" text="Station Admin Broadcasts" /></p></div>
+    <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="support.broadcasts.title" text="Branch Admin Broadcasts" /></p></div>
     <div class="erp-panel-body">
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
             <div class="erp-table-scroll">

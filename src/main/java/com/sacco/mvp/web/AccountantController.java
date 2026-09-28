@@ -17,7 +17,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
-import com.sacco.mvp.service.ForesightRepaymentScheduleService;
+import com.sacco.mvp.service.LoanRepaymentScheduleDisplayService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
@@ -75,7 +75,7 @@ public class AccountantController {
     private final NotificationInboxService notificationInboxService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
-    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
+    private final LoanRepaymentScheduleDisplayService repaymentScheduleDisplayService;
     private final MessageSource messageSource;
     private final EmailOtpService emailOtpService;
     private final StationOtpSettingsService stationOtpSettingsService;
@@ -308,7 +308,7 @@ public class AccountantController {
         model.addAttribute("activeApplicantLoans", activeLoanDisplay.rows());
         model.addAttribute("activeApplicantLoanCount", activeLoanDisplay.count());
         model.addAttribute("activeApplicantLoanTotalAmount", activeLoanDisplay.totalExposure());
-        model.addAttribute("activeApplicantLoansForesightEnabled", true);
+        model.addAttribute("activeApplicantLoansEnabled", true);
         model.addAttribute("reviewBasePath", "/accountant");
         model.addAttribute("reviewPanelBreadcrumb", message("review.accountant.breadcrumb"));
         model.addAttribute("reviewPanelTitle", message("review.accountant.title"));
@@ -361,7 +361,7 @@ public class AccountantController {
                                                                  @AuthenticationPrincipal AppUserPrincipal principal) {
         LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+        return ResponseEntity.ok(repaymentScheduleDisplayService.loadLocalLoanSchedule(app, applicant).toPayload());
     }
 
     @GetMapping("/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule")
@@ -371,7 +371,7 @@ public class AccountantController {
                                                                                    @AuthenticationPrincipal AppUserPrincipal principal) {
         LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService
+        return ResponseEntity.ok(repaymentScheduleDisplayService
             .loadExternalLoanSchedule(applicant, app.getStationId(), loanId)
             .toPayload());
     }

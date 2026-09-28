@@ -42,28 +42,28 @@
     <section class="erp-panel overflow-hidden">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
             <p class="erp-widget-title"><spring:message code="admin.settings.otp.eyebrow" text="Authentication" /></p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.otp.title" text="Station OTP Delivery" /></h2>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.otp.subtitle" text="Choose how this station sends authentication and workflow confirmation codes." /></p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.otp.title" text="Branch OTP Delivery" /></h2>
+            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.otp.subtitle" text="Choose how this Branch sends authentication and workflow confirmation codes." /></p>
         </div>
         <form action="/admin/settings-controls/otp-delivery" method="post" class="erp-panel-body">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="grid gap-3 lg:grid-cols-3">
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${stationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
+                    <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${StationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.email" text="Email" /></span>
                         <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.emailHelp" text="Always send OTP codes to the account email." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
+                    <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${StationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsOnly" text="SMS only" /></span>
-                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsOnlyHelp" text="Use normal station SMS units. OTP requests stop when units are depleted." /></span>
+                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsOnlyHelp" text="Use normal Branch SMS units. OTP requests stop when units are depleted." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
+                    <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${StationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsFallback" text="SMS with email fallback" /></span>
                         <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsFallbackHelp" text="Try SMS first, then use email when SMS cannot be sent." /></span>
@@ -77,7 +77,7 @@
                     <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                         <input name="otpSelectionPolicy" type="radio" value="AT_LEAST_ONE" class="mt-1"
                                data-clearable-otp-policy
-                               ${stationOtpSelectionPolicy eq 'AT_LEAST_ONE' ? 'checked' : ''} />
+                               ${StationOtpSelectionPolicy eq 'AT_LEAST_ONE' ? 'checked' : ''} />
                         <span>
                             <span class="block font-semibold text-slate-900">At least one</span>
                             <span class="mt-1 block text-xs text-slate-500">Users select login OTP, approval OTP, or both.</span>
@@ -86,7 +86,7 @@
                     <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                         <input name="otpSelectionPolicy" type="radio" value="BOTH" class="mt-1"
                                data-clearable-otp-policy
-                               ${stationOtpSelectionPolicy eq 'BOTH' ? 'checked' : ''} />
+                               ${StationOtpSelectionPolicy eq 'BOTH' ? 'checked' : ''} />
                         <span>
                             <span class="block font-semibold text-slate-900">Both required</span>
                             <span class="mt-1 block text-xs text-slate-500">All users must use OTP for login and approvals.</span>
@@ -187,7 +187,7 @@
                     Active Loan Officers: <strong>${activeLoanOfficerCount}</strong>
                 </div>
                 <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Board Members: <strong>${activeBoardMemberCount}</strong>
+                    Active Committee Members: <strong>${activeBoardMemberCount}</strong>
                 </div>
                 <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     Active Accountants: <strong>${activeAccountantCount}</strong>
@@ -213,7 +213,7 @@
         <form action="/admin/settings-controls/qualification-policies" method="post" class="aws-settings-form aws-qualification-form">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="aws-settings-commandbar">
-                <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="Set applicant, guarantor, and portfolio risk rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
+                <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="Set applicant, guarantor, and portfolio risk rules for this Branch. Product-specific guarantor Disposable Income is configured inside each loan product." /></p>
                 <button type="submit" class="app-btn btn-primary aws-settings-save-action"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
             </div>
             <div class="aws-settings-grid aws-qualification-grid">
@@ -240,7 +240,7 @@
                             <input class="aws-settings-checkbox" name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
                             <span class="aws-settings-checkbox-copy">
                                 <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.allowActiveLoanGuarantors" text="Allow guarantors with active loans" /></span>
-                                <span class="aws-settings-help"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, members with active loans cannot guarantee." /></span>
+                                <span class="aws-settings-help"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, clients with active loans cannot guarantee." /></span>
                             </span>
                         </label>
                         <fmt:formatNumber value="${policyGuarantorMaxGuaranteedLoanAmount}" maxFractionDigits="0" groupingUsed="false" var="policyGuarantorMaxGuarantees" />
@@ -346,13 +346,13 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.maximumLoanMultipleHelp" text="Maximum loan multiple allowed against member savings." /></p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Disposable Income" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.maximumLoanMultipleHelp" text="Maximum loan multiple allowed against client Disposable Income." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
                                 <c:when test="${product.maxLoanSavingsRatio gt 0}">
-                                    Loan can be up to <fmt:formatNumber value="${product.maxLoanSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" />
+                                    Loan can be up to <fmt:formatNumber value="${product.maxLoanSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of Disposable Income" />
                                 </c:when>
                                 <c:otherwise><spring:message code="common.notSet" text="Not set" /></c:otherwise>
                             </c:choose>
@@ -388,12 +388,12 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.guarantorSavingsCheck" text="Guarantor Savings Check" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.guarantorSavingsCheckHelp" text="Controls whether selected guarantors must meet this product's minimum savings." /></p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.guarantorSavingsCheck" text="Guarantor Disposable Income Check" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.guarantorSavingsCheckHelp" text="Controls whether selected guarantors must meet this product's minimum Disposable Income." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
-                                <c:when test="${product.guarantorMinSavingsCheckRequired}"><spring:message code="common.enabled" text="Enabled" /></c:when>
+                                <c:when test="${product.guarantorMinsavingsCheckRequired}"><spring:message code="common.enabled" text="Enabled" /></c:when>
                                 <c:otherwise><spring:message code="common.disabled" text="Disabled" /></c:otherwise>
                             </c:choose>
                         </p>
@@ -402,7 +402,7 @@
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.activeLoanApplication" text="Application With Active Loan" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.activeLoanApplicationHelp" text="Controls whether members can apply again while a disbursed loan is still open." /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.activeLoanApplicationHelp" text="Controls whether clients can apply again while a disbursed loan is still open." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
@@ -414,8 +414,8 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.loadedFinancialData" text="Loaded Financial Data (Savings & Shares)" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.loadedFinancialDataHelp" text="Controls whether the member must load current financial data before the application can move forward." /></p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.loadedFinancialData" text="Loaded Financial Data (Credit Assessment Data)" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.loadedFinancialDataHelp" text="Controls whether the client must provide current assessment data before the application can move forward." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
@@ -444,7 +444,7 @@
                                 </c:choose>
                             </span>
                             <span class="workflow-order-${product.boardReviewRequired ? product.resolvedBoardPriority : 6} mt-1 block text-sm font-semibold ${product.boardReviewRequired ? 'text-emerald-700' : 'text-slate-500'}">
-                                P${product.resolvedBoardPriority} Board Member ${product.boardReviewRequired ? 'Configured' : 'Skipped'}
+                                P${product.resolvedBoardPriority} Committee Member ${product.boardReviewRequired ? 'Configured' : 'Skipped'}
                             </span>
                             <span class="workflow-order-${product.committeeReviewRequired ? product.resolvedCommitteePriority : 6} mt-1 block text-sm font-semibold ${product.committeeReviewRequired ? 'text-emerald-700' : 'text-slate-500'}">
                                 P${product.resolvedCommitteePriority} Credit Committee ${product.committeeReviewRequired ? 'Configured' : 'Skipped'}
@@ -471,7 +471,7 @@
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.applicantAttachments" text="Applicant Attachments" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.applicantAttachmentsHelp" text="Controls whether members must upload a supporting attachment while applying." /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.applicantAttachmentsHelp" text="Controls whether clients must upload a supporting attachment while applying." /></p>
                         </div>
                         <p class="text-right text-base font-semibold ${product.applicantAttachmentRequired ? 'text-emerald-700' : 'text-slate-600'}">
                             ${product.applicantAttachmentRequired ? 'Required' : 'Optional'}
@@ -599,7 +599,7 @@
                     <div>
                         <p class="erp-widget-title"><spring:message code="admin.settings.addLoanProduct" text="Add Loan Product" /></p>
                         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.createLoanProduct" text="Create Loan Product" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.createLoanProductHelp" text="Set the loan name, approval path, and lending limits for this SACCO." /></p>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.createLoanProductHelp" text="Set the loan name, approval path, and lending limits for this institution." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-product-modal-close="create-product" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -647,7 +647,7 @@
                         <div class="product-builder-section-header">
                             <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.basics" text="Basics" /></p>
                             <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityCreateHelp" text="Set the member-facing name, display order, and status for this product." /></p>
+                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityCreateHelp" text="Set the client-facing name, display order, and status for this product." /></p>
                         </div>
                         <div class="product-builder-section-body product-identity-grid">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -670,7 +670,7 @@
 
                             <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="common.description" text="Description" />
-                                <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'></textarea>
+                                <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to clients when choosing this product." />'></textarea>
                             </label>
                         </div>
                     </section>
@@ -679,7 +679,7 @@
                         <div class="product-builder-section-header">
                             <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></p>
                             <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityCreateHelp" text="Define lending limits and savings coverage for this product." /></p>
+                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityCreateHelp" text="Define lending limits and Disposable Income coverage for this product." /></p>
                         </div>
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -693,25 +693,25 @@
                             </label>
 
                             <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
-                                <input name="maxLoanSavingsPercent" type="hidden" value="300.00" data-savings-percent />
+                                <input name="maxLoansavingsPercent" type="hidden" value="300.00" data-savings-percent />
                                 <div class="savings-ratio-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
+                                    <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Disposable Income" />
                                     <div class="savings-multiplier-control mt-1">
-                                        <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Loan savings multiplier" data-savings-multiplier />
-                                        <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
+                                        <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Loan Disposable Income multiplier" data-savings-multiplier />
+                                        <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of Disposable Income" /></span>
                                     </div>
                                 </div>
                                 <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                     <input name="savingsLimitCheckRequired" type="checkbox" value="true" checked data-savings-limit-check />
                                     <span>
-                                        <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check savings against loan amount" /></span>
+                                        <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check Disposable Income against loan amount" /></span>
                                         <span class="block text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" text="When unchecked, only the product minimum and maximum amount range is enforced." /></span>
                                     </span>
                                 </label>
                             </div>
                             <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                 <input name="freshFinancialDataRequired" type="checkbox" value="true" data-workflow-loaded-financial />
-                                <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Savings & Shares) At Submission" /></span>
+                                <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Credit Assessment Data) At Submission" /></span>
                             </label>
                             <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                 <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" />
@@ -836,9 +836,9 @@
                                         </div>
                                     </div>
                                     <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.boardMember" text="Board Member" /></div>
+                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.boardMember" text="Committee Member" /></div>
                                         <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" data-workflow-board aria-label="Board Member required" /></label>
+                                            <label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" data-workflow-board aria-label="Committee Member required" /></label>
                                         </div>
                                         <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                             <select name="boardPriority" class="workflow-priority-select" data-workflow-board-priority>
@@ -901,11 +901,11 @@
                             </div>
 
                             <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Board Member" /></p>
+                                <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Committee Member" /></p>
                                 <div class="grid gap-3">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Board Members Assigned
-                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
+                                        Committee Members Assigned
+                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search Committee Members..." data-board-reviewer-search />
                                     </label>
                                     <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-board-reviewer-list>
                                         <c:forEach items="${boardReviewerOptions}" var="reviewer">
@@ -918,10 +918,10 @@
                                             </label>
                                         </c:forEach>
                                         <c:if test="${empty boardReviewerOptions}">
-                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active board members are available.</div>
+                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active Committee Members are available.</div>
                                         </c:if>
                                     </div>
-                                    <p class="text-xs text-slate-500">Every selected board member will be assigned and notified for this product.</p>
+                                    <p class="text-xs text-slate-500">Every selected Committee Member will be assigned and notified for this product.</p>
                                 </div>
                             </div>
 
@@ -943,10 +943,10 @@
                                             </label>
                                         </c:forEach>
                                         <c:if test="${empty creditCommitteeReviewerOptions}">
-                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active credit committee members are available.</div>
+                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active credit committee Members are available.</div>
                                         </c:if>
                                     </div>
-                                    <p class="text-xs text-slate-500">Every selected credit committee member will be assigned and notified for this product.</p>
+                                    <p class="text-xs text-slate-500">Every selected credit committee Member will be assigned and notified for this product.</p>
                                 </div>
                             </div>
 
@@ -987,12 +987,12 @@
                                         <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-guarantors />
                                     </label>
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Minimum Guarantor Savings
+                                        Minimum Guarantor Disposable Income
                                         <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
                                     </label>
                                     <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" />
-                                        <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
+                                        <input name="guarantorMinsavingsCheckRequired" type="checkbox" value="true" />
+                                        <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum Disposable Income before selection" /></span>
                                     </label>
                                 </div>
                             </div>
@@ -1090,7 +1090,7 @@
                     <div class="product-builder-section-header">
                         <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.basics" text="Basics" /></p>
                         <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityHelp" text="Update the member-facing name, display order, and status for this product." /></p>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityHelp" text="Update the client-facing name, display order, and status for this product." /></p>
                     </div>
                     <div class="product-builder-section-body product-identity-grid">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1113,7 +1113,7 @@
 
                         <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="common.description" text="Description" />
-                            <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
+                            <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to clients when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
                         </label>
                     </div>
                 </section>
@@ -1122,7 +1122,7 @@
                     <div class="product-builder-section-header">
                         <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></p>
                         <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityHelp" text="Update loan limits and savings coverage for this product." /></p>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityHelp" text="Update loan limits and Disposable Income coverage for this product." /></p>
                     </div>
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1136,25 +1136,25 @@
                         </label>
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
-                            <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
+                            <input name="maxLoansavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
                             <div class="savings-ratio-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
+                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Disposable Income" />
                                 <div class="savings-multiplier-control mt-1">
-                                    <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
-                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
+                                    <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan Disposable Income multiplier" data-savings-multiplier />
+                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of Disposable Income" /></span>
                                 </div>
                             </div>
                             <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                 <input name="savingsLimitCheckRequired" type="checkbox" value="true" ${product.savingsLimitCheckRequired ? 'checked' : ''} data-savings-limit-check />
                                 <span>
-                                    <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check savings against loan amount" /></span>
+                                    <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check Disposable Income against loan amount" /></span>
                                     <span class="block text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" text="When unchecked, only the product minimum and maximum amount range is enforced." /></span>
                                 </span>
                             </label>
                         </div>
                         <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="freshFinancialDataRequired" type="checkbox" value="true" ${product.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
-                            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Savings & Shares) At Submission" /></span>
+                            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Credit Assessment Data) At Submission" /></span>
                         </label>
                         <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${product.applicationWithActiveLoanAllowed ? 'checked' : ''} />
@@ -1279,9 +1279,9 @@
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
-                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.boardMember" text="Board Member" /></div>
+                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.boardMember" text="Committee Member" /></div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                        <label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" ${product.boardReviewRequired ? 'checked' : ''} data-workflow-board aria-label="Board Member required" /></label>
+                                        <label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" ${product.boardReviewRequired ? 'checked' : ''} data-workflow-board aria-label="Committee Member required" /></label>
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                         <select name="boardPriority" class="workflow-priority-select" data-workflow-board-priority>
@@ -1344,11 +1344,11 @@
                         </div>
 
                         <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Board Member" /></p>
+                            <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Committee Member" /></p>
                             <div class="grid gap-3">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Board Members Assigned
-                                    <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
+                                    Committee Members Assigned
+                                    <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search Committee Members..." data-board-reviewer-search />
                                 </label>
                                 <c:set var="assignedBoardReviewerTokens" value="${productBoardReviewerIdTokens[product.id]}" />
                                 <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-board-reviewer-list>
@@ -1363,10 +1363,10 @@
                                         </label>
                                     </c:forEach>
                                     <c:if test="${empty boardReviewerOptions}">
-                                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active board members are available.</div>
+                                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active Committee Members are available.</div>
                                     </c:if>
                                 </div>
-                                <p class="text-xs text-slate-500">Every selected board member will be assigned and notified for this product.</p>
+                                <p class="text-xs text-slate-500">Every selected Committee Member will be assigned and notified for this product.</p>
                             </div>
                         </div>
 
@@ -1390,10 +1390,10 @@
                                         </label>
                                     </c:forEach>
                                     <c:if test="${empty creditCommitteeReviewerOptions}">
-                                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active credit committee members are available.</div>
+                                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active credit committee Members are available.</div>
                                     </c:if>
                                 </div>
-                                <p class="text-xs text-slate-500">Every selected credit committee member will be assigned and notified for this product.</p>
+                                <p class="text-xs text-slate-500">Every selected credit committee Member will be assigned and notified for this product.</p>
                             </div>
                         </div>
 
@@ -1448,12 +1448,12 @@
                                     <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.guarantorsRequired}" data-number-range-max="15" data-workflow-guarantors />
                                 </label>
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Minimum Guarantor Savings
-                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedGuarantorMinimumSavings}" />
+                                    Minimum Guarantor Disposable Income
+                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedguarantorMinimumSavings}" />
                                 </label>
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinSavingsCheckRequired ? 'checked' : ''} />
-                                    <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
+                                    <input name="guarantorMinsavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinsavingsCheckRequired ? 'checked' : ''} />
+                                    <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum Disposable Income before selection" /></span>
                                 </label>
                             </div>
                         </div>
@@ -1497,20 +1497,20 @@
 <spring:message code="admin.settings.workflow.warning.noLoanOfficers" text="Loan Officer review is enabled for this product, but there are no active Loan Officers assigned yet." var="warningNoLoanOfficers" />
 <spring:message code="admin.settings.workflow.warning.managerLoanOfficerSamePriority" text="Manager and Loan Officer cannot share the same priority." var="warningManagerLoanOfficerSamePriority" />
 <spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority." var="warningDuplicatePriorities" />
-<spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Board Member review is configured, but there are no active board members available for assignment." var="warningNoBoardReviewers" />
+<spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Committee Member review is configured, but there are no active Committee Members available for assignment." var="warningNoBoardReviewers" />
 <spring:message code="admin.settings.workflow.warning.noChairpersons" text="Chairperson review is configured, but there are no active chairpersons available for assignment." var="warningNoChairpersons" />
-<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Credit Committee review is configured, but there are no active credit committee members available for assignment." var="warningNoCommitteeReviewers" />
+<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Credit Committee review is configured, but there are no active credit committee Members available for assignment." var="warningNoCommitteeReviewers" />
 <spring:message code="admin.settings.workflow.warning.committeeAccountantSamePriority" text="Committee and Accountant cannot share the same priority slot." var="warningCommitteeAccountantSamePriority" />
 <spring:message code="admin.settings.workflow.warning.noAccountants" text="Accountant review is enabled for this product, but there are no active accountants available." var="warningNoAccountants" />
 <spring:message code="admin.settings.workflow.warning.noDisbursementOfficers" text="Disbursement/Teller Officer is required, but there are no active Disbursement/Teller Officers assigned yet." var="warningNoDisbursementOfficers" />
 <spring:message code="admin.settings.workflow.warning.noDisbursementClaimHolders" text="Disbursement/Teller Officer is optional, but no active staff user has both disbursement claims." var="warningNoDisbursementClaimHolders" />
-<spring:message code="admin.settings.workflow.warning.loadedFinancialRequired" text="Members must load current financial data before this product can move into review." var="warningLoadedFinancialRequired" />
+<spring:message code="admin.settings.workflow.warning.loadedFinancialRequired" text="Clients must provide current assessment data before this product can move into review." var="warningLoadedFinancialRequired" />
 <spring:message code="admin.settings.workflow.warning.guarantorPrefix" text="This product waits for" var="warningGuarantorPrefix" />
 <spring:message code="admin.settings.workflow.warning.guarantorApproval" text="guarantor approval" var="warningGuarantorApproval" />
 <spring:message code="admin.settings.workflow.warning.guarantorApprovals" text="guarantor approvals" var="warningGuarantorApprovals" />
 <spring:message code="admin.settings.workflow.warning.guarantorSuffix" text="before the review flow starts." var="warningGuarantorSuffix" />
-<spring:message code="admin.settings.workflow.runtime.member" text="Member" var="runtimeMember" />
-<spring:message code="admin.settings.workflow.runtime.loadedFinancialData" text="Loaded Financial Data (Savings & Shares)" var="runtimeLoadedFinancialData" />
+<spring:message code="admin.settings.workflow.runtime.Member" text="Client" var="runtimeMember" />
+<spring:message code="admin.settings.workflow.runtime.loadedFinancialData" text="Loaded Financial Data (Credit Assessment Data)" var="runtimeLoadedFinancialData" />
 <spring:message code="admin.settings.workflow.runtime.guarantor" text="Guarantor" var="runtimeGuarantor" />
 <spring:message code="admin.settings.workflow.runtime.guarantors" text="Guarantors" var="runtimeGuarantors" />
 <spring:message code="admin.settings.workflow.runtime.fixManagerLoanOfficerPriority" text="Fix Priority Slots" var="runtimeFixManagerLoanOfficerPriority" />
@@ -1518,7 +1518,7 @@
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />
 <spring:message code="role.chairperson" text="Chairperson" var="runtimeChairperson" />
-<spring:message code="role.boardMember" text="Board Member" var="runtimeBoardMember" />
+<spring:message code="role.boardMember" text="Committee Member" var="runtimeBoardMember" />
 <spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
 <spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" var="runtimeDisbursementOfficer" />
@@ -1530,7 +1530,7 @@
 <spring:message code="admin.settings.validation.minimumAmount" text="Minimum amount cannot be negative." var="validationMinimumAmount" />
 <spring:message code="admin.settings.validation.maximumAmountPositive" text="Maximum amount must be greater than zero." var="validationMaximumAmountPositive" />
 <spring:message code="admin.settings.validation.maximumBelowMinimum" text="Maximum amount cannot be lower than the minimum amount." var="validationMaximumBelowMinimum" />
-<spring:message code="admin.settings.validation.savingsPercent" text="Loan savings multiple must be between 0 and 10x." var="validationSavingsPercent" />
+<spring:message code="admin.settings.validation.savingsPercent" text="Loan Disposable Income multiple must be between 0 and 10x." var="validationsavingsPercent" />
 <spring:message code="admin.settings.validation.insurancePercent" text="Insurance percentage cannot be negative." var="validationInsurancePercent" />
 <spring:message code="admin.settings.validation.annualInterestPercent" text="Annual interest percentage cannot be negative." var="validationAnnualInterestPercent" />
 <spring:message code="admin.settings.validation.minRepaymentMonths" text="Minimum repayment period must be at least 1 month." var="validationMinRepaymentMonths" />
@@ -1546,8 +1546,8 @@
 <spring:message code="admin.settings.validation.managerLoanOfficerDifferentPriority" text="Choose different priorities for Manager and Loan Officer." var="validationManagerLoanOfficerDifferentPriority" />
 <spring:message code="admin.settings.validation.assignLoanOfficer" text="Assign at least one active Loan Officer before using this stage." var="validationAssignLoanOfficer" />
 <spring:message code="admin.settings.validation.assignChairperson" text="Assign at least one active Chairperson before using this stage." var="validationAssignChairperson" />
-<spring:message code="admin.settings.validation.assignBoardReviewer" text="Assign at least one active board member before using this stage." var="validationAssignBoardReviewer" />
-<spring:message code="admin.settings.validation.assignCommitteeReviewer" text="Assign at least one active credit committee member before using this stage." var="validationAssignCommitteeReviewer" />
+<spring:message code="admin.settings.validation.assignBoardReviewer" text="Assign at least one active Committee Member before using this stage." var="validationAssignBoardReviewer" />
+<spring:message code="admin.settings.validation.assignCommitteeReviewer" text="Assign at least one active credit committee Member before using this stage." var="validationAssignCommitteeReviewer" />
 <spring:message code="admin.settings.validation.committeeAccountantDifferentPriority" text="Committee and Accountant cannot share the same priority slot." var="validationCommitteeAccountantDifferentPriority" />
 <spring:message code="admin.settings.validation.assignAccountant" text="Assign at least one active Accountant before using this stage." var="validationAssignAccountant" />
 <spring:message code="admin.settings.validation.assignDisbursementOfficer" text="Assign at least one active Disbursement/Teller Officer before requiring this role." var="validationAssignDisbursementOfficer" />

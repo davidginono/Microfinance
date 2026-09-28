@@ -6,7 +6,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="notifications.member.breadcrumb" text="Member Workspace / Notifications" /></p>
+    <p class="erp-breadcrumb"><spring:message code="notifications.member.breadcrumb" text="Borrower Workspace / Notifications" /></p>
     <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
 </div>
 <div class="mb-3 flex items-center justify-end">

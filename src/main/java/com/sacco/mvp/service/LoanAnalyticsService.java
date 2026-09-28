@@ -754,7 +754,7 @@ public class LoanAnalyticsService {
         }
         BigDecimal principal = nonNegative(loan.getAmount());
         Map<String, Object> snapshot = financialSnapshot(loan.getFinancialSnapshot());
-        BigDecimal syncedOutstanding = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING));
+        BigDecimal syncedOutstanding = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING));
         if (syncedOutstanding != null) {
             return nonNegative(syncedOutstanding);
         }

@@ -5,13 +5,13 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="admin.saccos.breadcrumb" text="Admin Tools / SACCOs" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.saccos.title" text="SACCOs" /></h1>
+    <p class="erp-breadcrumb"><spring:message code="admin.saccos.breadcrumb" text="Admin Tools / Institutions" /></p>
+    <h1 class="erp-page-title"><spring:message code="admin.saccos.title" text="Institutions" /></h1>
 </div>
 
 <section class="erp-panel">
     <div class="erp-panel-header">
-        <p class="erp-panel-title"><spring:message code="admin.saccos.portfolio" text="SACCO Portfolio" /></p>
+        <p class="erp-panel-title"><spring:message code="admin.saccos.portfolio" text="Institution Portfolio" /></p>
     </div>
     <div class="erp-panel-body space-y-4">
         <c:set var="portfolioSummaries" value="${platformDashboard.saccos}" />

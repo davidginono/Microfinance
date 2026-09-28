@@ -23,11 +23,11 @@
 </c:if>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
+    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Borrower Workspace / Application Detail" /></p>
     <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
 </div>
 <div class="loan-application-detail-page">
-<c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
+<c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your institution'}" />
 <c:if test="${app.status eq 'AWAITING_GUARANTORS'}">
     <div class="aws-inline-notice loan-detail-notice" role="status">
         <spring:message code="loan.view.awaitingGuarantors" text="Waiting for guarantor approval. This page auto-refreshes every 1 hour." />
@@ -135,11 +135,11 @@
                     <div class="loan-stat-value">${app.tenorMonths} <spring:message code="common.months" text="month(s)" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
+                    <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Disposable Income" /></div>
                     <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></div>
+                    <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Risk History" /></div>
                     <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
             </div>
@@ -477,7 +477,7 @@
                             <c:otherwise>
                                 <tr data-repayment-schedule-empty>
                                     <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
-                                        <spring:message code="loan.repayment.foresightPending" text="Repayment schedule will appear when Foresight is available." />
+                                        <spring:message code="loan.repayment.schedulePending" text="Repayment schedule will appear after disbursement." />
                                     </td>
                                 </tr>
                             </c:otherwise>
@@ -573,7 +573,7 @@
         <thead class="bg-slate-50">
             <tr>
                 <th class="w-[18%] px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
-                <th class="w-[12%] px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+                <th class="w-[12%] px-3 py-2 text-left"><spring:message code="member.memberNo" text="Client No" /></th>
                 <th class="w-[14%] px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
                 <th class="w-[14%] px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
                 <th class="w-[42%] px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
@@ -712,7 +712,7 @@
                                 </c:choose>
                 </div>
                             <div class="mt-1 text-xs text-slate-500">
-                                <spring:message code="member.memberNo" text="Member No" />:
+                                <spring:message code="member.memberNo" text="Client No" />:
                                 <c:choose>
                                     <c:when test="${not empty guarantorMembersById[req.guarantorMemberId] and not empty guarantorMembersById[req.guarantorMemberId].memberNo}">${guarantorMembersById[req.guarantorMemberId].memberNo}</c:when>
                                     <c:when test="${not empty req.externalMemberNo}">${req.externalMemberNo}</c:when>
@@ -880,7 +880,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.otp.code" text="OTP Code" /></div>
-                            <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.codeHelp" text="The code is sent using the station OTP delivery policy." /></p>
+                            <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.codeHelp" text="The code is sent using the Branch OTP delivery policy." /></p>
                         </div>
                         <button id="requestApplicantSubmitOtp" type="button" class="app-btn btn-primary otp-request-button inline-flex items-center justify-center gap-2">
                             <span class="otp-button-spinner hidden"></span>

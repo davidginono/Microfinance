@@ -104,12 +104,12 @@
         const adminScopeToggle = document.getElementById("adminScopeToggle");
         const adminScopePanel = document.getElementById("adminScopePanel");
         const adminScopeChevron = document.getElementById("adminScopeChevron");
-        const memberArchiveToggle = document.getElementById("memberArchiveToggle");
-        const memberArchivePanel = document.getElementById("memberArchivePanel");
-        const memberArchiveChevron = document.getElementById("memberArchiveChevron");
-        const memberSupportToggle = document.getElementById("memberSupportToggle");
-        const memberSupportPanel = document.getElementById("memberSupportPanel");
-        const memberSupportChevron = document.getElementById("memberSupportChevron");
+        const MemberArchiveToggle = document.getElementById("MemberArchiveToggle");
+        const MemberArchivePanel = document.getElementById("MemberArchivePanel");
+        const MemberArchiveChevron = document.getElementById("MemberArchiveChevron");
+        const MembersupportToggle = document.getElementById("MembersupportToggle");
+        const MembersupportPanel = document.getElementById("MembersupportPanel");
+        const MembersupportChevron = document.getElementById("MembersupportChevron");
         const adminSaccoToggle = document.getElementById("adminSaccoToggle");
         const adminSaccoPanel = document.getElementById("adminSaccoPanel");
         const adminSaccoChevron = document.getElementById("adminSaccoChevron");
@@ -307,7 +307,7 @@
             }
         }
 
-        function rememberSidebarClick(event) {
+        function reMembersidebarClick(event) {
             const eventTarget = event.target instanceof Element ? event.target : null;
             const link = eventTarget ? eventTarget.closest(".shell-sidebar-scroll a[href]") : null;
             if (!link) {
@@ -417,7 +417,7 @@
         }
 
         if (sidebarScroll) {
-            sidebarScroll.addEventListener("click", rememberSidebarClick);
+            sidebarScroll.addEventListener("click", reMembersidebarClick);
             prepareCollapsedSidebarLabels();
             sidebarScroll.addEventListener("mouseover", function (event) {
                 const target = sidebarTooltipTarget(event);
@@ -488,8 +488,8 @@
         registerExpandableMenu(staffDashboardToggle, staffDashboardPanel, staffDashboardChevron, "staffDashboardExpanded");
         registerExpandableMenu(staffSettingsToggle, staffSettingsPanel, staffSettingsChevron, "staffSettingsExpanded");
         registerExpandableMenu(staffSupportToggle, staffSupportPanel, staffSupportChevron, "staffSupportExpanded");
-        registerExpandableMenu(memberArchiveToggle, memberArchivePanel, memberArchiveChevron, "memberArchiveExpanded");
-        registerExpandableMenu(memberSupportToggle, memberSupportPanel, memberSupportChevron, "memberSupportExpanded");
+        registerExpandableMenu(MemberArchiveToggle, MemberArchivePanel, MemberArchiveChevron, "MemberArchiveExpanded");
+        registerExpandableMenu(MembersupportToggle, MembersupportPanel, MembersupportChevron, "MembersupportExpanded");
         registerExpandableMenu(adminSaccoToggle, adminSaccoPanel, adminSaccoChevron, "adminSaccoExpanded");
         registerExpandableMenu(adminSupportToggle, adminSupportPanel, adminSupportChevron, "adminSupportExpanded");
         registerExpandableMenu(adminSettingsToggle, adminSettingsPanel, adminSettingsChevron, "adminSettingsExpanded");

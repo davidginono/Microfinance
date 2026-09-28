@@ -247,7 +247,7 @@ class PlatformEmailSettingsServiceTest {
     void sendTestEmailWrapsSmtpTimeoutAsPlainLanguageFailure() {
         PlatformEmailSettings existing = existingSettings();
         existing.setEnabled(true);
-        existing.setHost("smtp.foresight.co.tz");
+        existing.setHost("smtp.microfinance.local");
         existing.setUsername("mailer");
         existing.setPasswordEncrypted("enc:v1:stored");
         existing.setFromAddress("alerts@example.com");
@@ -260,7 +260,7 @@ class PlatformEmailSettingsServiceTest {
         when(secrets.decrypt("enc:v1:stored")).thenReturn("db-secret");
         when(factory.getMailSender()).thenReturn(mailSender);
         doThrow(new MailSendException(
-            "Mail server connection failed. Couldn't connect to host, port: smtp.foresight.co.tz, 465; timeout 10000",
+            "Mail server connection failed. Couldn't connect to host, port: smtp.microfinance.local, 465; timeout 10000",
             new SocketTimeoutException("Connect timed out")
         )).when(mailSender).send(any(SimpleMailMessage.class));
         PlatformEmailSettingsService service = service(repository, secrets, factoryProvider(factory), auditService);
@@ -269,7 +269,7 @@ class PlatformEmailSettingsServiceTest {
             service.sendTestEmail("admin@example.com", UUID.randomUUID()));
 
         assertEquals(
-            "Test email could not be sent. Connection to smtp.foresight.co.tz on port 465 timed out.",
+            "Test email could not be sent. Connection to smtp.microfinance.local on port 465 timed out.",
             ex.getMessage()
         );
         verify(auditService, never()).log(eq("PLATFORM_EMAIL_SETTINGS"), isNull(), eq("ADMIN_TEST_EMAIL"), any(), any(), any());

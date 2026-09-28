@@ -89,9 +89,9 @@
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
                     <span><spring:message code="staff.analytics.staffView" text="Staff report" /></span>
                 </button>
-                <button type="button" data-report-view="staff" aria-pressed="${viewAs eq 'staff'}" title="<spring:message code='staff.analytics.stationView' text='Station report' />" class="staff-view-option ${viewAs eq 'staff' ? 'is-active' : ''}" ${canViewStationAnalytics ? '' : 'disabled'}>
+                <button type="button" data-report-view="staff" aria-pressed="${viewAs eq 'staff'}" title="<spring:message code='staff.analytics.stationView' text='Branch report' />" class="staff-view-option ${viewAs eq 'staff' ? 'is-active' : ''}" ${canViewStationAnalytics ? '' : 'disabled'}>
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21a6 6 0 0 0-12 0"/><circle cx="11" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
-                    <span><spring:message code="staff.analytics.stationView" text="Station report" /></span>
+                    <span><spring:message code="staff.analytics.stationView" text="Branch report" /></span>
                 </button>
             </div>
         </div>
@@ -130,23 +130,23 @@
         </div>
     </c:forEach>
     <c:if test="${stationWideStaffView and stationParticipation ne null}">
-        <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.totalMembers' text='Total Members' />">
+        <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.totalMembers' text='Total Clients' />">
             <div class="staff-metric-main">
                 <span class="staff-metric-icon tone-blue">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 0 1 3-3.87"/><path d="M20 21v-2a4 4 0 0 0-3-3.87"/></svg>
                 </span>
                 <div class="min-w-0">
-                    <p class="staff-metric-title"><spring:message code="staff.analytics.totalMembers" text="Total Members" /></p>
+                    <p class="staff-metric-title"><spring:message code="staff.analytics.totalMembers" text="Total Clients" /></p>
                     <p class="staff-metric-value"><fmt:formatNumber value="${stationTotalMembers}" /></p>
                     <p class="staff-metric-trend">
                         <strong><spring:message code="staff.analytics.activeMembers" text="Active" /></strong>
-                        <span><spring:message code="staff.analytics.stationMembers" text="station members" /></span>
+                        <span><spring:message code="staff.analytics.stationMembers" text="Branch Clients" /></span>
                     </p>
                 </div>
             </div>
             <div class="staff-spark-row">
                 <p class="staff-metric-meta">
-                    <spring:message code="staff.analytics.stationScope" text="Current station scope" />
+                    <spring:message code="staff.analytics.stationScope" text="Current Branch Scope" />
                 </p>
             </div>
         </div>
@@ -160,7 +160,7 @@
                     <p class="staff-metric-value"><fmt:formatNumber value="${stationTotalApplicants}" /></p>
                     <p class="staff-metric-trend">
                         <strong>${stationParticipation.participationRateLabel}</strong>
-                        <span><spring:message code="staff.analytics.ofMembers" text="of members" /></span>
+                        <span><spring:message code="staff.analytics.ofMembers" text="of Clients" /></span>
                     </p>
                 </div>
             </div>
@@ -183,7 +183,7 @@
                 <h2 class="erp-panel-title">
                     <c:choose>
                         <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:when>
-                        <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationPortfolioSummary" text="Station Portfolio Summary" /></c:when>
+                        <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationPortfolioSummary" text="Branch Portfolio Summary" /></c:when>
                         <c:otherwise><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:otherwise>
                     </c:choose>
                 </h2>

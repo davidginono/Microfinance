@@ -8,7 +8,7 @@
 <c:choose>
     <c:when test="${memberWorkspace}">
         <c:set var="profileWorkspaceHome" value="/app/dashboard" />
-        <c:set var="profileWorkspaceLabel" value="Member Workspace" />
+        <c:set var="profileWorkspaceLabel" value="Client Workspace" />
     </c:when>
     <c:when test="${isPlatformAdminIdentity or not empty adminScope}">
         <c:set var="profileWorkspaceHome" value="/admin/dashboard" />
@@ -117,7 +117,7 @@
                     <h3>${profileMember.fullName}</h3>
                     <dl>
                     <div>
-                        <dt><spring:message code="profile.memberNumber" text="Member Number" /></dt>
+                        <dt><spring:message code="profile.memberNo" text="Client Number" /></dt>
                         <dd>${profileMember.memberNo}</dd>
                 </div>
                     <c:if test="${not empty profileMember.staffNo}">

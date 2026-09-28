@@ -19,26 +19,26 @@
     <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
-                SACCO
+                Institution
                 <select id="eventSaccoFilter" name="saccoId" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none">
-                    <option value="">All SACCOs</option>
-                    <c:forEach items="${registeredSaccos}" var="sacco">
-                        <option value="${sacco.saccoId}" ${selectedSaccoId eq sacco.saccoId ? 'selected' : ''}>${sacco.saccoName}</option>
+                    <option value="">All Institutions</option>
+                    <c:forEach items="${registeredSaccos}" var="Sacco">
+                        <option value="${Sacco.saccoId}" ${selectedSaccoId eq Sacco.saccoId ? 'selected' : ''}>${Sacco.saccoName}</option>
                     </c:forEach>
                 </select>
             </label>
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
-                Station
+                Branch
                 <select id="eventStationFilter" name="stationId" data-selected-station="${selectedStationId}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none">
-                    <option value="">All stations</option>
-                    <c:forEach items="${selectedStationOptions}" var="station">
-                        <option value="${station}" ${selectedStationId eq station ? 'selected' : ''}>${station}</option>
+                    <option value="">All Branches</option>
+                    <c:forEach items="${selectedStationOptions}" var="Station">
+                        <option value="${Station}" ${selectedStationId eq Station ? 'selected' : ''}>${Station}</option>
                     </c:forEach>
                 </select>
                 <div id="eventStationTemplate" hidden>
-                    <c:forEach items="${registeredSaccos}" var="sacco">
-                        <c:forEach items="${sacco.stationIds}" var="station">
-                            <span data-station-option data-sacco="${sacco.saccoId}" data-station="${station}"></span>
+                    <c:forEach items="${registeredSaccos}" var="Sacco">
+                        <c:forEach items="${Sacco.stationIds}" var="Station">
+                            <span data-station-option data-sacco="${Sacco.saccoId}" data-station="${Station}"></span>
                         </c:forEach>
                     </c:forEach>
                 </div>
@@ -81,7 +81,7 @@
         <tr>
             <th>Action</th>
             <c:if test="${superAdminScopeFilters}">
-                <th>SACCO</th>
+                <th>Institution</th>
             </c:if>
             <th>Status</th>
             <th>Entity</th>
@@ -99,7 +99,7 @@
                     <c:set var="entrySaccoName" value="${registeredSaccoNamesById[entry.saccoId]}" />
                     <td class="px-3 py-2">
                         <c:choose>
-                            <c:when test="${not empty entrySaccoName}"><c:out value="${entrySaccoName}" /></c:when>
+                            <c:when test="${not empty entrysaccoName}"><c:out value="${entrysaccoName}" /></c:when>
                             <c:otherwise>${entry.saccoReferenceLabel}</c:otherwise>
                         </c:choose>
                     </td>
@@ -155,24 +155,24 @@
 <c:if test="${superAdminScopeFilters}">
     <script>
         (function () {
-            const saccoFilter = document.getElementById('eventSaccoFilter');
-            const stationFilter = document.getElementById('eventStationFilter');
-            const stationTemplate = document.getElementById('eventStationTemplate');
-            if (!saccoFilter || !stationFilter || !stationTemplate) {
+            const SaccoFilter = document.getElementById('eventSaccoFilter');
+            const StationFilter = document.getElementById('eventStationFilter');
+            const StationTemplate = document.getElementById('eventStationTemplate');
+            if (!SaccoFilter || !StationFilter || !StationTemplate) {
                 return;
             }
 
             function refreshStations() {
-                const selectedSacco = saccoFilter.value;
-                const selectedStation = stationFilter.dataset.selectedStation || '';
-                stationFilter.innerHTML = '';
+                const selectedSacco = SaccoFilter.value;
+                const selectedStation = StationFilter.dataset.selectedStation || '';
+                StationFilter.innerHTML = '';
 
                 const allOption = document.createElement('option');
                 allOption.value = '';
-                allOption.textContent = selectedSacco ? 'All stations' : 'Select a SACCO first';
-                stationFilter.appendChild(allOption);
+                allOption.textContent = selectedSacco ? 'All Branches' : 'Select an institution first';
+                StationFilter.appendChild(allOption);
 
-                stationTemplate.querySelectorAll('[data-station-option]')
+                StationTemplate.querySelectorAll('[data-station-option]')
                     .forEach(option => {
                         if (option.dataset.sacco !== selectedSacco) {
                             return;
@@ -181,14 +181,14 @@
                         next.value = option.dataset.station;
                         next.textContent = option.dataset.station;
                         next.selected = option.dataset.station === selectedStation;
-                        stationFilter.appendChild(next);
+                        StationFilter.appendChild(next);
                     });
-                stationFilter.disabled = !selectedSacco;
-                stationFilter.dispatchEvent(new Event('change', { bubbles: true }));
+                StationFilter.disabled = !selectedSacco;
+                StationFilter.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
-            saccoFilter.addEventListener('change', function () {
-                stationFilter.dataset.selectedStation = '';
+            SaccoFilter.addEventListener('change', function () {
+                StationFilter.dataset.selectedStation = '';
                 refreshStations();
             });
             refreshStations();

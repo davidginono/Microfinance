@@ -5,7 +5,7 @@
         const form = button.closest('[data-archive-delete]');
         button.disabled = true;
         button.setAttribute('aria-busy', 'true');
-        const pending = window.showToast('info', 'Checking Foresight…');
+        const pending = window.showToast('info', 'Checking local archive…');
         try {
             const response = await fetch(form.dataset.checkUrl, {
                 headers: {Accept: 'application/json'},

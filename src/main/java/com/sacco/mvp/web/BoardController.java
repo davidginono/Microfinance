@@ -18,7 +18,7 @@ import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
-import com.sacco.mvp.service.ForesightRepaymentScheduleService;
+import com.sacco.mvp.service.LoanRepaymentScheduleDisplayService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
@@ -61,7 +61,7 @@ public class BoardController {
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
     private final ActiveLoanDisplayService activeLoanDisplayService;
-    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
+    private final LoanRepaymentScheduleDisplayService repaymentScheduleDisplayService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final EmailOtpService emailOtpService;
@@ -300,7 +300,7 @@ public class BoardController {
         model.addAttribute("activeApplicantLoans", activeLoanDisplay.rows());
         model.addAttribute("activeApplicantLoanCount", activeLoanDisplay.count());
         model.addAttribute("activeApplicantLoanTotalAmount", activeLoanDisplay.totalExposure());
-        model.addAttribute("activeApplicantLoansForesightEnabled", true);
+        model.addAttribute("activeApplicantLoansEnabled", true);
         model.addAttribute("previousApprovedReviews",
             loanPresentationService.previousApprovedReviews(app, myReview.getReviewStage()));
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
@@ -382,7 +382,7 @@ public class BoardController {
         LoanApplication app = boardService.findLoan(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+        return ResponseEntity.ok(repaymentScheduleDisplayService.loadLocalLoanSchedule(app, applicant).toPayload());
     }
 
     @GetMapping("/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule")
@@ -395,7 +395,7 @@ public class BoardController {
         LoanApplication app = boardService.findLoan(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService
+        return ResponseEntity.ok(repaymentScheduleDisplayService
             .loadExternalLoanSchedule(applicant, app.getStationId(), loanId)
             .toPayload());
     }

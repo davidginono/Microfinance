@@ -20,7 +20,7 @@ class DirectOtpGuarantorSearchViewContractTest {
     }
 
     @Test
-    void directOtpSwitchesSearchModesAndUsesForesightBackedEndpoint() throws Exception {
+    void directOtpSwitchesSearchModesAndUsesLocalDirectoryEndpoint() throws Exception {
         String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
 
         assertThat(source)

@@ -17,11 +17,11 @@
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <label class="block text-sm font-semibold text-slate-700">
             <spring:message code="support.subject" text="Subject" />
-            <input name="subject" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder='<spring:message code="admin.support.subjectPlaceholder" text="Example: Station users cannot view loan queue" />' required />
+            <input name="subject" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder='<spring:message code="admin.support.subjectPlaceholder" text="Example: Branch users cannot view loan queue" />' required />
         </label>
         <label class="block text-sm font-semibold text-slate-700">
             <spring:message code="support.message" text="Message" />
-            <textarea name="message" rows="7" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder='<spring:message code="admin.support.messagePlaceholder" text="Describe the issue, station, page, and expected outcome." />' required></textarea>
+            <textarea name="message" rows="7" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder='<spring:message code="admin.support.messagePlaceholder" text="Describe the issue, Branch, page, and expected outcome." />' required></textarea>
         </label>
         <div class="flex justify-end">
             <button type="submit" class="app-btn btn-primary">Send To Platform Admin</button>

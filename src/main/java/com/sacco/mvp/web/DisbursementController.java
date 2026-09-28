@@ -16,7 +16,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
-import com.sacco.mvp.service.ForesightRepaymentScheduleService;
+import com.sacco.mvp.service.LoanRepaymentScheduleDisplayService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
@@ -74,7 +74,7 @@ public class DisbursementController {
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
-    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
+    private final LoanRepaymentScheduleDisplayService repaymentScheduleDisplayService;
     private final MessageSource messageSource;
     private final AccessControlService access;
     private final ApplicationClock applicationClock;
@@ -225,7 +225,7 @@ public class DisbursementController {
         try {
             boolean eligible = archivedLoanDeletionService.canDelete(id, principal);
             return Map.of("eligible", eligible, "message", eligible
-                ? "Loan not found in Foresight." : "This loan exists in Foresight and cannot be deleted.");
+                ? "Loan not found in this branch." : "This loan cannot be deleted from the local archive.");
         } catch (com.sacco.mvp.service.ArchivedLoanDeletionService.EligibilityException ex) {
             return Map.of("eligible", false, "message", ex.getMessage());
         } catch (IllegalStateException | IllegalArgumentException ex) {
@@ -415,7 +415,7 @@ public class DisbursementController {
                                                                  @AuthenticationPrincipal AppUserPrincipal principal) {
         LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+        return ResponseEntity.ok(repaymentScheduleDisplayService.loadLocalLoanSchedule(app, applicant).toPayload());
     }
 
     @PostMapping("/loan-applications/{id}/finalize")
@@ -447,13 +447,7 @@ public class DisbursementController {
                 disbursementProofFile
             );
             emailOtpService.consumeOtpById(otpTokenId);
-            ForesightRepaymentScheduleService.RefreshResult scheduleRefresh =
-                foresightRepaymentScheduleService.tryRefreshLocalLoanSchedule(id);
-            if (scheduleRefresh.status() == ForesightRepaymentScheduleService.RefreshStatus.UPDATED) {
-                ra.addFlashAttribute("message", "Loan disbursed successfully. Repayment schedule loaded from Foresight.");
-            } else {
-                ra.addFlashAttribute("message", "Loan disbursed successfully. Repayment schedule will appear when Foresight is available.");
-            }
+            ra.addFlashAttribute("message", "Loan disbursed successfully. Repayment schedule created.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

@@ -6,14 +6,14 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="chairperson.office" text="Chairperson Office" /> / <spring:message code="chairperson.configurations" text="SACCO Configurations" /></p>
-    <h1 class="erp-page-title"><spring:message code="chairperson.configurations" text="SACCO Configurations" /></h1>
+    <p class="erp-breadcrumb"><spring:message code="chairperson.office" text="Chairperson Office" /> / <spring:message code="chairperson.configurations" text="Institution Configurations" /></p>
+    <h1 class="erp-page-title"><spring:message code="chairperson.configurations" text="Institution Configurations" /></h1>
 </div>
 
 <div class="chairperson-config-grid">
     <section class="erp-panel chairperson-config-panel">
         <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.stationPolicies" text="General Applicant Qualifications & Guarantor Policies" /></h2>
-        <p class="chairperson-config-context"><spring:message code="common.station" text="Station" />: <c:out value="${configuration.stationId}" /></p>
+        <p class="chairperson-config-context"><spring:message code="common.station" text="Branch" />: <c:out value="${configuration.stationId}" /></p>
         <dl class="chairperson-config-list">
             <div class="chairperson-config-row">
                 <dt><spring:message code="chairperson.applicantMaxDefaults" text="Applicant default limit" /></dt>

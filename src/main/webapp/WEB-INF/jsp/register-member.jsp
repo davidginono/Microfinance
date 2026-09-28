@@ -51,7 +51,7 @@
                                 <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
                             </spring:bind>
                             <form:select path="saccoId" cssClass="registration-select">
-                                <option value="" data-placeholder="true">Select SACCO Name</option>
+                                <option value="" data-placeholder="true">Select Institution Name</option>
                                 <c:forEach items="${registrationSaccos}" var="sacco">
                                     <form:option value="${sacco.saccoId}">${sacco.saccoName}</form:option>
                                 </c:forEach>
@@ -112,7 +112,7 @@
                             <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
                         </spring:bind>
                         <form:select path="stationId" id="registrationStationSelect" cssClass="registration-select">
-                            <option value="" data-placeholder="true">Select station ID</option>
+                            <option value="" data-placeholder="true">Select Branch ID</option>
                         </form:select>
                         <form:errors path="stationId" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
@@ -396,7 +396,7 @@
             const selectedSacco = saccoSelect.value;
             const sacco = registrationSaccos.find((item) => item.saccoId === selectedSacco);
             const currentValue = stationSelect.value;
-            stationSelect.innerHTML = '<option value="" data-placeholder="true">Select station ID</option>';
+            stationSelect.innerHTML = '<option value="" data-placeholder="true">Select Branch ID</option>';
             const stationIds = sacco && Array.isArray(sacco.stationIds) ? sacco.stationIds : [];
             stationIds.forEach((stationId) => {
                 const option = document.createElement('option');
@@ -440,7 +440,7 @@
                 }
 
                 if (!verifyResponse.ok || payload.valid !== true) {
-                    setError(payload.message || "Unable to verify the member details right now.");
+                    setError(payload.message || "Unable to verify the client details right now.");
                     setOtpButtonState("idle");
                     return;
                 }
@@ -452,7 +452,7 @@
                 setSuccess(payload.message || "We sent an OTP code to your email.");
                 setOtpButtonState("sent");
             } catch (error) {
-                setError("Unable to verify the member details right now. Please try again.");
+                setError("Unable to verify the client details right now. Please try again.");
                 setOtpButtonState("idle");
             }
         });

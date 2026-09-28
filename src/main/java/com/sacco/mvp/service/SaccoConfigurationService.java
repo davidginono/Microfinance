@@ -218,7 +218,56 @@ public class SaccoConfigurationService {
         return """
             {
               "type": "object",
-              "properties": {}
+              "required": [
+                "monthlyIncome",
+                "monthlyExpenses",
+                "businessOrEmployerName",
+                "businessOrEmploymentType",
+                "incomeSource",
+                "loanPurpose"
+              ],
+              "properties": {
+                "monthlyIncome": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "monthlyExpenses": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "otherDebtRepayments": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "businessOrEmployerName": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 120
+                },
+                "businessOrEmploymentType": {
+                  "type": "string",
+                  "enum": ["Business", "Employment", "Farming", "Informal trade", "Other"]
+                },
+                "incomeSource": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "collateralDescription": {
+                  "type": "string",
+                  "format": "textarea",
+                  "maxLength": 500
+                },
+                "collateralEstimatedValue": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "loanPurpose": {
+                  "type": "string",
+                  "format": "textarea",
+                  "minLength": 5,
+                  "maxLength": 500
+                }
+              }
             }
             """;
     }

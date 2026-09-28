@@ -79,7 +79,7 @@ class ActiveLoanHydrationRouteContractTest {
     }
 
     @Test
-    void disbursementReviewDoesNotExposeForesightHydrationEndpoint() throws Exception {
+    void disbursementReviewDoesNotExposeApplicantActiveLoanHydrationEndpoint() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/sacco/mvp/web/DisbursementController.java"));
 
         assertThat(source).doesNotContain("applicant-active-loans");

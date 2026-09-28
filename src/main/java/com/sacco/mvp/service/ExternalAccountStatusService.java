@@ -1,8 +1,6 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
-import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,37 +13,28 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 public class ExternalAccountStatusService {
-    private final ForesightDirectoryService foresightDirectoryService;
+    private final LoanAnalyticsService loanAnalyticsService;
 
     public ExternalAccountStatusView resolve(Member member) {
         if (member == null) {
-            return ExternalAccountStatusView.unavailable("Member account details are not available.");
+            return ExternalAccountStatusView.unavailable("Client details are not available.");
         }
-        if (member.getMemberNo() == null || member.getMemberNo().isBlank()) {
-            return ExternalAccountStatusView.unavailable("Member number is not available for live balance lookup.");
-        }
-        if (member.getStationId() == null || member.getStationId().isBlank()) {
-            return ExternalAccountStatusView.unavailable("Station ID is not available for live balance lookup.");
-        }
-        try {
-            ForesightAccountSummary summary = foresightDirectoryService.fetchAccountSummary(
-                member.getMemberNo(),
-                member.getStationId()
-            );
-            BigDecimal savings = summary == null || summary.savingsBalance() == null
-                ? BigDecimal.ZERO
-                : summary.savingsBalance();
-            BigDecimal shares = summary == null || summary.sharesBalance() == null
-                ? BigDecimal.ZERO
-                : summary.sharesBalance();
-            return ExternalAccountStatusView.available(
-                formatMoney(savings),
-                formatMoney(shares),
-                "Financial statuses loaded."
-            );
-        } catch (IllegalStateException ex) {
-            return ExternalAccountStatusView.unavailable("Live balances are unavailable right now. Try again later.");
-        }
+        BigDecimal activeExposure = loanAnalyticsService.activeLoanAmount(
+            member.getId(),
+            member.getSaccoId(),
+            member.getStationId()
+        );
+        long defaultRiskCount = loanAnalyticsService.defaultedRiskLoanCount(
+            member.getId(),
+            member.getSaccoId(),
+            member.getStationId()
+        );
+        String riskLabel = defaultRiskCount <= 0 ? "No PAR/default history" : defaultRiskCount + " PAR/default record(s)";
+        return ExternalAccountStatusView.available(
+            formatMoney(activeExposure),
+            riskLabel,
+            "Local credit status loaded."
+        );
     }
 
     public ExternalAccountStatusView loading(String statusMessage) {
@@ -74,8 +63,8 @@ public class ExternalAccountStatusService {
             this.statusMessage = statusMessage;
         }
 
-        public static ExternalAccountStatusView available(String savingsLabel, String sharesLabel, String statusMessage) {
-            return new ExternalAccountStatusView(true, false, savingsLabel, sharesLabel, statusMessage);
+        public static ExternalAccountStatusView available(String activeExposureLabel, String riskHistoryLabel, String statusMessage) {
+            return new ExternalAccountStatusView(true, false, activeExposureLabel, riskHistoryLabel, statusMessage);
         }
 
         public static ExternalAccountStatusView loading(String statusMessage) {
@@ -99,6 +88,14 @@ public class ExternalAccountStatusService {
         }
 
         public String getSharesLabel() {
+            return sharesLabel;
+        }
+
+        public String getActiveExposureLabel() {
+            return savingsLabel;
+        }
+
+        public String getRiskHistoryLabel() {
             return sharesLabel;
         }
 

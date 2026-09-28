@@ -32,16 +32,16 @@ class PlatformSmsGatewaySettingsServiceTest {
         ReflectionTestUtils.setField(service, "envEnabled", true);
         ReflectionTestUtils.setField(service, "envBaseUrl", "https://api.bentergroup.com");
         ReflectionTestUtils.setField(service, "envSendPath", "/version1/messaging/bulk");
-        ReflectionTestUtils.setField(service, "envClientId", "foresight");
+        ReflectionTestUtils.setField(service, "envClientId", "microfinance");
         ReflectionTestUtils.setField(service, "envApiKey", "env-key");
-        ReflectionTestUtils.setField(service, "envSenderId", "FORESIGHT");
+        ReflectionTestUtils.setField(service, "envSenderId", "MFI");
 
         PlatformSmsGatewaySettingsService.ResolvedSmsGatewayConfig config = service.resolvedConfig();
 
         assertTrue(config.enabled());
         assertEquals("https://api.bentergroup.com", config.baseUrl());
         assertEquals("env-key", config.apiKey());
-        assertEquals("FORESIGHT", config.senderId());
+        assertEquals("MFI", config.senderId());
     }
 
     @Test
@@ -106,9 +106,9 @@ class PlatformSmsGatewaySettingsServiceTest {
             true,
             " https://api.bentergroup.com ",
             " /version1/messaging/bulk ",
-            " foresight ",
+            " microfinance ",
             "new-key",
-            " FORESIGHT ",
+            " MFI ",
             3,
             8,
             actorId

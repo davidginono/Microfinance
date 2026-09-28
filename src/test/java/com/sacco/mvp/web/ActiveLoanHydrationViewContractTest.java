@@ -60,7 +60,7 @@ class ActiveLoanHydrationViewContractTest {
     }
 
     @Test
-    void actualRepaymentScheduleViewsExposeForesightHydrationHooks() throws Exception {
+    void actualRepaymentScheduleViewsExposeLocalHydrationHooks() throws Exception {
         String memberDetail = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-view.jsp"));
         String staffSummary = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/staff-repayment-summary.jspf"));
 
@@ -76,7 +76,7 @@ class ActiveLoanHydrationViewContractTest {
             .contains("data-repayment-schedule-url=\"${repaymentSchedulePath}\"")
             .contains("data-repayment-schedule-refresh")
             .contains("data-repayment-schedule-body")
-            .contains("Repayment schedule will appear when Foresight is available.");
+            .contains("Repayment schedule will appear after disbursement.");
     }
 
     @Test

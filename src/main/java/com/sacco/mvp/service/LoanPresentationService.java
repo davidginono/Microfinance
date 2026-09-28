@@ -975,9 +975,9 @@ public class LoanPresentationService {
         if (raw.isEmpty()) {
             return principal;
         }
-        BigDecimal foresightTotalOutstanding = readBigDecimal(raw.get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING));
-        if (foresightTotalOutstanding != null) {
-            return nonNegative(foresightTotalOutstanding).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal paymentSummaryTotalOutstanding = readBigDecimal(raw.get(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING));
+        if (paymentSummaryTotalOutstanding != null) {
+            return nonNegative(paymentSummaryTotalOutstanding).setScale(2, RoundingMode.HALF_UP);
         }
         BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principal);
         return principalPlusInterest == null
@@ -986,8 +986,8 @@ public class LoanPresentationService {
     }
 
     public BigDecimal activeLoanPaidAmount(LoanApplication app) {
-        BigDecimal principalPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID);
-        BigDecimal interestPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID);
+        BigDecimal principalPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_PRINCIPAL_PAID);
+        BigDecimal interestPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_INTEREST_PAID);
         if (principalPaid != null || interestPaid != null) {
             return nonNegative(zeroIfNull(principalPaid).add(zeroIfNull(interestPaid)));
         }
@@ -1000,7 +1000,7 @@ public class LoanPresentationService {
         if (app == null || app.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal syncedPrincipal = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_PRINCIPAL);
+        BigDecimal syncedPrincipal = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_OUTSTANDING_PRINCIPAL);
         return syncedPrincipal == null
             ? nonNegative(app.getAmount())
             : nonNegative(syncedPrincipal);
@@ -1010,7 +1010,7 @@ public class LoanPresentationService {
         if (app == null || app.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal syncedInterest = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_INTEREST);
+        BigDecimal syncedInterest = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_OUTSTANDING_INTEREST);
         if (syncedInterest != null) {
             return nonNegative(syncedInterest);
         }
@@ -1021,7 +1021,7 @@ public class LoanPresentationService {
     }
 
     public BigDecimal activeLoanTotalPrincipalPaid(LoanApplication app) {
-        BigDecimal syncedPrincipalPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID);
+        BigDecimal syncedPrincipalPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_PRINCIPAL_PAID);
         if (syncedPrincipalPaid != null) {
             return nonNegative(syncedPrincipalPaid);
         }
@@ -1031,7 +1031,7 @@ public class LoanPresentationService {
     }
 
     public BigDecimal activeLoanTotalInterestPaid(LoanApplication app) {
-        BigDecimal syncedInterestPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID);
+        BigDecimal syncedInterestPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_INTEREST_PAID);
         if (syncedInterestPaid != null) {
             return nonNegative(syncedInterestPaid);
         }
@@ -1042,7 +1042,7 @@ public class LoanPresentationService {
     }
 
     public String activeLoanLastPaymentDateLabel(LoanApplication app) {
-        String lastPaymentDate = financialSnapshotText(app, LoanFinancialSnapshotKeys.FORESIGHT_LAST_PAYMENT_DATE);
+        String lastPaymentDate = financialSnapshotText(app, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_LAST_PAYMENT_DATE);
         return lastPaymentDate == null || lastPaymentDate.isBlank() ? "-" : lastPaymentDate;
     }
 

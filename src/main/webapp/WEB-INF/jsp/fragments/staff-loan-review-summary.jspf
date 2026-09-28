@@ -10,8 +10,8 @@
         <c:set var="reviewLoanPurpose" value="${loan.formFields['Loan Purpose']}" />
         <c:set var="reviewLoanAmount" value="${loan.amount}" />
         <c:set var="reviewLoanTenorMonths" value="${loan.tenorMonths}" />
-        <c:set var="reviewSavingsLabel" value="-" />
-        <c:set var="reviewSharesLabel" value="-" />
+        <c:set var="reviewsavingsLabel" value="-" />
+        <c:set var="reviewsharesLabel" value="-" />
         <c:set var="reviewLiveStatusUrl" value="" />
     </c:when>
     <c:otherwise>
@@ -25,8 +25,8 @@
         <c:set var="reviewLoanPurpose" value="${formFields['Loan Purpose']}" />
         <c:set var="reviewLoanAmount" value="${app.amount}" />
         <c:set var="reviewLoanTenorMonths" value="${app.tenorMonths}" />
-        <c:set var="reviewSavingsLabel" value="${applicantExternalAccountStatus.savingsLabel}" />
-        <c:set var="reviewSharesLabel" value="${applicantExternalAccountStatus.sharesLabel}" />
+        <c:set var="reviewsavingsLabel" value="${applicantExternalAccountStatus.savingsLabel}" />
+        <c:set var="reviewsharesLabel" value="${applicantExternalAccountStatus.sharesLabel}" />
         <c:set var="reviewLiveStatusUrl" value="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status" />
     </c:otherwise>
 </c:choose>
@@ -40,7 +40,7 @@
                     <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${reviewApplicationId}" /></dd>
                 </div>
                 <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="member.memberNo" text="Member No" /></dt>
+                    <dt class="loan-hero-inline-label"><spring:message code="Member.memberNo" text="Client No" /></dt>
                     <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${empty reviewApplicantMemberNo ? '-' : reviewApplicantMemberNo}" /></dd>
                 </div>
                 <div class="loan-hero-inline-fact">
@@ -103,15 +103,15 @@
                 <span class="loan-staff-kpi-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 0 8h-1l-1 3h-3l-1-3H9l-1 3H5l1-3H5a4 4 0 0 1 0-8h1Z"/><path d="M9 9V6a3 3 0 0 1 5.5-1.7"/><path d="M18 12h.01"/></svg>
                 </span>
-                <dt class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></dt>
-                <dd class="loan-stat-value" data-live-account-status-savings><c:out value="${reviewSavingsLabel}" /></dd>
+                <dt class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Disposable Income" /></dt>
+                <dd class="loan-stat-value" data-live-account-status-savings><c:out value="${reviewsavingsLabel}" /></dd>
             </div>
             <div class="loan-staff-kpi-card">
                 <span class="loan-staff-kpi-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9v9h9Z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"/></svg>
                 </span>
-                <dt class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></dt>
-                <dd class="loan-stat-value" data-live-account-status-shares><c:out value="${reviewSharesLabel}" /></dd>
+                <dt class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Risk History" /></dt>
+                <dd class="loan-stat-value" data-live-account-status-shares><c:out value="${reviewsharesLabel}" /></dd>
             </div>
         </dl>
         <c:if test="${not processedLoanDetail}">

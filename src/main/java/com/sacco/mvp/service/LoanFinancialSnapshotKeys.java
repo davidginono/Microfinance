@@ -1,21 +1,21 @@
 package com.sacco.mvp.service;
 
 final class LoanFinancialSnapshotKeys {
-    static final String FORESIGHT_PAYMENT_SUMMARY_LOAN_ID = "foresightPaymentSummaryLoanId";
-    static final String FORESIGHT_LOAN_DESCRIPTION = "foresightLoanDescription";
-    static final String FORESIGHT_REQUESTED_AMOUNT = "foresightRequestedAmount";
-    static final String FORESIGHT_DISBURSED_AMOUNT = "foresightDisbursedAmount";
-    static final String FORESIGHT_INTEREST_RATE = "foresightInterestRate";
-    static final String FORESIGHT_EFFECTIVE_DATE = "foresightEffectiveDate";
-    static final String FORESIGHT_LAST_PAYMENT_DATE = "foresightLastPaymentDate";
-    static final String FORESIGHT_PRINCIPAL_AMOUNT = "foresightPrincipalAmount";
-    static final String FORESIGHT_INTEREST_AMOUNT = "foresightInterestAmount";
-    static final String FORESIGHT_TOTAL_PRINCIPAL_PAID = "foresightTotalPrincipalPaid";
-    static final String FORESIGHT_TOTAL_INTEREST_PAID = "foresightTotalInterestPaid";
-    static final String FORESIGHT_OUTSTANDING_PRINCIPAL = "foresightOutstandingPrincipal";
-    static final String FORESIGHT_OUTSTANDING_INTEREST = "foresightOutstandingInterest";
-    static final String FORESIGHT_TOTAL_OUTSTANDING = "foresightTotalOutstanding";
-    static final String FORESIGHT_PAYMENT_SUMMARY_FETCHED_AT = "foresightPaymentSummaryFetchedAt";
+    static final String PAYMENT_SUMMARY_LOAN_ID = "paymentSummaryLoanId";
+    static final String PAYMENT_SUMMARY_LOAN_DESCRIPTION = "paymentSummaryLoanDescription";
+    static final String PAYMENT_SUMMARY_REQUESTED_AMOUNT = "paymentSummaryRequestedAmount";
+    static final String PAYMENT_SUMMARY_DISBURSED_AMOUNT = "paymentSummaryDisbursedAmount";
+    static final String PAYMENT_SUMMARY_INTEREST_RATE = "paymentSummaryInterestRate";
+    static final String PAYMENT_SUMMARY_EFFECTIVE_DATE = "paymentSummaryEffectiveDate";
+    static final String PAYMENT_SUMMARY_LAST_PAYMENT_DATE = "paymentSummaryLastPaymentDate";
+    static final String PAYMENT_SUMMARY_PRINCIPAL_AMOUNT = "paymentSummaryPrincipalAmount";
+    static final String PAYMENT_SUMMARY_INTEREST_AMOUNT = "paymentSummaryInterestAmount";
+    static final String PAYMENT_SUMMARY_TOTAL_PRINCIPAL_PAID = "paymentSummaryTotalPrincipalPaid";
+    static final String PAYMENT_SUMMARY_TOTAL_INTEREST_PAID = "paymentSummaryTotalInterestPaid";
+    static final String PAYMENT_SUMMARY_OUTSTANDING_PRINCIPAL = "paymentSummaryOutstandingPrincipal";
+    static final String PAYMENT_SUMMARY_OUTSTANDING_INTEREST = "paymentSummaryOutstandingInterest";
+    static final String PAYMENT_SUMMARY_TOTAL_OUTSTANDING = "paymentSummaryTotalOutstanding";
+    static final String PAYMENT_SUMMARY_FETCHED_AT = "paymentSummaryFetchedAt";
 
     private LoanFinancialSnapshotKeys() {
     }

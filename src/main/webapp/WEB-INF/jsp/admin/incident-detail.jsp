@@ -59,7 +59,7 @@
 <c:if test="${isPlatformAdminIdentity or incident.source eq 'Member Support'}">
     <section class="grid gap-4 xl:grid-cols-2">
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">${isPlatformAdminIdentity ? 'Reply To SACCO Admin' : 'Reply To Member'}</h5>
+            <h5 class="erp-panel-title">${isPlatformAdminIdentity ? 'Reply To Institution Admin' : 'Reply To Client'}</h5>
             <form action="/admin/incidents/${incident.id}/reply" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>
@@ -76,7 +76,7 @@
 
         <c:if test="${isPlatformAdminIdentity}">
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">Broadcast To SACCOS Admins</h5>
+            <h5 class="erp-panel-title">Broadcast To Institution Admins</h5>
             <form action="/admin/incidents/broadcast-minor-admins" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>

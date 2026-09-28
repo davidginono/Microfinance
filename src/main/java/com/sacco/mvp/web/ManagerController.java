@@ -15,7 +15,7 @@ import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ActiveLoanDisplayService;
 import com.sacco.mvp.service.ArchiveDateRange;
-import com.sacco.mvp.service.ForesightRepaymentScheduleService;
+import com.sacco.mvp.service.LoanRepaymentScheduleDisplayService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
@@ -59,7 +59,7 @@ public class ManagerController {
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
     private final ActiveLoanDisplayService activeLoanDisplayService;
-    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
+    private final LoanRepaymentScheduleDisplayService repaymentScheduleDisplayService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final ReversalRequestService reversalRequestService;
@@ -275,7 +275,7 @@ public class ManagerController {
         model.addAttribute("activeApplicantLoans", activeLoanDisplay.rows());
         model.addAttribute("activeApplicantLoanCount", activeLoanDisplay.count());
         model.addAttribute("activeApplicantLoanTotalAmount", activeLoanDisplay.totalExposure());
-        model.addAttribute("activeApplicantLoansForesightEnabled", true);
+        model.addAttribute("activeApplicantLoansEnabled", true);
         model.addAttribute("reviewBasePath", "/manager");
         model.addAttribute("reviewPanelBreadcrumb", message("review.manager.breadcrumb"));
         model.addAttribute("reviewPanelTitle", message("review.manager.title"));
@@ -329,7 +329,7 @@ public class ManagerController {
                                                                  @AuthenticationPrincipal AppUserPrincipal principal) {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+        return ResponseEntity.ok(repaymentScheduleDisplayService.loadLocalLoanSchedule(app, applicant).toPayload());
     }
 
     @GetMapping("/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule")
@@ -339,7 +339,7 @@ public class ManagerController {
                                                                                    @AuthenticationPrincipal AppUserPrincipal principal) {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService
+        return ResponseEntity.ok(repaymentScheduleDisplayService
             .loadExternalLoanSchedule(applicant, app.getStationId(), loanId)
             .toPayload());
     }

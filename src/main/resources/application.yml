@@ -155,9 +155,9 @@ app:
     benter:
       base-url: ${APP_SMS_BENTER_BASE_URL:https://api.bentergroup.com}
       send-path: ${APP_SMS_BENTER_SEND_PATH:/version1/messaging/bulk}
-      client-id: ${APP_SMS_BENTER_CLIENT_ID:foresight}
+      client-id: ${APP_SMS_BENTER_CLIENT_ID:microfinance}
       api-key: ${APP_SMS_BENTER_API_KEY:}
-      sender-id: ${APP_SMS_BENTER_SENDER_ID:FORESIGHT}
+      sender-id: ${APP_SMS_BENTER_SENDER_ID:MFI}
   retention:
     cleanup-enabled: ${APP_RETENTION_CLEANUP_ENABLED:true}
     cleanup-cron: "${APP_RETENTION_CLEANUP_CRON:0 30 2 * * *}"
@@ -173,9 +173,3 @@ app:
       ttl-hours: ${APP_AUTH_INVITATION_TTL_HOURS:72}
     local-dev-minor-admin-password-login-enabled: ${APP_AUTH_LOCAL_DEV_MINOR_ADMIN_PASSWORD_LOGIN_ENABLED:true}
     local-dev-minor-admin-password: ${APP_AUTH_LOCAL_DEV_MINOR_ADMIN_PASSWORD:DevMinor123!}
-
-external:
-  foresight:
-    base-url: ${EXTERNAL_FORESIGHT_BASE_URL:https://api.foresightfin.app}
-    loan-payment-summary-sync-cron: "${EXTERNAL_FORESIGHT_LOAN_PAYMENT_SUMMARY_SYNC_CRON:0 15 2 * * *}"
-    loan-payment-summary-sync-batch-size: ${EXTERNAL_FORESIGHT_LOAN_PAYMENT_SUMMARY_SYNC_BATCH_SIZE:100}

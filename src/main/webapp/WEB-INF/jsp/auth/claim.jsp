@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Activate Your SACCO Admin Account</title>
+    <title>Activate Your Institution Admin Account</title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-mark-light-green.png?v=20260826-clean' />" />
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-400.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
@@ -20,7 +20,7 @@
 <main class="flex min-h-screen items-center justify-center px-4 py-10">
     <div class="claim-card w-full max-w-xl border border-slate-200 bg-white p-8">
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">SACCOS Admin Activation</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">Institution Admin Activation</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-900">Activate your staff account</h1>
             <p class="mt-1 text-sm text-slate-500">Verify your staff account, then create your password.</p>
         </div>
@@ -45,7 +45,7 @@
                     <c:if test="${not empty staffNo}">
                         <p class="mt-1 text-xs text-slate-500">Staff Number ${staffNo}</p>
                     </c:if>
-                    <p class="text-xs text-slate-500">SACCO ${memberSaccoId}<c:if test="${not empty memberStationId}"> &middot; Station ${memberStationId}</c:if></p>
+                    <p class="text-xs text-slate-500">Institution ${memberSaccoId}<c:if test="${not empty memberStationId}"> &middot; Branch ${memberStationId}</c:if></p>
                     <p class="mt-2 text-xs text-slate-500"><c:out value="${otpDeliveryText}" /></p>
                 </div>
 

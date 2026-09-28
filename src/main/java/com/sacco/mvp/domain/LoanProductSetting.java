@@ -79,6 +79,22 @@ public class LoanProductSetting {
     @Column(name = "max_repayment_months")
     private Integer maxRepaymentMonths;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "repayment_frequency", length = 32)
+    private RepaymentFrequency repaymentFrequency;
+
+    @Column(name = "affordability_check_required")
+    private Boolean affordabilityCheckRequired;
+
+    @Column(name = "max_repayment_to_disposable_income_ratio", precision = 6, scale = 4)
+    private BigDecimal maxRepaymentToDisposableIncomeRatio;
+
+    @Column(name = "collateral_required")
+    private Boolean collateralRequired;
+
+    @Column(name = "min_collateral_coverage_ratio", precision = 6, scale = 4)
+    private BigDecimal minCollateralCoverageRatio;
+
     @Column(name = "allow_application_with_active_loan")
     private Boolean allowApplicationWithActiveLoan;
 
@@ -201,6 +217,28 @@ public class LoanProductSetting {
 
     public boolean isFreshFinancialDataRequired() {
         return Boolean.TRUE.equals(freshFinancialDataRequired);
+    }
+
+    public RepaymentFrequency getResolvedRepaymentFrequency() {
+        return repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
+    }
+
+    public boolean isAffordabilityCheckRequired() {
+        return affordabilityCheckRequired == null || affordabilityCheckRequired;
+    }
+
+    public BigDecimal getResolvedMaxRepaymentToDisposableIncomeRatio() {
+        return maxRepaymentToDisposableIncomeRatio == null
+            ? new BigDecimal("0.4000")
+            : maxRepaymentToDisposableIncomeRatio;
+    }
+
+    public boolean isCollateralRequired() {
+        return Boolean.TRUE.equals(collateralRequired);
+    }
+
+    public BigDecimal getResolvedMinCollateralCoverageRatio() {
+        return minCollateralCoverageRatio == null ? BigDecimal.ZERO : minCollateralCoverageRatio;
     }
 
     public boolean isSavingsLimitCheckRequired() {

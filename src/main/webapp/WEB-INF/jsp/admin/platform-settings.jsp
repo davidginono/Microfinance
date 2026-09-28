@@ -41,7 +41,7 @@
     <div class="aws-settings-header">
         <p class="aws-settings-kicker">Support</p>
         <h2 class="aws-settings-title">Platform Support Contact</h2>
-        <p class="aws-settings-description">These details appear in member, SACCO Admin, and staff sidebar support menus.</p>
+        <p class="aws-settings-description">These details appear in client, institution admin, and staff sidebar support menus.</p>
     </div>
     <form action="/admin/platform-settings/support-contact" method="post" class="erp-panel-body platform-settings-form">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -234,9 +234,9 @@
             </label>
             <label class="platform-settings-field">
                 API username
-                <input name="clientId" maxlength="120"
+                <input name="memberId" maxlength="120"
                        class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
-                       value="${fn:escapeXml(platformSmsGatewaySettings.clientId)}" />
+                       value="${fn:escapeXml(platformSmsGatewaySettings.memberId)}" />
             </label>
             <label class="platform-settings-field">
                 Sender ID
@@ -263,7 +263,7 @@
             </label>
         </div>
         <div class="platform-settings-actions">
-            <p>Station SMS balances and warning thresholds remain on the SMS Usage page.</p>
+            <p>Branch SMS balances and warning thresholds remain on the SMS Usage page.</p>
             <button type="submit" class="app-btn btn-primary">Save SMS Gateway</button>
         </div>
     </form>
@@ -285,18 +285,18 @@
 
 <section class="erp-panel aws-settings-panel overflow-hidden">
     <div class="aws-settings-header">
-        <p class="aws-settings-kicker">SACCO Features</p>
+        <p class="aws-settings-kicker">Institution Features</p>
         <h2 class="aws-settings-title">Loan Top-Up Access</h2>
-        <p class="aws-settings-description">Allow or block loan top-up requests for each SACCO.</p>
+        <p class="aws-settings-description">Allow or block loan top-up requests for each institution.</p>
     </div>
     <div class="erp-panel-body">
-        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading SACCO feature settings...">
+        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading institution feature settings...">
             <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th>SACCO</th>
-                        <th>Stations</th>
+                        <th>Institution</th>
+                        <th>Branches</th>
                         <th>Status</th>
                         <th>Loan Top-Up</th>
                         <th class="text-right">Action</th>
@@ -306,7 +306,7 @@
                     <c:choose>
                         <c:when test="${empty registeredSaccos}">
                             <tr>
-                                <td colspan="5" class="text-slate-500">No SACCOs registered.</td>
+                                <td colspan="5" class="text-slate-500">No institutions registered.</td>
                             </tr>
                         </c:when>
                         <c:otherwise>
@@ -353,7 +353,7 @@
     <div class="aws-settings-header">
         <p class="aws-settings-kicker">Branding</p>
         <h2 class="aws-settings-title">Logo Upload Rules</h2>
-        <p class="aws-settings-description">These limits apply to every SACCO logo uploaded from registration or station registry.</p>
+        <p class="aws-settings-description">These limits apply to every institution logo uploaded from registration or branch registry.</p>
     </div>
     <form action="/admin/platform-settings/logo-policy" method="post" class="erp-panel-body platform-settings-form">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />

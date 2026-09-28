@@ -56,9 +56,9 @@ class BenterSmsGatewayTest {
                 true,
                 "http://localhost:" + server.getAddress().getPort(),
                 "/version1/messaging/bulk",
-                "foresight",
+                "microfinance",
                 "api-key",
-                "FORESIGHT",
+                "MFI",
                 3,
                 8,
                 true,
@@ -76,8 +76,8 @@ class BenterSmsGatewayTest {
             assertEquals("application/json", contentType.get());
             assertEquals(objectMapper.readTree("""
                 {
-                  "senderid": "FORESIGHT",
-                  "username": "foresight",
+                  "senderid": "MFI",
+                  "username": "microfinance",
                   "content": [{"msisdn": "255673054445", "message": "Test Message"}]
                 }
                 """), objectMapper.readTree(requestBody.get()));
@@ -98,7 +98,7 @@ class BenterSmsGatewayTest {
                   "message": "Sent to 0/1. Cost: 0 units",
                   "data": [{
                     "statusCode": 403,
-                    "description": "Charging user foresight failed, Balance 0 Total Bill (1)",
+                    "description": "Charging user microfinance failed, Balance 0 Total Bill (1)",
                     "msisdn": "255673054445",
                     "messageId": ""
                   }]
@@ -116,9 +116,9 @@ class BenterSmsGatewayTest {
                 true,
                 "http://localhost:" + server.getAddress().getPort(),
                 "/version1/messaging/bulk",
-                "foresight",
+                "microfinance",
                 "api-key",
-                "FORESIGHT",
+                "MFI",
                 3,
                 8,
                 true,

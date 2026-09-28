@@ -11,7 +11,7 @@
                 <tr>
                     <th class="px-3 py-2 text-left"><spring:message code="review.stage" text="Stage" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="review.reviewer" text="Reviewer" /></th>
-                    <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="Member.memberNo" text="Client No" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="review.decision" text="Decision" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="review.note" text="Note" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="review.submitted" text="Submitted" /></th>

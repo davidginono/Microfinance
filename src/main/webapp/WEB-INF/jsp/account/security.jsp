@@ -13,10 +13,10 @@
         <h2 id="otpSecurityTitle" class="aws-settings-title">When to use OTP</h2>
         <c:choose>
             <c:when test="${otpSelectionPolicy eq 'BOTH'}">
-                <p class="aws-settings-description">Your SACCO requires OTP for both login and approvals.</p>
+                <p class="aws-settings-description">Your institution requires OTP for both login and approvals.</p>
             </c:when>
             <c:when test="${otpSelectionPolicy eq 'AT_LEAST_ONE'}">
-                <p class="aws-settings-description">Your SACCO requires login OTP, approval OTP, or both.</p>
+                <p class="aws-settings-description">Your institution requires login OTP, approval OTP, or both.</p>
             </c:when>
             <c:otherwise>
                 <p class="aws-settings-description">Choose either option, both options, or neither.</p>

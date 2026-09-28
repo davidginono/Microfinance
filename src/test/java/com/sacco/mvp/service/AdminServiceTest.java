@@ -22,8 +22,6 @@ import com.sacco.mvp.domain.StaffAccessStatus;
 import com.sacco.mvp.domain.StationSmsAccount;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.UserSettings;
-import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
-import com.sacco.mvp.integration.foresight.ForesightMemberProfile;
 import com.sacco.mvp.repository.AdminIncidentRepository;
 import com.sacco.mvp.repository.AuditLogRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
@@ -96,7 +94,6 @@ class AdminServiceTest {
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private MemberAccessClaimRepository memberAccessClaimRepository;
-    @Mock private ForesightDirectoryService foresightDirectoryService;
 
     private AdminService adminService;
     private AtomicInteger issuedInvitationCount;
@@ -160,10 +157,6 @@ class AdminServiceTest {
                 lastRevokedBy.set(revokedBy);
             }
         };
-        lenient().when(foresightDirectoryService.lookupMemberProfileByPhone(any()))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
-        lenient().when(foresightDirectoryService.lookupMemberProfileByEmailV2(any()))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
         AtomicInteger staffNumberSequence = new AtomicInteger(10000);
         lenient().when(memberRepository.nextStaffNumberValue())
             .thenAnswer(invocation -> (long) staffNumberSequence.getAndIncrement());
@@ -197,7 +190,6 @@ class AdminServiceTest {
             minorAdminInvitationService,
             objectMapper,
             nameSignatureService,
-            foresightDirectoryService,
             applicationClock
         );
     }
@@ -1657,8 +1649,6 @@ class AdminServiceTest {
         verify(memberAccessClaimRepository).deleteByMemberId(lastInvitedMember.get().getId());
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_DOCUMENTS_VIEW));
-        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000001");
-        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("manager@example.com");
     }
 
     @Test
@@ -1686,34 +1676,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void createUserRejectsExternalMemberBeforeLocalMemberRegistration() {
-        when(foresightDirectoryService.lookupMemberProfileByPhone("+255700000002"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
-                new ForesightMemberProfile("Smith", "Anna", "MBR-001", "ST-1", "Demo SACCO")
-            ));
-
-        assertThatThrownBy(() -> adminService.createUser(
-            "SACCO-01",
-            "ST-1",
-            UUID.randomUUID(),
-            Set.of(Position.ADMIN),
-            "Anna Smith",
-            "anna.staff@example.com",
-            "255700000002",
-            List.of(Position.MANAGER)
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("This person is registered in Foresight as a member. Ask them to register as an LMS member first, then add them as SACCOS Admin.");
-
-        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000002");
-        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("anna.staff@example.com");
-        verify(memberRepository).findByEmailIgnoreCase("anna.staff@example.com");
-        verify(memberRepository).findByPhone("255700000002");
-        verify(memberRepository, never()).save(any(Member.class));
-    }
-
-    @Test
-    void createUserAssignsStaffAccessToExistingExternalMember() {
+    void createUserAssignsStaffAccessToExistingLocalClient() {
         UUID memberId = UUID.randomUUID();
         Member member = Member.builder()
             .id(memberId)
@@ -1733,11 +1696,6 @@ class AdminServiceTest {
         when(memberRepository.findByPhone("255700000003")).thenReturn(Optional.of(member));
         when(memberRepository.nextStaffNumberValue()).thenReturn(10002L);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(foresightDirectoryService.lookupMemberProfileByEmailV2("member@example.com"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
-                new ForesightMemberProfile("Member", "Existing", "MBR-002", "ST-1", "Demo SACCO")
-            ));
-
         adminService.createUser(
             "SACCO-01",
             "ST-1",
@@ -1758,34 +1716,9 @@ class AdminServiceTest {
         assertThat(member.getStaffAccessStatus()).isEqualTo(com.sacco.mvp.domain.StaffAccessStatus.PENDING_ACKNOWLEDGEMENT);
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isZero();
 
-        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000003");
-        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("member@example.com");
         verify(memberRepository).save(any(Member.class));
         verify(notificationRepository).save(any(Notification.class));
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
-    }
-
-    @Test
-    void createUserRejectsWhenAnyForesightLookupIsUnavailable() {
-        when(foresightDirectoryService.lookupMemberProfileByEmailV2("offline@example.com"))
-            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.unavailable());
-
-        assertThatThrownBy(() -> adminService.createUser(
-            "SACCO-01",
-            null,
-            UUID.randomUUID(),
-            Set.of(Position.ADMIN),
-            "Offline Lookup",
-            "offline@example.com",
-            "255700000004",
-            List.of(Position.MANAGER)
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("We could not verify this person against Foresight. Try again later.");
-
-        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000004");
-        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("offline@example.com");
-        verify(memberRepository, never()).save(any(Member.class));
     }
 
     @Test
@@ -1803,8 +1736,6 @@ class AdminServiceTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Enter the staff member phone number.");
 
-        verify(foresightDirectoryService, never()).lookupMemberProfileByPhone(any());
-        verify(foresightDirectoryService, never()).lookupMemberProfileByEmailV2(any());
         verify(memberRepository, never()).save(any(Member.class));
     }
 

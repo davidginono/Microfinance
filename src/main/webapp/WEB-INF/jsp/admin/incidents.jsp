@@ -14,26 +14,26 @@
     <form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <div class="admin-filter-field min-w-0">
-                <label class="mb-1 block text-sm font-semibold text-slate-700">SACCO</label>
+                <label class="mb-1 block text-sm font-semibold text-slate-700">Institution</label>
                 <select id="incidentSaccoFilter" name="saccoId" class="w-full border border-slate-300 px-3 py-2.5 focus:border-sacco-blue focus:outline-none">
-                    <option value="">All SACCOs</option>
-                    <c:forEach items="${registeredSaccos}" var="sacco">
-                        <option value="${sacco.saccoId}" ${selectedSaccoId eq sacco.saccoId ? 'selected' : ''}>${sacco.saccoName}</option>
+                    <option value="">All Institutions</option>
+                    <c:forEach items="${registeredSaccos}" var="Sacco">
+                        <option value="${Sacco.saccoId}" ${selectedSaccoId eq Sacco.saccoId ? 'selected' : ''}>${Sacco.saccoName}</option>
                     </c:forEach>
                 </select>
             </div>
             <div class="admin-filter-field min-w-0">
-                <label class="mb-1 block text-sm font-semibold text-slate-700">Station</label>
+                <label class="mb-1 block text-sm font-semibold text-slate-700">Branch</label>
                 <select id="incidentStationFilter" name="stationId" data-selected-station="${selectedStationId}" class="w-full border border-slate-300 px-3 py-2.5 focus:border-sacco-blue focus:outline-none">
-                    <option value="">All stations</option>
-                    <c:forEach items="${selectedStationOptions}" var="station">
-                        <option value="${station}" ${selectedStationId eq station ? 'selected' : ''}>${station}</option>
+                    <option value="">All Branches</option>
+                    <c:forEach items="${selectedStationOptions}" var="Station">
+                        <option value="${Station}" ${selectedStationId eq Station ? 'selected' : ''}>${Station}</option>
                     </c:forEach>
                 </select>
                 <div id="incidentStationTemplate" hidden>
-                    <c:forEach items="${registeredSaccos}" var="sacco">
-                        <c:forEach items="${sacco.stationIds}" var="station">
-                            <span data-station-option data-sacco="${sacco.saccoId}" data-station="${station}"></span>
+                    <c:forEach items="${registeredSaccos}" var="Sacco">
+                        <c:forEach items="${Sacco.stationIds}" var="Station">
+                            <span data-station-option data-sacco="${Sacco.saccoId}" data-station="${Station}"></span>
                         </c:forEach>
                     </c:forEach>
                 </div>
@@ -82,13 +82,13 @@
 <c:if test="${isPlatformAdminIdentity}">
     <section class="grid gap-4 xl:grid-cols-2">
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">Reply To SACCOS Admin</h5>
+            <h5 class="erp-panel-title">Reply To Institution Admin</h5>
             <form action="/admin/incidents/reply-minor-admin" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>
                     <label class="mb-1 block text-sm font-semibold text-slate-700">Recipient</label>
                     <select name="memberId" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required>
-                        <option value="">Select SACCOS admin</option>
+                        <option value="">Select Institution Admin</option>
                         <c:forEach items="${minorAdmins}" var="admin">
                             <option value="${admin.accountId}">${admin.loginId} - ${admin.fullName} (${admin.saccoId} / ${admin.stationId})</option>
                         </c:forEach>
@@ -107,7 +107,7 @@
                 </div>
 
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">Broadcast To SACCOS Admins</h5>
+            <h5 class="erp-panel-title">Broadcast To Institution Admins</h5>
             <form action="/admin/incidents/broadcast-minor-admins" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>
@@ -127,24 +127,24 @@
 <c:if test="${superAdminScopeFilters}">
     <script>
         (function () {
-            const saccoFilter = document.getElementById('incidentSaccoFilter');
-            const stationFilter = document.getElementById('incidentStationFilter');
-            const stationTemplate = document.getElementById('incidentStationTemplate');
-            if (!saccoFilter || !stationFilter || !stationTemplate) {
+            const SaccoFilter = document.getElementById('incidentSaccoFilter');
+            const StationFilter = document.getElementById('incidentStationFilter');
+            const StationTemplate = document.getElementById('incidentStationTemplate');
+            if (!SaccoFilter || !StationFilter || !StationTemplate) {
                 return;
             }
 
             function refreshStations() {
-                const selectedSacco = saccoFilter.value;
-                const selectedStation = stationFilter.dataset.selectedStation || '';
-                stationFilter.innerHTML = '';
+                const selectedSacco = SaccoFilter.value;
+                const selectedStation = StationFilter.dataset.selectedStation || '';
+                StationFilter.innerHTML = '';
 
                 const allOption = document.createElement('option');
                 allOption.value = '';
-                allOption.textContent = selectedSacco ? 'All stations' : 'Select a SACCO first';
-                stationFilter.appendChild(allOption);
+                allOption.textContent = selectedSacco ? 'All Branches' : 'Select an institution first';
+                StationFilter.appendChild(allOption);
 
-                stationTemplate.querySelectorAll('[data-station-option]')
+                StationTemplate.querySelectorAll('[data-station-option]')
                     .forEach(option => {
                         if (option.dataset.sacco !== selectedSacco) {
                             return;
@@ -153,14 +153,14 @@
                         next.value = option.dataset.station;
                         next.textContent = option.dataset.station;
                         next.selected = option.dataset.station === selectedStation;
-                        stationFilter.appendChild(next);
+                        StationFilter.appendChild(next);
                     });
-                stationFilter.disabled = !selectedSacco;
-                stationFilter.dispatchEvent(new Event('change', { bubbles: true }));
+                StationFilter.disabled = !selectedSacco;
+                StationFilter.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
-            saccoFilter.addEventListener('change', function () {
-                stationFilter.dataset.selectedStation = '';
+            SaccoFilter.addEventListener('change', function () {
+                StationFilter.dataset.selectedStation = '';
                 refreshStations();
             });
             refreshStations();

@@ -405,7 +405,7 @@ class LoanReportServiceTest {
     }
 
     @Test
-    void memberActiveLoanDetailsPreferSyncedForesightOutstandingBalance() {
+    void memberActiveLoanDetailsPreferSyncedPaymentSummaryOutstandingBalance() {
         UUID memberId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
@@ -423,11 +423,11 @@ class LoanReportServiceTest {
                 {
                   "interestAmount":25000.00,
                   "principalPlusInterest":525000.00,
-                  "foresightTotalOutstanding":445000.00,
-                  "foresightOutstandingPrincipal":425000.00,
-                  "foresightOutstandingInterest":20000.00,
-                  "foresightTotalPrincipalPaid":75000.00,
-                  "foresightTotalInterestPaid":5000.00
+                  "paymentSummaryTotalOutstanding":445000.00,
+                  "paymentSummaryOutstandingPrincipal":425000.00,
+                  "paymentSummaryOutstandingInterest":20000.00,
+                  "paymentSummaryTotalPrincipalPaid":75000.00,
+                  "paymentSummaryTotalInterestPaid":5000.00
                 }
                 """)
             .build();
@@ -636,8 +636,8 @@ class LoanReportServiceTest {
             .financialSnapshot("""
                 {
                   "interestAmount":70000.00,
-                  "foresightTotalInterestPaid":5000.00,
-                  "foresightLastPaymentDate":"2026-07-12"
+                  "paymentSummaryTotalInterestPaid":5000.00,
+                  "paymentSummaryLastPaymentDate":"2026-07-12"
                 }
                 """)
             .build();

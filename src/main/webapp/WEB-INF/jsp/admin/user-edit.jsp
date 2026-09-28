@@ -37,7 +37,7 @@
                 <p class="admin-user-summary-meta">
                     <c:choose>
                         <c:when test="${user.memberAccess}">
-                            Member Number <c:out value="${user.memberNumber}" />
+                            Client Number <c:out value="${user.memberNumber}" />
                         </c:when>
                         <c:otherwise>
                             Staff Number <c:out value="${user.staffMemberNumber}" />
@@ -83,7 +83,7 @@
         <div class="admin-user-section-header">
             <h2>Staff Roles</h2>
             <c:if test="${user.memberAccess}">
-                <p>Clear all staff roles to keep member access only.</p>
+                <p>Clear all staff roles to keep client access only.</p>
             </c:if>
         </div>
         <div class="admin-role-grid">
@@ -212,7 +212,7 @@
                     class="app-btn btn-danger"
                     formaction="/admin/users/${user.accountId}/cancel-invite"
                     formmethod="post"
-                    onclick="return confirm('Cancel this invitation? The staff member will be marked inactive.');">
+                    onclick="return confirm('Cancel this invitation? The staff user will be marked inactive.');">
                 Cancel Invite
             </button>
         </c:if>
@@ -265,7 +265,7 @@
 </c:if>
 
 <script type="application/json" id="role-default-claims-json">${roleDefaultClaimsJson}</script>
-<script type="application/json" id="member-default-claims-json">${memberDefaultClaimsJson}</script>
+<script type="application/json" id="Member-default-claims-json">${MemberDefaultClaimsJson}</script>
 
 <script>
     (() => {
@@ -285,7 +285,7 @@
         }
 
         const roleDefaultClaims = readJson('role-default-claims-json', {});
-        const memberDefaultClaims = readJson('member-default-claims-json', []);
+        const MemberDefaultClaims = readJson('Member-default-claims-json', []);
 
         document.querySelectorAll('[data-user-modal]').forEach((modal) => {
             modal.style.position = 'fixed';
@@ -360,7 +360,7 @@
         function selectedDefaultClaims(editForm) {
             const defaults = new Set();
             if (editForm.getAttribute('data-member-access') === 'true') {
-                memberDefaultClaims.forEach((claim) => defaults.add(claim));
+                MemberDefaultClaims.forEach((claim) => defaults.add(claim));
             }
             enabledInputs(editForm, '[data-staff-role-checkbox="edit-user"]').forEach((roleInput) => {
                 if (!roleInput.checked) {

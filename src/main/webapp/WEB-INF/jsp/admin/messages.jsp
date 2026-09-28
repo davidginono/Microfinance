@@ -54,15 +54,15 @@
 
 <section class="grid gap-4 xl:grid-cols-2">
     <div class="erp-form-wrap">
-        <h5 class="erp-panel-title">Reply To Member</h5>
+        <h5 class="erp-panel-title">Reply To Client</h5>
         <form action="/admin/messages/reply" method="post" class="space-y-3">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div>
                 <label class="mb-1 block text-sm font-semibold text-slate-700">Recipient</label>
                 <select name="memberId" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required>
-                    <option value="">Select member</option>
-                    <c:forEach items="${members}" var="member">
-                        <option value="${member.id}">${member.memberNo} - ${member.fullName} (${member.position})</option>
+                    <option value="">Select Client</option>
+                    <c:forEach items="${Members}" var="Member">
+                        <option value="${Member.id}">${Member.memberNo} - ${Member.fullName} (${Member.position})</option>
                     </c:forEach>
                 </select>
             </div>
@@ -79,7 +79,7 @@
             </div>
 
     <div class="erp-form-wrap">
-        <h5 class="erp-panel-title">Broadcast To SACCO Members</h5>
+        <h5 class="erp-panel-title">Broadcast To Institution Clients</h5>
         <form action="/admin/messages/broadcast" method="post" class="space-y-3">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div>

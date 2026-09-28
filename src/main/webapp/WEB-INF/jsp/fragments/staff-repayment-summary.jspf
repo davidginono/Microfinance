@@ -12,7 +12,7 @@
                 <div class="mt-1 text-sm text-slate-500">
                     <c:choose>
                         <c:when test="${repaymentSummaryEstimated}"><spring:message code="loan.repayment.estimatedHelp" text="This is a calculated repayment schedule based on the applied loan amount." /></c:when>
-                        <c:otherwise><spring:message code="loan.repayment.actualHelp" text="Actual repayment details retrieved from Foresight after disbursement." /></c:otherwise>
+                        <c:otherwise><spring:message code="loan.repayment.actualHelp" text="Actual repayment details recorded after disbursement." /></c:otherwise>
                     </c:choose>
                 </div>
             </div>
@@ -99,7 +99,7 @@
                                 <c:otherwise>
                                     <tr data-repayment-schedule-empty>
                                         <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
-                                            <spring:message code="loan.repayment.foresightPending" text="Repayment schedule will appear when Foresight is available." />
+                                            <spring:message code="loan.repayment.schedulePending" text="Repayment schedule will appear after disbursement." />
                                         </td>
                                     </tr>
                                 </c:otherwise>

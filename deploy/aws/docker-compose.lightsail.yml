@@ -33,8 +33,6 @@ services:
       APP_SMS_BENTER_CLIENT_ID: ${APP_SMS_BENTER_CLIENT_ID:-}
       APP_SMS_BENTER_API_KEY: ${APP_SMS_BENTER_API_KEY:-}
       APP_SMS_BENTER_SENDER_ID: ${APP_SMS_BENTER_SENDER_ID:-}
-      EXTERNAL_FORESIGHT_BASE_URL: ${EXTERNAL_FORESIGHT_BASE_URL:-https://api.foresightfin.app}
-      EXTERNAL_MEMBERPORTAL_BASE_URL: ${EXTERNAL_MEMBERPORTAL_BASE_URL:-https://api.foresightfin.app}
     expose:
       - "8080"
     volumes:

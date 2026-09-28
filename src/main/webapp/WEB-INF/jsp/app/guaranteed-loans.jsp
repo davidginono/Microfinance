@@ -7,7 +7,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Member Workspace / Guarantees" /></p>
+    <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Borrower Workspace / Guarantees" /></p>
     <h1 class="erp-page-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
 </div>
 
@@ -36,7 +36,7 @@
         </label>
     </div>
 
-    <div class="erp-table-scroll" data-view-position-key="member-guaranteed-loans">
+    <div class="erp-table-scroll" data-view-position-key="Member-guaranteed-loans">
         <table class="erp-table">
             <thead>
             <tr>

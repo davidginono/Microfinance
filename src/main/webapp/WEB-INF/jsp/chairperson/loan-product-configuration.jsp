@@ -6,7 +6,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="chairperson.configurations" text="SACCO Configurations" /> / <spring:message code="reports.loanProduct" text="Loan Product" /></p>
+    <p class="erp-breadcrumb"><spring:message code="chairperson.configurations" text="Institution Configurations" /> / <spring:message code="reports.loanProduct" text="Loan Product" /></p>
     <h1 class="erp-page-title"><c:out value="${product.name}" /></h1>
 </div>
 
@@ -78,12 +78,12 @@
                 <dd><c:out value="${product.guarantorsRequired}" /></dd>
             </div>
             <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.savingsCheck" text="Savings-limit check" /></dt>
+                <dt><spring:message code="chairperson.savingsCheck" text="Disposable Income-limit check" /></dt>
                 <dd><c:choose><c:when test="${product.savingsCheckRequired}"><spring:message code="common.enabled" text="Enabled" /></c:when><c:otherwise><spring:message code="common.disabled" text="Disabled" /></c:otherwise></c:choose></dd>
             </div>
             <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.configuredSavingsMultiplier" text="Configured savings multiplier" /></dt>
-                <dd><c:choose><c:when test="${empty product.maximumSavingsRatio}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise><fmt:formatNumber value="${product.maximumSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></c:otherwise></c:choose></dd>
+                <dt><spring:message code="chairperson.configuredSavingsMultiplier" text="Configured Disposable Income multiplier" /></dt>
+                <dd><c:choose><c:when test="${empty product.maximumSavingsRatio}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise><fmt:formatNumber value="${product.maximumSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of Disposable Income" /></c:otherwise></c:choose></dd>
             </div>
             <div class="chairperson-config-row">
                 <dt><spring:message code="chairperson.activeLoanAllowed" text="Application with active loan" /></dt>
@@ -102,11 +102,11 @@
                 <dd><c:choose><c:when test="${product.disbursementProofRequired}"><spring:message code="common.yes" text="Yes" /></c:when><c:otherwise><spring:message code="common.no" text="No" /></c:otherwise></c:choose></dd>
             </div>
             <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.guarantorSavingsCheck" text="Guarantor savings check" /></dt>
+                <dt><spring:message code="chairperson.guarantorSavingsCheck" text="Guarantor Disposable Income check" /></dt>
                 <dd><c:choose><c:when test="${product.guarantorSavingsCheckRequired}"><spring:message code="common.enabled" text="Enabled" /></c:when><c:otherwise><spring:message code="common.disabled" text="Disabled" /></c:otherwise></c:choose></dd>
             </div>
             <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.guarantorSavings" text="Guarantor minimum savings" /></dt>
+                <dt><spring:message code="chairperson.guarantorSavings" text="Guarantor minimum Disposable Income" /></dt>
                 <dd><c:choose><c:when test="${product.guarantorSavingsCheckRequired}">TSh <fmt:formatNumber value="${product.guarantorMinimumSavings}" maxFractionDigits="2" /></c:when><c:otherwise><spring:message code="chairperson.notApplied" text="Not applied" /></c:otherwise></c:choose></dd>
             </div>
             <div class="chairperson-config-row">

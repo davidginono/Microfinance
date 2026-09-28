@@ -5,8 +5,8 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="support.member.breadcrumb" text="Member Workspace / Support" /></p>
-    <h1 class="erp-page-title"><spring:message code="support.member.title" text="Contact Station Admin" /></h1>
+    <p class="erp-breadcrumb"><spring:message code="support.member.breadcrumb" text="Borrower Workspace / Support" /></p>
+    <h1 class="erp-page-title"><spring:message code="support.member.title" text="Contact Branch Admin" /></h1>
 </div>
 
 <section class="erp-panel max-w-4xl overflow-hidden">
@@ -24,7 +24,7 @@
             <textarea name="message" rows="7" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder="<spring:message code='support.member.messagePlaceholder' text='Describe the problem clearly. Include the page and what happened.' />" required></textarea>
         </label>
         <div class="flex justify-end">
-            <button type="submit" class="app-btn btn-primary"><spring:message code="support.member.send" text="Send To Station Admin" /></button>
+            <button type="submit" class="app-btn btn-primary"><spring:message code="support.member.send" text="Send To Branch Admin" /></button>
         </div>
     </form>
 </section>

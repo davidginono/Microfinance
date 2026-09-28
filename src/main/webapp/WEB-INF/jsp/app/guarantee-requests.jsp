@@ -7,7 +7,7 @@
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="guaranteeRequests.breadcrumb" text="Member Workspace / Guarantee Requests" /></p>
+    <p class="erp-breadcrumb"><spring:message code="guaranteeRequests.breadcrumb" text="Borrower Workspace / Guarantee Requests" /></p>
     <h1 class="erp-page-title"><spring:message code="menu.grequests" /></h1>
 </div>
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
@@ -161,7 +161,7 @@
                                 <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                                 <p class="mt-2 text-sm text-slate-600"><spring:message code="guaranteeRequests.otpHelp" text="Request a one-time code to confirm that you are the guarantor approving this loan." /></p>
                                 <c:if test="${not hasGuarantorSignature}">
-                                    <p class="mt-2 text-sm text-rose-600"><spring:message code="newloan.otp.addSignature" text="Add your signature on your member account before requesting OTP." /></p>
+                                    <p class="mt-2 text-sm text-rose-600"><spring:message code="newloan.otp.addSignature" text="Add your signature on your client account before requesting OTP." /></p>
                                 </c:if>
                                 <c:if test="${not policyEligible}">
                                     <p class="mt-2 text-sm text-rose-600">${policyReason}</p>

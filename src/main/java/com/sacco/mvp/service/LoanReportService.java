@@ -1289,7 +1289,7 @@ public class LoanReportService {
     }
 
     private BigDecimal outstandingBalanceAmount(LoanApplication loan) {
-        BigDecimal syncedOutstanding = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING);
+        BigDecimal syncedOutstanding = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING);
         if (syncedOutstanding != null) {
             return syncedOutstanding.max(BigDecimal.ZERO);
         }
@@ -1303,7 +1303,7 @@ public class LoanReportService {
         if (loan == null || !DISBURSED_STATUSES.contains(loan.getStatus())) {
             return BigDecimal.ZERO;
         }
-        BigDecimal syncedPrincipal = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_PRINCIPAL);
+        BigDecimal syncedPrincipal = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_OUTSTANDING_PRINCIPAL);
         if (syncedPrincipal != null) {
             return syncedPrincipal.max(BigDecimal.ZERO);
         }
@@ -1311,7 +1311,7 @@ public class LoanReportService {
     }
 
     private BigDecimal interestPaidAmount(LoanApplication loan) {
-        BigDecimal syncedInterestPaid = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID);
+        BigDecimal syncedInterestPaid = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_INTEREST_PAID);
         if (syncedInterestPaid != null) {
             return syncedInterestPaid.max(BigDecimal.ZERO);
         }
@@ -1321,7 +1321,7 @@ public class LoanReportService {
     }
 
     private BigDecimal principalPaidAmount(LoanApplication loan) {
-        BigDecimal syncedPrincipalPaid = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID);
+        BigDecimal syncedPrincipalPaid = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_PRINCIPAL_PAID);
         if (syncedPrincipalPaid != null) {
             return syncedPrincipalPaid.max(BigDecimal.ZERO);
         }
@@ -1337,7 +1337,7 @@ public class LoanReportService {
         if (loan == null || !DISBURSED_STATUSES.contains(loan.getStatus())) {
             return BigDecimal.ZERO;
         }
-        BigDecimal syncedInterest = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_INTEREST);
+        BigDecimal syncedInterest = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_OUTSTANDING_INTEREST);
         if (syncedInterest != null) {
             return syncedInterest.max(BigDecimal.ZERO);
         }
@@ -2876,7 +2876,7 @@ public class LoanReportService {
     }
 
     private int stationInterestYear(LoanApplication loan) {
-        LocalDate lastPaymentDate = financialSnapshotDate(loan, LoanFinancialSnapshotKeys.FORESIGHT_LAST_PAYMENT_DATE);
+        LocalDate lastPaymentDate = financialSnapshotDate(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_LAST_PAYMENT_DATE);
         return lastPaymentDate == null ? loanYear(loan) : lastPaymentDate.getYear();
     }
 

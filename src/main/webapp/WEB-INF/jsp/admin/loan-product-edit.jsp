@@ -126,7 +126,7 @@
 
                         <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="common.description" text="Description" />
-                            <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
+                            <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to clients when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
                         </label>
                     </div>
                 </section>
@@ -154,25 +154,25 @@
                         </label>
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
-                            <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
+                            <input name="maxLoansavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
                             <div class="savings-ratio-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
+                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Disposable Income" />
                                 <div class="savings-multiplier-control mt-1">
-                                    <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
-                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
+                                    <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan Disposable Income multiplier" data-savings-multiplier />
+                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of Disposable Income" /></span>
                                 </div>
                             </div>
                             <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                 <input name="savingsLimitCheckRequired" type="checkbox" value="true" ${product.savingsLimitCheckRequired ? 'checked' : ''} data-savings-limit-check />
                                 <span>
-                                    <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check savings against loan amount" /></span>
+                                    <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check Disposable Income against loan amount" /></span>
                                     <span class="block text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" text="When unchecked, only the product minimum and maximum amount range is enforced." /></span>
                                 </span>
                             </label>
                         </div>
                         <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="freshFinancialDataRequired" type="checkbox" value="true" ${product.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
-                            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Savings & Shares) At Submission" /></span>
+                            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Credit Assessment Data) At Submission" /></span>
                         </label>
                         <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${product.applicationWithActiveLoanAllowed ? 'checked' : ''} />
@@ -249,8 +249,8 @@
                                             <td><spring:message code="admin.settings.workflow.openPriorityNote" text="Priority follows active review roles." /></td>
                                         </tr>
                                         <tr>
-                                            <td class="workflow-table-cell workflow-table-stage"><spring:message code="role.boardMember" text="Board Member" /></td>
-                                            <td class="workflow-table-cell"><label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" ${product.boardReviewRequired ? 'checked' : ''} data-workflow-board aria-label="Board Member included" /></label></td>
+                                            <td class="workflow-table-cell workflow-table-stage"><spring:message code="role.boardMember" text="Committee Member" /></td>
+                                            <td class="workflow-table-cell"><label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" ${product.boardReviewRequired ? 'checked' : ''} data-workflow-board aria-label="Committee Member included" /></label></td>
                                             <td class="workflow-table-cell"><select name="boardPriority" class="workflow-priority-select" data-workflow-board-priority><c:forEach begin="1" end="6" var="priorityOption"><option value="${priorityOption}" ${product.resolvedBoardPriority == priorityOption ? 'selected' : ''}>${priorityOption}</option></c:forEach></select></td>
                                             <td><spring:message code="admin.settings.workflow.openPriorityNote" text="Priority follows active review roles." /></td>
                                         </tr>
@@ -280,19 +280,19 @@
                         </details>
 
                         <details class="workflow-subsection product-config-subsection">
-                            <summary class="workflow-subsection-title"><spring:message code="role.boardMember" text="Board Member" /></summary>
+                            <summary class="workflow-subsection-title"><spring:message code="role.boardMember" text="Committee Member" /></summary>
                             <div class="product-config-subsection-body">
                             <div class="erp-table-wrap" data-board-reviewer-list data-aws-no-titlebar="true">
                                 <div class="aws-filter-toolbar">
                                     <label class="min-w-[14rem] flex-[1_1_20rem]">
-                                        <span class="sr-only">Search board members</span>
-                                        <input type="search" class="w-full rounded border border-slate-300 px-3 text-sm text-slate-800" placeholder="Search board members" data-board-reviewer-search />
+                                        <span class="sr-only">Search Committee Members</span>
+                                        <input type="search" class="w-full rounded border border-slate-300 px-3 text-sm text-slate-800" placeholder="Search Committee Members" data-board-reviewer-search />
                                     </label>
                                 </div>
                                 <c:set var="assignedBoardReviewerTokens" value="${productBoardReviewerIdTokens[product.id]}" />
                                 <div class="erp-table-scroll erp-table-scroll-sm">
                                     <table class="erp-table">
-                                        <thead><tr><th class="whitespace-nowrap">Assign</th><th>Board Member</th><th class="whitespace-nowrap">Staff Number</th></tr></thead>
+                                        <thead><tr><th class="whitespace-nowrap">Assign</th><th>Committee Member</th><th class="whitespace-nowrap">Staff Number</th></tr></thead>
                                         <tbody>
                                         <c:forEach items="${boardReviewerOptions}" var="reviewer">
                                             <c:set var="reviewerToken" value="|${reviewer.id}|" />
@@ -302,7 +302,7 @@
                                                 <td class="whitespace-nowrap"><c:out value="${reviewer.memberNo}" /></td>
                                             </tr>
                                         </c:forEach>
-                                        <c:if test="${empty boardReviewerOptions}"><tr><td colspan="3" class="text-center text-slate-500">No active board members are available.</td></tr></c:if>
+                                        <c:if test="${empty boardReviewerOptions}"><tr><td colspan="3" class="text-center text-slate-500">No active Committee Members are available.</td></tr></c:if>
                                         </tbody>
                                     </table>
                                 </div>
@@ -316,8 +316,8 @@
                             <div class="erp-table-wrap" data-credit-committee-reviewer-list data-aws-no-titlebar="true">
                                 <div class="aws-filter-toolbar">
                                     <label class="min-w-[14rem] flex-[1_1_20rem]">
-                                        <span class="sr-only">Search credit committee members</span>
-                                        <input type="search" class="w-full rounded border border-slate-300 px-3 text-sm text-slate-800" placeholder="Search credit committee members" data-credit-committee-reviewer-search />
+                                        <span class="sr-only">Search credit committee Members</span>
+                                        <input type="search" class="w-full rounded border border-slate-300 px-3 text-sm text-slate-800" placeholder="Search credit committee Members" data-credit-committee-reviewer-search />
                                     </label>
                                 </div>
                                 <c:set var="assignedCreditCommitteeReviewerTokens" value="${productCreditCommitteeReviewerIdTokens[product.id]}" />
@@ -333,7 +333,7 @@
                                                 <td class="whitespace-nowrap"><c:out value="${reviewer.memberNo}" /></td>
                                             </tr>
                                         </c:forEach>
-                                        <c:if test="${empty creditCommitteeReviewerOptions}"><tr><td colspan="3" class="text-center text-slate-500">No active credit committee members are available.</td></tr></c:if>
+                                        <c:if test="${empty creditCommitteeReviewerOptions}"><tr><td colspan="3" class="text-center text-slate-500">No active credit committee Members are available.</td></tr></c:if>
                                         </tbody>
                                     </table>
                                 </div>
@@ -373,7 +373,7 @@
                                         <button type="button" class="app-btn btn-neutral" data-required-attachment-cancel>Cancel</button>
                                     </div>
                                 </div>
-                                <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading members...">
+                                <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading clients...">
                                     <div class="erp-table-scroll erp-table-scroll-sm">
                                     <table class="erp-table min-w-[620px]">
                                         <thead>
@@ -432,12 +432,12 @@
                                     <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.guarantorsRequired}" data-number-range-max="15" data-workflow-guarantors />
                                 </label>
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Minimum Guarantor Savings
-                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedGuarantorMinimumSavings}" />
+                                    Minimum Guarantor Disposable Income
+                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedguarantorMinimumSavings}" />
                                 </label>
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinSavingsCheckRequired ? 'checked' : ''} />
-                                    <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
+                                    <input name="guarantorMinsavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinsavingsCheckRequired ? 'checked' : ''} />
+                                    <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum Disposable Income before selection" /></span>
                                 </label>
                             </div>
                             </div>
@@ -489,20 +489,20 @@
 <spring:message code="admin.settings.workflow.warning.noLoanOfficers" text="Loan Officer review is enabled for this product, but there are no active Loan Officers assigned yet." var="warningNoLoanOfficers" />
 <spring:message code="admin.settings.workflow.warning.managerLoanOfficerSamePriority" text="Manager and Loan Officer cannot share the same priority." var="warningManagerLoanOfficerSamePriority" />
 <spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority." var="warningDuplicatePriorities" />
-<spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Board Member review is configured, but there are no active board members available for assignment." var="warningNoBoardReviewers" />
+<spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Committee Member review is configured, but there are no active Committee Members available for assignment." var="warningNoBoardReviewers" />
 <spring:message code="admin.settings.workflow.warning.noChairpersons" text="Chairperson review is configured, but there are no active chairpersons available for assignment." var="warningNoChairpersons" />
-<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Committee review is configured, but there are no active board members available for assignment." var="warningNoCommitteeReviewers" />
+<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Committee review is configured, but there are no active Committee Members available for assignment." var="warningNoCommitteeReviewers" />
 <spring:message code="admin.settings.workflow.warning.committeeAccountantSamePriority" text="Committee and Accountant cannot share the same priority slot." var="warningCommitteeAccountantSamePriority" />
 <spring:message code="admin.settings.workflow.warning.noAccountants" text="Accountant review is enabled for this product, but there are no active accountants available." var="warningNoAccountants" />
 <spring:message code="admin.settings.workflow.warning.noDisbursementOfficers" text="Disbursement/Teller Officer is required, but there are no active Disbursement/Teller Officers assigned yet." var="warningNoDisbursementOfficers" />
 <spring:message code="admin.settings.workflow.warning.noDisbursementClaimHolders" text="Disbursement/Teller Officer is optional, but no active staff user has both disbursement claims." var="warningNoDisbursementClaimHolders" />
-<spring:message code="admin.settings.workflow.warning.loadedFinancialRequired" text="Members must load current financial data before this product can move into review." var="warningLoadedFinancialRequired" />
+<spring:message code="admin.settings.workflow.warning.loadedFinancialRequired" text="Clients must provide current assessment data before this product can move into review." var="warningLoadedFinancialRequired" />
 <spring:message code="admin.settings.workflow.warning.guarantorPrefix" text="This product waits for" var="warningGuarantorPrefix" />
 <spring:message code="admin.settings.workflow.warning.guarantorApproval" text="guarantor approval" var="warningGuarantorApproval" />
 <spring:message code="admin.settings.workflow.warning.guarantorApprovals" text="guarantor approvals" var="warningGuarantorApprovals" />
 <spring:message code="admin.settings.workflow.warning.guarantorSuffix" text="before the review flow starts." var="warningGuarantorSuffix" />
-<spring:message code="admin.settings.workflow.runtime.member" text="Member" var="runtimeMember" />
-<spring:message code="admin.settings.workflow.runtime.loadedFinancialData" text="Loaded Financial Data (Savings & Shares)" var="runtimeLoadedFinancialData" />
+<spring:message code="admin.settings.workflow.runtime.Member" text="Client" var="runtimeMember" />
+<spring:message code="admin.settings.workflow.runtime.loadedFinancialData" text="Loaded Financial Data (Credit Assessment Data)" var="runtimeLoadedFinancialData" />
 <spring:message code="admin.settings.workflow.runtime.guarantor" text="Guarantor" var="runtimeGuarantor" />
 <spring:message code="admin.settings.workflow.runtime.guarantors" text="Guarantors" var="runtimeGuarantors" />
 <spring:message code="admin.settings.workflow.runtime.fixManagerLoanOfficerPriority" text="Fix Priority Slots" var="runtimeFixManagerLoanOfficerPriority" />
@@ -510,7 +510,7 @@
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />
 <spring:message code="role.chairperson" text="Chairperson" var="runtimeChairperson" />
-<spring:message code="role.boardMember" text="Board Member" var="runtimeBoardMember" />
+<spring:message code="role.boardMember" text="Committee Member" var="runtimeBoardMember" />
 <spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
 <spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" var="runtimeDisbursementOfficer" />
@@ -522,7 +522,7 @@
 <spring:message code="admin.settings.validation.minimumAmount" text="Minimum amount cannot be negative." var="validationMinimumAmount" />
 <spring:message code="admin.settings.validation.maximumAmountPositive" text="Maximum amount must be greater than zero." var="validationMaximumAmountPositive" />
 <spring:message code="admin.settings.validation.maximumBelowMinimum" text="Maximum amount cannot be lower than the minimum amount." var="validationMaximumBelowMinimum" />
-<spring:message code="admin.settings.validation.savingsPercent" text="Loan savings multiple must be between 0 and 10x." var="validationSavingsPercent" />
+<spring:message code="admin.settings.validation.savingsPercent" text="Loan Disposable Income multiple must be between 0 and 10x." var="validationsavingsPercent" />
 <spring:message code="admin.settings.validation.insurancePercent" text="Insurance percentage cannot be negative." var="validationInsurancePercent" />
 <spring:message code="admin.settings.validation.annualInterestPercent" text="Annual interest percentage cannot be negative." var="validationAnnualInterestPercent" />
 <spring:message code="admin.settings.validation.minRepaymentMonths" text="Minimum repayment period must be at least 1 month." var="validationMinRepaymentMonths" />
@@ -538,8 +538,8 @@
 <spring:message code="admin.settings.validation.managerLoanOfficerDifferentPriority" text="Choose different priorities for Manager and Loan Officer." var="validationManagerLoanOfficerDifferentPriority" />
 <spring:message code="admin.settings.validation.assignLoanOfficer" text="Assign at least one active Loan Officer before using this stage." var="validationAssignLoanOfficer" />
 <spring:message code="admin.settings.validation.assignChairperson" text="Assign at least one active Chairperson before using this stage." var="validationAssignChairperson" />
-<spring:message code="admin.settings.validation.assignBoardReviewer" text="Assign at least one active board member before using this stage." var="validationAssignBoardReviewer" />
-<spring:message code="admin.settings.validation.assignCommitteeReviewer" text="Assign at least one active credit committee member before using this stage." var="validationAssignCommitteeReviewer" />
+<spring:message code="admin.settings.validation.assignBoardReviewer" text="Assign at least one active Committee Member before using this stage." var="validationAssignBoardReviewer" />
+<spring:message code="admin.settings.validation.assignCommitteeReviewer" text="Assign at least one active credit committee Member before using this stage." var="validationAssignCommitteeReviewer" />
 <spring:message code="admin.settings.validation.committeeAccountantDifferentPriority" text="Committee and Accountant cannot share the same priority slot." var="validationCommitteeAccountantDifferentPriority" />
 <spring:message code="admin.settings.validation.assignAccountant" text="Assign at least one active Accountant before using this stage." var="validationAssignAccountant" />
 <spring:message code="admin.settings.validation.assignDisbursementOfficer" text="Assign at least one active Disbursement/Teller Officer before requiring this role." var="validationAssignDisbursementOfficer" />

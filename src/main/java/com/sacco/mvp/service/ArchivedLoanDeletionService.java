@@ -1,8 +1,6 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.*;
-import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
-import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -20,38 +18,14 @@ import java.util.UUID;
 @lombok.extern.slf4j.Slf4j
 public class ArchivedLoanDeletionService {
     private final EntityManager entityManager;
-    private final MemberRepository memberRepository;
-    private final ForesightDirectoryService foresightDirectoryService;
     private final AccessControlService access;
     private final LoanAttachmentService loanAttachmentService;
     private final AuditService auditService;
     private final PlatformTransactionManager transactionManager;
 
     public boolean canDelete(UUID id, AppUserPrincipal actor) {
-        LoanApplication loan = load(id, actor, false);
-        Member member = memberRepository.findById(loan.getApplicantMemberId())
-            .orElseThrow(() -> new EligibilityException("The applicant member record is missing. Contact support."));
-        if (member.getMemberNo() == null || member.getMemberNo().isBlank()) {
-            throw new EligibilityException("Applicant member number is missing. Update the member details before checking Foresight.");
-        }
-        try {
-            return foresightDirectoryService.isLoanPaymentSummaryMissing(
-                member.getMemberNo().trim(), loan.getStationId(), loan.getLoanId());
-        } catch (RuntimeException ex) {
-            log.warn("Foresight deletion eligibility lookup failed for application {}", id, ex);
-            for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-                if (cause instanceof org.springframework.web.client.RestClientResponseException response) {
-                    int status = response.getStatusCode().value();
-                    throw new EligibilityException(status == 401 || status == 403
-                        ? "Foresight refused access to the loan check. Contact support to check the integration credentials."
-                        : "Foresight returned an error (HTTP " + status + "). Please retry later.");
-                }
-                if (cause instanceof org.springframework.web.client.ResourceAccessException) {
-                    throw new EligibilityException("The server could not reach Foresight or the request timed out. Please retry later.");
-                }
-            }
-            throw new EligibilityException("Foresight returned an unreadable or empty response. Deletion is blocked; contact support.");
-        }
+        load(id, actor, false);
+        return true;
     }
 
     public void delete(UUID id, AppUserPrincipal actor) {
@@ -59,7 +33,7 @@ public class ArchivedLoanDeletionService {
         String checkedLoanId = checked.getLoanId();
         UUID checkedMemberId = checked.getApplicantMemberId();
         if (!canDelete(id, actor)) {
-            throw new EligibilityException("This loan exists in Foresight and cannot be deleted.");
+            throw new EligibilityException("This loan cannot be deleted from the local archive.");
         }
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             LoanApplication loan = load(id, actor, true);
@@ -83,9 +57,9 @@ public class ArchivedLoanDeletionService {
                 .setParameter("id", id.toString()).executeUpdate();
             loanAttachmentService.deleteAll(id);
             auditService.logEvent("LOAN_APPLICATION", id, "ARCHIVED_LOAN_DELETED", actor.getMemberId(),
-                AuditEventStatus.SUCCESS, "Archived loan deleted after Foresight confirmed it was not found",
+                AuditEventStatus.SUCCESS, "Archived loan deleted after local archive checks passed",
                 "LOAN", loan.getLoanId(), loan.getSaccoId(), loan.getStationId(),
-                Map.of("loanId", loan.getLoanId(), "reason", "FORESIGHT_NOT_FOUND"));
+                Map.of("loanId", loan.getLoanId(), "reason", "LOCAL_ARCHIVE_DELETE"));
             entityManager.remove(loan);
         });
     }

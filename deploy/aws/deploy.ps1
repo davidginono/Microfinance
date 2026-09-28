@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($PublicDomain)) {
-    $PublicDomain = "lms.foresight.co.tz"
+    $PublicDomain = "microfinance.example.com"
 }
 
 function Invoke-AwsJson {
@@ -227,7 +227,6 @@ function Add-IngressIfMissing {
 
 $stackSlug = "$AppName-$Environment"
 $parameterPrefix = "/$AppName/$Environment"
-$foresightBaseUrl = "https://api.foresightfin.app"
 $repositoryName = $AppName
 $roleName = "$stackSlug-ec2-role"
 $profileName = "$stackSlug-instance-profile"
@@ -286,8 +285,8 @@ if ($subnetIds.Count -lt 2) {
     throw "RDS needs at least two subnets in different AZs."
 }
 
-$webSgId = Ensure-SecurityGroup -Name $webSgName -Description "SACCOS LMS public web access" -VpcId $vpcId
-$dbSgId = Ensure-SecurityGroup -Name $dbSgName -Description "SACCOS LMS RDS access from app host only" -VpcId $vpcId
+$webSgId = Ensure-SecurityGroup -Name $webSgName -Description "Microfinance LMS public web access" -VpcId $vpcId
+$dbSgId = Ensure-SecurityGroup -Name $dbSgName -Description "Microfinance LMS RDS access from app host only" -VpcId $vpcId
 Add-IngressIfMissing -GroupId $webSgId -Port 80 -Cidr "0.0.0.0/0"
 Add-IngressIfMissing -GroupId $webSgId -Port 443 -Cidr "0.0.0.0/0"
 Add-IngressIfMissing -GroupId $dbSgId -Port 5432 -SourceGroupId $webSgId
@@ -305,7 +304,7 @@ if (-not $subnetGroupExists) {
     & aws rds create-db-subnet-group `
         --region $Region `
         --db-subnet-group-name $dbSubnetGroupName `
-        --db-subnet-group-description "SACCOS LMS RDS subnets" `
+        --db-subnet-group-description "Microfinance LMS RDS subnets" `
         --subnet-ids $subnetIds *> $null
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to create RDS subnet group"
@@ -421,8 +420,6 @@ if ($dbCreated -or $OverwriteExistingConfig) {
     Put-Parameter -Name "$parameterPrefix/SPRING_DATASOURCE_PASSWORD" -Value $dbPassword -Type "SecureString"
 }
 Put-Parameter -Name "$parameterPrefix/APP_BASE_URL" -Value $baseUrl -Type "String" -Force
-Put-Parameter -Name "$parameterPrefix/EXTERNAL_FORESIGHT_BASE_URL" -Value $foresightBaseUrl -Type "String" -Force
-Put-Parameter -Name "$parameterPrefix/EXTERNAL_MEMBERPORTAL_BASE_URL" -Value $foresightBaseUrl -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_SERVLET_SESSION_COOKIE_SECURE" -Value "true" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_FORWARD_HEADERS_STRATEGY" -Value "framework" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_SERVLET_JSP_DEVELOPMENT" -Value "false" -Type "String" -Force

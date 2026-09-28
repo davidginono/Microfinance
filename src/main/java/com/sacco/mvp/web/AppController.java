@@ -12,7 +12,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
-import com.sacco.mvp.service.ForesightRepaymentScheduleService;
+import com.sacco.mvp.service.LoanRepaymentScheduleDisplayService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -30,8 +30,6 @@ import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.service.SmsUnitTransactionService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserSettingsService;
-import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
-import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.service.dto.FormModel;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -104,7 +102,7 @@ public class AppController {
     private final LoanPresentationService loanPresentationService;
     private final LoanPaymentSummarySyncService loanPaymentSummarySyncService;
     private final ActiveLoanDisplayService activeLoanDisplayService;
-    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
+    private final LoanRepaymentScheduleDisplayService repaymentScheduleDisplayService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
@@ -119,7 +117,6 @@ public class AppController {
     private final PaymentDetailsService paymentDetailsService;
     private final MemberDirectoryService memberDirectoryService;
     private final UserSettingsService userSettingsService;
-    private final ForesightDirectoryService foresightDirectoryService;
     private final ObjectMapper objectMapper;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
     private final MessageSource messageSource;
@@ -243,7 +240,7 @@ public class AppController {
                                                                      @AuthenticationPrincipal AppUserPrincipal principal) {
         LoanApplication app = loanWorkflowService.getMine(id, principal.getMemberId());
         Member member = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, member).toPayload());
+        return ResponseEntity.ok(repaymentScheduleDisplayService.loadLocalLoanSchedule(app, member).toPayload());
     }
 
     @GetMapping("/active-loans/{loanId}/repayment-schedule")
@@ -252,7 +249,7 @@ public class AppController {
     public ResponseEntity<Map<String, Object>> externalActiveLoanRepaymentSchedule(@PathVariable String loanId,
                                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
         Member member = memberDirectoryService.find(principal.getMemberId()).orElse(null);
-        return ResponseEntity.ok(foresightRepaymentScheduleService
+        return ResponseEntity.ok(repaymentScheduleDisplayService
             .loadExternalLoanSchedule(member, principal.getStationId(), loanId)
             .toPayload());
     }
@@ -1636,11 +1633,6 @@ public class AppController {
                 .map(this::directOtpCandidateRow)
                 .toList();
             return ResponseEntity.ok(Map.of("items", items));
-        } catch (UpstreamAvailabilityException ex) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
-                "items", List.of(),
-                "message", ex.getMessage()
-            ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "items", List.of(),
@@ -1661,12 +1653,6 @@ public class AppController {
             return ResponseEntity.ok(Map.of(
                 "summaries", details.summaries().stream().map(this::directOtpPaymentSummaryRow).toList(),
                 "transactions", details.transactions().stream().map(this::directOtpPaymentTransactionRow).toList()
-            ));
-        } catch (UpstreamAvailabilityException ex) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
-                "message", ex.getMessage(),
-                "summaries", List.of(),
-                "transactions", List.of()
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -1761,7 +1747,8 @@ public class AppController {
                                                                 @RequestParam BigDecimal amount,
                                                                 @RequestParam Integer tenorMonths,
                                                                 @RequestParam(required = false) UUID applicationId,
-                                                                @RequestParam(required = false) UUID topUpLoanId) {
+                                                                @RequestParam(required = false) UUID topUpLoanId,
+                                                                @RequestParam Map<String, String> requestParams) {
         try {
             loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId, applicationId);
             LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
@@ -1769,8 +1756,15 @@ public class AppController {
                 principal.getSaccoId(), principal.getMemberId(), product, amount, tenorMonths, topUpLoanId);
             BigDecimal effectiveAmount = Optional.ofNullable(readBigDecimal(snapshot.get("principalAmount")))
                 .orElse(amount);
+            Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-                principal.getSaccoId(), principal.getMemberId(), product, effectiveAmount);
+                principal.getSaccoId(),
+                principal.getMemberId(),
+                product,
+                effectiveAmount,
+                formData,
+                snapshot
+            );
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("snapshotJson", financialDetailsService.toJson(snapshot));
             response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
@@ -1806,7 +1800,7 @@ public class AppController {
                                                          Integer tenorMonths,
                                                          UUID applicationId,
                                                          UUID topUpLoanId) {
-        return financialPreview(principal, null, loanType, amount, tenorMonths, applicationId, topUpLoanId);
+        return financialPreview(principal, null, loanType, amount, tenorMonths, applicationId, topUpLoanId, Map.of());
     }
 
     @GetMapping("/loan-applications/external-eligibility-summary")

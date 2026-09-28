@@ -60,7 +60,7 @@
                     </div>
                 </div>
                 <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="admin.saccoRegistry.station" text="Station" /></div>
+                    <div class="applicant-info-label"><spring:message code="admin.saccoRegistry.station" text="Branch" /></div>
                     <div class="applicant-info-value">
                         <c:choose>
                             <c:when test="${not empty applicant.stationId}">${applicant.stationId}</c:when>
@@ -77,14 +77,14 @@
 
 <c:if test="${not hideDisbursementSupportSections}">
 <div class="loan-view-summary-card mt-5 px-5 py-5"
-     <c:if test="${activeApplicantLoansForesightEnabled}">data-staff-active-loans-section="true" data-active-loans-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans"</c:if>>
+     <c:if test="${activeApplicantLoansEnabled}">data-staff-active-loans-section="true" data-active-loans-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans"</c:if>>
     <div>
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
                 <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantActiveLoansHelp" text="Other disbursed loans that are still active for this applicant at the time of review." /></p>
             </div>
-            <c:if test="${activeApplicantLoansForesightEnabled}">
+            <c:if test="${activeApplicantLoansEnabled}">
                 <button type="button"
                         class="app-icon-button btn-neutral shrink-0"
                         data-staff-active-loans-refresh
@@ -290,7 +290,7 @@
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="Member.memberNo" text="Client No" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="common.status" text="Status" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="financial.status" text="Financial Status" /></th>
@@ -332,11 +332,11 @@
                     </button>
                     <div class="guarantor-financial-result hidden">
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Savings" /></span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Disposable Income" /></span>
                             <span class="guarantor-financial-result-value" data-financial-savings>-</span>
 </div>
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Shares" /></span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Risk History" /></span>
                             <span class="guarantor-financial-result-value" data-financial-shares>-</span>
                         </div>
                         <div class="guarantor-financial-result-note" data-financial-note></div>
@@ -578,15 +578,15 @@
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.loanId" text="Loan ID" /> <span class="text-rose-600">*</span></label>
                 <input type="text" name="loanId" value="${app.loanId}"
                        pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
-                       title="<spring:message code='loan.disbursement.loanIdTitle' text='Enter the SACCO loan-book number (4-20 digits)' />"
+                       title="<spring:message code='loan.disbursement.loanIdTitle' text='Enter the institution loan-book number (4-20 digits)' />"
                        class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                       placeholder="<spring:message code='loan.disbursement.loanIdPlaceholder' text='SACCO loan-book number (digits only)' />" />
-                <p class="mt-1 text-xs text-slate-500"><spring:message code="loan.disbursement.loanIdHelp" text="Entered at disbursement. 4-20 digits, unique within this SACCO." /></p>
+                       placeholder="<spring:message code='loan.disbursement.loanIdPlaceholder' text='Institution loan-book number (digits only)' />" />
+                <p class="mt-1 text-xs text-slate-500"><spring:message code="loan.disbursement.loanIdHelp" text="Entered at disbursement. 4-20 digits, unique within this institution." /></p>
         </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>
                 <div class="erp-section-muted text-sm text-slate-600">
-                    <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The actual repayment schedule is retrieved from Foresight." />
+                    <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The local repayment schedule is created at disbursement." />
         </div>
                 </div>
             </div>

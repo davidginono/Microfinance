@@ -6,7 +6,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Member Workspace / Application Progress" /></p>
+    <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Client Workspace / Application Progress" /></p>
     <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
 </div>
 <c:set var="hasAwaitingGuarantors" value="false" />

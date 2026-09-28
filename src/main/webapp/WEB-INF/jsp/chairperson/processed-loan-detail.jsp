@@ -60,7 +60,7 @@
 
 <section class="erp-panel mt-4 overflow-hidden" data-aws-table-region>
     <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-900"><spring:message code="review.guarantors" text="Guarantors" /></h2></div>
-    <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="common.name" text="Name" /></th><th><spring:message code="member.memberNo" text="Member No" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="common.amount" text="Amount" /></th><th><spring:message code="review.reason" text="Reason" /></th></tr></thead><tbody>
+    <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="common.name" text="Name" /></th><th><spring:message code="Member.memberNo" text="Client No" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="common.amount" text="Amount" /></th><th><spring:message code="review.reason" text="Reason" /></th></tr></thead><tbody>
         <c:forEach items="${loan.guarantors}" var="guarantor"><tr><td><c:out value="${guarantor.name}" /></td><td><c:out value="${guarantor.memberNo}" /></td><td><c:out value="${guarantor.status}" /></td><td><fmt:formatNumber value="${guarantor.committedAmount}" maxFractionDigits="2" /></td><td><c:out value="${guarantor.reason}" /></td></tr></c:forEach>
         <c:if test="${empty loan.guarantors}"><tr><td colspan="5" class="py-5 text-center text-sm text-slate-500"><spring:message code="review.noGuarantors" text="No guarantor records." /></td></tr></c:if>
     </tbody></table></div>

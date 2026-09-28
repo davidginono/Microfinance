@@ -44,6 +44,7 @@ public class ManagerService {
     private final WorkflowRoutingService workflowRoutingService;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final RepaymentScheduleService repaymentScheduleService;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -411,14 +412,29 @@ public class ManagerService {
         }
         app.setDepositAmount(effectiveDepositAmount);
         app.setDisbursementDate(disbursementDate);
-        app.setFirstRepaymentDate(null);
-        app.setRepaymentFrequency(null);
-        app.setInstallmentAmount(null);
-        app.setFinalDueDate(null);
         app.setLoanId(normalisedLoanId);
         app.setDisbursementReference(blankToNull(disbursementReference));
         app.setDisbursementNotes(blankToNull(disbursementNotes));
-        app.setRepaymentScheduleJson(null);
+        RepaymentFrequency effectiveFrequency = repaymentFrequency == null
+            ? resolveProduct(app).getResolvedRepaymentFrequency()
+            : repaymentFrequency;
+        LocalDate effectiveFirstRepaymentDate = firstRepaymentDate == null
+            ? defaultFirstRepaymentDate(disbursementDate, effectiveFrequency)
+            : firstRepaymentDate;
+        RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
+            app,
+            disbursementDate,
+            effectiveFirstRepaymentDate,
+            effectiveFrequency,
+            installmentAmount,
+            disbursementReference,
+            disbursementNotes
+        );
+        app.setFirstRepaymentDate(effectiveFirstRepaymentDate);
+        app.setRepaymentFrequency(effectiveFrequency);
+        app.setInstallmentAmount(schedule.installmentAmount());
+        app.setFinalDueDate(schedule.finalDueDate());
+        app.setRepaymentScheduleJson(schedule.scheduleJson());
         if (hasUploadedProof) {
             app.setAttachmentsJson(loanAttachmentService.store(
                 app.getId(),
@@ -558,12 +574,24 @@ public class ManagerService {
         if (app == null || app.getLoanType() == null) {
             return true;
         }
+        return resolveProduct(app).isDisbursementProofRequired();
+    }
+
+    private LoanProductSetting resolveProduct(LoanApplication app) {
+        if (app == null || app.getLoanType() == null) {
+            throw new IllegalArgumentException("Loan product is not available for this application");
+        }
         java.util.Optional<LoanProductSetting> product = app.getLoanProductSettingId() == null
             ? loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType())
             : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId());
-        return product
-            .map(LoanProductSetting::isDisbursementProofRequired)
-            .orElse(true);
+        return product.orElseThrow(() -> new IllegalArgumentException("Loan product is not available for this application"));
+    }
+
+    private LocalDate defaultFirstRepaymentDate(LocalDate disbursementDate, RepaymentFrequency frequency) {
+        if (frequency == RepaymentFrequency.WEEKLY) {
+            return disbursementDate.plusWeeks(1);
+        }
+        return disbursementDate.plusMonths(1);
     }
 
     private boolean hasDisbursementProofAttachment(LoanApplication app) {

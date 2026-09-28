@@ -323,7 +323,7 @@ class LoanPresentationServiceTest {
     }
 
     @Test
-    void activeLoanOutstandingBalancePrefersForesightPaymentSummaryValues() {
+    void activeLoanOutstandingBalancePrefersLocalPaymentSummaryValues() {
         LoanApplication app = LoanApplication.builder()
             .amount(new BigDecimal("500000.00"))
             .status(LoanStatus.DISBURSED)
@@ -331,12 +331,12 @@ class LoanPresentationServiceTest {
                 {
                   "interestAmount": 25000.00,
                   "principalPlusInterest": 525000.00,
-                  "foresightTotalOutstanding": 445000.00,
-                  "foresightOutstandingPrincipal": 425000.00,
-                  "foresightOutstandingInterest": 20000.00,
-                  "foresightTotalPrincipalPaid": 75000.00,
-                  "foresightTotalInterestPaid": 5000.00,
-                  "foresightLastPaymentDate": "2024-04-10"
+                  "paymentSummaryTotalOutstanding": 445000.00,
+                  "paymentSummaryOutstandingPrincipal": 425000.00,
+                  "paymentSummaryOutstandingInterest": 20000.00,
+                  "paymentSummaryTotalPrincipalPaid": 75000.00,
+                  "paymentSummaryTotalInterestPaid": 5000.00,
+                  "paymentSummaryLastPaymentDate": "2024-04-10"
                 }
                 """)
             .build();

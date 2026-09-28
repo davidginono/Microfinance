@@ -96,7 +96,7 @@
                         <thead>
                         <tr>
                             <th>Page</th>
-                            <c:if test="${usageShowSaccoColumn}"><th>SACCO</th></c:if>
+                            <c:if test="${usageShowSaccoColumn}"><th>Institution</th></c:if>
                             <th class="text-right">Views</th>
                         </tr>
                         </thead>
@@ -132,7 +132,7 @@
                         <thead>
                         <tr>
                             <th>User</th>
-                            <c:if test="${usageShowSaccoColumn}"><th>SACCO</th></c:if>
+                            <c:if test="${usageShowSaccoColumn}"><th>Institution</th></c:if>
                             <th>Role</th>
                             <th>Page</th>
                             <th>Last Activity</th>
@@ -329,9 +329,9 @@
                 return;
             }
             body.innerHTML = rows.map(function (row) {
-                const saccoCell = showSaccoColumn ? '<td class="break-words text-slate-600">' + escapeHtml(row.saccoId) + '</td>' : '';
+                const SaccoCell = showSaccoColumn ? '<td class="break-words text-slate-600">' + escapeHtml(row.saccoId) + '</td>' : '';
                 return '<tr><td class="break-words font-medium text-slate-800">' + escapeHtml(row.label)
-                    + '</td>' + saccoCell + '<td class="text-right font-semibold">' + formatNumber(row.total) + '</td></tr>';
+                    + '</td>' + SaccoCell + '<td class="text-right font-semibold">' + formatNumber(row.total) + '</td></tr>';
             }).join('');
         }
 
@@ -343,10 +343,10 @@
                 return;
             }
             body.innerHTML = rows.map(function (row) {
-                const saccoCell = showSaccoColumn ? '<td class="break-words text-slate-600">' + escapeHtml(row.saccoId) + '</td>' : '';
+                const SaccoCell = showSaccoColumn ? '<td class="break-words text-slate-600">' + escapeHtml(row.saccoId) + '</td>' : '';
                 return '<tr>'
                     + '<td class="break-words font-medium text-slate-800">' + escapeHtml(row.displayName) + '</td>'
-                    + saccoCell
+                    + SaccoCell
                     + '<td class="break-words">' + escapeHtml(row.roles) + '</td>'
                     + '<td class="break-words">' + escapeHtml(row.currentPage) + '</td>'
                     + '<td class="break-words">' + escapeHtml(row.lastActivityLabel) + '</td>'

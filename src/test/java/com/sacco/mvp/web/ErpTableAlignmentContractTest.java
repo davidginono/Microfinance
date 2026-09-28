@@ -20,7 +20,7 @@ class ErpTableAlignmentContractTest {
 
     @Test
     void sharedTableStylesAlignHeadersWithBodyCellsAndPreserveExplicitAlignment() throws Exception {
-        String shellCss = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
+        String shellCss = normalizedCss();
 
         assertThat(shellCss)
             .containsPattern("(?s)\\.erp-table th \\{.*?text-align: left !important;.*?vertical-align: top;")
@@ -32,7 +32,7 @@ class ErpTableAlignmentContractTest {
 
     @Test
     void laptopTableColumnLabelsStayOnOneLineInsideScrollableTables() throws Exception {
-        String shellCss = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
+        String shellCss = normalizedCss();
 
         assertThat(shellCss)
             .contains("""
@@ -49,7 +49,7 @@ class ErpTableAlignmentContractTest {
 
     @Test
     void tableValuesWrapBetweenWordsButNeverInsideWords() throws Exception {
-        String shellCss = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
+        String shellCss = normalizedCss();
 
         assertThat(shellCss)
             .contains("""
@@ -104,6 +104,11 @@ class ErpTableAlignmentContractTest {
     private boolean isJspView(Path path) {
         String name = path.getFileName().toString();
         return name.endsWith(".jsp") || name.endsWith(".jspf");
+    }
+
+    private String normalizedCss() throws Exception {
+        return Files.readString(Path.of("src/main/resources/static/css/shell.css"))
+            .replace("\r\n", "\n");
     }
 
     private boolean contains(String[] values, String expected) {

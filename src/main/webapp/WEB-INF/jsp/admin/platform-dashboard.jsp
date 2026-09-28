@@ -12,7 +12,7 @@
     <div class="erp-stat-card erp-stat-blue">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Registered SACCOs</p>
+                <p class="erp-stat-label">Registered Institutions</p>
                 <p class="erp-stat-value">${platformDashboard.totalSaccos}</p>
                 <p class="erp-stat-meta">New: ${platformDashboard.newSaccos} | Healthy: ${platformDashboard.healthySaccos}</p>
             </div>
@@ -23,13 +23,13 @@
     <div class="erp-stat-card erp-stat-green">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Members</p>
+                <p class="erp-stat-label">Clients</p>
                 <p class="erp-stat-value">${platformDashboard.totalMembers}</p>
-                <p class="erp-stat-meta">Across all active SACCO workspaces</p>
+                <p class="erp-stat-meta">Across all active institution workspaces</p>
             </div>
             <span class="erp-stat-icon">M</span>
         </div>
-        <div class="erp-stat-footer"><span>Platform-wide member base</span><span>${platformDashboard.totalMembers}</span></div>
+        <div class="erp-stat-footer"><span>Platform-wide client base</span><span>${platformDashboard.totalMembers}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-amber">
         <div class="erp-stat-main">
@@ -45,7 +45,7 @@
     <div class="erp-stat-card erp-stat-red">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">At Risk SACCOs</p>
+                <p class="erp-stat-label">At Risk Institutions</p>
                 <p class="erp-stat-value">${platformDashboard.atRiskSaccos}</p>
                 <p class="erp-stat-meta">Failed outbox events: ${platformDashboard.failedOutboxCount}</p>
             </div>
@@ -62,8 +62,8 @@
     <div class="erp-panel">
         <div class="erp-panel-header">
             <div>
-                <p class="erp-panel-title">SACCO Portfolio</p>
-                <p class="mt-1 text-sm text-slate-500">Portfolio cards for every registered SACCO.</p>
+                <p class="erp-panel-title">Institution Portfolio</p>
+                <p class="mt-1 text-sm text-slate-500">Portfolio cards for every registered institution.</p>
             </div>
         </div>
         <div class="erp-panel-body space-y-4">

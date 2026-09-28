@@ -56,7 +56,7 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void memberDashboardActiveLoansUsesForesightBalanceRefreshControl() throws Exception {
+    void memberDashboardActiveLoansUsesLocalBalanceRefreshControl() throws Exception {
         String dashboard = read(JSP_ROOT.resolve("app/dashboard.jsp"));
 
         assertThat(dashboard)

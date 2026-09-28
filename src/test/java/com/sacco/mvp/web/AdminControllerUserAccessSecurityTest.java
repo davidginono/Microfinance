@@ -281,9 +281,9 @@ class AdminControllerUserAccessSecurityTest {
                 .param("enabled", "true")
                 .param("baseUrl", "https://api.bentergroup.com")
                 .param("sendPath", "/version1/messaging/bulk")
-                .param("clientId", "foresight")
+                .param("clientId", "microfinance")
                 .param("apiKey", "api-key")
-                .param("senderId", "FORESIGHT")
+                .param("senderId", "MFI")
                 .param("connectTimeoutSeconds", "3")
                 .param("readTimeoutSeconds", "8")
                 .with(csrf())
@@ -295,9 +295,9 @@ class AdminControllerUserAccessSecurityTest {
             true,
             "https://api.bentergroup.com",
             "/version1/messaging/bulk",
-            "foresight",
+            "microfinance",
             "api-key",
-            "FORESIGHT",
+            "MFI",
             3,
             8,
             principal.getMemberId()
@@ -485,7 +485,7 @@ class AdminControllerUserAccessSecurityTest {
     void sendTestEmailRedirectsWithErrorFlashWhenSmtpConnectionFails() throws Exception {
         AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
         doThrow(new MailSendException(
-            "Mail server connection failed. Couldn't connect to host, port: smtp.foresight.co.tz, 465; timeout 10000",
+            "Mail server connection failed. Couldn't connect to host, port: smtp.microfinance.local, 465; timeout 10000",
             new SocketTimeoutException("Connect timed out")
         )).when(platformEmailSettingsService).sendTestEmail(any(), any());
 
@@ -497,7 +497,7 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(redirectedUrl("/admin/platform-settings"))
             .andExpect(flash().attribute(
                 "error",
-                "Test email could not be sent. Connection to smtp.foresight.co.tz on port 465 timed out."
+                "Test email could not be sent. Connection to smtp.microfinance.local on port 465 timed out."
             ))
             .andExpect(flash().attribute("message", org.hamcrest.Matchers.nullValue()));
     }

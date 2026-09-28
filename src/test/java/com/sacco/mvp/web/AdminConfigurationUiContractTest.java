@@ -229,7 +229,7 @@ class AdminConfigurationUiContractTest {
         String smsIndex = read(Path.of("src/main/resources/db/migration/V39__sms_usage_report_filter_index.sql"));
 
         assertThat(smsUsage)
-            .contains("Station SMS Balances")
+            .contains("Branch SMS Balances")
             .contains("app-table-titlebar")
             .contains("aws-filter-toolbar")
             .contains("data-sms-applicant-filter")
@@ -290,7 +290,7 @@ class AdminConfigurationUiContractTest {
             .contains("Total Applied")
             .contains("Disbursed Principal")
             .contains("Loan Applications by Status")
-            .contains("No disbursed or rejected loan applications found for this SACCO.")
+            .contains("No disbursed or rejected loan applications found for this institution.")
             .doesNotContain("Paid Loans")
             .doesNotContain("Overdue Unpaid")
             .doesNotContain("Recent Loan Activity")

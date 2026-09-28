@@ -114,7 +114,7 @@
                     </div>
                     <div class="mt-2 space-y-1 text-sm text-slate-600">
                         <p id="productsEligibilityMessage"><spring:message code="products.eligibilityResult.message" /></p>
-                        <p><strong><spring:message code="products.eligibilityResult.savings" />:</strong> <span id="productsSavingsLabel">-</span></p>
+                        <p><strong><spring:message code="products.eligibilityResult.savings" />:</strong> <span id="productssavingsLabel">-</span></p>
                         <p><strong><spring:message code="products.eligibilityResult.ratio" />:</strong> <span id="productsRatioLabel">-</span></p>
                         <p><strong><spring:message code="products.eligibilityResult.maximum" />:</strong> <span id="productsMaxAllowedLabel">-</span></p>
                     </div>
@@ -328,7 +328,7 @@
         const editFiguresButton = document.querySelector("[data-calculator-edit]");
         const applyLink = document.getElementById("productsCalculatorApplyLink");
         const calculatorSteps = Array.from(document.querySelectorAll("[data-calculator-step]"));
-        const savingsLabel = document.getElementById("productsSavingsLabel");
+        const savingsLabel = document.getElementById("productssavingsLabel");
         const ratioLabel = document.getElementById("productsRatioLabel");
         const maxAllowedLabel = document.getElementById("productsMaxAllowedLabel");
         const csrfToken = "${_csrf.token}";

@@ -37,7 +37,6 @@ class LoanQualificationPolicyServiceTest {
     @Mock private ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     @Mock private SaccoStationPolicyRepository saccoStationPolicyRepository;
     @Mock private LoanAnalyticsService loanAnalyticsService;
-    @Mock private EligibilityService eligibilityService;
 
     private LoanQualificationPolicyService service;
 
@@ -49,8 +48,7 @@ class LoanQualificationPolicyServiceTest {
             memberRepository,
             externalGuarantorRegistryRepository,
             saccoStationPolicyRepository,
-            loanAnalyticsService,
-            eligibilityService
+            loanAnalyticsService
         );
     }
 
@@ -265,9 +263,9 @@ class LoanQualificationPolicyServiceTest {
     }
 
     @Test
-    void productMinimumSavingsPolicyBlocksGuarantorForThatProduct() {
+    void productMinimumSavingsPolicyNoLongerBlocksGuarantorForThatProduct() {
         UUID guarantorId = UUID.randomUUID();
-        givenGuarantorSavingsPolicy(guarantorId, "50000.00");
+        givenGuarantorPolicy(guarantorId);
 
         Optional<String> reason = service.guarantorFailureReason(
             SACCO_ID,
@@ -275,42 +273,6 @@ class LoanQualificationPolicyServiceTest {
             null,
             LoanProductSetting.builder()
                 .guarantorMinSavingsCheckRequired(true)
-                .guarantorMinimumSavings(new BigDecimal("100000.00"))
-                .build()
-        );
-
-        assertThat(reason)
-            .hasValue("Disabled: guarantor savings are 50000.00, below the required minimum of 100000.00 for this loan product.");
-    }
-
-    @Test
-    void productMinimumSavingsPolicyIsIgnoredWhenProductCheckIsOff() {
-        UUID guarantorId = UUID.randomUUID();
-        when(saccoSettingsRepository.findById(SACCO_ID))
-            .thenReturn(Optional.of(SaccoSettings.builder()
-                .saccoId(SACCO_ID)
-                .build()));
-        when(memberRepository.findById(guarantorId))
-            .thenReturn(Optional.of(Member.builder()
-                .id(guarantorId)
-                .saccoId(SACCO_ID)
-                .stationId(STATION_ID)
-                .memberNo("MEM-001")
-                .fullName("Test Guarantor")
-                .memberAccount(true)
-                .status(MemberStatus.ACTIVE)
-                .position(Position.MEMBER)
-                .createdAt(OffsetDateTime.now())
-                .build()));
-        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
-            .thenReturn(Optional.empty());
-
-        Optional<String> reason = service.guarantorFailureReason(
-            SACCO_ID,
-            guarantorId,
-            null,
-            LoanProductSetting.builder()
-                .guarantorMinSavingsCheckRequired(false)
                 .guarantorMinimumSavings(new BigDecimal("100000.00"))
                 .build()
         );
@@ -369,7 +331,7 @@ class LoanQualificationPolicyServiceTest {
         );
     }
 
-    private void givenGuarantorSavingsPolicy(UUID guarantorId, String currentSavings) {
+    private void givenGuarantorPolicy(UUID guarantorId) {
         when(saccoSettingsRepository.findById(SACCO_ID))
             .thenReturn(Optional.of(SaccoSettings.builder()
                 .saccoId(SACCO_ID)
@@ -388,8 +350,6 @@ class LoanQualificationPolicyServiceTest {
                 .build()));
         when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
             .thenReturn(Optional.empty());
-        when(eligibilityService.resolveSavings(guarantorId))
-            .thenReturn(new BigDecimal(currentSavings));
     }
 
 }

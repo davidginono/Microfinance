@@ -37,7 +37,7 @@
             return [
                 "<tr data-repayment-schedule-empty>",
                 "<td colspan=\"7\" class=\"px-3 py-4 text-center text-sm text-slate-600\">",
-                escapeHtml(valueOrDash(message || "Repayment schedule is not available from Foresight yet.")),
+                escapeHtml(valueOrDash(message || "Repayment schedule is not available yet.")),
                 "</td>",
                 "</tr>"
             ].join("");

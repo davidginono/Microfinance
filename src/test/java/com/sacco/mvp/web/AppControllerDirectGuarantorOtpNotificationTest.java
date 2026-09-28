@@ -10,7 +10,6 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
-import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.FormSchemaService;
@@ -57,7 +56,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
     @InjectMocks private AppController controller;
 
     @Test
-    void directOtpSearchReportsMemberDirectoryOutage() {
+    void directOtpSearchReportsLocalDirectoryProblem() {
         UUID applicantId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
         LoanProductSetting product = LoanProductSetting.builder()
@@ -78,10 +77,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             "tahasaccos@gmail.com",
             "email",
             product
-        )).thenThrow(new UpstreamAvailabilityException(
-            "Member directory is unavailable right now. Please try again later.",
-            null
-        ));
+        )).thenThrow(new IllegalStateException("Client directory is unavailable right now. Please try again later."));
 
         var response = controller.searchDirectOtpGuarantors(
             principal,
@@ -91,10 +87,10 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             LoanType.DEVELOPMENT_LOAN
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody())
             .containsEntry("items", java.util.List.of())
-            .containsEntry("message", "Member directory is unavailable right now. Please try again later.");
+            .containsEntry("message", "Client directory is unavailable right now. Please try again later.");
     }
 
     @Test
@@ -197,7 +193,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
     }
 
     @Test
-    void directGuarantorOtpNotificationSupportsForesightOnlyRequest() {
+    void directGuarantorOtpNotificationSupportsLocalDirectoryRequest() {
         UUID loanId = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
@@ -218,7 +214,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             .id(requestId)
             .loanApplicationId(loanId)
             .guarantorMemberId(null)
-            .guarantorSource("FORESIGHT")
+            .guarantorSource("LMS")
             .externalMemberNo("EXT-77")
             .externalStationId("ST-1")
             .externalFullName("Asha Mtei")

@@ -126,7 +126,7 @@ public class FinancialDetailsService {
         if (sourceLoan == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal syncedOutstanding = financialSnapshotAmount(sourceLoan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING);
+        BigDecimal syncedOutstanding = financialSnapshotAmount(sourceLoan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING);
         if (syncedOutstanding != null) {
             return syncedOutstanding.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         }

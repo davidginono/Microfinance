@@ -36,7 +36,7 @@
                         aria-selected="${activeLoginTab eq 'member'}"
                         data-login-tab-toggle="member"
                         data-active="${activeLoginTab eq 'member'}">
-                    Members
+                    Clients
                 </button>
                 <button type="button"
                         id="staffLoginTab"
@@ -54,7 +54,7 @@
         <div class="pb-1">
 
                     <c:if test="${param.error != null}">
-                        <div hidden data-toast-message="${fn:escapeXml(not empty errorMessage ? errorMessage : 'Invalid member number or password.')}" data-toast-type="error" data-mfa-email-fallback="${not empty errorMessage and fn:contains(errorMessage, 'SMS OTP')}"></div>
+                        <div hidden data-toast-message="${fn:escapeXml(not empty errorMessage ? errorMessage : 'Invalid Client Number or password.')}" data-toast-type="error" data-mfa-email-fallback="${not empty errorMessage and fn:contains(errorMessage, 'SMS OTP')}"></div>
                     </c:if>
                     <c:if test="${not empty errorMessage and param.error == null}">
                         <div hidden data-toast-message="${fn:escapeXml(errorMessage)}" data-toast-type="error" data-mfa-email-fallback="${fn:contains(errorMessage, 'SMS OTP')}"></div>
@@ -108,7 +108,7 @@
                             </form>
                         </div>
                         <div class="auth-login-meta border-t border-slate-200 pt-6 text-center text-sm">
-                            <a href="/login" class="auth-text-link">Member or staff login</a>
+                            <a href="/login" class="auth-text-link">Client or staff login</a>
                         </div>
                     </div>
                     </c:when>
@@ -117,12 +117,12 @@
                     <div id="memberLoginPanel" role="tabpanel" aria-labelledby="memberLoginTab" data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'member'}">hidden</c:if>>
                         <div class="auth-mode-card space-y-4">
                             <div>
-                                <p class="auth-mode-title">Member Number &amp; Password</p>
+                                <p class="auth-mode-title">Client Number &amp; Password</p>
                             </div>
                             <form action="/login" method="post" class="space-y-4" data-login-password-form>
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <div>
-                                    <label class="mb-2 block auth-section-label">Member Number</label>
+                                    <label class="mb-2 block auth-section-label">Client Number</label>
                                     <input name="username" autocomplete="username" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
@@ -168,7 +168,7 @@
                     <div id="staffLoginPanel" role="tabpanel" aria-labelledby="staffLoginTab" data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'staff'}">hidden</c:if>>
                         <div class="auth-mode-card space-y-4">
                             <div>
-                                <p class="auth-mode-title">Member Number &amp; Password</p>
+                                <p class="auth-mode-title">Client Number &amp; Password</p>
                             </div>
                             <form action="/login" method="post" class="space-y-4" data-login-password-form>
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -235,7 +235,7 @@
         <div class="flex items-start justify-between border-b border-slate-200 px-5 py-4">
             <div>
                 <h2 class="text-lg font-bold text-slate-900">Reset password</h2>
-                <p id="forgotPasswordSubtitle" class="mt-1 text-sm text-slate-500">Enter your member number. The code goes to the email saved on your account.</p>
+                <p id="forgotPasswordSubtitle" class="mt-1 text-sm text-slate-500">Enter your Client Number. The code goes to the email saved on your account.</p>
             </div>
             <button type="button" class="px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-forgot-password-close aria-label="Close modal">&times;</button>
         </div>
@@ -246,7 +246,7 @@
             <div id="forgotPasswordError" class="hidden border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"></div>
             <div id="forgotPasswordSuccess" class="hidden border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700"></div>
             <div>
-                <label id="forgotPasswordUsernameLabel" class="mb-1.5 block auth-section-label">Member Number</label>
+                <label id="forgotPasswordUsernameLabel" class="mb-1.5 block auth-section-label">Client Number</label>
                 <input id="forgotPasswordUsername" autocomplete="username" required class="auth-input w-full px-4 py-3 text-slate-900" />
                 <p class="mt-2 text-xs text-slate-500">We will send the OTP to the registered email for this account.</p>
             </div>
@@ -995,14 +995,14 @@
                 if (usernameLabel) {
                     usernameLabel.textContent = accountTypeInput.value === 'system-admin'
                         ? 'System Admin ID'
-                        : (accountTypeInput.value === 'staff' ? 'Staff Number' : 'Member Number');
+                        : (accountTypeInput.value === 'staff' ? 'Staff Number' : 'Client Number');
                 }
                 if (subtitle) {
                     subtitle.textContent = accountTypeInput.value === 'system-admin'
                         ? 'Enter your System Admin ID. The code goes to the email saved on your account.'
                         : (accountTypeInput.value === 'staff'
                             ? 'Enter your staff number. The code goes to the email saved on your account.'
-                            : 'Enter your member number. The code goes to the email saved on your account.');
+                            : 'Enter your Client Number. The code goes to the email saved on your account.');
                 }
                 otpInput.value = '';
                 passwordInput.value = '';

@@ -26,7 +26,6 @@ public class LoanQualificationPolicyService {
     private final ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     private final SaccoStationPolicyRepository saccoStationPolicyRepository;
     private final LoanAnalyticsService loanAnalyticsService;
-    private final EligibilityService eligibilityService;
 
     public void assertApplicantEligible(String saccoId, UUID memberId) {
         applicantFailureReason(saccoId, memberId).ifPresent(reason -> {
@@ -80,19 +79,6 @@ public class LoanQualificationPolicyService {
         }
         String stationId = resolveMemberStationId(guarantorMemberId);
         ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
-        BigDecimal minSavings = product == null || !product.isGuarantorMinSavingsCheckRequired()
-            ? null
-            : positive(product.getGuarantorMinimumSavings());
-        if (minSavings != null) {
-            BigDecimal savings = eligibilityService.resolveSavings(guarantorMemberId);
-            if (savings.compareTo(minSavings) < 0) {
-                return Optional.of("Disabled: guarantor savings are "
-                    + formatAmount(savings)
-                    + ", below the required minimum of "
-                    + formatAmount(minSavings)
-                    + " for this loan product.");
-            }
-        }
         if (!policy.guarantorWithActiveLoanAllowed()
             && nullToZero(loanAnalyticsService.activeLoanAmount(guarantorMemberId, saccoId, stationId)).compareTo(BigDecimal.ZERO) > 0) {
             return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
@@ -119,7 +105,7 @@ public class LoanQualificationPolicyService {
                                                               String stationId,
                                                               String externalMemberNo,
                                                               String externalStationId,
-                                                              BigDecimal savings,
+                                                              BigDecimal declaredIncome,
                                                               int activeLoanCount,
                                                               int defaultedRiskLoanCount,
                                                               BigDecimal pendingGuaranteedAmount,
@@ -129,16 +115,6 @@ public class LoanQualificationPolicyService {
             return Optional.empty();
         }
         ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
-        BigDecimal minSavings = product == null || !product.isGuarantorMinSavingsCheckRequired()
-            ? null
-            : positive(product.getGuarantorMinimumSavings());
-        if (minSavings != null && nullToZero(savings).compareTo(minSavings) < 0) {
-            return Optional.of("Disabled: guarantor savings are "
-                + formatAmount(savings)
-                + ", below the required minimum of "
-                + formatAmount(minSavings)
-                + " for this loan product.");
-        }
         if (!policy.guarantorWithActiveLoanAllowed() && activeLoanCount > 0) {
             return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
         }

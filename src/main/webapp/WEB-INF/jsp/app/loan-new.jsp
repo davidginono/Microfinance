@@ -11,7 +11,7 @@
     <p class="erp-breadcrumb"><spring:message code="newloan.breadcrumb" /></p>
     <h1 class="erp-page-title"><spring:message code="newloan.title" />: <c:out value="${loanProductName}" /></h1>
 </div>
-<c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
+<c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your institution'}" />
 <div class="mb-4 erp-section-muted">
     <div class="flex flex-wrap items-center gap-2">
         <h5 class="erp-panel-title"><spring:message code="newloan.eligibilityGuide.title" /></h5>
@@ -1448,12 +1448,25 @@
             financialButton.disabled = true;
             financialButton.classList.add("opacity-60", "cursor-not-allowed");
             try {
+                const previewParams = new URLSearchParams();
+                new FormData(form).forEach(function (value, key) {
+                    if (value instanceof File) {
+                        return;
+                    }
+                    previewParams.set(key, value);
+                });
+                previewParams.set("${_csrf.parameterName}", csrfInput.value);
+                previewParams.set("loanProductId", "${loanProductId}");
+                previewParams.set("loanType", "${loanType}");
+                previewParams.set("amount", amountInput.value);
+                previewParams.set("tenorMonths", tenorInput.value);
+                previewParams.set("applicationId", "${formValues['applicationId']}");
+                previewParams.set("topUpLoanId", topUpLoanIdInput ? topUpLoanIdInput.value : "");
                 const response = await fetch("/app/loan-applications/financial-preview", {
                     method: "POST",
                     headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                     },
-                    body: new URLSearchParams({"${_csrf.parameterName}": csrfInput.value,"loanProductId":"${loanProductId}","loanType":"${loanType}","amount": amountInput.value,"tenorMonths": tenorInput.value,"applicationId":"${formValues['applicationId']}","topUpLoanId": topUpLoanIdInput ? topUpLoanIdInput.value :""
-                    })
+                    body: previewParams
                 });
 
                 if (!response.ok) {
@@ -1602,7 +1615,7 @@
             const msgValidGuarantorSearch = "<spring:message code='newloan.js.validGuarantorSearch' text='Ready to search.' />";
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
-            const msgMemberDirectoryUnavailable = "<spring:message code='newloan.js.memberDirectoryUnavailable' text='Member directory is unavailable right now. Please try again later.' />";
+            const msgMemberDirectoryUnavailable = "<spring:message code='newloan.js.memberDirectoryUnavailable' text='Client directory is unavailable right now. Please try again later.' />";
             const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
             const msgDirectOtpSearchModeChanged = "<spring:message code='newloan.js.directOtpSearchModeChanged' text='Select guarantors again for this approval mode.' />";
             const modeNumberLabel = "<spring:message code='newloan.guarantors.modeNumber' />";
@@ -1616,7 +1629,7 @@
             const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
             const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
             const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Use Tanzania format 255XXXXXXXXX or 0XXXXXXXXX, for example 255746359369.' />";
-            const emailHint = "<spring:message code='newloan.guarantors.emailHint' text='Direct OTP searches the member profile portal by email address.' />";
+            const emailHint = "<spring:message code='newloan.guarantors.emailHint' text='Direct OTP searches the client profile portal by email address.' />";
             const searchConfigurations = {
                 LOGIN: [
                     { value: "number", label: modeNumberLabel, placeholder: numberPlaceholder, hint: numberHint },
@@ -1824,7 +1837,7 @@
                 if (!item) {
                     return null;
                 }
-                const source = item.source === "FORESIGHT" ? "FORESIGHT" : "LMS";
+                const source = "LMS";
                 const payload = { source: source };
                 const localId = item.localMemberId || (source === "LMS" && /^[0-9a-f-]{36}$/i.test(item.id || "") ? item.id : "");
                 if (localId) {
@@ -2036,7 +2049,7 @@
                             + "</div>";
                         row.querySelector("[data-select-guarantor]").addEventListener("click", function () {
                             if (!eligible) {
-                                hint.textContent = item.disabledReason || "<spring:message code='newloan.js.guarantorDisabled' text='This guarantor is disabled by SACCO policy.' />";
+                                hint.textContent = item.disabledReason || "<spring:message code='newloan.js.guarantorDisabled' text='This guarantor is disabled by institution policy.' />";
                                 return;
                             }
                             selectCandidate(item);

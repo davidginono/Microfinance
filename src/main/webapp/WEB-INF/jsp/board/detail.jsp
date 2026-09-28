@@ -38,14 +38,14 @@
 <%@ include file="../fragments/applicant-payment-details.jspf" %>
 
 <div class="loan-view-summary-card mt-5 px-5 py-5"
-     <c:if test="${activeApplicantLoansForesightEnabled}">data-staff-active-loans-section="true" data-active-loans-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans"</c:if>>
+     <c:if test="${activeApplicantLoansEnabled}">data-staff-active-loans-section="true" data-active-loans-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans"</c:if>>
     <div>
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
                 <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantActiveLoansHelp" text="Other disbursed loans that are still active for this applicant at the time of review." /></p>
             </div>
-            <c:if test="${activeApplicantLoansForesightEnabled}">
+            <c:if test="${activeApplicantLoansEnabled}">
                 <button type="button"
                         class="app-icon-button btn-neutral shrink-0"
                         data-staff-active-loans-refresh
@@ -163,7 +163,7 @@
             <thead>
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="review.assessor" text="Assessor" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+                <th class="px-3 py-2 text-left"><spring:message code="Member.memberNo" text="Client No" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="review.decision" text="Decision" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="review.comment" text="Comment" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="review.submitted" text="Submitted" /></th>
@@ -288,7 +288,7 @@
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="Member.memberNo" text="Client No" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="common.status" text="Status" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="financial.status" text="Financial Status" /></th>
@@ -330,11 +330,11 @@
                     </button>
                     <div class="guarantor-financial-result hidden">
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Savings" /></span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Disposable Income" /></span>
                             <span class="guarantor-financial-result-value" data-financial-savings>-</span>
             </div>
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Shares" /></span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Risk History" /></span>
                             <span class="guarantor-financial-result-value" data-financial-shares>-</span>
             </div>
                         <div class="guarantor-financial-result-note" data-financial-note></div>

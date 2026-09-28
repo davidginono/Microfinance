@@ -4,7 +4,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.*;
-import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -78,7 +77,6 @@ public class AdminService {
     private final MinorAdminInvitationService minorAdminInvitationService;
     private final ObjectMapper objectMapper;
     private final NameSignatureService nameSignatureService;
-    private final ForesightDirectoryService foresightDirectoryService;
     private final ApplicationClock applicationClock;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
@@ -2698,13 +2696,12 @@ public class AdminService {
         if (normalizedPhone == null) {
             throw new IllegalStateException("Enter the staff member phone number.");
         }
-        ExternalMemberPrecheck externalMemberPrecheck = verifyExternalMemberDirectory(normalizedEmail, normalizedPhone);
         Optional<Member> existingLocalMember = findLocalMemberByIdentity(normalizedEmail, normalizedPhone);
 
-        if (externalMemberPrecheck.memberFound()) {
+        if (existingLocalMember.isPresent() && existingLocalMember.get().isMemberAccess()) {
             Member member = existingLocalMember
                 .filter(Member::isMemberAccess)
-                .orElseThrow(() -> new IllegalStateException("This person is registered in Foresight as a member. Ask them to register as an LMS member first, then add them as SACCOS Admin."));
+                .orElseThrow(() -> new IllegalStateException("This person must be a registered local client before staff access can be added."));
             ensureExistingMemberIdentityMatches(member, normalizedEmail, normalizedPhone);
             ensureExistingMemberScopeMatches(member, saccoId, normalizedStationId);
             return assignStaffAccessToExistingMember(member, normalizedFullName, normalizedEmail, normalizedPhone,
@@ -2755,22 +2752,6 @@ public class AdminService {
             minorAdminInvitationService.issueInvitation(saved, adminId);
         }
         return saved;
-    }
-
-    private ExternalMemberPrecheck verifyExternalMemberDirectory(String normalizedEmail, String normalizedPhone) {
-        ForesightDirectoryService.MemberProfileLookupResult phoneLookup =
-            foresightDirectoryService.lookupMemberProfileByPhone("+" + normalizedPhone);
-        ForesightDirectoryService.MemberProfileLookupResult emailLookup =
-            foresightDirectoryService.lookupMemberProfileByEmailV2(normalizedEmail);
-
-        if (!isExternalMemberLookupResolved(phoneLookup) || !isExternalMemberLookupResolved(emailLookup)) {
-            throw new IllegalStateException("We could not verify this person against Foresight. Try again later.");
-        }
-        return new ExternalMemberPrecheck(phoneLookup.isFound() || emailLookup.isFound());
-    }
-
-    private boolean isExternalMemberLookupResolved(ForesightDirectoryService.MemberProfileLookupResult lookup) {
-        return lookup != null && (lookup.isFound() || lookup.isNotFound());
     }
 
     private Optional<Member> findLocalMemberByIdentity(String normalizedEmail, String normalizedPhone) {
@@ -2831,9 +2812,6 @@ public class AdminService {
         }
         auditService.log("MEMBER", saved.getId(), auditAction, adminId, before, snapshotMember(saved));
         return saved;
-    }
-
-    private record ExternalMemberPrecheck(boolean memberFound) {
     }
 
     public String userIdLabel(UUID accountId) {

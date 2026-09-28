@@ -4,7 +4,7 @@
     <c:when test="${empty portfolioSummaries}">
         <section class="erp-panel">
             <div class="erp-panel-body">
-                <p class="text-sm text-slate-500">No SACCOs have been registered yet.</p>
+                <p class="text-sm text-slate-500">No institutions have been registered yet.</p>
             </div>
         </section>
     </c:when>
@@ -43,7 +43,7 @@
 
                         <dl class="grid grid-cols-2 gap-3 text-sm">
                             <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Members</dt>
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Clients</dt>
                                 <dd class="mt-1 font-semibold text-slate-900">${summary.totalMembers}</dd>
                             </div>
                             <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
@@ -69,7 +69,7 @@
                         </dl>
 
                         <div class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                            <p class="font-semibold text-slate-800">Stations</p>
+                            <p class="font-semibold text-slate-800">Branches</p>
                             <p class="mt-1">${summary.stationListLabel}</p>
                             <p class="mt-2 text-xs text-slate-500">${summary.healthNote}</p>
                         </div>

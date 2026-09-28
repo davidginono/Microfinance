@@ -241,9 +241,9 @@ class LoanPortfolioRiskStatusServiceTest {
     private String outstandingSnapshot(String outstanding, String principalPaid, String interestPaid) {
         return """
             {
-              "foresightTotalOutstanding": "%s",
-              "foresightTotalPrincipalPaid": "%s",
-              "foresightTotalInterestPaid": "%s"
+              "paymentSummaryTotalOutstanding": "%s",
+              "paymentSummaryTotalPrincipalPaid": "%s",
+              "paymentSummaryTotalInterestPaid": "%s"
             }
             """.formatted(outstanding, principalPaid, interestPaid);
     }

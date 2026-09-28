@@ -39,7 +39,7 @@
             validationMinimumAmount: "${validationMinimumAmount}",
             validationMaximumAmountPositive: "${validationMaximumAmountPositive}",
             validationMaximumBelowMinimum: "${validationMaximumBelowMinimum}",
-            validationSavingsPercent: "${validationSavingsPercent}",
+            validationsavingsPercent: "${validationsavingsPercent}",
             validationInsurancePercent: "${validationInsurancePercent}",
             validationAnnualInterestPercent: "${validationAnnualInterestPercent}",
             validationMinRepaymentMonths: "${validationMinRepaymentMonths}",
@@ -580,7 +580,7 @@
                 productCodeField.value = generateProductCode(productNameField.value);
             }
 
-            function syncSavingsMultiplierFromPercent() {
+            function syncsavingsMultiplierFromPercent() {
                 if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
                     return;
                 }
@@ -593,7 +593,7 @@
                 syncingSavingsRatio = false;
             }
 
-            function syncSavingsPercentFromMultiplier() {
+            function syncsavingsPercentFromMultiplier() {
                 if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
                     return;
                 }
@@ -833,7 +833,7 @@
                 const productDescription = form.querySelector('[name="productDescription"]');
                 const minimumAmount = numberOrNull(form.querySelector('[name="minimumAmount"]'));
                 const maximumAmount = numberOrNull(form.querySelector('[name="maximumAmount"]'));
-                const savingsPercent = numberOrNull(form.querySelector('[name="maxLoanSavingsPercent"]'));
+                const savingsPercent = numberOrNull(form.querySelector('[name="maxLoansavingsPercent"]'));
                 const applicationFee = numberOrNull(form.querySelector('[name="applicationFee"]'));
                 const insurancePercent = numberOrNull(form.querySelector('[name="insurancePercent"]'));
                 const processingFeePercent = numberOrNull(form.querySelector('[name="processingFeePercent"]'));
@@ -877,7 +877,7 @@
                     addValidationError(errors, 'maximumAmount', productSettingsText.validationMaximumBelowMinimum);
                 }
                 if (savingsPercent === null || Number.isNaN(savingsPercent) || savingsPercent < 0 || savingsPercent > 1000) {
-                    addValidationError(errors, 'maxLoanSavingsPercent', productSettingsText.validationSavingsPercent);
+                    addValidationError(errors, 'maxLoansavingsPercent', productSettingsText.validationsavingsPercent);
                 }
                 if (applicationFee === null || Number.isNaN(applicationFee) || applicationFee < 0) {
                     addValidationError(errors, 'applicationFee', productSettingsText.validationApplicationFee);
@@ -978,18 +978,18 @@
                 .filter(Boolean)
                 .forEach((field) => {
                     field.addEventListener('change', () => {
-                        syncSavingsPercentFromMultiplier();
+                        syncsavingsPercentFromMultiplier();
                         applyRules({ notify: true });
                     });
                     field.addEventListener('input', () => {
-                        syncSavingsPercentFromMultiplier();
+                        syncsavingsPercentFromMultiplier();
                         applyRules();
                     });
                 });
             if (savingsPercentInput) {
-                savingsPercentInput.addEventListener('change', syncSavingsMultiplierFromPercent);
-                savingsPercentInput.addEventListener('input', syncSavingsMultiplierFromPercent);
-                syncSavingsMultiplierFromPercent();
+                savingsPercentInput.addEventListener('change', syncsavingsMultiplierFromPercent);
+                savingsPercentInput.addEventListener('input', syncsavingsMultiplierFromPercent);
+                syncsavingsMultiplierFromPercent();
             }
             [managerStartRadio, loanOfficerStartRadio].filter(Boolean).forEach((field) => {
                 field.addEventListener('change', () => {

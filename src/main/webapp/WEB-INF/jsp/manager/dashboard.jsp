@@ -175,7 +175,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 </c:choose>
 <c:set var="dashboardTotalDisbursedHrefValue" value="#recentDisbursements" />
 <c:set var="dashboardActiveDisbursedHrefValue" value="#recentDisbursements" />
-<c:set var="dashboardDefaultedHrefValue" value="#stationLoanStatusChart" />
+<c:set var="dashboardDefaultedHrefValue" value="#StationLoanStatusChart" />
 <c:choose>
     <c:when test="${dashboardDetailBasePathValue eq '/manager/loan-applications'}">
         <c:set var="dashboardTotalDisbursedHrefValue" value="/manager/archive?filter=DISBURSED" />
@@ -233,7 +233,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     </a>
 </section>
 
-<section id="stationLoanStatusChart" class="erp-panel">
+<section id="StationLoanStatusChart" class="erp-panel">
     <div class="erp-panel-header">
         <div>
             <p class="erp-panel-title">${dashboardChartTitleValue}</p>

@@ -74,7 +74,7 @@
                 <p class="text-sm font-semibold text-sacco-ink">Report should include</p>
                 <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
                     <li>Loan Application ID</li>
-                    <li>Member details</li>
+                    <li>Client details</li>
                     <li>Approved product</li>
                     <li>Approved amount and tenure</li>
                     <li>Estimated fee/insurance deductions</li>
@@ -108,7 +108,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
                         <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Loan Application ID</td><td class="px-4 py-3">Application reference</td></tr>
-                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Member Number</td><td class="px-4 py-3">Member identifier</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Client Number</td><td class="px-4 py-3">Client identifier</td></tr>
                         <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Approved Amount</td><td class="px-4 py-3">Approved amount</td></tr>
                         <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Handoff Status</td><td class="px-4 py-3">Pending/exported/captured/exception</td></tr>
                         <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Loan ID</td><td class="px-4 py-3">Captured loan identifier</td></tr>
