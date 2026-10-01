@@ -1,23 +1,42 @@
 # AGENTS.md
 
-This file gives coding agents project-specific guidance for working in `IAA_SACCOS`.
+This file gives coding agents project-specific guidance for working in `Microfinance`.
 
 ## Project Overview
 
-- Project: `SACCO Loan Workflow MVP`
+- Project: `Microfinance Loan Management System`
+- Target: credit-policy-backed, non-deposit-taking microfinance in Tanzania Mainland.
+- Start with individual business lending; salary, group, and agricultural lending are separate product capabilities, not assumed existing features.
+- The conversion backlog and implementation gates live in `docs/microfinance-gap-checklist.md`.
 - Stack:
-  - Spring Boot 3.x
-  - Java
+  - Spring Boot 4.1.x (check `pom.xml` before choosing APIs)
+  - Java 25
   - Spring MVC + JSP/JSTL
   - Spring Security
   - Spring Data JPA + Hibernate
   - PostgreSQL
-  - Tailwind CSS via CDN in JSP pages
+  - Shared local CSS and Tailwind CSS in JSP pages
 - Auth model:
   - Session-based authentication
   - Form login
   - CSRF enabled
   - Not JWT-based
+
+## Microfinance Domain
+
+- Use `Institution` for the tenant, `Branch` for its operating location, and `Client` or `Borrower` for the person borrowing.
+- Preserve existing implementation identifiers unless a migration is explicitly requested:
+  - `sacco_id` / `saccoId` = institution / tenant
+  - `station_id` / `stationId` = branch
+  - `Member` / `memberId` / `memberNo` = existing client or user record / ID / client number
+  - `com.sacco.mvp`, existing routes, permission keys, and localization keys remain compatibility identifiers, not user-facing branding.
+- Do not require savings, shares, membership contributions, or deposit loading before a loan application or guarantor approval.
+- Assess borrowing using verified income and expenses, business or employment details, active debt, repayment history, affordability, guarantor capacity, documents, and collateral where the product requires it.
+- Loan products control limits, interest, tenure, fees, repayment frequency, guarantors, documents, collateral, and the approval path. Do not hardcode one approval path for every product.
+- Foresight integrations have been removed. Do not reintroduce their clients, configuration, endpoints, dependencies, or network-based savings checks.
+- Local schedules and JSON financial snapshots are not proof of posted repayments. Do not present balances as ledger-backed until repayment posting and reconciliation exist.
+- Separate verified information from client declarations and unavailable data. Never treat missing history or an unavailable integration as a clean credit record.
+- Research and forum discussions inform product discovery; only verified official sources and the institution's approved policy establish compliance requirements. Recheck current Tanzanian requirements for changes to pricing, contracts, reporting, or recovery.
 
 ## Run And Build
 
@@ -35,7 +54,7 @@ Default local URL:
 
 ## Key Application Areas
 
-- Member pages:
+- Client pages:
   - `src/main/webapp/WEB-INF/jsp/app`
 - Admin pages:
   - `src/main/webapp/WEB-INF/jsp/admin`
@@ -55,7 +74,7 @@ Default local URL:
   - `src/main/java/com/sacco/mvp/security/AppUserDetailsService.java`
   - `src/main/java/com/sacco/mvp/security/AppUserPrincipal.java`
   - `src/main/java/com/sacco/mvp/security/AuthzService.java`
-- Main member workflow:
+- Main client workflow:
   - `src/main/java/com/sacco/mvp/web/AppController.java`
   - `src/main/java/com/sacco/mvp/service/LoanWorkflowService.java`
 - Manager workflow:
@@ -80,6 +99,8 @@ Default local URL:
   - approval / rejection paths
 - Guarantor and board rules are business-critical.
 - Board review quorum and guarantor approval logic must remain consistent with service-layer rules.
+- Keep disbursement, repayment, arrears, default, restructuring, and settlement distinct. Do not mark a loan paid merely because its final due date passed or a top-up was approved.
+- Monetary mutations need transactional consistency, idempotency, auditability, and concurrency protection. Corrections to posted financial records must preserve history rather than overwrite or delete it.
 
 ## Security Notes
 
@@ -90,28 +111,44 @@ Default local URL:
   - `@PreAuthorize`
   - `AuthzService`
 - Do not weaken route or ownership checks without explicit instruction.
+- Institution and branch scope must be enforced on the server for reads, writes, exports, receipts, and document downloads. Do not trust hidden form fields or UI filters as access control.
+- Clients see their own records; guarantors receive only the information needed to understand and approve their liability.
+
+## Project UI Skills
+
+Read the relevant project-local skills before UI work:
+
+- `.agents/skills/microfinance-ui-governance/SKILL.md`: page flows, navigation, lending information, localization, and financial-action states.
+- `.agents/skills/microfinance-ui-style/SKILL.md`: shared ERP shell, controls, forms, modals, and responsive presentation.
+- `.agents/skills/microfinance-table-standard/SKILL.md`: client registries, review queues, repayment records, collections, reports, and pagination.
+
+The root `SKILL.md` routes to these maintained instructions. These are the project-specific UI references for this repository; old SACCO-specific skills are not its domain or branding specification. Keep reusable shell patterns without importing SACCO savings, share, or membership assumptions.
 
 ## UI Conventions
 
 - Shared shell styling lives primarily in:
   - `src/main/webapp/WEB-INF/jsp/fragments/header.jspf`
   - `src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf`
-- Treat the sidebar as the only global navigation for admin, member, manager, board, and chairperson pages.
+- Treat the sidebar as the only global navigation for staff and client workspaces.
 - Do not add duplicate navigation actions inside page bodies for destinations that already exist in the sidebar.
 - Keep dashboard routes focused on summary cards and high-level KPIs. Do not place registry tables, cross-workspace listings, or alternate route launchers on dashboards unless explicitly requested.
 - Keep portfolio views and registry views separate when both exist:
-  - `SACCOs` should remain a focused portfolio/workspace view
-  - `SACCO Registry` should be its own sidebar destination and view
-- Keep visual changes consistent with the current ERP-style admin/member layout.
+  - `Institutions` should remain a focused portfolio/workspace view
+  - `Institution Registry` should be its own sidebar destination and view
+- Keep visual changes consistent with the current ERP-style staff/client layout. Rebranding does not authorize a framework migration or a wholesale visual redesign.
 - Keep panel-header and toolbar action buttons compact by default. Do not stretch actions such as Restore Default Permissions to full width unless a specific mobile form flow explicitly calls for it.
 - Use one shared modal language across the app. Default to the shared modal shell with calm white surfaces, modest system-aligned corner radii, thin grey borders, light shadows, right-aligned footer actions, and a simple top-right close icon.
 - Reduce short-term memory overload:
   - keep page-header explanations brief
   - keep card-header helper text brief or omit it when the title already explains the section
   - avoid stacking multiple instructional sentences when one short line is enough
-- Prefer plain-language labels for non-technical SACCO staff:
+- Prefer plain-language labels for non-technical microfinance staff and clients:
   - avoid exposing internal codes or technical identifiers unless they are truly needed for the task
   - choose wording a layperson can understand at first glance
+- Show principal, due interest, fees, arrears, and total outstanding separately. Do not label the sum of future scheduled payments as today's settlement amount.
+- Use `TZS` for monetary context and distinguish transaction dates from instalment due dates. Keep approved rates and their time basis visible where clients make lending decisions.
+- Use the existing English/Kiswahili message bundles; do not hardcode English-only labels or invent untranslated regulatory disclosures. The default-language and digital-lending release requirements are tracked in the conversion backlog.
+- Keep mandated pricing, consent, guarantor liability, error, and complaint information even when reducing helper copy.
 - Preserve responsiveness across:
   - small mobile screens
   - tablets
@@ -137,16 +174,17 @@ Default local URL:
   - `All Guarantors Approved`
   - `On Review By Manager`
   - `On Review By Board`
-- Treat station scope as the default tenant boundary for workspace roles:
-  - when a workflow, registry, report, member list, incident list, or loan listing is filtered by SACCO for a workspace admin or station-bound role, prefer filtering to the selected station as well
-  - `LoanApplication.stationId` is now the first-class station reference for loan workflow, reporting, archive, queue, and loan-document visibility paths; prefer it over rebuilding station scope from the applicant member record
-  - if a path cannot be fully station-scoped because the current data model still lacks a first-class station reference for that record type, call that out clearly before widening access
+- The institution is the tenant boundary; branch scope is the default workspace boundary for branch-bound roles:
+  - filter workflows, registries, reports, client lists, incidents, and loan listings by institution and the selected branch
+  - `LoanApplication.stationId` is the first-class branch reference for loan workflow, reporting, archive, queue, and loan-document visibility paths; prefer it over rebuilding scope from the applicant record
+  - if a record lacks a first-class branch reference, call that out clearly before widening access
+  - institution-wide risk aggregation needs explicit authorization and minimal returned information; it does not authorize cross-branch registry access
 
 ## Testing Checklist
 
 After workflow or UI changes, validate as applicable:
 
-- Member:
+- Client:
   - `/app/dashboard`
   - `/app/loan-products`
   - `/app/loan-applications`
@@ -159,6 +197,8 @@ After workflow or UI changes, validate as applicable:
   - `/manager/loan-applications`
 - Board:
   - `/board/assigned`
+- Accountant and disbursement:
+  - validate the affected queues and record-specific actions when those areas change
 
 Also check:
 - login still works
@@ -167,6 +207,8 @@ Also check:
 - notification and profile dropdowns still behave correctly
 - no horizontal overflow appears on common screen sizes
 - responsiveness for mobile devices
+- institution/branch isolation and client ownership on affected routes
+- for financial changes: partial payments, rounding, duplicate submissions, reversals, concurrent posting, backdated payments, early settlement, and reconciliation
 
 ## Practical Guidance For Agents
 
@@ -174,6 +216,8 @@ Also check:
 - If the user asks about a workflow status, inspect `LoanWorkflowService` first.
 - If the user asks about a page layout issue, inspect shared fragments before editing individual JSPs.
 - If a modal is visually broken, check whether it is trapped inside the page shell instead of being attached to `document.body`.
+- For repayment or balance work, inspect `RepaymentScheduleService`, `LoanPaymentSummarySyncService`, `LoanPresentationService`, and `LoanAnalyticsService`; do not assume the current refresh service posts payments.
+- For affordability or guarantor changes, inspect `EligibilityService` and `LoanQualificationPolicyService` before modifying application or review pages.
 
 ## Safe Defaults
 
@@ -181,8 +225,9 @@ Also check:
 - Assume responsiveness matters for every UI change.
 - Assume user-facing IDs and labels should remain readable and domain-friendly.
 - Assume production changes must preserve a path toward at least 1,000 requests per second:
-  - never add unbounded `findAll()` or SACCO-wide list loading on request paths
-  - prefer tenant/station-scoped `Pageable`, `count`, `exists`, `top`, and aggregate queries
+  - never add unbounded `findAll()` or institution-wide list loading on request paths
+  - prefer institution/branch-scoped `Pageable`, `count`, `exists`, `top`, and aggregate queries
   - keep loan submit and review transactions short, indexed, and free of avoidable external or file work
   - avoid hot-row locks where a small allocation block, queue, or async worker preserves correctness
   - keep outbox/report/notification work batchable and configurable
+- This performance target is an architectural constraint, not a verified throughput claim.
