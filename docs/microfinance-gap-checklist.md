@@ -6,6 +6,10 @@ This is an implementation backlog based on targeted code inspection, not a compl
 
 Implementation update (2026-10-01): a limited local repayment increment now supports new ordinary disbursements, scheduled payments, receipts, linked reversals, and balanced clearing entries. See [Repayment Ledger Increment](repayment-ledger-increment.md) for supported operations and remaining release gates. The baseline gaps below are retained as an audit record; the full accounting/reconciliation slice is not complete.
 
+Credit-estimate update (2026-10-01): server-derived draft/submission snapshots, a shared decimal calculator, normalized affordability, explicit invalid/missing-data failures, anchored monthly dates, and new-quote disbursement term checks are implemented. See [Credit Estimate Increment](credit-estimate-increment.md). This does not complete verified underwriting, automatic existing-debt servicing, approved fee policy, accepted agreement versioning, or reconciliation.
+
+Credit-estimate verification (2026-10-01): the latest packaged build reports 743 tests with no failures, errors, or skips, including five disposable PostgreSQL tests. English Chromium/Playwright checks covered weekly quotes, failed assessments, invalid declarations, CSRF, stale-quote clearing, submitted-snapshot tampering, login/logout, and widths of 360, 768, 1366, and 1920 pixels without page overflow or application JavaScript errors. Kiswahili messages have regression coverage; this increment's Kiswahili browser flow was not verified.
+
 ### Verified Increment
 
 - `mvn package` passed 704 tests with no failures, errors, or skips, including five opt-in tests against disposable PostgreSQL 17.9. The WAR was packaged successfully.

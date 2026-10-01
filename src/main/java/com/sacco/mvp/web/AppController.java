@@ -5,6 +5,7 @@ import com.sacco.mvp.config.MemberLocaleInterceptor;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EligibilityService;
 import com.sacco.mvp.service.FinancialDetailsService;
+import com.sacco.mvp.service.LoanAmortizationCalculator;
 import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.AdminService;
 import com.sacco.mvp.service.ActiveLoanDisplayService;
@@ -1772,7 +1773,11 @@ public class AppController {
             response.put("snapshotJson", financialDetailsService.toJson(snapshot));
             response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
             response.put("fieldSections", loanPresentationService.parseFinancialFieldSections(financialDetailsService.toJson(snapshot)));
-            response.put("message", "Loan calculations loaded");
+            response.put("message", messageSource.getMessage(
+                eligibility.eligible() ? "newloan.assessment.estimate" : "newloan.assessment.failed", null,
+                eligibility.eligible() ? "Estimate calculated. Income, expenses, and debt declarations still require verification."
+                    : "Credit assessment requirements are not met. Check cash flow, repayment affordability, and required security.",
+                LocaleContextHolder.getLocale()));
             BigDecimal principalPlusInterest = readBigDecimal(snapshot.get("principalPlusInterest"));
             if (principalPlusInterest == null) {
                 principalPlusInterest = readBigDecimal(snapshot.get("loanPlusInterest"));
@@ -1782,6 +1787,7 @@ public class AppController {
             response.put("repaymentSchedule", previewRepaymentSchedule(effectiveAmount, tenorMonths, snapshot));
             Map<String, Object> eligibilityMap = new LinkedHashMap<>();
             eligibilityMap.put("eligible", eligibility.eligible());
+            eligibilityMap.put("verificationStatus", "DECLARED_NOT_VERIFIED");
             eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
             eligibilityMap.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
             eligibilityMap.put("savingsLimitCheckRequired", eligibility.savingsLimitCheckRequired());
@@ -2697,72 +2703,22 @@ public class AppController {
             .orElse(amount == null ? BigDecimal.ZERO : amount)
             .setScale(2, RoundingMode.HALF_UP);
         int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
-        BigDecimal annualRate = Optional.ofNullable(readBigDecimal(snapshot.get("interestRate")))
-            .orElse(BigDecimal.ZERO);
-        InterestMethod interestMethod = InterestMethod.FLAT_RATE;
-        Object rawMethod = snapshot.get("interestMethod");
-        if (rawMethod != null) {
-            try {
-                interestMethod = InterestMethod.valueOf(String.valueOf(rawMethod));
-            } catch (IllegalArgumentException ignored) {
-                interestMethod = InterestMethod.FLAT_RATE;
-            }
-        }
-
+        LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, snapshot);
         List<Map<String, String>> rows = new ArrayList<>();
-        BigDecimal runningPrincipal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        BigDecimal runningInterest = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        BigDecimal remainingPrincipal = principal;
-        BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
-        BigDecimal flatTotalInterest = Optional.ofNullable(readBigDecimal(snapshot.get("interestAmount")))
-            .orElseGet(() -> principal.multiply(annualRate)
-                .multiply(BigDecimal.valueOf(months))
-                .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP));
-        BigDecimal flatPrincipalBase = principal.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
-        BigDecimal flatInterestBase = flatTotalInterest.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
-        BigDecimal reducingInstallment = reducingInstallment(principal, monthlyRate, months);
         List<BigDecimal> installmentAmounts = new ArrayList<>();
-
-        for (int month = 1; month <= months; month++) {
-            BigDecimal principalComponent;
-            BigDecimal interestComponent;
-            BigDecimal installmentAmount;
-            if (interestMethod == InterestMethod.REDUCING_BALANCE) {
-                interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
-                principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                if (principalComponent.compareTo(BigDecimal.ZERO) < 0) {
-                    principalComponent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-                }
-                if (month == months) {
-                    principalComponent = principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP);
-                    installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                } else {
-                    installmentAmount = reducingInstallment;
-                }
-            } else {
-                principalComponent = month == months
-                    ? principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
-                    : flatPrincipalBase;
-                interestComponent = month == months
-                    ? flatTotalInterest.subtract(runningInterest).setScale(2, RoundingMode.HALF_UP)
-                    : flatInterestBase;
-                installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-            }
-
-            runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
-            runningInterest = runningInterest.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-            remainingPrincipal = principal.subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-
+        for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("pmtNo", String.valueOf(month));
-            row.put("month", "Month " + month);
-            row.put("payment", formatTzs(installmentAmount));
-            row.put("loanAmount", formatTzs(principalComponent));
-            row.put("interest", formatTzs(interestComponent));
-            row.put("installment", formatTzs(installmentAmount));
-            row.put("principal", formatTzs(principalComponent));
+            row.put("pmtNo", String.valueOf(installment.number()));
+            boolean weekly = "WEEKLY".equals(snapshot.get("repaymentFrequency"));
+            row.put("month", messageSource.getMessage(weekly ? "newloan.calculation.week" : "newloan.calculation.month",
+                null, weekly ? "Week" : "Month", LocaleContextHolder.getLocale()) + " " + installment.number());
+            row.put("payment", formatTzs(installment.amount()));
+            row.put("loanAmount", formatTzs(installment.principal()));
+            row.put("interest", formatTzs(installment.interest()));
+            row.put("installment", formatTzs(installment.amount()));
+            row.put("principal", formatTzs(installment.principal()));
             rows.add(row);
-            installmentAmounts.add(installmentAmount);
+            installmentAmounts.add(installment.amount());
         }
         applyInterestInclusivePreviewBalances(rows, installmentAmounts);
         return rows;
@@ -2785,19 +2741,6 @@ public class AppController {
             row.put("endingBalance", endingBalance);
             row.put("outstandingBalance", endingBalance);
         }
-    }
-
-    private BigDecimal reducingInstallment(BigDecimal principal, BigDecimal monthlyRate, int months) {
-        if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        if (monthlyRate == null || monthlyRate.compareTo(BigDecimal.ZERO) <= 0) {
-            return principal.divide(BigDecimal.valueOf(Math.max(months, 1)), 2, RoundingMode.HALF_UP);
-        }
-        double rate = monthlyRate.doubleValue();
-        double factor = 1d - Math.pow(1d + rate, -Math.max(months, 1));
-        return BigDecimal.valueOf(principal.doubleValue() * rate / factor)
-            .setScale(2, RoundingMode.HALF_UP);
     }
 
     private String formatTzs(BigDecimal amount) {

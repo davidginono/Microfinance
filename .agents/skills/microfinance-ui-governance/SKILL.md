@@ -27,6 +27,7 @@ description: Design, edit, or review JSP page flows, navigation, loan assessment
 - Show the currency and rate basis. A monthly rate must not look like an annual rate; an instalment amount must include its repayment frequency.
 - Do not call future scheduled interest a current settlement balance. Use server-calculated, dated values and disclose stale or unavailable balances.
 - Keep prices, contractual disclosures, and consent visible at the relevant decision, even when removing explanatory copy. Do not create new fees or settlement rules in the UI.
+- Present credit estimates as declared and unverified, not approved. Display the actual periodic instalment and its frequency separately from the monthly affordability amount; failed assessment must not receive a success state.
 - Receipts identify the loan, transaction reference, actual payment date, amount, channel, and posting status. An unconfirmed payment must not appear as posted or reduce the balance.
 
 ## Actions And Recovery

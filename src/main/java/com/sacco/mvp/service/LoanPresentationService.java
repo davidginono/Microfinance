@@ -4,7 +4,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.GuarantorRequest;
-import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.ManagerDecision;
@@ -254,12 +253,18 @@ public class LoanPresentationService {
                 tenorMonths = fallbackTenorMonths;
             }
             putValue(calculations, "Loan Period in Years", formatYears(tenorMonths));
-            putValue(calculations, "Number of Payments", tenorMonths);
+            putValue(calculations, "Number of Payments", firstNonNull(raw.get("numberOfPayments"), tenorMonths));
+            putValue(calculations, financialMessage("frequency", "Repayment Frequency"), repaymentFrequencyLabel(raw.get("repaymentFrequency")));
             BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
             if (principalPlusInterest != null) {
                 calculations.put("Loan Amount + Interest (TZS)", formatMoney(principalPlusInterest));
             }
-            addFinancialRow(calculations, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
+            if (raw.containsKey("periodicRepaymentAmount")) {
+                addFinancialRow(calculations, financialMessage("installment", "Installment Amount (TZS)"), raw.get("periodicRepaymentAmount"));
+                addFinancialRow(calculations, financialMessage("monthlyAffordability", "Monthly Affordability Amount (TZS)"), raw.get("monthlyRepaymentAmount"));
+            } else {
+                addFinancialRow(calculations, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
+            }
             Map<String, Map<String, Object>> sections = new LinkedHashMap<>();
             sections.put("Loan Calculations", calculations);
             sections.put("Loan Fees", fees);
@@ -520,8 +525,9 @@ public class LoanPresentationService {
             putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
             putValue(display, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
             putValue(display, "Loan Period in Years", formatYears(app.getTenorMonths()));
-            putValue(display, "Number of Payments", app.getTenorMonths());
-            putMoney(display, "Estimated Installment", raw.get("monthlyRepaymentAmount"));
+            putValue(display, "Number of Payments", firstNonNull(raw.get("numberOfPayments"), app.getTenorMonths()));
+            putValue(display, financialMessage("frequency", "Repayment Frequency"), repaymentFrequencyLabel(raw.get("repaymentFrequency")));
+            putMoney(display, "Estimated Installment", firstNonNull(raw.get("periodicRepaymentAmount"), raw.get("monthlyRepaymentAmount")));
             putMoney(display, "Total Interest", raw.get("interestAmount"));
             putMoney(display, "Total Principal", app.getAmount());
             putMoney(display, "Total Amount", raw.get("principalPlusInterest"));
@@ -670,73 +676,23 @@ public class LoanPresentationService {
             Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
             BigDecimal principal = app.getAmount().setScale(2, RoundingMode.HALF_UP);
             int months = app.getTenorMonths() == null || app.getTenorMonths() <= 0 ? 1 : app.getTenorMonths();
-            BigDecimal annualRate = toBigDecimal(raw.get("interestRate"));
-            if (annualRate == null) {
-                annualRate = BigDecimal.ZERO;
-            }
-            InterestMethod interestMethod = resolveInterestMethod(raw.get("interestMethod"));
-            BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
-            BigDecimal flatTotalInterest = toBigDecimal(raw.get("interestAmount"));
-            if (flatTotalInterest == null) {
-                flatTotalInterest = principal.multiply(annualRate)
-                    .multiply(BigDecimal.valueOf(months))
-                    .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-            }
-            BigDecimal flatPrincipalBase = principal.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
-            BigDecimal flatInterestBase = flatTotalInterest.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
-            BigDecimal reducingInstallment = toBigDecimal(raw.get("monthlyRepaymentAmount"));
-            if (reducingInstallment == null) {
-                reducingInstallment = reducingInstallment(principal, monthlyRate, months);
-            }
-
+            LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, raw);
             List<Map<String, Object>> rows = new ArrayList<>();
-            BigDecimal runningPrincipal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            BigDecimal runningInterest = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            BigDecimal remainingPrincipal = principal;
-            for (int month = 1; month <= months; month++) {
-                BigDecimal principalComponent;
-                BigDecimal interestComponent;
-                BigDecimal installmentAmount;
-                if (interestMethod == InterestMethod.REDUCING_BALANCE) {
-                    interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
-                    principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                    if (principalComponent.compareTo(BigDecimal.ZERO) < 0) {
-                        principalComponent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-                    }
-                    if (month == months) {
-                        principalComponent = principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP);
-                        installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                    } else {
-                        installmentAmount = reducingInstallment;
-                    }
-                } else {
-                    principalComponent = month == months
-                        ? principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
-                        : flatPrincipalBase;
-                    interestComponent = month == months
-                        ? flatTotalInterest.subtract(runningInterest).setScale(2, RoundingMode.HALF_UP)
-                        : flatInterestBase;
-                    installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                }
-
-                runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
-                runningInterest = runningInterest.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                remainingPrincipal = principal.subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-
+            for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
                 Map<String, Object> row = new LinkedHashMap<>();
-                row.put("installment", "Installment " + month);
-                row.put("installmentNumber", String.valueOf(month));
-                row.put("pmtNo", String.valueOf(month));
-                row.put("month", "Month " + month);
+                row.put("installment", "Installment " + installment.number());
+                row.put("installmentNumber", String.valueOf(installment.number()));
+                row.put("pmtNo", String.valueOf(installment.number()));
+                row.put("month", estimatePeriodLabel(raw) + " " + installment.number());
                 row.put("dueDate", "-");
-                row.put("amount", formatMoney(installmentAmount));
-                row.put("payment", formatMoney(installmentAmount));
-                row.put("loanAmount", formatMoney(principalComponent));
-                row.put("interest", formatMoney(interestComponent));
-                row.put("scheduledBreakdown", "Loan Amount: " + formatMoney(principalComponent) + "\nInterest: " + formatMoney(interestComponent));
-                row.put("scheduledPrincipalAmount", principalComponent);
-                row.put("scheduledInterestAmount", interestComponent);
-                row.put("scheduledTotalAmount", installmentAmount);
+                row.put("amount", formatMoney(installment.amount()));
+                row.put("payment", formatMoney(installment.amount()));
+                row.put("loanAmount", formatMoney(installment.principal()));
+                row.put("interest", formatMoney(installment.interest()));
+                row.put("scheduledBreakdown", "Loan Amount: " + formatMoney(installment.principal()) + "\nInterest: " + formatMoney(installment.interest()));
+                row.put("scheduledPrincipalAmount", installment.principal());
+                row.put("scheduledInterestAmount", installment.interest());
+                row.put("scheduledTotalAmount", installment.amount());
                 row.put("principalPaid", "-");
                 row.put("interestPaid", "-");
                 row.put("totalPaid", "-");
@@ -767,28 +723,20 @@ public class LoanPresentationService {
         }
     }
 
-    private InterestMethod resolveInterestMethod(Object value) {
-        if (value == null) {
-            return InterestMethod.FLAT_RATE;
+    private String repaymentFrequencyLabel(Object frequency) {
+        if (frequency == null) {
+            return null;
         }
-        try {
-            return InterestMethod.valueOf(String.valueOf(value));
-        } catch (IllegalArgumentException ex) {
-            return InterestMethod.FLAT_RATE;
-        }
+        return financialMessage(String.valueOf(frequency), humanizeValue(frequency));
     }
 
-    private BigDecimal reducingInstallment(BigDecimal principal, BigDecimal monthlyRate, int months) {
-        if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        if (monthlyRate == null || monthlyRate.compareTo(BigDecimal.ZERO) <= 0) {
-            return principal.divide(BigDecimal.valueOf(Math.max(months, 1)), 2, RoundingMode.HALF_UP);
-        }
-        double rate = monthlyRate.doubleValue();
-        double factor = 1d - Math.pow(1d + rate, -Math.max(months, 1));
-        return BigDecimal.valueOf(principal.doubleValue() * rate / factor)
-            .setScale(2, RoundingMode.HALF_UP);
+    private String estimatePeriodLabel(Map<String, Object> snapshot) {
+        return "WEEKLY".equals(snapshot.get("repaymentFrequency"))
+            ? financialMessage("week", "Week") : financialMessage("month", "Month");
+    }
+
+    private String financialMessage(String code, String fallback) {
+        return messageSource.getMessage("newloan.calculation." + code, null, fallback, LocaleContextHolder.getLocale());
     }
 
     private int indexOfLabel(List<String> labels, String target) {
@@ -2585,7 +2533,7 @@ public class LoanPresentationService {
                     repaymentRowValue(row, "endingBalance", "outstandingBalance")
                 });
             }
-            String[] headers = new String[]{"No.", "Month", "Beginning Balance", "Amount to Pay", "Loan Amount", "Interest", "Ending Balance"};
+            String[] headers = new String[]{"No.", "Period", "Beginning Balance", "Amount to Pay", "Loan Amount", "Interest", "Ending Balance"};
             float[] widths = new float[]{38f, 56f, 86f, 84f, 78f, 70f, contentWidth() - 412f};
             ensureSectionTableStartSpace(headers, widths, rows, SMALL_SIZE, SMALL_SIZE, CELL_PADDING_Y, 2f);
             drawSuperSectionStrip(title, null);

@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -184,6 +185,60 @@ class RepaymentScheduleServiceTest {
         assertThat(new BigDecimal(String.valueOf(
             repaymentScheduleService.parseRows(result.scheduleJson()).getFirst().get("interestComponent")
         )).compareTo(BigDecimal.ZERO)).isPositive();
+    }
+
+    @Test
+    void monthlyDatesStayAnchoredToOriginalRepaymentDay() {
+        var app = baseApplication("{\"interestMethod\":\"REDUCING_BALANCE\",\"interestRate\":0}");
+        app.setTenorMonths(3);
+        var result = repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
+            RepaymentFrequency.MONTHLY, null, null, null);
+        assertThat(repaymentScheduleService.parseRows(result.scheduleJson())).extracting(row -> row.get("dueDate"))
+            .containsExactly("2026-01-31", "2026-02-28", "2026-03-31");
+    }
+
+    @Test
+    void flatFallbackUsesAnnualRateAndTenure() {
+        var app = baseApplication("{\"interestMethod\":\"FLAT_RATE\",\"interestRate\":0.12}");
+        app.setTenorMonths(6);
+        var result = repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1),
+            RepaymentFrequency.MONTHLY, null, null, null);
+        assertThat(repaymentScheduleService.parseRows(result.scheduleJson()).stream()
+            .map(row -> new BigDecimal(String.valueOf(row.get("interestComponent"))))
+            .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo("7200.00");
+    }
+
+    @Test
+    void assessedTermsCannotBeChangedAtDisbursement() {
+        var app = baseApplication("""
+            {"calculationVersion":"DECIMAL_PERIODIC_V1","repaymentFrequency":"MONTHLY",
+             "interestMethod":"REDUCING_BALANCE","interestRate":0,"principalAmount":120000,
+             "periodicRepaymentAmount":10000,"interestAmount":0}
+            """);
+        assertThatThrownBy(() -> repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 8),
+            RepaymentFrequency.WEEKLY, null, null, null)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("reassessment");
+        assertThatThrownBy(() -> repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1),
+            RepaymentFrequency.MONTHLY, new BigDecimal("9000.00"), null, null))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("reassessment");
+    }
+
+    @Test
+    void invalidDatesAndOversizedOverridesFailBeforeProducingSchedule() {
+        var app = baseApplication("{\"interestMethod\":\"REDUCING_BALANCE\",\"interestRate\":0.12}");
+        assertThatThrownBy(() -> repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1),
+            RepaymentFrequency.MONTHLY, null, null, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1),
+            RepaymentFrequency.MONTHLY, new BigDecimal("120000.00"), null, null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void oldWeeklyQuoteKeepsLegacyCountUntilExplicitReassessment() {
+        var app = baseApplication("{\"interestMethod\":\"REDUCING_BALANCE\",\"interestRate\":0.12}");
+        var result = repaymentScheduleService.buildSchedule(app, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 8),
+            RepaymentFrequency.WEEKLY, null, null, null);
+        assertThat(result.installments()).isEqualTo(48);
+        assertThat(repaymentScheduleService.parseSummary(result.scheduleJson()).get("calculationVersion"))
+            .isEqualTo("LEGACY_PERIOD_COUNT_DECIMAL");
     }
 
     private LoanApplication baseApplication(String financialSnapshot) {

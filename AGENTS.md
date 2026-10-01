@@ -102,6 +102,16 @@ Default local URL:
 - Keep disbursement, repayment, arrears, default, restructuring, and settlement distinct. Do not mark a loan paid merely because its final due date passed or a top-up was approved.
 - Monetary mutations need transactional consistency, idempotency, auditability, and concurrency protection. Corrections to posted financial records must preserve history rather than overwrite or delete it.
 
+## Credit Calculation Rules
+
+- Use `LoanAmortizationCalculator` for quotes and newly generated repayment estimates/schedules; do not add separate double-based financial formulas in controllers, JSPs, or presentation services.
+- New quotes use `DECIMAL_PERIODIC_V1`. Preserve stored contracts and unversioned legacy period counts; do not reprice a disbursed loan by refreshing its product.
+- Derive draft and submission financial snapshots on the server. Borrower-supplied snapshot JSON is not an authoritative rate, principal, repayment, interest, or policy result.
+- Distinguish periodic instalments from monthly affordability amounts. Use the largest scheduled payment and normalize weekly payments consistently; retain exact final principal reconciliation.
+- A passing declared cash-flow estimate is not verified creditworthiness. Missing or invalid repayment/cash-flow values must fail the required assessment; do not assume missing expenses or debt are zero.
+- Disbursement must not silently change assessed repayment amounts, tenure, or frequency. Keep changed terms on an explicit reassessment/approval path.
+- Read `docs/credit-estimate-increment.md` for conventions, compatibility, and open policy/underwriting gates.
+
 ## Security Notes
 
 - The app uses Spring Security form login, not JWT.

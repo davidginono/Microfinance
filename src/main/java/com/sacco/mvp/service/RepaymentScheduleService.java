@@ -33,80 +33,55 @@ public class RepaymentScheduleService {
                                         BigDecimal installmentOverride,
                                         String disbursementReference,
                                         String disbursementNotes) {
-        int installments = frequency == RepaymentFrequency.WEEKLY
-            ? Math.max(app.getTenorMonths() * 4, 1)
-            : Math.max(app.getTenorMonths(), 1);
+        if (app == null || app.getTenorMonths() == null || app.getTenorMonths() < 1
+            || app.getTenorMonths() > LoanAmortizationCalculator.MAX_PAYMENTS || frequency == null
+            || disbursementDate == null || firstRepaymentDate == null || !firstRepaymentDate.isAfter(disbursementDate)) {
+            throw new IllegalArgumentException("Select valid terms and a first repayment date after disbursement.");
+        }
+        Map<String, Object> snapshot = parseSummary(app.getFinancialSnapshot());
+        boolean decimalQuote = LoanAmortizationCalculator.VERSION.equals(snapshot.get("calculationVersion"));
+        if (decimalQuote && !frequency.name().equals(snapshot.get("repaymentFrequency"))) {
+            throw new IllegalArgumentException("Repayment frequency differs from the assessed terms. Return the application for reassessment.");
+        }
+        int installments = decimalQuote ? LoanAmortizationCalculator.numberOfPayments(app.getTenorMonths(), frequency)
+            : frequency == RepaymentFrequency.WEEKLY ? app.getTenorMonths() * 4 : app.getTenorMonths();
         LoanProductSetting product = app.getLoanProductSettingId() == null
             ? loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType()).orElse(null)
             : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId()).orElse(null);
         BigDecimal configuredRate = resolveAnnualInterestRate(app, product);
         InterestMethod interestMethod = resolveInterestMethod(app, product);
-        BigDecimal totalFlatInterest = resolveFlatInterestAmount(app, configuredRate);
-        BigDecimal baseInstallment = installmentOverride != null && installmentOverride.compareTo(BigDecimal.ZERO) > 0
-            ? installmentOverride.setScale(2, RoundingMode.HALF_UP)
-            : defaultInstallment(app.getAmount(), installments, configuredRate, interestMethod, frequency, totalFlatInterest);
-
+        LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.calculate(
+            app.getAmount(), installments, configuredRate, interestMethod, frequency, installmentOverride,
+            resolveFlatInterestAmount(app, configuredRate));
+        BigDecimal baseInstallment = calculation.installment();
+        if (decimalQuote && (readBigDecimal(snapshot.get("tenorMonths")) == null
+            || BigDecimal.valueOf(app.getTenorMonths()).compareTo(readBigDecimal(snapshot.get("tenorMonths"))) != 0
+            || readBigDecimal(snapshot.get("numberOfPayments")) == null
+            || BigDecimal.valueOf(installments).compareTo(readBigDecimal(snapshot.get("numberOfPayments"))) != 0
+            || readBigDecimal(snapshot.get("maximumInstallmentAmount")) == null
+            || calculation.maximumInstallment().compareTo(readBigDecimal(snapshot.get("maximumInstallmentAmount"))) != 0
+            || readBigDecimal(snapshot.get("periodicRepaymentAmount")) == null
+            || baseInstallment.compareTo(readBigDecimal(snapshot.get("periodicRepaymentAmount"))) != 0
+            || readBigDecimal(snapshot.get("interestAmount")) == null
+            || calculation.totalInterest().compareTo(readBigDecimal(snapshot.get("interestAmount"))) != 0
+            || readBigDecimal(snapshot.get("principalAmount")) == null
+            || app.getAmount().compareTo(readBigDecimal(snapshot.get("principalAmount"))) != 0)) {
+            throw new IllegalArgumentException("Repayment amounts differ from the assessed terms. Return the application for reassessment.");
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
-        BigDecimal runningTotal = BigDecimal.ZERO;
-        BigDecimal runningPrincipal = BigDecimal.ZERO;
-        BigDecimal remainingPrincipal = app.getAmount().setScale(2, RoundingMode.HALF_UP);
-        LocalDate dueDate = firstRepaymentDate;
-        BigDecimal periodicRate = periodicRate(configuredRate, frequency);
-        BigDecimal runningInterest = BigDecimal.ZERO;
-        for (int index = 1; index <= installments; index++) {
-            BigDecimal installmentAmount;
-            BigDecimal principalComponent;
-            BigDecimal interestComponent;
-
-            if (interestMethod == InterestMethod.REDUCING_BALANCE) {
-                interestComponent = remainingPrincipal.multiply(periodicRate).setScale(2, RoundingMode.HALF_UP);
-                principalComponent = baseInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                if (principalComponent.compareTo(BigDecimal.ZERO) < 0) {
-                    principalComponent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-                }
-                if (index == installments) {
-                    principalComponent = app.getAmount().subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP);
-                    installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                } else {
-                    installmentAmount = baseInstallment;
-                }
-                remainingPrincipal = remainingPrincipal.subtract(principalComponent).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-                runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
-            } else {
-                BigDecimal principalBase = app.getAmount().divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
-                BigDecimal interestBase = totalFlatInterest.divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
-                interestComponent = index == installments
-                    ? totalFlatInterest.subtract(runningInterest).setScale(2, RoundingMode.HALF_UP)
-                    : interestBase;
-                if (installmentOverride != null && installmentOverride.compareTo(BigDecimal.ZERO) > 0) {
-                    installmentAmount = index == installments
-                        ? app.getAmount().add(totalFlatInterest).subtract(runningTotal).setScale(2, RoundingMode.HALF_UP)
-                        : baseInstallment;
-                    principalComponent = index == installments
-                        ? app.getAmount().subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
-                        : installmentAmount.subtract(interestComponent).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-                } else {
-                    principalComponent = index == installments
-                        ? app.getAmount().subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
-                        : principalBase;
-                    installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                }
-                runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
-                runningInterest = runningInterest.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
-                remainingPrincipal = app.getAmount().subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-            }
-
-            runningTotal = runningTotal.add(installmentAmount).setScale(2, RoundingMode.HALF_UP);
+        for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
+            LocalDate dueDate = frequency == RepaymentFrequency.WEEKLY
+                ? firstRepaymentDate.plusWeeks(installment.number() - 1L)
+                : firstRepaymentDate.plusMonths(installment.number() - 1L);
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("installmentNumber", index);
+            row.put("installmentNumber", installment.number());
             row.put("dueDate", dueDate.toString());
-            row.put("amount", installmentAmount);
-            row.put("principalComponent", principalComponent);
-            row.put("interestComponent", interestComponent);
-            row.put("outstandingBalance", remainingPrincipal);
+            row.put("amount", installment.amount());
+            row.put("principalComponent", installment.principal());
+            row.put("interestComponent", installment.interest());
+            row.put("outstandingBalance", installment.remainingPrincipal());
             row.put("status", "UPCOMING");
             rows.add(row);
-            dueDate = frequency == RepaymentFrequency.WEEKLY ? dueDate.plusWeeks(1) : dueDate.plusMonths(1);
         }
         applyInterestInclusiveOutstandingBalances(rows);
 
@@ -125,6 +100,7 @@ public class RepaymentScheduleService {
         summary.put("installments", installments);
         summary.put("interestMethod", interestMethod.name());
         summary.put("interestRate", configuredRate);
+        summary.put("calculationVersion", decimalQuote ? LoanAmortizationCalculator.VERSION : "LEGACY_PERIOD_COUNT_DECIMAL");
         summary.put("disbursementReference", disbursementReference == null ? "" : disbursementReference);
         summary.put("disbursementNotes", disbursementNotes == null ? "" : disbursementNotes);
         summary.put("schedule", rows);
@@ -195,51 +171,18 @@ public class RepaymentScheduleService {
         }
     }
 
-    private BigDecimal defaultInstallment(BigDecimal principal,
-                                          int installments,
-                                          BigDecimal annualRate,
-                                          InterestMethod interestMethod,
-                                          RepaymentFrequency frequency,
-                                          BigDecimal totalFlatInterest) {
-        if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        if (interestMethod == InterestMethod.REDUCING_BALANCE) {
-            BigDecimal ratePerPeriod = periodicRate(annualRate, frequency);
-            if (ratePerPeriod.compareTo(BigDecimal.ZERO) <= 0) {
-                return principal.divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
-            }
-            double rateDouble = ratePerPeriod.doubleValue();
-            double factor = 1d - Math.pow(1d + rateDouble, -installments);
-            return BigDecimal.valueOf(principal.doubleValue() * rateDouble / factor)
-                .setScale(2, RoundingMode.HALF_UP);
-        }
-        BigDecimal totalDue = principal.add(totalFlatInterest);
-        return totalDue.divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
-    }
-
     private BigDecimal resolveFlatInterestAmount(LoanApplication app, BigDecimal annualRate) {
         Map<String, Object> snapshot = parseSummary(app.getFinancialSnapshot());
         BigDecimal snapshotInterest = readBigDecimal(snapshot.get("interestAmount"));
         if (snapshotInterest != null) {
             return snapshotInterest.setScale(2, RoundingMode.HALF_UP);
         }
-        return totalFlatInterest(app.getAmount(), annualRate);
-    }
-
-    private BigDecimal totalFlatInterest(BigDecimal principal, BigDecimal annualRate) {
-        if (principal == null || annualRate == null || annualRate.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        return principal.multiply(annualRate).setScale(2, RoundingMode.HALF_UP);
+        return LoanAmortizationCalculator.flatInterest(app.getAmount(), annualRate, app.getTenorMonths());
     }
 
     private BigDecimal readBigDecimal(Object value) {
         if (value == null) {
             return null;
-        }
-        if (value instanceof Number number) {
-            return BigDecimal.valueOf(number.doubleValue());
         }
         try {
             return new BigDecimal(String.valueOf(value));
@@ -248,25 +191,12 @@ public class RepaymentScheduleService {
         }
     }
 
-    private BigDecimal periodicRate(BigDecimal annualRate, RepaymentFrequency frequency) {
-        if (annualRate == null || annualRate.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(12, RoundingMode.HALF_UP);
-        }
-        return switch (frequency) {
-            case WEEKLY -> annualRate.divide(BigDecimal.valueOf(52), 12, RoundingMode.HALF_UP);
-            case MONTHLY -> annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
-        };
-    }
-
     private BigDecimal resolveAnnualInterestRate(LoanApplication app, LoanProductSetting product) {
         Map<String, Object> snapshot = parseSummary(app.getFinancialSnapshot());
         Object snapshotRate = snapshot.get("interestRate");
-        if (snapshotRate instanceof Number number) {
-            return BigDecimal.valueOf(number.doubleValue()).setScale(4, RoundingMode.HALF_UP);
-        }
         if (snapshotRate != null) {
             try {
-                return new BigDecimal(String.valueOf(snapshotRate)).setScale(4, RoundingMode.HALF_UP);
+                return new BigDecimal(String.valueOf(snapshotRate));
             } catch (NumberFormatException ignored) {
                 // Fall back to current product below.
             }

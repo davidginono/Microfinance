@@ -504,6 +504,9 @@ class LoanWorkflowServiceTest {
 
         when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
         when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(financialDetailsService.generateSnapshot(saccoId, applicantId, product, new BigDecimal("100000"), 6, null))
+            .thenReturn(Map.of("principalAmount", new BigDecimal("100000.00"),
+                "monthlyRepaymentAmount", new BigDecimal("20000.00"), "interestRate", new BigDecimal("0.1200")));
         when(memberRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
             UUID memberId = invocation.getArgument(0);
             return Optional.of(activeMember(memberId, saccoId, "ST01"));
@@ -525,7 +528,7 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "WORKING CAPITAL"),
             null,
             List.of(guarantorOne.toString(), guarantorTwo.toString()),
-            "{\"principalPlusInterest\":120000.00}",
+            "{\"principalAmount\":1,\"monthlyRepaymentAmount\":1,\"interestRate\":0}",
             null,
             null,
             null
@@ -533,6 +536,7 @@ class LoanWorkflowServiceTest {
 
         assertThat(saved.getSelectedGuarantors()).contains(guarantorOne.toString(), guarantorTwo.toString());
         assertThat(saved.getSelectedGuarantors()).doesNotContain("amount");
+        assertThat(saved.getFinancialSnapshot()).contains("\"monthlyRepaymentAmount\":20000.00", "\"principalAmount\":100000.00", "0.1200");
     }
 
     @Test
@@ -1731,7 +1735,7 @@ class LoanWorkflowServiceTest {
             .tenorMonths(6)
             .status(LoanStatus.DRAFT)
             .requiredGuarantors(0)
-            .financialSnapshot("{\"interestMethod\":\"FLAT_RATE\",\"interestRate\":0.1000}")
+            .financialSnapshot("{\"interestMethod\":\"FLAT_RATE\",\"interestRate\":0.1000,\"monthlyRepaymentAmount\":1,\"interestAmount\":0}")
             .formData("{}")
             .policySnapshot("{}")
             .createdAt(OffsetDateTime.now())
@@ -1753,7 +1757,8 @@ class LoanWorkflowServiceTest {
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
         when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
         when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000"), 6, null))
-            .thenReturn(Map.of("interestMethod", "REDUCING_BALANCE", "interestRate", new BigDecimal("0.1200")));
+            .thenReturn(Map.of("interestMethod", "REDUCING_BALANCE", "interestRate", new BigDecimal("0.1200"),
+                "monthlyRepaymentAmount", new BigDecimal("26000.00"), "interestAmount", new BigDecimal("6000.00")));
         when(eligibilityService.check(eq(saccoId), eq(memberId), eq(product),
             eq(new BigDecimal("150000")), anyMap(), anyMap()))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("600000"),
@@ -1770,5 +1775,6 @@ class LoanWorkflowServiceTest {
         assertThat(submitted.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
         assertThat(submitted.getFinancialSnapshot()).contains("REDUCING_BALANCE");
         assertThat(submitted.getFinancialSnapshot()).contains("0.1200");
+        assertThat(submitted.getFinancialSnapshot()).contains("\"monthlyRepaymentAmount\":26000.00", "\"interestAmount\":6000.00");
     }
 }
