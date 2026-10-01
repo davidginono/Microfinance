@@ -47,6 +47,7 @@ class LoanPortfolioRiskStatusServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private AuditService auditService;
     @Mock private ApplicationClock applicationClock;
+    @Mock private LoanRepaymentLedgerService loanRepaymentLedgerService;
 
     private LoanPortfolioRiskStatusService service;
 
@@ -60,10 +61,37 @@ class LoanPortfolioRiskStatusServiceTest {
             outboxService,
             auditService,
             applicationClock,
-            new ObjectMapper()
+            new ObjectMapper(),
+            loanRepaymentLedgerService
         );
         when(applicationClock.today()).thenReturn(TODAY);
         lenient().when(applicationClock.now()).thenReturn(OffsetDateTime.parse("2026-08-24T13:00:00+03:00"));
+    }
+
+    @Test
+    void localLedgerArrearsOverrideAnIncorrectZeroBalanceSnapshot() {
+        LoanApplication loan = loan(LoanStatus.DISBURSED, outstandingSnapshot("0.00", "200.00", "0.00"));
+        givenSettings(30);
+        givenCandidatePage(loan);
+        when(loanRepaymentLedgerService.riskBalance(loan.getId(), TODAY)).thenReturn(Optional.of(
+            new LoanRepaymentLedgerService.RiskBalance(new BigDecimal("110.00"), new BigDecimal("218.00"), TODAY.minusDays(3))));
+        when(loanApplicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.reevaluatePortfolioRiskStatuses(50).par()).isEqualTo(1);
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAR);
+        verify(repaymentScheduleService, never()).parseRows(any());
+    }
+
+    @Test
+    void zeroCurrentDueDoesNotSettleRemainingFutureInstalments() {
+        LoanApplication loan = loan(LoanStatus.DISBURSED, outstandingSnapshot("0.00", "200.00", "0.00"));
+        givenCandidatePage(loan);
+        when(loanRepaymentLedgerService.riskBalance(loan.getId(), TODAY)).thenReturn(Optional.of(
+            new LoanRepaymentLedgerService.RiskBalance(new BigDecimal("100.00"), new BigDecimal("108.00"), null)));
+
+        assertThat(service.reevaluatePortfolioRiskStatuses(50).changed()).isZero();
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+        verify(loanApplicationRepository, never()).save(any());
     }
 
     @Test

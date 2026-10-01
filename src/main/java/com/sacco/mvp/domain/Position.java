@@ -32,8 +32,8 @@ public enum Position {
 
     public String getDisplayName() {
         return switch (this) {
-            case MEMBER -> "Member";
-            case MINOR_ADMIN -> "SACCOS Admin";
+            case MEMBER -> "Client";
+            case MINOR_ADMIN -> "Institution Admin";
             case MANAGER -> "Manager";
             case ACCOUNTANT -> "Accountant";
             case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";

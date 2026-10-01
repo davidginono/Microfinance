@@ -1,6 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
-<%@ taglib prefix="appTime" uri="https://Sacco.local/tags/time" %>
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <!DOCTYPE html>
@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
+    <script src="<c:url value='/js/vendor/lucide-repayments.js' />" defer></script>
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">

@@ -61,8 +61,11 @@
         </form>
     </div>
 </c:if>
-<c:if test="${showTopUpAction or canPrint}">
+<c:if test="${showTopUpAction or canPrint or hasRepaymentLedger}">
     <div class="loan-detail-action-row">
+        <c:if test="${hasRepaymentLedger}">
+            <a href="<c:url value='/repayments/loans/${app.id}' />" class="app-btn btn-neutral"><i data-lucide="receipt" aria-hidden="true"></i><spring:message code="repayment.title" /></a>
+        </c:if>
         <c:if test="${canPrint}">
             <a href="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print?signatureMode=signed" data-print-action="true" class="app-btn btn-neutral">
                 <span class="loan-document-action-icon" aria-hidden="true">

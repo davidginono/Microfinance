@@ -18,6 +18,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
 
     long deleteByCreatedAtBefore(OffsetDateTime cutoff);
 
+    long deleteByCreatedAtBeforeAndEntityTypeNot(OffsetDateTime cutoff, String retainedEntityType);
+
     @Query(
         value = """
             select *

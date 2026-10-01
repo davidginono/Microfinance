@@ -13,6 +13,7 @@ public enum AccessFeature {
     OUTBOX("Outbox"),
     MEMBER_SETTINGS("Member Settings"),
     PAYMENT_DETAILS("Payment Details"),
+    LOAN_REPAYMENTS("Repayments"),
     MEMBER_LOANS("Member Loans"),
     GUARANTOR_REQUESTS("Guarantor Requests"),
     LOAN_DOCUMENTS("Loan Documents"),

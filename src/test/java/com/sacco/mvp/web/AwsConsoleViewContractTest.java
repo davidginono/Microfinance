@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,10 +16,38 @@ class AwsConsoleViewContractTest {
     private static final Path JSP_ROOT = Path.of("src/main/webapp/WEB-INF/jsp");
 
     @Test
+    void repaymentPagesHaveLiteralMessagesInBothLanguages() throws Exception {
+        Pattern message = Pattern.compile("<spring:message\\s+code=[\"']([^\"'$]+)[\"']");
+        for (String language : List.of("en", "sw")) {
+            Properties bundle = new Properties();
+            try (var reader = Files.newBufferedReader(Path.of("src/main/resources/messages_" + language + ".properties"))) {
+                bundle.load(reader);
+            }
+            for (String page : List.of("index", "loan", "receipt")) {
+                var matches = message.matcher(read(JSP_ROOT.resolve("repayments/" + page + ".jsp")));
+                while (matches.find()) {
+                    assertThat(bundle).as(language + " repayment " + page).containsKey(matches.group(1));
+                }
+            }
+        }
+    }
+
+    @Test
+    void applicationTimeTagMatchesItsRegisteredUri() throws Exception {
+        javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        var descriptor = factory.newDocumentBuilder().parse(JSP_ROOT.getParent().resolve("application-time.tld").toFile());
+        String uri = descriptor.getElementsByTagName("uri").item(0).getTextContent();
+        assertThat(read(JSP_ROOT.resolve("fragments/header.jspf"))).contains("uri=\"" + uri + "\"");
+    }
+
+    @Test
     void everyRouteUsesTheAwsConsoleOrAuthShell() throws Exception {
         List<Path> routes = routeViews();
 
-        assertThat(routes).hasSize(75);
+        assertThat(routes).hasSize(78);
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
             assertThat(view)

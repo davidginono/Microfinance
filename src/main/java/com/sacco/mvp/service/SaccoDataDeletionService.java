@@ -88,6 +88,10 @@ public class SaccoDataDeletionService {
     }
 
     private void deleteSaccoScopedRows(String saccoId) {
+        if (Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select exists(select 1 from loan_ledgers where sacco_id = ?)", Boolean.class, saccoId))) {
+            throw new IllegalStateException("This institution has posted financial records and cannot be deleted. Retain or deactivate it instead.");
+        }
         deleteStoredUploadFilesForSacco(saccoId);
         update("""
             delete from stored_uploads
@@ -164,6 +168,12 @@ public class SaccoDataDeletionService {
     }
 
     private void deleteMemberScopedRows(UUID memberId, String email) {
+        if (Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+            select exists(select 1 from loan_ledgers where applicant_member_id = ?
+                union all select 1 from loan_repayment_transactions where actor_member_id = ?)
+            """, Boolean.class, memberId, memberId))) {
+            throw new IllegalStateException("This account is linked to posted financial records and cannot be deleted. Deactivate access instead.");
+        }
         String memberIdText = memberId.toString();
         deleteStoredUploadFilesForMember(memberIdText);
         update("delete from stored_uploads where owner_type = 'MEMBER' and owner_id = ?", memberIdText);

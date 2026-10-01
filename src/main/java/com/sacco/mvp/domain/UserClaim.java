@@ -55,6 +55,10 @@ public enum UserClaim {
     PAYMENT_DETAILS_VIEW(AccessFeature.PAYMENT_DETAILS, AccessAction.VIEW),
     PAYMENT_DETAILS_UPDATE(AccessFeature.PAYMENT_DETAILS, AccessAction.UPDATE),
 
+    LOAN_REPAYMENTS_VIEW(AccessFeature.LOAN_REPAYMENTS, AccessAction.VIEW),
+    LOAN_REPAYMENTS_CREATE(AccessFeature.LOAN_REPAYMENTS, AccessAction.CREATE),
+    LOAN_REPAYMENTS_REVERSE(AccessFeature.LOAN_REPAYMENTS, AccessAction.REVERSE),
+
     MEMBER_LOANS_VIEW(AccessFeature.MEMBER_LOANS, AccessAction.VIEW),
     MEMBER_LOANS_CREATE(AccessFeature.MEMBER_LOANS, AccessAction.CREATE),
     MEMBER_LOANS_UPDATE(AccessFeature.MEMBER_LOANS, AccessAction.UPDATE),

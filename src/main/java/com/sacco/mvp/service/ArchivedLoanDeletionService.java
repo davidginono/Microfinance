@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.repository.LoanLedgerRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class ArchivedLoanDeletionService {
     private final LoanAttachmentService loanAttachmentService;
     private final AuditService auditService;
     private final PlatformTransactionManager transactionManager;
+    private final LoanLedgerRepository loanLedgerRepository;
 
     public boolean canDelete(UUID id, AppUserPrincipal actor) {
         load(id, actor, false);
@@ -84,6 +86,9 @@ public class ArchivedLoanDeletionService {
         }
         if (loan.getStatus() != LoanStatus.DISBURSED || loan.getLoanId() == null || loan.getLoanId().isBlank()) {
             throw new EligibilityException("Only archived disbursed loans with a Loan ID can be deleted.");
+        }
+        if (loanLedgerRepository.existsById(id)) {
+            throw new EligibilityException("Posted financial records must be retained. This loan cannot be deleted.");
         }
         Long references = entityManager.createQuery(
             "select count(l) from LoanApplication l where l.topUpSourceLoanId = :id", Long.class)

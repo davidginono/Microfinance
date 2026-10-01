@@ -114,7 +114,7 @@ class AppUsageAnalyticsServiceTest {
         assertThat(payload.activeSessions()).isEqualTo(1);
         assertThat(payload.activeUserRows()).hasSize(1);
         assertThat(payload.activeUserRows().getFirst().saccoId()).isEqualTo("Arusha Central SACCO");
-        assertThat(payload.activeUserRows().getFirst().roles()).isEqualTo("SACCOS Admin");
+        assertThat(payload.activeUserRows().getFirst().roles()).isEqualTo("Institution Admin");
     }
 
     @Test

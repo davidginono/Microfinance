@@ -51,13 +51,14 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
         String contextPath = request.getContextPath();
         String adminPrefix = contextPath + "/admin/";
         String appPrefix = contextPath + "/app/";
+        boolean repaymentPage = path.equals(contextPath + "/repayments") || path.startsWith(contextPath + "/repayments/");
         boolean staffPath = path.startsWith(contextPath + "/staff/")
             || path.startsWith(contextPath + "/manager/")
             || path.startsWith(contextPath + "/board/")
             || path.startsWith(contextPath + "/loan-officer/")
             || path.startsWith(contextPath + "/accountant/")
-            || path.startsWith(contextPath + "/disbursement/");
-        if (path.startsWith(adminPrefix) && (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope())) {
+            || path.startsWith(contextPath + "/disbursement/") || repaymentPage;
+        if ((path.startsWith(adminPrefix) || repaymentPage) && (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope())) {
             String saccoId = principal.getSaccoId();
             if (saccoId == null || saccoId.isBlank()) {
                 return null;
@@ -66,7 +67,7 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
                 .map(this::resolveLocale)
                 .orElse(Locale.ENGLISH);
         }
-        if (path.startsWith(appPrefix) && principal.isMemberAccess()) {
+        if ((path.startsWith(appPrefix) || (repaymentPage && !principal.isStaffSession())) && principal.isMemberAccess()) {
             return resolveUserLocale(request, principal.getMemberId());
         }
         if (staffPath && !principal.isPlatformIdentity() && !principal.isWorkspaceAdminScope()) {

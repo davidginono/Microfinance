@@ -1,0 +1,28 @@
+.repayment-workspace { min-width: 0; max-width: 100%; }
+.repayment-workspace > section { margin-top: 18px; }
+.repayment-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--panel-border); }
+.repayment-facts > div { min-width: 0; }
+.repayment-facts dt { color: var(--text-muted); font-size: 12px; }
+.repayment-facts dd { margin: 4px 0 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.repayment-section > h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+.repayment-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 760px; }
+.repayment-form > label { display: grid; gap: 6px; min-width: 0; font-size: 13px; }
+.repayment-form .aws-control { width: 100%; min-width: 0; max-width: 100%; }
+.repayment-form > .repayment-confirm { display: flex; align-items: flex-start; gap: 8px; grid-column: 1 / -1; }
+.repayment-confirm input { flex: 0 0 auto; margin-top: 3px; }
+.repayment-form > button { justify-self: start; white-space: normal; gap: 6px; }
+.repayment-workspace .money { text-align: right !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.repayment-reference { overflow-wrap: anywhere; }
+.repayment-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px; }
+.repayment-error { margin: 12px 0; padding: 10px 12px; border: 1px solid #dca7a7; background: #fff5f5; color: #8b2020; border-radius: 4px; }
+@media (max-width: 640px) {
+    .repayment-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .repayment-form { grid-template-columns: minmax(0, 1fr); }
+}
+@media print {
+    body.aws-console, .aws-console-root, .shell-main, .shell-content-frame { background: #fff !important; }
+    .app-topbar, .shell-sidebar, .repayment-no-print, .aws-skip-link { display: none !important; }
+    .shell-content-frame { margin: 0 !important; padding: 0 !important; }
+    .shell-main { margin: 0 !important; padding: 0 !important; width: 100% !important; min-height: 0 !important; }
+    .repayment-receipt { color: #000; background: #fff; }
+}

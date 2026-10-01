@@ -94,6 +94,7 @@ public class AppController {
         + "that you are willing to guarantee this loan, accept responsibility for recoveries and penalties if the applicant "
         + "defaults, and agree to the guarantor terms and conditions in the SACCO bylaws and loan contract.";
     private final LoanWorkflowService loanWorkflowService;
+    private final com.sacco.mvp.service.LoanRepaymentLedgerService loanRepaymentLedgerService;
     private final LoanAnalyticsService loanAnalyticsService;
     private final LoanQualificationPolicyService loanQualificationPolicyService;
     private final FormSchemaService formSchemaService;
@@ -1306,7 +1307,9 @@ public class AppController {
         model.addAttribute("topUpSourceLoan",
             app.getTopUpSourceLoanId() == null ? null
                 : loanWorkflowService.findMine(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
-        model.addAttribute("canRequestTopUp", loanWorkflowService.canRequestTopUp(app));
+        boolean hasRepaymentLedger = loanRepaymentLedgerService.hasLedger(id);
+        model.addAttribute("hasRepaymentLedger", hasRepaymentLedger);
+        model.addAttribute("canRequestTopUp", !hasRepaymentLedger && loanWorkflowService.canRequestTopUp(app));
         model.addAttribute("loanFinalSubmitLabel", finalSubmitLabel(app));
         model.addAttribute("formFields", loanPresentationService.parseFormFields(app.getFormData()));
         model.addAttribute("guarantorRequests", guarantorRequests);

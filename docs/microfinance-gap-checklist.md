@@ -4,6 +4,16 @@ Audit date: 2026-10-01. Baseline: `184b3de` (Transform loan workflow to microfin
 
 This is an implementation backlog based on targeted code inspection, not a compliance certification or confirmation that every route was tested. No loan behaviour is changed by this document. Findings describe the baseline above; mark items complete only after implementation and verification.
 
+Implementation update (2026-10-01): a limited local repayment increment now supports new ordinary disbursements, scheduled payments, receipts, linked reversals, and balanced clearing entries. See [Repayment Ledger Increment](repayment-ledger-increment.md) for supported operations and remaining release gates. The baseline gaps below are retained as an audit record; the full accounting/reconciliation slice is not complete.
+
+### Verified Increment
+
+- `mvn package` passed 704 tests with no failures, errors, or skips, including five opt-in tests against disposable PostgreSQL 17.9. The WAR was packaged successfully.
+- Chromium/Playwright checks exercised registry search and empty/error states, payment allocation, exact retry, CSRF rejection, printable receipts, rejected overpayment/reference reuse, same-officer refusal, linked correction by a second officer, borrower read-only access, Kiswahili preference, logout, and wrong-client/wrong-branch access.
+- Rendered widths: 360, 768, 1366, and 1920 pixels. No page overflow or application JavaScript errors were observed. Expected 404 responses for fake accounts without profile photos used the existing fallback. Browser plugin was unavailable; bundled Playwright was used.
+- Archive/institution/account deletion guards and repayment-audit retention have regression coverage. No operational credentials or records were used for database or browser verification.
+- Still open: approved pricing/schedule conventions, verified affordability/KYC, existing-portfolio cutover, mapped general-ledger accounts and reconciliation, fee/early-settlement handling, top-up settlement, broader reporting, and regulatory release gates. This increment does not establish production readiness or measured 1,000-RPS throughput.
+
 ## Target And Boundaries
 
 - Target a Tanzania Mainland Tier 2, non-deposit-taking lender, initially offering individual business loans. Confirm the operator's licence and approved policies before production use. Zanzibar requires a separate jurisdiction review.

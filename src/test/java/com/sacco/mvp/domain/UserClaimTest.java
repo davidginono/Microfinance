@@ -6,6 +6,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
     @Test
+    void roleLabelsUseMicrofinanceLanguageWithoutRenamingStoredRoles() {
+        assertThat(Position.MEMBER.getDisplayName()).isEqualTo("Client");
+        assertThat(Position.MINOR_ADMIN.getDisplayName()).isEqualTo("Institution Admin");
+        assertThat(Position.valueOf("MEMBER")).isSameAs(Position.MEMBER);
+        assertThat(Position.valueOf("MINOR_ADMIN")).isSameAs(Position.MINOR_ADMIN);
+    }
+
+    @Test
+    void repaymentPermissionsAreExplicitRatherThanAutomaticallyGranted() {
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()), true))
+            .doesNotContain(UserClaim.LOAN_REPAYMENTS_VIEW, UserClaim.LOAN_REPAYMENTS_CREATE, UserClaim.LOAN_REPAYMENTS_REVERSE);
+        assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_REPAYMENTS, AccessAction.REVERSE))
+            .contains(UserClaim.LOAN_REPAYMENTS_REVERSE);
+    }
+
+    @Test
     void matrixRowsKeepUnsupportedActionCellsAsMissingClaims() {
         UserClaim.AccessMatrixRow accessMatrix = UserClaim.matrixRows().stream()
             .filter(row -> row.feature() == AccessFeature.ACCESS_MATRIX)

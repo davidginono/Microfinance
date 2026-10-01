@@ -30,6 +30,23 @@ class MemberLocaleInterceptorTest {
     }
 
     @Test
+    void clientRepaymentReceiptsUseTheirCachedLanguagePreference() {
+        UUID memberId = UUID.randomUUID();
+        UserSettingsService userSettings = mock(UserSettingsService.class);
+        SaccoRegistryService registry = mock(SaccoRegistryService.class);
+        when(userSettings.languageOrDefault(memberId)).thenReturn("sw");
+        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, registry);
+        authenticateMember(memberId);
+        MockHttpServletRequest first = new MockHttpServletRequest("GET", "/repayments/loans/123/receipts/456");
+        interceptor.preHandle(first, new MockHttpServletResponse(), new Object());
+        MockHttpServletRequest second = new MockHttpServletRequest("GET", "/repayments/loans/123");
+        second.setSession(first.getSession());
+        interceptor.preHandle(second, new MockHttpServletResponse(), new Object());
+        verify(userSettings, times(1)).languageOrDefault(memberId);
+        verifyNoInteractions(registry);
+    }
+
+    @Test
     void jsonRequestSkipsDatabaseBackedLocaleResolution() {
         UserSettingsService userSettings = mock(UserSettingsService.class);
         SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);

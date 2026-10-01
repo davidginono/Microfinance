@@ -45,6 +45,7 @@ public class ManagerService {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final RepaymentScheduleService repaymentScheduleService;
+    private final LoanRepaymentLedgerService loanRepaymentLedgerService;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -457,6 +458,11 @@ public class ManagerService {
         app.setStatus(LoanStatus.DISBURSED);
         app.setUpdatedAt(now);
         loanApplicationRepository.save(app);
+        try {
+            loanRepaymentLedgerService.openAtDisbursement(app);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("The loan schedule could not be verified for repayment posting. Review the dates and contract amounts before disbursing.", ex);
+        }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("managerId", disbursementOfficerId.toString());
         details.put("finalDueDate", String.valueOf(app.getFinalDueDate()));
@@ -491,6 +497,9 @@ public class ManagerService {
         }
         if (sourceLoan.getStatus() != LoanStatus.DISBURSED) {
             throw new IllegalStateException("Top-up source loan must still be disbursed before settlement.");
+        }
+        if (loanRepaymentLedgerService.hasLedger(sourceLoan.getId())) {
+            throw new IllegalStateException("Ledger-backed top-up settlement requires a verified settlement transaction.");
         }
         if (sourceLoan.getFinalDueDate() != null && sourceLoan.getFinalDueDate().isBefore(LocalDate.now())) {
             throw new IllegalStateException("Top-up source loan has already reached its final due date.");

@@ -11,6 +11,7 @@ public enum AccessAction {
     CONFIGURE("Configure"),
     EXPORT("Export"),
     DISBURSE("Disburse"),
+    REVERSE("Reverse"),
     DELETE("Delete");
 
     private final String displayName;

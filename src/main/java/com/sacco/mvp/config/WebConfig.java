@@ -47,7 +47,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(memberLocaleInterceptor)
             .addPathPatterns("/app/**", "/admin/**", "/staff/**", "/manager/**", "/board/**",
-                "/loan-officer/**", "/accountant/**", "/disbursement/**");
+                "/loan-officer/**", "/accountant/**", "/disbursement/**", "/repayments", "/repayments/**");
         registry.addInterceptor(adminScopeInterceptor)
             .addPathPatterns("/admin/**")
             .excludePathPatterns("/admin/scope", "/admin/scope/select");

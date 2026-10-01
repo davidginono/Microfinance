@@ -6,8 +6,8 @@ import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @Controller
 public class ErrorPageController implements ErrorController {
@@ -18,7 +18,8 @@ public class ErrorPageController implements ErrorController {
         return renderError(model, statusCode, requestUri);
     }
 
-    @GetMapping("/error/403")
+    @RequestMapping("/error/403")
+    @ResponseStatus(HttpStatus.FORBIDDEN)
     public String forbidden(HttpServletRequest request, Model model) {
         String requestUri = originalRequestPath(request);
         return renderError(model, 403, requestUri);

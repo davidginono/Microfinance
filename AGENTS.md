@@ -216,7 +216,11 @@ Also check:
 - If the user asks about a workflow status, inspect `LoanWorkflowService` first.
 - If the user asks about a page layout issue, inspect shared fragments before editing individual JSPs.
 - If a modal is visually broken, check whether it is trapped inside the page shell instead of being attached to `document.body`.
-- For repayment or balance work, inspect `RepaymentScheduleService`, `LoanPaymentSummarySyncService`, `LoanPresentationService`, and `LoanAnalyticsService`; do not assume the current refresh service posts payments.
+- For repayment or balance work, start with `LoanRepaymentLedgerService` and `docs/repayment-ledger-increment.md`, then inspect `RepaymentScheduleService`, `LoanPaymentSummarySyncService`, `LoanPresentationService`, and `LoanAnalyticsService`. Refresh recalculates projections; it does not receive money.
+- `V41__local_repayment_ledger.sql` opens no legacy balances. New ordinary disbursements initialize their ledger within the disbursement transaction. Legacy and top-up loans require separately verified opening/settlement work.
+- Repayment history, allocations, and journal entries are append-only. Corrections use linked reversals by a different authorized staff member. Never bypass their database protections or assign repayment claims automatically.
+- Do not delete ledger-backed loans, institutions, or referenced accounts. Deactivate access instead; repayment audit events are excluded from routine operational cleanup pending an approved financial-record lifecycle.
+- The current posting command accepts only verified TZS payments against instalments due on the effective payment date. It does not implement new fees, advances, early settlement, channel reconciliation, or complete general-ledger accounting.
 - For affordability or guarantor changes, inspect `EligibilityService` and `LoanQualificationPolicyService` before modifying application or review pages.
 
 ## Safe Defaults

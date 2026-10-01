@@ -45,7 +45,7 @@ public class OperationalDataRetentionScheduler {
         OffsetDateTime outboxCutoff = now.minusDays(Math.max(outboxRetentionDays, 1));
         OffsetDateTime readNotificationCutoff = now.minusDays(Math.max(readNotificationRetentionDays, 1));
 
-        long deletedAuditLogs = auditLogRepository.deleteByCreatedAtBefore(auditCutoff);
+        long deletedAuditLogs = auditLogRepository.deleteByCreatedAtBeforeAndEntityTypeNot(auditCutoff, "LOAN_REPAYMENT");
         long deletedOutboxEvents = outboxEventRepository.deleteByCreatedAtBefore(outboxCutoff);
         long deletedReadNotifications = notificationRepository.deleteByReadAtIsNotNullAndCreatedAtBefore(readNotificationCutoff);
 

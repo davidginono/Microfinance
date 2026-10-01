@@ -43,6 +43,7 @@ public class LoanPortfolioRiskStatusService {
     private final AuditService auditService;
     private final ApplicationClock applicationClock;
     private final ObjectMapper objectMapper;
+    private final LoanRepaymentLedgerService loanRepaymentLedgerService;
 
     @Transactional
     public PortfolioRiskStatusResult reevaluatePortfolioRiskStatuses(int batchSize) {
@@ -105,6 +106,16 @@ public class LoanPortfolioRiskStatusService {
     StatusDecision decideStatus(LoanApplication loan, LocalDate today) {
         if (loan == null) {
             return StatusDecision.skipped("Loan is missing.");
+        }
+        Optional<LoanRepaymentLedgerService.RiskBalance> ledgerBalance = loanRepaymentLedgerService.riskBalance(loan.getId(), today);
+        if (ledgerBalance.isPresent()) {
+            LoanRepaymentLedgerService.RiskBalance balance = ledgerBalance.get();
+            int riskDays = resolvedPortfolioAtRiskDays(loan);
+            LoanStatus status = balance.contractualRemaining().signum() == 0 ? LoanStatus.PAID
+                : loan.getStatus() == LoanStatus.DEFAULTED ? LoanStatus.DEFAULTED
+                : balance.oldestOverdue() == null ? LoanStatus.DISBURSED
+                : today.isAfter(balance.oldestOverdue().plusDays(riskDays)) ? LoanStatus.DEFAULTED : LoanStatus.PAR;
+            return StatusDecision.to(status, balance.oldestOverdue(), balance.currentOutstanding(), riskDays);
         }
         BigDecimal outstanding = syncedOutstandingBalance(loan);
         if (outstanding == null) {

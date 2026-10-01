@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.repository.LoanLedgerRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +24,9 @@ class ArchivedLoanDeletionServiceTest {
     private final AppUserPrincipal actor = mock(AppUserPrincipal.class);
     private final UUID id = UUID.randomUUID();
     private final LoanApplication loan = new LoanApplication();
+    private final LoanLedgerRepository ledgers = mock(LoanLedgerRepository.class);
     private final ArchivedLoanDeletionService service = new ArchivedLoanDeletionService(
-        em, access, mock(LoanAttachmentService.class), mock(AuditService.class), transactions);
+        em, access, mock(LoanAttachmentService.class), mock(AuditService.class), transactions, ledgers);
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -52,6 +54,16 @@ class ArchivedLoanDeletionServiceTest {
     @Test
     void disbursedLocalLoanIsEligibleUsingLoanStation() {
         assertThat(service.canDelete(id, actor)).isTrue();
+    }
+
+    @Test
+    void ledgerBackedArchiveCannotStartDeletion() {
+        when(ledgers.existsById(id)).thenReturn(true);
+        assertThatThrownBy(() -> service.delete(id, actor))
+            .isInstanceOf(ArchivedLoanDeletionService.EligibilityException.class)
+            .hasMessageContaining("financial records must be retained");
+        verifyNoInteractions(transactions);
+        verify(em, never()).remove(any());
     }
 
     @Test
