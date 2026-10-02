@@ -10,6 +10,7 @@ import com.sacco.mvp.reporting.OperationalReportTemplateService;
 import com.sacco.mvp.accounting.reconciliation.ReconciliationService;
 import com.sacco.mvp.reporting.execution.service.ReportRunService;
 import com.sacco.mvp.accounting.statements.StatementDesignerService;
+import com.sacco.mvp.accounting.business.repository.BusinessAccountingRepository;
 
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
@@ -40,6 +41,7 @@ public class SaccoDataDeletionService {
     private final ReconciliationService reconciliationHistory;
     private final ReportRunService reportRuns;
     private final StatementDesignerService financialStatements;
+    private final BusinessAccountingRepository businessHistory;
 
     @Transactional
     public void deleteSacco(String saccoId, String confirmation) {
@@ -103,7 +105,7 @@ public class SaccoDataDeletionService {
     private void deleteSaccoScopedRows(String saccoId) {
         if (accountingPolicies.hasInstitutionHistory(saccoId) || generalLedger.hasInstitutionHistory(saccoId)
             || reportTemplates.hasInstitutionHistory(saccoId)
-            || reconciliationHistory.hasInstitutionHistory(saccoId) || reportRuns.hasInstitutionHistory(saccoId) || financialStatements.hasInstitutionHistory(saccoId)
+            || reconciliationHistory.hasInstitutionHistory(saccoId) || reportRuns.hasInstitutionHistory(saccoId) || financialStatements.hasInstitutionHistory(saccoId) || businessHistory.hasInstitutionHistory(saccoId)
             || Boolean.TRUE.equals(jdbcTemplate.queryForObject(
             "select exists(select 1 from loan_ledgers where sacco_id = ?)", Boolean.class, saccoId))) {
             throw new IllegalStateException("This institution has posted financial records and cannot be deleted. Retain or deactivate it instead.");
@@ -186,7 +188,7 @@ public class SaccoDataDeletionService {
     private void deleteMemberScopedRows(UUID memberId, String email) {
         if (accountingPolicies.hasMemberHistory(memberId) || generalLedger.hasMemberHistory(memberId)
             || reportTemplates.hasMemberHistory(memberId)
-            || reconciliationHistory.hasMemberHistory(memberId) || reportRuns.hasMemberHistory(memberId) || financialStatements.hasMemberHistory(memberId)
+            || reconciliationHistory.hasMemberHistory(memberId) || reportRuns.hasMemberHistory(memberId) || financialStatements.hasMemberHistory(memberId) || businessHistory.hasMemberHistory(memberId)
             || Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
             select exists(select 1 from loan_ledgers where applicant_member_id = ?
                 union all select 1 from loan_repayment_transactions where actor_member_id = ?)

@@ -15,6 +15,20 @@ public class BusinessAccountingRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
 
+    public boolean hasInstitutionHistory(String institution) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from accounting_business_document where sacco_id=?
+                union all select 1 from accounting_supplier where sacco_id=?)
+            """,Boolean.class,institution,institution));
+    }
+
+    public boolean hasMemberHistory(UUID member) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from accounting_business_document where maker_id=? or checker_id=?
+                union all select 1 from accounting_supplier where maker_id=?)
+            """,Boolean.class,member,member,member));
+    }
+
     public void lockRequest(String institution,String branch,UUID key) {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","BUSINESS/"+institution+"/"+branch+"/"+key);
     }

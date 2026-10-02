@@ -126,6 +126,22 @@ class BusinessAccountingPostgresTest {
     }
     @Test void failedSourceAuditRollsBackGlOutboxAndControlTogether(){var d=submitted(Kind.CAPITAL_RECEIPT,"3.01",null);doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).logEvent(anyString(),eq(d.id()),eq("SOURCE_POSTED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());assertThatThrownBy(()->service.approveAndPost(checker,d.id(),"Independent review",true)).isInstanceOf(IllegalStateException.class);assertThat(service.view(maker,d.id()).state()).isEqualTo("SUBMITTED");assertThat(books.journal(maker,d.journalId()).state()).isEqualTo("DRAFT");assertThat(repository.remaining(d.id())).isZero();assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,d.journalId())).isZero();}
     @Test void makerCheckerRevocationAndBranchScopeAreEnforced(){var d=submitted(Kind.CAPITAL_RECEIPT,"1.01",null);assertThatThrownBy(()->service.approveAndPost(maker,d.id(),"Own review",true)).isInstanceOf(IllegalArgumentException.class);when(claims.effectiveClaims(eq(checker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());assertThatThrownBy(()->service.approveAndPost(checker,d.id(),"Revoked review",true)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);var foreign=operator("B2");assertThatThrownBy(()->service.view(foreign,d.id())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);when(institutions.findStation(institution,"B1")).thenReturn(Optional.of(SaccoStation.builder().active(false).build()));assertThatThrownBy(()->service.view(maker,d.id())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);}
+    @Test void retainedSupplierEvidenceBlocksInstitutionAndAuthorDeletionBeforeAnyJournal(){
+        assertThat(repository.hasInstitutionHistory(institution)).isFalse();
+        assertThat(repository.hasMemberHistory(maker.getMemberId())).isFalse();
+        service.supplier(maker,"Synthetic retained supplier","Synthetic supplier identity evidence");
+        assertThat(repository.hasInstitutionHistory(institution)).isTrue();
+        assertThat(repository.hasMemberHistory(maker.getMemberId())).isTrue();
+        assertThat(repository.hasMemberHistory(checker.getMemberId())).isFalse();
+    }
+    @Test void draftSourceAndRejectedReviewerKeepIndependentHistory(){
+        var d=service.create(maker,command(Kind.DIRECT_EXPENSE,"2.01",null));
+        assertThat(repository.hasInstitutionHistory(institution)).isTrue();
+        assertThat(repository.hasMemberHistory(maker.getMemberId())).isTrue();
+        assertThat(repository.hasMemberHistory(checker.getMemberId())).isFalse();
+        service.reject(checker,d.id(),"Synthetic rejection evidence");
+        assertThat(repository.hasMemberHistory(checker.getMemberId())).isTrue();
+    }
     private Document submitted(Kind kind,String amount,UUID related){var d=service.create(maker,command(kind,amount,related));return service.submit(maker,d.id());}
     private Document posted(Kind kind,String amount,UUID related){var d=submitted(kind,amount,related);var p=service.approveAndPost(checker,d.id(),"Synthetic independent evidence",true);assertThat(service.approveAndPost(checker,d.id(),"Synthetic independent evidence",true).id()).isEqualTo(p.id());assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id=?",BigDecimal.class,p.journalId())).isZero();return p;}
     private Command command(Kind kind,String amount,UUID related){return new Command(UUID.randomUUID(),kind,DAY,new BigDecimal(amount),null,related,null,"Synthetic "+kind,"Synthetic source evidence",Set.of(Kind.BUSINESS_REVERSAL,Kind.EXPENSE_INVOICE,Kind.SUPPLIER_CREDIT,Kind.PREPAYMENT_RELEASE,Kind.ACCRUAL,Kind.TAX_LIABILITY,Kind.DEPRECIATION).contains(kind)?null:"C-REF-"+UUID.randomUUID(),"BANK",null,null,null,null,null);}

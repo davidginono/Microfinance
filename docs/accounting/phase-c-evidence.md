@@ -25,3 +25,5 @@ Real PostgreSQL scenarios include partial invoice payments and credits without d
 - Add source/history deletion guards after the final authoritative ports exist.
 
 No unchecked requirement is considered complete because this baseline compiles or its focused tests pass.
+
+Retention follow-up command: mvn '-Dtest=SaccoDataDeletionServiceTest,BusinessAccountingValidationTest,BusinessAccountingPostgresTest,LoanRepaymentLedgerServiceTest' test. **48 passed, zero failures/errors/skips**, finished16:29:43 EAT (8:21); includes12 actual PostgreSQL cases and15 early deletion guards. Separate supplier-only and draft/rejected source-only history now protects institution and maker/checker references before file/row effects, even without a GL journal. This proves retention queries and guard boundaries, not source-to-loan voucher reconciliation.
