@@ -118,6 +118,7 @@ public class ReconciliationService {
             if(Boolean.TRUE.equals(s.get("duplicate")))require("BATCH".equals(kind),"duplicateReview");
             if(j.get("reverses_id")!=null||Boolean.TRUE.equals(j.get("original_reversed"))||"REVERSAL".equals(s.get("kind")))require("REVERSAL".equals(kind),"reversalReview");
             if("CHARGE".equals(s.get("kind")))require("CHARGE".equals(kind)||"SETTLEMENT".equals(kind),"feeReview");
+            if("SETTLEMENT".equals(s.get("kind")))require("SETTLEMENT".equals(kind),"settlementReview");
             BigDecimal sum=statements.merge(p.statementLine(),p.amount(),BigDecimal::add);require(((BigDecimal)s.get("allocated")).add(sum).compareTo(statement.abs())<=0,"overmatch");
             sum=journals.merge(p.journalLine(),p.amount(),BigDecimal::add);require(((BigDecimal)j.get("allocated")).add(sum).compareTo(ledger.abs())<=0,"overmatch");
             if("EXACT".equals(kind))require(parts.size()==1&&p.amount().compareTo(statement.abs())==0&&p.amount().compareTo(ledger.abs())==0&&Objects.equals(s.get("reference"),j.get("source_reference")),"exactMatch");
