@@ -385,7 +385,7 @@
         return control.getAttribute?.('data-download-action') === 'true'
             || control.hasAttribute?.('download')
             || /\.(pdf|xlsx?|csv|zip)(?:$|[?#])/i.test(href)
-            || /^(export|csv|pdf|excel|download)/.test(label);
+            || /^(export|csv|xlsx?|pdf|excel|download)/.test(label);
     };
     const isConsolePrintAction = function (control) {
         return !!control && control.getAttribute?.('data-print-action') === 'true';
@@ -631,8 +631,11 @@
     const initConsoleTableLoading = function () {
         clearConsoleTableLoading();
         document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
-            form.addEventListener('submit', function () {
-                if (form.matches('[data-page-preloader="true"]')) {
+            form.addEventListener('submit', function (event) {
+                if (event.defaultPrevented
+                    || resolveExportFormUrl(form, event.submitter)
+                    || isConsolePrintAction(event.submitter)
+                    || form.matches('[data-page-preloader="true"]')) {
                     clearConsoleTableLoading();
                     return;
                 }
