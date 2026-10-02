@@ -38,6 +38,7 @@ class GeneralLedgerPostgresTest {
     private AuditService audit;
     private UserClaimService claims;
     private MemberDirectoryService directory;
+    private SaccoRegistryService institutions;
     private String institution;
     private AppUserPrincipal maker,checker,reverseMaker,reverseChecker;
     private UUID cash,capital,principal,period,policy;
@@ -48,15 +49,18 @@ class GeneralLedgerPostgresTest {
         var ds=new DriverManagerDataSource(System.getenv("MICROFINANCE_ACCOUNTING_B_DATABASE_URL"),"microfinance_test","");
         Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
         jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
-        policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);
+        policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         ApplicationClock clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);
-        var raw=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory);
+        var raw=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions);
         var factory=new ProxyFactory(raw);factory.setProxyTargetClass(true);factory.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));
         service=(GeneralLedgerService)factory.getProxy();
     }
     @BeforeEach void fixture() {
-        reset(policies,audit,claims,directory);
+        reset(policies,audit,claims,directory,institutions);
         institution="GL-"+UUID.randomUUID();jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic GL test");
+        when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
+        when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder()
+            .saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
         maker=operator("B1");checker=operator("B1");reverseMaker=operator("B1");reverseChecker=operator("B1");
         cash=service.createAccount(maker,new AccountCommand("CASH","Verified test cash","ASSET","DEBIT","POSTING","CASH",null));
