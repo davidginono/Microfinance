@@ -44,9 +44,13 @@ public class ReconciliationRepository {
     }
     public List<StatementRow> rows(UUID statement,int offset) {
         return jdbc.query("""
-          select l.*,coalesce((select sum(a.amount) from reconciliation_active_allocation a where a.statement_line_id=l.id),0) matched
+          select l.*,coalesce((select sum(a.amount) from reconciliation_active_allocation a where a.statement_line_id=l.id),0) matched,
+          exists(select 1 from reconciliation_allocation x join reconciliation_match_decision xd on xd.match_id=x.match_id and xd.decision='APPROVED'
+          join gl_journal_line jl on jl.id=x.journal_line_id
+          join gl_journal j on j.id=jl.journal_id where x.statement_line_id=l.id and (j.reverses_id is not null
+          or exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED'))) reversed
           from reconciliation_statement_line l where statement_id=? order by row_number limit 26 offset ?
-          """,(r,n)->{BigDecimal amount=r.getBigDecimal("amount"),matched=r.getBigDecimal("matched");boolean duplicate=r.getBoolean("duplicate");return new StatementRow(uuid(r,"id"),r.getInt("row_number"),date(r,"effective_date"),r.getString("reference"),amount,r.getString("kind"),duplicate,matched,duplicate?"DUPLICATE":matched.signum()==0?"UNMATCHED":matched.compareTo(amount.abs())==0?"MATCHED":"PARTIAL");},statement,offset);
+          """,(r,n)->{BigDecimal amount=r.getBigDecimal("amount"),matched=r.getBigDecimal("matched");boolean duplicate=r.getBoolean("duplicate");return new StatementRow(uuid(r,"id"),r.getInt("row_number"),date(r,"effective_date"),r.getString("reference"),amount,r.getString("kind"),duplicate,matched,r.getBoolean("reversed")?"REVERSED":duplicate?"DUPLICATE":matched.signum()==0?"UNMATCHED":matched.compareTo(amount.abs())==0?"MATCHED":"PARTIAL");},statement,offset);
     }
     public List<Candidate> candidates(String institution,String branch,UUID account,LocalDate from,LocalDate through,int offset) {
         return jdbc.query("""
@@ -118,6 +122,20 @@ public class ReconciliationRepository {
           and abs(l.amount)<>coalesce((select sum(a.amount) from reconciliation_active_allocation a where a.statement_line_id=l.id),0)
           and not exists(select 1 from reconciliation_exception e join reconciliation_exception_decision d on d.exception_id=e.id where e.statement_line_id=l.id)
           """,institution,branch,p.through())));
+        result.add(new CloseCheck("reversed",count("""
+          select count(distinct sl.id) from reconciliation_statement_line sl join reconciliation_statement s on s.id=sl.statement_id
+          join reconciliation_allocation a on a.statement_line_id=sl.id join reconciliation_match_decision ad on ad.match_id=a.match_id and ad.decision='APPROVED'
+          join gl_journal_line jl on jl.id=a.journal_line_id
+          join gl_journal r on r.reverses_id=jl.journal_id and r.state='POSTED' and r.effective_date<=?
+          where s.sacco_id=? and s.station_id=? and sl.effective_date<=?
+          and not exists(select 1 from reconciliation_exception e join reconciliation_exception_decision d on d.exception_id=e.id
+          where e.statement_line_id=sl.id and e.sacco_id=s.sacco_id and e.station_id=s.station_id and e.kind='REVERSED' and d.decided_at>=r.posted_at)
+          and not exists(select 1 from reconciliation_active_allocation x join reconciliation_match m on m.id=x.match_id
+          join reconciliation_match_decision d on d.match_id=m.id where x.statement_line_id=sl.id and x.journal_line_id=jl.id
+          and m.kind='REVERSAL' and d.decided_at>=r.posted_at)
+          and not exists(select 1 from reconciliation_match m join reconciliation_match_decision d on d.match_id=m.id
+          where m.reverses_id=a.match_id and d.decision='APPROVED' and d.decided_at>=r.posted_at)
+          """,p.through(),institution,branch,p.through())));
         result.add(new CloseCheck("accountEvidence",count("""
           select count(*) from gl_account a where a.sacco_id=? and a.kind<>'HEADING'
           and (a.active or exists(select 1 from gl_journal_line hl join gl_journal hj on hj.id=hl.journal_id where hl.account_id=a.id and hj.station_id=? and hj.state='POSTED' and hj.effective_date<=?))
