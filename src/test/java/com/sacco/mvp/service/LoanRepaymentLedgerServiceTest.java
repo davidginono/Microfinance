@@ -28,6 +28,7 @@ class LoanRepaymentLedgerServiceTest {
     @Mock LoanApplicationRepository loans;
     @Mock ApplicationClock clock;
     @Mock AuditService audit;
+    @Mock com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
     @Spy ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
     @Spy AccessControlService access = new AccessControlService();
     @InjectMocks LoanRepaymentLedgerService service;

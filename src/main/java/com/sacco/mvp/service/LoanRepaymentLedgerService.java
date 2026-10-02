@@ -31,6 +31,7 @@ public class LoanRepaymentLedgerService {
     private final ApplicationClock clock;
     private final AccessControlService access;
     private final AuditService audit;
+    private final com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
 
     // Called only by the actual disbursement transaction; never infer an opening balance for an old loan.
     @Transactional(propagation = Propagation.MANDATORY)
@@ -113,6 +114,7 @@ public class LoanRepaymentLedgerService {
     @Transactional
     public Receipt post(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_CREATE);
+        accountingGuard.repayment(loanId, actor, command);
         LoanLedger ledger = lockedLedger(loanId, actor);
         BigDecimal amount = money(command.amount());
         String reference = text(command.reference(), 100);
@@ -191,6 +193,7 @@ public class LoanRepaymentLedgerService {
     @Transactional
     public Receipt reverse(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_REVERSE);
+        accountingGuard.reversal(loanId, actor, requestKey);
         LoanLedger ledger = lockedLedger(loanId, actor);
         String explanation = text(reason, 500);
         require(requestKey != null, "retry");

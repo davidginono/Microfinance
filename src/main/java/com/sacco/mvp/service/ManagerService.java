@@ -46,6 +46,7 @@ public class ManagerService {
     private final ObjectMapper objectMapper;
     private final RepaymentScheduleService repaymentScheduleService;
     private final LoanRepaymentLedgerService loanRepaymentLedgerService;
+    private final com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -436,6 +437,7 @@ public class ManagerService {
         app.setInstallmentAmount(schedule.installmentAmount());
         app.setFinalDueDate(schedule.finalDueDate());
         app.setRepaymentScheduleJson(schedule.scheduleJson());
+        accountingGuard.disbursement(app, disbursementOfficerId);
         if (hasUploadedProof) {
             app.setAttachmentsJson(loanAttachmentService.store(
                 app.getId(),
