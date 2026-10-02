@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.policy;
 
 import com.sacco.mvp.domain.UserClaim;
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +90,7 @@ public class AccountingPolicyService {
                     && !p.getEffectiveFrom().isBefore(clock.today()), "effective");
                 require(p.getAuthoritativeLedger() == prev.getAuthoritativeLedger()
                     && p.getOpeningDate().equals(prev.getOpeningDate()), "cutover");
-            }
+            } else require(p.getOpeningDate().equals(p.getEffectiveFrom()), "initialDate");
         }
         var a = approvals.saveAndFlush(AccountingPolicyApproval.builder().policyId(p.getId()).saccoId(institution)
             .policyVersion(p.getPolicyVersion()).effectiveFrom(p.getEffectiveFrom()).checkerId(actor.getMemberId())
@@ -137,12 +138,25 @@ public class AccountingPolicyService {
         require(rule != null && rule.permission() == PostingPermission.ALLOWED, "disabled");
     }
 
+    /** Deletion lifecycle guard. Callers enforce their own administration permission/scope first. */
+    @Transactional(readOnly = true)
+    public boolean hasInstitutionHistory(String institutionId) {
+        return institutionId != null && policies.existsBySaccoId(institutionId);
+    }
+
+    /** Preserve makers/checkers of even rejected proposals; deactivate access instead of deleting evidence. */
+    @Transactional(readOnly = true)
+    public boolean hasMemberHistory(UUID memberId) {
+        return memberId != null && (policies.existsByMakerId(memberId) || approvals.existsByCheckerId(memberId));
+    }
+
     private String requireActor(AppUserPrincipal actor, UserClaim claim) {
         if (actor == null || !actor.isStaffSession() || actor.isPlatformIdentity() || !access.has(actor, claim)
             || actor.getSaccoId() == null || actor.getSaccoId().isBlank() || actor.getMemberId() == null)
             throw new AccessDeniedException("Accounting policy access denied");
         var current = directory.find(actor.getMemberId()).orElseThrow(() -> new AccessDeniedException("Accounting policy access denied"));
         if (!current.isStaffAccessActive() || !Objects.equals(current.getSaccoId(), actor.getSaccoId())
+            || current.getActiveStaffRolesResolved().contains(Position.ADMIN)
             || !userClaims.effectiveClaims(current.getId(), current.getActiveStaffRolesResolved(), current.isMemberAccess()).contains(claim))
             throw new AccessDeniedException("Accounting policy permission unavailable");
         return actor.getSaccoId();

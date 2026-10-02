@@ -8,6 +8,8 @@ import java.util.*;
 
 interface AccountingPolicyRepository extends JpaRepository<AccountingPolicy, UUID> {
     Optional<AccountingPolicy> findByIdAndSaccoId(UUID id, String saccoId);
+    boolean existsBySaccoId(String saccoId);
+    boolean existsByMakerId(UUID makerId);
     Optional<AccountingPolicy> findBySaccoIdAndRequestKey(String saccoId, UUID requestKey);
     Page<AccountingPolicy> findBySaccoIdOrderByPolicyVersionDesc(String saccoId, Pageable pageable);
     @Query("select coalesce(max(p.policyVersion), 0) from AccountingPolicy p where p.saccoId = :institution")

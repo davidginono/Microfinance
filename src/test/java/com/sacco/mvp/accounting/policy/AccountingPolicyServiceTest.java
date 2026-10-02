@@ -97,6 +97,18 @@ class AccountingPolicyServiceTest {
         when(policies.findBySaccoIdAndRequestKey("I1", c.requestKey())).thenReturn(Optional.of(p));
         assertThatThrownBy(() -> service.create(actor(makerId), c)).hasMessage("accounting.policy.error.retry");
     }
+    @Test void freshlyChangedPlatformIdentityCannotUseStaleWorkspaceSession() {
+        var current = member(makerId, "I1"); current.setPosition(Position.ADMIN);
+        when(directory.find(makerId)).thenReturn(Optional.of(current));
+        assertThatThrownBy(() -> service.create(actor(makerId), command())).isInstanceOf(AccessDeniedException.class);
+        verify(policies, never()).saveAndFlush(any());
+    }
+    @Test void initialPolicyMustCoverItsOpeningDate() {
+        var p = policy(); p.setOpeningDate(date.minusDays(1));
+        when(policies.findByIdAndSaccoId(p.getId(), "I1")).thenReturn(Optional.of(p));
+        assertThatThrownBy(() -> service.decide(p.getId(), actor(checkerId), decision())).hasMessage("accounting.policy.error.initialDate");
+        verify(approvals, never()).saveAndFlush(any());
+    }
     static Member member(UUID id, String institution) {
         return Member.builder().id(id).saccoId(institution).stationId("B1").memberNo(id.toString())
             .fullName("Synthetic accountant").position(Position.ACCOUNTANT).memberAccount(false).status(MemberStatus.ACTIVE).build();
