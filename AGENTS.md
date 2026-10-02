@@ -8,6 +8,7 @@ This file gives coding agents project-specific guidance for working in `Microfin
 - Target: credit-policy-backed, non-deposit-taking microfinance in Tanzania Mainland.
 - Start with individual business lending; salary, group, and agricultural lending are separate product capabilities, not assumed existing features.
 - The conversion backlog and implementation gates live in `docs/microfinance-gap-checklist.md`.
+- The accounting package and institution-specific report customization goal, dependency order, and acceptance gates live in `docs/accounting-report-builder-checklist.md`. Read it before accounting or report-builder work; checklist creation is not implementation completion.
 - Stack:
   - Spring Boot 4.1.x (check `pom.xml` before choosing APIs)
   - Java 25
@@ -101,6 +102,16 @@ Default local URL:
 - Board review quorum and guarantor approval logic must remain consistent with service-layer rules.
 - Keep disbursement, repayment, arrears, default, restructuring, and settlement distinct. Do not mark a loan paid merely because its final due date passed or a top-up was approved.
 - Monetary mutations need transactional consistency, idempotency, auditability, and concurrency protection. Corrections to posted financial records must preserve history rather than overwrite or delete it.
+
+## Credit Calculation Rules
+
+- Use `LoanAmortizationCalculator` for quotes and newly generated repayment estimates/schedules; do not add separate double-based financial formulas in controllers, JSPs, or presentation services.
+- New quotes use `DECIMAL_PERIODIC_V1`. Preserve stored contracts and unversioned legacy period counts; do not reprice a disbursed loan by refreshing its product.
+- Derive draft and submission financial snapshots on the server. Borrower-supplied snapshot JSON is not an authoritative rate, principal, repayment, interest, or policy result.
+- Distinguish periodic instalments from monthly affordability amounts. Use the largest scheduled payment and normalize weekly payments consistently; retain exact final principal reconciliation.
+- A passing declared cash-flow estimate is not verified creditworthiness. Missing or invalid repayment/cash-flow values must fail the required assessment; do not assume missing expenses or debt are zero.
+- Disbursement must not silently change assessed repayment amounts, tenure, or frequency. Keep changed terms on an explicit reassessment/approval path.
+- Read `docs/credit-estimate-increment.md` for conventions, compatibility, and open policy/underwriting gates.
 
 ## Security Notes
 

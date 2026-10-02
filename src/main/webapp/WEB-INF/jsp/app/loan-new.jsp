@@ -16,14 +16,13 @@
     <div class="flex flex-wrap items-center gap-2">
         <h5 class="erp-panel-title"><spring:message code="newloan.eligibilityGuide.title" /></h5>
         <span id="eligibilityExternalInlineStatus" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500">
-            <span id="eligibilityExternalSpinner" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-            <span id="eligibilityExternalStatusText"><spring:message code="newloan.applicationRules.loading" /></span>
+            <span id="eligibilityExternalStatusText"><spring:message code="newloan.assessment.notCalculated" /></span>
         </span>
     </div>
     <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
-        <li><spring:message code="newloan.applicationRules.savings" /> <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
+        <li><spring:message code="newloan.applicationRules.savings" /> <strong id="eligibilitySavingsValue">-</strong></li>
         <c:if test="${savingsLimitCheckRequired}">
-            <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
+            <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">-</strong></li>
         </c:if>
         <li><spring:message code="newloan.applicationRules.amountRange" /> <strong>${minimumAmountLabel}</strong> <spring:message code="common.to" text="to" /> <strong>${maximumAmountLabel}</strong></li>
     </ul>
@@ -187,7 +186,7 @@
                 <spring:message code="newloan.loanDetails.button" />
             </button>
         </div>
-        <div id="financialFeedback" data-auto-scroll-message="true" class="mt-3 hidden border px-4 py-3 text-sm"></div>
+        <div id="financialFeedback" role="status" aria-live="polite" data-auto-scroll-message="true" class="mt-3 hidden border px-4 py-3 text-sm"></div>
         <div id="financialLoading" class="mt-3 hidden erp-section text-sm text-slate-600">
             <span class="sr-only"><spring:message code="newloan.loanDetails.loading" /></span>
             <div class="skeleton-table" aria-hidden="true">
@@ -800,15 +799,14 @@
         const eligibilitySavingsValue = document.getElementById("eligibilitySavingsValue");
         const eligibilityMaxAllowedValue = document.getElementById("eligibilityMaxAllowedValue");
         const eligibilityExternalStatus = document.getElementById("eligibilityExternalInlineStatus");
-        const eligibilityExternalSpinner = document.getElementById("eligibilityExternalSpinner");
         const eligibilityExternalStatusText = document.getElementById("eligibilityExternalStatusText");
         const msgCheckingCode = "<spring:message code='newloan.js.checkingCode' />";
         const msgVerifyingCode = "<spring:message code='newloan.js.verifyingCode' />";
         const msgVerified = "<spring:message code='newloan.js.verified' />";
         const msgInvalidOtp = "<spring:message code='newloan.js.invalidOtp' />";
-        const msgLoadingStatuses = "<spring:message code='newloan.js.loadingStatuses' />";
-        const msgUnableLoadSavings = "<spring:message code='newloan.js.unableLoadSavings' />";
-        const msgStatusesLoaded = "<spring:message code='newloan.js.statusesLoaded' />";
+        const msgAssessmentNotCalculated = "<spring:message code='newloan.assessment.notCalculated' />";
+        const msgAssessmentDeclared = "<spring:message code='newloan.assessment.declared' />";
+        const msgAssessmentNotMet = "<spring:message code='newloan.assessment.notMet' />";
         const msgUnableLoadOfficialDetails = "<spring:message code='newloan.js.unableLoadOfficialDetails' />";
         const msgLoanDetailsLoaded = "<spring:message code='newloan.js.loanDetailsLoaded' text='Loan calculations loaded successfully.' />";
         const msgFailedLoadLoanDetails = "<spring:message code='newloan.js.failedLoadLoanDetails' text='Failed to load the loan calculations.' />";
@@ -1110,6 +1108,7 @@
         }
 
         function resetFinancialPreview() {
+            updateEligibilitySummary(null);
             if (!financialSnapshotInput.value) {
                 return;
             }
@@ -1346,50 +1345,23 @@
             };
         }
 
-        async function loadExternalEligibilitySummary() {
+        function updateEligibilitySummary(payload) {
             if (!eligibilityExternalStatus) {
                 return;
             }
-            if (eligibilityExternalSpinner) {
-                eligibilityExternalSpinner.classList.remove("hidden");
-            }
-            if (eligibilityExternalStatusText) {
-                eligibilityExternalStatusText.textContent = msgLoadingStatuses;
-            }
             eligibilityExternalStatus.classList.remove("text-emerald-600", "text-rose-600");
             eligibilityExternalStatus.classList.add("text-slate-500");
-            try {
-                const response = await fetch("/app/loan-applications/external-eligibility-summary?loanProductId=${loanProductId}", {
-                    headers: {"Accept":"application/json","X-Requested-With":"XMLHttpRequest"
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(msgUnableLoadSavings);
-                }
-                const payload = await response.json();
-                if (payload.savingsLabel) {
-                    eligibilitySavingsValue.textContent = payload.savingsLabel;
-                }
-                if (eligibilityMaxAllowedValue && payload.maxAllowedLabel && payload.savingsLimitCheckRequired !== false) {
-                    eligibilityMaxAllowedValue.textContent = payload.maxAllowedLabel;
-                }
-                if (eligibilityExternalSpinner) {
-                    eligibilityExternalSpinner.classList.add("hidden");
-                }
-                if (eligibilityExternalStatusText) {
-                    eligibilityExternalStatusText.textContent = msgStatusesLoaded;
-                }
-                eligibilityExternalStatus.classList.remove("text-rose-600");
-                eligibilityExternalStatus.classList.remove("text-slate-500");
-                eligibilityExternalStatus.classList.add("text-emerald-600");
-            } catch (error) {
-                if (eligibilityExternalSpinner) {
-                    eligibilityExternalSpinner.classList.add("hidden");
-                }
-                if (eligibilityExternalStatusText) {
-                    eligibilityExternalStatusText.textContent = error.message || msgUnableLoadSavings;
-                }
-                eligibilityExternalStatus.classList.remove("text-emerald-600");
+            if (eligibilitySavingsValue) {
+                eligibilitySavingsValue.textContent = payload && payload.savingsLabel ? payload.savingsLabel : "-";
+            }
+            if (eligibilityMaxAllowedValue) {
+                eligibilityMaxAllowedValue.textContent = payload && payload.maxAllowedLabel ? payload.maxAllowedLabel : "-";
+            }
+            if (eligibilityExternalStatusText) {
+                eligibilityExternalStatusText.textContent = !payload ? msgAssessmentNotCalculated
+                    : payload.eligible ? msgAssessmentDeclared : msgAssessmentNotMet;
+            }
+            if (payload && !payload.eligible) {
                 eligibilityExternalStatus.classList.remove("text-slate-500");
                 eligibilityExternalStatus.classList.add("text-rose-600");
             }
@@ -1416,7 +1388,9 @@
         });
         syncAmountInput(false, true);
         setTenureUnit("MONTHS");
-        loadExternalEligibilitySummary();
+        form.querySelectorAll('[name="monthlyIncome"], [name="monthlyExpenses"], [name="otherDebtRepayments"], [name="collateralDescription"], [name="collateralEstimatedValue"]').forEach(function (input) {
+            input.addEventListener("change", resetFinancialPreview);
+        });
         const applicantOtpUi = bindOtpLiveStatus(
             applicantSignatureOtpInput,
             applicantSignatureOtpLiveStatus,
@@ -1478,8 +1452,14 @@
                 document.dispatchEvent(new CustomEvent("loanFinancialSnapshotChanged", { detail: payload }));
                 renderFinancialSections(payload.fieldSections || {});
                 renderRepaymentSchedule(payload.repaymentSchedule || []);
-                showFinancialFeedback("success", payload.message || msgLoanDetailsLoaded);
+                updateEligibilitySummary(payload.eligibility);
+                showFinancialFeedback(payload.eligibility && payload.eligibility.eligible ? "success" : "error",
+                    payload.message || msgLoanDetailsLoaded);
             } catch (error) {
+                financialSnapshotInput.value = "";
+                updateEligibilitySummary(null);
+                renderFinancialSections({});
+                renderRepaymentSchedule([]);
                 showFinancialFeedback("error", error.message || msgFailedLoadLoanDetails);
             } finally {
                 financialLoading.classList.add("hidden");

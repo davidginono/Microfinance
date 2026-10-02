@@ -332,12 +332,12 @@
                     </button>
                     <div class="guarantor-financial-result hidden">
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Disposable Income" /></span>
-                            <span class="guarantor-financial-result-value" data-financial-savings>-</span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Active Loan Exposure" /></span>
+                            <span class="guarantor-financial-result-value" data-financial-active-exposure>-</span>
 </div>
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Risk History" /></span>
-                            <span class="guarantor-financial-result-value" data-financial-shares>-</span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="PAR/Default History" /></span>
+                            <span class="guarantor-financial-result-value" data-financial-risk-history>-</span>
                         </div>
                         <div class="guarantor-financial-result-note" data-financial-note></div>
                     </div>

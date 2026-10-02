@@ -45,21 +45,21 @@ public class ExternalAccountStatusService {
         BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.DOWN);
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
         DecimalFormat format = new DecimalFormat("#,##0.##", symbols);
-        return "TSh " + format.format(safeAmount);
+        return "TZS " + format.format(safeAmount);
     }
 
     public static final class ExternalAccountStatusView {
         private final boolean available;
         private final boolean pending;
-        private final String savingsLabel;
-        private final String sharesLabel;
+        private final String activeExposureLabel;
+        private final String riskHistoryLabel;
         private final String statusMessage;
 
-        private ExternalAccountStatusView(boolean available, boolean pending, String savingsLabel, String sharesLabel, String statusMessage) {
+        private ExternalAccountStatusView(boolean available, boolean pending, String activeExposureLabel, String riskHistoryLabel, String statusMessage) {
             this.available = available;
             this.pending = pending;
-            this.savingsLabel = savingsLabel;
-            this.sharesLabel = sharesLabel;
+            this.activeExposureLabel = activeExposureLabel;
+            this.riskHistoryLabel = riskHistoryLabel;
             this.statusMessage = statusMessage;
         }
 
@@ -83,20 +83,12 @@ public class ExternalAccountStatusService {
             return pending;
         }
 
-        public String getSavingsLabel() {
-            return savingsLabel;
-        }
-
-        public String getSharesLabel() {
-            return sharesLabel;
-        }
-
         public String getActiveExposureLabel() {
-            return savingsLabel;
+            return activeExposureLabel;
         }
 
         public String getRiskHistoryLabel() {
-            return sharesLabel;
+            return riskHistoryLabel;
         }
 
         public String getStatusMessage() {

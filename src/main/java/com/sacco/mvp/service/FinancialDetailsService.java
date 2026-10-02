@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
@@ -45,8 +46,16 @@ public class FinancialDetailsService {
         if (product == null) {
             throw new IllegalArgumentException("Loan product settings not found");
         }
-        BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        int safeTenor = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
+        BigDecimal safeAmount;
+        try {
+            safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException("Loan amount must have at most two decimal places.");
+        }
+        if (tenorMonths == null || tenorMonths <= 0) {
+            throw new IllegalArgumentException("Select a valid repayment period.");
+        }
+        int safeTenor = tenorMonths;
         validatePositiveAmount(safeAmount);
         validateRepaymentPeriod(product, safeTenor);
 
@@ -71,11 +80,16 @@ public class FinancialDetailsService {
         BigDecimal totalDeductions = applicationFee.add(insuranceFee).add(processingFee)
             .setScale(2, RoundingMode.HALF_UP);
 
-        AmortizationResult amortization = amortize(principalAmount, safeTenor, interestRate, product.getInterestMethod());
+        InterestMethod method = product.getInterestMethod() == null ? InterestMethod.REDUCING_BALANCE : product.getInterestMethod();
+        RepaymentFrequency frequency = product.getResolvedRepaymentFrequency();
+        int payments = LoanAmortizationCalculator.numberOfPayments(safeTenor, frequency);
+        LoanAmortizationCalculator.Result amortization = LoanAmortizationCalculator.calculate(
+            principalAmount, payments, interestRate, method, frequency, null,
+            LoanAmortizationCalculator.flatInterest(principalAmount, interestRate, safeTenor));
         BigDecimal interestAmount = amortization.totalInterest();
         BigDecimal principalPlusInterest = amortization.totalRepayment()
             .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal periodicRepaymentAmount = amortization.periodicPayment();
+        BigDecimal periodicRepaymentAmount = amortization.installment();
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("requestedAmount", safeAmount);
@@ -89,14 +103,18 @@ public class FinancialDetailsService {
         snapshot.put("principalPlusInterest", principalPlusInterest);
         snapshot.put("loanPlusInterest", principalPlusInterest);
         snapshot.put("interestAmount", interestAmount);
-        snapshot.put("monthlyRepaymentAmount", periodicRepaymentAmount);
+        snapshot.put("monthlyRepaymentAmount", LoanAmortizationCalculator.monthlyEquivalent(amortization.maximumInstallment(), frequency));
+        snapshot.put("periodicRepaymentAmount", periodicRepaymentAmount);
+        snapshot.put("maximumInstallmentAmount", amortization.maximumInstallment());
+        snapshot.put("repaymentFrequency", frequency.name());
+        snapshot.put("calculationVersion", LoanAmortizationCalculator.VERSION);
         snapshot.put("applicationFeeRate", applicationFee);
         snapshot.put("insuranceRate", insuranceRate);
         snapshot.put("processingFeeRate", processingFeeRate);
         snapshot.put("interestRate", interestRate);
         snapshot.put("tenorMonths", safeTenor);
-        snapshot.put("numberOfPayments", safeTenor);
-        snapshot.put("interestMethod", product.getInterestMethod() == null ? InterestMethod.FLAT_RATE.name() : product.getInterestMethod().name());
+        snapshot.put("numberOfPayments", payments);
+        snapshot.put("interestMethod", method.name());
         snapshot.put("topUpSourceLoanId", topUpSourceLoanId == null ? "" : topUpSourceLoanId.toString());
         if (topUpSourceLoanId != null) {
             snapshot.put("topUpRequestedAmount", safeAmount);
@@ -177,9 +195,6 @@ public class FinancialDetailsService {
         if (value instanceof BigDecimal decimal) {
             return decimal;
         }
-        if (value instanceof Number number) {
-            return BigDecimal.valueOf(number.doubleValue());
-        }
         try {
             return new BigDecimal(String.valueOf(value));
         } catch (NumberFormatException ex) {
@@ -225,42 +240,4 @@ public class FinancialDetailsService {
         }
     }
 
-    private AmortizationResult amortize(BigDecimal principal,
-                                        int tenorMonths,
-                                        BigDecimal annualRate,
-                                        InterestMethod interestMethod) {
-        InterestMethod method = interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod;
-        if (method == InterestMethod.REDUCING_BALANCE) {
-            BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
-            if (monthlyRate.compareTo(BigDecimal.ZERO) <= 0) {
-                BigDecimal payment = principal.divide(BigDecimal.valueOf(tenorMonths), 2, RoundingMode.HALF_UP);
-                return new AmortizationResult(
-                    payment,
-                    payment.multiply(BigDecimal.valueOf(tenorMonths)).setScale(2, RoundingMode.HALF_UP),
-                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
-                );
-            }
-            double monthlyRateDouble = monthlyRate.doubleValue();
-            double factor = 1d - Math.pow(1d + monthlyRateDouble, -tenorMonths);
-            BigDecimal payment = BigDecimal.valueOf(principal.doubleValue() * monthlyRateDouble / factor)
-                .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal totalRepayment = payment.multiply(BigDecimal.valueOf(tenorMonths)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal totalInterest = totalRepayment.subtract(principal).setScale(2, RoundingMode.HALF_UP);
-            return new AmortizationResult(payment, totalRepayment, totalInterest);
-        }
-
-        BigDecimal totalInterest = principal.multiply(annualRate)
-            .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalRepayment = principal.add(totalInterest)
-            .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal payment = totalRepayment.divide(BigDecimal.valueOf(tenorMonths), 2, RoundingMode.HALF_UP);
-        return new AmortizationResult(payment, totalRepayment, totalInterest);
-    }
-
-    private record AmortizationResult(
-        BigDecimal periodicPayment,
-        BigDecimal totalRepayment,
-        BigDecimal totalInterest
-    ) {
-    }
 }

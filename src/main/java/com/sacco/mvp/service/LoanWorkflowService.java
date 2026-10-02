@@ -404,9 +404,8 @@ public class LoanWorkflowService {
         LoanType resolvedLoanType = product.getLoanType();
         assertCanApplyForProduct(saccoId, applicantId, product, existingDraft == null ? null : existingDraft.getId());
         validateRepaymentPeriod(product, tenorMonths);
-        Map<String, Object> generatedTopUpSnapshot = topUpSourceLoan == null
-            ? null
-            : financialDetailsService.generateSnapshot(saccoId, applicantId, product, amount, tenorMonths, topUpSourceLoan.getId());
+        Map<String, Object> generatedTopUpSnapshot = financialDetailsService.generateSnapshot(
+            saccoId, applicantId, product, amount, tenorMonths, topUpSourceLoan == null ? null : topUpSourceLoan.getId());
         BigDecimal applicationAmount = topUpSourceLoan == null
             ? amount
             : requireFinancialSnapshotAmount(generatedTopUpSnapshot, "principalAmount");
@@ -435,7 +434,7 @@ public class LoanWorkflowService {
             guarantorApprovalMode
         );
 
-        String preparedFinancialSnapshot = financialSnapshotForDraft(generatedTopUpSnapshot, financialSnapshotJson);
+        String preparedFinancialSnapshot = writeJson(generatedTopUpSnapshot, "Failed to calculate loan terms.");
         EligibilityService.EligibilityResult eligibility = checkApplicantCreditEligibility(
             saccoId,
             applicantId,
@@ -2108,19 +2107,10 @@ public class LoanWorkflowService {
         }
     }
 
-    private String financialSnapshotForDraft(Map<String, Object> generatedSnapshot, String submittedFinancialSnapshotJson) {
-        if (generatedSnapshot == null) {
-            return normalizeJson(submittedFinancialSnapshotJson, "Load SACCO financial details again before saving the draft.");
-        }
-        Map<String, Object> snapshot = new LinkedHashMap<>(generatedSnapshot);
-        snapshot.putAll(extractLiveFinancialValues(submittedFinancialSnapshotJson));
-        return writeJson(snapshot, "Failed to prepare top-up financial details.");
-    }
-
     private BigDecimal requireFinancialSnapshotAmount(Map<String, Object> snapshot, String key) {
         BigDecimal amount = snapshot == null ? null : readBigDecimal(snapshot.get(key));
         if (amount == null) {
-            throw new IllegalStateException("Load SACCO financial details again before saving the draft.");
+            throw new IllegalStateException("Calculate the loan terms again before saving the draft.");
         }
         return amount.setScale(2, java.math.RoundingMode.HALF_UP);
     }
@@ -2332,9 +2322,7 @@ public class LoanWorkflowService {
         if (app.getTopUpSourceLoanId() != null) {
             app.setAmount(requireFinancialSnapshotAmount(generatedSnapshot, "principalAmount"));
         }
-        Map<String, Object> latestSnapshot = new LinkedHashMap<>(generatedSnapshot);
-        latestSnapshot.putAll(extractLiveFinancialValues(app.getFinancialSnapshot()));
-        app.setFinancialSnapshot(writeJson(latestSnapshot, "Failed to refresh financial snapshot."));
+        app.setFinancialSnapshot(writeJson(generatedSnapshot, "Failed to refresh financial snapshot."));
     }
 
     private void refreshFinancialSnapshotIfRequired(LoanApplication app, LoanProductSetting product) {
@@ -2346,32 +2334,6 @@ public class LoanWorkflowService {
                 "This loan product requires a current credit assessment. Calculate affordability before submitting."
             );
         }
-    }
-
-    private Map<String, Object> extractLiveFinancialValues(String rawJson) {
-        Map<String, Object> liveValues = new LinkedHashMap<>();
-        if (rawJson == null || rawJson.isBlank()) {
-            return liveValues;
-        }
-        try {
-            Map<String, Object> snapshot = objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
-            for (String key : List.of(
-                "monthlyRepaymentAmount",
-                "periodicRepaymentAmount",
-                "installmentAmount",
-                "interestAmount",
-                "principalAmount",
-                "totalRepayableAmount",
-                "activeExposure"
-            )) {
-                if (snapshot.containsKey(key)) {
-                    liveValues.put(key, snapshot.get(key));
-                }
-            }
-        } catch (Exception ignored) {
-            return liveValues;
-        }
-        return liveValues;
     }
 
     private String writeJson(Map<String, Object> payload, String messageOnFailure) {

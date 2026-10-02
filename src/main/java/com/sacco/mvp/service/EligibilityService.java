@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -71,15 +72,16 @@ public class EligibilityService {
         Map<String, ?> safeFormData = formData == null ? Map.of() : formData;
         Map<String, ?> safeFinancialSnapshot = financialSnapshot == null ? Map.of() : financialSnapshot;
 
-        BigDecimal monthlyIncome = readMoney(safeFormData, "monthlyIncome", "income", "declaredMonthlyIncome");
-        BigDecimal monthlyExpenses = readMoney(safeFormData, "monthlyExpenses", "expenses", "declaredMonthlyExpenses");
-        BigDecimal otherDebtRepayments = readMoney(safeFormData, "otherDebtRepayments", "monthlyDebtRepayments", "debtRepayments");
+        BigDecimal incomeInput = readMoney(safeFormData, "monthlyIncome", "income", "declaredMonthlyIncome");
+        BigDecimal expensesInput = readMoney(safeFormData, "monthlyExpenses", "expenses", "declaredMonthlyExpenses");
+        BigDecimal debtInput = readMoney(safeFormData, "otherDebtRepayments", "monthlyDebtRepayments", "debtRepayments");
+        BigDecimal monthlyIncome = money(incomeInput);
+        BigDecimal monthlyExpenses = money(expensesInput);
+        BigDecimal otherDebtRepayments = money(debtInput);
         BigDecimal collateralValue = readMoney(safeFormData, "collateralEstimatedValue", "collateralValue");
         String collateralDescription = readText(safeFormData, "collateralDescription", "securityDescription");
-        BigDecimal repayment = readMoney(safeFinancialSnapshot, "monthlyRepaymentAmount", "periodicRepaymentAmount");
-        if (repayment.compareTo(BigDecimal.ZERO) <= 0) {
-            repayment = readMoney(safeFinancialSnapshot, "installmentAmount");
-        }
+        BigDecimal repaymentInput = monthlyRepayment(safeFinancialSnapshot);
+        BigDecimal repayment = money(repaymentInput);
         BigDecimal disposableIncome = monthlyIncome.subtract(monthlyExpenses).subtract(otherDebtRepayments)
             .setScale(2, RoundingMode.HALF_UP);
         BigDecimal ratio = product.getResolvedMaxRepaymentToDisposableIncomeRatio();
@@ -93,16 +95,19 @@ public class EligibilityService {
             : repayment.divide(disposableIncome, 4, RoundingMode.HALF_UP);
 
         boolean amountProvided = safeAmount.compareTo(BigDecimal.ZERO) > 0;
+        boolean cashFlowValid = incomeInput != null && incomeInput.signum() > 0
+            && expensesInput != null && expensesInput.signum() >= 0
+            && debtInput != null && debtInput.signum() >= 0;
         boolean affordabilityOk = !product.isAffordabilityCheckRequired()
-            || !amountProvided
-            || (monthlyIncome.compareTo(BigDecimal.ZERO) > 0
+            || (cashFlowValid && repaymentInput != null && repaymentInput.signum() > 0
                 && disposableIncome.compareTo(BigDecimal.ZERO) > 0
                 && repayment.compareTo(maxAffordableRepayment) <= 0);
         boolean collateralOk = !product.isCollateralRequired()
             || (!collateralDescription.isBlank()
+                && collateralValue != null && collateralValue.signum() >= 0
                 && collateralValue.compareTo(minCollateralValue(product, safeAmount)) >= 0);
-        boolean eligible = affordabilityOk && collateralOk;
-        String reason = reason(product, amountProvided, monthlyIncome, disposableIncome, repayment,
+        boolean eligible = amountProvided && affordabilityOk && collateralOk;
+        String reason = reason(product, amountProvided, cashFlowValid, repaymentInput, monthlyIncome, disposableIncome, repayment,
             maxAffordableRepayment, collateralDescription, collateralValue, safeAmount);
 
         return new EligibilityResult(
@@ -117,7 +122,7 @@ public class EligibilityService {
             repayment,
             repaymentBurdenRatio,
             activeExposure == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : activeExposure,
-            collateralValue,
+            money(collateralValue),
             product.isCollateralRequired(),
             reason
         );
@@ -126,6 +131,8 @@ public class EligibilityService {
     public String policySnapshotJson(EligibilityResult result, int guarantorsRequired, Map<String, Object> extraData) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("assessmentType", "LOCAL_CREDIT_POLICY");
+        snapshot.put("verificationStatus", "DECLARED_NOT_VERIFIED");
+        snapshot.put("repaymentAmountBasis", "MONTHLY_EQUIVALENT_MAX_INSTALLMENT");
         snapshot.put("assessedAt", OffsetDateTime.now().toString());
         snapshot.put("eligible", result.eligible());
         snapshot.put("reason", result.reason());
@@ -142,7 +149,7 @@ public class EligibilityService {
         snapshot.put("collateralValue", result.collateralValue());
         snapshot.put("guarantorsRequired", guarantorsRequired);
         if (extraData != null && !extraData.isEmpty()) {
-            snapshot.putAll(extraData);
+            extraData.forEach(snapshot::putIfAbsent);
         }
         try {
             return objectMapper.writeValueAsString(snapshot);
@@ -169,6 +176,8 @@ public class EligibilityService {
 
     private String reason(LoanProductSetting product,
                           boolean amountProvided,
+                          boolean cashFlowValid,
+                          BigDecimal repaymentInput,
                           BigDecimal monthlyIncome,
                           BigDecimal disposableIncome,
                           BigDecimal repayment,
@@ -176,6 +185,15 @@ public class EligibilityService {
                           String collateralDescription,
                           BigDecimal collateralValue,
                           BigDecimal requestedAmount) {
+        if (!amountProvided) {
+            return "Enter a positive loan amount before calculating the credit assessment.";
+        }
+        if (product.isAffordabilityCheckRequired() && !cashFlowValid) {
+            return "Enter valid monthly income, expenses, and debt repayments. Expenses and debts must be zero or greater.";
+        }
+        if (product.isAffordabilityCheckRequired() && (repaymentInput == null || repaymentInput.signum() <= 0)) {
+            return "Calculate a positive repayment amount with a valid repayment frequency before assessing affordability.";
+        }
         if (product.isAffordabilityCheckRequired() && amountProvided && monthlyIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return "Enter monthly income before calculating the credit assessment.";
         }
@@ -189,7 +207,7 @@ public class EligibilityService {
             return "Collateral details are required for this loan product.";
         }
         BigDecimal minimumCollateral = minCollateralValue(product, requestedAmount);
-        if (product.isCollateralRequired() && collateralValue.compareTo(minimumCollateral) < 0) {
+        if (product.isCollateralRequired() && (collateralValue == null || collateralValue.signum() < 0 || collateralValue.compareTo(minimumCollateral) < 0)) {
             return "Collateral value is below the minimum coverage required for this loan product.";
         }
         return "Credit assessment requirements are met.";
@@ -205,19 +223,32 @@ public class EligibilityService {
 
     private BigDecimal readMoney(Map<String, ?> source, String... keys) {
         if (source == null || keys == null) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            return null;
         }
         for (String key : keys) {
             Object value = source.get(key);
             if (value == null) {
                 continue;
             }
-            BigDecimal parsed = parseMoney(value);
-            if (parsed != null) {
-                return parsed;
-            }
+            return parseMoney(value);
         }
-        return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        return null;
+    }
+
+    private BigDecimal monthlyRepayment(Map<String, ?> snapshot) {
+        if (snapshot.containsKey("monthlyRepaymentAmount")) {
+            return readMoney(snapshot, "monthlyRepaymentAmount");
+        }
+        BigDecimal periodic = readMoney(snapshot, "periodicRepaymentAmount", "installmentAmount");
+        if (periodic == null || periodic.signum() <= 0) {
+            return null;
+        }
+        try {
+            RepaymentFrequency frequency = RepaymentFrequency.valueOf(String.valueOf(snapshot.get("repaymentFrequency")));
+            return LoanAmortizationCalculator.monthlyEquivalent(periodic, frequency);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private String readText(Map<String, ?> source, String... keys) {
@@ -234,14 +265,8 @@ public class EligibilityService {
     }
 
     private BigDecimal parseMoney(Object value) {
-        if (value instanceof BigDecimal decimal) {
-            return money(decimal);
-        }
-        if (value instanceof Number number) {
-            return money(BigDecimal.valueOf(number.doubleValue()));
-        }
         try {
-            return money(new BigDecimal(String.valueOf(value).replace(",", "").trim()));
+            return new BigDecimal(String.valueOf(value).replace(",", "").trim()).setScale(2, RoundingMode.UNNECESSARY);
         } catch (RuntimeException ex) {
             return null;
         }

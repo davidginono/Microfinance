@@ -138,12 +138,12 @@
                     <div class="loan-stat-value">${app.tenorMonths} <spring:message code="common.months" text="month(s)" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Disposable Income" /></div>
-                    <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
+                    <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Active Loan Exposure" /></div>
+                    <div class="loan-stat-value" data-live-account-status-active-exposure>${applicantExternalAccountStatus.activeExposureLabel}</div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Risk History" /></div>
-                    <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
+                    <div class="loan-stat-label"><spring:message code="loan.currentShares" text="PAR/Default History" /></div>
+                    <div class="loan-stat-value" data-live-account-status-risk-history>${applicantExternalAccountStatus.riskHistoryLabel}</div>
                 </div>
             </div>
             <%@ include file="../fragments/live-account-status-message.jspf" %>

@@ -3,6 +3,7 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.ActiveLoanDisplayService;
@@ -59,6 +60,42 @@ class AppControllerActiveLoanBalanceRefreshTest {
     @Mock private AppUserPrincipal principal;
 
     @InjectMocks private AppController controller;
+
+    @Test
+    void dashboardCreditProfileUsesExposureAndRiskPayloadNames() {
+        UUID memberId = UUID.randomUUID();
+        Member member = Member.builder().id(memberId).saccoId("IAA").stationId("ST-1").build();
+        when(principal.getMemberId()).thenReturn(memberId);
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
+        when(externalAccountStatusService.resolve(member)).thenReturn(
+            ExternalAccountStatusService.ExternalAccountStatusView.available(
+                "TZS 770,000", "2 PAR/default record(s)", "Local credit status loaded."
+            )
+        );
+
+        assertThat(controller.dashboardExternalAccountStatus(principal).getBody())
+            .containsEntry("activeExposureLabel", "TZS 770,000")
+            .containsEntry("riskHistoryLabel", "2 PAR/default record(s)")
+            .containsEntry("available", true)
+            .containsEntry("pending", false)
+            .doesNotContainKeys("savingsLabel", "sharesLabel");
+    }
+
+    @Test
+    void dashboardMissingCreditProfileRemainsUnavailable() {
+        UUID memberId = UUID.randomUUID();
+        when(principal.getMemberId()).thenReturn(memberId);
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.empty());
+        when(externalAccountStatusService.resolve(null)).thenReturn(
+            ExternalAccountStatusService.ExternalAccountStatusView.unavailable("Client details are not available.")
+        );
+
+        assertThat(controller.dashboardExternalAccountStatus(principal).getBody())
+            .containsEntry("available", false)
+            .containsEntry("activeExposureLabel", "-")
+            .containsEntry("riskHistoryLabel", "-")
+            .doesNotContainKeys("savingsLabel", "sharesLabel");
+    }
 
     @Test
     void progressiveDashboardRendersShellWithoutSynchronousDashboardQueries() {

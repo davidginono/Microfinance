@@ -19,6 +19,7 @@ import com.sacco.mvp.repository.ManagerReviewRepository;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -52,11 +53,12 @@ class LoanPresentationServiceTest {
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
 
     private LoanPresentationService loanPresentationService;
+    private StaticMessageSource messageSource;
 
     @BeforeEach
     void setUp() {
         LocaleContextHolder.setLocale(Locale.ENGLISH);
-        StaticMessageSource messageSource = new StaticMessageSource();
+        messageSource = new StaticMessageSource();
         messageSource.addMessage("loan.status.DRAFT", Locale.ENGLISH, "Draft");
         messageSource.addMessage("loan.status.AWAITING_GUARANTORS", Locale.ENGLISH, "Awaiting Guarantors");
         messageSource.addMessage("loan.status.ALL_GUARANTORS_APPROVED", Locale.ENGLISH, "All Guarantors Approved");
@@ -78,6 +80,29 @@ class LoanPresentationServiceTest {
             loanProductWorkflowService,
             messageSource
         );
+    }
+
+    @AfterEach
+    void resetLocale() {
+        LocaleContextHolder.resetLocaleContext();
+    }
+
+    @Test
+    void weeklyQuoteDisplaysActualCountAndLocalizedPaymentBasis() {
+        var sw = Locale.forLanguageTag("sw");
+        messageSource.addMessage("newloan.calculation.frequency", sw, "Muda Kati ya Marejesho");
+        messageSource.addMessage("newloan.calculation.installment", sw, "Kiasi cha Rejesho (TZS)");
+        messageSource.addMessage("newloan.calculation.monthlyAffordability", sw, "Kiasi cha Tathmini ya Uwezo kwa Mwezi (TZS)");
+        messageSource.addMessage("newloan.calculation.WEEKLY", sw, "Kila Wiki");
+        LocaleContextHolder.setLocale(sw);
+        var sections = loanPresentationService.parseFinancialFieldSections("""
+            {"numberOfPayments":52,"tenorMonths":12,"repaymentFrequency":"WEEKLY",
+             "periodicRepaymentAmount":1000,"monthlyRepaymentAmount":4333.34}
+            """);
+        assertThat(sections.get("Loan Calculations")).containsEntry("Number of Payments", 52)
+            .containsEntry("Muda Kati ya Marejesho", "Kila Wiki")
+            .containsEntry("Kiasi cha Rejesho (TZS)", "TSh 1,000")
+            .containsEntry("Kiasi cha Tathmini ya Uwezo kwa Mwezi (TZS)", "TSh 4,333.34");
     }
 
     @Test

@@ -307,15 +307,15 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <p class="erp-panel-title"><spring:message code="dashboard.panel.financialStatus" /></p>
                 </div>
                 <div class="erp-panel-body">
-                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.yourBalances" text="Your Balances" /></h2>
+                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.yourBalances" text="Your Credit Profile" /></h2>
                     <div class="aws-status-summary-grid mt-3">
                         <div class="aws-status-summary-item">
                             <p class="aws-status-summary-label"><spring:message code="dashboard.savings.label" /></p>
-                            <p class="aws-status-summary-value" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
+                            <p class="aws-status-summary-value" data-live-account-status-active-exposure>${dashboardExternalAccountStatus.activeExposureLabel}</p>
                         </div>
                         <div class="aws-status-summary-item">
                             <p class="aws-status-summary-label"><spring:message code="dashboard.shares.label" /></p>
-                            <p class="aws-status-summary-value" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
+                            <p class="aws-status-summary-value" data-live-account-status-risk-history>${dashboardExternalAccountStatus.riskHistoryLabel}</p>
                         </div>
                     </div>
                 </div>
@@ -398,19 +398,19 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         <div class="erp-panel-body">
             <div>
                 <div>
-                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.yourBalances" text="Your Balances" /></h2>
+                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.yourBalances" text="Your Credit Profile" /></h2>
                 </div>
             </div>
 
             <div class="aws-status-summary-grid">
                 <div class="aws-status-summary-item">
                     <p class="aws-status-summary-label"><spring:message code="dashboard.savings.label" /></p>
-                    <p class="aws-status-summary-value" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
+                    <p class="aws-status-summary-value" data-live-account-status-active-exposure>${dashboardExternalAccountStatus.activeExposureLabel}</p>
                 </div>
 
                 <div class="aws-status-summary-item">
                     <p class="aws-status-summary-label"><spring:message code="dashboard.shares.label" /></p>
-                    <p class="aws-status-summary-value" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
+                    <p class="aws-status-summary-value" data-live-account-status-risk-history>${dashboardExternalAccountStatus.riskHistoryLabel}</p>
                 </div>
             </div>
         </div>

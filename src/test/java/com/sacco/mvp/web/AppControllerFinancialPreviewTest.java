@@ -9,11 +9,13 @@ import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.MessageSource;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,10 +25,13 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class AppControllerFinancialPreviewTest {
@@ -36,8 +41,15 @@ class AppControllerFinancialPreviewTest {
     @Mock private EligibilityService eligibilityService;
     @Mock private LoanPresentationService loanPresentationService;
     @Mock private AppUserPrincipal principal;
+    @Mock private MessageSource messageSource;
 
     @InjectMocks private AppController controller;
+
+    @BeforeEach
+    void messagesUseEnglishFallback() {
+        lenient().when(messageSource.getMessage(anyString(), isNull(), anyString(), any(java.util.Locale.class)))
+            .thenAnswer(invocation -> invocation.getArgument(2));
+    }
 
     @Test
     void calculatorDoesNotApplyNewApplicationLocks() {
@@ -76,7 +88,7 @@ class AppControllerFinancialPreviewTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("message", "Loan calculations loaded");
+        assertThat(response.getBody()).containsEntry("message", "Estimate calculated. Income, expenses, and debt declarations still require verification.");
         verify(loanWorkflowService, never()).assertCanApplyForProduct(any(), any(), any(), any());
     }
 
