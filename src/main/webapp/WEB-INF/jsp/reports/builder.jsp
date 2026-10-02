@@ -66,10 +66,10 @@
         <p><spring:message code="report.period" />: <c:out value="${result.from}" /> / <c:out value="${result.through}" />. <spring:message code="report.cutoff" />: <c:out value="${result.recordedCutoff}" /></p>
         <p><spring:message code="report.untracked" />: <c:out value="${result.untrackedLoans}" /></p></div>
       <div class="erp-table-scroll" data-view-position-key="operational-report-preview"><table class="erp-table"><thead><tr>
-        <c:forEach items="${result.visibleColumns}" var="column"><th style="min-width:${column.width}px"><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><c:out value="${fieldLabels[column.field.name()]}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
-      </tr></thead><tbody><c:forEach items="${result.rows}" var="row"><tr><c:forEach items="${result.visibleColumns}" var="column"><td class="${column.field.unit == 'TZS' ? 'report-money' : ''}">
+        <c:forEach items="${result.getVisibleColumns()}" var="column"><th style="min-width:${column.width}px"><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><c:out value="${fieldLabels[column.field.name()]}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
+      </tr></thead><tbody><c:forEach items="${result.rows}" var="row"><tr><c:forEach items="${result.getVisibleColumns()}" var="column"><td class="${column.field.unit == 'TZS' ? 'report-money' : ''}">
         <c:choose><c:when test="${row[column.field.name()] == null}"><spring:message code="report.unknown" /></c:when><c:when test="${column.field.unit == 'TZS'}"><fmt:formatNumber value="${row[column.field.name()]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise><c:out value="${row[column.field.name()]}" /></c:otherwise></c:choose>
-      </td></c:forEach></tr></c:forEach><c:if test="${empty result.rows}"><tr><td colspan="${result.visibleColumns.size()}"><spring:message code="report.empty" /></td></tr></c:if></tbody></table></div>
+      </td></c:forEach></tr></c:forEach><c:if test="${empty result.rows}"><tr><td colspan="${result.getVisibleColumns().size()}"><spring:message code="report.empty" /></td></tr></c:if></tbody></table></div>
       <div class="report-context"><strong><spring:message code="report.scopeTotals" /></strong><c:forEach items="${result.totals}" var="total"><p><c:out value="${fieldLabels[total.key]}" /> (TZS): <fmt:formatNumber value="${total.value}" minFractionDigits="2" maxFractionDigits="2" /></p></c:forEach></div>
       <div class="report-actions">
         <c:if test="${not empty runVersion}">
