@@ -34,7 +34,8 @@ public enum AccessFeature {
     DISBURSEMENT_QUEUE("Disbursement Queue"),
     LOAN_REPORTS("Loan Reports"),
     NOTIFICATIONS("Notifications"),
-    SUPPORT("Support");
+    SUPPORT("Support"),
+    REPORT_BUILDER("Operational Report Builder");
 
     private final String displayName;
 

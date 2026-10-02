@@ -137,7 +137,12 @@ public enum UserClaim {
 
     SUPPORT_VIEW(AccessFeature.SUPPORT, AccessAction.VIEW),
     SUPPORT_CREATE(AccessFeature.SUPPORT, AccessAction.CREATE),
-    SUPPORT_UPDATE(AccessFeature.SUPPORT, AccessAction.UPDATE);
+    SUPPORT_UPDATE(AccessFeature.SUPPORT, AccessAction.UPDATE),
+    REPORT_TEMPLATE_DESIGN(AccessFeature.REPORT_BUILDER, AccessAction.CREATE),
+    REPORT_TEMPLATE_PUBLISH(AccessFeature.REPORT_BUILDER, AccessAction.APPROVE),
+    REPORT_RUN(AccessFeature.REPORT_BUILDER, AccessAction.VIEW),
+    REPORT_EXPORT(AccessFeature.REPORT_BUILDER, AccessAction.EXPORT),
+    REPORT_TEMPLATE_SHARE(AccessFeature.REPORT_BUILDER, AccessAction.ASSIGN);
 
     private static final Map<AccessFeature, Map<AccessAction, UserClaim>> BY_FEATURE_ACTION = buildLookup();
 
