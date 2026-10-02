@@ -30,6 +30,8 @@ public record StatementDefinition(int schemaVersion, int calculationVersion, Kin
         for(Row row:rows) {
             require(row!=null && row.id()!=null && row.id().matches("[A-Z][A-Z0-9_]{0,39}") && byId.put(row.id(),row)==null,"line");
             text(row.labelEn(),120);text(row.labelSw(),120);
+            if(row.noteEn()!=null && !row.noteEn().isBlank())text(row.noteEn(),1000);
+            if(row.noteSw()!=null && !row.noteSw().isBlank())text(row.noteSw(),1000);
             require(row.kind()!=null && row.section()!=null && row.unit()!=null && row.accounts()!=null && row.accounts().size()<=1000,"line");
             require(new HashSet<>(row.accounts()).size()==row.accounts().size() && !row.accounts().contains(null),"overlap");
             if(row.kind()==RowKind.ACCOUNT_GROUP) {
@@ -117,6 +119,6 @@ public record StatementDefinition(int schemaVersion, int calculationVersion, Kin
         }
         var value=new Value(amount,status);computed.put(id,value);return value;
     }
-    static void text(String s,int max){require(s!=null && !s.isBlank() && s.length()<=max && s.codePoints().noneMatch(c->c<32 || c=='<' || c=='>'),"text");}
+    static void text(String s,int max){require(s!=null && !s.isBlank() && s.length()<=max && s.codePoints().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t' || c=='<' || c=='>'),"text");}
     static void require(boolean ok,String key){if(!ok)throw new IllegalArgumentException("statement.error."+key);}
 }
