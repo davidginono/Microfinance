@@ -22,3 +22,11 @@ Reproduce using an isolated loopback database `microfinance_accounting_a_test` o
 `hasInstitutionHistory(String)` and `hasMemberHistory(UUID)` provide bounded internal lifecycle guards, including makers/checkers of rejected proposals. Administration integration must call them before deleting files/operational records and deactivate access when history exists.
 
 No 1,000-RPS claim, production cutover, accountant approval or compliance certification is made. Rendered browser/mobile verification is coordinated by the root integrated H run; Java compilation and MockMvc forwarding alone do not prove JSP rendering.
+
+## Local mapping validation follow-up, 2026-10-02
+
+Local policy proposals and independent approvals now require every mapped account to be active, non-heading, and owned by the same institution. The bounded distinct mapping set (maximum100) is read under row share locks, preventing an account deactivation from racing through the review transaction; later posting still revalidates active accounts. External policy activation remains restricted by the existing unsupported external-runtime gate. No institution accounts or decisions are seeded.
+
+`mvn -Dtest=AccountingPolicyServiceTest,AccountingPolicyPostgresTest test` passed **22 scenarios:16 unit and six actual PostgreSQL17.9 scenarios**, zero failures/errors/skips, finishing15:25:07 EAT. Main310/test144 compilation succeeded. The new cases reject missing, foreign, heading and inactive mapped accounts before creating a proposal, permit an active owned mapped account, and prevent approval when the account was deactivated after proposal. Existing independent review, immutable/idempotent decisions, audit rollback and competing-book concurrency scenarios also passed.
+
+The exact opt-in synthetic database `microfinance_accounting_a_test_integration_20261002` was newly created on loopback55439. Normal strict Flyway applied all49 migrations currently present in root in version order, including D45/45.1 and F46/46.1 before H49; no out-of-order option was used. This is evidence for the integrated schema currently present, not completion of absent C44/G47/E48 or the later H49.1 feature. Test connections use a bounded four-connection pool and explicit loopback SSL/timeouts; production datasource settings are unchanged.

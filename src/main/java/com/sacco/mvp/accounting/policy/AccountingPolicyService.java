@@ -1,5 +1,6 @@
 package com.sacco.mvp.accounting.policy;
 
+import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.MemberStatus;
@@ -41,11 +42,14 @@ public class AccountingPolicyService {
     private final UserClaimService userClaims;
     private final MemberDirectoryService directory;
     private final SaccoRegistryService institutions;
+    private final GeneralLedgerRepository accounts;
 
     @Transactional
     public PolicySnapshot create(AppUserPrincipal actor, PolicyCommand command) {
         String institution = requireActor(actor, UserClaim.ACCOUNTING_POLICIES_CREATE);
         validate(command);
+        if(command.authoritativeLedger()==AuthoritativeLedger.LOCAL_GL)
+            require(accounts.validPolicyMappings(institution,command.accountMappings().values()),"accountMappings");
         String decisions = mapper.writeValueAsString(command.decisions());
         String matrix = mapper.writeValueAsString(command.postingMatrix());
         String mappings = mapper.writeValueAsString(command.accountMappings());
@@ -86,6 +90,8 @@ public class AccountingPolicyService {
             return snapshot(p, a);
         }
         if (command.decision() == Decision.APPROVED) {
+            if(p.getAuthoritativeLedger()==AuthoritativeLedger.LOCAL_GL)
+                require(accounts.validPolicyMappings(institution,readMappings(p).values()),"accountMappings");
             // A new decision cannot rewrite an earlier policy's effective boundary or switch the official books.
             var previous = policies.approvedAt(institution, LocalDate.of(9999, 12, 31), PageRequest.of(0, 1));
             if (!previous.isEmpty()) {
