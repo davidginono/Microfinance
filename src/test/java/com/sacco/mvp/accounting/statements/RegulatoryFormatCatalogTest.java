@@ -1,0 +1,14 @@
+package com.sacco.mvp.accounting.statements;
+
+import org.junit.jupiter.api.Test;
+import java.time.LocalDate;
+import java.util.*;
+import static com.sacco.mvp.accounting.statements.StatementDefinition.*;
+import static org.assertj.core.api.Assertions.*;
+
+class RegulatoryFormatCatalogTest {
+    RegulatoryFormatCatalog.Format format(List<RegulatoryFormatCatalog.Field> fields,List<RegulatoryFormatCatalog.Calculation> calculations){return new RegulatoryFormatCatalog.Format(1,"Synthetic authority","SYNTHETIC_ONLY","1","https://www.bot.go.tz/synthetic-test-only","Synthetic externally reviewed fixture only",Kind.BALANCE_SHEET,RegulatoryFormatCatalog.FileFormat.CSV,RegulatoryFormatCatalog.Period.QUARTER,30,fields,calculations);}
+    @Test void prescribedPeriodsAndDeadlineAreExplicit(){var f=format(List.of(new RegulatoryFormatCatalog.Field("ASSETS","Assets","Mali",Unit.TZS,"REQUIRED_ASSETS")),List.of());f.validate();assertThat(f.deadline(LocalDate.of(2026,1,1),LocalDate.of(2026,3,31))).isEqualTo(LocalDate.of(2026,4,30));assertThatThrownBy(()->f.deadline(LocalDate.of(2026,2,1),LocalDate.of(2026,4,30))).hasMessage("statement.error.officialPeriod");}
+    @Test void institutionRowIdentifiersCannotBecomePrescribedFinancialDefinitions(){var f=format(List.of(new RegulatoryFormatCatalog.Field("ASSETS","Assets","Mali",Unit.TZS,"USER_LINE")),List.of());assertThatThrownBy(f::validate).hasMessage("statement.error.officialField");}
+    @Test void protectedRatiosAndCyclesUseTheSameBoundedLanguage(){var f=format(List.of(new RegulatoryFormatCatalog.Field("RATIO","Ratio","Uwiano",Unit.RATIO,"REG_RATIO")),List.of(new RegulatoryFormatCatalog.Calculation("REG_RATIO",Unit.RATIO,new Expression(Operation.RATIO,List.of("REQUIRED_ASSETS","REQUIRED_EQUITY")))));f.validate();var cyclic=format(List.of(new RegulatoryFormatCatalog.Field("TOTAL","Total","Jumla",Unit.TZS,"REG_A")),List.of(new RegulatoryFormatCatalog.Calculation("REG_A",Unit.TZS,new Expression(Operation.SUM,List.of("REG_B","REQUIRED_ASSETS"))),new RegulatoryFormatCatalog.Calculation("REG_B",Unit.TZS,new Expression(Operation.SUM,List.of("REG_A","REQUIRED_EQUITY")))));assertThatThrownBy(cyclic::validate).hasMessage("statement.error.cycle");}
+}
