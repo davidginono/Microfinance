@@ -118,7 +118,7 @@ class ReconciliationPostgresTest {
         assertThatThrownBy(()->service.finalizedSnapshotForPublication(maker,review)).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
         assertThat(tx.execute(status->service.finalizedSnapshotForPublication(maker,review)).periodClosed()).isTrue();
         assertThatThrownBy(()->post("BACKDATED","1.00",false)).hasMessage("accounting.error.openPeriodRequired");UUID reopen=service.proposeClose(third,period,"Verified late correction",true);service.approveClose(fourth,reopen,"Independent controlled reopen");assertThat(service.finalizedSnapshot(maker,review).periodClosed()).isFalse();assertThat(service.finalizedSnapshot(maker,review).snapshot()).isEqualTo(original.snapshot());assertThat(service.finalizedSnapshot(maker,review).restatement()).isTrue();
-        verify(reopenListener).periodReopened(eq(fourth),eq(period),contains("Verified late correction"));
+        verify(reopenListener).periodReopened(eq(fourth),eq(period),eq(DAY),contains("Verified late correction"));
         post("LATE","1.00",false);assertThat(service.closeChecks(maker,period)).anyMatch(c->c.blockers()>0);assertThatThrownBy(()->service.proposeClose(maker,period,"Cannot reuse stale evidence",false)).hasMessage("reconciliation.error.closeBlocked");
         UUID late=jdbc.queryForObject("select id from gl_journal where sacco_id=? and source_reference='LATE'",UUID.class,institution),lateStatement=service.importStatement(maker,new StatementCommand(UUID.randomUUID(),bank,format,DAY.plusDays(1),DAY.plusDays(1),new BigDecimal("110.00"),new BigDecimal("111.00"),"late.csv","Correction evidence","date,reference,amount,kind\n2026-10-02,LATE,1.00,RECEIPT"));
         UUID lateMatch=service.proposeMatch(maker,"EXACT","Correction matching",List.of(new Allocation(statementLine(lateStatement),journalLine(late),BigDecimal.ONE)));service.reviewMatch(checker,lateMatch,true,"Correction independent review");certify(new BigDecimal("111.00"));when(clock.now()).thenReturn(NOW.plusMinutes(1));
@@ -175,7 +175,7 @@ class ReconciliationPostgresTest {
         UUID journal=gl.draftManual(maker,new JournalCommand(UUID.randomUUID(),"COMPOUND",DAY.plusDays(1),"Synthetic compound movement",null,List.of(new Line(bank,new BigDecimal("10.00"),BigDecimal.ZERO),new Line(expense,new BigDecimal("5.00"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("15.00"))))).id();gl.approve(checker,journal,"Independent synthetic review");gl.post(checker,journal,false);
         UUID s=importOne("COMPOUND","10.00"),match=service.proposeMatch(maker,"EXACT","Evidence",List.of(new Allocation(statementLine(s),journalLine(journal),new BigDecimal("10.00"))));service.reviewMatch(checker,match,true,"Independent evidence");certify(new BigDecimal("110.00"));UUID close=service.proposeClose(maker,period,"Prepared compound close",false);service.approveClose(checker,close,"Independent close");service.completeInstitutionClose(checker,period,"All branches reviewed");
         var frozen=JsonMapper.builder().findAndAddModules().build().readTree(service.finalizedSnapshot(maker,close).snapshot());assertThat(frozen.get("cashTransfers").get("ambiguous_journals").asLong()).isEqualTo(1);assertThat(frozen.get("cashTransfers").get("noncash_pairs_possible").asLong()).isEqualTo(1);
-        UUID reopen=service.proposeClose(third,period,"Verified correction",true);doThrow(new IllegalStateException("Synthetic downstream audit failure")).when(reopenListener).periodReopened(any(),eq(period),anyString());assertThatThrownBy(()->service.approveClose(fourth,reopen,"Independent reopen")).hasMessage("Synthetic downstream audit failure");assertThat(service.finalizedSnapshot(maker,close).periodClosed()).isTrue();assertThat(jdbc.queryForObject("select count(*) from accounting_close_decision where review_id=?",Integer.class,reopen)).isZero();
+        UUID reopen=service.proposeClose(third,period,"Verified correction",true);doThrow(new IllegalStateException("Synthetic downstream audit failure")).when(reopenListener).periodReopened(any(),eq(period),eq(DAY),anyString());assertThatThrownBy(()->service.approveClose(fourth,reopen,"Independent reopen")).hasMessage("Synthetic downstream audit failure");assertThat(service.finalizedSnapshot(maker,close).periodClosed()).isTrue();assertThat(jdbc.queryForObject("select count(*) from accounting_close_decision where review_id=?",Integer.class,reopen)).isZero();
     }
     @Test void chargesDisbursementsAndSettlementSplitsKeepExplicitTreatmentAndDirection() {
         opening();UUID charge=outgoing("FEE","0.03"),disbursement=outgoing("DISBURSE","10.00"),settlement=outgoing("SETTLE","6.00"),receipt=post("OPPOSITE","10.00",false);
@@ -219,5 +219,134 @@ class ReconciliationPostgresTest {
         when(clock.now()).thenReturn(NOW.plusMinutes(1));UUID voucher=gl.reverse(third,j,UUID.randomUUID(),DAY.plusDays(1),"Subsequent voucher correction","Subsequent source evidence").id();gl.approve(fourth,voucher,"Independent voucher reversal");gl.post(fourth,voucher,false);
         assertThat(service.rows(maker,s,0).rows().getFirst().status()).isEqualTo("REVERSED");assertThat(service.closeChecks(maker,period)).anyMatch(c->c.key().equals("reversed")&&c.blockers()==1);
         UUID investigated=service.assignException(maker,sl,"REVERSED",checker.getMemberId(),"Subsequent linked investigation");service.reviewException(checker,investigated,"Independent reviewed reversal difference");assertThat(service.closeChecks(maker,period)).anyMatch(c->c.key().equals("reversed")&&c.blockers()==0);
+    }
+
+    private com.sacco.mvp.accounting.dto.GeneralLedgerDtos.Journal sourceDraft(String ref) {
+        return tx.execute(status->gl.draftSourceEvent(maker,PostingEvent.CAPITAL,new JournalCommand(UUID.randomUUID(),ref,DAY.plusDays(1),"Synthetic source evidence",null,List.of(new Line(bank,new BigDecimal("3.01"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("3.01"))))));
+    }
+    private UUID sourcePosted(String ref) {var draft=sourceDraft(ref);return tx.execute(status->gl.approveAndPostSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,ref,"Synthetic independent source review")).id();}
+    private JournalCommand sourceCorrection(String ref) {return new JournalCommand(UUID.randomUUID(),ref,DAY.plusDays(1),"Synthetic actual source correction","Verified source correction",List.of(new Line(bank,BigDecimal.ZERO,new BigDecimal("3.01")),new Line(capital,new BigDecimal("3.01"),BigDecimal.ZERO)));}
+    @Test void sourceLifecycleRequiresOwningTransactionAndExactIndependentCorrection() {
+        opening();UUID original=sourcePosted("SOURCE");JournalCommand command=sourceCorrection("CORRECTION");
+        assertThatThrownBy(()->gl.draftSourceReversal(third,original,command)).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        assertThatThrownBy(()->tx.execute(status->gl.draftSourceReversal(maker,original,command))).hasMessage("accounting.error.independentReversal");
+        assertThatThrownBy(()->tx.execute(status->gl.draftSourceReversal(checker,original,command))).hasMessage("accounting.error.independentReversal");
+        var wrong=new JournalCommand(UUID.randomUUID(),"WRONG",command.effectiveDate(),command.evidenceReference(),command.reason(),List.of(new Line(bank,BigDecimal.ZERO,BigDecimal.ONE),new Line(capital,BigDecimal.ONE,BigDecimal.ZERO)));
+        assertThatThrownBy(()->tx.execute(status->gl.draftSourceReversal(third,original,wrong))).hasMessage("accounting.error.original");
+        var correction=tx.execute(status->gl.draftSourceReversal(third,original,command));
+        assertThat(tx.execute(status->gl.draftSourceReversal(third,original,command)).id()).isEqualTo(correction.id());
+        assertThatThrownBy(()->gl.approve(fourth,correction.id(),"Generic shortcut")).hasMessage("accounting.error.sourceType");
+        assertThatThrownBy(()->gl.post(fourth,correction.id(),false)).hasMessage("accounting.error.sourceType");
+        assertThatThrownBy(()->tx.execute(status->gl.approveAndPostSourceReversal(fourth,correction.id(),"WRONG","Synthetic review"))).hasMessage("accounting.error.sourceType");
+        assertThatThrownBy(()->tx.execute(status->gl.approveAndPostSourceReversal(third,correction.id(),command.sourceReference(),"Own review"))).hasMessage("accounting.error.independentChecker");
+        var posted=tx.execute(status->gl.approveAndPostSourceReversal(fourth,correction.id(),command.sourceReference(),"Independent source correction"));
+        assertThat(posted.state()).isEqualTo("POSTED");assertThat(posted.reversesId()).isEqualTo(original);
+        assertThat(tx.execute(status->gl.approveAndPostSourceReversal(fourth,correction.id(),command.sourceReference(),"Independent source correction")).id()).isEqualTo(correction.id());
+        assertThatThrownBy(()->tx.execute(status->gl.approveAndPostSourceReversal(fourth,correction.id(),command.sourceReference(),"Changed correction review"))).hasMessage("accounting.error.changedRetry");
+        assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,correction.id())).isEqualTo(1);
+        assertThat(gl.journal(maker,original).reversed()).isTrue();
+    }
+    @Test void retainedCancellationIsAtomicIdempotentScopedAndCannotBePosted() {
+        opening();var draft=sourceDraft("REJECTED");
+        assertThatThrownBy(()->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"REJECTED","Independent rejection")).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(maker,draft.id(),PostingEvent.CAPITAL,"REJECTED","Own rejection"))).hasMessage("accounting.error.independentChecker");
+        station("B2");var b2=operator("B2");
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(b2,draft.id(),PostingEvent.CAPITAL,"REJECTED","Wrong branch"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.FUNDING,"REJECTED","Wrong event"))).hasMessage("accounting.error.sourceType");
+        assertThat(service.closeChecks(maker,period)).anyMatch(c->c.key().equals("drafts")&&c.blockers()==1);
+        var cancelled=tx.execute(status->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"REJECTED","Independent rejection"));
+        assertThat(cancelled.state()).isEqualTo("CANCELLED");
+        assertThat(tx.execute(status->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"REJECTED","Independent rejection")).state()).isEqualTo("CANCELLED");
+        assertThat(gl.journals(maker,0).rows()).anyMatch(j->j.id().equals(draft.id())&&j.state().equals("CANCELLED"));
+        assertThat(gl.sourceCancellation(maker,draft.id()).orElseThrow().checker()).isEqualTo(checker.getMemberId());
+        assertThat(service.closeChecks(maker,period)).anyMatch(c->c.key().equals("drafts")&&c.blockers()==0);
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"REJECTED","Changed rejection"))).hasMessage("accounting.error.changedRetry");
+        assertThatThrownBy(()->tx.execute(status->gl.approveAndPostSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"REJECTED","Resurrection"))).hasMessage("accounting.error.state");
+        assertThatThrownBy(()->jdbc.update("update gl_journal set state='APPROVED',checker_id=?,checked_at=now(),approval_evidence_reference='Bypass' where id=?",checker.getMemberId(),draft.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,1,0)",UUID.randomUUID(),draft.id(),institution,"B1",bank)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("delete from gl_source_cancellation where journal_id=?",draft.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("update gl_source_cancellation set evidence_reference='Rewrite' where journal_id=?",draft.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,draft.id())).isZero();
+    }
+    @Test void callerAndAuditFailuresRollBackSourceCancellationAndCorrection() {
+        opening();var draft=sourceDraft("ROLLBACK");
+        assertThatThrownBy(()->tx.execute(status->{gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"ROLLBACK","Independent rejected source");throw new IllegalStateException("Owning source rejection failed");})).hasMessage("Owning source rejection failed");
+        assertThat(gl.journal(maker,draft.id()).state()).isEqualTo("DRAFT");assertThat(gl.sourceCancellation(maker,draft.id())).isEmpty();
+        doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).logEvent(anyString(),eq(draft.id()),eq("SOURCE_JOURNAL_CANCELLED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"ROLLBACK","Independent rejected source"))).hasMessage("Synthetic audit failure");assertThat(gl.sourceCancellation(maker,draft.id())).isEmpty();
+        reset(audit);UUID original=sourcePosted("POSTED-ROLLBACK");var command=sourceCorrection("CORRECTION-ROLLBACK");var correction=tx.execute(status->gl.draftSourceReversal(third,original,command));
+        assertThatThrownBy(()->tx.execute(status->{gl.approveAndPostSourceReversal(fourth,correction.id(),command.sourceReference(),"Independent actual correction");throw new IllegalStateException("Subledger correction failed");})).hasMessage("Subledger correction failed");
+        assertThat(gl.journal(maker,correction.id()).state()).isEqualTo("DRAFT");assertThat(gl.journal(maker,original).reversed()).isFalse();assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,correction.id())).isZero();
+    }
+    @Test void cancellationNeverAcceptsManualOpeningOrPostedSourcesAndReplacementRetainsHistory() {
+        UUID opening=opening(),manual=gl.draftManual(maker,new JournalCommand(UUID.randomUUID(),"MANUAL-CANCEL",DAY.plusDays(1),"Synthetic manual",null,List.of(new Line(bank,BigDecimal.ONE,BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,BigDecimal.ONE)))).id();
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(checker,manual,PostingEvent.MANUAL_JOURNAL,"MANUAL-CANCEL","Wrong source"))).hasMessage("accounting.error.sourceType");
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(checker,opening,PostingEvent.OPENING_BALANCE,"OPENING","Wrong opening"))).hasMessage("accounting.error.sourceType");
+        UUID original=sourcePosted("REPLACE-SOURCE");assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(checker,original,PostingEvent.CAPITAL,"REPLACE-SOURCE","Posted cannot cancel"))).hasMessage("accounting.error.state");
+        var first=sourceCorrection("REJECTED-CORRECTION");var rejected=tx.execute(status->gl.draftSourceReversal(third,original,first));tx.execute(status->gl.cancelSourceEvent(fourth,rejected.id(),PostingEvent.REVERSAL,first.sourceReference(),"Rejected owning correction"));
+        var second=sourceCorrection("REPLACEMENT-CORRECTION");var replacement=tx.execute(status->gl.draftSourceReversal(third,original,second));tx.execute(status->gl.approveAndPostSourceReversal(fourth,replacement.id(),second.sourceReference(),"Independently reviewed replacement"));
+        assertThat(gl.journal(maker,rejected.id()).state()).isEqualTo("CANCELLED");assertThat(gl.journal(maker,replacement.id()).state()).isEqualTo("POSTED");assertThat(jdbc.queryForObject("select count(*) from gl_journal where reverses_id=?",Integer.class,original)).isEqualTo(2);
+    }
+    @Test void reversalPolicyAndCurrentStaffRevocationGateSourceLifecycle() {
+        opening();UUID original=sourcePosted("POLICY-SOURCE");var command=sourceCorrection("POLICY-CORRECTION");
+        doThrow(new IllegalArgumentException("accounting.error.postingDisabled")).when(policies).requireAllowedPosting(any(),eq(PostingEvent.REVERSAL));
+        assertThatThrownBy(()->tx.execute(status->gl.draftSourceReversal(third,original,command))).hasMessage("accounting.error.postingDisabled");
+        doNothing().when(policies).requireAllowedPosting(any(),eq(PostingEvent.REVERSAL));var correction=tx.execute(status->gl.draftSourceReversal(third,original,command));
+        doThrow(new IllegalArgumentException("accounting.error.postingDisabled")).when(policies).requireAllowedPosting(any(),eq(PostingEvent.REVERSAL));
+        assertThatThrownBy(()->tx.execute(status->gl.approveAndPostSourceReversal(fourth,correction.id(),command.sourceReference(),"Policy now disabled"))).hasMessage("accounting.error.postingDisabled");assertThat(gl.journal(maker,correction.id()).state()).isEqualTo("DRAFT");
+        when(claims.effectiveClaims(eq(fourth.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());
+        assertThatThrownBy(()->tx.execute(status->gl.cancelSourceEvent(fourth,correction.id(),PostingEvent.REVERSAL,command.sourceReference(),"Revoked checker"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void concurrentSourceCorrectionsKeepOnlyOneActiveReservation() throws Exception {
+        opening();UUID original=sourcePosted("SOURCE-RACE");var a=sourceCorrection("RACE-A");var b=sourceCorrection("RACE-B");
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var jobs=List.of(pool.submit(()->sourceCorrectionAttempt(original,a)),pool.submit(()->sourceCorrectionAttempt(original,b)));
+            assertThat(jobs.get(0).get(20,TimeUnit.SECONDS)+jobs.get(1).get(20,TimeUnit.SECONDS)).isEqualTo(1);
+        }
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where reverses_id=?",Integer.class,original)).isEqualTo(1);
+    }
+    private int sourceCorrectionAttempt(UUID original,JournalCommand c) {try{tx.execute(status->gl.draftSourceReversal(third,original,c));return 1;}catch(org.springframework.dao.DataAccessException e){return 0;}}
+    private UUID balancedTimingClose(UUID p,LocalDate date,String prefix) {
+        UUID statement=service.importStatement(maker,new StatementCommand(UUID.randomUUID(),bank,format,date,date,new BigDecimal("100.00"),new BigDecimal("100.00"),prefix+".csv","Synthetic retained timing","date,reference,amount,kind\n"+date+","+prefix+"-IN,1.00,RECEIPT\n"+date+","+prefix+"-OUT,-1.00,DISBURSEMENT"));
+        for(var row:service.rows(maker,statement,0).rows()) {UUID ex=service.assignException(maker,row.id(),"TIMING",checker.getMemberId(),"Verified retained timing");service.reviewException(checker,ex,"Independent retained difference");}
+        UUID cert=service.certify(maker,bank,date,"STATEMENT",new BigDecimal("100.00"),"Verified balanced bank statement");service.reviewCertificate(checker,cert,"Independent balanced statement review");
+        UUID close=service.proposeClose(maker,p,"Prepared synthetic close",false);service.approveClose(checker,close,"Independent synthetic close");service.completeInstitutionClose(checker,p,"All institution branches reviewed");return close;
+    }
+    @Test void earlierPeriodReopenInvalidatesLaterCumulativePublicationWithoutRewritingSnapshots() {
+        opening();UUID first=balancedTimingClose(period,DAY.plusDays(1),"FIRST");UUID laterPeriod=gl.createPeriod(maker,DAY.plusDays(2),DAY.plusDays(2));when(clock.today()).thenReturn(DAY.plusDays(2));when(clock.now()).thenReturn(NOW.plusDays(1));
+        UUID later=balancedTimingClose(laterPeriod,DAY.plusDays(2),"LATER");var frozen=service.finalizedSnapshot(maker,later);assertThat(tx.execute(status->service.finalizedSnapshotForPublication(maker,later)).periodClosed()).isTrue();
+        when(clock.now()).thenReturn(NOW.plusDays(1).plusMinutes(1));UUID reopen=service.proposeClose(third,period,"Earlier backdated correction",true);service.approveClose(fourth,reopen,"Independent earlier reopening");
+        verify(reopenListener).periodReopened(eq(fourth),eq(period),eq(DAY),contains("Earlier backdated correction"));
+        assertThat(service.finalizedSnapshot(maker,later).periodClosed()).isFalse();assertThat(service.finalizedSnapshot(maker,later).snapshot()).isEqualTo(frozen.snapshot());
+        assertThatThrownBy(()->tx.execute(status->service.finalizedSnapshotForPublication(maker,later))).hasMessage("reconciliation.error.approvalRequired");
+        when(clock.now()).thenReturn(NOW.plusDays(1).plusMinutes(2));UUID revised=service.proposeClose(maker,period,"Reclosed earlier source",false);service.approveClose(checker,revised,"Independent earlier reclose");service.completeInstitutionClose(checker,period,"Reviewed earlier branches");
+        assertThat(service.finalizedSnapshot(maker,later).periodClosed()).isFalse();assertThat(service.finalizedSnapshot(maker,first).snapshot()).isNotNull();
+    }
+
+    @Test void concurrentRetainedCancellationRetriesBothReturnCancelledWithoutDuplicateAudit() throws Exception {
+        opening();var draft=sourceDraft("CANCEL-RACE");var retained=new CountDownLatch(1);var release=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var first=pool.submit(()->tx.execute(status->{var result=gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"CANCEL-RACE","Independent concurrent rejection");retained.countDown();try{if(!release.await(20,TimeUnit.SECONDS))throw new IllegalStateException("Cancellation barrier timed out");}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}return result;}));
+            assertThat(retained.await(20,TimeUnit.SECONDS)).isTrue();
+            var retry=pool.submit(()->tx.execute(status->gl.cancelSourceEvent(checker,draft.id(),PostingEvent.CAPITAL,"CANCEL-RACE","Independent concurrent rejection")));
+            try{assertThatThrownBy(()->retry.get(250,TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);}finally{release.countDown();}
+            assertThat(first.get(20,TimeUnit.SECONDS).state()).isEqualTo("CANCELLED");assertThat(retry.get(20,TimeUnit.SECONDS).state()).isEqualTo("CANCELLED");
+        }finally{release.countDown();}
+        assertThat(jdbc.queryForObject("select count(*) from gl_source_cancellation where journal_id=?",Integer.class,draft.id())).isEqualTo(1);
+        verify(audit,times(1)).logEvent(anyString(),eq(draft.id()),eq("SOURCE_JOURNAL_CANCELLED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+    }
+    @Test void databaseRejectsDisabledReversalPolicyWhileRetainedRejectionNeedsNoNewPostingPermission() {
+        opening();UUID original=sourcePosted("DB-POLICY-SOURCE");var rejected=sourceDraft("OLD-POLICY-REJECTION");var previous=policies.requireApprovedLocalPolicy(institution,DAY.plusDays(1));UUID next=UUID.randomUUID();
+        var matrix=new EnumMap<PostingEvent,PostingRule>(PostingEvent.class);matrix.putAll(previous.postingMatrix());matrix.put(PostingEvent.REVERSAL,new PostingRule(PostingPermission.DISABLED,"Independent synthetic reversal disabled"));matrix.put(PostingEvent.CAPITAL,new PostingRule(PostingPermission.DISABLED,"Independent synthetic capital disabled"));
+        var json=JsonMapper.builder().findAndAddModules().build();
+        jdbc.update("insert into accounting_policies(id,sacco_id,policy_version,effective_from,opening_date,authoritative_ledger,decisions_json,posting_matrix_json,account_mappings_json,evidence_reference,maker_id,request_key,created_at) values(?,?,2,?,?,'LOCAL_GL',?,?,?,'Synthetic independently reviewed disabled events',?,?,?)",next,institution,DAY.plusDays(1),DAY,json.writeValueAsString(previous.decisions()),json.writeValueAsString(matrix),json.writeValueAsString(previous.accountMappings()),maker.getMemberId(),UUID.randomUUID(),NOW);
+        jdbc.update("insert into accounting_policy_approvals(policy_id,sacco_id,policy_version,effective_from,checker_id,decision,evidence_reference,reason,decided_at) values(?,?,2,?,?,'APPROVED','Synthetic independent policy review','No institution policy is represented',?)",next,institution,DAY.plusDays(1),checker.getMemberId(),NOW);
+        var snapshot=new PolicySnapshot(next,institution,2,DAY,DAY.plusDays(1),AuthoritativeLedger.LOCAL_GL,previous.decisions(),matrix,previous.accountMappings(),"Synthetic policy",maker.getMemberId(),Decision.APPROVED,checker.getMemberId(),"Synthetic independent review","Test",NOW);
+        when(policies.requireApprovedLocalPolicy(eq(institution),any())).thenReturn(snapshot);
+        // Mocked service permission allows this attempted draft; the genuine database policy must reject it.
+        assertThatThrownBy(()->tx.execute(status->gl.draftSourceReversal(third,original,sourceCorrection("DB-DISABLED-CORRECTION")))).hasStackTraceContaining("Approved explicit reversal treatment is required");
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where reverses_id=?",Integer.class,original)).isZero();
+        var cancelled=tx.execute(status->gl.cancelSourceEvent(checker,rejected.id(),PostingEvent.CAPITAL,"OLD-POLICY-REJECTION","Independent source rejection after disabling posting"));
+        assertThat(cancelled.state()).isEqualTo("CANCELLED");assertThat(gl.sourceCancellation(maker,rejected.id()).orElseThrow().payloadChecksum()).isEqualTo(rejected.payloadHash());
     }
 }

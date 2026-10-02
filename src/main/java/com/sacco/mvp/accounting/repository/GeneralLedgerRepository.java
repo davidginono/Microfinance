@@ -22,7 +22,7 @@ public class GeneralLedgerRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where sacco_id=?) or exists(select 1 from accounting_period where sacco_id=?) or exists(select 1 from gl_journal where sacco_id=?)",Boolean.class,institution,institution,institution));
     }
     public boolean hasMemberHistory(UUID id) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where maker_id=?) or exists(select 1 from accounting_period where created_by=? or closed_by=?) or exists(select 1 from gl_journal where maker_id=? or checker_id=?)",Boolean.class,id,id,id,id,id));
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where maker_id=?) or exists(select 1 from accounting_period where created_by=? or closed_by=?) or exists(select 1 from gl_journal where maker_id=? or checker_id=?) or exists(select 1 from gl_source_cancellation where checker_id=?)",Boolean.class,id,id,id,id,id,id));
     }
     public void lockRequest(String institution, String branch, UUID key) {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))", institution + "/" + branch + "/" + key);
@@ -72,13 +72,13 @@ public class GeneralLedgerRepository {
         return id;
     }
     public Optional<Journal> byRequest(String institution,String branch,UUID key) {
-        return jdbc.query("select j.*, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? and j.request_key=?",this::journal,institution,branch,key).stream().findFirst();
+        return jdbc.query("select j.*, case when exists(select 1 from gl_source_cancellation c where c.journal_id=j.id) then 'CANCELLED' else j.state end display_state, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? and j.request_key=?",this::journal,institution,branch,key).stream().findFirst();
     }
     public Optional<Journal> journal(String institution,String branch,UUID id,boolean lock) {
-        return jdbc.query("select j.*, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? and j.id=?"+(lock?" for update of j":""),this::journal,institution,branch,id).stream().findFirst();
+        return jdbc.query("select j.*, case when exists(select 1 from gl_source_cancellation c where c.journal_id=j.id) then 'CANCELLED' else j.state end display_state, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? and j.id=?"+(lock?" for update of j":""),this::journal,institution,branch,id).stream().findFirst();
     }
     public List<Journal> journals(String institution,String branch,int offset,int limit) {
-        return jdbc.query("select j.*, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? order by j.recorded_at desc,j.id limit ? offset ?",this::journal,institution,branch,limit,offset);
+        return jdbc.query("select j.*, case when exists(select 1 from gl_source_cancellation c where c.journal_id=j.id) then 'CANCELLED' else j.state end display_state, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? order by j.recorded_at desc,j.id limit ? offset ?",this::journal,institution,branch,limit,offset);
     }
     public List<Line> lines(UUID journal) {
         return jdbc.query("select account_id,debit,credit from gl_journal_line where journal_id=? order by id",(r,n)->new Line(r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)),journal);
@@ -87,6 +87,15 @@ public class GeneralLedgerRepository {
         jdbc.update("insert into gl_journal(id,sacco_id,station_id,policy_id,policy_version,period_id,source_type,source_reference,request_key,payload_hash,currency,state,evidence_reference,reason,effective_date,maker_id,recorded_at,reverses_id) values(?,?,?,?,?,?,?,?,?,?,'TZS','DRAFT',?,?,?,?,?,?)",
             j.id(),j.institutionId(),j.branchId(),j.policyId(),j.policyVersion(),j.periodId(),j.sourceType(),j.sourceReference(),j.requestKey(),j.payloadHash(),j.evidenceReference(),j.reason(),j.effectiveDate(),j.makerId(),j.recordedAt(),j.reversesId());
         for(Line l:j.lines()) jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,?)",UUID.randomUUID(),j.id(),j.institutionId(),j.branchId(),l.accountId(),l.debit(),l.credit());
+    }
+    public Optional<SourceCancellation> cancellation(UUID journal) {
+        return jdbc.query("select * from gl_source_cancellation where journal_id=?",(r,n)->new SourceCancellation(r.getObject("journal_id",UUID.class),r.getObject("maker_id",UUID.class),r.getObject("checker_id",UUID.class),r.getString("source_event"),r.getString("source_reference"),r.getString("previous_state"),r.getString("evidence_reference"),r.getString("payload_hash"),r.getObject("recorded_at",OffsetDateTime.class)),journal).stream().findFirst();
+    }
+    public boolean historicallyApprovedPolicy(Journal j) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accounting_policies p join accounting_policy_approvals a on a.policy_id=p.id where p.id=? and p.sacco_id=? and p.policy_version=? and a.sacco_id=p.sacco_id and a.decision='APPROVED' and p.authoritative_ledger='LOCAL_GL')",Boolean.class,j.policyId(),j.institutionId(),j.policyVersion()));
+    }
+    public void cancel(Journal j,UUID checker,String sourceEvent,String evidence,OffsetDateTime now) {
+        jdbc.update("insert into gl_source_cancellation(journal_id,sacco_id,station_id,maker_id,checker_id,source_event,source_reference,previous_state,evidence_reference,payload_hash,recorded_at) values(?,?,?,?,?,?,?,?,?,?,?)",j.id(),j.institutionId(),j.branchId(),j.makerId(),checker,sourceEvent,j.sourceReference(),j.state(),evidence,j.payloadHash(),now);
     }
     public void approve(UUID id,UUID checker,String evidence,OffsetDateTime now) {
         jdbc.update("update gl_journal set state='APPROVED',checker_id=?,checked_at=?,approval_evidence_reference=? where id=? and state='DRAFT'",checker,now,evidence,id);
@@ -97,6 +106,7 @@ public class GeneralLedgerRepository {
     public void outbox(Journal j,OffsetDateTime now) {
         jdbc.update("insert into accounting_outbox(id,journal_id,sacco_id,station_id,event_type,created_at) values(?,?,?,?,'GL_JOURNAL_POSTED',?)",UUID.randomUUID(),j.id(),j.institutionId(),j.branchId(),now);
     }
+    public String sourceApprovalEvidence(UUID id) {return approvalEvidence(id);}
     private String approvalEvidence(UUID id) {return jdbc.queryForObject("select approval_evidence_reference from gl_journal where id=?",String.class,id);}
     public boolean reviewedOpening(String institution,String branch) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_cutover_coverage c join gl_journal j on j.id=c.opening_journal_id where c.sacco_id=? and c.station_id=? and c.complete and j.state='POSTED')",Boolean.class,institution,branch));
@@ -127,6 +137,6 @@ public class GeneralLedgerRepository {
         return new Period(r.getObject("id",UUID.class),r.getString("sacco_id"),r.getObject("starts_on",LocalDate.class),r.getObject("ends_on",LocalDate.class),r.getString("state"),r.getObject("policy_id",UUID.class));
     }
     private Journal journal(ResultSet r,int n) throws SQLException {
-        return new Journal(r.getObject("id",UUID.class),r.getString("sacco_id"),r.getString("station_id"),r.getObject("policy_id",UUID.class),r.getInt("policy_version"),r.getObject("period_id",UUID.class),r.getString("source_type"),r.getString("source_reference"),r.getObject("request_key",UUID.class),r.getString("payload_hash"),r.getString("state"),r.getString("evidence_reference"),r.getString("reason"),r.getObject("effective_date",LocalDate.class),r.getObject("maker_id",UUID.class),r.getObject("checker_id",UUID.class),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),List.of(),r.getBoolean("reversed"));
+        return new Journal(r.getObject("id",UUID.class),r.getString("sacco_id"),r.getString("station_id"),r.getObject("policy_id",UUID.class),r.getInt("policy_version"),r.getObject("period_id",UUID.class),r.getString("source_type"),r.getString("source_reference"),r.getObject("request_key",UUID.class),r.getString("payload_hash"),r.getString("display_state"),r.getString("evidence_reference"),r.getString("reason"),r.getObject("effective_date",LocalDate.class),r.getObject("maker_id",UUID.class),r.getObject("checker_id",UUID.class),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),List.of(),r.getBoolean("reversed"));
     }
 }

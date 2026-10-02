@@ -22,6 +22,8 @@ public final class GeneralLedgerDtos {
                           String payloadHash, String state, String evidenceReference, String reason,
                           LocalDate effectiveDate, UUID makerId, UUID checkerId, OffsetDateTime recordedAt,
                           OffsetDateTime postedAt, UUID reversesId, List<Line> lines, boolean reversed) { }
+    public record SourceCancellation(UUID journal,UUID maker,UUID checker,String sourceEvent,String sourceReference,
+                                     String previousState,String evidence,String payloadChecksum,OffsetDateTime recordedAt) { }
     public record Period(UUID id, String institutionId, LocalDate startsOn, LocalDate endsOn,
                          String state, UUID policyId) { }
     public record Coverage(boolean reviewedOpening, Long unbridgedOperationalVouchers,
