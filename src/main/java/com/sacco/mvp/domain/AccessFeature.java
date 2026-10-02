@@ -38,7 +38,8 @@ public enum AccessFeature {
     REPORT_BUILDER("Operational Report Builder"),
     FINANCIAL_REPORTS("Financial and management reports"),
     ACCOUNTING_RECONCILIATION("Reconciliation"),
-    ACCOUNTING_CLOSING("Period Closing");
+    ACCOUNTING_CLOSING("Period Closing"),
+    REPORT_EXECUTION("Report execution and approval");
 
 
     private final String displayName;
