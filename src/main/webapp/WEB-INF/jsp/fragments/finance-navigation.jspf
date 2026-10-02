@@ -1,5 +1,5 @@
 <c:if test="${staffWorkspace}">
-    <sec:authorize access="@access.hasAny(principal, 'ACCOUNTING_POLICIES_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'REPORT_RUN')">
+    <sec:authorize access="@access.hasAny(principal, 'ACCOUNTING_POLICIES_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'FINANCIAL_REPORTS_VIEW')">
         <div class="shell-sidebar-nav-heading"><span><spring:message code="finance.nav.title" /></span></div>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_POLICIES_VIEW')">
@@ -20,6 +20,11 @@
     <sec:authorize access="@access.hasAny(principal, 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN')">
         <a href="<c:url value='/reports/builder' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/builder') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
             <spring:message code="finance.nav.builder" />
+        </a>
+    </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')">
+        <a href="<c:url value='/reports/financial' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+            <spring:message code="financial.report.trial" />
         </a>
     </sec:authorize>
 </c:if>
