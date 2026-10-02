@@ -18,6 +18,7 @@ public enum AccessFeature {
     ACCOUNTING_JOURNALS("Accounting journals"),
     ACCOUNTING_OPENINGS("Opening balances"),
     ACCOUNTING_PERIODS("Accounting periods"),
+    ACCOUNTING_POLICIES("Accounting policies"),
     MEMBER_LOANS("Member Loans"),
     GUARANTOR_REQUESTS("Guarantor Requests"),
     LOAN_DOCUMENTS("Loan Documents"),
