@@ -35,7 +35,8 @@ public enum AccessFeature {
     LOAN_REPORTS("Loan Reports"),
     NOTIFICATIONS("Notifications"),
     SUPPORT("Support"),
-    REPORT_BUILDER("Operational Report Builder");
+    REPORT_BUILDER("Operational Report Builder"),
+    FINANCIAL_REPORTS("Financial and management reports");
 
     private final String displayName;
 
