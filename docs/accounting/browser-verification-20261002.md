@@ -1,0 +1,11 @@
+# Accounting browser verification increment
+
+Verified 2026-10-02 at 14:31:21 EAT against local commit `5d467ef`. Isolated synthetic application: `http://127.0.0.1:18080`, disposable `microfinance_accounting_ui_integrated_test` database, no operational data. Playwright 1.62.1 with Chromium was used because the browser plugin was unavailable.
+
+The matrix exercised `/finance/accounts`, `/finance/journals`, `/finance/policies`, and `/reports/builder` in English and Kiswahili at 360, 768, 1366 and 1920 pixels: **32 successful page checks**. Every response was HTTP 200 with a visible page heading, the expected actual HTML language, document scroll width equal to viewport width, and no JavaScript page errors. The institution administrator changed language through the real institution-language form, with CSRF and normal server processing. Mobile Kiswahili builder and desktop Kiswahili policy screenshots were visually inspected.
+
+The first matrix failed Kiswahili because finance/report routes were absent from MemberLocaleInterceptor. Commit `5d467ef` includes these routes in the existing personal/institution language rules; six locale tests passed with zero failures/errors/skips at 14:16:39 EAT. Initial administrator settings navigation also exposed missing synthetic institution settings; these were added only to UI-A in the disposable fixture. An accountant fixture correctly required OTP at login, which was not bypassed. Tests then used the institution administrator's existing settings flow.
+
+The raw local evidence is `%TEMP%/microfinance-accounting-browser-evidence.json`; screenshots are `%TEMP%/finance-*-{width}-{language}.png` and `%TEMP%/reports-builder-{width}-{language}.png`. These temporary helpers and synthetic credentials are excluded from production commits.
+
+This is partial H10 evidence. Keyboard ordering, publication, record review, exports/downloads, all new C/D/E/G/H flows, print layouts, mobile navigation/dropdowns/logout, full shell localization and wrong-role/branch rendered interactions remain outstanding. The successful matrix does not mark H10 or any full phase complete. No institution accountant approval was supplied or created; the synthetic policy proposal remains pending.
