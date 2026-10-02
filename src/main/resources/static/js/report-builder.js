@@ -54,10 +54,12 @@
           drawColumns();});row.append(labelled(words.group,group));
       }
       for(const [delta,text] of [[-1,words.up],[1,words.down]]) {
-        const move=element('button',text,{type:'button',class:'app-btn btn-neutral','aria-label':text+' '+labels[column.field]});
+        const move=element('button',text,{type:'button',class:'app-btn btn-neutral','aria-label':text+' '+labels[column.field],'data-move-direction':String(delta)});
         move.disabled=index+delta<0||index+delta>=definition.columns.length;
         move.addEventListener('click',()=>{const target=index+delta;[definition.columns[index],definition.columns[target]]=[definition.columns[target],definition.columns[index]];drawColumns();
-          byId('report-columns').children[target].querySelector('button').focus();});row.append(move);
+          const controls=byId('report-columns').children[target];
+          const preferred=controls.querySelector('[data-move-direction="'+delta+'"]:not(:disabled)');
+          (preferred||controls.querySelector('button:not(:disabled)'))?.focus();});row.append(move);
       }
       area.append(row);
     });
