@@ -133,7 +133,10 @@ public class GeneralLedgerService {
     }
     @Transactional
     public Journal approve(AppUserPrincipal actor,UUID id,String evidence) {
-        Journal j=scoped(actor,id,true);
+        Journal j=scoped(actor,id,true);requireGenericSource(j);return approveInternal(actor,j,evidence);
+    }
+    private Journal approveInternal(AppUserPrincipal actor,Journal j,String evidence) {
+        UUID id=j.id();
         requireActor(actor,"OPENING".equals(j.sourceType())?"ACCOUNTING_OPENINGS_APPROVE":"ACCOUNTING_JOURNALS_APPROVE");
         text(evidence,500,"approvalEvidence");
         require(!j.makerId().equals(actor.getMemberId()),"independentChecker");
@@ -146,7 +149,10 @@ public class GeneralLedgerService {
     }
     @Transactional
     public Journal post(AppUserPrincipal actor,UUID id,boolean openingReconciled) {
-        Journal j=scoped(actor,id,true);
+        Journal j=scoped(actor,id,true);requireGenericSource(j);return postInternal(actor,j,openingReconciled);
+    }
+    private Journal postInternal(AppUserPrincipal actor,Journal j,boolean openingReconciled) {
+        UUID id=j.id();
         requireActor(actor,"OPENING".equals(j.sourceType())?"ACCOUNTING_OPENINGS_APPROVE":"ACCOUNTING_JOURNALS_APPROVE");
         require(actor.getMemberId().equals(j.checkerId()),"checker");
         if("POSTED".equals(j.state())) return withLines(j);
@@ -169,6 +175,16 @@ public class GeneralLedgerService {
         event(actor,id,"JOURNAL_POSTED",Map.of("sourceType",j.sourceType(),"sourceReference",j.sourceReference(),"policyVersion",j.policyVersion()));
         return withLines(scoped(actor,id,false));
     }
+    /** Source component must update its source/subledger in this same transaction. Never exposed as a generic HTTP command. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Journal approveAndPostSourceEvent(AppUserPrincipal actor,UUID journalId,PostingEvent event,String sourceReference,String evidence) {
+        requireActor(actor,"ACCOUNTING_JOURNALS_APPROVE");
+        require(event!=null && !Set.of(PostingEvent.MANUAL_JOURNAL,PostingEvent.OPENING_BALANCE,PostingEvent.REVERSAL,PostingEvent.OPERATIONAL_BRIDGE).contains(event),"sourceType");
+        Journal j=scoped(actor,journalId,true);
+        require(event.name().equals(j.sourceType()) && Objects.equals(sourceReference,j.sourceReference()),"sourceType");
+        return postInternal(actor,approveInternal(actor,j,evidence),false);
+    }
+    private void requireGenericSource(Journal j) {require(Set.of("MANUAL","OPENING","REVERSAL","OPERATIONAL_BRIDGE").contains(j.sourceType()),"sourceType");}
     @Transactional
     public Journal reverse(AppUserPrincipal actor,UUID originalId,UUID key,LocalDate date,String reason,String evidence) {
         requireActor(actor,"ACCOUNTING_JOURNALS_REVERSE");text(reason,500,"reason");
