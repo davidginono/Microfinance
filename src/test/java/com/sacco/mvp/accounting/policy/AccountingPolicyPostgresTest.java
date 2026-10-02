@@ -44,8 +44,15 @@ class AccountingPolicyPostgresTest {
         institution = "AP-" + UUID.randomUUID();
         jdbc.update("INSERT INTO registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) VALUES (?, 'Synthetic policy test',true,now(),now())", institution);
         maker = actor("B1"); checker = actor("B2");
-        reset(context.getBean(AuditService.class), context.getBean(MemberDirectoryService.class), context.getBean(UserClaimService.class));
-        when(context.getBean(MemberDirectoryService.class).find(any())).thenAnswer(i -> Optional.of(AccountingPolicyServiceTest.member(i.getArgument(0), institution)));
+        reset(context.getBean(AuditService.class), context.getBean(MemberDirectoryService.class), context.getBean(UserClaimService.class), context.getBean(SaccoRegistryService.class));
+        when(context.getBean(MemberDirectoryService.class).find(any())).thenAnswer(i -> {
+            UUID memberId = i.getArgument(0); var member = AccountingPolicyServiceTest.member(memberId, institution);
+            member.setStationId(memberId.equals(checker.getMemberId()) ? "B2" : "B1"); return Optional.of(member);
+        });
+        when(context.getBean(SaccoRegistryService.class).findActiveSacco(institution)).thenReturn(Optional.of(
+            RegisteredSacco.builder().saccoId(institution).active(true).build()));
+        when(context.getBean(SaccoRegistryService.class).findStation(eq(institution), anyString())).thenAnswer(i -> Optional.of(
+            SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         when(context.getBean(UserClaimService.class).effectiveClaims(any(), anyCollection(), anyBoolean())).thenReturn(Set.of(
             UserClaim.ACCOUNTING_POLICIES_VIEW, UserClaim.ACCOUNTING_POLICIES_CREATE, UserClaim.ACCOUNTING_POLICIES_APPROVE));
     }
@@ -127,9 +134,10 @@ class AccountingPolicyPostgresTest {
         @Bean AuditService audit() { return mock(AuditService.class); }
         @Bean UserClaimService userClaims() { return mock(UserClaimService.class); }
         @Bean MemberDirectoryService directory() { return mock(MemberDirectoryService.class); }
+        @Bean SaccoRegistryService institutions() { return mock(SaccoRegistryService.class); }
         @Bean AccountingPolicyService policies(AccountingPolicyRepository policies, AccountingPolicyApprovalRepository approvals,
-            AccessControlService access, AuditService audit, ApplicationClock clock, ObjectMapper mapper, UserClaimService claims, MemberDirectoryService directory) {
-            return new AccountingPolicyService(policies, approvals, access, audit, clock, mapper, claims, directory);
+            AccessControlService access, AuditService audit, ApplicationClock clock, ObjectMapper mapper, UserClaimService claims, MemberDirectoryService directory, SaccoRegistryService institutions) {
+            return new AccountingPolicyService(policies, approvals, access, audit, clock, mapper, claims, directory, institutions);
         }
     }
 }

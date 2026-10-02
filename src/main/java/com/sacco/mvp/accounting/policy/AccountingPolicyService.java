@@ -2,6 +2,9 @@ package com.sacco.mvp.accounting.policy;
 
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.SaccoAccessStatus;
+import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,7 @@ public class AccountingPolicyService {
     private final ObjectMapper mapper;
     private final UserClaimService userClaims;
     private final MemberDirectoryService directory;
+    private final SaccoRegistryService institutions;
 
     @Transactional
     public PolicySnapshot create(AppUserPrincipal actor, PolicyCommand command) {
@@ -152,11 +156,16 @@ public class AccountingPolicyService {
 
     private String requireActor(AppUserPrincipal actor, UserClaim claim) {
         if (actor == null || !actor.isStaffSession() || actor.isPlatformIdentity() || !access.has(actor, claim)
-            || actor.getSaccoId() == null || actor.getSaccoId().isBlank() || actor.getMemberId() == null)
+            || actor.getSaccoId() == null || actor.getSaccoId().isBlank() || actor.getMemberId() == null
+            || actor.getStationId() == null || actor.getStationId().isBlank())
             throw new AccessDeniedException("Accounting policy access denied");
         var current = directory.find(actor.getMemberId()).orElseThrow(() -> new AccessDeniedException("Accounting policy access denied"));
-        if (!current.isStaffAccessActive() || !Objects.equals(current.getSaccoId(), actor.getSaccoId())
+        if (!current.isStaffAccessActive() || current.getStatus() != MemberStatus.ACTIVE
+            || !Objects.equals(current.getSaccoId(), actor.getSaccoId()) || !Objects.equals(current.getStationId(), actor.getStationId())
             || current.getActiveStaffRolesResolved().contains(Position.ADMIN)
+            || institutions.findActiveSacco(actor.getSaccoId()).isEmpty()
+            || institutions.findStation(actor.getSaccoId(), actor.getStationId()).filter(SaccoStation::isActive)
+                .filter(station -> station.getAccessStatus() == SaccoAccessStatus.ACTIVE).isEmpty()
             || !userClaims.effectiveClaims(current.getId(), current.getActiveStaffRolesResolved(), current.isMemberAccess()).contains(claim))
             throw new AccessDeniedException("Accounting policy permission unavailable");
         return actor.getSaccoId();

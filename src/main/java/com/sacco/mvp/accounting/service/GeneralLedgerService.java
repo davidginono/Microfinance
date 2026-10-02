@@ -8,6 +8,9 @@ import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.SaccoAccessStatus;
+import com.sacco.mvp.domain.SaccoStation;
+import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.UserClaimService;
 import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -36,6 +39,7 @@ public class GeneralLedgerService {
     private final ApplicationClock clock;
     private final UserClaimService userClaims;
     private final MemberDirectoryService directory;
+    private final SaccoRegistryService institutions;
     private static final Set<String> TYPES=Set.of("ASSET","LIABILITY","EQUITY","INCOME","EXPENSE");
     private static final Set<String> KINDS=Set.of("HEADING","POSTING","CONTROL");
     private static final Set<String> PURPOSES=Set.of("CASH","BANK","MOBILE_MONEY","CLEARING","SUSPENSE","LOAN_PRINCIPAL",
@@ -254,6 +258,9 @@ public class GeneralLedgerService {
         requireScope(actor);if(!access.has(actor,claim))throw new AccessDeniedException("Accounting permission required");
         var current=directory.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Accounting access unavailable"));
         if(!current.isStaffAccessActive() || current.getStatus()!=MemberStatus.ACTIVE || current.getActiveStaffRolesResolved().contains(Position.ADMIN) || !Objects.equals(current.getSaccoId(),actor.getSaccoId()) || !Objects.equals(current.getStationId(),actor.getStationId())
+            || institutions.findActiveSacco(actor.getSaccoId()).isEmpty()
+            || institutions.findStation(actor.getSaccoId(),actor.getStationId()).filter(SaccoStation::isActive)
+                .filter(station->station.getAccessStatus()==SaccoAccessStatus.ACTIVE).isEmpty()
             || !userClaims.effectiveClaims(current.getId(),current.getActiveStaffRolesResolved(),current.isMemberAccess()).contains(UserClaim.valueOf(claim)))
             throw new AccessDeniedException("Accounting permission unavailable");
     }

@@ -24,6 +24,7 @@ class AccountingPolicyServiceTest {
     @Mock ApplicationClock clock;
     @Mock UserClaimService userClaims;
     @Mock MemberDirectoryService directory;
+    @Mock SaccoRegistryService institutions;
     @Spy AccessControlService access = new AccessControlService();
     @Spy ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
     @InjectMocks AccountingPolicyService service;
@@ -32,6 +33,9 @@ class AccountingPolicyServiceTest {
     final UUID checkerId = UUID.randomUUID();
 
     @BeforeEach void setup() {
+        lenient().when(institutions.findActiveSacco("I1")).thenReturn(Optional.of(RegisteredSacco.builder().saccoId("I1").active(true).build()));
+        lenient().when(institutions.findStation("I1", "B1")).thenReturn(Optional.of(SaccoStation.builder()
+            .saccoId("I1").stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         lenient().when(clock.today()).thenReturn(date);
         lenient().when(clock.now()).thenReturn(date.atStartOfDay().atOffset(ZoneOffset.ofHours(3)));
         lenient().when(directory.find(any())).thenAnswer(i -> Optional.of(member(i.getArgument(0), "I1")));
@@ -108,6 +112,22 @@ class AccountingPolicyServiceTest {
         when(policies.findByIdAndSaccoId(p.getId(), "I1")).thenReturn(Optional.of(p));
         assertThatThrownBy(() -> service.decide(p.getId(), actor(checkerId), decision())).hasMessage("accounting.policy.error.initialDate");
         verify(approvals, never()).saveAndFlush(any());
+    }
+    @Test void inactiveInstitutionCannotUseExistingStaffSession() {
+        when(institutions.findActiveSacco("I1")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.create(actor(makerId), command())).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(policies, approvals, audit);
+    }
+    @Test void suspendedBranchCannotUseExistingStaffSession() {
+        when(institutions.findStation("I1", "B1")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.create(actor(makerId), command())).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(policies, approvals, audit);
+    }
+    @Test void changedBranchCannotReuseInstitutionPolicySession() {
+        var current = member(makerId, "I1"); current.setStationId("B2");
+        when(directory.find(makerId)).thenReturn(Optional.of(current));
+        assertThatThrownBy(() -> service.create(actor(makerId), command())).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(policies, approvals, audit);
     }
     static Member member(UUID id, String institution) {
         return Member.builder().id(id).saccoId(institution).stationId("B1").memberNo(id.toString())
