@@ -33,6 +33,17 @@ public class GeneralLedgerRepository {
     public List<Account> accounts(String institution, int offset, int limit) {
         return jdbc.query("select * from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
     }
+    /** Validate the bounded local mapping set and hold mapped accounts stable until review commits. */
+    public boolean validPolicyMappings(String institution, java.util.Collection<UUID> mappings) {
+        var ids=new java.util.HashSet<>(mappings);
+        if(ids.isEmpty()) return true;
+        if(ids.size()>100) return false;
+        var args=new java.util.ArrayList<Object>(); args.add(institution); args.addAll(ids);
+        String placeholders=String.join(",", java.util.Collections.nCopies(ids.size(),"?"));
+        var found=jdbc.queryForList("select id from gl_account where sacco_id=? and active and kind<>'HEADING' and id in ("+placeholders+") order by id for share", UUID.class,args.toArray());
+        return new java.util.HashSet<>(found).equals(ids);
+    }
+
     public Optional<Account> account(String institution, UUID id) {
         return jdbc.query("select * from gl_account where sacco_id=? and id=?",this::account,institution,id).stream().findFirst();
     }

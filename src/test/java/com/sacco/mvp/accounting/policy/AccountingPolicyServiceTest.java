@@ -1,5 +1,6 @@
 package com.sacco.mvp.accounting.policy;
 
+import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -25,6 +26,7 @@ class AccountingPolicyServiceTest {
     @Mock UserClaimService userClaims;
     @Mock MemberDirectoryService directory;
     @Mock SaccoRegistryService institutions;
+    @Mock GeneralLedgerRepository accounts;
     @Spy AccessControlService access = new AccessControlService();
     @Spy ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
     @InjectMocks AccountingPolicyService service;
@@ -33,6 +35,7 @@ class AccountingPolicyServiceTest {
     final UUID checkerId = UUID.randomUUID();
 
     @BeforeEach void setup() {
+        lenient().when(accounts.validPolicyMappings(anyString(),anyCollection())).thenReturn(true);
         lenient().when(institutions.findActiveSacco("I1")).thenReturn(Optional.of(RegisteredSacco.builder().saccoId("I1").active(true).build()));
         lenient().when(institutions.findStation("I1", "B1")).thenReturn(Optional.of(SaccoStation.builder()
             .saccoId("I1").stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
@@ -43,6 +46,16 @@ class AccountingPolicyServiceTest {
             UserClaim.ACCOUNTING_POLICIES_VIEW, UserClaim.ACCOUNTING_POLICIES_CREATE, UserClaim.ACCOUNTING_POLICIES_APPROVE));
         lenient().when(policies.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         lenient().when(approvals.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+    }
+
+    @Test void invalidLocalAccountMappingCannotBeProposedOrApproved() {
+        var base=command(); var c=new AccountingPolicyService.PolicyCommand(base.requestKey(),base.authoritativeLedger(),base.openingDate(),base.effectiveFrom(),base.decisions(),base.postingMatrix(),Map.of("CASH",UUID.randomUUID()),base.evidenceReference());
+        when(accounts.validPolicyMappings(eq("I1"),anyCollection())).thenReturn(false);
+        assertThatThrownBy(()->service.create(actor(makerId),c)).hasMessage("accounting.policy.error.accountMappings");
+        verify(policies,never()).saveAndFlush(any());
+        var p=policy(); when(policies.findByIdAndSaccoId(p.getId(),"I1")).thenReturn(Optional.of(p));
+        assertThatThrownBy(()->service.decide(p.getId(),actor(checkerId),decision())).hasMessage("accounting.policy.error.accountMappings");
+        verify(approvals,never()).saveAndFlush(any());
     }
 
     @Test void missingExplicitDecisionsCannotCreatePolicy() {

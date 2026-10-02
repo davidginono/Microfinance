@@ -1,5 +1,6 @@
 package com.sacco.mvp.accounting.policy;
 
+import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -10,7 +11,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.orm.jpa.*;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -25,7 +26,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_POLICY_TEST_DATABASE_URL", matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_a_test")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_POLICY_TEST_DATABASE_URL", matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_a_test(?:_integration_20261002)?")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AccountingPolicyPostgresTest {
     AnnotationConfigApplicationContext context;
@@ -71,6 +72,31 @@ class AccountingPolicyPostgresTest {
         assertThat(count("accounting_policies")).isEqualTo(1);
         assertThat(count("accounting_policy_approvals")).isEqualTo(1);
     }
+    @Test void localMappingsRejectForeignMissingHeadingAndInactiveAccounts() {
+        var valid=account(institution,"POSTING",true);
+        for(var id:List.of(UUID.randomUUID(),account("FOREIGN-"+institution,"POSTING",true),account(institution,"HEADING",true),account(institution,"POSTING",false))) {
+            var c=withMapping(id);
+            assertThatThrownBy(()->service.create(maker,c)).hasMessage("accounting.policy.error.accountMappings");
+        }
+        assertThat(count("accounting_policies")).isZero();
+        var p=service.create(maker,withMapping(valid));service.decide(p.id(),checker,decision());
+        assertThat(service.requireApprovedLocalPolicy(institution,p.effectiveFrom()).accountMappings()).containsEntry("CASH",valid);
+    }
+    @Test void accountDeactivatedAfterProposalCannotBeApproved() {
+        var id=account(institution,"POSTING",true);var p=service.create(maker,withMapping(id));
+        jdbc.update("update gl_account set active=false where id=?",id);
+        assertThatThrownBy(()->service.decide(p.id(),checker,decision())).hasMessage("accounting.policy.error.accountMappings");
+        assertThat(count("accounting_policy_approvals")).isZero();
+        assertThatThrownBy(()->service.requireApprovedLocalPolicy(institution,p.effectiveFrom())).hasMessage("accounting.policy.error.unapproved");
+    }
+    UUID account(String institutionId,String kind,boolean active) {
+        var id=UUID.randomUUID();
+        jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,active,maker_id,created_at) values(?,?,?,'Synthetic mapped cash','ASSET','DEBIT',?,'CASH',?,?,now())",id,institutionId,"T"+id.toString().replace("-",""),kind,active,maker.getMemberId());return id;
+    }
+    AccountingPolicyService.PolicyCommand withMapping(UUID id) {
+        var c=AccountingPolicyServiceTest.command();return new AccountingPolicyService.PolicyCommand(c.requestKey(),c.authoritativeLedger(),c.openingDate(),c.effectiveFrom(),c.decisions(),c.postingMatrix(),Map.of("CASH",id),c.evidenceReference());
+    }
+
     @Test void failedAuditRollsBackProposalAndApproval() {
         doThrow(new IllegalStateException("Audit unavailable")).when(context.getBean(AuditService.class))
             .log(anyString(), any(), anyString(), any(), any(), any());
@@ -120,7 +146,12 @@ class AccountingPolicyPostgresTest {
     @Configuration(proxyBeanMethods=false) @EnableTransactionManagement
     @EnableJpaRepositories(basePackages="com.sacco.mvp.accounting.policy")
     static class Config {
-        @Bean DataSource dataSource() { return new DriverManagerDataSource(System.getenv("MICROFINANCE_POLICY_TEST_DATABASE_URL"), "microfinance_test", ""); }
+        @Bean(destroyMethod="close") HikariDataSource dataSource() {
+            var source=new HikariDataSource(); source.setJdbcUrl(System.getenv("MICROFINANCE_POLICY_TEST_DATABASE_URL"));
+            source.setUsername("microfinance_test"); source.setPassword(""); source.setMaximumPoolSize(4); source.setMinimumIdle(0);
+            source.setConnectionTimeout(30000); source.addDataSourceProperty("sslmode","disable");
+            source.addDataSourceProperty("connectTimeout","10"); source.addDataSourceProperty("socketTimeout","30"); return source;
+        }
         @Bean(initMethod="migrate") Flyway flyway(DataSource source) { return Flyway.configure().dataSource(source).locations("classpath:db/migration").load(); }
         @Bean @DependsOn("flyway") LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource source) {
             var factory = new LocalContainerEntityManagerFactoryBean(); factory.setDataSource(source);
@@ -135,9 +166,10 @@ class AccountingPolicyPostgresTest {
         @Bean UserClaimService userClaims() { return mock(UserClaimService.class); }
         @Bean MemberDirectoryService directory() { return mock(MemberDirectoryService.class); }
         @Bean SaccoRegistryService institutions() { return mock(SaccoRegistryService.class); }
+        @Bean GeneralLedgerRepository accounts(DataSource source) { return new GeneralLedgerRepository(new JdbcTemplate(source)); }
         @Bean AccountingPolicyService policies(AccountingPolicyRepository policies, AccountingPolicyApprovalRepository approvals,
-            AccessControlService access, AuditService audit, ApplicationClock clock, ObjectMapper mapper, UserClaimService claims, MemberDirectoryService directory, SaccoRegistryService institutions) {
-            return new AccountingPolicyService(policies, approvals, access, audit, clock, mapper, claims, directory, institutions);
+            AccessControlService access, AuditService audit, ApplicationClock clock, ObjectMapper mapper, UserClaimService claims, MemberDirectoryService directory, SaccoRegistryService institutions, GeneralLedgerRepository accounts) {
+            return new AccountingPolicyService(policies, approvals, access, audit, clock, mapper, claims, directory, institutions, accounts);
         }
     }
 }
