@@ -36,7 +36,9 @@ public enum AccessFeature {
     NOTIFICATIONS("Notifications"),
     SUPPORT("Support"),
     REPORT_BUILDER("Operational Report Builder"),
-    REPORT_EXECUTION("Report execution and approval");
+    REPORT_EXECUTION("Report execution and approval"),
+    ACCOUNTING_RECONCILIATION("Reconciliation"),
+    ACCOUNTING_CLOSING("Period Closing");
 
     private final String displayName;
 
