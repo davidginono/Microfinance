@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
+import com.sacco.mvp.reporting.OperationalReportTemplateService;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class SaccoDataDeletionService {
     private final StoredUploadStorageService storedUploadStorageService;
     private final AccountingPolicyService accountingPolicies;
     private final GeneralLedgerService generalLedger;
+    private final OperationalReportTemplateService reportTemplates;
 
     @Transactional
     public void deleteSacco(String saccoId, String confirmation) {
@@ -93,6 +95,7 @@ public class SaccoDataDeletionService {
 
     private void deleteSaccoScopedRows(String saccoId) {
         if (accountingPolicies.hasInstitutionHistory(saccoId) || generalLedger.hasInstitutionHistory(saccoId)
+            || reportTemplates.hasInstitutionHistory(saccoId)
             || Boolean.TRUE.equals(jdbcTemplate.queryForObject(
             "select exists(select 1 from loan_ledgers where sacco_id = ?)", Boolean.class, saccoId))) {
             throw new IllegalStateException("This institution has posted financial records and cannot be deleted. Retain or deactivate it instead.");
@@ -174,6 +177,7 @@ public class SaccoDataDeletionService {
 
     private void deleteMemberScopedRows(UUID memberId, String email) {
         if (accountingPolicies.hasMemberHistory(memberId) || generalLedger.hasMemberHistory(memberId)
+            || reportTemplates.hasMemberHistory(memberId)
             || Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
             select exists(select 1 from loan_ledgers where applicant_member_id = ?
                 union all select 1 from loan_repayment_transactions where actor_member_id = ?)

@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
+import com.sacco.mvp.reporting.OperationalReportTemplateService;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class SaccoDataDeletionServiceTest {
     @Mock StoredUploadStorageService uploads;
     @Mock AccountingPolicyService accountingPolicies;
     @Mock GeneralLedgerService generalLedger;
+    @Mock OperationalReportTemplateService reportTemplates;
     @InjectMocks SaccoDataDeletionService service;
 
     @Test
@@ -65,7 +67,7 @@ class SaccoDataDeletionServiceTest {
             .saccoId("I-PG").saccoName("Preview Finance").active(true).build()));
         assertThatThrownBy(() -> service.deleteSacco("I-PG", "wrong confirmation"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("confirmation phrase");
-        verifyNoInteractions(jdbc, uploads, logos, registry, accountingPolicies, generalLedger);
+        verifyNoInteractions(jdbc, uploads, logos, registry, accountingPolicies, generalLedger, reportTemplates);
     }
 
     @Test
@@ -105,6 +107,27 @@ class SaccoDataDeletionServiceTest {
         when(members.findById(id)).thenReturn(Optional.of(Member.builder().id(id).fullName("Former Officer")
             .position(Position.MINOR_ADMIN).status(MemberStatus.INACTIVE).build()));
         when(generalLedger.hasMemberHistory(id)).thenReturn(true);
+        assertThatThrownBy(() -> service.deleteRevokedMinorAdmin(id, "delete Former Officer"))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be deleted");
+        verifyNoInteractions(jdbc, uploads, logos, registry);
+    }
+
+    @Test
+    void institutionWithOnlyReportDefinitionsIsBlockedBeforeFilesystemDeletion() {
+        when(institutions.findById("I-PG")).thenReturn(Optional.of(RegisteredSacco.builder()
+            .saccoId("I-PG").saccoName("Preview Finance").active(true).build()));
+        when(reportTemplates.hasInstitutionHistory("I-PG")).thenReturn(true);
+        assertThatThrownBy(() -> service.deleteSacco("I-PG", "delete Preview Finance and all its data"))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be deleted");
+        verifyNoInteractions(jdbc, uploads, logos, registry);
+    }
+
+    @Test
+    void formerOfficerWithOnlyReportReviewEvidenceCannotBeDeleted() {
+        UUID id = UUID.randomUUID();
+        when(members.findById(id)).thenReturn(Optional.of(Member.builder().id(id).fullName("Former Officer")
+            .position(Position.MINOR_ADMIN).status(MemberStatus.INACTIVE).build()));
+        when(reportTemplates.hasMemberHistory(id)).thenReturn(true);
         assertThatThrownBy(() -> service.deleteRevokedMinorAdmin(id, "delete Former Officer"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be deleted");
         verifyNoInteractions(jdbc, uploads, logos, registry);
