@@ -188,6 +188,64 @@ public class GeneralLedgerService {
         require(event.name().equals(j.sourceType()) && Objects.equals(sourceReference,j.sourceReference()),"sourceType");
         return postInternal(actor,approveInternal(actor,j,evidence),false);
     }
+    /** Owning source must retain its correction and subledger changes in this same transaction. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Journal draftSourceReversal(AppUserPrincipal actor,UUID originalId,JournalCommand command) {
+        requireActor(actor,"ACCOUNTING_JOURNALS_REVERSE");
+        validateCommand(command);text(command.reason(),500,"reason");
+        Journal original=withLines(scoped(actor,originalId,true));requireBusinessOriginal(original);
+        independentOriginal(actor,original);
+        require(!command.effectiveDate().isBefore(original.effectiveDate()),"effectiveDate");
+        require(exactLines(command.lines()).equals(exactLines(original.lines().stream().map(l->new Line(l.accountId(),l.credit(),l.debit())).toList())),"original");
+        return draft(actor,command,"SOURCE_REVERSAL",originalId);
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Journal approveAndPostSourceReversal(AppUserPrincipal actor,UUID journalId,String sourceReference,String evidence) {
+        requireActor(actor,"ACCOUNTING_JOURNALS_REVERSE");requireActor(actor,"ACCOUNTING_JOURNALS_APPROVE");
+        Journal j=scoped(actor,journalId,true);
+        require("SOURCE_REVERSAL".equals(j.sourceType()) && j.reversesId()!=null && Objects.equals(sourceReference,j.sourceReference()),"sourceType");
+        Journal original=withLines(scoped(actor,j.reversesId(),true));requireBusinessOriginal(original);independentOriginal(actor,original);
+        require(exactLines(books.lines(j.id())).equals(exactLines(original.lines().stream().map(l->new Line(l.accountId(),l.credit(),l.debit())).toList())),"original");
+        text(evidence,500,"approvalEvidence");
+        if(Set.of("APPROVED","POSTED").contains(j.state()))require(Objects.equals(evidence,books.sourceApprovalEvidence(j.id())),"changedRetry");
+        var policy=policies.requireApprovedLocalPolicy(actor.getSaccoId(),j.effectiveDate());
+        require(policy.id().equals(j.policyId()),"policyChanged");policies.requireAllowedPosting(policy,PostingEvent.REVERSAL);
+        return postInternal(actor,approveInternal(actor,j,evidence),false);
+    }
+    /** Rejection/cancellation of the owning source must commit or roll back with this immutable overlay. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Journal cancelSourceEvent(AppUserPrincipal actor,UUID journalId,PostingEvent sourceEvent,String sourceReference,String evidence) {
+        requireActor(actor,"ACCOUNTING_JOURNALS_APPROVE");text(evidence,500,"approvalEvidence");
+        Journal j=scoped(actor,journalId,true);
+        require(isBusinessSource(j.sourceType()) && sourceEvent!=null && postingEvent(j.sourceType())==sourceEvent && Objects.equals(sourceReference,j.sourceReference()),"sourceType");
+        if("SOURCE_REVERSAL".equals(j.sourceType()))requireActor(actor,"ACCOUNTING_JOURNALS_REVERSE");
+        require(!j.makerId().equals(actor.getMemberId()),"independentChecker");
+        var prior=books.cancellation(j.id());
+        if(prior.isPresent()) {
+            require(prior.get().checker().equals(actor.getMemberId()) && prior.get().sourceEvent().equals(sourceEvent.name())
+                && prior.get().sourceReference().equals(sourceReference) && prior.get().evidence().equals(evidence),"changedRetry");
+            return withLines(scoped(actor,j.id(),false));
+        }
+        require(Set.of("DRAFT","APPROVED").contains(j.state()),"state");
+        openPeriod(actor,j.effectiveDate());
+        require(books.historicallyApprovedPolicy(j),"policyChanged");
+        books.cancel(j,actor.getMemberId(),sourceEvent.name(),evidence,clock.now());
+        event(actor,j.id(),"SOURCE_JOURNAL_CANCELLED",Map.of("sourceType",j.sourceType(),"sourceReference",sourceReference,"sourceEvent",sourceEvent.name(),"evidenceReference",evidence,"previousState",j.state(),"payloadChecksum",j.payloadHash()));
+        return withLines(scoped(actor,j.id(),false));
+    }
+    @Transactional(readOnly=true)
+    public Optional<SourceCancellation> sourceCancellation(AppUserPrincipal actor,UUID journalId) {
+        requireActor(actor,"ACCOUNTING_JOURNALS_VIEW");scoped(actor,journalId,false);return books.cancellation(journalId);
+    }
+    private static boolean isBusinessSource(String source) {
+        return Set.of("DISBURSEMENT","REPAYMENT","INTEREST_ACCRUAL","FEE","REFUND","ADVANCE","SETTLEMENT","TOP_UP","EXPENSE","FUNDING","CAPITAL","PROVISION","WRITE_OFF","RECOVERY","SOURCE_REVERSAL").contains(source);
+    }
+    private static void requireBusinessOriginal(Journal j) {
+        require("POSTED".equals(j.state()) && isBusinessSource(j.sourceType()) && !"SOURCE_REVERSAL".equals(j.sourceType()) && j.reversesId()==null,"original");
+    }
+    private static List<String> exactLines(List<Line> lines) {
+        return lines.stream().map(l->l.accountId()+":"+l.debit().setScale(2).toPlainString()+":"+l.credit().setScale(2).toPlainString()).sorted().toList();
+    }
     private void requireGenericSource(Journal j) {require(Set.of("MANUAL","OPENING","REVERSAL","OPERATIONAL_BRIDGE").contains(j.sourceType()),"sourceType");}
     @Transactional
     public Journal reverse(AppUserPrincipal actor,UUID originalId,UUID key,LocalDate date,String reason,String evidence) {
@@ -239,7 +297,7 @@ public class GeneralLedgerService {
         books.createJournal(j);event(actor,j.id(),"JOURNAL_DRAFTED",Map.of("sourceType",source,"sourceReference",c.sourceReference()));return j;
     }
     private PostingEvent postingEvent(String source) {
-        return switch(source) { case "MANUAL"->PostingEvent.MANUAL_JOURNAL;case "OPENING"->PostingEvent.OPENING_BALANCE;default->PostingEvent.valueOf(source);};
+        return switch(source) { case "MANUAL"->PostingEvent.MANUAL_JOURNAL;case "OPENING"->PostingEvent.OPENING_BALANCE;case "SOURCE_REVERSAL"->PostingEvent.REVERSAL;default->PostingEvent.valueOf(source);};
     }
     private Period openPeriod(AppUserPrincipal actor,LocalDate date) {
         List<Period> rows=books.lockOpenPeriod(actor.getSaccoId(),date);

@@ -108,12 +108,12 @@ public class ReconciliationRepository {
     public void reviewCertificate(UUID id,UUID checker,String evidence,OffsetDateTime now) {jdbc.update("insert into reconciliation_certificate_decision(certificate_id,checker_id,evidence,decided_at) values(?,?,?,?)",id,checker,evidence,now);}
     public List<Period> periods(String institution,int offset) {return jdbc.query("select * from accounting_period where sacco_id=? order by starts_on desc,id limit 26 offset ?",(r,n)->new Period(uuid(r,"id"),date(r,"starts_on"),date(r,"ends_on"),r.getString("state")),institution,offset);}
     public Optional<Period> period(String institution,UUID id,boolean lock) {return jdbc.query("select * from accounting_period where sacco_id=? and id=?"+(lock?" for update":""),(r,n)->new Period(uuid(r,"id"),date(r,"starts_on"),date(r,"ends_on"),r.getString("state")),institution,id).stream().findFirst();}
-    public void lockPeriodForPublication(String institution,UUID id) {jdbc.queryForObject("select id from accounting_period where sacco_id=? and id=? for share",UUID.class,institution,id);}
+    public void lockPeriodForPublication(String institution,UUID id) {jdbc.query("select p.id from accounting_period p where p.sacco_id=? and p.starts_on<=(select ends_on from accounting_period where id=? and sacco_id=?) order by p.starts_on,p.id for share of p",(r,n)->uuid(r,"id"),institution,id,institution);}
     public void lockPriorPeriods(String institution,LocalDate through) {jdbc.query("select id from accounting_period where sacco_id=? and starts_on<=? order by starts_on,id for update",(r,n)->uuid(r,"id"),institution,through);}
     public List<CloseCheck> checks(String institution,String branch,Period p) {
         var result=new ArrayList<CloseCheck>();
         result.add(new CloseCheck("opening",count("select count(*) from gl_cutover_coverage c join gl_journal j on j.id=c.opening_journal_id where c.sacco_id=? and c.station_id=? and c.complete and j.state='POSTED'",institution,branch)==1?0:1));
-        result.add(new CloseCheck("drafts",count("select count(*) from gl_journal where sacco_id=? and station_id=? and period_id=? and state<>'POSTED'",institution,branch,p.id())));
+        result.add(new CloseCheck("drafts",count("select count(*) from gl_journal where sacco_id=? and station_id=? and period_id=? and state<>'POSTED' and not exists(select 1 from gl_source_cancellation c where c.journal_id=gl_journal.id)",institution,branch,p.id())));
         result.add(new CloseCheck("unbalanced",count("select count(*) from (select j.id from gl_journal j join gl_journal_line l on l.journal_id=j.id where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.effective_date<=? group by j.id having sum(l.debit-l.credit)<>0) x",institution,branch,p.through())));
         result.add(new CloseCheck("exceptions",count("select count(*) from reconciliation_exception e join reconciliation_statement_line l on l.id=e.statement_line_id left join reconciliation_exception_decision d on d.exception_id=e.id where e.sacco_id=? and e.station_id=? and l.effective_date<=? and d.exception_id is null",institution,branch,p.through())));
         result.add(new CloseCheck("unmatched",count("""
@@ -151,6 +151,7 @@ public class ReconciliationRepository {
     }
     public Map<String,Object> snapshot(String institution,String branch,Period p) {
         var out=new LinkedHashMap<String,Object>();out.put("schema",1);out.put("period",p.id().toString());out.put("from",p.from().toString());out.put("through",p.through().toString());
+        out.put("cancelledSources",jdbc.queryForList("select c.journal_id,c.source_event,c.source_reference,c.previous_state,c.maker_id,c.checker_id,c.evidence_reference,c.payload_hash,c.recorded_at::text from gl_source_cancellation c join gl_journal j on j.id=c.journal_id where c.sacco_id=? and c.station_id=? and j.period_id=? order by c.recorded_at,c.journal_id limit 1001",institution,branch,p.id()));
         out.put("journals",jdbc.queryForMap("select count(*) posted_count,coalesce(sum(l.total),0) debit_total,max(j.posted_at)::text latest_posted from gl_journal j join lateral(select sum(debit) total from gl_journal_line where journal_id=j.id) l on true where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.effective_date<=?",institution,branch,p.through()));
         out.put("accounts",jdbc.queryForList("""
           select a.id::text,a.code,a.type,a.normal_balance,a.purpose,coalesce(m.opening,0) opening,
@@ -207,6 +208,11 @@ public class ReconciliationRepository {
           select ?=(select r.id from accounting_close_review r join accounting_close_decision d on d.review_id=r.id
           where r.sacco_id=? and r.station_id=? and r.period_id=? and r.action='CLOSE'
           and r.recorded_at>coalesce((select max(rd.decided_at) from accounting_close_review rr join accounting_close_decision rd on rd.review_id=rr.id where rr.period_id=r.period_id and rr.action='REOPEN'),'-infinity')
+          and not exists(select 1 from accounting_period earlier join accounting_period own on own.id=r.period_id
+            where earlier.sacco_id=r.sacco_id and earlier.starts_on<own.starts_on and earlier.state<>'CLOSED')
+          and not exists(select 1 from accounting_close_review rr join accounting_close_decision rd on rd.review_id=rr.id
+            join accounting_period earlier on earlier.id=rr.period_id join accounting_period own on own.id=r.period_id
+            where rr.sacco_id=r.sacco_id and rr.action='REOPEN' and earlier.starts_on<own.starts_on and rd.decided_at>=r.recorded_at)
           order by r.version desc limit 1)
           """,Boolean.class,review,institution,branch,period));}
     public List<String> branches(String institution,LocalDate through) {return jdbc.query("""

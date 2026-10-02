@@ -209,7 +209,7 @@ public class ReconciliationService {
         require((reopen?"CLOSED":"OPEN").equals(p.state()),"periodState");
         if(!reopen) {checkReady(actor.getSaccoId(),actor.getStationId(),p);require(r.checksum().equals(sha(snapshot(actor.getSaccoId(),actor.getStationId(),p))),"staleEvidence");}
         repo.decideClose(id,actor.getMemberId(),evidence,clock.now());
-        if(reopen) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_INSTITUTION);repo.setPeriod(p.id(),false,actor.getMemberId(),clock.now());for(var listener:reopenListeners)listener.periodReopened(actor,p.id(),r.evidence()+" | "+evidence);}
+        if(reopen) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_INSTITUTION);repo.setPeriod(p.id(),false,actor.getMemberId(),clock.now());for(var listener:reopenListeners)listener.periodReopened(actor,p.id(),p.from(),r.evidence()+" | "+evidence);}
         event(actor,id,reopen?"PERIOD_REOPENED":"BRANCH_CLOSE_APPROVED");
     }
     @Transactional
@@ -246,7 +246,7 @@ public class ReconciliationService {
         require(!repo.hasExpandedLoanMovements(actor.getSaccoId(),actor.getStationId(),date),"controlUnavailable");return repo.loanBalance(actor.getSaccoId(),actor.getStationId(),date);
     }
     private String snapshot(String institution,String branch,Period p) {
-        var data=repo.snapshot(institution,branch,p);for(String key:List.of("accounts","cashMovements","certificates","statementEvidence","retainedDifferences","sourcePolicyVersions"))require(((List<?>)data.get(key)).size()<=1000,"snapshotSize");
+        var data=repo.snapshot(institution,branch,p);for(String key:List.of("accounts","cashMovements","certificates","statementEvidence","retainedDifferences","sourcePolicyVersions","cancelledSources"))require(((List<?>)data.get(key)).size()<=1000,"snapshotSize");
         var policy=policies.requireApprovedLocalPolicy(institution,p.through());
         data.put("periodPolicy",data.get("accountingPolicy"));data.put("accountingPolicy",Map.of("id",policy.id().toString(),"policy_version",policy.version(),"authoritative_ledger",policy.authoritativeLedger().name(),"effective_from",policy.effectiveFrom().toString(),"opening_date",policy.openingDate().toString(),"decisions",policy.decisions()));
         return JSON.writeValueAsString(data);
