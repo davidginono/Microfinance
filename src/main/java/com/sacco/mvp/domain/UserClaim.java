@@ -142,7 +142,9 @@ public enum UserClaim {
     REPORT_TEMPLATE_PUBLISH(AccessFeature.REPORT_BUILDER, AccessAction.APPROVE),
     REPORT_RUN(AccessFeature.REPORT_BUILDER, AccessAction.VIEW),
     REPORT_EXPORT(AccessFeature.REPORT_BUILDER, AccessAction.EXPORT),
-    REPORT_TEMPLATE_SHARE(AccessFeature.REPORT_BUILDER, AccessAction.ASSIGN);
+    REPORT_TEMPLATE_SHARE(AccessFeature.REPORT_BUILDER, AccessAction.ASSIGN),
+    REPORT_RUN_APPROVE(AccessFeature.REPORT_EXECUTION, AccessAction.APPROVE),
+    REPORT_JOBS_REVIEW(AccessFeature.REPORT_EXECUTION, AccessAction.VIEW);
 
     private static final Map<AccessFeature, Map<AccessAction, UserClaim>> BY_FEATURE_ACTION = buildLookup();
 
