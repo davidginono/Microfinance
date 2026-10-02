@@ -39,8 +39,9 @@ public enum AccessFeature {
     FINANCIAL_REPORTS("Financial and management reports"),
     ACCOUNTING_RECONCILIATION("Reconciliation"),
     ACCOUNTING_CLOSING("Period Closing"),
-    REPORT_EXECUTION("Report execution and approval");
-
+    REPORT_EXECUTION("Report execution and approval"),
+    FINANCIAL_STATEMENTS("Financial statement designer"),
+    REGULATORY_STATEMENTS("Regulatory submissions");
 
     private final String displayName;
 
