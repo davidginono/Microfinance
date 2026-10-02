@@ -8,6 +8,7 @@ This file gives coding agents project-specific guidance for working in `Microfin
 - Target: credit-policy-backed, non-deposit-taking microfinance in Tanzania Mainland.
 - Start with individual business lending; salary, group, and agricultural lending are separate product capabilities, not assumed existing features.
 - The conversion backlog and implementation gates live in `docs/microfinance-gap-checklist.md`.
+- The accounting package and institution-specific report customization goal, dependency order, and acceptance gates live in `docs/accounting-report-builder-checklist.md`. Read it before accounting or report-builder work; checklist creation is not implementation completion.
 - Stack:
   - Spring Boot 4.1.x (check `pom.xml` before choosing APIs)
   - Java 25

@@ -10,6 +10,8 @@ Credit-estimate update (2026-10-01): server-derived draft/submission snapshots, 
 
 Credit-estimate verification (2026-10-01): the latest packaged build reports 743 tests with no failures, errors, or skips, including five disposable PostgreSQL tests. English Chromium/Playwright checks covered weekly quotes, failed assessments, invalid declarations, CSRF, stale-quote clearing, submitted-snapshot tampering, login/logout, and widths of 360, 768, 1366, and 1920 pixels without page overflow or application JavaScript errors. Kiswahili messages have regression coverage; this increment's Kiswahili browser flow was not verified.
 
+Accounting/report-builder planning (2026-10-02): the [Accounting Package And Report Customization Goal](accounting-report-builder-checklist.md) defines phased agent tasks, dependencies, human approval gates, and acceptance tests. It does not mark the accounting/reconciliation or reporting gaps below complete.
+
 ### Verified Increment
 
 - `mvn package` passed 704 tests with no failures, errors, or skips, including five opt-in tests against disposable PostgreSQL 17.9. The WAR was packaged successfully.
