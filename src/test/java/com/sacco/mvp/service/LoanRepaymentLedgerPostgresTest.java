@@ -69,6 +69,28 @@ class LoanRepaymentLedgerPostgresTest {
     }
 
     @Test
+    void operationalCleanupRetainsFinancialAndReportEvidence() {
+        List<String> retainedTypes = List.of("LOAN_REPAYMENT", "ACCOUNTING", "ACCOUNTING_POLICY",
+            "ACCOUNTING_PERIOD", "OPERATIONAL_REPORT_TEMPLATE", "REPORT_RUN", "FINANCIAL_STATEMENT");
+        List<UUID> retained = new ArrayList<>();
+        OffsetDateTime old = OffsetDateTime.now().minusDays(1000);
+        for (String type : retainedTypes) {
+            UUID id = UUID.randomUUID(); retained.add(id);
+            jdbc.update("INSERT INTO audit_log(id, entity_type, action, created_at) VALUES (?, ?, ?, ?)",
+                id, type, "RETENTION_TEST", old);
+        }
+        UUID operational = UUID.randomUUID();
+        jdbc.update("INSERT INTO audit_log(id, entity_type, action, created_at) VALUES (?, 'LOGIN', 'RETENTION_TEST', ?)",
+            operational, old);
+        tx.executeWithoutResult(status -> context.getBean(AuditLogRepository.class)
+            .deleteExpiredOperationalAudit(OffsetDateTime.now().minusDays(70)));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE id = ?", Long.class, operational)).isZero();
+        for (UUID id : retained) {
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE id = ?", Long.class, id)).isEqualTo(1L);
+        }
+    }
+
+    @Test
     void postingRetryAndReversalPersistExactlyOnceAndBalance() {
         var command = command("100.00", "PG-" + UUID.randomUUID(), UUID.randomUUID());
         var receipt = service.post(loan.getId(), poster, command);

@@ -34,7 +34,7 @@ class OperationalDataRetentionSchedulerTest {
         ReflectionTestUtils.setField(scheduler, "outboxRetentionDays", 45L);
         ReflectionTestUtils.setField(scheduler, "readNotificationRetentionDays", 180L);
 
-        when(auditLogRepository.deleteByCreatedAtBeforeAndEntityTypeNot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("LOAN_REPAYMENT"))).thenReturn(1L);
+        when(auditLogRepository.deleteExpiredOperationalAudit(org.mockito.ArgumentMatchers.any())).thenReturn(1);
         when(outboxEventRepository.deleteByCreatedAtBefore(org.mockito.ArgumentMatchers.any())).thenReturn(2L);
         when(notificationRepository.deleteByReadAtIsNotNullAndCreatedAtBefore(org.mockito.ArgumentMatchers.any())).thenReturn(3L);
 
@@ -42,7 +42,7 @@ class OperationalDataRetentionSchedulerTest {
 
         org.mockito.ArgumentCaptor<OffsetDateTime> notificationCutoff =
             org.mockito.ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(auditLogRepository).deleteByCreatedAtBeforeAndEntityTypeNot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("LOAN_REPAYMENT"));
+        verify(auditLogRepository).deleteExpiredOperationalAudit(org.mockito.ArgumentMatchers.any());
         org.mockito.Mockito.verify(auditLogRepository, org.mockito.Mockito.never()).deleteByCreatedAtBefore(org.mockito.ArgumentMatchers.any());
         verify(outboxEventRepository).deleteByCreatedAtBefore(org.mockito.ArgumentMatchers.any());
         verify(notificationRepository).deleteByReadAtIsNotNullAndCreatedAtBefore(notificationCutoff.capture());
