@@ -8,7 +8,11 @@ import java.util.*;
 /** Stable schema 1: a controlled operational report, never executable user content. */
 public record OperationalReportDefinition(int schemaVersion, Dataset dataset, String title, String footer,
         String language, boolean landscape, List<Column> columns, List<Filter> filters,
-        List<Sort> sorts, List<Field> groups, List<Field> totals) {
+        List<Sort> sorts, List<Field> groups, List<Field> totals, boolean institutionLogo) {
+    public OperationalReportDefinition(int schemaVersion,Dataset dataset,String title,String footer,String language,boolean landscape,
+            List<Column> columns,List<Filter> filters,List<Sort> sorts,List<Field> groups,List<Field> totals){
+        this(schemaVersion,dataset,title,footer,language,landscape,columns,filters,sorts,groups,totals,false);
+    }
     public enum Dataset { COLLECTIONS, DISBURSEMENTS, LOAN_PORTFOLIO }
     public enum Type { TEXT, DATE, MONEY }
     public enum Operator { EQ, GE, LE }
@@ -106,7 +110,8 @@ public record OperationalReportDefinition(int schemaVersion, Dataset dataset, St
     private static void invalid() { throw new IllegalArgumentException("report.error.definition"); }
     public static OperationalReportDefinition standard(Dataset dataset, String language) {
         List<Column> columns = fields(dataset).stream().map(f -> new Column(f, "", 130, true)).toList();
-        return new OperationalReportDefinition(1, dataset, dataset.name().replace('_', ' '), "", language,
+        String title=switch(dataset){case COLLECTIONS->language.equals("sw")?"Makusanyo na marejesho":"Collections and reversals";case DISBURSEMENTS->language.equals("sw")?"Utoaji wa mikopo uliothibitishwa":"Verified disbursements";case LOAN_PORTFOLIO->language.equals("sw")?"Mikopo iliyothibitishwa":"Verified loan portfolio";};
+        return new OperationalReportDefinition(1, dataset, title, "", language,
             dataset == Dataset.COLLECTIONS, columns, List.of(), List.of(new Sort(Field.LOAN_ID, false)), List.of(),
             fields(dataset).stream().filter(f -> f.getType() == Type.MONEY).toList());
     }

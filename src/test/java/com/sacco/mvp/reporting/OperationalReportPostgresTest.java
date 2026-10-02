@@ -27,6 +27,7 @@ class OperationalReportPostgresTest {
     private static final OffsetDateTime CUTOFF=OffsetDateTime.parse("2026-10-02T10:00:00+03:00");
     private JdbcTemplate jdbc;private TransactionTemplate tx;private OperationalReportService reports;private OperationalReportTemplateService templates;
     private MemberDirectoryService directory;private UserClaimService claims;private SaccoRegistryService institutions;
+    private SaccoLogoStorageService logos;
     private AppUserPrincipal maker,checker;private String institution;private UUID loan;
     @BeforeAll void migrate(){
         var source=new DriverManagerDataSource(System.getenv("MICROFINANCE_REPORT_F_DATABASE_URL"),"microfinance_test","");
@@ -36,7 +37,8 @@ class OperationalReportPostgresTest {
     @BeforeEach void fixture(){
         directory=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);
         var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(THROUGH);when(clock.now()).thenReturn(CUTOFF.plusMinutes(5));
-        reports=new OperationalReportService(new OperationalReportRepository(new NamedParameterJdbcTemplate(jdbc)),new AccessControlService(),clock,directory,claims,institutions);
+        logos=mock(SaccoLogoStorageService.class);
+        reports=new OperationalReportService(new OperationalReportRepository(new NamedParameterJdbcTemplate(jdbc)),new AccessControlService(),clock,directory,claims,institutions,logos);
         templates=new OperationalReportTemplateService(new OperationalReportTemplateRepository(jdbc,JsonMapper.builder().findAndAddModules().build()),reports,new AccessControlService(),clock,mock(AuditService.class));
         institution="RF-"+UUID.randomUUID();jdbc.update("INSERT INTO registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) VALUES(?,'Synthetic reporting institution',true,now(),now())",institution);
         when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
@@ -87,6 +89,14 @@ class OperationalReportPostgresTest {
         assertThat(templates.get(next,maker,false).version()).isEqualTo(2);assertThat(templates.get(id,maker,true).definition().language()).isEqualTo("en");
         tx.executeWithoutResult(status->templates.retire(id,checker));assertThatThrownBy(()->templates.get(id,maker,true)).hasMessage("report.error.unpublished");
     }
+    @Test void retentionGuardsRecognizeInstitutionCreatorMakerAndChecker(){
+        assertThat(templates.hasInstitutionHistory(institution)).isFalse();assertThat(templates.hasMemberHistory(maker.getMemberId())).isFalse();
+        UUID id=tx.execute(status->templates.save(standard(Dataset.COLLECTIONS,"en"),null,true,maker));
+        assertThat(templates.hasInstitutionHistory(institution)).isTrue();assertThat(templates.hasInstitutionHistory("FOREIGN")).isFalse();
+        assertThat(templates.hasMemberHistory(maker.getMemberId())).isTrue();assertThat(templates.hasMemberHistory(checker.getMemberId())).isFalse();
+        tx.executeWithoutResult(status->templates.publish(id,checker));assertThat(templates.hasMemberHistory(checker.getMemberId())).isTrue();
+        assertThat(templates.hasMemberHistory(UUID.randomUUID())).isFalse();
+    }
     @Test void foreignInstitutionCannotReadOrPublishGuessedTemplate(){
         UUID id=tx.execute(status->templates.save(standard(Dataset.COLLECTIONS,"en"),null,true,maker));
         var foreign=operator("FOREIGN-"+UUID.randomUUID(),"B1");
@@ -95,16 +105,28 @@ class OperationalReportPostgresTest {
         assertThatThrownBy(()->templates.get(id,foreign,false)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->tx.executeWithoutResult(status->templates.publish(id,foreign))).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void selectedLogoIsOwnedByTrustedInstitutionAndItsExactBytesAreFrozen(){
+        byte[] bytes=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrwoAAAAASUVORK5CYII=");
+        when(logos.hasLogo(institution)).thenReturn(true);when(logos.load(institution)).thenReturn(new SaccoLogoStorageService.LogoResource(bytes,org.springframework.http.MediaType.IMAGE_PNG));
+        var d=standard(Dataset.DISBURSEMENTS,"en");
+        var branded=new OperationalReportDefinition(1,d.dataset(),d.title(),"","en",false,d.columns(),d.filters(),d.sorts(),d.groups(),d.totals(),true);
+        var result=run(branded,CUTOFF,25);assertThat(result.branding().logo()).containsExactly(bytes);assertThat(result.branding().sha256()).hasSize(64);
+        bytes[0]=0;assertThat(result.branding().logo()[0]).isNotZero();
+        verify(logos).load(institution);verify(logos,never()).load("FOREIGN");
+        when(institutions.findStation(institution,"B1")).thenReturn(Optional.empty());
+        clearInvocations(logos);assertThatThrownBy(()->run(branded,CUTOFF,25)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(logos);
+    }
     private OperationalReportService.Result run(OperationalReportDefinition d,OffsetDateTime cutoff,int size){return tx.execute(status->reports.execute(d,maker,FROM,THROUGH,cutoff,0,size));}
     private Set<UserClaim> allClaims(){return Set.of(UserClaim.REPORT_TEMPLATE_DESIGN,UserClaim.REPORT_TEMPLATE_PUBLISH,UserClaim.REPORT_TEMPLATE_SHARE,UserClaim.REPORT_RUN,UserClaim.REPORT_EXPORT,UserClaim.LOAN_REPAYMENTS_VIEW,UserClaim.LOAN_REPORTS_VIEW);}
     private AppUserPrincipal operator(String institution,String branch){
+        jdbc.update("INSERT INTO registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) VALUES(?,'Synthetic reporting institution',true,now(),now()) ON CONFLICT DO NOTHING",institution);
         UUID id=UUID.randomUUID();jdbc.update("INSERT INTO members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) VALUES(?,?,?,?,?,'ACTIVE','MANAGER',now(),true,'synthetic')",id,institution,branch,id.toString(),"Synthetic report officer");
         Member m=Member.builder().id(id).saccoId(institution).stationId(branch).memberNo(id.toString()).fullName("Synthetic report officer").position(Position.MANAGER).memberAccount(true).status(MemberStatus.ACTIVE).build();
         when(directory.find(id)).thenReturn(Optional.of(m));when(claims.effectiveClaims(eq(id),anyCollection(),anyBoolean())).thenReturn(allClaims());return new AppUserPrincipal(m,allClaims(),true);
     }
     private UUID openLoan(String institution,String branch,UUID applicant,boolean ledger){
         UUID id=UUID.randomUUID();long number=Math.abs(id.getLeastSignificantBits())%100000000000000000L;
-        jdbc.update("INSERT INTO loan_applications(id,application_number,loan_id,sacco_id,station_id,applicant_member_id,amount,tenor_months,status,loan_type,form_data,policy_snapshot,required_guarantors,created_at,updated_at,version,disbursement_date) VALUES(?,?,?,?,?,?,1000,1,'DISBURSED','CUSTOMIZED','{}','{}',0,?,?,0,?)",id,number,Long.toString(number),institution,branch,applicant,CUTOFF.minusMonths(1),CUTOFF.minusMonths(1),FROM);
+        jdbc.update("INSERT INTO loan_applications(id,application_number,loan_id,sacco_id,station_id,applicant_member_id,amount,tenor_months,status,loan_type,form_data,policy_snapshot,required_guarantors,created_at,updated_at,version,disbursement_date) VALUES(?,?,?,?,?,?,1000,1,'DISBURSED','CUSTOMIZED_LOAN','{}','{}',0,?,?,0,?)",id,number,Long.toString(number),institution,branch,applicant,CUTOFF.minusMonths(1),CUTOFF.minusMonths(1),FROM);
         if(ledger)jdbc.update("INSERT INTO loan_ledgers(loan_application_id,sacco_id,station_id,loan_id,applicant_member_id,disbursement_date,principal,created_at) VALUES(?,?,?,?,?,?,1000,?)",id,institution,branch,Long.toString(number),applicant,FROM,CUTOFF.minusMonths(1));return id;
     }
     private void payment(UUID loan,String institution,String branch,UUID actor,String kind,String amount,String principal,OffsetDateTime posted,UUID original){

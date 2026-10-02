@@ -3,8 +3,10 @@ package com.sacco.mvp.reporting;
 import com.sacco.mvp.reporting.OperationalReportDefinition.Column;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.core.io.ClassPathResource;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.context.MessageSource;
@@ -43,7 +45,11 @@ public class OperationalReportExportService {
             message("report.cutoff",lang) + ": " + r.recordedCutoff(),
             message("report.coverage." + r.definition().dataset(),lang),
             message("report.untracked",lang) + ": " + r.untrackedLoans(),
-            message("report.rows",lang) + ": " + r.rowsInScope());
+            message("report.rows",lang) + ": " + r.rowsInScope(),
+            message("report.scope",lang)+": "+r.institution()+" / "+r.branch(),
+            message("report.filters",lang)+": "+(r.definition().filters().isEmpty()?message("report.noFilters",lang):r.definition().filters().stream()
+                .map(f->heading(new Column(f.field(),"",130,true),lang)+" "+message("report."+f.operator(),lang)+" "+f.value())
+                .reduce((a,b)->a+"; "+b).orElseThrow()));
     }
     private byte[] csv(OperationalReportService.Result r) {
         StringBuilder text = new StringBuilder("\uFEFF");
@@ -74,6 +80,8 @@ public class OperationalReportExportService {
     private byte[] xlsx(OperationalReportService.Result r) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet=workbook.createSheet("Report"); int index=0;
+            if(r.branding()!=null){int picture=workbook.addPicture(r.branding().logo(),r.branding().mediaType().equals("image/png")?Workbook.PICTURE_TYPE_PNG:Workbook.PICTURE_TYPE_JPEG);
+                ClientAnchor anchor=workbook.getCreationHelper().createClientAnchor();anchor.setCol1(5);anchor.setRow1(0);anchor.setCol2(7);anchor.setRow2(4);sheet.createDrawingPatriarch().createPicture(anchor,picture);}
             CellStyle money=workbook.createCellStyle(); money.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00;[Red]-#,##0.00"));
             CellStyle date=workbook.createCellStyle(); date.setDataFormat(workbook.createDataFormat().getFormat("yyyy-mm-dd"));
             CellStyle head=workbook.createCellStyle(); Font bold=workbook.createFont(); bold.setBold(true); head.setFont(bold); head.setWrapText(true);
@@ -108,36 +116,40 @@ public class OperationalReportExportService {
     }
     private byte[] pdf(OperationalReportService.Result r) throws IOException {
         try (PDDocument document=new PDDocument(); ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+            PDFont font;
+            try(InputStream in=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream()){font=PDType0Font.load(document,in);}
+            PDImageXObject logo=r.branding()==null?null:PDImageXObject.createFromByteArray(document,r.branding().logo(),"institution-logo");
             List<Column> columns=r.getVisibleColumns();
             // Wide reports use column bands, repeating loan/reference context where available.
             for(int first=0;first<columns.size();first+=5) {
                 List<Column> band=new ArrayList<>();
                 if(first>0 && columns.getFirst().field().getType()==OperationalReportDefinition.Type.TEXT) band.add(columns.getFirst());
                 band.addAll(columns.subList(first,Math.min(columns.size(),first+5)));
-                PdfPage page=new PdfPage(document,r,band,this);
+                PdfPage page=new PdfPage(document,r,band,this,font,logo);
                 for(Map<String,Object> row:r.rows()) page.row(band.stream().map(c->string(row.get(c.field().name()))).toList());
                 page.close();
             }
-            PdfPage totals=new PdfPage(document,r,List.of(),this);
+            PdfPage totals=new PdfPage(document,r,List.of(),this,font,logo);
             totals.text(message("report.total",r.definition().language()));
             for(Column column:columns) if(r.totals().containsKey(column.field().name())) totals.text(heading(column,r.definition().language())+": "+string(r.totals().get(column.field().name())));
             totals.text(r.definition().footer()); totals.close();
             int pageNo=0;
             for(PDPage page:document.getPages()) try(PDPageContentStream stream=new PDPageContentStream(document,page,PDPageContentStream.AppendMode.APPEND,true)) {
-                stream.beginText(); stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),8); stream.newLineAtOffset(35,20); stream.showText(++pageNo+" / "+document.getNumberOfPages()); stream.endText();
+                stream.beginText(); stream.setFont(font,8); stream.newLineAtOffset(35,20); stream.showText(++pageNo+" / "+document.getNumberOfPages()); stream.endText();
             }
             document.save(out); return out.toByteArray();
         }
     }
     private static final class PdfPage implements AutoCloseable {
         private final PDDocument doc; private final OperationalReportService.Result result; private final List<Column> columns; private final OperationalReportExportService exporter;
-        private final PDType1Font font=new PDType1Font(Standard14Fonts.FontName.HELVETICA); private PDPageContentStream stream; private float y,width;
-        PdfPage(PDDocument doc,OperationalReportService.Result result,List<Column> columns,OperationalReportExportService exporter) throws IOException {
-            this.doc=doc; this.result=result; this.columns=columns; this.exporter=exporter; next();
+        private final PDFont font;private final PDImageXObject logo; private PDPageContentStream stream; private float y,width;
+        PdfPage(PDDocument doc,OperationalReportService.Result result,List<Column> columns,OperationalReportExportService exporter,PDFont font,PDImageXObject logo) throws IOException {
+            this.doc=doc; this.result=result; this.columns=columns; this.exporter=exporter;this.font=font;this.logo=logo; next();
         }
         private void next() throws IOException {
             if(stream!=null)stream.close(); PDRectangle size=result.definition().landscape()?new PDRectangle(PDRectangle.A4.getHeight(),PDRectangle.A4.getWidth()):PDRectangle.A4;
             PDPage page=new PDPage(size); doc.addPage(page); stream=new PDPageContentStream(doc,page); y=size.getHeight()-35; width=size.getWidth()-70;
+            if(logo!=null){float scale=Math.min(100f/logo.getWidth(),35f/logo.getHeight());stream.drawImage(logo,35,y-35,logo.getWidth()*scale,logo.getHeight()*scale);y-=45;}
             for(String line:exporter.context(result))text(line);
             if(!columns.isEmpty())draw(columns.stream().map(c->exporter.heading(c,result.definition().language())).toList());
         }

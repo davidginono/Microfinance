@@ -5,6 +5,7 @@
   let definition = JSON.parse(document.getElementById('report-seed').value);
   const catalogs = JSON.parse(document.getElementById('report-catalog').value);
   const labels = Object.fromEntries([...document.querySelectorAll('#report-labels [data-field]')].map(e => [e.dataset.field, e.textContent]));
+  const descriptions=Object.fromEntries([...document.querySelectorAll('#report-labels [data-field]')].map(e=>[e.dataset.field,e.dataset.description]));
   const words = Object.fromEntries([...document.querySelectorAll('#report-words [data-word]')].map(e => [e.dataset.word, e.textContent]));
   const money = new Set(['AMOUNT', 'PRINCIPAL', 'INTEREST', 'OUTSTANDING_PRINCIPAL']);
   const grouped = new Set(['CHANNEL', 'KIND']);
@@ -26,6 +27,7 @@
     definition.footer = byId('report-footer').value;
     definition.language = byId('report-language').value;
     definition.landscape = byId('report-landscape').value === 'true';
+    definition.institutionLogo=byId('report-logo').checked;
     const field = byId('report-sort').value;
     definition.sorts = field ? [{field,descending:byId('report-descending').value === 'true'}] : [];
   }
@@ -33,7 +35,7 @@
     const area = byId('report-columns'); area.replaceChildren();
     definition.columns.forEach((column,index) => {
       const row = element('div',null,{class:'report-column'});
-      row.append(element('strong',labels[column.field]+(money.has(column.field)?' (TZS)':'')));
+      row.append(element('strong',labels[column.field]+(money.has(column.field)?' (TZS)':''),{title:descriptions[column.field]}));
       const shown = element('input',null,{type:'checkbox'}); shown.checked = column.visible;
       shown.addEventListener('change',()=>{column.visible=shown.checked;if(!shown.checked){definition.totals=definition.totals.filter(f=>f!==column.field);definition.groups=definition.groups.filter(f=>f!==column.field);}drawColumns();});
       row.append(labelled(words.show,shown));
@@ -82,6 +84,7 @@
   function hydrate() {
     byId('report-dataset').value=definition.dataset;byId('report-name').value=definition.title;byId('report-footer').value=definition.footer;
     byId('report-language').value=definition.language;byId('report-landscape').value=String(definition.landscape);
+    byId('report-logo').checked=Boolean(definition.institutionLogo);
     byId('report-descending').value=String(definition.sorts[0]?.descending||false);drawColumns();drawFilters();
   }
   byId('report-dataset').addEventListener('change',()=>{

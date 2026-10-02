@@ -13,7 +13,7 @@
   <textarea id="report-seed" hidden><c:out value="${definitionJson}" /></textarea>
   <textarea id="report-catalog" hidden><c:out value="${catalogJson}" /></textarea>
   <div id="report-labels" hidden>
-    <c:forEach items="${fieldLabels}" var="label"><span data-field="<c:out value='${label.key}' />"><c:out value="${label.value}" /></span></c:forEach>
+    <c:forEach items="${fieldLabels}" var="label"><span data-field="<c:out value='${label.key}' />" data-description="<c:out value='${fieldDescriptions[label.key]}' />"><c:out value="${label.value}" /></span></c:forEach>
   </div>
   <div id="report-words" hidden>
     <span data-word="show"><spring:message code="report.show" /></span><span data-word="alias"><spring:message code="report.alias" /></span>
@@ -34,6 +34,7 @@
       <label><spring:message code="report.language" /><select class="aws-control" id="report-language"><option value="en">English</option><option value="sw">Kiswahili</option></select></label>
       <label><spring:message code="report.orientation" /><select class="aws-control" id="report-landscape"><option value="false"><spring:message code="report.portrait" /></option><option value="true"><spring:message code="report.landscape" /></option></select></label>
       <label><spring:message code="report.footer" /><input class="aws-control" id="report-footer" maxlength="160" /></label>
+      <label><spring:message code="report.logo" /><input type="checkbox" id="report-logo" /></label>
     </div>
     <p id="report-source-note"><spring:message code="report.catalogNote" /></p>
     <h2><spring:message code="report.columns" /></h2>
@@ -59,15 +60,17 @@
   <c:if test="${not empty result}">
     <section class="erp-table-wrap">
       <div class="app-table-titlebar"><h2><c:out value="${result.definition.title}" /></h2><span><c:out value="${result.rowsInScope}" /> <spring:message code="report.rows" /></span></div>
-      <div class="report-context"><p><spring:message code="${result.coverageKey}" /></p>
+      <div class="report-context"><p><c:out value="${reportCoverage}" /></p>
+        <p><spring:message code="report.scope" />: <c:out value="${result.institution}" /> / <c:out value="${result.branch}" /></p>
+        <p><spring:message code="report.filters" />: <c:choose><c:when test="${empty result.definition.filters}"><spring:message code="report.noFilters" /></c:when><c:otherwise><c:forEach items="${result.definition.filters}" var="filter"><c:out value="${fieldLabels[filter.field.name()]}" /> <spring:message code="report.${filter.operator}" /> <c:out value="${filter.value}" />; </c:forEach></c:otherwise></c:choose></p>
         <p><spring:message code="report.period" />: <c:out value="${result.from}" /> / <c:out value="${result.through}" />. <spring:message code="report.cutoff" />: <c:out value="${result.recordedCutoff}" /></p>
         <p><spring:message code="report.untracked" />: <c:out value="${result.untrackedLoans}" /></p></div>
       <div class="erp-table-scroll" data-view-position-key="operational-report-preview"><table class="erp-table"><thead><tr>
-        <c:forEach items="${result.visibleColumns}" var="column"><th><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><spring:message code="${column.field.key}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
+        <c:forEach items="${result.visibleColumns}" var="column"><th style="min-width:${column.width}px"><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><c:out value="${fieldLabels[column.field.name()]}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
       </tr></thead><tbody><c:forEach items="${result.rows}" var="row"><tr><c:forEach items="${result.visibleColumns}" var="column"><td class="${column.field.unit == 'TZS' ? 'report-money' : ''}">
         <c:choose><c:when test="${row[column.field.name()] == null}"><spring:message code="report.unknown" /></c:when><c:when test="${column.field.unit == 'TZS'}"><fmt:formatNumber value="${row[column.field.name()]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise><c:out value="${row[column.field.name()]}" /></c:otherwise></c:choose>
       </td></c:forEach></tr></c:forEach><c:if test="${empty result.rows}"><tr><td colspan="${result.visibleColumns.size()}"><spring:message code="report.empty" /></td></tr></c:if></tbody></table></div>
-      <div class="report-context"><strong><spring:message code="report.scopeTotals" /></strong><c:forEach items="${result.totals}" var="total"><p><spring:message code="report.field.${total.key}" /> (TZS): <fmt:formatNumber value="${total.value}" minFractionDigits="2" maxFractionDigits="2" /></p></c:forEach></div>
+      <div class="report-context"><strong><spring:message code="report.scopeTotals" /></strong><c:forEach items="${result.totals}" var="total"><p><c:out value="${fieldLabels[total.key]}" /> (TZS): <fmt:formatNumber value="${total.value}" minFractionDigits="2" maxFractionDigits="2" /></p></c:forEach></div>
       <div class="report-actions">
         <c:if test="${not empty runVersion}">
           <c:url var="runUrl" value="/reports/builder/templates/${runVersion}/run" />

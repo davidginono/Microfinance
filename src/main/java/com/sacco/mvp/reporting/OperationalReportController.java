@@ -34,9 +34,9 @@ public class OperationalReportController {
     @GetMapping
     @PreAuthorize("@access.hasAny(principal,'REPORT_TEMPLATE_DESIGN','REPORT_TEMPLATE_PUBLISH','REPORT_RUN')")
     public String index(@AuthenticationPrincipal AppUserPrincipal actor, @RequestParam(required=false) UUID version,
-            @RequestParam(defaultValue="0") int page, Model model) {
+            @RequestParam(defaultValue="0") int page, Locale locale,Model model) {
         OperationalReportDefinition definition = version == null ? OperationalReportDefinition.standard(
-            access.has(actor,UserClaim.LOAN_REPAYMENTS_VIEW) ? OperationalReportDefinition.Dataset.COLLECTIONS : OperationalReportDefinition.Dataset.LOAN_PORTFOLIO,"en")
+            access.has(actor,UserClaim.LOAN_REPAYMENTS_VIEW) ? OperationalReportDefinition.Dataset.COLLECTIONS : OperationalReportDefinition.Dataset.LOAN_PORTFOLIO,locale.getLanguage().equals("sw")?"sw":"en")
             : templates.get(version,actor,false).definition();
         if(version!=null)model.addAttribute("sourceTemplate",templates.get(version,actor,false));
         populate(actor,definition,page,model);
@@ -71,7 +71,7 @@ public class OperationalReportController {
     @PostMapping("/preview")
     @PreAuthorize("@access.has(principal,'REPORT_TEMPLATE_DESIGN') and @access.has(principal,'REPORT_RUN')")
     public String preview(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String definition,
-            @RequestParam LocalDate from,@RequestParam LocalDate through,@RequestParam(required=false) OffsetDateTime cutoff,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime cutoff,
             @RequestParam(defaultValue="0") int page,Model model) {
         OperationalReportDefinition validated = fallback(definition);
         try {
@@ -85,8 +85,8 @@ public class OperationalReportController {
     }
     @GetMapping("/templates/{id}/run")
     @PreAuthorize("@access.has(principal,'REPORT_RUN')")
-    public String run(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam LocalDate from,
-            @RequestParam LocalDate through,@RequestParam(required=false) OffsetDateTime cutoff,@RequestParam(defaultValue="0") int page,Model model) {
+    public String run(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime cutoff,@RequestParam(defaultValue="0") int page,Model model) {
         var template=templates.get(id,actor,true);
         try {
             model.addAttribute("result",reports.execute(template.definition(),actor,from,through,cutoff==null?clock.now():cutoff,page,25));
@@ -98,15 +98,15 @@ public class OperationalReportController {
     @PostMapping("/preview/export")
     @PreAuthorize("@access.has(principal,'REPORT_TEMPLATE_DESIGN') and @access.has(principal,'REPORT_RUN') and @access.has(principal,'REPORT_EXPORT')")
     public ResponseEntity<byte[]> previewExport(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String definition,
-            @RequestParam LocalDate from,@RequestParam LocalDate through,@RequestParam OffsetDateTime cutoff,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime cutoff,
             @RequestParam OperationalReportExportService.Format format) {
         var validated=decode(definition);reports.authorize(actor,validated.dataset(),UserClaim.REPORT_TEMPLATE_DESIGN);
         return export(validated,null,actor,from,through,cutoff,format);
     }
     @GetMapping("/templates/{id}/export")
     @PreAuthorize("@access.has(principal,'REPORT_RUN') and @access.has(principal,'REPORT_EXPORT')")
-    public ResponseEntity<byte[]> exportVersion(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam LocalDate from,
-            @RequestParam LocalDate through,@RequestParam OffsetDateTime cutoff,@RequestParam OperationalReportExportService.Format format) {
+    public ResponseEntity<byte[]> exportVersion(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime cutoff,@RequestParam OperationalReportExportService.Format format) {
         return export(templates.get(id,actor,true).definition(),id,actor,from,through,cutoff,format);
     }
     private ResponseEntity<byte[]> export(OperationalReportDefinition definition,UUID version,AppUserPrincipal actor,
@@ -127,8 +127,12 @@ public class OperationalReportController {
         if(!model.containsAttribute("from"))model.addAttribute("from",clock.today().withDayOfMonth(1));
         if(!model.containsAttribute("through"))model.addAttribute("through",clock.today());
         Map<String,String> headings=new LinkedHashMap<>();
+        Map<String,String> descriptions=new LinkedHashMap<>();
         for(var field:OperationalReportDefinition.Field.values())headings.put(field.name(),exports.message(field.getKey(),definition.language()));
+        for(var field:OperationalReportDefinition.Field.values())descriptions.put(field.name(),exports.message(field.getDescriptionKey(),definition.language()));
         model.addAttribute("fieldLabels",headings);
+        model.addAttribute("fieldDescriptions",descriptions);
+        if(model.getAttribute("result") instanceof OperationalReportService.Result result)model.addAttribute("reportCoverage",exports.message(result.coverageKey(),definition.language()));
     }
     private OperationalReportDefinition decode(String json) {
         if(json==null||json.length()>12000)throw new IllegalArgumentException("report.error.definition");

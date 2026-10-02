@@ -1,16 +1,10 @@
 package com.sacco.mvp.reporting;
 
-import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.security.AppUserPrincipal;
-import com.sacco.mvp.service.AccessControlService;
-import com.sacco.mvp.service.ApplicationClock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,16 +12,10 @@ import java.time.OffsetDateTime;
 import java.util.*;
 import static com.sacco.mvp.reporting.OperationalReportDefinition.*;
 
-@org.springframework.stereotype.Repository
+@Repository
 @RequiredArgsConstructor
 public class OperationalReportRepository {
     private final NamedParameterJdbcTemplate jdbc;
-
-
-
-
-    /** All constituent queries share a PostgreSQL repeatable-read snapshot; no posting locks. */
-
     public OperationalReportService.Result execute(OperationalReportDefinition definition, AppUserPrincipal actor, LocalDate from,
             LocalDate through, OffsetDateTime cutoff, int page, int pageSize) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()

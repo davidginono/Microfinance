@@ -13,6 +13,8 @@ import static com.sacco.mvp.reporting.OperationalReportTemplateService.Version;
 public class OperationalReportTemplateRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    public boolean hasInstitutionHistory(String institution){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM operational_report_templates WHERE sacco_id=?)",Boolean.class,institution));}
+    public boolean hasMemberHistory(UUID member){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM operational_report_templates WHERE created_by=?) OR EXISTS(SELECT 1 FROM operational_report_template_versions WHERE made_by=? OR checked_by=?)",Boolean.class,member,member,member));}
     public void create(UUID id,String institution,UUID actor,OffsetDateTime now){
         jdbc.update("INSERT INTO operational_report_templates(id,sacco_id,created_by,created_at) VALUES(?,?,?,?)",id,institution,actor,now);
     }

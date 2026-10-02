@@ -21,6 +21,10 @@ public class OperationalReportTemplateService {
     private final AuditService audit;
     public record Version(UUID id, UUID templateId, int version, String state, String visibility,
             UUID madeBy, UUID checkedBy, OperationalReportDefinition definition) { }
+    @Transactional(readOnly=true)
+    public boolean hasInstitutionHistory(String institution){return institution!=null&&!institution.isBlank()&&repository.hasInstitutionHistory(institution);}
+    @Transactional(readOnly=true)
+    public boolean hasMemberHistory(UUID member){return member!=null&&repository.hasMemberHistory(member);}
 
     @Transactional
     public UUID save(OperationalReportDefinition definition, UUID templateId, boolean shared, AppUserPrincipal actor) {
