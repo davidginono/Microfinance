@@ -64,7 +64,7 @@ class GeneralLedgerPostgresTest {
         principal=service.createAccount(maker,new AccountCommand("PRINCIPAL","Loan principal control","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL",null));
         policy=UUID.randomUUID();var decisions=new EnumMap<PolicyDecision,String>(PolicyDecision.class);for(var k:PolicyDecision.values())decisions.put(k,"Synthetic approved evidence only");
         var matrix=new EnumMap<PostingEvent,PostingRule>(PostingEvent.class);for(var k:PostingEvent.values())matrix.put(k,new PostingRule(PostingPermission.ALLOWED,"Synthetic treatment"));
-        var mapping=Map.of("LOAN_PRINCIPAL",principal,"DISBURSEMENT_CLEARING",cash,"REPAYMENT_CLEARING",cash);
+        var mapping=Map.of("LOAN_PRINCIPAL",principal,"DISBURSEMENT_CLEARING",cash,"REPAYMENT_CLEARING",cash,"OWNER_CAPITAL",capital);
         var mapper=JsonMapper.builder().findAndAddModules().build();
         jdbc.update("insert into accounting_policies(id,sacco_id,policy_version,effective_from,opening_date,authoritative_ledger,decisions_json,posting_matrix_json,account_mappings_json,evidence_reference,maker_id,request_key,created_at) values(?,?,1,?,?,'LOCAL_GL',?,?,?,'Synthetic reviewer evidence',?,?,?)",policy,institution,DAY,DAY,mapper.writeValueAsString(decisions),mapper.writeValueAsString(matrix),mapper.writeValueAsString(mapping),maker.getMemberId(),UUID.randomUUID(),NOW);
         jdbc.update("insert into accounting_policy_approvals(policy_id,sacco_id,policy_version,effective_from,checker_id,decision,evidence_reference,reason,decided_at) values(?,?,1,?,?,'APPROVED','Synthetic independent review','Test evidence only',?)",policy,institution,DAY,checker.getMemberId(),NOW);
@@ -166,6 +166,19 @@ class GeneralLedgerPostgresTest {
         assertThat(service.coverage(maker).unbridgedOperationalVouchers()).isZero();
         assertThat(jdbc.queryForObject("select count(*) from loan_journal_entries where voucher_id=?",Integer.class,voucher)).isEqualTo(2);
         assertThatThrownBy(()->service.reverse(reverseMaker,j.id(),UUID.randomUUID(),DAY.plusDays(1),"Invalid GL-only reversal","Evidence")).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void sourcePostingRequiresOwningTransactionAndCannotUseGenericEndpoints() {
+        opening();var c=command("CAPITAL-SOURCE","12.01");
+        var j=tx.execute(s->service.draftSourceEvent(maker,PostingEvent.CAPITAL,c));
+        assertThatThrownBy(()->service.approve(checker,j.id(),"Generic approval")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->service.post(checker,j.id(),false)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->service.approveAndPostSourceEvent(checker,j.id(),PostingEvent.CAPITAL,c.sourceReference(),"Evidence")).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        assertThatThrownBy(()->tx.execute(s->service.approveAndPostSourceEvent(checker,j.id(),PostingEvent.EXPENSE,c.sourceReference(),"Evidence"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->tx.execute(s->{service.approveAndPostSourceEvent(checker,j.id(),PostingEvent.CAPITAL,c.sourceReference(),"Independent source review");throw new IllegalStateException("Source subledger update failed");})).isInstanceOf(IllegalStateException.class);
+        assertThat(service.journal(maker,j.id()).state()).isEqualTo("DRAFT");
+        var posted=tx.execute(s->service.approveAndPostSourceEvent(checker,j.id(),PostingEvent.CAPITAL,c.sourceReference(),"Independent source review"));
+        assertThat(posted.state()).isEqualTo("POSTED");
+        assertThat(tx.execute(s->service.approveAndPostSourceEvent(checker,j.id(),PostingEvent.CAPITAL,c.sourceReference(),"Independent source review")).id()).isEqualTo(j.id());
     }
     @Test void revokedPermissionAndMovedBranchCannotUseSessionClaims() {
         var foreign=operator("B2");var j=service.importOpening(maker,command("SCOPE","6.00"));
