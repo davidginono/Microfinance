@@ -266,7 +266,7 @@ public class LoanOfficerController {
         model.addAttribute("applicant", applicant);
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
-        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));
         model.addAttribute("myReview", myReview);
         model.addAttribute("formFields", parseFormData(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
@@ -342,8 +342,8 @@ public class LoanOfficerController {
         ExternalAccountStatusService.ExternalAccountStatusView status = externalAccountStatusService.resolve(guarantor);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("available", status.isAvailable());
-        payload.put("savingsLabel", status.getSavingsLabel());
-        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("activeExposureLabel", status.getActiveExposureLabel());
+        payload.put("riskHistoryLabel", status.getRiskHistoryLabel());
         payload.put("statusMessage", status.getStatusMessage());
         return ResponseEntity.ok(payload);
     }
@@ -760,8 +760,8 @@ public class LoanOfficerController {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("available", status.isAvailable());
         payload.put("pending", status.isPending());
-        payload.put("savingsLabel", status.getSavingsLabel());
-        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("activeExposureLabel", status.getActiveExposureLabel());
+        payload.put("riskHistoryLabel", status.getRiskHistoryLabel());
         payload.put("statusMessage", status.getStatusMessage());
         return payload;
     }

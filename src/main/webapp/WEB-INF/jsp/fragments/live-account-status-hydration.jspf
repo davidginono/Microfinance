@@ -2,6 +2,8 @@
     (() => {
         const LIVE_ACCOUNT_STATUS_TIMEOUT_MS = 10000;
         const activeRequests = new WeakMap();
+        const creditProfileUnavailable = "<spring:message code='creditProfile.unavailable' javaScriptEscape='true' />";
+        const creditProfileTimeout = "<spring:message code='creditProfile.timeout' javaScriptEscape='true' />";
 
         function setStatusBoxState(box, state, statusMessage) {
             if (!box) {
@@ -23,16 +25,16 @@
             if (!container || !payload) {
                 return;
             }
-            const savings = container.querySelector("[data-live-account-status-savings]");
-            const shares = container.querySelector("[data-live-account-status-shares]");
+            const activeExposure = container.querySelector("[data-live-account-status-active-exposure]");
+            const riskHistory = container.querySelector("[data-live-account-status-risk-history]");
             const message = container.querySelector("[data-live-account-status-message]");
             const box = container.querySelector("[data-live-account-status-box]");
 
-            if (savings) {
-                savings.textContent = payload.savingsLabel || "-";
+            if (activeExposure) {
+                activeExposure.textContent = payload.activeExposureLabel || "-";
             }
-            if (shares) {
-                shares.textContent = payload.sharesLabel || "-";
+            if (riskHistory) {
+                riskHistory.textContent = payload.riskHistoryLabel || "-";
             }
             if (message) {
                 message.textContent = payload.statusMessage || "";
@@ -44,7 +46,7 @@
             setStatusBoxState(
                 box,
                 payload.pending ? "loading" : "unavailable",
-                payload.statusMessage || "Live balances are unavailable right now."
+                payload.statusMessage || creditProfileUnavailable
             );
         }
 
@@ -98,9 +100,9 @@
                 finish({
                     available: false,
                     pending: false,
-                    savingsLabel: "-",
-                    sharesLabel: "-",
-                    statusMessage: "Live balances are taking too long to load. Try again later."
+                    activeExposureLabel: "-",
+                    riskHistoryLabel: "-",
+                    statusMessage: creditProfileTimeout
                 });
             }, LIVE_ACCOUNT_STATUS_TIMEOUT_MS);
 
@@ -114,7 +116,7 @@
                 .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
                 .then(({ ok, payload }) => {
                     if (!ok) {
-                        throw new Error((payload && payload.message) || "Live balances are unavailable right now.");
+                        throw new Error((payload && payload.message) || creditProfileUnavailable);
                     }
                     finish(payload);
                 })
@@ -125,11 +127,11 @@
                     finish({
                         available: false,
                         pending: false,
-                        savingsLabel: "-",
-                        sharesLabel: "-",
+                        activeExposureLabel: "-",
+                        riskHistoryLabel: "-",
                         statusMessage: error && error.message
                             ? error.message
-                            : "Live balances are unavailable right now."
+                            : creditProfileUnavailable
                     });
                 });
         }

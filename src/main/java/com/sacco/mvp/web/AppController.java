@@ -3583,8 +3583,8 @@ public class AppController {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("available", status.isAvailable());
         payload.put("pending", status.isPending());
-        payload.put("savingsLabel", status.getSavingsLabel());
-        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("activeExposureLabel", status.getActiveExposureLabel());
+        payload.put("riskHistoryLabel", status.getRiskHistoryLabel());
         payload.put("statusMessage", status.getStatusMessage());
         return payload;
     }
