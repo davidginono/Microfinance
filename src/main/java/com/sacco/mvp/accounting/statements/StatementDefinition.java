@@ -23,7 +23,7 @@ public record StatementDefinition(int schemaVersion, int calculationVersion, Kin
     public record Value(BigDecimal amount, String status) { }
 
     public void validate() {
-        require(schemaVersion==1 && calculationVersion==1 && kind!=null,"version");
+        require(schemaVersion==1 && kind!=null && (calculationVersion==1 || calculationVersion==2 && kind==Kind.CASH_FLOW),"version");
         text(titleEn,100);text(titleSw,100);
         require(rows!=null && !rows.isEmpty() && rows.size()<=100 && exclusions!=null && exclusions.size()<=1000,"size");
         var byId=new LinkedHashMap<String,Row>();
@@ -37,6 +37,7 @@ public record StatementDefinition(int schemaVersion, int calculationVersion, Kin
             if(row.kind()==RowKind.ACCOUNT_GROUP) {
                 require(!row.accounts().isEmpty() && row.sign()!=null && row.expression()==null && row.unit()==Unit.TZS,"line");
                 if(row.memo()) {require(row.section()==Section.NOTES,"memo");text(row.exceptionEvidence(),500);}
+                else if(kind==Kind.CASH_FLOW && calculationVersion==2 && row.exceptionEvidence()!=null)text(row.exceptionEvidence(),500);
             } else {
                 require(row.accounts().isEmpty() && row.sign()==null && !row.memo(),"line");
                 if(row.kind()==RowKind.SUBTOTAL || row.kind()==RowKind.RATIO) {
@@ -62,12 +63,13 @@ public record StatementDefinition(int schemaVersion, int calculationVersion, Kin
         validate();require(catalog!=null && catalog.size()<=1000,"size");
         var accounts=new HashMap<UUID,Account>();catalog.forEach(a->accounts.put(a.id(),a));
         for(var a:catalog){String expected=switch(a.purpose()){case "LOAN_PRINCIPAL","INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE","FIXED_ASSET","PREPAYMENT"->"ASSET";case "PAYABLE","FUNDING","TAX"->"LIABILITY";case "CAPITAL"->"EQUITY";case "INCOME"->"INCOME";case "EXPENSE"->"EXPENSE";default->null;};require(expected==null || expected.equals(a.type()),"section");}
-        var used=new HashSet<UUID>();
+        var used=new HashSet<UUID>();var placements=new HashMap<UUID,List<Row>>();
         for(var row:rows)for(UUID id:row.accounts()) {
             Account account=accounts.get(id);require(account!=null && eligible(account),"account");
-            if(!row.memo()) {require(used.add(id),"overlap");require(sectionAllows(row.section(),account.type()),"section");
+            if(!row.memo()) {var prior=placements.computeIfAbsent(id,k->new ArrayList<>());require(used.add(id) || kind==Kind.CASH_FLOW && calculationVersion==2 && prior.stream().noneMatch(r->r.section()==row.section()),"overlap");prior.add(row);require(sectionAllows(row.section(),account.type()),"section");
                 require(row.sign()==(Set.of(Section.LIABILITIES,Section.EQUITY,Section.INCOME).contains(row.section())?Sign.CREDIT_POSITIVE:Sign.DEBIT_POSITIVE),"sign");}
         }
+        for(var placement:placements.values())if(placement.size()>1){require(placement.stream().filter(r->r.exceptionEvidence()==null || r.exceptionEvidence().isBlank()).count()<=1,"cashMapping");for(var row:placement)if(row.exceptionEvidence()!=null && !row.exceptionEvidence().isBlank())text(row.exceptionEvidence(),500);require(placement.stream().allMatch(r->Set.of(Section.OPERATING,Section.INVESTING,Section.FINANCING).contains(r.section())),"cashMapping");}
         for(var x:exclusions){require(accounts.containsKey(x.account()) && eligible(accounts.get(x.account())) && used.add(x.account()),"account");}
         for(var account:catalog)if(eligible(account))require(used.contains(account.id()),"omitted");
         // Repeated memo placement is an explicit disclosure, never a subtotal operand.
@@ -98,14 +100,15 @@ public record StatementDefinition(int schemaVersion, int calculationVersion, Kin
         visiting.remove(id);cached.put(id,Set.copyOf(leaves));heights.put(id,height);return leaves;
     }
     public Map<String,Value> calculate(Map<UUID,BigDecimal> source) {
-        validate();var rowsById=new HashMap<String,Row>();rows.forEach(r->rowsById.put(r.id(),r));var values=new LinkedHashMap<String,Value>();
-        for(Row row:rows)calculate(row.id(),rowsById,source,values);return Collections.unmodifiableMap(values);
+        return calculateGroups(row->{BigDecimal amount=BigDecimal.ZERO.setScale(2);for(UUID a:row.accounts()){if(source.get(a)==null)return null;amount=amount.add(source.get(a));}return amount;});
     }
-    private static Value calculate(String id,Map<String,Row> rows,Map<UUID,BigDecimal> source,Map<String,Value> computed) {
+    /** Version 2 cash sources are resolved by approved row/activity, never duplicated account totals. */
+    public Map<String,Value> calculateCashRows(Map<String,BigDecimal> source){require(kind==Kind.CASH_FLOW && calculationVersion==2,"version");return calculateGroups(r->source.get(r.id()));}
+    private Map<String,Value> calculateGroups(java.util.function.Function<Row,BigDecimal> source){validate();var rowsById=new HashMap<String,Row>();rows.forEach(r->rowsById.put(r.id(),r));var values=new LinkedHashMap<String,Value>();for(Row row:rows)calculate(row.id(),rowsById,source,values);return Collections.unmodifiableMap(values);}
+    private static Value calculate(String id,Map<String,Row> rows,java.util.function.Function<Row,BigDecimal> source,Map<String,Value> computed) {
         if(computed.containsKey(id))return computed.get(id);Row row=rows.get(id);BigDecimal amount=null;String status="TEXT";
         if(row.kind()==RowKind.ACCOUNT_GROUP) {
-            amount=BigDecimal.ZERO.setScale(2);status="KNOWN";
-            for(UUID a:row.accounts()){if(source.get(a)==null){amount=null;status="UNAVAILABLE";break;}amount=amount.add(source.get(a));}
+            amount=source.apply(row);status=amount==null?"UNAVAILABLE":"KNOWN";
             if(amount!=null && row.sign()==Sign.CREDIT_POSITIVE)amount=amount.negate();
         } else if(row.expression()!=null) {
             var args=row.expression().lines().stream().map(ref->calculate(ref,rows,source,computed)).toList();
