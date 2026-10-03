@@ -11,7 +11,7 @@ public final class BusinessAccountingDtos {
     private BusinessAccountingDtos() {}
     public enum Kind {
         LOAN_DISBURSEMENT(PostingEvent.DISBURSEMENT), LOAN_REPAYMENT(PostingEvent.REPAYMENT),
-        LOAN_REPAYMENT_REVERSAL(PostingEvent.REPAYMENT), INTEREST_ACCRUAL(PostingEvent.INTEREST_ACCRUAL),
+        LOAN_REPAYMENT_REVERSAL(PostingEvent.REVERSAL), INTEREST_ACCRUAL(PostingEvent.INTEREST_ACCRUAL),
         LOAN_FEE(PostingEvent.FEE), UNMATCHED_RECEIPT(PostingEvent.ADVANCE), LOAN_ADVANCE(PostingEvent.ADVANCE),
         REFUND(PostingEvent.REFUND), ADVANCE_APPLICATION(PostingEvent.REPAYMENT), EARLY_SETTLEMENT(PostingEvent.SETTLEMENT),
         IMPAIRMENT(PostingEvent.PROVISION), IMPAIRMENT_RELEASE(PostingEvent.PROVISION), WRITE_OFF(PostingEvent.WRITE_OFF), RECOVERY(PostingEvent.RECOVERY),
@@ -22,7 +22,7 @@ public final class BusinessAccountingDtos {
         ASSET_PURCHASE(PostingEvent.EXPENSE), DEPRECIATION(PostingEvent.EXPENSE), ASSET_DISPOSAL(PostingEvent.EXPENSE),
         PREPAYMENT(PostingEvent.EXPENSE), PREPAYMENT_RELEASE(PostingEvent.EXPENSE), ACCRUAL(PostingEvent.EXPENSE), ACCRUAL_PAYMENT(PostingEvent.EXPENSE),
         TAX_LIABILITY(PostingEvent.EXPENSE), TAX_PAYMENT(PostingEvent.EXPENSE), INTERNAL_TRANSFER_OUT(PostingEvent.EXPENSE), INTERNAL_TRANSFER_IN(PostingEvent.EXPENSE),
-        BUSINESS_REVERSAL(PostingEvent.EXPENSE);
+        BUSINESS_REVERSAL(PostingEvent.REVERSAL);
         private final PostingEvent event;
         Kind(PostingEvent event) {this.event=event;}
         public PostingEvent event(){return event;}

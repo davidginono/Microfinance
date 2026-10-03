@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 import java.util.UUID;
+import java.time.LocalDate;
 
 /** The database-backed posting ticket is created only by the independently authorized source workflow. */
 @Service @RequiredArgsConstructor
@@ -30,6 +31,12 @@ public class BusinessAccountingGuard {
     public void reversal(UUID loan,AppUserPrincipal actor,UUID requestKey) {
         if(sources.activated(actor.getSaccoId()) && !sources.byRequest(actor.getSaccoId(),actor.getStationId(),requestKey)
             .filter(d->"POSTING".equals(d.state()) && "LOAN_REPAYMENT_REVERSAL".equals(d.command().kind().name()) && loan.equals(d.command().loanId()) && actor.getMemberId().equals(d.checkerId())).isPresent())
+            throw new IllegalArgumentException("finance.business.error.reviewedSource");
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void reversal(UUID loan,AppUserPrincipal actor,UUID requestKey,LocalDate effectiveDate,UUID originalTransaction) {
+        if(sources.activated(actor.getSaccoId()) && !sources.trustedReversal(actor.getSaccoId(),actor.getStationId(),loan,
+            actor.getMemberId(),requestKey,effectiveDate,originalTransaction))
             throw new IllegalArgumentException("finance.business.error.reviewedSource");
     }
 }

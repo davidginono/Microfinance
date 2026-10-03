@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002)?")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003)?")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BusinessAccountingPostgresTest {
     private static final LocalDate OPENING=LocalDate.of(2026,10,1), DAY=OPENING.plusDays(1);
@@ -118,6 +118,8 @@ class BusinessAccountingPostgresTest {
         service.approveAndPost(fourth,reversal.id(),"Independent correction review",true);
         assertThat(balance("OPERATING_EXPENSE")).isZero();
         assertThat(balance("SUPPLIER_PAYABLE")).isZero();
+        assertThat(books.journal(third,service.view(third,reversal.id()).journalId()).reversesId()).isEqualTo(original.journalId());
+        assertThat(books.journal(third,service.view(third,reversal.id()).journalId()).sourceType()).isEqualTo("SOURCE_REVERSAL");
         assertThat(repository.remaining(original.id())).isZero();
         assertThat(jdbc.queryForObject("select count(*) from accounting_business_control_entry where sacco_id=?",Integer.class,institution)).isEqualTo(2);
         assertThatThrownBy(()->jdbc.update("delete from accounting_business_document where id=?",original.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
@@ -141,6 +143,72 @@ class BusinessAccountingPostgresTest {
         assertThat(repository.hasMemberHistory(checker.getMemberId())).isFalse();
         service.reject(checker,d.id(),"Synthetic rejection evidence");
         assertThat(repository.hasMemberHistory(checker.getMemberId())).isTrue();
+    }
+    @Test void rejectedSubmittedSourceRetainsCancellationAndExactRetry(){
+        var d=submitted(Kind.CAPITAL_RECEIPT,"2.01",null);
+        var rejected=service.reject(checker,d.id(),"Independent source rejection");
+        assertThat(rejected.state()).isEqualTo("REJECTED");
+        assertThat(books.journal(checker,d.journalId()).state()).isEqualTo("CANCELLED");
+        assertThat(books.sourceCancellation(checker,d.journalId())).isPresent();
+        assertThat(service.reject(checker,d.id(),"Independent source rejection").id()).isEqualTo(d.id());
+        assertThatThrownBy(()->service.reject(checker,d.id(),"Changed evidence")).hasMessage("finance.business.error.retry");
+        assertThatThrownBy(()->books.approve(checker,d.journalId(),"Attempt resurrection")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("select count(*) from gl_source_cancellation where journal_id=?",Integer.class,d.journalId())).isEqualTo(1);
+        assertThat(repository.remaining(d.id())).isZero();
+    }
+    @Test void submittedSourceCannotBeRejectedInDatabaseWithoutItsJournalCancellation(){
+        var d=submitted(Kind.CAPITAL_RECEIPT,"2.01",null);
+        assertThatThrownBy(()->jdbc.update("update accounting_business_document set state='REJECTED',checker_id=?,approval_evidence='Unlinked rejection' where id=?",checker.getMemberId(),d.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(service.view(checker,d.id()).state()).isEqualTo("SUBMITTED");
+        assertThat(books.journal(checker,d.journalId()).state()).isEqualTo("DRAFT");
+    }
+    @Test void rejectionAuditFailureRollsBackSourceAndCancellationTogether(){
+        var d=submitted(Kind.CAPITAL_RECEIPT,"2.01",null);
+        doThrow(new IllegalStateException("Synthetic rejection audit failure")).when(audit).logEvent(anyString(),eq(d.id()),eq("SOURCE_REJECTED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+        assertThatThrownBy(()->service.reject(checker,d.id(),"Independent rejection")).isInstanceOf(IllegalStateException.class);
+        assertThat(service.view(checker,d.id()).state()).isEqualTo("SUBMITTED");
+        assertThat(books.journal(checker,d.journalId()).state()).isEqualTo("DRAFT");
+        assertThat(books.sourceCancellation(checker,d.journalId())).isEmpty();
+    }
+    @Test void rejectedCorrectionReleasesReservationWithoutDeletingEitherJournal(){
+        var original=posted(Kind.EXPENSE_INVOICE,"12.01",null);
+        var first=service.create(third,command(Kind.BUSINESS_REVERSAL,"12.01",original.id()));service.submit(third,first.id());
+        service.reject(fourth,first.id(),"Reject first correction evidence");
+        var replacement=service.create(third,command(Kind.BUSINESS_REVERSAL,"12.01",original.id()));service.submit(third,replacement.id());
+        var posted=service.approveAndPost(fourth,replacement.id(),"Independent replacement correction",true);
+        assertThat(books.journal(third,service.view(third,first.id()).journalId()).state()).isEqualTo("CANCELLED");
+        assertThat(books.journal(third,posted.journalId()).reversesId()).isEqualTo(original.journalId());
+        assertThat(balance("OPERATING_EXPENSE")).isZero();assertThat(balance("SUPPLIER_PAYABLE")).isZero();
+    }
+    @Test void sourceEvidenceAndAssetCountersCannotBeEditedWithoutPostedAdjustments(){
+        UUID supplier=service.supplier(maker,"Retained supplier","Synthetic identity evidence");
+        assertThatThrownBy(()->jdbc.update("delete from accounting_supplier where id=?",supplier)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("update accounting_supplier set evidence_reference='Replacement' where id=?",supplier)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        var asset=posted(Kind.ASSET_PURCHASE,"100.00",null);posted(Kind.DEPRECIATION,"20.00",asset.id());
+        assertThatThrownBy(()->jdbc.update("update accounting_fixed_asset set accumulated_depreciation=25 where id=?",asset.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("update accounting_fixed_asset set disposed=true where id=?",asset.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("delete from accounting_fixed_asset where id=?",asset.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(service.assets(maker,0).rows().getFirst().depreciation()).isEqualByComparingTo("20.00");
+    }
+    @Test void concurrentIdenticalRejectionsKeepOneCancellationAndOneSourceAudit()throws Exception{
+        var d=submitted(Kind.CAPITAL_RECEIPT,"2.01",null);
+        try(var pool=Executors.newFixedThreadPool(2)){
+            var a=pool.submit(()->service.reject(checker,d.id(),"Independent concurrent rejection"));
+            var b=pool.submit(()->service.reject(checker,d.id(),"Independent concurrent rejection"));
+            assertThat(a.get(30,TimeUnit.SECONDS).state()).isEqualTo("REJECTED");
+            assertThat(b.get(30,TimeUnit.SECONDS).state()).isEqualTo("REJECTED");
+        }
+        assertThat(jdbc.queryForObject("select count(*) from gl_source_cancellation where journal_id=?",Integer.class,d.journalId())).isEqualTo(1);
+        verify(audit,times(1)).logEvent(anyString(),eq(d.id()),eq("SOURCE_REJECTED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+    }
+    @Test void independentlyRejectedMoneyReferenceCanBeReusedByReviewedReplacement(){
+        BigDecimal openingCapital=balance("OWNER_CAPITAL");
+        var original=submitted(Kind.CAPITAL_RECEIPT,"2.01",null);service.reject(checker,original.id(),"Reject original incomplete evidence");
+        var c=original.command();var command=new Command(UUID.randomUUID(),c.kind(),c.effectiveDate(),c.amount(),c.loanId(),c.relatedDocumentId(),c.supplierId(),c.description(),c.evidenceReference(),c.channelReference(),c.moneyAccountKey(),c.destinationBranch(),c.loanNumber(),c.firstRepaymentDate(),c.frequency(),c.installmentAmount());
+        var replacement=service.create(maker,command);service.submit(maker,replacement.id());service.approveAndPost(checker,replacement.id(),"Review corrected evidence",true);
+        assertThat(books.journal(checker,original.journalId()).state()).isEqualTo("CANCELLED");
+        assertThat(balance("OWNER_CAPITAL")).isEqualByComparingTo(openingCapital.subtract(new BigDecimal("2.01")));
+        assertThat(repository.remaining(original.id())).isZero();assertThat(repository.remaining(replacement.id())).isEqualByComparingTo("2.01");
     }
     private Document submitted(Kind kind,String amount,UUID related){var d=service.create(maker,command(kind,amount,related));return service.submit(maker,d.id());}
     private Document posted(Kind kind,String amount,UUID related){var d=submitted(kind,amount,related);var p=service.approveAndPost(checker,d.id(),"Synthetic independent evidence",true);assertThat(service.approveAndPost(checker,d.id(),"Synthetic independent evidence",true).id()).isEqualTo(p.id());assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id=?",BigDecimal.class,p.journalId())).isZero();return p;}

@@ -179,6 +179,30 @@ class LoanRepaymentLedgerServiceTest {
         verify(transactions, never()).delete(any());
     }
 
+    @Test void laterApprovedCorrectionKeepsOriginalReceiptDateAndUsesItsOwnEffectiveDate(){
+        var original=original(command("100",today.minusDays(1)),"82","18");
+        rows.getFirst().setPrincipalPaid(money("82"));rows.getFirst().setInterestPaid(money("10"));rows.getLast().setInterestPaid(money("8"));
+        ledger.setPrincipalPaid(money("82"));ledger.setInterestPaid(money("18"));ledger.setNextSequence(2);
+        when(transactions.latestUnreversed(eq(loanId),any())).thenReturn(List.of(original),List.of());
+        when(allocations.findByTransactionId(eq(original.getId()),any())).thenReturn(List.of(
+            allocation(original.getId(),rows.getFirst().getId(),"82","10"),allocation(original.getId(),rows.getLast().getId(),"0","8")));
+        var checker=actor(UUID.randomUUID(),"B1",Set.of(UserClaim.LOAN_REPAYMENTS_REVERSE),true);
+        var request=UUID.randomUUID();
+        var reversed=service.reverseAt(loanId,original.getId(),checker,request,"Approved later-period correction",today);
+        assertThat(reversed.reverses()).isEqualTo(original.getId());
+        assertThat(original.getPaymentDate()).isEqualTo(today.minusDays(1));
+        verify(transactions).saveAndFlush(argThat(tx->tx.getKind()==LoanRepaymentTransaction.Kind.REVERSAL && tx.getPaymentDate().equals(today)));
+        verify(accountingGuard).reversal(loanId,checker,request,today,original.getId());
+        verify(transactions,never()).delete(any());
+    }
+    @Test void correctionCannotTakeEffectBeforeOriginalPaymentOrAfterToday(){
+        var original=original(command("100",today.minusDays(1)),"82","18");
+        when(transactions.latestUnreversed(eq(loanId),any())).thenReturn(List.of(original));
+        var checker=actor(UUID.randomUUID(),"B1",Set.of(UserClaim.LOAN_REPAYMENTS_REVERSE),true);
+        assertThatThrownBy(()->service.reverseAt(loanId,original.getId(),checker,UUID.randomUUID(),"Correction",today.minusDays(2))).hasMessage("repayment.error.date");
+        assertThatThrownBy(()->service.reverseAt(loanId,original.getId(),checker,UUID.randomUUID(),"Correction",today.plusDays(1))).hasMessage("repayment.error.date");
+        verify(transactions,never()).saveAndFlush(any());
+    }
     @Test void originalPosterCannotReverseOwnPayment() {
         LoanRepaymentTransaction original = original(command("100", today), "82", "18");
         when(transactions.latestUnreversed(eq(loanId), any())).thenReturn(List.of(original));

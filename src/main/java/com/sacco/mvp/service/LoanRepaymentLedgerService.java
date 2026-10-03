@@ -192,6 +192,12 @@ public class LoanRepaymentLedgerService {
 
     @Transactional
     public Receipt reverse(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason) {
+        return reverseAt(loanId,paymentId,actor,requestKey,reason,null);
+    }
+
+    /** An approved source correction may take effect in a later open period without rewriting the receipt. */
+    @Transactional
+    public Receipt reverseAt(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason, LocalDate effectiveDate) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_REVERSE);
         accountingGuard.reversal(loanId, actor, requestKey);
         LoanLedger ledger = lockedLedger(loanId, actor);
@@ -202,19 +208,23 @@ public class LoanRepaymentLedgerService {
         if (retry.isPresent()) {
             LoanRepaymentTransaction r = retry.get();
             require(r.getKind() == LoanRepaymentTransaction.Kind.REVERSAL && r.getLoanApplicationId().equals(loanId)
-                && paymentId.equals(r.getReversesTransactionId()) && explanation.equals(r.getReason()), "retry");
+                && paymentId.equals(r.getReversesTransactionId()) && explanation.equals(r.getReason())
+                && (effectiveDate==null || effectiveDate.equals(r.getPaymentDate())), "retry");
             return receipt(r, ledger.getLoanId(), null);
         }
         LoanRepaymentTransaction original = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
             .findFirst().filter(t -> t.getId().equals(paymentId)).orElseThrow(() -> new IllegalArgumentException("repayment.error.latest"));
         require(!original.getActorMemberId().equals(actor.getMemberId()), "checker");
+        LocalDate correctionDate=effectiveDate==null?original.getPaymentDate():effectiveDate;
+        require(!correctionDate.isBefore(original.getPaymentDate()) && !correctionDate.isAfter(clock.today()),"date");
+        accountingGuard.reversal(loanId,actor,requestKey,correctionDate,paymentId);
         LoanApplication loan = loans.findById(loanId).orElseThrow(() -> new IllegalArgumentException("repayment.error.unavailable"));
         require(Set.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID).contains(loan.getStatus()), "state");
         UUID id = UUID.randomUUID();
         LoanRepaymentTransaction reversal = LoanRepaymentTransaction.builder().id(id).loanApplicationId(loanId)
             .saccoId(ledger.getSaccoId()).stationId(ledger.getStationId()).sequence(ledger.getNextSequence())
             .receiptReference("RV-" + id).requestKey(requestKey).kind(LoanRepaymentTransaction.Kind.REVERSAL)
-            .channel(original.getChannel()).channelReference(original.getChannelReference()).paymentDate(original.getPaymentDate())
+            .channel(original.getChannel()).channelReference(original.getChannelReference()).paymentDate(correctionDate)
             .amount(original.getAmount()).principalAmount(original.getPrincipalAmount()).interestAmount(original.getInterestAmount())
             .actorMemberId(actor.getMemberId()).reversesTransactionId(paymentId).reason(explanation)
             .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).build();

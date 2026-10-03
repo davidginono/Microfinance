@@ -34,6 +34,7 @@ public class BusinessAccountingService {
     private final SaccoRegistryService institutions;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     private static final Set<String> MONEY_KEYS=Set.of("CASH","BANK","MOBILE_MONEY");
+    private static boolean isReversal(Kind kind){return kind==Kind.BUSINESS_REVERSAL || kind==Kind.LOAN_REPAYMENT_REVERSAL;}
     private record Plan(List<Line> lines,UUID root,BigDecimal delta,BigDecimal principal,BigDecimal interest,BigDecimal fees) {}
 
     @Transactional
@@ -57,7 +58,11 @@ public class BusinessAccountingService {
         if(Set.of("SUBMITTED","POSTED").contains(d.state()))return d;
         require("DRAFT".equals(d.state()),"state");
         var policy=policies.requireApprovedLocalPolicy(d.institutionId(),d.command().effectiveDate());policies.requireAllowedPosting(policy,d.command().kind().event());
-        var p=plan(actor,d,policy);var j=ledger.draftSourceEvent(actor,d.command().kind().event(),new JournalCommand(d.command().requestKey(),d.id().toString(),d.command().effectiveDate(),d.command().evidenceReference(),d.command().description(),p.lines()));
+        var p=plan(actor,d,policy);
+        var command=new JournalCommand(d.command().requestKey(),d.id().toString(),d.command().effectiveDate(),d.command().evidenceReference(),d.command().description(),p.lines());
+        var j=isReversal(d.command().kind())
+            ?ledger.draftSourceReversal(actor,related(actor,d.command(),true).journalId(),command)
+            :ledger.draftSourceEvent(actor,d.command().kind().event(),command);
         sources.submitted(d.id(),j.id(),p.principal(),p.interest(),p.fees());event(actor,d,"SOURCE_SUBMITTED");return scoped(actor,id,false);
     }
     @Transactional
@@ -69,7 +74,8 @@ public class BusinessAccountingService {
         var policy=policies.requireApprovedLocalPolicy(d.institutionId(),d.command().effectiveDate());var p=plan(actor,d,policy);
         var journal=ledger.journal(actor,d.journalId());require(sameLines(journal.lines(),p.lines()),"changedBalance");
         sources.posting(id,actor.getMemberId(),evidence);
-        ledger.approveAndPostSourceEvent(actor,d.journalId(),d.command().kind().event(),d.id().toString(),evidence);
+        if(isReversal(d.command().kind()))ledger.approveAndPostSourceReversal(actor,d.journalId(),d.id().toString(),evidence);
+        else ledger.approveAndPostSourceEvent(actor,d.journalId(),d.command().kind().event(),d.id().toString(),evidence);
         UUID loanTransaction=null;Command c=d.command();
         if(c.kind()==Kind.LOAN_REPAYMENT) {
             authorize(actor,UserClaim.LOAN_REPAYMENTS_CREATE);
@@ -80,7 +86,7 @@ public class BusinessAccountingService {
         } else if(c.kind()==Kind.LOAN_REPAYMENT_REVERSAL) {
             authorize(actor,UserClaim.LOAN_REPAYMENTS_REVERSE);
             var original=related(actor,c,true);require(original.loanTransactionId()!=null,"source");
-            loanTransaction=repayments.reverse(c.loanId(),original.loanTransactionId(),actor,c.requestKey(),c.description()).id();
+            loanTransaction=repayments.reverseAt(c.loanId(),original.loanTransactionId(),actor,c.requestKey(),c.description(),c.effectiveDate()).id();
         }
         if(p.root()!=null && p.delta().signum()!=0)sources.control(id,p.root(),d.institutionId(),d.branchId(),p.delta(),clock.now());
         if(c.kind()==Kind.ASSET_PURCHASE)sources.asset(d);
@@ -91,7 +97,12 @@ public class BusinessAccountingService {
     @Transactional
     public Document reject(AppUserPrincipal actor,UUID id,String evidence) {
         authorize(actor,UserClaim.ACCOUNTING_BUSINESS_APPROVE);text(evidence,500);var d=scoped(actor,id,true);
-        require(!d.makerId().equals(actor.getMemberId()) && Set.of("DRAFT","SUBMITTED").contains(d.state()),"checker");
+        require(!d.makerId().equals(actor.getMemberId()),"checker");
+        if("REJECTED".equals(d.state())){
+            require(actor.getMemberId().equals(d.checkerId()) && evidence.equals(d.approvalEvidence()),"retry");return d;
+        }
+        require(Set.of("DRAFT","SUBMITTED").contains(d.state()),"state");
+        if(d.journalId()!=null)ledger.cancelSourceEvent(actor,d.journalId(),d.command().kind().event(),d.id().toString(),evidence);
         sources.reject(id,actor.getMemberId(),evidence);event(actor,d,"SOURCE_REJECTED");return scoped(actor,id,false);
     }
     @Transactional(readOnly=true)

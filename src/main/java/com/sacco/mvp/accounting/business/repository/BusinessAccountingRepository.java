@@ -107,6 +107,17 @@ public class BusinessAccountingRepository {
     public boolean trustedLoanCommand(String institution,String branch,UUID loan,UUID checker,String kind,UUID requestKey,String reference,BigDecimal amount,LocalDate date) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accounting_business_document d join gl_journal j on j.id=d.journal_id where d.sacco_id=? and d.station_id=? and d.loan_id=? and d.checker_id=? and d.kind=? and d.state='POSTING' and j.state='POSTED' and (?::uuid is null or d.request_key=?::uuid) and (?::text is null or d.channel_reference=?::text) and d.amount=? and d.effective_date=?)",Boolean.class,institution,branch,loan,checker,kind,requestKey,requestKey,reference,reference,amount,date));
     }
+    public boolean trustedReversal(String institution,String branch,UUID loan,UUID checker,UUID requestKey,LocalDate date,UUID originalTransaction) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from accounting_business_document d
+                join gl_journal j on j.id=d.journal_id and j.sacco_id=d.sacco_id and j.station_id=d.station_id
+                join accounting_business_document o on o.id=d.related_document_id and o.sacco_id=d.sacco_id and o.station_id=d.station_id
+                where d.sacco_id=? and d.station_id=? and d.loan_id=? and d.checker_id=? and d.request_key=?
+                  and d.kind='LOAN_REPAYMENT_REVERSAL' and d.state='POSTING' and d.effective_date=?
+                  and j.state='POSTED' and j.source_type='SOURCE_REVERSAL' and j.reverses_id=o.journal_id
+                  and o.kind='LOAN_REPAYMENT' and o.state='POSTED' and o.loan_id=d.loan_id and o.loan_transaction_id=?)
+            """,Boolean.class,institution,branch,loan,checker,requestKey,date,originalTransaction));
+    }
     private Document document(ResultSet r,int n)throws SQLException {
         return new Document(r.getObject("id",UUID.class),r.getString("sacco_id"),r.getString("station_id"),r.getObject("maker_id",UUID.class),r.getObject("checker_id",UUID.class),mapper.readValue(r.getString("command_json"),Command.class),r.getString("state"),r.getObject("journal_id",UUID.class),r.getObject("loan_transaction_id",UUID.class),r.getString("approval_evidence"),r.getObject("created_at",OffsetDateTime.class),r.getObject("posted_at",OffsetDateTime.class),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("fees"));
     }
