@@ -1,0 +1,10 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ include file="../fragments/header.jspf" %>
+<%@ include file="../fragments/sidebar.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/statement-designer.css' />" />
+<div class="statement-designer"><h1 class="erp-page-title"><spring:message code="statement.institutionClose" /></h1><p><spring:message code="statement.institutionBoundary" /></p>
+<form class="statement-panel" method="post" action="<c:url value='/reports/statements/versions/${version.id}/finalize-institution' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><div class="statement-fields">
+<label><spring:message code="statement.closePeriod" /><select name="period" required><option value=""><spring:message code="statement.select" /></option><c:forEach items="${institutionPeriods.rows}" var="p"><c:if test="${p.state eq 'CLOSED'}"><option value="${p.id}"><c:out value="${p.from}" /> — <c:out value="${p.through}" /></option></c:if></c:forEach></select></label>
+<c:if test="${version.definition.comparison}"><label><spring:message code="statement.comparisonClose" /><select name="comparisonPeriod" required><option value=""><spring:message code="statement.select" /></option><c:forEach items="${institutionPeriods.rows}" var="p"><c:if test="${p.state eq 'CLOSED'}"><option value="${p.id}"><c:out value="${p.from}" /> — <c:out value="${p.through}" /></option></c:if></c:forEach></select></label></c:if>
+<label><spring:message code="statement.priorResult" /><input name="priorResult" /></label><button class="app-btn btn-primary"><spring:message code="statement.finalize" /></button></div></form><div class="statement-actions"><c:if test="${page gt 0}"><a class="app-btn btn-neutral" href="?page=${page-1}"><spring:message code="statement.previous" /></a></c:if><c:if test="${institutionPeriods.hasNext}"><a class="app-btn btn-neutral" href="?page=${page+1}"><spring:message code="statement.next" /></a></c:if></div></div><%@ include file="../fragments/footer.jspf" %>
