@@ -69,6 +69,34 @@ class LedgerReportServiceTest {
         assertThatThrownBy(()->service.trialBalance(actor,parameters,false)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(repository,policies);
     }
+    @Test void exportsRequireFreshSeparatePermissionBeforeReadingBooks() {
+        assertThatThrownBy(()->service.exportTrialBalance(actor,parameters,false)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.exportAccountActivity(actor,UUID.randomUUID(),parameters,false)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(repository,policies);
+    }
+    @Test void closingLeafDoesNotGrantFinancialRegistryAccessAndGlobalProofNeedsExplicitClaim() {
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.ACCOUNTING_CLOSING_APPROVE));
+        assertThat(service.authorizeClosingProof(actor,"I1","B1",false).branch()).isEqualTo("B1");
+        assertThatThrownBy(()->service.trialBalance(actor,parameters,false)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.authorizeClosingProof(actor,"I1","B1",true)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.authorizeClosingProof(actor,"I1","B2",false)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.ACCOUNTING_CLOSING_APPROVE,UserClaim.ACCOUNTING_CLOSING_INSTITUTION));
+        when(institutions.findStation("I1","B2")).thenReturn(Optional.of(SaccoStation.builder().saccoId("I1").stationId("B2").active(false).build()));
+        assertThat(service.authorizeClosingProof(actor,"I1","B2",true).branch()).isEqualTo("B2");
+        assertThatThrownBy(()->service.authorizeClosingProof(actor,"I2","B2",true)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(repository,policies);
+    }
+    @Test void institutionPermissionDoesNotGrantForeignJournalActivityOrExport() {
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.FINANCIAL_REPORTS_INSTITUTION,UserClaim.FINANCIAL_REPORTS_EXPORT));
+        assertThatThrownBy(()->service.accountActivity(actor,UUID.randomUUID(),parameters,true)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.exportAccountActivity(actor,UUID.randomUUID(),parameters,true)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(repository,policies);
+    }
+    @Test void latestHistoricalExternalLedgerPolicyCannotFallBackToOldLocalPolicy() {
+        when(repository.policyAt(any(),eq(parameters))).thenReturn(Optional.of(new LedgerReportRepository.PolicyLineage(UUID.randomUUID(),2,day.minusDays(1),"EXTERNAL_GL")));
+        assertThatThrownBy(()->service.trialBalance(actor,parameters,false)).hasMessage("financial.report.error.policyCutoff");
+        verify(repository).policyAt(any(),eq(parameters));verifyNoMoreInteractions(repository);verifyNoInteractions(policies);
+    }
     @Test void allocationCreateAndApproveHaveIndependentFreshClaims() {
         assertThatThrownBy(()->service.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_CREATE)).isInstanceOf(AccessDeniedException.class);
         when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.ACCOUNTING_CASH_FLOW_CREATE));

@@ -47,6 +47,30 @@ public class CashFlowAllocationRepository {
         String marks=String.join(",",Collections.nCopies(journals.size(),"?"));var args=new ArrayList<Object>(List.of(institution,branch,cutoff,cutoff));args.addAll(journals);
         return Objects.equals(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=? and station_id=? and state='POSTED' and source_type<>'OPENING' and recorded_at<=? and posted_at<=? and id in ("+marks+")",Long.class,args.toArray()),(long)journals.size());
     }
+    public List<UUID> qualifying(String institution,String branch,java.time.LocalDate from,java.time.LocalDate through,OffsetDateTime cutoff) {
+        return jdbc.query("""
+            select j.id from gl_journal j join gl_journal_line l on l.journal_id=j.id
+            join gl_account a on (a.id,a.sacco_id)=(l.account_id,l.sacco_id)
+            where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.source_type<>'OPENING'
+              and j.effective_date between ? and ? and j.posted_at<=? and j.recorded_at<=?
+            group by j.id having count(*) filter(where a.purpose in('CASH','BANK','MOBILE_MONEY'))>0
+              and (count(*) filter(where a.purpose not in('CASH','BANK','MOBILE_MONEY'))>1
+                or count(*) filter(where a.purpose in('CASH','BANK','MOBILE_MONEY'))>1
+                  and count(*) filter(where a.purpose not in('CASH','BANK','MOBILE_MONEY'))>0)
+            order by j.id limit 1001
+            """,(r,n)->r.getObject("id",UUID.class),institution,branch,from,through,cutoff,cutoff);
+    }
+    /** One bounded batch verifies retained source records against their actual immutable posted journals. */
+    public Map<UUID,Source> sources(String institution,String branch,OffsetDateTime cutoff,List<UUID> journals) {
+        if(journals.isEmpty())return Map.of();String marks=String.join(",",Collections.nCopies(journals.size(),"?"));
+        var args=new ArrayList<Object>(List.of(institution,branch,cutoff,cutoff));args.addAll(journals);
+        var header=jdbc.queryForList("select id,policy_id,policy_version,source_reference from gl_journal where sacco_id=? and station_id=? and state='POSTED' and source_type<>'OPENING' and recorded_at<=? and posted_at<=? and id in ("+marks+") order by id",args.toArray());
+        if(header.size()!=journals.size())throw new AccessDeniedException("Posted sources unavailable");
+        var lineArgs=new ArrayList<Object>(List.of(institution,branch));lineArgs.addAll(journals);
+        var lines=jdbc.query("select l.journal_id,l.id,l.account_id,a.code,a.type,a.purpose,l.debit-l.credit amount from gl_journal_line l join gl_account a on (a.id,a.sacco_id)=(l.account_id,l.sacco_id) where l.sacco_id=? and l.station_id=? and l.journal_id in ("+marks+") order by l.journal_id,l.id limit 10001",(r,n)->Map.entry(r.getObject("journal_id",UUID.class),new SourceLine(r.getObject("id",UUID.class),r.getObject("account_id",UUID.class),r.getString("code"),r.getString("type"),r.getString("purpose"),r.getBigDecimal("amount"))),lineArgs.toArray());
+        require(lines.size()<=10000,"size");var grouped=new HashMap<UUID,List<SourceLine>>();lines.forEach(e->grouped.computeIfAbsent(e.getKey(),k->new ArrayList<>()).add(e.getValue()));
+        var result=new LinkedHashMap<UUID,Source>();for(var h:header){UUID id=(UUID)h.get("id");result.put(id,new Source(id,(UUID)h.get("policy_id"),(Integer)h.get("policy_version"),h.get("source_reference").toString(),grouped.getOrDefault(id,List.of())));}return Map.copyOf(result);
+    }
     public List<Version> list(String institution,String branch,int page){return query("a.sacco_id=? and a.station_id=? order by a.made_at desc,a.id limit 26 offset ?",institution,branch,page*25);}
     public boolean hasInstitutionHistory(String institution){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from cash_flow_allocations where sacco_id=?)",Boolean.class,institution));}
     public boolean hasMemberHistory(UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from cash_flow_allocations where made_by=?) or exists(select 1 from cash_flow_allocation_reviews where checker_id=?)",Boolean.class,id,id));}

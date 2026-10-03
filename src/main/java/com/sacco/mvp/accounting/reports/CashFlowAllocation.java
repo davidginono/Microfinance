@@ -32,7 +32,7 @@ public final class CashFlowAllocation {
         require(splits!=null && !splits.isEmpty() && splits.size()<=400,"size");
         var lines=new HashMap<UUID,SourceLine>();source.lines().forEach(l->require(lines.put(l.id(),l)==null,"source"));
         var accountLines=new HashMap<UUID,List<SourceLine>>();source.lines().forEach(l->accountLines.computeIfAbsent(l.accountId(),k->new ArrayList<>()).add(l));
-        var sums=new HashMap<UUID,BigDecimal>();var nonmoneyAssigned=new HashMap<UUID,BigDecimal>();
+        var sums=new HashMap<UUID,BigDecimal>();var positiveAssigned=new HashMap<UUID,BigDecimal>();var negativeAssigned=new HashMap<UUID,BigDecimal>();var internalByAccount=new HashMap<UUID,BigDecimal>();
         BigDecimal transfers=BigDecimal.ZERO;var unique=new HashSet<String>();
         for(Split s:splits) {
             require(s!=null && s.moneyLineId()!=null && s.counterpartAccountId()!=null && s.activity()!=null,"source");
@@ -45,16 +45,24 @@ public final class CashFlowAllocation {
             require(counterparts.stream().anyMatch(l->l.signedAmount().signum()==-amount.signum()),"counterpart");
             require(unique.add(s.moneyLineId()+"/"+s.counterpartAccountId()+"/"+s.activity()),"duplicate");
             sums.merge(s.moneyLineId(),amount,BigDecimal::add);
-            if(targetMoney)transfers=transfers.add(amount);else nonmoneyAssigned.merge(s.counterpartAccountId(),amount.negate(),BigDecimal::add);
+            (amount.signum()<0?positiveAssigned:negativeAssigned).merge(s.counterpartAccountId(),amount.abs(),BigDecimal::add);
+            if(targetMoney){transfers=transfers.add(amount);internalByAccount.merge(money.accountId(),amount,BigDecimal::add);}
         }
         for(SourceLine l:source.lines())if(l.money())require(sums.getOrDefault(l.id(),BigDecimal.ZERO).compareTo(l.signedAmount())==0,"lineTotal");
         require(transfers.signum()==0,"transfer");
+        // Validate all gross capacities before checking paired transfers, independent of UUID iteration order.
+        for(var e:accountLines.entrySet()) {
+            var positive=e.getValue().stream().map(SourceLine::signedAmount).filter(a->a.signum()>0).reduce(BigDecimal.ZERO,BigDecimal::add);
+            var negative=e.getValue().stream().map(SourceLine::signedAmount).filter(a->a.signum()<0).map(BigDecimal::abs).reduce(BigDecimal.ZERO,BigDecimal::add);
+            require(positiveAssigned.getOrDefault(e.getKey(),BigDecimal.ZERO).compareTo(positive)<=0 && negativeAssigned.getOrDefault(e.getKey(),BigDecimal.ZERO).compareTo(negative)<=0,"counterpartTotal");
+        }
         boolean residual=false;
-        for(var e:accountLines.entrySet())if(e.getValue().stream().noneMatch(SourceLine::money)) {
-            BigDecimal posted=e.getValue().stream().map(SourceLine::signedAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
-            BigDecimal assigned=nonmoneyAssigned.getOrDefault(e.getKey(),BigDecimal.ZERO);
-            require(assigned.signum()==0 || assigned.signum()==posted.signum() && assigned.abs().compareTo(posted.abs())<=0,"counterpartTotal");
-            residual|=assigned.compareTo(posted)!=0;
+        for(var e:accountLines.entrySet()) {
+            BigDecimal positive=e.getValue().stream().map(SourceLine::signedAmount).filter(a->a.signum()>0).reduce(BigDecimal.ZERO,BigDecimal::add);
+            BigDecimal negative=e.getValue().stream().map(SourceLine::signedAmount).filter(a->a.signum()<0).map(BigDecimal::abs).reduce(BigDecimal.ZERO,BigDecimal::add);
+            BigDecimal assignedPositive=positiveAssigned.getOrDefault(e.getKey(),BigDecimal.ZERO),assignedNegative=negativeAssigned.getOrDefault(e.getKey(),BigDecimal.ZERO);
+            if(e.getValue().stream().allMatch(SourceLine::money))require(internalByAccount.getOrDefault(e.getKey(),BigDecimal.ZERO).compareTo(assignedPositive.subtract(assignedNegative))==0,"transfer");
+            else residual|=assignedPositive.compareTo(positive)!=0 || assignedNegative.compareTo(negative)!=0;
         }
         require(!residual || noncashEvidence!=null && !noncashEvidence.isBlank(),"noncashEvidence");
     }

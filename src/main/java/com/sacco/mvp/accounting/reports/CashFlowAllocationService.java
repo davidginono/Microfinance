@@ -24,7 +24,7 @@ public class CashFlowAllocationService {
     @Transactional(timeout=20) public UUID draft(AppUserPrincipal actor,UUID journal,UUID request,List<Split> splits,String evidence,String noncashEvidence) {
         var scope=reports.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_CREATE);text(evidence,true);text(noncashEvidence,false);require(journal!=null && request!=null,"source");
         repository.lockSource(scope.institution(),scope.branch(),journal);Source source=repository.source(scope.institution(),scope.branch(),journal);validate(source,splits,noncashEvidence);
-        splits=splits.stream().sorted(Comparator.comparing(Split::moneyLineId).thenComparing(Split::counterpartAccountId).thenComparing(Split::activity)).toList();
+        splits=splits.stream().map(s->new Split(s.moneyLineId(),s.counterpartAccountId(),s.activity(),s.signedAmount().setScale(2,java.math.RoundingMode.UNNECESSARY))).sorted(Comparator.comparing(Split::moneyLineId).thenComparing(Split::counterpartAccountId).thenComparing(Split::activity)).toList();
         String sourceHash=hash(mapper.writeValueAsString(source)),definitionHash=hash(mapper.writeValueAsString(splits));var prior=repository.retry(scope.institution(),scope.branch(),request);
         if(prior.isPresent()){var p=prior.get();require(p.maker().equals(actor.getMemberId()) && p.journalId().equals(journal) && p.sourceChecksum().equals(sourceHash) && p.definitionChecksum().equals(definitionHash) && p.evidence().equals(evidence) && Objects.equals(p.noncashEvidence(),noncashEvidence),"changedRetry");return p.id();}
         UUID id=repository.save(scope.institution(),scope.branch(),request,actor.getMemberId(),clock.now(),evidence,noncashEvidence,source,splits,sourceHash,definitionHash);event(actor,id,"DRAFTED");return id;
@@ -40,11 +40,37 @@ public class CashFlowAllocationService {
     /** Caller freezes these actual versions in its own close snapshot. Missing review is explicit coverage. */
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
     public Coverage reviewedAllocations(AppUserPrincipal actor,List<UUID> journals,OffsetDateTime cutoff) {
-        var scope=reports.authorizeAllocation(actor,null);require(journals!=null && journals.size()<=1000 && journals.stream().allMatch(Objects::nonNull) && cutoff!=null && !cutoff.isAfter(clock.now()),"size");
+        return reviewed(reports.authorizeAllocation(actor,null),journals,cutoff);
+    }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
+    public Coverage reviewedForClosing(AppUserPrincipal actor,List<UUID> journals,OffsetDateTime cutoff) {
+        return canonical(reviewed(reports.authorizeClosingProof(actor,actor==null?null:actor.getSaccoId(),actor==null?null:actor.getStationId(),false),journals,cutoff));
+    }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
+    public boolean currentForInstitutionClosingProof(AppUserPrincipal actor,String institution,String branch,java.time.LocalDate from,java.time.LocalDate through,OffsetDateTime recordedCutoff,Coverage frozen) {
+        var scope=reports.authorizeClosingProof(actor,institution,branch,true);
+        if(from==null || through==null || through.isBefore(from) || through.isAfter(from.plusDays(366)) || through.isAfter(clock.today()) || recordedCutoff==null || recordedCutoff.isAfter(clock.now()) || frozen==null)return false;
+        var now=clock.now();var ids=repository.qualifying(institution,branch,from,through,now);if(ids.size()>1000)return false;
+        return canonical(reviewed(scope,ids,now)).equals(canonical(frozen));
+    }
+    private Coverage reviewed(LedgerReportService.Scope scope,List<UUID> journals,OffsetDateTime cutoff) {
+        require(journals!=null && journals.size()<=1000 && journals.stream().allMatch(Objects::nonNull) && cutoff!=null && !cutoff.isAfter(clock.now()),"size");
         var ids=journals.stream().distinct().sorted().toList();if(!repository.allSourcesAvailable(scope.institution(),scope.branch(),cutoff,ids))throw new org.springframework.security.access.AccessDeniedException("Posted cash flow sources outside cutoff or scope");
-        var versions=repository.approved(scope.institution(),scope.branch(),cutoff,ids);versions.forEach(this::verify);var covered=new HashSet<UUID>();versions.forEach(v->covered.add(v.journalId()));
+        var versions=repository.approved(scope.institution(),scope.branch(),cutoff,ids);versions.forEach(this::verify);
+        var actual=repository.sources(scope.institution(),scope.branch(),cutoff,versions.stream().map(Version::journalId).toList());
+        versions.forEach(v->require(hash(mapper.writeValueAsString(actual.get(v.journalId()))).equals(v.sourceChecksum()),"source"));
+        var covered=new HashSet<UUID>();versions.forEach(v->covered.add(v.journalId()));
         return new Coverage(versions,ids.stream().filter(id->!covered.contains(id)).toList());
     }
+    private static Coverage canonical(Coverage proof) {
+        require(proof.versions().size()<=1000 && proof.missingJournalIds().size()<=1000,"size");
+        long count=proof.versions().stream().mapToLong(v->(long)v.source().lines().size()+v.splits().size()).sum();require(count<=10000,"size");
+        var versions=proof.versions().stream().map(v->new Version(v.id(),v.journalId(),v.version(),v.maker(),utc(v.madeAt()),v.evidence(),v.noncashEvidence(),v.sourceChecksum(),v.definitionChecksum(),
+            new Source(v.source().journalId(),v.source().policyId(),v.source().policyVersion(),v.source().sourceReference(),v.source().lines().stream().map(l->new SourceLine(l.id(),l.accountId(),l.code(),l.type(),l.purpose(),l.signedAmount().setScale(2))).sorted(Comparator.comparing(l->l.id().toString())).toList()),
+            v.splits().stream().map(s->new Split(s.moneyLineId(),s.counterpartAccountId(),s.activity(),s.signedAmount().setScale(2))).sorted(Comparator.comparing(s->s.moneyLineId()+"/"+s.counterpartAccountId()+"/"+s.activity())).toList(),v.checker(),utc(v.reviewedAt()),v.reviewEvidence())).sorted(Comparator.comparing(v->v.journalId().toString())).toList();
+        return new Coverage(versions,proof.missingJournalIds().stream().sorted(Comparator.comparing(UUID::toString)).toList());
+    }
+    private static OffsetDateTime utc(OffsetDateTime time){return time==null?null:time.withOffsetSameInstant(java.time.ZoneOffset.UTC);}
     @Transactional(readOnly=true) public boolean hasInstitutionHistory(String id){return id!=null && repository.hasInstitutionHistory(id);}
     @Transactional(readOnly=true) public boolean hasMemberHistory(UUID id){return id!=null && repository.hasMemberHistory(id);}
     private void verify(Version v){require(hash(mapper.writeValueAsString(v.source())).equals(v.sourceChecksum()) && hash(mapper.writeValueAsString(v.splits())).equals(v.definitionChecksum()),"checksum");validate(v.source(),v.splits(),v.noncashEvidence());}

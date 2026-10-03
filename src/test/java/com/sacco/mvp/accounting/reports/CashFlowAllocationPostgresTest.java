@@ -28,10 +28,10 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_E_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_e_(test|cash_test)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_E_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_e_(test|cash_test|test_reviewed_20261003_v2)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CashFlowAllocationPostgresTest {
-    JdbcTemplate jdbc;DataSourceTransactionManager manager;GeneralLedgerService ledger;CashFlowAllocationService service;
+    JdbcTemplate jdbc;DataSourceTransactionManager manager;GeneralLedgerService ledger;CashFlowAllocationService service;LedgerReportService ledgerReports;
     CashFlowAllocationRepository allocations;AccountingPolicyService policies;MemberDirectoryService members;UserClaimService claims;SaccoRegistryService institutions;AuditService audit;
     ApplicationClock clock;String institution;AppUserPrincipal maker,checker;UUID cash,capital,income,funding,journal;Source source;
     static final LocalDate DAY=LocalDate.of(2026,10,1);
@@ -42,6 +42,7 @@ class CashFlowAllocationPostgresTest {
         when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenAnswer(i->OffsetDateTime.now());var mapper=JsonMapper.builder().findAndAddModules().build();
         ledger=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,members,institutions));
         var reports=new LedgerReportService(new LedgerReportRepository(new NamedParameterJdbcTemplate(jdbc)),policies,members,claims,institutions,clock);
+        ledgerReports=proxy(reports);
         allocations=new CashFlowAllocationRepository(jdbc,mapper);service=proxy(new CashFlowAllocationService(allocations,reports,clock,audit,mapper));
     }
     @SuppressWarnings("unchecked") private <T>T proxy(T object){var p=new ProxyFactory(object);p.setProxyTargetClass(true);p.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));return (T)p.getProxy();}
@@ -71,4 +72,44 @@ class CashFlowAllocationPostgresTest {
     @Test void failedAuditRollsBackDraft(){doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).log(eq("ACCOUNTING_CASH_FLOW"),any(),eq("DRAFTED"),any(),isNull(),anyMap());assertThatThrownBy(()->draft(UUID.randomUUID())).hasMessage("Synthetic audit failure");assertThat(service.versions(maker,0)).isEmpty();}
     @Test void concurrentDuplicateDraftsHaveOneImmutableVersion()throws Exception{UUID request=UUID.randomUUID();var pool=Executors.newFixedThreadPool(2);try{var latch=new CountDownLatch(1);Callable<UUID> command=()->{latch.await();return draft(request);};var a=pool.submit(command);var b=pool.submit(command);latch.countDown();assertThat(a.get(15,TimeUnit.SECONDS)).isEqualTo(b.get(15,TimeUnit.SECONDS));assertThat(service.versions(maker,0)).hasSize(1);}finally{pool.shutdownNow();}}
     @Test void newerApprovedVersionDoesNotRewriteArchivedCutoff(){UUID first=draft(UUID.randomUUID());service.approve(checker,first,"First classification");var cutoff=OffsetDateTime.now();UUID second=draft(UUID.randomUUID());service.approve(checker,second,"Revised reviewed classification");assertThat(service.reviewedAllocations(maker,List.of(journal),cutoff).versions().getFirst().id()).isEqualTo(first);assertThat(service.reviewedAllocations(maker,List.of(journal),OffsetDateTime.now()).versions().getFirst().id()).isEqualTo(second);}
+    @Test void postedBookExportsReadEntireBoundedSourceAndPreserveCutoff(){
+        for(int i=0;i<30;i++){account("EXTRA"+i,"ASSET","DEBIT","OTHER");var j=ledger.draftManual(maker,new JournalCommand(UUID.randomUUID(),"EXPORT-"+i,DAY.plusDays(1),"Synthetic source",null,List.of(new Line(cash,new BigDecimal("0.01"),BigDecimal.ZERO),new Line(income,BigDecimal.ZERO,new BigDecimal("0.01")))));ledger.approve(checker,j.id(),"Independent export fixture");ledger.post(checker,j.id(),false);}
+        var cutoff=OffsetDateTime.now();var p=new LedgerReportService.Parameters(DAY,DAY.plusDays(1),cutoff,0);
+        assertThat(ledgerReports.trialBalance(maker,p,false).accounts()).hasSize(25);assertThat(ledgerReports.trialBalance(maker,p,false).hasNext()).isTrue();
+        var trial=ledgerReports.exportTrialBalance(maker,p,false);assertThat(trial.accounts()).hasSize(34);assertThat(trial.hasNext()).isFalse();assertThat(trial.totals().movementDebit()).isEqualByComparingTo(trial.totals().movementCredit());
+        assertThat(ledgerReports.accountActivity(maker,cash,p,false).movements()).hasSize(25);var full=ledgerReports.exportAccountActivity(maker,cash,p,false);assertThat(full.activity().movements()).hasSize(31);assertThat(full.activity().closing()).isEqualByComparingTo("1100.31");assertThat(full.policyVersion()).isEqualTo(1);
+        var late=ledger.draftManual(maker,new JournalCommand(UUID.randomUUID(),"LATER-EXPORT",DAY.plusDays(1),"Synthetic later source",null,List.of(new Line(cash,new BigDecimal("0.01"),BigDecimal.ZERO),new Line(income,BigDecimal.ZERO,new BigDecimal("0.01")))));ledger.approve(checker,late.id(),"Independent later fixture");ledger.post(checker,late.id(),false);
+        assertThat(ledgerReports.exportAccountActivity(maker,cash,p,false).activity().movements()).hasSize(31);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW));assertThatThrownBy(()->ledgerReports.exportTrialBalance(maker,p,false)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void laterPolicyApprovalPreservesHistoricalReportLineageAndActivityStaysInBranch() {
+        var cutoff=OffsetDateTime.now();var oldParameters=new LedgerReportService.Parameters(DAY,DAY.plusDays(1),cutoff,0);
+        var old=ledgerReports.exportTrialBalance(maker,oldParameters,false);UUID second=UUID.randomUUID();
+        jdbc.update("insert into accounting_policies(id,sacco_id,policy_version,effective_from,opening_date,authoritative_ledger,decisions_json,posting_matrix_json,account_mappings_json,evidence_reference,maker_id,request_key,created_at) select ?,sacco_id,2,effective_from+1,opening_date,authoritative_ledger,decisions_json,posting_matrix_json,account_mappings_json,'Synthetic later policy',maker_id,?,now() from accounting_policies where id=?",second,UUID.randomUUID(),old.policyId());
+        jdbc.update("insert into accounting_policy_approvals(policy_id,sacco_id,policy_version,effective_from,checker_id,decision,evidence_reference,reason,decided_at) values(?,?,2,?,?,'APPROVED','Synthetic later approval','Synthetic only',now())",second,institution,DAY.plusDays(1),checker.getMemberId());
+        assertThat(ledgerReports.exportTrialBalance(maker,oldParameters,false).policyId()).isEqualTo(old.policyId());
+        assertThat(ledgerReports.trialBalance(maker,new LedgerReportService.Parameters(DAY,DAY.plusDays(1),OffsetDateTime.now(),0),false).policyId()).isEqualTo(second);
+        assertThatThrownBy(()->ledgerReports.accountActivity(maker,cash,oldParameters,true)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->ledgerReports.exportAccountActivity(maker,cash,oldParameters,true)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of());
+        assertThatThrownBy(()->ledgerReports.exportTrialBalance(maker,oldParameters,false)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void realLeafAllowsClosingProofWithoutReportRegistryAccess(){UUID id=draft(UUID.randomUUID());service.approve(checker,id,"Independent classification");var adapter=new CashFlowClosingAdapter(service);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.ACCOUNTING_CLOSING_APPROVE));
+        var proof=adapter.reviewedAllocations(maker,List.of(journal),OffsetDateTime.now());assertThat(proof.missingJournalIds()).isEmpty();assertThat(proof.versions()).singleElement().satisfies(v->{assertThat(v.id()).isEqualTo(id);assertThat(v.splits()).extracting(com.sacco.mvp.accounting.reconciliation.CashFlowReconciliationSource.Split::activity).containsExactlyInAnyOrder("OPERATING","FINANCING");});
+        assertThatThrownBy(()->service.source(maker,journal)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of());assertThatThrownBy(()->adapter.reviewedAllocations(maker,List.of(journal),OffsetDateTime.now())).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void institutionProofValidatesForeignBranchWithoutForeignPrincipalOrRegistryAccess(){
+        jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at,access_status,otp_requirement_mode,user_otp_selection_policy) values(?,?,'B2',true,now(),now(),'ACTIVE','APPROVAL_ONLY','NONE')",UUID.randomUUID(),institution);
+        when(institutions.findStation(institution,"B2")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B2").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
+        var b2maker=operator(institution,"B2");var b2checker=operator(institution,"B2");var opening=ledger.importOpening(b2maker,new JournalCommand(UUID.randomUUID(),"B2-OPENING",DAY,"Synthetic B2 opening",null,List.of(new Line(cash,new BigDecimal("1000.00"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("1000.00")))));ledger.approve(b2checker,opening.id(),"Independent B2 opening");ledger.post(b2checker,opening.id(),true);
+        var j=ledger.draftManual(b2maker,new JournalCommand(UUID.randomUUID(),"B2-COMPOUND",DAY.plusDays(1),"Synthetic B2 source",null,List.of(new Line(cash,new BigDecimal("100.01"),BigDecimal.ZERO),new Line(income,BigDecimal.ZERO,new BigDecimal("30.01")),new Line(funding,BigDecimal.ZERO,new BigDecimal("70.00")))));ledger.approve(b2checker,j.id(),"B2 source review");ledger.post(b2checker,j.id(),false);
+        UUID line=service.source(b2maker,j.id()).lines().stream().filter(SourceLine::money).findFirst().orElseThrow().id();var allocation=List.of(new Split(line,income,Activity.OPERATING,new BigDecimal("30.010")),new Split(line,funding,Activity.FINANCING,new BigDecimal("70")));UUID id=service.draft(b2maker,j.id(),UUID.randomUUID(),allocation,"B2 classification",null);service.approve(b2checker,id,"Independent B2 classification");var adapter=new CashFlowClosingAdapter(service);var cutoff=OffsetDateTime.now();var frozen=adapter.reviewedAllocations(b2maker,List.of(j.id()),cutoff);
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.ACCOUNTING_CLOSING_APPROVE,UserClaim.ACCOUNTING_CLOSING_INSTITUTION));
+        assertThat(adapter.allocationCoverageCurrentForInstitutionClose(maker,institution,"B2",DAY,DAY.plusDays(1),cutoff,frozen)).isTrue();
+        assertThatThrownBy(()->adapter.reviewedAllocations(maker,List.of(j.id()),cutoff)).isInstanceOf(AccessDeniedException.class);assertThatThrownBy(()->service.source(maker,j.id())).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.ACCOUNTING_CLOSING_APPROVE));assertThatThrownBy(()->adapter.allocationCoverageCurrentForInstitutionClose(maker,institution,"B2",DAY,DAY.plusDays(1),cutoff,frozen)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.ACCOUNTING_CLOSING_APPROVE,UserClaim.ACCOUNTING_CLOSING_INSTITUTION));UUID next=service.draft(b2maker,j.id(),UUID.randomUUID(),allocation,"New retained classification",null);service.approve(b2checker,next,"New independent B2 classification");assertThat(adapter.allocationCoverageCurrentForInstitutionClose(maker,institution,"B2",DAY,DAY.plusDays(1),cutoff,frozen)).isFalse();assertThat(frozen.versions().getFirst().id()).isEqualTo(id);
+    }
 }

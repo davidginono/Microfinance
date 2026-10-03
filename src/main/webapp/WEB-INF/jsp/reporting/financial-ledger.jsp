@@ -17,12 +17,20 @@
       <label><spring:message code="financial.report.from" /><input type="date" name="from" class="aws-control" value="<c:out value='${parameters.from}' />" required /></label>
       <label><spring:message code="financial.report.through" /><input type="date" name="through" class="aws-control" value="<c:out value='${parameters.through}' />" required /></label>
       <label><spring:message code="financial.report.recordedThrough" /><input type="datetime-local" step="1" name="recordedThrough" class="aws-control" value="<c:out value='${cutoffInput}' />" required /><span><c:out value="${reportZone}" /></span></label>
-      <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_INSTITUTION')"><label><spring:message code="financial.report.scope" /><select name="institutionWide" class="aws-control"><option value="false" ${not scope.institutionWide ? 'selected' : ''}><spring:message code="financial.report.branch" /></option><option value="true" ${scope.institutionWide ? 'selected' : ''}><spring:message code="financial.report.institution" /></option></select></label></sec:authorize>
+      <c:if test="${not activityMode}"><sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_INSTITUTION')"><label><spring:message code="financial.report.scope" /><select name="institutionWide" class="aws-control"><option value="false" ${not scope.institutionWide ? 'selected' : ''}><spring:message code="financial.report.branch" /></option><option value="true" ${scope.institutionWide ? 'selected' : ''}><spring:message code="financial.report.institution" /></option></select></label></sec:authorize></c:if>
     </div>
     <button class="app-btn btn-primary" type="submit"><spring:message code="financial.report.run" /></button>
   </form>
   <c:if test="${not empty reportError}"><p role="alert"><spring:message code="${reportError}" /></p></c:if>
   <c:if test="${not empty coverage}">
+    <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')">
+      <form class="accounting-actions" method="get" action="<c:url value='${reportRoute}/export' />">
+        <input type="hidden" name="from" value="<c:out value='${parameters.from}' />" /><input type="hidden" name="through" value="<c:out value='${parameters.through}' />" />
+        <input type="hidden" name="recordedThrough" value="<c:out value='${cutoffInput}' />" /><input type="hidden" name="institutionWide" value="<c:out value='${scope.institutionWide}' />" />
+        <label><spring:message code="financial.export.format" /><select class="aws-control" name="format"><option value="CSV">CSV</option><option value="XLSX">XLSX</option><option value="PDF">PDF</option></select></label>
+        <button class="app-btn btn-neutral" type="submit" data-download-action="true"><spring:message code="financial.export.download" /></button>
+      </form>
+    </sec:authorize>
     <div class="financial-context"><span><spring:message code="financial.report.draft" /></span><span><spring:message code="financial.report.currency" /></span><span><spring:message code="${scope.institutionWide ? 'financial.report.institution' : 'financial.report.branch'}" /></span></div>
     <c:choose><c:when test="${coverage.complete()}"><p role="status"><spring:message code="financial.report.coverageReviewed" /></p></c:when><c:otherwise><p role="status"><spring:message code="financial.report.coverageIncomplete" /> <spring:message code="financial.report.missingOpenings" />: <c:out value="${coverage.missingOpenings}" />; <spring:message code="financial.report.unbridged" />: <c:out value="${coverage.unbridgedVouchers}" />; <spring:message code="financial.report.uncovered" />: <c:out value="${coverage.uncoveredLoans}" />.</p></c:otherwise></c:choose>
     <p><spring:message code="financial.report.balanceSign" /></p>
@@ -33,7 +41,7 @@
       <c:forEach items="${['opening','debit','credit','closing']}" var="label"><th class="financial-number"><spring:message code="financial.report.${label}" /></th></c:forEach>
     </tr></thead><tbody>
       <c:forEach items="${trial.accounts}" var="a"><tr>
-        <td><c:url value="/reports/financial/accounts/${a.id}" var="accountUrl"><c:param name="from" value="${parameters.from}" /><c:param name="through" value="${parameters.through}" /><c:param name="recordedThrough" value="${cutoffInput}" /><c:param name="institutionWide" value="${scope.institutionWide}" /></c:url><a href="<c:out value='${accountUrl}' />"><c:out value="${a.code}" /></a></td><td><c:out value="${a.name}" /></td>
+        <td><c:url value="/reports/financial/accounts/${a.id}" var="accountUrl"><c:param name="from" value="${parameters.from}" /><c:param name="through" value="${parameters.through}" /><c:param name="recordedThrough" value="${cutoffInput}" /><c:param name="institutionWide" value="${scope.institutionWide}" /></c:url><c:choose><c:when test="${scope.institutionWide}"><c:out value="${a.code}" /></c:when><c:otherwise><a href="<c:out value='${accountUrl}' />"><c:out value="${a.code}" /></a></c:otherwise></c:choose></td><td><c:out value="${a.name}" /></td>
         <c:forEach items="${['opening','debit','credit','closing']}" var="field"><td class="financial-number"><c:choose><c:when test="${a[field] == null}"><spring:message code="financial.report.unknown" /></c:when><c:otherwise><fmt:formatNumber value="${a[field]}" minFractionDigits="2" maxFractionDigits="2" /></c:otherwise></c:choose></td></c:forEach>
       </tr></c:forEach><c:if test="${empty trial.accounts}"><tr><td colspan="6"><spring:message code="financial.report.empty" /></td></tr></c:if>
     </tbody></table></div></section>

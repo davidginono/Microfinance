@@ -17,6 +17,18 @@ import static com.sacco.mvp.accounting.reports.LedgerReportService.*;
 @RequiredArgsConstructor
 public class LedgerReportRepository {
     private final NamedParameterJdbcTemplate jdbc;
+    public record PolicyLineage(UUID id,int version,LocalDate openingDate,String ledger) {}
+    /** Select the policy actually approved at the recorded cutoff, including external-ledger decisions. */
+    public Optional<PolicyLineage> policyAt(Scope scope,Parameters p) {
+        return jdbc.query("""
+            SELECT p.id,p.policy_version,p.opening_date,p.authoritative_ledger
+            FROM accounting_policies p JOIN accounting_policy_approvals a
+              ON (a.policy_id,a.sacco_id,a.policy_version,a.effective_from)=(p.id,p.sacco_id,p.policy_version,p.effective_from)
+            WHERE p.sacco_id=:institution AND p.effective_from<=:through AND a.decision='APPROVED'
+              AND a.decided_at<=:cutoff AND p.created_at<=:cutoff
+            ORDER BY p.effective_from DESC,p.policy_version DESC LIMIT 1
+            """,parameters(scope,p),(r,n)->new PolicyLineage(r.getObject("id",UUID.class),r.getInt("policy_version"),r.getObject("opening_date",LocalDate.class),r.getString("authoritative_ledger"))).stream().findFirst();
+    }
     private static final String BALANCES="""
         WITH movements AS (
           SELECT l.account_id,
@@ -43,6 +55,9 @@ public class LedgerReportRepository {
     public List<AccountBalance> balances(Scope scope,Parameters p,boolean known) {
         return jdbc.query(BALANCES+"SELECT * FROM balances ORDER BY code,id LIMIT 26 OFFSET :offset",parameters(scope,p),(r,n)->balance(r,known));
     }
+    public List<AccountBalance> exportBalances(Scope scope,Parameters p,boolean known) {
+        return jdbc.query(BALANCES+"SELECT * FROM balances ORDER BY code,id LIMIT 2001",parameters(scope,p),(r,n)->balance(r,known));
+    }
     public Optional<AccountBalance> balance(Scope scope,Parameters p,UUID account,boolean known) {
         return jdbc.query(BALANCES+"SELECT * FROM balances WHERE id=:account",parameters(scope,p).addValue("account",account),(r,n)->balance(r,known)).stream().findFirst();
     }
@@ -55,14 +70,20 @@ public class LedgerReportRepository {
                 r.getBigDecimal("movement_debit"),r.getBigDecimal("movement_credit"),known?r.getBigDecimal("closing_debit"):null,known?r.getBigDecimal("closing_credit"):null));
     }
     public List<Activity> activity(Scope scope,Parameters p,UUID account) {
+        return activity(scope,p,account,26,Math.multiplyExact(p.page(),25));
+    }
+    public List<Activity> exportActivity(Scope scope,Parameters p,UUID account) {
+        return activity(scope,p,account,2001,0);
+    }
+    private List<Activity> activity(Scope scope,Parameters p,UUID account,int limit,int offset) {
         return jdbc.query("""
             SELECT j.id,j.effective_date,j.recorded_at,j.posted_at,j.source_type,j.source_reference,j.evidence_reference,j.reverses_id,
               SUM(l.debit) debit,SUM(l.credit) credit
             FROM gl_journal j JOIN gl_journal_line l ON (l.journal_id,l.sacco_id,l.station_id)=(j.id,j.sacco_id,j.station_id)
             WHERE j.sacco_id=:institution AND (:wide OR j.station_id=:branch) AND l.account_id=:account AND j.state='POSTED'
               AND j.source_type<>'OPENING' AND j.effective_date BETWEEN :from AND :through AND j.posted_at<=:cutoff AND j.recorded_at<=:cutoff
-            GROUP BY j.id ORDER BY j.effective_date,j.posted_at,j.id LIMIT 26 OFFSET :offset
-            """,parameters(scope,p).addValue("account",account),(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),
+            GROUP BY j.id ORDER BY j.effective_date,j.posted_at,j.id LIMIT :rowLimit OFFSET :offset
+            """,parameters(scope,p).addValue("account",account).addValue("rowLimit",limit).addValue("offset",offset),(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),
                 r.getObject("recorded_at",OffsetDateTime.class),r.getObject("posted_at",OffsetDateTime.class),r.getString("source_type"),r.getString("source_reference"),
                 r.getString("evidence_reference"),r.getObject("reverses_id",UUID.class),r.getBigDecimal("debit"),r.getBigDecimal("credit")));
     }
