@@ -38,6 +38,7 @@ public enum AccessFeature {
     SUPPORT("Support"),
     REPORT_BUILDER("Operational Report Builder"),
     FINANCIAL_REPORTS("Financial and management reports"),
+    ACCOUNTING_CASH_FLOW("Cash flow classification"),
     ACCOUNTING_RECONCILIATION("Reconciliation"),
     ACCOUNTING_CLOSING("Period Closing"),
     REPORT_EXECUTION("Report execution and approval"),

@@ -69,4 +69,11 @@ class LedgerReportServiceTest {
         assertThatThrownBy(()->service.trialBalance(actor,parameters,false)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(repository,policies);
     }
+    @Test void allocationCreateAndApproveHaveIndependentFreshClaims() {
+        assertThatThrownBy(()->service.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_CREATE)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.ACCOUNTING_CASH_FLOW_CREATE));
+        assertThat(service.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_CREATE).branch()).isEqualTo("B1");
+        assertThatThrownBy(()->service.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_APPROVE)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.authorizeAllocation(actor,UserClaim.STATEMENT_APPROVE)).isInstanceOf(AccessDeniedException.class);
+    }
 }

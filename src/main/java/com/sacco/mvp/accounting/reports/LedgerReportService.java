@@ -72,6 +72,14 @@ public class LedgerReportService {
     }
 
     Scope authorize(AppUserPrincipal actor, boolean institutionWide) {
+        return authorize(actor,institutionWide,null);
+    }
+    Scope authorizeAllocation(AppUserPrincipal actor,UserClaim allocationClaim) {
+        if(allocationClaim!=null && allocationClaim!=UserClaim.ACCOUNTING_CASH_FLOW_CREATE && allocationClaim!=UserClaim.ACCOUNTING_CASH_FLOW_APPROVE)
+            throw new AccessDeniedException("Cash flow action required");
+        return authorize(actor,false,allocationClaim);
+    }
+    private Scope authorize(AppUserPrincipal actor, boolean institutionWide, UserClaim allocationClaim) {
         if(actor==null || !actor.isStaffSession() || actor.isPlatformIdentity() || actor.getMemberId()==null
             || actor.getSaccoId()==null || actor.getSaccoId().isBlank() || actor.getStationId()==null || actor.getStationId().isBlank())
             throw new AccessDeniedException("Financial report staff scope required");
@@ -85,7 +93,8 @@ public class LedgerReportService {
             throw new AccessDeniedException("Financial report workspace inactive");
         var effective=claims.effectiveClaims(current.getId(),current.getActiveStaffRolesResolved(),current.isMemberAccess());
         if(!effective.contains(UserClaim.FINANCIAL_REPORTS_VIEW)
-            || (institutionWide && !effective.contains(UserClaim.FINANCIAL_REPORTS_INSTITUTION)))
+            || (institutionWide && !effective.contains(UserClaim.FINANCIAL_REPORTS_INSTITUTION))
+            || (allocationClaim!=null && !effective.contains(allocationClaim)))
             throw new AccessDeniedException("Financial report permission required");
         return new Scope(actor.getSaccoId(),actor.getStationId(),institutionWide);
     }

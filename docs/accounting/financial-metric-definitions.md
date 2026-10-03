@@ -1,0 +1,21 @@
+# Financial and management metric definitions
+
+Version: MANAGEMENT_LOAN_METRICS_V1. Reviewed sources: 2026-10-03. This definition does not approve an institution's accounting policy or certify a regulatory return.
+
+Posted-book statements use exact signed TZS decimals, immutable posted general-ledger lines, effective dates and a retained recorded cutoff. Opening entries are end-of-day cutover balances, not period income or cash receipts. A complete opening, approved mappings and a reviewed close are required for a finalized financial statement. Unknown source coverage remains unknown.
+
+Management loan principal is contractual principal less signed verified principal allocations as of the effective date and recorded cutoff. It excludes future interest. Paid amounts come from posted transactions, never from a projection or mutable paid counter. Reversals restore the linked amounts. Fee, settlement, restructuring and write-off sources require their separately verified accounting lineage; unsupported historical adjustments must be disclosed and excluded from authoritative metrics.
+
+Days past due is the number of calendar days from the oldest contractual installment with a positive unpaid due principal or due interest to the as-of date. An unpaid installment due on the as-of date has zero elapsed days. An interest-only missed installment still places the exposed principal at risk. Management ageing bands are 0, 1–30, 31–60, 61–90 and over 90 days; these are distinct from the regulator's classification bands.
+
+PAR1, PAR30 and PAR90 numerators are the entire exposed outstanding principal of covered loans with respectively at least one, more than thirty and more than ninety elapsed days past due. The denominator is the entire covered outstanding principal. Institution percentages are recomputed from summed numerators and denominators, never averaged from branch percentages. A zero denominator yields unavailable, not a claim of zero risk. Coverage counts and excluded principal uncertainty accompany every metric.
+
+Disbursement and collection metrics identify actual posted origins/transactions and use effective dates; signed reversals are included. Gross collection and channel settlement are different movements. Cash transfers between the approved money accounts cancel and never inflate operating cash flow. Reviewed cash-flow classifications retain actual money-line identifiers, exact signed amounts, counterpart accounts, activities, policy references, immutable versions, maker/checker evidence and checksums. Remaining noncash entries require an explicit explanation.
+
+## Regulatory review evidence
+
+The [BoT 2019 Mainland Tier 2 regulations, regulations 44–45](https://www.bot.go.tz/Publications/Acts,%20Regulations,%20Circulars,%20Guidelines/Regulations/en/2020021122490967551.pdf) distinguish ordinary lending classification bands (0–5, 6–30, 31–60, 61–90 and above 90 days) and minimum provisions (1%, 5%, 25%, 50% and 100%). Housing treatment is separate. Regulation 50 leaves periodic formats and frequency to BoT instructions. These rates are a versioned reference for applicability review; they are not a substitute for the institution's financial-reporting impairment policy.
+
+The [BoT 2026 guidance note, published 2026-09-21](https://www.bot.go.tz/Publications/Acts,%20Regulations,%20Circulars,%20Guidelines/Guidelines/en/2026092118400398.pdf) addresses signed applications, approval requests and notifications, including a prescribed request for deletion of incorrectly submitted returns (Form 16). It says it does not supersede laws or regulations. Some annexures refer to 2026 regulations while its substantive provisions cite familiar regulation numbers: the accountant/compliance officer must verify the applicable gazetted text and any institution-specific periodic-return instruction before activating an official format. A local correction preserves the original report and submission history; it does not delete a regulator's return or imply regulator approval.
+
+The [NBAA reporting-framework pronouncement](https://www.nbaa.go.tz/2019/march/techpro2019.pdf) makes framework applicability entity-specific. The institution accountant must record that determination. This software produces no audit opinion.
