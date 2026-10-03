@@ -37,10 +37,10 @@ public class CashFlowAllocationRepository {
     }
     public void approve(String institution,String branch,UUID id,UUID checker,String evidence,OffsetDateTime now){jdbc.update("insert into cash_flow_allocation_reviews(allocation_id,sacco_id,station_id,checker_id,evidence,reviewed_at) values(?,?,?,?,?,?)",id,institution,branch,checker,evidence,now);}
     public List<Version> approved(String institution,String branch,OffsetDateTime cutoff,List<UUID> journals) {
+        require(journals!=null && journals.size()<=1000,"size");
         if(journals.isEmpty())return List.of();
         String marks=String.join(",",Collections.nCopies(journals.size(),"?"));var args=new ArrayList<Object>(List.of(institution,branch,cutoff));args.addAll(journals);
-        var rows=query("a.sacco_id=? and a.station_id=? and r.reviewed_at<=? and a.journal_id in ("+marks+") order by a.journal_id,a.version desc",args.toArray());
-        var latest=new LinkedHashMap<UUID,Version>();rows.forEach(v->latest.putIfAbsent(v.journalId(),v));return List.copyOf(latest.values());
+        return select("distinct on(a.journal_id) a.*","a.sacco_id=? and a.station_id=? and r.reviewed_at<=? and a.journal_id in ("+marks+") order by a.journal_id,a.version desc,a.id limit 1001",args.toArray());
     }
     public boolean allSourcesAvailable(String institution,String branch,OffsetDateTime cutoff,List<UUID> journals) {
         if(journals.isEmpty())return true;
@@ -75,6 +75,9 @@ public class CashFlowAllocationRepository {
     public boolean hasInstitutionHistory(String institution){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from cash_flow_allocations where sacco_id=?)",Boolean.class,institution));}
     public boolean hasMemberHistory(UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from cash_flow_allocations where made_by=?) or exists(select 1 from cash_flow_allocation_reviews where checker_id=?)",Boolean.class,id,id));}
     private List<Version> query(String predicate,Object...args) {
-        return jdbc.query("select a.*,r.checker_id,r.reviewed_at,r.evidence review_evidence from cash_flow_allocations a left join cash_flow_allocation_reviews r on r.allocation_id=a.id where "+predicate,(r,n)->new Version(r.getObject("id",UUID.class),r.getObject("journal_id",UUID.class),r.getInt("version"),r.getObject("made_by",UUID.class),r.getObject("made_at",OffsetDateTime.class),r.getString("evidence"),r.getString("noncash_evidence"),r.getString("source_checksum"),r.getString("definition_checksum"),mapper.readValue(r.getString("source_json"),Source.class),mapper.readValue(r.getString("definition_json"),mapper.getTypeFactory().constructCollectionType(List.class,Split.class)),r.getObject("checker_id",UUID.class),r.getObject("reviewed_at",OffsetDateTime.class),r.getString("review_evidence")),args);
+        return select("a.*",predicate,args);
+    }
+    private List<Version> select(String projection,String predicate,Object...args) {
+        return jdbc.query("select "+projection+",r.checker_id,r.reviewed_at,r.evidence review_evidence from cash_flow_allocations a left join cash_flow_allocation_reviews r on r.allocation_id=a.id where "+predicate,(r,n)->new Version(r.getObject("id",UUID.class),r.getObject("journal_id",UUID.class),r.getInt("version"),r.getObject("made_by",UUID.class),r.getObject("made_at",OffsetDateTime.class),r.getString("evidence"),r.getString("noncash_evidence"),r.getString("source_checksum"),r.getString("definition_checksum"),mapper.readValue(r.getString("source_json"),Source.class),mapper.readValue(r.getString("definition_json"),mapper.getTypeFactory().constructCollectionType(List.class,Split.class)),r.getObject("checker_id",UUID.class),r.getObject("reviewed_at",OffsetDateTime.class),r.getString("review_evidence")),args);
     }
 }

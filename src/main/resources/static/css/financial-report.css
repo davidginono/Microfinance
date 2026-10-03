@@ -9,3 +9,5 @@
   .financial-report .erp-table { font-size: 9pt; }
   .financial-report .erp-table thead { display: table-header-group; }
 }
+
+.financial-report .financial-definition { overflow-wrap: anywhere; }

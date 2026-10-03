@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_E_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_e_(test|cash_test|test_reviewed_20261003_v2|test_portfolio_20261003_v1)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_E_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_e_(test|cash_test|test_reviewed_20261003_v2|test_portfolio_20261003_v1|test_portfolio_20261003_v2)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CashFlowAllocationPostgresTest {
     JdbcTemplate jdbc;DataSourceTransactionManager manager;GeneralLedgerService ledger;CashFlowAllocationService service;LedgerReportService ledgerReports;
@@ -72,6 +72,17 @@ class CashFlowAllocationPostgresTest {
     @Test void failedAuditRollsBackDraft(){doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).log(eq("ACCOUNTING_CASH_FLOW"),any(),eq("DRAFTED"),any(),isNull(),anyMap());assertThatThrownBy(()->draft(UUID.randomUUID())).hasMessage("Synthetic audit failure");assertThat(service.versions(maker,0)).isEmpty();}
     @Test void concurrentDuplicateDraftsHaveOneImmutableVersion()throws Exception{UUID request=UUID.randomUUID();var pool=Executors.newFixedThreadPool(2);try{var latch=new CountDownLatch(1);Callable<UUID> command=()->{latch.await();return draft(request);};var a=pool.submit(command);var b=pool.submit(command);latch.countDown();assertThat(a.get(15,TimeUnit.SECONDS)).isEqualTo(b.get(15,TimeUnit.SECONDS));assertThat(service.versions(maker,0)).hasSize(1);}finally{pool.shutdownNow();}}
     @Test void newerApprovedVersionDoesNotRewriteArchivedCutoff(){UUID first=draft(UUID.randomUUID());service.approve(checker,first,"First classification");var cutoff=OffsetDateTime.now();UUID second=draft(UUID.randomUUID());service.approve(checker,second,"Revised reviewed classification");assertThat(service.reviewedAllocations(maker,List.of(journal),cutoff).versions().getFirst().id()).isEqualTo(first);assertThat(service.reviewedAllocations(maker,List.of(journal),OffsetDateTime.now()).versions().getFirst().id()).isEqualTo(second);}
+    @Test void latestApprovedHistoryIsBoundedBeforeJdbcMappingAndRetainsEarlierCutoff(){
+        UUID first=draft(UUID.randomUUID());service.approve(checker,first,"First retained classification");var old=OffsetDateTime.now();UUID latest=first;
+        for(int i=0;i<7;i++){latest=draft(UUID.randomUUID());service.approve(checker,latest,"Later classification "+i);}
+        var mapped=new java.util.concurrent.atomic.AtomicInteger();var tracking=new JdbcTemplate(jdbc.getDataSource()){
+            @Override public <T>List<T> query(String sql,RowMapper<T> rowMapper,Object...args){return super.query(sql,(r,n)->{mapped.incrementAndGet();return rowMapper.mapRow(r,n);},args);}
+        };
+        var bounded=new CashFlowAllocationRepository(tracking,JsonMapper.builder().findAndAddModules().build());
+        assertThat(bounded.approved(institution,"B1",OffsetDateTime.now(),List.of(journal))).singleElement().satisfies(v->assertThat(v.version()).isEqualTo(8));assertThat(mapped.get()).isEqualTo(1);
+        mapped.set(0);assertThat(bounded.approved(institution,"B1",old,List.of(journal))).singleElement().satisfies(v->assertThat(v.id()).isEqualTo(first));assertThat(mapped.get()).isEqualTo(1);
+        assertThatThrownBy(()->bounded.approved(institution,"B1",OffsetDateTime.now(),Collections.nCopies(1001,journal))).hasMessage("financial.cash.error.size");
+    }
     @Test void postedBookExportsReadEntireBoundedSourceAndPreserveCutoff(){
         for(int i=0;i<30;i++){account("EXTRA"+i,"ASSET","DEBIT","OTHER");var j=ledger.draftManual(maker,new JournalCommand(UUID.randomUUID(),"EXPORT-"+i,DAY.plusDays(1),"Synthetic source",null,List.of(new Line(cash,new BigDecimal("0.01"),BigDecimal.ZERO),new Line(income,BigDecimal.ZERO,new BigDecimal("0.01")))));ledger.approve(checker,j.id(),"Independent export fixture");ledger.post(checker,j.id(),false);}
         var cutoff=OffsetDateTime.now();var p=new LedgerReportService.Parameters(DAY,DAY.plusDays(1),cutoff,0);
