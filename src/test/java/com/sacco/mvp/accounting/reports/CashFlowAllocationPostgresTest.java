@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_E_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_e_(test|cash_test|test_reviewed_20261003_v2)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_E_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_e_(test|cash_test|test_reviewed_20261003_v2|test_portfolio_20261003_v1)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CashFlowAllocationPostgresTest {
     JdbcTemplate jdbc;DataSourceTransactionManager manager;GeneralLedgerService ledger;CashFlowAllocationService service;LedgerReportService ledgerReports;
