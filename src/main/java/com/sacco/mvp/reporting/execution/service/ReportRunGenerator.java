@@ -6,6 +6,7 @@ import com.sacco.mvp.reporting.execution.repository.ReportRunRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +40,15 @@ public class ReportRunGenerator {
    if(result.rowsInScope()!=first.rowsInScope()||!result.totals().equals(first.totals()))throw new IllegalStateException("report.run.error.snapshot");
    String payload=codec.rows(result.rows());byte[] encoded=payload.getBytes(StandardCharsets.UTF_8);bytes+=encoded.length;
    if(bytes>8*1024*1024||encoded.length>1024*1024)throw new IllegalArgumentException("report.run.error.memory");
-   String checksum=ReportRunService.sha256(encoded);repository.page(run.id(),page,result.rows().size(),payload,checksum);checksums.append(checksum);
+   control.check(run.id(),run.workerToken());
+   String checksum=ReportRunService.sha256(encoded);
+   try{repository.page(run.id(),page,result.rows().size(),payload,checksum);}
+   catch(ConcurrencyFailureException ex){
+    // A committed cancellation can invalidate the snapshot's FK lock on the run.
+    // Read control in its independent transaction; otherwise preserve the retryable failure.
+    control.check(run.id(),run.workerToken());throw ex;
+   }
+   checksums.append(checksum);
    frozen.addAll(result.rows());if(frozen.size()>=first.rowsInScope())break;
    if(System.nanoTime()-started>90_000_000_000L)throw new IllegalArgumentException("report.run.error.timeout");
   }

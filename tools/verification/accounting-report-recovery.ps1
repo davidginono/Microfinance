@@ -1,12 +1,14 @@
 param(
     [ValidateRange(1024,65535)][int]$Port = 55439,
+    [ValidateSet('microfinance_accounting_h_test','microfinance_accounting_h_release_test','microfinance_accounting_h_release_final_test')]
+    [string]$SourceDatabase = 'microfinance_accounting_h_test',
     [string]$PostgresBin = 'C:\Program Files\PostgreSQL\17\bin'
 )
 
 # Synthetic-only recovery rehearsal. It creates a new target and never deletes or overwrites a database.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$taskSourceDatabase = 'microfinance_accounting_h_test'
+$taskSourceDatabase = $SourceDatabase
 $taskTargetDatabase = 'microfinance_h_restore_' + (Get-Date -Format 'yyyyMMddHHmmss')
 $taskEvidenceDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('microfinance-h-recovery-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskEvidenceDirectory | Out-Null
@@ -42,6 +44,37 @@ UNION ALL SELECT 'MIGRATION|'||installed_rank||'|'||COALESCE(version,'')||'|'||C
 ORDER BY 1
 '@
 $taskMismatchQuery = "SELECT (SELECT count(*) FROM report_artifacts WHERE checksum<>encode(sha256(payload),'hex')) + (SELECT count(*) FROM report_result_pages WHERE checksum<>encode(sha256(convert_to(payload,'UTF8')),'hex')) + (SELECT count(*) FROM report_run_assets WHERE checksum<>encode(sha256(payload),'hex'))"
+# All names are fixed here; neither a database object name nor SQL is accepted from user input.
+$taskRetainedTables = @(
+    'accounting_policies','accounting_policy_approvals','gl_account','accounting_period',
+    'gl_journal','gl_journal_line','gl_cutover_coverage','gl_operational_bridge','gl_source_cancellation','accounting_outbox',
+    'reconciliation_format','reconciliation_statement','reconciliation_statement_line',
+    'reconciliation_match','reconciliation_allocation','reconciliation_match_decision',
+    'reconciliation_exception','reconciliation_exception_decision','reconciliation_certificate',
+    'reconciliation_certificate_decision','accounting_close_review','accounting_close_decision',
+    'financial_statement_templates','financial_statement_versions','financial_statement_results',
+    'regulatory_statement_formats','regulatory_statement_submissions','regulatory_statement_reviews',
+    'statement_output_sets','statement_output_artifacts','statement_output_reviews',
+    'accounting_release_requests','accounting_release_decisions','accounting_release_invalidations',
+    'loan_ledgers','loan_ledger_installments','loan_repayment_transactions',
+    'loan_repayment_allocations','loan_journal_entries',
+    'operational_report_templates','operational_report_template_versions'
+)
+$taskAvailableTables = @()
+foreach ($taskTable in $taskRetainedTables) {
+    if ((Read-SyntheticQuery $taskSourceDatabase "SELECT to_regclass('public.$taskTable') IS NOT NULL").Trim() -eq 't') {
+        $taskAvailableTables += $taskTable
+    }
+}
+$taskManifestParts = @($taskAvailableTables | ForEach-Object {
+    "SELECT '$($_)|' || encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') AS retained_row FROM $($_) t"
+})
+$taskManifestQuery = 'SELECT retained_row FROM (' + ($taskManifestParts -join ' UNION ALL ') + ') retained ORDER BY retained_row'
+$taskSourceManifest = Read-SyntheticQuery $taskSourceDatabase $taskManifestQuery
+$taskSourceManifest | Set-Content -LiteralPath (Join-Path $taskEvidenceDirectory 'source-retained-manifest.txt') -Encoding utf8
+if ($taskAvailableTables -contains 'statement_output_sets') {
+    $taskMismatchQuery += " + (SELECT count(*) FROM statement_output_sets WHERE result_checksum<>encode(sha256(convert_to(result_json,'UTF8')),'hex') OR (logo IS NOT NULL AND logo_checksum<>encode(sha256(logo),'hex'))) + (SELECT count(*) FROM statement_output_artifacts WHERE checksum<>encode(sha256(payload),'hex')) + (SELECT count(*) FROM accounting_release_requests WHERE dependency_checksum<>encode(sha256(convert_to(dependency_json,'UTF8')),'hex')) + (SELECT count(*) FROM financial_statement_results WHERE checksum<>encode(sha256(convert_to(result_json,'UTF8')),'hex')) + (SELECT count(*) FROM accounting_close_review WHERE checksum<>encode(sha256(convert_to(snapshot_json,'UTF8')),'hex'))"
+}
 if ((Read-SyntheticQuery $taskSourceDatabase $taskMismatchQuery).Trim() -ne '0') { throw 'Source payload checksum verification failed.' }
 $taskSourceSignature = Read-SyntheticQuery $taskSourceDatabase $taskSignatureQuery
 $taskSourceSignature | Set-Content -LiteralPath (Join-Path $taskEvidenceDirectory 'source-signature.txt') -Encoding utf8
@@ -56,6 +89,17 @@ if ((Read-SyntheticQuery $taskTargetDatabase $taskMismatchQuery).Trim() -ne '0')
 $taskRestoredSignature = Read-SyntheticQuery $taskTargetDatabase $taskSignatureQuery
 $taskRestoredSignature | Set-Content -LiteralPath (Join-Path $taskEvidenceDirectory 'restored-signature.txt') -Encoding utf8
 if ($taskSourceSignature -cne $taskRestoredSignature) { throw 'Restored report versions, checksums, counts, or migration history differ.' }
+$taskRestoredManifest = Read-SyntheticQuery $taskTargetDatabase $taskManifestQuery
+$taskRestoredManifest | Set-Content -LiteralPath (Join-Path $taskEvidenceDirectory 'restored-retained-manifest.txt') -Encoding utf8
+if ($taskSourceManifest -cne $taskRestoredManifest) { throw 'Restored financial entries, reconciliation evidence, statement versions, or release decisions differ.' }
+$taskBalanceQuery = @'
+SELECT count(*) FROM (
+ SELECT j.id FROM gl_journal j LEFT JOIN gl_journal_line l ON l.journal_id=j.id
+ WHERE j.state IN('APPROVED','POSTED') GROUP BY j.id
+ HAVING count(l.id)<2 OR sum(l.debit)<>sum(l.credit)
+) unbalanced
+'@
+if ((Read-SyntheticQuery $taskTargetDatabase $taskBalanceQuery).Trim() -ne '0') { throw 'Restored approved or posted journals do not balance.' }
 
 $taskProtectionQuery = @'
 DO $$
@@ -70,6 +114,10 @@ BEGIN
 END $$;
 '@
 Read-SyntheticQuery $taskTargetDatabase $taskProtectionQuery | Out-Null
+if ($taskAvailableTables -contains 'statement_output_artifacts') {
+    $taskStatementProtection = $taskProtectionQuery.Replace('report_artifacts','statement_output_artifacts')
+    Read-SyntheticQuery $taskTargetDatabase $taskStatementProtection | Out-Null
+}
 $taskRecord = [ordered]@{
     source = $taskSourceDatabase; restored = $taskTargetDatabase; loopbackPort = $Port
     backupSha256 = (Get-FileHash -LiteralPath $taskArchive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -77,6 +125,8 @@ $taskRecord = [ordered]@{
     elapsedSeconds = [math]::Round(((Get-Date)-$taskStarted).TotalSeconds,3)
     signaturesMatch = $true; allPayloadChecksumsVerified = $true; restoredArtifactProtection = $true
     artifactCount = [long]$taskArtifactCount; evidenceDirectory = $taskEvidenceDirectory
+    retainedTablesVerified = $taskAvailableTables; financialManifestMatches = $true
+    restoredPostedJournalsBalanced = $true; monetaryCommandReplayVerified = $false
     operationalDataUsed = $false; approvedHumanRelease = $false
 }
 $taskRecord | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskEvidenceDirectory 'recovery-evidence.json') -Encoding utf8

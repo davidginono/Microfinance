@@ -27,13 +27,14 @@ public class ReportRunController {
  @GetMapping
  @PreAuthorize("@access.has(principal,'REPORT_RUN')")
  public String index(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0")int page,Model model){
-  model.addAttribute("runs",runs.list(actor,page));model.addAttribute("listPage",page);model.addAttribute("templates",templates.list(actor,0));model.addAttribute("requestKey",UUID.randomUUID());model.addAttribute("from",clock.today().withDayOfMonth(1));model.addAttribute("through",clock.today());model.addAttribute("cutoff",clock.now());return "reports/runs";
+  var visible=runs.list(actor,page);model.addAttribute("runs",visible);model.addAttribute("acceptedRuns",visible.stream().filter(r->r.status().equals("APPROVED")).toList());model.addAttribute("listPage",page);model.addAttribute("templates",templates.list(actor,0));
+  if(!model.containsAttribute("requestKey"))model.addAttribute("requestKey",UUID.randomUUID());if(!model.containsAttribute("from"))model.addAttribute("from",clock.today().withDayOfMonth(1));if(!model.containsAttribute("through"))model.addAttribute("through",clock.today());if(!model.containsAttribute("cutoff"))model.addAttribute("cutoff",clock.now());return "reports/runs";
  }
  @PostMapping
  @PreAuthorize("@access.has(principal,'REPORT_RUN') and @access.has(principal,'REPORT_EXPORT')")
  public String request(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID requestKey,@RequestParam UUID templateVersion,@RequestParam LocalDate from,@RequestParam LocalDate through,@RequestParam OffsetDateTime recordedCutoff,@RequestParam Set<OperationalReportExportService.Format> formats,@RequestParam(required=false)UUID restates,@RequestParam(required=false)String reason,RedirectAttributes redirect){
   try{UUID id=runs.request(actor,new Request(requestKey,templateVersion,from,through,recordedCutoff,formats,restates,reason));redirect.addFlashAttribute("runSuccess","report.run.queued");return "redirect:/reports/runs/"+id;}
-  catch(IllegalArgumentException ex){redirect.addFlashAttribute("runError",key(ex));return "redirect:/reports/runs";}
+  catch(IllegalArgumentException ex){redirect.addFlashAttribute("runError",key(ex));redirect.addFlashAttribute("requestKey",requestKey);redirect.addFlashAttribute("selectedTemplate",templateVersion);redirect.addFlashAttribute("from",from);redirect.addFlashAttribute("through",through);redirect.addFlashAttribute("cutoff",recordedCutoff);redirect.addFlashAttribute("selectedFormats",formats);redirect.addFlashAttribute("restates",restates);redirect.addFlashAttribute("reason",reason);return "redirect:/reports/runs";}
  }
  @GetMapping("/{id}")
  @PreAuthorize("@access.has(principal,'REPORT_RUN')")
