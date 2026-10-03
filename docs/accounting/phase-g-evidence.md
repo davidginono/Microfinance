@@ -59,3 +59,32 @@ The real E closing adapter is used. A genuine B1 actor consumes independently re
 Rendered English/Kiswahili desktop/mobile flows, owning C source-control integration and H institution export/release assembly remain parent integration checks. Actual institution policy/format approval is still required for live finalization; no supplied approvals or official return were fabricated.
 
 Final exact-revision migration/index verification at 22:43:06 Africa/Nairobi: the same 52 tests passed with zero failures/errors/skips; the clean dedicated database applied all 52 migrations naturally, including the bounded closed-period choice index. No Java/test sources changed during either stable successful run.
+
+## H institution integration audit
+
+Read-only audit following verified G commit `c6ce29539a07f65af6948a7263d8c13ada63e953`. H/root sources were not edited. The following are integration recommendations, not verified H fixes or release-acceptance evidence.
+
+| Boundary | Required adaptation |
+| --- | --- |
+| `StatementOutputService.capture` | Validate explicit result dimension. INSTITUTION results deliberately have null branch close IDs and retain institution period/checksum/branch lineage instead. Archival reproduction uses `verifiedResult` and `verifiedResultDigest`; release/publication uses mandatory `verifiedResultForPublication`. Do not hold source/mapping/posting locks across CSV/XLSX/PDF rendering. |
+| Output get/list/review/download | Recheck G archival authorization and original source digest. Institution files require current FINANCIAL_REPORTS_VIEW and FINANCIAL_REPORTS_INSTITUTION even when STATEMENT_VIEW/EXPORT remain. Filter dimension authorization in SQL before pagination. Reopening must preserve authorized archived bytes. |
+| Output ownership/FK | V49.1 binds result/tenant/branch to the issuing workspace. Preserve issuer-only capture with an explicit domain error, or use the G47.2 tenant-only result FK plus a conditional BRANCH issuer guard for institution capture in another authorized workspace. Never fabricate a branch principal or widen branch registry access. |
+| `AccountingReleaseService.receipt` | Begin with `verifiedResultForPublication` under its existing transaction and compare the original digest. For institution evidence, use the trusted D institution boundary, exact aggregate checksum and current/comparative branch lineages; replace selected-branch-only opening verification with all `reviewedOpenings[{branch,opening}]` and typed control proof. Retain schema-2 dimension, immutable opening IDs/checksums/checkers and per-branch source cutoffs. Preserve legacy branch receipts. |
+| Release coverage/gate | Pin normalized immutable covered-branch rows to the verified institution source. The repository-only gate must authorize only covered branches for the exact policy version; a new branch remains restricted. Preserve the SHARE lock followed by a fresh eligibility read. Do not introduce Gate-to-G/D/C/E service cycles. |
+| Source changes | Later approved E allocations currently invalidate G publication proof without a release callback. Add atomic repository-only release invalidation on approved source revisions. A callback alone cannot prevent approval racing a not-yet-inserted release: pin qualifying journal lineage with a shared source guard through publication, and require the matching exclusive guard during newer approval/invalidation. Locking the old allocation row does not block a newer version. |
+| Typed export/JSP context | Display INSTITUTION explicitly, separate issuing workspace from financial scope, label current/comparison recorded cutoffs as the latest branch bounds, and show institution period/source checksums rather than null branch close IDs. Retain every mandatory branch-source and allocation note. Translate these labels in English/Kiswahili. |
+| Bounds | H's 1,200-row/disclosure and 64-KiB receipt limits can reject legal bounded G institution proof. Align limits or queue/store bounded immutable provenance separately; never truncate mandatory rows or all-branch evidence. |
+| Accepted operational layouts | H14's two different institution-owned layouts can be accepted through branch-scoped samples. Preserve each sample's actual branch/cutoff and label it layout acceptance, not institution-consolidated dataset coverage. Match its cutoff to that selected branch's source entry, not the aggregate latest bound. Require independent review, exact period, zero untracked sources and distinct structural layouts. |
+
+Recommended actual PostgreSQL/integration regressions:
+
+- Two-branch null-close-ID institution result generates and independently reviews all three artifact formats, then records all-branch release evidence with exact monetary totals and comparative hashes.
+- Different branch cutoffs remain explicit in English/Kiswahili exports/JSP; branch layout samples use their own covered cutoff. Mandatory rows survive every supported hide/collapse option.
+- Revoke financial institution/view permission while retaining statement permissions: output get/list/review/download and cached/queued execution deny access. Authorized archived reads after reopening preserve hashes.
+- Cross-issuer institution capture obeys the selected explicit ownership model; foreign BRANCH capture is denied with a domain error rather than an accidental FK exception.
+- Missing branch opening/control proof or newer allocation approval blocks release without rewriting archived results/artifacts. Allocation approval racing release creation/decision cannot leave a stale live gate.
+- Institution release enables only its pinned covered branches; legacy branch releases, newly created branches and foreign tenants cannot inherit authorization.
+- Reopen current/comparative/earlier dependent periods or retire/replace mappings: invalidate applicable release eligibility atomically, including concurrent decisions, while retaining immutable bytes and evidence.
+- Valid results above 1,200 mandatory rows follow a bounded supported path without omission. Legacy pre-dimension branch artifacts/receipts remain readable with their original checksums.
+
+The parent owns H implementation, integration, rendered verification and release acceptance. G's 52-test evidence predates the separate D V45.2 timing increment and does not claim its verification.
