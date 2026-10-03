@@ -24,6 +24,37 @@ public class CashFlowAllocationRepository {
     public void lockSource(String institution,String branch,UUID journal) {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","CASH_FLOW/"+institution+"/"+branch+"/"+journal);
     }
+    /** The same setup/period order as closing; no source guard precedes these locks. */
+    public void lockReviewSource(String institution,String branch,UUID journal) {
+        lockSourcePeriods(institution,branch,List.of(journal));lockSource(institution,branch,journal);
+    }
+    public void lockProofSources(String institution,String branch,List<UUID> journals) {
+        lockSourcePeriods(institution,branch,journals);
+        if(journals.isEmpty())return;
+        var keys=journals.stream().distinct().map(id->"CASH_FLOW/"+institution+"/"+branch+"/"+id).sorted().toList();
+        String values=String.join(",",Collections.nCopies(keys.size(),"(?)"));
+        jdbc.queryForList("select pg_advisory_xact_lock_shared(hashtextextended(key,0)) from (select column1 key from (values "+values+") guards order by column1) ordered_guards",keys.toArray());
+    }
+    public void lockProofPeriodRange(String institution,java.time.LocalDate from,java.time.LocalDate through) {
+        jdbc.queryForList("select pg_advisory_xact_lock_shared(hashtextextended(?,0))","GL_SETUP/"+institution);
+        jdbc.queryForList("select id from accounting_period where sacco_id=? and starts_on<=? and ends_on>=? order by starts_on,id for share",UUID.class,institution,through,from);
+    }
+    private void lockSourcePeriods(String institution,String branch,List<UUID> journals) {
+        require(journals!=null && journals.size()<=1000 && journals.stream().allMatch(Objects::nonNull),"size");
+        jdbc.queryForList("select pg_advisory_xact_lock_shared(hashtextextended(?,0))","GL_SETUP/"+institution);
+        if(journals.isEmpty())return;
+        String marks=String.join(",",Collections.nCopies(journals.size(),"?"));var args=new ArrayList<Object>(List.of(institution,institution,branch));args.addAll(journals);
+        jdbc.queryForList("select p.id from accounting_period p where p.sacco_id=? and exists(select 1 from gl_journal j where j.sacco_id=? and j.station_id=? and j.period_id=p.id and j.id in ("+marks+")) order by p.starts_on,p.id for share of p",UUID.class,args.toArray());
+    }
+    public int latestApprovedVersion(String institution,String branch,UUID journal) {
+        return jdbc.queryForObject("select coalesce(max(a.version),0) from cash_flow_allocations a join cash_flow_allocation_reviews r on r.allocation_id=a.id where a.sacco_id=? and a.station_id=? and a.journal_id=?",Integer.class,institution,branch,journal);
+    }
+    public Map<UUID,UUID> currentApprovedIdentifiers(String institution,String branch,List<UUID> journals) {
+        require(journals!=null && journals.size()<=1000,"size");if(journals.isEmpty())return Map.of();
+        String marks=String.join(",",Collections.nCopies(journals.size(),"?"));var args=new ArrayList<Object>(List.of(institution,branch));args.addAll(journals);
+        var rows=jdbc.query("select distinct on(a.journal_id) a.journal_id,a.id from cash_flow_allocations a join cash_flow_allocation_reviews r on r.allocation_id=a.id where a.sacco_id=? and a.station_id=? and a.journal_id in ("+marks+") order by a.journal_id,a.version desc,a.id limit 1001",(r,n)->Map.entry(r.getObject("journal_id",UUID.class),r.getObject("id",UUID.class)),args.toArray());
+        var result=new HashMap<UUID,UUID>();rows.forEach(row->result.put(row.getKey(),row.getValue()));return Map.copyOf(result);
+    }
     public Optional<Version> retry(String institution,String branch,UUID request) {
         return query("a.sacco_id=? and a.station_id=? and a.request_key=?",institution,branch,request).stream().findFirst();
     }

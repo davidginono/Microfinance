@@ -20,6 +20,7 @@ public class CashFlowAllocationService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final List<CashFlowApprovalListener> approvalListeners;
     public void authorizeCreate(AppUserPrincipal actor){reports.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_CREATE);}
     @Transactional(timeout=20) public UUID draft(AppUserPrincipal actor,UUID journal,UUID request,List<Split> splits,String evidence,String noncashEvidence) {
         var scope=reports.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_CREATE);text(evidence,true);text(noncashEvidence,false);require(journal!=null && request!=null,"source");
@@ -30,9 +31,13 @@ public class CashFlowAllocationService {
         UUID id=repository.save(scope.institution(),scope.branch(),request,actor.getMemberId(),clock.now(),evidence,noncashEvidence,source,splits,sourceHash,definitionHash);event(actor,id,"DRAFTED");return id;
     }
     @Transactional(timeout=20) public void approve(AppUserPrincipal actor,UUID id,String evidence) {
-        var scope=reports.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_APPROVE);text(evidence,true);var v=repository.version(scope.institution(),scope.branch(),id,true);
+        var scope=reports.authorizeAllocation(actor,UserClaim.ACCOUNTING_CASH_FLOW_APPROVE);text(evidence,true);writableTransaction();
+        var candidate=repository.version(scope.institution(),scope.branch(),id,false);
+        repository.lockReviewSource(scope.institution(),scope.branch(),candidate.journalId());var v=repository.version(scope.institution(),scope.branch(),id,true);
         require(!v.maker().equals(actor.getMemberId()) && !v.approved(),"checker");verify(v);Source source=repository.source(scope.institution(),scope.branch(),v.journalId());require(hash(mapper.writeValueAsString(source)).equals(v.sourceChecksum()),"source");
-        repository.approve(scope.institution(),scope.branch(),id,actor.getMemberId(),evidence,clock.now());event(actor,id,"APPROVED");
+        require(v.version()>repository.latestApprovedVersion(scope.institution(),scope.branch(),v.journalId()),"superseded");
+        var now=clock.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);repository.approve(scope.institution(),scope.branch(),id,actor.getMemberId(),evidence,now);
+        approvalListeners.forEach(listener->listener.approved(scope.institution(),v.journalId(),id,v.version(),actor.getMemberId(),now));event(actor,id,"APPROVED");
     }
     @Transactional(readOnly=true) public Source source(AppUserPrincipal actor,UUID journal){var scope=reports.authorizeAllocation(actor,null);return repository.source(scope.institution(),scope.branch(),journal);}
     @Transactional(readOnly=true) public List<Version> versions(AppUserPrincipal actor,int page){var scope=reports.authorizeAllocation(actor,null);require(page>=0 && page<=10000,"size");return repository.list(scope.institution(),scope.branch(),page);}
@@ -42,16 +47,21 @@ public class CashFlowAllocationService {
     public Coverage reviewedAllocations(AppUserPrincipal actor,List<UUID> journals,OffsetDateTime cutoff) {
         return reviewed(reports.authorizeAllocation(actor,null),journals,cutoff);
     }
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
+    @Transactional(propagation=Propagation.MANDATORY)
     public Coverage reviewedForClosing(AppUserPrincipal actor,List<UUID> journals,OffsetDateTime cutoff) {
-        return canonical(reviewed(reports.authorizeClosingProof(actor,actor==null?null:actor.getSaccoId(),actor==null?null:actor.getStationId(),false),journals,cutoff));
+        var scope=reports.authorizeClosingProof(actor,actor==null?null:actor.getSaccoId(),actor==null?null:actor.getStationId(),false);writableTransaction();
+        repository.lockProofSources(scope.institution(),scope.branch(),journals);var proof=reviewed(scope,journals,cutoff);
+        require(currentIdentifiers(scope,journals,proof),"superseded");return canonical(proof);
     }
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
+    @Transactional(propagation=Propagation.MANDATORY)
     public boolean currentForInstitutionClosingProof(AppUserPrincipal actor,String institution,String branch,java.time.LocalDate from,java.time.LocalDate through,OffsetDateTime recordedCutoff,Coverage frozen) {
         var scope=reports.authorizeClosingProof(actor,institution,branch,true);
+        writableTransaction();
         if(from==null || through==null || through.isBefore(from) || through.isAfter(from.plusDays(366)) || through.isAfter(clock.today()) || recordedCutoff==null || recordedCutoff.isAfter(clock.now()) || frozen==null)return false;
+        repository.lockProofPeriodRange(institution,from,through);
         var now=clock.now();var ids=repository.qualifying(institution,branch,from,through,now);if(ids.size()>1000)return false;
-        return canonical(reviewed(scope,ids,now)).equals(canonical(frozen));
+        repository.lockProofSources(institution,branch,ids);
+        var current=reviewed(scope,ids,clock.now());return currentIdentifiers(scope,ids,current) && canonical(current).equals(canonical(frozen));
     }
     private Coverage reviewed(LedgerReportService.Scope scope,List<UUID> journals,OffsetDateTime cutoff) {
         require(journals!=null && journals.size()<=1000 && journals.stream().allMatch(Objects::nonNull) && cutoff!=null && !cutoff.isAfter(clock.now()),"size");
@@ -71,6 +81,8 @@ public class CashFlowAllocationService {
         return new Coverage(versions,proof.missingJournalIds().stream().sorted(Comparator.comparing(UUID::toString)).toList());
     }
     private static OffsetDateTime utc(OffsetDateTime time){return time==null?null:time.withOffsetSameInstant(java.time.ZoneOffset.UTC);}
+    private boolean currentIdentifiers(LedgerReportService.Scope scope,List<UUID> journals,Coverage proof){var expected=new HashMap<UUID,UUID>();proof.versions().forEach(v->expected.put(v.journalId(),v.id()));return repository.currentApprovedIdentifiers(scope.institution(),scope.branch(),journals).equals(expected);}
+    private static void writableTransaction(){var isolation=org.springframework.transaction.support.TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive() || org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly() || isolation!=null && isolation!=java.sql.Connection.TRANSACTION_READ_COMMITTED)throw new IllegalStateException("Cash-flow approval/proof requires a writable READ_COMMITTED owning transaction");}
     @Transactional(readOnly=true) public boolean hasInstitutionHistory(String id){return id!=null && repository.hasInstitutionHistory(id);}
     @Transactional(readOnly=true) public boolean hasMemberHistory(UUID id){return id!=null && repository.hasMemberHistory(id);}
     private void verify(Version v){require(hash(mapper.writeValueAsString(v.source())).equals(v.sourceChecksum()) && hash(mapper.writeValueAsString(v.splits())).equals(v.definitionChecksum()),"checksum");validate(v.source(),v.splits(),v.noncashEvidence());}
