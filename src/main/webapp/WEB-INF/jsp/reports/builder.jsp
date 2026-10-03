@@ -5,6 +5,7 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/report-builder.css' />" />
+<link rel="stylesheet" href="<c:url value='/css/report-print.css' />" media="print" />
 <div class="report-builder">
   <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="report.title" /></h1></div>
   <p><spring:message code="report.boundary" /></p>
@@ -58,12 +59,13 @@
   </form>
   </sec:authorize>
   <c:if test="${not empty result}">
-    <section class="erp-table-wrap">
+    <section class="erp-table-wrap report-print-root ${result.definition.landscape ? 'report-print-landscape' : 'report-print-portrait'}">
       <div class="app-table-titlebar"><h2><c:out value="${result.definition.title}" /></h2><span><c:out value="${result.rowsInScope}" /> <spring:message code="report.rows" /></span></div>
       <div class="report-context"><p><c:out value="${reportCoverage}" /></p>
         <p><spring:message code="report.scope" />: <c:out value="${result.institution}" /> / <c:out value="${result.branch}" /></p>
         <p><spring:message code="report.filters" />: <c:choose><c:when test="${empty result.definition.filters}"><spring:message code="report.noFilters" /></c:when><c:otherwise><c:forEach items="${result.definition.filters}" var="filter"><c:out value="${fieldLabels[filter.field.name()]}" /> <spring:message code="report.${filter.operator}" /> <c:out value="${filter.value}" />; </c:forEach></c:otherwise></c:choose></p>
         <p><spring:message code="report.period" />: <c:out value="${result.from}" /> / <c:out value="${result.through}" />. <spring:message code="report.cutoff" />: <c:out value="${result.recordedCutoff}" /></p>
+        <p><spring:message code="report.printScope" arguments="${result.rows.size()},${result.rowsInScope}" /></p>
         <p><spring:message code="report.untracked" />: <c:out value="${result.untrackedLoans}" /></p></div>
       <div class="erp-table-scroll" data-view-position-key="operational-report-preview"><table class="erp-table"><thead><tr>
         <c:forEach items="${result.getVisibleColumns()}" var="column"><th style="min-width:${column.width}px"><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><c:out value="${fieldLabels[column.field.name()]}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
@@ -84,6 +86,7 @@
           </form>
         </c:if>
         <sec:authorize access="@access.has(principal,'REPORT_EXPORT')">
+          <button type="button" class="app-btn btn-neutral report-print-action" data-no-page-preloader="true"><spring:message code="common.print" /></button>
           <c:choose><c:when test="${not empty runVersion}"><c:url var="exportUrl" value="/reports/builder/templates/${runVersion}/export" /></c:when><c:otherwise><c:url var="exportUrl" value="/reports/builder/preview/export" /></c:otherwise></c:choose>
           <form action="${exportUrl}" method="${not empty runVersion ? 'get' : 'post'}"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="definition" value="<c:out value='${definitionJson}' />" /><input type="hidden" name="from" value="${result.from}" /><input type="hidden" name="through" value="${result.through}" /><input type="hidden" name="cutoff" value="${result.recordedCutoff}" />
           <c:forEach items="${['CSV','XLSX','PDF']}" var="format"><button class="app-btn btn-neutral" data-download-action="true" name="format" value="${format}"><c:out value="${format}" /></button></c:forEach></form>
@@ -107,4 +110,5 @@
   </section>
 </div>
 <script src="<c:url value='/js/report-builder.js' />" defer></script>
+<script src="<c:url value='/js/report-print.js' />" defer></script>
 <%@ include file="../fragments/footer.jspf" %>

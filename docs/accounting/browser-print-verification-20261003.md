@@ -1,0 +1,22 @@
+# Integrated finance UI and browser print verification — 2026-10-03
+
+Synthetic disposable loopback data only; no actual accountant, compliance, opening-balance or release approval is asserted. Root base commit before integration: 481e4ea. App used PostgreSQL17.9 database microfinance_accounting_ui_integrated_20261003 on127.0.0.1:55439, normal ordered57 migrations through49.2, own loopback HTTP18080.
+
+## Delivered UI changes
+
+Finance sidebar entries expose existing business/supplier/asset, reconciliation/closing, statement/regulatory, cash-flow/trial, report-run, statement-file and release destinations under their actual claims. Active destinations do not overlap; no default grants were added. Access-matrix finance/repayment feature labels, actions and matrix controls use English/Kiswahili bundles.
+
+Operational browser printing exposes only the displayed typed result: orientation, scope, source/date/cutoff/coverage, visible rows and full-filter totals. It explicitly distinguishes displayed rows from all matching rows. A4 portrait/landscape styles remove navigation, designer, toolbar, pagination and loaders, repeat table headers, allow wrapping and preserve totals. This prints the displayed page; full-result export remains separate.
+
+## Executed evidence
+
+- 15 maintained finance/report pages ×2 languages ×4 widths(360/768/1366/1920) =120 completed page checks, all HTTP200, correct saved language, no document overflow and no browser errors. Includes accounts,journals,policies,business index/new/suppliers/assets,reconciliation,closing,statement files,accounting release,report runs,statement designer,protected regulatory registry and operational builder. Screenshot examples were visually inspected for mobile release and desktop designer. Log: %TEMP%/microfinance-accounting-integrated-browser-rerun-20261003.log; JSON: microfinance-accounting-integrated-browser-evidence-20261003.json.
+- 8 additional access-matrix viewport/language checks passed without untranslated finance/action message IDs or page overflow. JSON: %TEMP%/microfinance-integrated-access-print-evidence-20261003.json. No permission changes were submitted.
+- Two actual synthetic operational layouts(en portrait/sw landscape): keyboard column ordering, typed empty preview, draft save, same-maker publication refusal, independent publication, published-run responsiveness at all4 widths and six nonempty CSV/XLSX/PDF downloads passed. The datasets were empty: this does not prove populated pagination or full-scope cents. JSON/log: %TEMP%/microfinance-builder-integrated-flow-evidence-20261003.json and microfinance-builder-integrated-flow-20261003.log.
+- Final browser print checks remove shell heading/skiplink, designer, navigation and actions, retain typed scope/coverage/totals and produce one A4 page each (portrait594.96×841.92points; landscape841.92×594.96points). Actual PDFs were rendered with bundled pypdfium2 and all browser-print pages visually inspected: no overlapping headers, extra blank shell page or missing source metadata. Final JSON: %TEMP%/microfinance-integrated-print-final-evidence-20261003.json; PDF render evidence: microfinance-integrated-print-render-evidence-20261003.json. Server-generated exports were separately rendered, preserving their deliberate horizontal column bands and totals pages.
+
+## Corrections and remaining gates
+
+The initial fixture lacked institution language settings; it was corrected only in the disposable database. An initial heading selector assumed every maintained page used the same class; the test now reads the semantic heading. Failed fixture logs remain retained. Visual print QA caught an extra shell-heading page and shared nested-header specificity causing overlap; print-only selectors were corrected and the final PDFs regenerated. Before-fix PDFs remain retained under synthetic-browser-print-before-fix/wrapping-before-fix names.
+
+This increment does not complete H10: populated C/D/G/H source workflows, invalid financial forms, source release restrictions after next integration, actual finalized statement acceptance, permission revocation/download tests, populated print/pagination and shared shell fallback localization remain open. D institution/E historical/export/G CFv2/C posting-release follow-up commits were verified independently but are integrated after this UI run. All eight phases and the overall goal remain incomplete. Real institutional policies and verified openings remain unavailable; their workflows stay gated.
