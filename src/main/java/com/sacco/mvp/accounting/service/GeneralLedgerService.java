@@ -88,7 +88,7 @@ public class GeneralLedgerService {
         require(start!=null && end!=null && !end.isBefore(start) && end.isBefore(start.plusYears(2)),"period");
         var policy=policies.requireApprovedLocalPolicy(actor.getSaccoId(),start);
         require(!start.isBefore(policy.openingDate()),"openingDate");
-        books.lockAccounts(actor.getSaccoId());require(!books.periodOverlap(actor.getSaccoId(),start,end),"overlappingPeriod");
+        books.lockAccounts(actor.getSaccoId());require(!books.hasClosedLaterPeriod(actor.getSaccoId(),start),"earlierPeriodNeedsReopen");require(!books.periodOverlap(actor.getSaccoId(),start,end),"overlappingPeriod");
         UUID id=books.createPeriod(actor.getSaccoId(),start,end,policy.id(),actor.getMemberId(),clock.now());
         event(actor,id,"PERIOD_CREATED",Map.of("start",start,"end",end));return id;
     }

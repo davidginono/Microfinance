@@ -29,6 +29,11 @@ public final class ReconciliationDtos {
         UUID maker,UUID checker,String evidence,OffsetDateTime recordedAt) { }
     public record FinalizedSnapshot(UUID id,UUID period,int version,LocalDate asOf,OffsetDateTime recordedCutoff,
         String checksum,String snapshot,UUID reviewer,boolean periodClosed,boolean restatement,String coverage) { }
+    public record BranchCloseSource(String branch,UUID reviewId,int version,OffsetDateTime recordedCutoff,String checksum,UUID reviewer) { }
+    public record InstitutionSnapshot(String dimension,String institution,UUID period,LocalDate from,LocalDate through,
+        String checksum,String snapshot,List<BranchCloseSource> branches,boolean periodClosed,boolean restated) {
+        public InstitutionSnapshot {branches=List.copyOf(branches);}
+    }
     public record BranchClose(UUID id,String branch,int version,String checksum) { }
     public record OpeningEvidence(UUID id,UUID journal,UUID policy,int policyVersion,String payloadChecksum,
         UUID maker,UUID reviewer,String sourceEvidence,String reviewEvidence,LocalDate through,

@@ -452,5 +452,89 @@ class ReconciliationPostgresTest {
         globalAllowed.set(true);service.completeInstitutionClose(checker,period,"Explicitly authorized institution source proof");
         assertThat(service.finalizedSnapshot(maker,ownClose).periodClosed()).isTrue();assertThat(service.finalizedSnapshot(b2maker,otherClose).periodClosed()).isTrue();
         verify(source,times(2)).historicalControlSnapshotCurrentForInstitutionClose(eq(checker),argThat(s->s.branch().equals("B2")));
+        var aggregate=tx.execute(status->service.finalizedInstitutionSnapshotForPublication(checker,period));
+        var retained=JsonMapper.builder().findAndAddModules().build().readTree(aggregate.snapshot());assertThat(retained.get("businessControlSources").size()).isEqualTo(2);
+        globalAllowed.set(false);assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(checker,period))).hasMessage("reconciliation.error.staleEvidence");assertThat(aggregate.checksum()).isEqualTo(ReconciliationService.sha(aggregate.snapshot()));
     }
+    private UUID secondBranchOpening(AppUserPrincipal actor,AppUserPrincipal reviewer) {
+        var j=gl.importOpening(actor,new JournalCommand(UUID.randomUUID(),"B2-INDEPENDENT-OPENING",DAY,"Synthetic reviewed B2 source",null,List.of(new Line(bank,new BigDecimal("100.00"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("100.00")))));
+        gl.approve(reviewer,j.id(),"Independent B2 imported balances");gl.post(reviewer,j.id(),true);return j.id();
+    }
+    private void matchBranchMovement(AppUserPrincipal actor,AppUserPrincipal reviewer,UUID journal,String reference,BigDecimal amount) {
+        UUID statement=service.importStatement(actor,new StatementCommand(UUID.randomUUID(),bank,format,DAY.plusDays(1),DAY.plusDays(1),
+            new BigDecimal("100.00"),new BigDecimal("100.00").add(amount),reference+".csv","Synthetic independent bank source",
+            "date,reference,amount,kind\n2026-10-02,"+reference+","+amount.toPlainString()+",RECEIPT"));
+        UUID row=service.rows(actor,statement,0).rows().getFirst().id();UUID match=service.proposeMatch(actor,"EXACT","Verified journal money line",List.of(new Allocation(row,journalLine(journal),amount)));
+        service.reviewMatch(reviewer,match,true,"Independent branch statement matching");UUID certificate=service.certify(actor,bank,DAY.plusDays(1),"STATEMENT",new BigDecimal("100.00").add(amount),"Reviewed bank closing balance");
+        service.reviewCertificate(reviewer,certificate,"Independent branch bank certificate");
+    }
+    @Test void institutionFinancialSourceSumsExactCentsAndRetainsOnlyMinimalLineageAndEssentialCashProof() {
+        opening();station("B2");var b2maker=operator("B2");var b2checker=operator("B2");secondBranchOpening(b2maker,b2checker);
+        UUID compound=compoundCash(),version=UUID.randomUUID();var cash=mock(CashFlowReconciliationSource.class);
+        when(cash.reviewedAllocations(any(),eq(List.of(compound)),any())).thenReturn(new CashFlowReconciliationSource.Coverage(List.of(cashVersion(compound,version)),List.of()));enableSources(null,cash);
+        matchBranchMovement(maker,checker,compound,"CASH-ALLOCATED",new BigDecimal("10.00"));
+        when(clock.now()).thenReturn(NOW.plusMinutes(1));UUID first=service.proposeClose(maker,period,"B1 independently prepared",false);service.approveClose(checker,first,"B1 independent closing approval");
+        UUID cent=gl.draftManual(b2maker,new JournalCommand(UUID.randomUUID(),"B2-CENT",DAY.plusDays(1),"Synthetic exact cent source",null,List.of(new Line(bank,new BigDecimal("0.01"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("0.01"))))).id();
+        gl.approve(b2checker,cent,"Independent cent posting");gl.post(b2checker,cent,false);matchBranchMovement(b2maker,b2checker,cent,"B2-CENT",new BigDecimal("0.01"));
+        when(clock.now()).thenReturn(NOW.plusMinutes(2));UUID second=service.proposeClose(b2maker,period,"B2 independently prepared",false);service.approveClose(b2checker,second,"B2 independent closing approval");service.completeInstitutionClose(checker,period,"Reviewed B1 and B2 sources");
+        when(claims.effectiveClaims(eq(checker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.FINANCIAL_REPORTS_INSTITUTION));
+        var combined=tx.execute(status->service.finalizedInstitutionSnapshotForPublication(checker,period));
+        assertThat(combined.dimension()).isEqualTo("INSTITUTION");assertThat(combined.periodClosed()).isTrue();assertThat(combined.branches()).extracting(BranchCloseSource::reviewId).containsExactly(first,second);
+        assertThat(combined.branches().get(0).recordedCutoff().toInstant()).isEqualTo(NOW.plusMinutes(1).toInstant());assertThat(combined.branches().get(1).recordedCutoff().toInstant()).isEqualTo(NOW.plusMinutes(2).toInstant());
+        var json=JsonMapper.builder().enable(tools.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).findAndAddModules().build().readTree(combined.snapshot());
+        var bankRow=java.util.stream.StreamSupport.stream(json.get("accounts").spliterator(),false).filter(n->n.get("id").asText().equals(bank.toString())).findFirst().orElseThrow();
+        assertThat(bankRow.get("opening").decimalValue()).isEqualByComparingTo("200.00");assertThat(bankRow.get("period_debit").decimalValue()).isEqualByComparingTo("10.01");assertThat(bankRow.get("closing").decimalValue()).isEqualByComparingTo("210.01");
+        assertThat(json.get("cashFlowAllocations").get("versions").size()).isEqualTo(1);assertThat(json.get("cashFlowAllocations").get("versions").get(0).get("id").asText()).isEqualTo(version.toString());
+        assertThat(json.get("automaticCashMovements").size()).isEqualTo(1);assertThat(json.get("automaticCashMovements").get(0).get("counterpart_movement").decimalValue()).isEqualByComparingTo("-0.01");
+        assertThat(json.get("recordedCutoff")).isNull();assertThat(json.get("statementEvidence")).isNull();assertThat(json.get("certificates")).isNull();assertThat(json.get("retainedDifferences")).isNull();assertThat(combined.checksum()).isEqualTo(ReconciliationService.sha(combined.snapshot()));
+        assertThatThrownBy(()->service.close(checker,second)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.finalizedInstitutionSnapshotForPublication(checker,period)).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        when(claims.effectiveClaims(eq(checker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW));
+        assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(checker,period))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void unreviewedActiveBranchesAndRevokedWorkspaceCannotPublishInstitutionAggregates() {
+        opening();UUID own=balancedTimingClose(period,DAY.plusDays(1),"INSTITUTION-BASE");
+        var source=tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,period));station("B2");
+        assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,period))).hasMessage("reconciliation.error.branchCoverage");
+        assertThat(service.finalizedSnapshot(maker,own).snapshot()).isNotBlank();assertThat(source.branches()).hasSize(1);
+        jdbc.update("update sacco_stations set active=false where sacco_id=? and station_id='B1'",institution);
+        assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,period))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void publicationMetadataPinBlocksEarlierGapSetupUntilIndependentReopening() throws Exception {
+        opening();balancedTimingClose(period,DAY.plusDays(1),"SETUP-FIRST");when(clock.today()).thenReturn(DAY.plusDays(3));when(clock.now()).thenReturn(NOW.plusDays(2));
+        UUID later=gl.createPeriod(maker,DAY.plusDays(3),DAY.plusDays(3));UUID retained=balancedTimingClose(later,DAY.plusDays(3),"SETUP-LATER");String frozen=service.finalizedSnapshot(maker,retained).snapshot();
+        when(clock.now()).thenReturn(NOW.plusDays(2).plusMinutes(1));var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var writerStarted=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var publication=pool.submit(()->tx.execute(status->{var snapshot=service.finalizedInstitutionSnapshotForPublication(maker,later);entered.countDown();try{assertThat(release.await(10,TimeUnit.SECONDS)).isTrue();}catch(InterruptedException e){throw new IllegalStateException(e);}return snapshot;}));
+            assertThat(entered.await(10,TimeUnit.SECONDS)).isTrue();
+            var writerPid=new java.util.concurrent.atomic.AtomicInteger();
+            var writer=pool.submit(()->tx.execute(status->{writerPid.set(jdbc.queryForObject("select pg_backend_pid()",Integer.class));writerStarted.countDown();return gl.createPeriod(maker,DAY.plusDays(2),DAY.plusDays(2));}));
+            assertThat(writerStarted.await(10,TimeUnit.SECONDS)).isTrue();boolean waiting=false;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+            while(!waiting&&System.nanoTime()<deadline) {waiting=Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from pg_locks where pid=? and locktype='advisory' and not granted)",Boolean.class,writerPid.get()));if(!waiting)Thread.sleep(10);}
+            assertThat(waiting).isTrue();assertThatThrownBy(()->writer.get(250,TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            release.countDown();assertThat(publication.get(10,TimeUnit.SECONDS).periodClosed()).isTrue();
+            assertThatThrownBy(()->writer.get(10,TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class).hasRootCauseMessage("accounting.error.earlierPeriodNeedsReopen");
+        } finally {release.countDown();}
+        assertThat(jdbc.queryForObject("select count(*) from accounting_period where sacco_id=? and starts_on=?",Integer.class,institution,DAY.plusDays(2))).isZero();
+        UUID reopen=service.proposeClose(third,later,"Explicit reopening for earlier gap setup",true);service.approveClose(fourth,reopen,"Independent review of cumulative impact");
+        verify(reopenListener).periodReopened(eq(fourth),eq(later),eq(DAY.plusDays(3)),contains("earlier gap setup"));
+        when(clock.now()).thenReturn(NOW.plusDays(2).plusMinutes(2));UUID gap=gl.createPeriod(maker,DAY.plusDays(2),DAY.plusDays(2));assertThat(gap).isNotNull();
+        when(clock.now()).thenReturn(NOW.plusDays(2).plusMinutes(3));balancedTimingClose(gap,DAY.plusDays(2),"SETUP-GAP");
+        assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,later))).hasMessage("reconciliation.error.approvalRequired");
+        when(clock.now()).thenReturn(NOW.plusDays(2).plusMinutes(4));UUID fresh=balancedTimingClose(later,DAY.plusDays(3),"SETUP-LATER-FRESH");
+        assertThat(tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,later)).branches()).extracting(BranchCloseSource::reviewId).containsExactly(fresh);
+        assertThat(service.finalizedSnapshot(maker,retained).snapshot()).isEqualTo(frozen);assertThat(service.finalizedSnapshot(maker,retained).periodClosed()).isFalse();
+    }
+    @Test void retainedLegacyEarlierPeriodMetadataKeepsOldLaterSourceIneligibleEvenAfterGapClosing() {
+        opening();balancedTimingClose(period,DAY.plusDays(1),"LEGACY-FIRST");when(clock.today()).thenReturn(DAY.plusDays(3));when(clock.now()).thenReturn(NOW.plusDays(2));
+        UUID later=gl.createPeriod(maker,DAY.plusDays(3),DAY.plusDays(3));UUID old=balancedTimingClose(later,DAY.plusDays(3),"LEGACY-LATER");String frozen=service.finalizedSnapshot(maker,old).snapshot();
+        when(clock.now()).thenReturn(NOW.plusDays(2).plusMinutes(1));
+        // Models retained metadata written before the new owning-service guard, never an exposed mutation route.
+        UUID gap=tx.execute(status->{var books=new GeneralLedgerRepository(jdbc);books.lockAccounts(institution);return books.createPeriod(institution,DAY.plusDays(2),DAY.plusDays(2),policy,maker.getMemberId(),NOW.plusDays(2).plusMinutes(1));});
+        when(clock.now()).thenReturn(NOW.plusDays(2).plusMinutes(2));balancedTimingClose(gap,DAY.plusDays(2),"LEGACY-GAP");
+        assertThat(service.finalizedSnapshot(maker,old).periodClosed()).isFalse();assertThat(service.finalizedSnapshot(maker,old).snapshot()).isEqualTo(frozen);
+        assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,later))).hasMessage("reconciliation.error.branchCoverage");
+        assertThatThrownBy(()->tx.execute(status->service.finalizedSnapshotForPublication(maker,old))).hasMessage("reconciliation.error.approvalRequired");
+    }
+
 }

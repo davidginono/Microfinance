@@ -30,6 +30,7 @@ public class GeneralLedgerRepository {
     public void lockAccounts(String institution) {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))", "GL_SETUP/" + institution);
     }
+    public boolean hasClosedLaterPeriod(String institution,java.time.LocalDate start) {return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accounting_period where sacco_id=? and starts_on>? and state in('CLOSING','CLOSED'))",Boolean.class,institution,start));}
     public List<Account> accounts(String institution, int offset, int limit) {
         return jdbc.query("select * from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
     }

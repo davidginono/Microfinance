@@ -146,8 +146,28 @@ public class ReconciliationRepository {
     public void reviewCertificate(UUID id,UUID checker,String evidence,OffsetDateTime now) {jdbc.update("insert into reconciliation_certificate_decision(certificate_id,checker_id,evidence,decided_at) values(?,?,?,?)",id,checker,evidence,now);}
     public List<Period> periods(String institution,int offset) {return jdbc.query("select * from accounting_period where sacco_id=? order by starts_on desc,id limit 26 offset ?",(r,n)->new Period(uuid(r,"id"),date(r,"starts_on"),date(r,"ends_on"),r.getString("state")),institution,offset);}
     public Optional<Period> period(String institution,UUID id,boolean lock) {return jdbc.query("select * from accounting_period where sacco_id=? and id=?"+(lock?" for update":""),(r,n)->new Period(uuid(r,"id"),date(r,"starts_on"),date(r,"ends_on"),r.getString("state")),institution,id).stream().findFirst();}
-    public void lockPeriodForPublication(String institution,UUID id) {jdbc.query("select p.id from accounting_period p where p.sacco_id=? and p.starts_on<=(select ends_on from accounting_period where id=? and sacco_id=?) order by p.starts_on,p.id for share of p",(r,n)->uuid(r,"id"),institution,id,institution);}
-    public void lockPriorPeriods(String institution,LocalDate through) {jdbc.query("select id from accounting_period where sacco_id=? and starts_on<=? order by starts_on,id for update",(r,n)->uuid(r,"id"),institution,through);}
+    public void lockPeriodForPublication(String institution,UUID id) {lockSetupForPublication(institution);jdbc.query("select p.id from accounting_period p where p.sacco_id=? and p.starts_on<=(select ends_on from accounting_period where id=? and sacco_id=?) order by p.starts_on,p.id for share of p",(r,n)->uuid(r,"id"),institution,id,institution);}
+    public void lockPriorPeriods(String institution,LocalDate through) {lockSetupForPublication(institution);jdbc.query("select id from accounting_period where sacco_id=? and starts_on<=? order by starts_on,id for update",(r,n)->uuid(r,"id"),institution,through);}
+
+    /** Pin rare account/period setup mutations before any ordered period lock. */
+    public void lockSetupForPublication(String institution) {jdbc.queryForList("select pg_advisory_xact_lock_shared(hashtextextended(?,0))","GL_SETUP/"+institution);}
+    /** Latest genuine current branch closes, bounded including total source bytes before transfer to the JVM. */
+    public List<CloseReview> currentInstitutionCloses(String institution,UUID period) {return jdbc.query("""
+          with latest as(select distinct on(r.station_id) r.*,d.checker_id from accounting_close_review r
+            join accounting_close_decision d on d.review_id=r.id where r.sacco_id=? and r.period_id=? and r.action='CLOSE'
+            and r.recorded_at>coalesce((select max(rd.decided_at) from accounting_close_review rr join accounting_close_decision rd on rd.review_id=rr.id
+              where rr.period_id=r.period_id and rr.action='REOPEN'),'-infinity')
+            and not exists(select 1 from accounting_period earlier join accounting_period own on own.id=r.period_id
+              where earlier.sacco_id=r.sacco_id and earlier.starts_on<own.starts_on and (earlier.state<>'CLOSED' or earlier.created_at>=r.recorded_at))
+            and not exists(select 1 from accounting_close_review rr join accounting_close_decision rd on rd.review_id=rr.id
+              join accounting_period earlier on earlier.id=rr.period_id join accounting_period own on own.id=r.period_id
+              where rr.sacco_id=r.sacco_id and rr.action='REOPEN' and earlier.starts_on<own.starts_on and rd.decided_at>=r.recorded_at)
+            order by r.station_id,r.version desc limit 1001),bounded as
+          (select latest.*,sum(octet_length(snapshot_json)) over(order by station_id) source_bytes from latest)
+          select id,period_id,station_id,version,'APPROVED_CLOSE' state,case when source_bytes<=8388608 then snapshot_json end snapshot_json,
+            checksum,maker_id,checker_id,evidence,recorded_at from bounded order by station_id limit 1001
+          """,CLOSE,institution,period);}
+
     public List<CloseCheck> checks(String institution,String branch,Period p) {
         var result=new ArrayList<CloseCheck>();
         result.add(new CloseCheck("opening",count("select count(*) from gl_cutover_coverage c join gl_journal j on j.id=c.opening_journal_id where c.sacco_id=? and c.station_id=? and c.complete and j.state='POSTED'",institution,branch)==1?0:1));
@@ -247,7 +267,7 @@ public class ReconciliationRepository {
           where r.sacco_id=? and r.station_id=? and r.period_id=? and r.action='CLOSE'
           and r.recorded_at>coalesce((select max(rd.decided_at) from accounting_close_review rr join accounting_close_decision rd on rd.review_id=rr.id where rr.period_id=r.period_id and rr.action='REOPEN'),'-infinity')
           and not exists(select 1 from accounting_period earlier join accounting_period own on own.id=r.period_id
-            where earlier.sacco_id=r.sacco_id and earlier.starts_on<own.starts_on and earlier.state<>'CLOSED')
+            where earlier.sacco_id=r.sacco_id and earlier.starts_on<own.starts_on and (earlier.state<>'CLOSED' or earlier.created_at>=r.recorded_at))
           and not exists(select 1 from accounting_close_review rr join accounting_close_decision rd on rd.review_id=rr.id
             join accounting_period earlier on earlier.id=rr.period_id join accounting_period own on own.id=r.period_id
             where rr.sacco_id=r.sacco_id and rr.action='REOPEN' and earlier.starts_on<own.starts_on and rd.decided_at>=r.recorded_at)

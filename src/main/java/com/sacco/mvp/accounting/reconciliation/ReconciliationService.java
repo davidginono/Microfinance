@@ -247,6 +247,23 @@ public class ReconciliationService {
         var result=finalizedSnapshot(actor,id);require(result.periodClosed(),"approvalRequired");
         var p=scopedPeriod(actor,review.period(),false);provenance().retainedControls(actor,actor.getStationId(),p,review,clock.now(),false);provenance().retainedCash(actor,actor.getStationId(),p,review,clock.now(),false);return result;
     }
+    /** Trusted institution aggregate for finalizers; no foreign registries or invented common cutoff. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public InstitutionSnapshot finalizedInstitutionSnapshotForPublication(AppUserPrincipal actor,UUID period) {
+        authorize(actor,UserClaim.FINANCIAL_REPORTS_VIEW);authorize(actor,UserClaim.FINANCIAL_REPORTS_INSTITUTION);
+        repo.lockPeriodForPublication(actor.getSaccoId(),period);var p=scopedPeriod(actor,period,false);require("CLOSED".equals(p.state()),"approvalRequired");
+        var branches=repo.branches(actor.getSaccoId(),p.through());require(!branches.isEmpty()&&branches.size()<=1000,"branchCoverage");
+        var reviews=repo.currentInstitutionCloses(actor.getSaccoId(),period);require(reviews.size()<=1000&&reviews.size()==branches.size(),"branchCoverage");
+        require(new HashSet<>(branches).equals(reviews.stream().map(CloseReview::branch).collect(java.util.stream.Collectors.toSet())),"branchCoverage");
+        var proofs=new ArrayList<InstitutionSnapshotAssembler.BranchProof>();var now=clock.now();
+        for(var review:reviews) {
+            require(review.snapshot()!=null,"snapshotSize");require(review.checker()!=null&&!review.checker().equals(review.maker()),"independentReview");
+            var control=provenance().retainedControls(actor,review.branch(),p,review,now,true);
+            var cash=provenance().retainedCash(actor,review.branch(),p,review,now,true);
+            proofs.add(new InstitutionSnapshotAssembler.BranchProof(review,control,cash));
+        }
+        return new InstitutionSnapshotAssembler().assemble(actor.getSaccoId(),p,proofs,repo.restated(period));
+    }
     @Transactional(readOnly=true)
     public OpeningEvidence reviewedOpeningEvidence(AppUserPrincipal actor) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);return repo.opening(actor.getSaccoId(),actor.getStationId()).orElseThrow(()->invalid("approvalRequired"));}
     private Map<String,Object> snapshotData(String institution,String branch,Period p) {
