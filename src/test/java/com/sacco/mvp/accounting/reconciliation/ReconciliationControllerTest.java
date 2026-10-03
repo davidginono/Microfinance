@@ -53,4 +53,19 @@ class ReconciliationControllerTest {
         @Bean SecurityFilterChain filter(HttpSecurity http) throws Exception {return http.authorizeHttpRequests(a->a.anyRequest().authenticated()).build();}
         @Bean InternalResourceViewResolver views() {return new InternalResourceViewResolver("/WEB-INF/jsp/",".jsp");}
     }
+
+    @Test void multipartNoMovementUsesAuthenticatedScopeAndRequiresCsrf() throws Exception {
+        UUID id=UUID.randomUUID();var actor=actor();var file=new org.springframework.mock.web.MockMultipartFile("statementFile","actual.csv","text/csv","date,reference,amount,kind".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        mvc.perform(multipart("/finance/reconciliation/import").file(file).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(service);
+        when(service.importUploadedStatement(any(),any(),any())).thenReturn(id);
+        mvc.perform(multipart("/finance/reconciliation/import").file(file).with(user(actor)).with(csrf()).param("requestKey",UUID.randomUUID().toString()).param("account",UUID.randomUUID().toString()).param("format",UUID.randomUUID().toString()).param("from","2026-10-01").param("through","2026-10-02").param("opening","0.00").param("closing","0.00").param("filename","spoofed.csv").param("content","ignored form text").param("evidence","Synthetic uploaded source").param("action","import").param("saccoId","FOREIGN").param("stationId","B2")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/reconciliation/statements/"+id));
+        verify(service).importUploadedStatement(eq(actor),argThat(c->c.opening().toPlainString().equals("0.00")&&c.closing().toPlainString().equals("0.00")),eq(file));verify(service,never()).importStatement(any(),any());
+    }
+    @Test void retainedFileDownloadUsesAuthenticatedRecordAndExactChecksumAndBytes() throws Exception {
+        UUID id=UUID.randomUUID();var actor=actor();String checksum="a".repeat(64),content="date,reference,amount,kind\r\n";
+        when(service.statementFile(actor,id)).thenReturn(new ReconciliationDtos.StatementFile(id,"actual.csv",checksum,content,true,"UPLOAD"));
+        mvc.perform(get("/finance/reconciliation/statements/"+id+"/evidence").with(user(actor)).param("saccoId","FOREIGN").param("stationId","B2")).andExpect(status().isOk()).andExpect(header().string("ETag","\""+checksum+"\"")).andExpect(content().bytes(content.getBytes(java.nio.charset.StandardCharsets.UTF_8))).andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("actual.csv")));
+        verify(service).statementFile(eq(actor),eq(id));
+    }
+
 }

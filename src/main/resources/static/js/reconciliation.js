@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const importForm = document.querySelector('[data-statement-import]');
+    if (importForm) {
+        const file = importForm.elements.namedItem('statementFile');
+        const content = importForm.elements.namedItem('content');
+        const filename = importForm.elements.namedItem('filename');
+        const update = () => { content.required = filename.required = file.files.length === 0; };
+        file.addEventListener('change', update);
+        update();
+    }
     const button = document.querySelector('[data-add-allocation]');
     const container = document.querySelector('[data-allocations]');
     if (!button || !container) return;

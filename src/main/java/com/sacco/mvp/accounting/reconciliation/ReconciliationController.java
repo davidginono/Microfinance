@@ -33,15 +33,26 @@ public class ReconciliationController {
     @PostMapping("/reconciliation/import")
     String imported(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID requestKey,@RequestParam UUID account,
         @RequestParam UUID format,@RequestParam LocalDate from,@RequestParam LocalDate through,@RequestParam BigDecimal opening,
-        @RequestParam BigDecimal closing,@RequestParam String filename,@RequestParam String evidence,@RequestParam String content,
-        @RequestParam String action,Model m) {
+        @RequestParam BigDecimal closing,@RequestParam(defaultValue="") String filename,@RequestParam String evidence,@RequestParam(defaultValue="") String content,
+        @RequestParam(required=false) org.springframework.web.multipart.MultipartFile statementFile,@RequestParam String action,Model m) {
         var c=new StatementCommand(requestKey,account,format,from,through,opening,closing,filename,evidence,content);
-        if("preview".equals(action)) {m.addAttribute("preview",service.preview(actor,c));m.addAttribute("draft",c);m.addAttribute("requestKey",requestKey);return index(actor,0,through,m);}
-        if(!"import".equals(action))throw new IllegalArgumentException("reconciliation.error.statement");return "redirect:/finance/reconciliation/statements/"+service.importStatement(actor,c);
+        boolean uploaded=statementFile!=null&&!statementFile.isEmpty();
+        if("preview".equals(action)) {
+            if(uploaded){var preview=service.previewUploadedStatement(actor,c,statementFile);m.addAttribute("preview",preview.rows());m.addAttribute("draft",preview.command());m.addAttribute("uploadedPreview",true);}
+            else {m.addAttribute("preview",service.preview(actor,c));m.addAttribute("draft",c);}
+            m.addAttribute("previewReady",true);m.addAttribute("requestKey",requestKey);return index(actor,0,through,m);
+        }
+        if(!"import".equals(action))throw new IllegalArgumentException("reconciliation.error.statement");return "redirect:/finance/reconciliation/statements/"+(uploaded?service.importUploadedStatement(actor,c,statementFile):service.importStatement(actor,c));
     }
     @GetMapping("/reconciliation/statements/{id}")
     String statement(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="0") int candidatePage,Model m) {
         m.addAttribute("statement",service.statement(actor,id));m.addAttribute("rows",service.rows(actor,id,page));m.addAttribute("candidates",service.candidates(actor,id,candidatePage));m.addAttribute("allocationIndexes",List.of(0,1,2,3,4,5,6,7));return "accounting/reconciliation/statement";
+    }
+    @GetMapping("/reconciliation/statements/{id}/evidence")
+    org.springframework.http.ResponseEntity<byte[]> evidence(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id) {
+        var file=service.statementFile(actor,id);return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType("text/csv;charset=UTF-8"))
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,org.springframework.http.ContentDisposition.attachment().filename(file.filename(),java.nio.charset.StandardCharsets.UTF_8).build().toString())
+            .eTag("\""+file.checksum()+"\"").body(file.content().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
     @PostMapping("/reconciliation/statements/{id}/match")
     String match(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam String kind,@RequestParam String evidence,

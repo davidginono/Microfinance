@@ -56,13 +56,36 @@ public class ReconciliationService {
         authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);statementAccount(actor,command);return parse(command);
     }
     @Transactional
-    public UUID importStatement(AppUserPrincipal actor,StatementCommand c) {
-        authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);statementAccount(actor,c);var rows=parse(c);
-        String checksum=sha(c.content());String payload=sha(c.account()+"|"+c.format()+"|"+c.from()+"|"+c.through()+"|"+c.opening().setScale(2)+"|"+c.closing().setScale(2)+"|"+c.filename()+"|"+c.evidence()+"|"+checksum);
+    public UUID importStatement(AppUserPrincipal actor,StatementCommand c) {return importStatement(actor,c,"TEXT");}
+    @Transactional(readOnly=true)
+    public UploadedPreview previewUploadedStatement(AppUserPrincipal actor,StatementCommand metadata,org.springframework.web.multipart.MultipartFile file) {
+        authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);var command=uploadedCommand(metadata,file);statementAccount(actor,command);return new UploadedPreview(command,parse(command));
+    }
+    @Transactional
+    public UUID importUploadedStatement(AppUserPrincipal actor,StatementCommand metadata,org.springframework.web.multipart.MultipartFile file) {
+        authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);return importStatement(actor,uploadedCommand(metadata,file),"UPLOAD");
+    }
+    private static StatementCommand uploadedCommand(StatementCommand c,org.springframework.web.multipart.MultipartFile file) {
+        require(c!=null&&file!=null&&!file.isEmpty()&&file.getSize()<=1_000_000,"importSize");
+        try {
+            byte[] bytes=file.getBytes();require(bytes.length>0&&bytes.length<=1_000_000,"importSize");
+            String content=StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+            return new StatementCommand(c.key(),c.account(),c.format(),c.from(),c.through(),c.opening(),c.closing(),file.getOriginalFilename(),c.evidence(),content);
+        }catch(java.io.IOException failure){throw invalid("uploadedFile");}
+    }
+    @Transactional(readOnly=true)
+    public StatementFile statementFile(AppUserPrincipal actor,UUID id) {
+        authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_VIEW);scopedStatement(actor,id);var file=repo.statementFile(actor.getSaccoId(),actor.getStationId(),id).orElseThrow(()->invalid("sourceUnavailable"));
+        require(sha(file.content()).equals(file.checksum()),"staleEvidence");return file;
+    }
+    private UUID importStatement(AppUserPrincipal actor,StatementCommand c,String origin) {
+        authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);statementAccount(actor,c);var rows=parse(c);require(!rows.isEmpty()||"UPLOAD".equals(origin),"zeroMovementFile");if(rows.isEmpty())require(c.content().matches("date,reference,amount,kind[\\r\\n]*"),"format");
+        String checksum=sha(c.content());String payload=sha(c.account()+"|"+c.format()+"|"+c.from()+"|"+c.through()+"|"+c.opening().setScale(2)+"|"+c.closing().setScale(2)+"|"+c.filename()+"|"+c.evidence()+"|"+checksum+("UPLOAD".equals(origin)?"|UPLOAD":""));
         repo.requestLock(actor.getSaccoId(),actor.getStationId(),c.key());var prior=repo.byRequest(actor.getSaccoId(),actor.getStationId(),c.key());
         if(prior.isPresent()) {require(prior.get().get("payload_hash").equals(payload)&&prior.get().get("maker_id").equals(actor.getMemberId()),"changedRetry");return (UUID)prior.get().get("id");}
-        requireOpenRange(actor,c.from(),c.through());repo.lock(actor.getSaccoId(),c.account());require(repo.duplicateFile(actor.getSaccoId(),actor.getStationId(),c,checksum).isEmpty(),"duplicateImport");
-        UUID id=repo.insertStatement(actor.getSaccoId(),actor.getStationId(),actor.getMemberId(),c,payload,checksum,rows,clock.now());event(actor,id,"STATEMENT_IMPORTED");return id;
+        requireOpenRange(actor,c.from(),c.through());if(rows.isEmpty()){var periods=repo.evidencePeriods(actor.getSaccoId(),c.from(),c.through());require(periods.size()==1&&periods.getFirst().from().equals(c.from())&&periods.getFirst().through().equals(c.through()),"zeroMovementPeriod");}
+        repo.lock(actor.getSaccoId(),c.account());require(repo.duplicateFile(actor.getSaccoId(),actor.getStationId(),c,checksum).isEmpty(),"duplicateImport");
+        UUID id=repo.insertStatement(actor.getSaccoId(),actor.getStationId(),actor.getMemberId(),c,payload,checksum,rows,clock.now(),origin);event(actor,id,"STATEMENT_IMPORTED");return id;
     }
     private void statementAccount(AppUserPrincipal actor,StatementCommand c) {
         require(c!=null&&c.account()!=null&&c.format()!=null,"statement");var account=repo.account(actor.getSaccoId(),c.account());
@@ -71,9 +94,9 @@ public class ReconciliationService {
     }
     static List<ImportedRow> parse(StatementCommand c) {
         require(c!=null&&c.key()!=null&&c.from()!=null&&c.through()!=null&&!c.through().isBefore(c.from())&&c.through().isBefore(c.from().plusYears(1)),"dates");
-        money(c.opening(),true);money(c.closing(),true);text(c.filename(),160);require(!c.filename().contains("/")&&!c.filename().contains("\\"),"filename");text(c.evidence(),500);
+        money(c.opening(),true);money(c.closing(),true);text(c.filename(),160);require(!c.filename().contains("/")&&!c.filename().contains("\\")&&c.filename().chars().noneMatch(Character::isISOControl),"filename");text(c.evidence(),500);
         require(c.content()!=null&&c.content().getBytes(StandardCharsets.UTF_8).length<=1_000_000,"importSize");
-        String[] rows=c.content().strip().split("\\R");require(rows.length>=2&&rows.length<=2001&&rows[0].equals("date,reference,amount,kind"),"format");
+        String[] rows=c.content().strip().split("\\R");require(rows.length>=1&&rows.length<=2001&&rows[0].equals("date,reference,amount,kind"),"format");
         var result=new ArrayList<ImportedRow>();var seen=new HashSet<String>();BigDecimal total=c.opening();
         for(int i=1;i<rows.length;i++) {
             String[] cells=rows[i].split(",",-1);require(cells.length==4,"format");
@@ -197,8 +220,8 @@ public class ReconciliationService {
             var control=provenance().control(actor,account,asOf,(String)a.get("purpose"),clock.now());
             require(source.compareTo(control.signedBalance())==0,"controlBalance");
         }
-        if("STATEMENT".equals(kind))require(repo.statementBalanceExists(actor.getSaccoId(),actor.getStationId(),account,asOf,source),"statementEvidence");
-        BigDecimal ledger=repo.balance(actor.getSaccoId(),actor.getStationId(),account,asOf);UUID id=repo.certificate(actor.getSaccoId(),actor.getStationId(),account,asOf,kind,source,ledger,actor.getMemberId(),evidence,clock.now());event(actor,id,"BALANCE_CERTIFICATE_PROPOSED");return id;
+        Statement statementSource=null;if("STATEMENT".equals(kind))statementSource=repo.matchingStatement(actor.getSaccoId(),actor.getStationId(),account,asOf,source).orElseThrow(()->invalid("statementEvidence"));
+        BigDecimal ledger=repo.balance(actor.getSaccoId(),actor.getStationId(),account,asOf);UUID id=repo.certificate(actor.getSaccoId(),actor.getStationId(),account,asOf,kind,source,ledger,actor.getMemberId(),evidence,clock.now());if(statementSource!=null)repo.linkCertificateStatement(id,statementSource.id(),clock.now());event(actor,id,"BALANCE_CERTIFICATE_PROPOSED");return id;
     }
     @Transactional
     public void reviewCertificate(AppUserPrincipal actor,UUID id,String evidence) {
@@ -208,6 +231,7 @@ public class ReconciliationService {
             String purpose=(String)repo.account(actor.getSaccoId(),c.account()).get("purpose");
             var control=provenance().control(actor,c.account(),c.asOf(),purpose,clock.now());require(control.signedBalance().compareTo(c.sourceBalance())==0,"staleEvidence");
         }
+        if("STATEMENT".equals(c.kind())){var statement=repo.certificateStatement(actor.getSaccoId(),actor.getStationId(),id).orElseThrow(()->invalid("statementEvidence"));independent(actor,statement.maker());require(statement.account().equals(c.account())&&statement.through().equals(c.asOf())&&statement.closing().compareTo(c.sourceBalance())==0,"staleEvidence");}
         repo.reviewCertificate(id,actor.getMemberId(),evidence,clock.now());event(actor,id,"BALANCE_DIFFERENCE_REVIEWED");
     }
     @Transactional(readOnly=true)

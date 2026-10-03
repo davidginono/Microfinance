@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_d_test(?:_bootstrap_20261004)?")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_d_test(?:_(?:bootstrap|zero)_20261004)?")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReconciliationPostgresTest {
     private JdbcTemplate jdbc;private TransactionTemplate tx;private GeneralLedgerService gl;private ReconciliationService service;
@@ -50,7 +50,7 @@ class ReconciliationPostgresTest {
     private String institution;private AppUserPrincipal maker,checker,third,fourth;private UUID bank,capital,period,policy,format;
     private static final LocalDate DAY=LocalDate.of(2026,10,1);private static final OffsetDateTime NOW=OffsetDateTime.parse("2026-10-02T10:00:00+03:00");
     @BeforeAll void start() {
-        var poolConfig=new HikariConfig();poolConfig.setJdbcUrl(System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL")+"?sslmode=disable&connectTimeout=5&socketTimeout=30");poolConfig.setUsername("microfinance_test");poolConfig.setPassword("");poolConfig.setMaximumPoolSize(4);poolConfig.setMinimumIdle(1);poolConfig.setConnectionTimeout(5000);poolConfig.setValidationTimeout(2000);testPool=new HikariDataSource(poolConfig);var ds=testPool;Flyway.configure().dataSource(ds).locations("classpath:db/migration").outOfOrder(!System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL").endsWith("/microfinance_accounting_d_test_bootstrap_20261004")).load().migrate();
+        var poolConfig=new HikariConfig();poolConfig.setJdbcUrl(System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL")+"?sslmode=disable&connectTimeout=5&socketTimeout=30");poolConfig.setUsername("microfinance_test");poolConfig.setPassword("");poolConfig.setMaximumPoolSize(4);poolConfig.setMinimumIdle(1);poolConfig.setConnectionTimeout(5000);poolConfig.setValidationTimeout(2000);testPool=new HikariDataSource(poolConfig);var ds=testPool;Flyway.configure().dataSource(ds).locations("classpath:db/migration").outOfOrder(System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL").endsWith("/microfinance_accounting_d_test")).load().migrate();
         jdbc=new JdbcTemplate(ds);manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);
         gl=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)),manager);
@@ -720,4 +720,68 @@ class ReconciliationPostgresTest {
         } finally {release.countDown();}
         assertThat(jdbc.queryForObject("select snapshot_json from accounting_close_review where id=?",String.class,review)).isEqualTo(frozen);
     }
+
+    private StatementCommand zeroCommand(UUID account,LocalDate from,LocalDate through,String amount) {return new StatementCommand(UUID.randomUUID(),account,format,from,through,new BigDecimal(amount),new BigDecimal(amount),"ignored-form-name.csv","Synthetic actual uploaded no-movement statement","");}
+    private org.springframework.mock.web.MockMultipartFile zeroFile() {return new org.springframework.mock.web.MockMultipartFile("statementFile","zero.csv","text/csv","date,reference,amount,kind\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));}
+    @Test void uploadedZeroMovementStatementRetainsExactFileWithoutInventingRowsOrJournalsAndCloses() {
+        opening();actualCashProvider();var command=zeroCommand(bank,DAY,DAY.plusDays(1),"100.00");var file=zeroFile();assertThat(service.previewUploadedStatement(maker,command,file).rows()).isEmpty();
+        UUID id=service.importUploadedStatement(maker,command,file);assertThat(service.importUploadedStatement(maker,command,file)).isEqualTo(id);
+        var statement=service.statement(maker,id);assertThat(statement.noMovement()).isTrue();assertThat(statement.sourceAvailable()).isTrue();assertThat(statement.filename()).isEqualTo("zero.csv");assertThat(statement.checksum()).hasSize(64);
+        assertThat(service.statementFile(maker,id).content()).isEqualTo("date,reference,amount,kind\r\n");assertThat(service.rows(maker,id,0).rows()).isEmpty();
+        UUID certificate=service.certify(maker,bank,DAY.plusDays(1),"STATEMENT",new BigDecimal("100.00"),"Actual retained no-movement file");service.reviewCertificate(checker,certificate,"Independent source-file review");
+        assertThat(jdbc.queryForObject("select statement_id from reconciliation_certificate_statement where certificate_id=?",UUID.class,certificate)).isEqualTo(id);
+        UUID review=service.proposeClose(maker,period,"Synthetic exact no-movement closing",false);service.approveClose(checker,review,"Independent unchanged balance review");service.completeInstitutionClose(checker,period,"All synthetic branch evidence reviewed");
+        var snapshot=service.finalizedSnapshot(maker,review);var data=JsonMapper.builder().findAndAddModules().build().readTree(snapshot.snapshot());
+        assertThat(data.path("statementEvidence").get(0).path("no_movement").asBoolean()).isTrue();assertThat(data.path("certificates").get(0).path("source_statement_id").asString()).isEqualTo(id.toString());
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=? and station_id='B1'",Integer.class,institution)).isEqualTo(1);
+        assertThat(tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,period)).periodClosed()).isTrue();
+    }
+    @Test void zeroMovementRequiresActualUploadExactPeriodAndEqualBalances() {
+        opening();var c=zeroCommand(bank,DAY,DAY.plusDays(1),"100.00");
+        var pasted=new StatementCommand(c.key(),bank,format,c.from(),c.through(),c.opening(),c.closing(),"pasted.csv",c.evidence(),"date,reference,amount,kind");
+        assertThatThrownBy(()->service.importStatement(maker,pasted)).hasMessage("reconciliation.error.zeroMovementFile");
+        assertThatThrownBy(()->service.importUploadedStatement(maker,zeroCommand(bank,DAY.plusDays(1),DAY.plusDays(1),"100.00"),zeroFile())).hasMessage("reconciliation.error.zeroMovementPeriod");
+        var changed=new StatementCommand(c.key(),bank,format,c.from(),c.through(),c.opening(),new BigDecimal("100.01"),c.filename(),c.evidence(),c.content());
+        assertThatThrownBy(()->service.importUploadedStatement(maker,changed,zeroFile())).hasMessage("reconciliation.error.statementBalance");
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_statement where sacco_id=?",Integer.class,institution)).isZero();
+    }
+    @Test void zeroMovementFileAndCertificateSourceAreImmutableAndImporterCannotReviewAnotherMakersCertificate() {
+        opening();UUID id=service.importUploadedStatement(maker,zeroCommand(bank,DAY,DAY.plusDays(1),"100.00"),zeroFile());
+        UUID certificate=service.certify(third,bank,DAY.plusDays(1),"STATEMENT",new BigDecimal("100.00"),"Synthetic retained source");
+        assertThatThrownBy(()->service.reviewCertificate(maker,certificate,"Original file importer reviewing another maker")).hasMessage("reconciliation.error.independentReview");
+        assertThatThrownBy(()->jdbc.update("update reconciliation_statement_file set content='changed' where statement_id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("append-only");
+        assertThatThrownBy(()->jdbc.update("delete from reconciliation_certificate_statement where certificate_id=?",certificate)).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("append-only");
+        assertThatThrownBy(()->jdbc.update("insert into reconciliation_statement_line(id,statement_id,row_number,effective_date,reference,amount,kind,duplicate) values(?,?,1,?,'FAKE',1,'RECEIPT',false)",UUID.randomUUID(),id,DAY.plusDays(1))).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("atomically");
+        service.reviewCertificate(checker,certificate,"Independent retained file and unchanged ledger");
+    }
+    @Test void invalidOrUnapprovedUploadedEvidenceAndChangedRetryAreRejectedAndAuditFailureRollsBack() throws Exception {
+        opening();var c=zeroCommand(bank,DAY,DAY.plusDays(1),"100.00");
+        var malformed=new org.springframework.mock.web.MockMultipartFile("statementFile","bad.csv","text/csv",new byte[]{(byte)0xc3,0x28});
+        assertThatThrownBy(()->service.importUploadedStatement(maker,c,malformed)).hasMessage("reconciliation.error.uploadedFile");
+        var fakeZero=new org.springframework.mock.web.MockMultipartFile("statementFile","fake.csv","text/csv","date,reference,amount,kind\n2026-10-02,R,0.00,RECEIPT".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThatThrownBy(()->service.importUploadedStatement(maker,c,fakeZero)).hasMessage("reconciliation.error.money");
+        UUID unapproved=service.proposeFormat(maker,"Unapproved upload format","Synthetic");var badFormat=new StatementCommand(c.key(),bank,unapproved,c.from(),c.through(),c.opening(),c.closing(),c.filename(),c.evidence(),c.content());
+        assertThatThrownBy(()->service.importUploadedStatement(maker,badFormat,zeroFile())).hasMessage("reconciliation.error.formatApproval");
+        doThrow(new IllegalStateException("Synthetic file audit failure")).when(audit).logEvent(anyString(),any(),eq("STATEMENT_IMPORTED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),anyMap());
+        assertThatThrownBy(()->service.importUploadedStatement(maker,c,zeroFile())).hasMessage("Synthetic file audit failure");assertThat(jdbc.queryForObject("select count(*) from reconciliation_statement where sacco_id=?",Integer.class,institution)).isZero();reset(audit);
+        UUID id=service.importUploadedStatement(maker,c,zeroFile());var changed=new org.springframework.mock.web.MockMultipartFile("statementFile","other.csv","text/csv",zeroFile().getBytes());
+        assertThatThrownBy(()->service.importUploadedStatement(maker,c,changed)).hasMessage("reconciliation.error.changedRetry");
+        station("B2");var foreignBranch=operator("B2");assertThatThrownBy(()->service.statementFile(foreignBranch,id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test void explicitlyUploadedReviewedZeroMobileMoneyBalanceRemainsEvidenceOnly() {
+        UUID mobile=gl.createAccount(maker,new AccountCommand("MOBILE","Synthetic mobile money","ASSET","DEBIT","POSTING","MOBILE_MONEY",null));opening();
+        UUID statement=service.importUploadedStatement(maker,zeroCommand(mobile,DAY,DAY.plusDays(1),"0.00"),zeroFile());UUID certificate=service.certify(maker,mobile,DAY.plusDays(1),"STATEMENT",BigDecimal.ZERO,"Explicit uploaded zero source");service.reviewCertificate(checker,certificate,"Independent zero source review");
+        assertThat(service.statement(maker,statement).noMovement()).isTrue();assertThat(service.rows(maker,statement,0).rows()).isEmpty();assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+    }
+
+    @Test void databaseRejectsForgedZeroFileChecksumAndPartialPeriodProofAtomically() {
+        var c=zeroCommand(bank,DAY,DAY.plusDays(1),"0.00");var actual=new StatementCommand(c.key(),bank,format,c.from(),c.through(),c.opening(),c.closing(),"zero.csv",c.evidence(),"date,reference,amount,kind");
+        assertThatThrownBy(()->tx.execute(status->new ReconciliationRepository(jdbc).insertStatement(institution,"B1",maker.getMemberId(),actual,"a".repeat(64),"b".repeat(64),List.of(),NOW,"UPLOAD"))).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("exact immutable checksum");
+        String checksum;try{checksum=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(actual.content().getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        var partial=new StatementCommand(UUID.randomUUID(),bank,format,DAY.plusDays(1),DAY.plusDays(1),BigDecimal.ZERO,BigDecimal.ZERO,"zero.csv",c.evidence(),actual.content());
+        assertThatThrownBy(()->tx.execute(status->new ReconciliationRepository(jdbc).insertStatement(institution,"B1",maker.getMemberId(),partial,"a".repeat(64),checksum,List.of(),NOW,"UPLOAD"))).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("exact open reporting period");
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_statement where sacco_id=?",Integer.class,institution)).isZero();
+    }
+
 }
