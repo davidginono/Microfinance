@@ -68,9 +68,12 @@
         </a>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')">
-        <a href="<c:url value='/reports/financial' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial') and not fn:startsWith(requestUri, '/reports/financial/cash-flow') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+        <a href="<c:url value='/reports/financial' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial') and not fn:startsWith(requestUri, '/reports/financial/cash-flow') and not fn:startsWith(requestUri, '/reports/financial/portfolio') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
             <spring:message code="financial.report.trial" />
         </a>
+    </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW')">
+        <a href="<c:url value='/reports/financial/portfolio' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial/portfolio') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="financial.portfolio.menu" /></a>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'STATEMENT_VIEW')">
         <a href="<c:url value='/finance/statement-outputs' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/statement-outputs') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
