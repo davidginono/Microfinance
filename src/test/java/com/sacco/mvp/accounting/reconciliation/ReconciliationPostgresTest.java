@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_d_test")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_d_test(?:_bootstrap_20261004)?")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReconciliationPostgresTest {
     private JdbcTemplate jdbc;private TransactionTemplate tx;private GeneralLedgerService gl;private ReconciliationService service;
@@ -50,7 +50,7 @@ class ReconciliationPostgresTest {
     private String institution;private AppUserPrincipal maker,checker,third,fourth;private UUID bank,capital,period,policy,format;
     private static final LocalDate DAY=LocalDate.of(2026,10,1);private static final OffsetDateTime NOW=OffsetDateTime.parse("2026-10-02T10:00:00+03:00");
     @BeforeAll void start() {
-        var poolConfig=new HikariConfig();poolConfig.setJdbcUrl(System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL")+"?sslmode=disable&connectTimeout=5&socketTimeout=30");poolConfig.setUsername("microfinance_test");poolConfig.setPassword("");poolConfig.setMaximumPoolSize(4);poolConfig.setMinimumIdle(1);poolConfig.setConnectionTimeout(5000);poolConfig.setValidationTimeout(2000);testPool=new HikariDataSource(poolConfig);var ds=testPool;Flyway.configure().dataSource(ds).locations("classpath:db/migration").outOfOrder(true).load().migrate();
+        var poolConfig=new HikariConfig();poolConfig.setJdbcUrl(System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL")+"?sslmode=disable&connectTimeout=5&socketTimeout=30");poolConfig.setUsername("microfinance_test");poolConfig.setPassword("");poolConfig.setMaximumPoolSize(4);poolConfig.setMinimumIdle(1);poolConfig.setConnectionTimeout(5000);poolConfig.setValidationTimeout(2000);testPool=new HikariDataSource(poolConfig);var ds=testPool;Flyway.configure().dataSource(ds).locations("classpath:db/migration").outOfOrder(!System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL").endsWith("/microfinance_accounting_d_test_bootstrap_20261004")).load().migrate();
         jdbc=new JdbcTemplate(ds);manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);
         gl=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)),manager);
@@ -59,7 +59,7 @@ class ReconciliationPostgresTest {
     @AfterAll void closePool(){if(testPool!=null)testPool.close();}
     private static <T> T proxy(T raw,DataSourceTransactionManager manager) {var f=new ProxyFactory(raw);f.setProxyTargetClass(true);f.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));return (T)f.getProxy();}
     @BeforeEach void fixture() {
-        reset(policies,audit,claims,directory,institutions,reopenListener);enableSources(null,null);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);institution="D-"+UUID.randomUUID();jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic reconciliation test");
+        reset(policies,audit,claims,directory,institutions,reopenListener);enableSources(null,null);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);institution="D-"+UUID.randomUUID().toString().toUpperCase(Locale.ROOT);jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic reconciliation test");
         when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         station("B1");when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));maker=operator("B1");checker=operator("B1");third=operator("B1");fourth=operator("B1");
         bank=gl.createAccount(maker,new AccountCommand("BANK","Verified synthetic bank","ASSET","DEBIT","POSTING","BANK",null));capital=gl.createAccount(maker,new AccountCommand("CAPITAL","Synthetic owner capital","EQUITY","CREDIT","POSTING","CAPITAL",null));
@@ -658,5 +658,66 @@ class ReconciliationPostgresTest {
         assertThatThrownBy(()->tx.execute(s->service.finalizedInstitutionSnapshotForPublication(maker,period))).hasMessage("reconciliation.error.staleEvidence");assertThat(ReconciliationService.sha(frozen.snapshot())).isEqualTo(frozen.checksum());
         when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.FINANCIAL_REPORTS_VIEW));
         assertThatThrownBy(()->tx.execute(s->service.finalizedInstitutionSnapshotForPublication(maker,period))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    private SaccoRegistryService cohortOwner(java.util.concurrent.atomic.AtomicBoolean directoryRead) {
+        var registry=mock(com.sacco.mvp.repository.RegisteredSaccoRepository.class);
+        var stations=mock(com.sacco.mvp.repository.SaccoStationRepository.class);
+        var settings=mock(com.sacco.mvp.repository.SaccoSettingsRepository.class);
+        when(registry.findById(institution)).thenAnswer(call->{directoryRead.set(true);return Optional.of(RegisteredSacco.builder().saccoId(institution).saccoName("Synthetic cohort").active(true).build());});
+        when(stations.findBySaccoIdOrderByStationIdAsc(institution)).thenAnswer(call->jdbc.query("select id,sacco_id,station_id,active from sacco_stations where sacco_id=? order by station_id",(r,n)->SaccoStation.builder().id(r.getObject("id",UUID.class)).saccoId(r.getString("sacco_id")).stationId(r.getString("station_id")).active(r.getBoolean("active")).build(),institution));
+        when(stations.save(any(SaccoStation.class))).thenAnswer(call->{SaccoStation s=call.getArgument(0);jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,access_status,created_at,updated_at) values(?,?,?,?,'ACTIVE',now(),now()) on conflict(id) do update set active=excluded.active",s.getId(),s.getSaccoId(),s.getStationId(),s.isActive());return s;});
+        when(settings.findById(institution)).thenReturn(Optional.empty());
+        return proxy(new SaccoRegistryService(registry,stations,settings,mock(SaccoLogoStorageService.class),mock(SmsUnitTransactionService.class),audit,jdbc),manager);
+    }
+    @Test void actualRegistryCohortSyncWaitsBeforeDirectoryReadAndRetainsHistoricalInactiveBranch() throws Exception {
+        opening();UUID review=balancedTimingClose(period,DAY.plusDays(1),"COHORT");String frozen=service.finalizedSnapshot(maker,review).snapshot();
+        var directoryRead=new java.util.concurrent.atomic.AtomicBoolean();var owner=cohortOwner(directoryRead);
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var writerStarted=new CountDownLatch(1);var writerPid=new java.util.concurrent.atomic.AtomicInteger();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var publication=pool.submit(()->tx.execute(status->{var snapshot=service.finalizedInstitutionSnapshotForPublication(maker,period);entered.countDown();try{assertThat(release.await(40,TimeUnit.SECONDS)).isTrue();}catch(InterruptedException e){throw new IllegalStateException(e);}return snapshot;}));
+            assertThat(entered.await(10,TimeUnit.SECONDS)).isTrue();
+            var writer=pool.submit(()->tx.execute(status->{writerPid.set(jdbc.queryForObject("select pg_backend_pid()",Integer.class));writerStarted.countDown();owner.updateStationsOnly(institution,"B1,B2");return true;}));
+            assertThat(writerStarted.await(10,TimeUnit.SECONDS)).isTrue();boolean waiting=false;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);
+            while(!waiting&&System.nanoTime()<deadline){waiting=Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from pg_locks where pid=? and locktype='advisory' and not granted)",Boolean.class,writerPid.get()));if(!waiting)Thread.sleep(10);}
+            assertThat(waiting).isTrue();assertThat(directoryRead.get()).isFalse();assertThatThrownBy(()->writer.get(250,TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            // The metadata pin belongs only to the publishing institution.
+            String foreign="OTHER-"+UUID.randomUUID();jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",foreign,"Synthetic unrelated cohort");
+            jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,access_status,created_at,updated_at) values(?,?,?,true,'ACTIVE',now(),now())",UUID.randomUUID(),foreign,"B1");
+            release.countDown();assertThat(publication.get(10,TimeUnit.SECONDS).branches()).extracting(BranchCloseSource::branch).containsExactly("B1");assertThat(writer.get(10,TimeUnit.SECONDS)).isTrue();
+        } finally {release.countDown();}
+        assertThat(directoryRead.get()).isTrue();assertThat(jdbc.queryForObject("select active from sacco_stations where sacco_id=? and station_id='B1'",Boolean.class,institution)).isTrue();
+        assertThat(new ReconciliationRepository(jdbc).branches(institution,DAY.plusDays(1))).containsExactly("B1","B2");
+        assertThatThrownBy(()->tx.execute(status->service.finalizedInstitutionSnapshotForPublication(maker,period))).hasMessage("reconciliation.error.branchCoverage");
+        assertThat(service.finalizedSnapshot(maker,review).snapshot()).isEqualTo(frozen);
+        jdbc.update("update sacco_stations set active=false where sacco_id=? and station_id='B1'",institution);
+        assertThat(new ReconciliationRepository(jdbc).branches(institution,DAY.plusDays(1))).containsExactly("B1","B2");
+        assertThatThrownBy(()->jdbc.update("delete from sacco_stations where sacco_id=? and station_id='B1'",institution)).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("Retained financial branch identity cannot be changed or deleted");
+    }
+    @Test void directCohortAccessMutationWaitsForSetupPinAndFinancialIdentityCannotMove() throws Exception {
+        opening();var held=new CountDownLatch(1);var release=new CountDownLatch(1);var started=new CountDownLatch(1);var pid=new java.util.concurrent.atomic.AtomicInteger();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var reader=pool.submit(()->tx.execute(status->{new ReconciliationRepository(jdbc).lockSetupForPublication(institution);held.countDown();try{assertThat(release.await(40,TimeUnit.SECONDS)).isTrue();}catch(InterruptedException e){throw new IllegalStateException(e);}return true;}));
+            assertThat(held.await(10,TimeUnit.SECONDS)).isTrue();var writer=pool.submit(()->tx.execute(status->{pid.set(jdbc.queryForObject("select pg_backend_pid()",Integer.class));started.countDown();return jdbc.update("update sacco_stations set access_status='SUSPENDED' where sacco_id=? and station_id='B1'",institution);}));
+            assertThat(started.await(10,TimeUnit.SECONDS)).isTrue();boolean waiting=false;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);
+            while(!waiting&&System.nanoTime()<deadline){waiting=Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from pg_locks where pid=? and locktype='advisory' and not granted)",Boolean.class,pid.get()));if(!waiting)Thread.sleep(10);}
+            assertThat(waiting).isTrue();assertThatThrownBy(()->writer.get(250,TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);release.countDown();assertThat(reader.get(10,TimeUnit.SECONDS)).isTrue();assertThat(writer.get(10,TimeUnit.SECONDS)).isEqualTo(1);
+        } finally {release.countDown();}
+        assertThatThrownBy(()->jdbc.update("update sacco_stations set station_id='MOVED' where sacco_id=? and station_id='B1'",institution)).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("Retained financial branch identity cannot be changed or deleted");
+    }
+
+    @Test void institutionalPublicationRefreshesBranchAccessAfterWaitingForCohortMutation() throws Exception {
+        opening();UUID review=balancedTimingClose(period,DAY.plusDays(1),"SUSPEND-PUB");String frozen=service.finalizedSnapshot(maker,review).snapshot();
+        var changed=new CountDownLatch(1);var release=new CountDownLatch(1);var started=new CountDownLatch(1);var pid=new java.util.concurrent.atomic.AtomicInteger();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var suspender=pool.submit(()->tx.execute(status->{new GeneralLedgerRepository(jdbc).lockAccounts(institution);jdbc.update("update sacco_stations set access_status='SUSPENDED' where sacco_id=? and station_id='B1'",institution);changed.countDown();try{assertThat(release.await(40,TimeUnit.SECONDS)).isTrue();}catch(InterruptedException e){throw new IllegalStateException(e);}return true;}));
+            assertThat(changed.await(10,TimeUnit.SECONDS)).isTrue();
+            var publisher=pool.submit(()->tx.execute(status->{pid.set(jdbc.queryForObject("select pg_backend_pid()",Integer.class));started.countDown();return service.finalizedInstitutionSnapshotForPublication(maker,period);}));
+            assertThat(started.await(10,TimeUnit.SECONDS)).isTrue();boolean waiting=false;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);
+            while(!waiting&&System.nanoTime()<deadline){waiting=Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from pg_locks where pid=? and locktype='advisory' and not granted)",Boolean.class,pid.get()));if(!waiting)Thread.sleep(10);}
+            assertThat(waiting).isTrue();assertThatThrownBy(()->publisher.get(250,TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            release.countDown();assertThat(suspender.get(10,TimeUnit.SECONDS)).isTrue();assertThatThrownBy(()->publisher.get(10,TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class).hasRootCauseInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        } finally {release.countDown();}
+        assertThat(jdbc.queryForObject("select snapshot_json from accounting_close_review where id=?",String.class,review)).isEqualTo(frozen);
     }
 }

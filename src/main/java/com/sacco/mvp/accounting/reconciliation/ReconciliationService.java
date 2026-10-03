@@ -272,7 +272,10 @@ public class ReconciliationService {
     @Transactional(propagation=Propagation.MANDATORY)
     public InstitutionSnapshot finalizedInstitutionSnapshotForPublication(AppUserPrincipal actor,UUID period) {
         authorize(actor,UserClaim.FINANCIAL_REPORTS_VIEW);authorize(actor,UserClaim.FINANCIAL_REPORTS_INSTITUTION);
-        repo.lockPeriodForPublication(actor.getSaccoId(),period);var p=scopedPeriod(actor,period,false);require("CLOSED".equals(p.state()),"approvalRequired");require(repo.timingBlockers(actor.getSaccoId(),null,p.through())==0,"timingReview");
+        repo.lockPeriodForPublication(actor.getSaccoId(),period);
+        // A cohort mutation may have committed while this publisher waited for setup.
+        authorize(actor,UserClaim.FINANCIAL_REPORTS_VIEW);authorize(actor,UserClaim.FINANCIAL_REPORTS_INSTITUTION);
+        var p=scopedPeriod(actor,period,false);require("CLOSED".equals(p.state()),"approvalRequired");require(repo.timingBlockers(actor.getSaccoId(),null,p.through())==0,"timingReview");
         var branches=repo.branches(actor.getSaccoId(),p.through());require(!branches.isEmpty()&&branches.size()<=1000,"branchCoverage");
         var reviews=repo.currentInstitutionCloses(actor.getSaccoId(),period);require(reviews.size()<=1000&&reviews.size()==branches.size(),"branchCoverage");
         require(new HashSet<>(branches).equals(reviews.stream().map(CloseReview::branch).collect(java.util.stream.Collectors.toSet())),"branchCoverage");
