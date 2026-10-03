@@ -91,6 +91,44 @@ public class ReconciliationRepository {
     public List<ExceptionRecord> exceptions(String institution,String branch,int offset) {return jdbc.query("select e.*,d.checker_id,case when d.exception_id is null then 'OPEN' else 'REVIEWED_DIFFERENCE' end state from reconciliation_exception e left join reconciliation_exception_decision d on d.exception_id=e.id where e.sacco_id=? and e.station_id=? order by created_at desc,e.id limit 26 offset ?",(r,n)->new ExceptionRecord(uuid(r,"id"),uuid(r,"statement_line_id"),r.getString("kind"),uuid(r,"assigned_to"),r.getString("state"),uuid(r,"maker_id"),uuid(r,"checker_id"),r.getString("evidence")),institution,branch,offset);}
     public Optional<Map<String,Object>> exception(String institution,String branch,UUID id) {return jdbc.queryForList("select * from reconciliation_exception where sacco_id=? and station_id=? and id=?",institution,branch,id).stream().findFirst();}
     public void reviewException(UUID id,UUID checker,String evidence,OffsetDateTime now) {jdbc.update("insert into reconciliation_exception_decision(exception_id,checker_id,evidence,decided_at) values(?,?,?,?)",id,checker,evidence,now);}
+    public boolean approvedSourcePolicy(String institution,UUID id,int version) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accounting_policies p join accounting_policy_approvals a on a.policy_id=p.id where p.sacco_id=? and p.id=? and p.policy_version=? and a.sacco_id=p.sacco_id and a.decision='APPROVED' and p.authoritative_ledger='LOCAL_GL')",Boolean.class,institution,id,version));
+    }
+    public List<Map<String,Object>> controlAccounts(String institution,String branch,LocalDate asOf,OffsetDateTime cutoff) {
+        return jdbc.queryForList("""
+            select a.id,a.purpose,coalesce(m.balance,0) balance from gl_account a left join
+            (select l.account_id,sum(l.debit-l.credit) balance from gl_journal_line l join gl_journal j on j.id=l.journal_id
+             where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.effective_date<=? and j.posted_at<=? group by l.account_id) m on m.account_id=a.id
+            where a.sacco_id=? and a.kind<>'HEADING' and a.purpose in('LOAN_PRINCIPAL','PAYABLE','FUNDING')
+            and ((a.active and a.created_at<=?) or m.account_id is not null) order by a.id limit 1001
+            """,institution,branch,asOf,cutoff,institution,cutoff);
+    }
+    public List<UUID> ambiguousCashJournals(String institution,String branch,LocalDate from,LocalDate through,OffsetDateTime cutoff) {
+        return jdbc.query("""
+            select j.id from gl_journal j join lateral
+            (select count(*) filter(where a.purpose in('CASH','BANK','MOBILE_MONEY')) money_legs,
+             count(*) filter(where a.purpose not in('CASH','BANK','MOBILE_MONEY')) nonmoney_legs
+             from gl_journal_line l join gl_account a on a.id=l.account_id where l.journal_id=j.id) x on true
+            where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.source_type<>'OPENING'
+            and j.effective_date between ? and ? and j.posted_at<=?
+            and x.money_legs>0 and (x.nonmoney_legs>1 or (x.money_legs>1 and x.nonmoney_legs>0))
+            order by j.id limit 1001
+            """,(r,n)->uuid(r,"id"),institution,branch,from,through,cutoff);
+    }
+    public List<Map<String,Object>> automaticCashMovements(String institution,String branch,Period p) {
+        return jdbc.queryForList("""
+            with simple as(select j.id from gl_journal j join lateral
+              (select count(*) filter(where a.purpose in('CASH','BANK','MOBILE_MONEY')) money_legs,
+               count(*) filter(where a.purpose not in('CASH','BANK','MOBILE_MONEY')) nonmoney_legs
+               from gl_journal_line l join gl_account a on a.id=l.account_id where l.journal_id=j.id) x on true
+              where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.source_type<>'OPENING'
+              and j.effective_date between ? and ? and x.money_legs=1 and x.nonmoney_legs=1)
+            select a.id::text account_id,a.code,a.type,a.purpose,sum(l.debit-l.credit) counterpart_movement,
+              count(distinct l.journal_id) journal_count,1 money_lines from gl_journal_line l join simple s on s.id=l.journal_id
+              join gl_account a on a.id=l.account_id where a.purpose not in('CASH','BANK','MOBILE_MONEY')
+              group by a.id order by a.code,a.id limit 1001
+            """,institution,branch,p.from(),p.through());
+    }
     public BigDecimal balance(String institution,String branch,UUID account,LocalDate asOf) {return jdbc.queryForObject("select coalesce(sum(l.debit-l.credit),0) from gl_journal_line l join gl_journal j on j.id=l.journal_id where j.sacco_id=? and j.station_id=? and l.account_id=? and j.state='POSTED' and j.effective_date<=?",BigDecimal.class,institution,branch,account,asOf);}
     public List<AccountBalance> balances(String institution,String branch,LocalDate asOf,int offset) {return jdbc.query("""
           select a.id,a.code,a.name,a.purpose,coalesce(m.balance,0) balance from gl_account a left join

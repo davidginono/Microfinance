@@ -40,19 +40,20 @@ class ReconciliationPostgresTest {
     private ApplicationClock clock;
     private PeriodReopenListener reopenListener;
     private HikariDataSource testPool;
+    private DataSourceTransactionManager manager;
     private String institution;private AppUserPrincipal maker,checker,third,fourth;private UUID bank,capital,period,policy,format;
     private static final LocalDate DAY=LocalDate.of(2026,10,1);private static final OffsetDateTime NOW=OffsetDateTime.parse("2026-10-02T10:00:00+03:00");
     @BeforeAll void start() {
         var poolConfig=new HikariConfig();poolConfig.setJdbcUrl(System.getenv("MICROFINANCE_ACCOUNTING_D_DATABASE_URL")+"?sslmode=disable&connectTimeout=5&socketTimeout=30");poolConfig.setUsername("microfinance_test");poolConfig.setPassword("");poolConfig.setMaximumPoolSize(4);poolConfig.setMinimumIdle(1);poolConfig.setConnectionTimeout(5000);poolConfig.setValidationTimeout(2000);testPool=new HikariDataSource(poolConfig);var ds=testPool;Flyway.configure().dataSource(ds).locations("classpath:db/migration").outOfOrder(true).load().migrate();
-        jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
+        jdbc=new JdbcTemplate(ds);manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);
         gl=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions),manager);
-        reopenListener=mock(PeriodReopenListener.class);service=proxy(new ReconciliationService(new ReconciliationRepository(jdbc),policies,new AccessControlService(),directory,claims,audit,clock,Optional.empty(),List.of(reopenListener)),manager);
+        reopenListener=mock(PeriodReopenListener.class);service=proxy(new ReconciliationService(new ReconciliationRepository(jdbc),policies,new AccessControlService(),directory,claims,audit,clock,Optional.empty(),List.of(reopenListener),Optional.empty()),manager);
     }
     @AfterAll void closePool(){if(testPool!=null)testPool.close();}
     private static <T> T proxy(T raw,DataSourceTransactionManager manager) {var f=new ProxyFactory(raw);f.setProxyTargetClass(true);f.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));return (T)f.getProxy();}
     @BeforeEach void fixture() {
-        reset(policies,audit,claims,directory,institutions,reopenListener);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);institution="D-"+UUID.randomUUID();jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic reconciliation test");
+        reset(policies,audit,claims,directory,institutions,reopenListener);enableSources(null,null);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);institution="D-"+UUID.randomUUID();jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic reconciliation test");
         when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         station("B1");when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));maker=operator("B1");checker=operator("B1");third=operator("B1");fourth=operator("B1");
         bank=gl.createAccount(maker,new AccountCommand("BANK","Verified synthetic bank","ASSET","DEBIT","POSTING","BANK",null));capital=gl.createAccount(maker,new AccountCommand("CAPITAL","Synthetic owner capital","EQUITY","CREDIT","POSTING","CAPITAL",null));
@@ -348,5 +349,108 @@ class ReconciliationPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from gl_journal where reverses_id=?",Integer.class,original)).isZero();
         var cancelled=tx.execute(status->gl.cancelSourceEvent(checker,rejected.id(),PostingEvent.CAPITAL,"OLD-POLICY-REJECTION","Independent source rejection after disabling posting"));
         assertThat(cancelled.state()).isEqualTo("CANCELLED");assertThat(gl.sourceCancellation(maker,rejected.id()).orElseThrow().payloadChecksum()).isEqualTo(rejected.payloadHash());
+    }
+
+    private void enableSources(BusinessReconciliationSource controls,CashFlowReconciliationSource cash) {
+        service=proxy(new ReconciliationService(new ReconciliationRepository(jdbc),policies,new AccessControlService(),directory,claims,audit,clock,Optional.ofNullable(controls),List.of(reopenListener),Optional.ofNullable(cash)),manager);
+    }
+    private UUID controlAccount(String purpose) {return gl.createAccount(maker,new AccountCommand(purpose,"Synthetic "+purpose+" control",purpose.equals("LOAN_PRINCIPAL")?"ASSET":"LIABILITY",purpose.equals("LOAN_PRINCIPAL")?"DEBIT":"CREDIT","CONTROL",purpose,null));}
+    private BusinessReconciliationSource.HistoricalControlSnapshot zeroSource(AppUserPrincipal actor,UUID account,LocalDate date,String purpose,OffsetDateTime cutoff,UUID evidence,String digest) {
+        var opening=new ReconciliationRepository(jdbc).opening(actor.getSaccoId(),actor.getStationId()).orElseThrow();
+        var proof=new BusinessReconciliationSource.SourceOpeningEvidence(evidence,opening.journal(),account,opening.through(),policy,1,opening.maker(),opening.reviewer(),"Synthetic explicit zero source coverage","Independent zero source-opening review","a".repeat(64),NOW,true,true);
+        return new BusinessReconciliationSource.HistoricalControlSnapshot(actor.getSaccoId(),actor.getStationId(),account,date,purpose,cutoff,BigDecimal.ZERO,List.of(proof),0,digest,null,true);
+    }
+    private void prepareBankDifference() {
+        UUID s=importOne("SOURCE-TIMING","1.00"),ex=service.assignException(maker,statementLine(s),"TIMING",checker.getMemberId(),"Verified independent timing");service.reviewException(checker,ex,"Retained timing review");certify(new BigDecimal("101.00"));
+    }
+    @Test void balanceOnlyControlProvidersRemainUnavailableEvenWhenBothNumbersAreZero() {
+        opening();UUID account=controlAccount("PAYABLE");enableSources((a,id,date,purpose)->Optional.of(BigDecimal.ZERO),null);
+        assertThatThrownBy(()->service.certify(maker,account,DAY.plusDays(1),"SUPPLIER",BigDecimal.ZERO,"Numbers alone are insufficient")).hasMessage("reconciliation.error.controlUnavailable");
+        assertThat(service.closeChecks(maker,period)).anyMatch(c->c.key().equals("businessControlSources")&&c.blockers()==1);
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_certificate where account_id=?",Integer.class,account)).isZero();
+    }
+    @Test void explicitReviewedZeroSourceProofIsFrozenAndLaterProvenanceChangesBlockNewPublication() {
+        opening();UUID account=controlAccount("PAYABLE"),coverage=UUID.randomUUID();var source=mock(BusinessReconciliationSource.class);var digest=new java.util.concurrent.atomic.AtomicReference<>("b".repeat(64));
+        when(source.historicalControlSnapshot(any(),eq(account),any(),eq("PAYABLE"),any())).thenAnswer(i->Optional.of(zeroSource(i.getArgument(0),account,i.getArgument(2),"PAYABLE",i.getArgument(4),coverage,digest.get())));
+        enableSources(source,null);UUID certificate=service.certify(maker,account,DAY.plusDays(1),"SUPPLIER",BigDecimal.ZERO,"Independently reviewed zero obligations");service.reviewCertificate(checker,certificate,"Independent control certificate review");prepareBankDifference();
+        UUID close=service.proposeClose(maker,period,"Prepared with frozen source-opening proof",false);digest.set("c".repeat(64));
+        assertThatThrownBy(()->service.approveClose(checker,close,"Cannot reuse changed source evidence")).hasMessage("reconciliation.error.staleEvidence");assertThat(jdbc.queryForObject("select count(*) from accounting_close_decision where review_id=?",Integer.class,close)).isZero();
+        digest.set("b".repeat(64));service.approveClose(checker,close,"Independent typed source close review");service.completeInstitutionClose(checker,period,"All source coverage revalidated");
+        var frozen=service.finalizedSnapshot(maker,close);var json=JsonMapper.builder().findAndAddModules().build().readTree(frozen.snapshot());var proof=json.get("businessControlSources").get(0);
+        assertThat(proof.get("completeCoverage").asBoolean()).isTrue();assertThat(proof.get("signedBalance").decimalValue()).isZero();assertThat(proof.get("movementDigest").asText()).isEqualTo(digest.get());
+        assertThat(proof.get("reviewedOpenings").get(0).get("generalLedgerOpeningId").asText()).isEqualTo(service.reviewedOpeningEvidence(maker).journal().toString());assertThat(proof.get("reviewedOpenings").get(0).get("reviewedZero").asBoolean()).isTrue();
+        assertThat(tx.execute(status->service.finalizedSnapshotForPublication(maker,close)).periodClosed()).isTrue();digest.set("d".repeat(64));
+        assertThatThrownBy(()->tx.execute(status->service.finalizedSnapshotForPublication(maker,close))).hasMessage("reconciliation.error.staleEvidence");assertThat(service.finalizedSnapshot(maker,close).snapshot()).isEqualTo(frozen.snapshot());
+    }
+    @Test void incompleteForeignFutureAndSelfReviewedControlProofsCannotCreateCertificates() {
+        opening();UUID account=controlAccount("FUNDING"),coverage=UUID.randomUUID();var source=mock(BusinessReconciliationSource.class);
+        var baseline=zeroSource(maker,account,DAY.plusDays(1),"FUNDING",NOW,coverage,"b".repeat(64));var e=baseline.reviewedOpenings().getFirst();
+        var variants=List.of(
+            new BusinessReconciliationSource.HistoricalControlSnapshot(institution,"B2",account,baseline.asOf(),"FUNDING",NOW,BigDecimal.ZERO,baseline.reviewedOpenings(),0,baseline.movementDigest(),null,true),
+            new BusinessReconciliationSource.HistoricalControlSnapshot(institution,"B1",account,baseline.asOf(),"FUNDING",NOW,BigDecimal.ZERO,List.of(),0,baseline.movementDigest(),null,true),
+            new BusinessReconciliationSource.HistoricalControlSnapshot(institution,"B1",account,baseline.asOf(),"FUNDING",NOW,BigDecimal.ZERO,baseline.reviewedOpenings(),0,baseline.movementDigest(),null,false),
+            new BusinessReconciliationSource.HistoricalControlSnapshot(institution,"B1",account,baseline.asOf(),"FUNDING",NOW,BigDecimal.ZERO,List.of(new BusinessReconciliationSource.SourceOpeningEvidence(e.id(),UUID.randomUUID(),account,e.through(),policy,1,e.maker(),e.reviewer(),e.sourceEvidence(),e.reviewEvidence(),e.payloadChecksum(),NOW,true,true)),0,baseline.movementDigest(),null,true),
+            new BusinessReconciliationSource.HistoricalControlSnapshot(institution,"B1",account,baseline.asOf(),"FUNDING",NOW,BigDecimal.ZERO,List.of(new BusinessReconciliationSource.SourceOpeningEvidence(e.id(),e.generalLedgerOpeningId(),account,e.through(),policy,1,e.maker(),e.maker(),e.sourceEvidence(),e.reviewEvidence(),e.payloadChecksum(),NOW,true,true)),0,baseline.movementDigest(),null,true),
+            new BusinessReconciliationSource.HistoricalControlSnapshot(institution,"B1",account,baseline.asOf(),"FUNDING",NOW,BigDecimal.ZERO,baseline.reviewedOpenings(),1,baseline.movementDigest(),NOW.plusMinutes(1),true));
+        enableSources(source,null);
+        for(var candidate:variants) {
+            when(source.historicalControlSnapshot(any(),eq(account),any(),eq("FUNDING"),any())).thenReturn(Optional.of(candidate));
+            assertThatThrownBy(()->service.certify(maker,account,DAY.plusDays(1),"FUNDING",BigDecimal.ZERO,"Untrusted source coverage")).hasMessage("reconciliation.error.controlUnavailable");
+        }
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_certificate where account_id=?",Integer.class,account)).isZero();
+    }
+    private UUID compoundCash() {
+        UUID expense=gl.createAccount(maker,new AccountCommand("NONCASH","Synthetic noncash expense","EXPENSE","DEBIT","POSTING","EXPENSE",null));
+        UUID journal=gl.draftManual(maker,new JournalCommand(UUID.randomUUID(),"CASH-ALLOCATED",DAY.plusDays(1),"Synthetic reviewed compound source",null,List.of(new Line(bank,new BigDecimal("10.00"),BigDecimal.ZERO),new Line(expense,new BigDecimal("5.00"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("15.00"))))).id();gl.approve(checker,journal,"Independent compound posting");gl.post(checker,journal,false);return journal;
+    }
+    private CashFlowReconciliationSource.Version cashVersion(UUID journal,UUID version) {
+        var lines=jdbc.query("select l.id,l.account_id,a.code,a.type,a.purpose,l.debit-l.credit signed_amount from gl_journal_line l join gl_account a on a.id=l.account_id where l.journal_id=? order by l.id",(r,n)->new CashFlowReconciliationSource.SourceLine(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getString(4),r.getString(5),r.getBigDecimal(6)),journal);
+        return new CashFlowReconciliationSource.Version(version,journal,1,third.getMemberId(),NOW,"Synthetic cash allocation source evidence","Verified owner-funded noncash expense","b".repeat(64),"c".repeat(64),new CashFlowReconciliationSource.Source(journal,policy,1,"CASH-ALLOCATED",lines),List.of(new CashFlowReconciliationSource.Split(journalLine(journal),capital,"FINANCING",new BigDecimal("10.00"))),fourth.getMemberId(),NOW,"Independent cash allocation review");
+    }
+    @Test void cashAllocationVersionsAreFrozenAndCompoundJournalsAreExcludedFromAutomaticCash() {
+        opening();UUID journal=compoundCash(),version=UUID.randomUUID();var cash=mock(CashFlowReconciliationSource.class);var proof=cashVersion(journal,version);
+        when(cash.reviewedAllocations(any(),eq(List.of(journal)),any())).thenReturn(new CashFlowReconciliationSource.Coverage(List.of(proof),List.of()));enableSources(null,cash);
+        UUID s=importOne("CASH-ALLOCATED","10.00"),match=service.proposeMatch(maker,"EXACT","Compound money source",List.of(new Allocation(statementLine(s),journalLine(journal),new BigDecimal("10.00"))));service.reviewMatch(checker,match,true,"Independent cash matching");certify(new BigDecimal("110.00"));UUID close=service.proposeClose(maker,period,"Prepared allocated cash close",false);service.approveClose(checker,close,"Independent cash-flow evidence");service.completeInstitutionClose(checker,period,"Reviewed institution cash evidence");
+        var frozen=service.finalizedSnapshot(maker,close);var json=JsonMapper.builder().findAndAddModules().build().readTree(frozen.snapshot());
+        assertThat(json.get("automaticCashMovements").size()).isZero();assertThat(json.get("cashFlowAllocations").get("missingJournalIds").size()).isZero();assertThat(json.get("cashFlowAllocations").get("versions").get(0).get("id").asText()).isEqualTo(version.toString());assertThat(json.get("cashFlowAllocations").get("versions").get(0).get("splits").get(0).get("activity").asText()).isEqualTo("FINANCING");
+        assertThat(tx.execute(status->service.finalizedSnapshotForPublication(maker,close)).periodClosed()).isTrue();
+        when(cash.reviewedAllocations(any(),eq(List.of(journal)),any())).thenReturn(new CashFlowReconciliationSource.Coverage(List.of(),List.of(journal)));
+        assertThatThrownBy(()->tx.execute(status->service.finalizedSnapshotForPublication(maker,close))).hasMessage("reconciliation.error.staleEvidence");assertThat(service.finalizedSnapshot(maker,close).snapshot()).isEqualTo(frozen.snapshot());
+    }
+    @Test void absentCashAllocationCoverageIsExplicitAndUnapprovedOrIncompleteSplitsFailClosed() {
+        opening();UUID journal=compoundCash(),version=UUID.randomUUID();var cash=mock(CashFlowReconciliationSource.class);var v=cashVersion(journal,version);enableSources(null,cash);
+        when(cash.reviewedAllocations(any(),anyList(),any())).thenReturn(new CashFlowReconciliationSource.Coverage(List.of(),List.of(journal)));
+        var provenance=new ReconciliationProvenance(new ReconciliationRepository(jdbc),Optional.empty(),Optional.of(cash));var p=new ReconciliationDtos.Period(period,DAY,DAY.plusDays(1),"OPEN");
+        assertThat(provenance.prepareCash(maker,p,NOW).missingJournalIds()).containsExactly(journal);
+        var ownReview=new CashFlowReconciliationSource.Version(v.id(),v.journalId(),v.version(),v.maker(),v.madeAt(),v.evidence(),v.noncashEvidence(),v.sourceChecksum(),v.definitionChecksum(),v.source(),v.splits(),v.maker(),v.reviewedAt(),v.reviewEvidence());
+        when(cash.reviewedAllocations(any(),anyList(),any())).thenReturn(new CashFlowReconciliationSource.Coverage(List.of(ownReview),List.of()));
+        assertThatThrownBy(()->provenance.prepareCash(maker,p,NOW)).hasMessage("reconciliation.error.cashFlowEvidence");
+        var incomplete=new CashFlowReconciliationSource.Version(v.id(),v.journalId(),v.version(),v.maker(),v.madeAt(),v.evidence(),v.noncashEvidence(),v.sourceChecksum(),v.definitionChecksum(),v.source(),List.of(new CashFlowReconciliationSource.Split(journalLine(journal),capital,"FINANCING",new BigDecimal("9.99"))),v.checker(),v.reviewedAt(),v.reviewEvidence());
+        when(cash.reviewedAllocations(any(),anyList(),any())).thenReturn(new CashFlowReconciliationSource.Coverage(List.of(incomplete),List.of()));
+        assertThatThrownBy(()->provenance.prepareCash(maker,p,NOW)).hasMessage("reconciliation.error.cashFlowEvidence");
+    }
+
+    @Test void institutionCompletionUsesOnlyExplicitlyAuthorizedMinimalForeignBranchProof() {
+        opening();UUID account=controlAccount("PAYABLE");station("B2");var b2maker=operator("B2");var b2checker=operator("B2");
+        var opening=gl.importOpening(b2maker,new JournalCommand(UUID.randomUUID(),"B2-OPENING",DAY,"Synthetic independently reviewed B2 opening",null,List.of(new Line(bank,new BigDecimal("100.00"),BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,new BigDecimal("100.00")))));
+        gl.approve(b2checker,opening.id(),"Synthetic B2 independent cutover");gl.post(b2checker,opening.id(),true);
+        var coverage=Map.of("B1",UUID.randomUUID(),"B2",UUID.randomUUID());var source=mock(BusinessReconciliationSource.class);var globalAllowed=new java.util.concurrent.atomic.AtomicBoolean(false);
+        when(source.historicalControlSnapshot(any(),eq(account),any(),eq("PAYABLE"),any())).thenAnswer(i->{
+            AppUserPrincipal actor=i.getArgument(0);assertThat(directory.find(actor.getMemberId()).orElseThrow().getStationId()).isEqualTo(actor.getStationId());
+            return Optional.of(zeroSource(actor,account,i.getArgument(2),"PAYABLE",i.getArgument(4),coverage.get(actor.getStationId()),"b".repeat(64)));
+        });
+        when(source.historicalControlSnapshotCurrentForInstitutionClose(any(),any())).thenAnswer(i->{AppUserPrincipal actor=i.getArgument(0);BusinessReconciliationSource.HistoricalControlSnapshot frozen=i.getArgument(1);assertThat(actor.getStationId()).isEqualTo("B1");assertThat(frozen.branch()).isEqualTo("B2");return globalAllowed.get();});
+        enableSources(source,null);
+        UUID own=service.certify(maker,account,DAY.plusDays(1),"SUPPLIER",BigDecimal.ZERO,"Reviewed B1 empty obligations");service.reviewCertificate(checker,own,"Independent B1 source agreement");prepareBankDifference();UUID ownClose=service.proposeClose(maker,period,"B1 reviewed source branch",false);service.approveClose(checker,ownClose,"Independent B1 closing");
+        UUID other=service.certify(b2maker,account,DAY.plusDays(1),"SUPPLIER",BigDecimal.ZERO,"Reviewed B2 empty obligations");service.reviewCertificate(b2checker,other,"Independent B2 source agreement");
+        UUID statement=service.importStatement(b2maker,new StatementCommand(UUID.randomUUID(),bank,format,DAY.plusDays(1),DAY.plusDays(1),new BigDecimal("100.00"),new BigDecimal("100.00"),"b2-bank.csv","Synthetic B2 verified source","date,reference,amount,kind\n2026-10-02,B2-IN,1.00,RECEIPT\n2026-10-02,B2-OUT,-1.00,DISBURSEMENT"));
+        for(var row:service.rows(b2maker,statement,0).rows()) {UUID ex=service.assignException(b2maker,row.id(),"TIMING",b2checker.getMemberId(),"B2 verified timing");service.reviewException(b2checker,ex,"B2 independent retained timing");}
+        UUID bankCertificate=service.certify(b2maker,bank,DAY.plusDays(1),"STATEMENT",new BigDecimal("100.00"),"B2 balanced bank source");service.reviewCertificate(b2checker,bankCertificate,"B2 independent bank review");
+        UUID otherClose=service.proposeClose(b2maker,period,"B2 prepared independent source close",false);service.approveClose(b2checker,otherClose,"Independent B2 closing");
+        assertThatThrownBy(()->service.completeInstitutionClose(checker,period,"No global source validation yet")).hasMessage("reconciliation.error.staleEvidence");
+        assertThat(jdbc.queryForObject("select state from accounting_period where id=?",String.class,period)).isEqualTo("OPEN");
+        globalAllowed.set(true);service.completeInstitutionClose(checker,period,"Explicitly authorized institution source proof");
+        assertThat(service.finalizedSnapshot(maker,ownClose).periodClosed()).isTrue();assertThat(service.finalizedSnapshot(b2maker,otherClose).periodClosed()).isTrue();
+        verify(source,times(2)).historicalControlSnapshotCurrentForInstitutionClose(eq(checker),argThat(s->s.branch().equals("B2")));
     }
 }

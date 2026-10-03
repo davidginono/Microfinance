@@ -30,6 +30,7 @@ public class ReconciliationService {
     private final ApplicationClock clock;
     private final Optional<BusinessReconciliationSource> businessControls;
     private final List<PeriodReopenListener> reopenListeners;
+    private final Optional<CashFlowReconciliationSource> cashFlowSources;
     private static final Set<String> ROW_KINDS=Set.of("RECEIPT","DISBURSEMENT","TRANSFER","SETTLEMENT","CHARGE","REVERSAL");
     private static final JsonMapper JSON=JsonMapper.builder().enable(tools.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).findAndAddModules().build();
     @Transactional(readOnly=true)
@@ -170,10 +171,10 @@ public class ReconciliationService {
         if("OPENING".equals(kind)) {
             require(!Set.of("PAYABLE","FUNDING","LOAN_PRINCIPAL").contains(a.get("purpose")),"certificateKind");var opening=repo.opening(actor.getSaccoId(),actor.getStationId()).orElseThrow(()->invalid("approvalRequired"));require(opening.through().equals(asOf)&&source.compareTo(repo.balance(actor.getSaccoId(),actor.getStationId(),account,asOf))==0,"staleEvidence");
         }
-        if("LOAN_CONTROL".equals(kind)) {var policy=policies.requireApprovedLocalPolicy(actor.getSaccoId(),asOf);require(account.equals(policy.accountMappings().get("LOAN_PRINCIPAL")),"loanMapping");require(source.compareTo(historicalPrincipal(actor,account,asOf))==0,"loanBalance");}
-        if(Set.of("SUPPLIER","FUNDING").contains(kind)) {
-            var control=businessControls.flatMap(provider->provider.historicalControlBalance(actor,account,asOf,(String)a.get("purpose"))).orElseThrow(()->invalid("controlUnavailable"));
-            require(source.compareTo(control)==0,"controlBalance");
+        if("LOAN_CONTROL".equals(kind)) {var policy=policies.requireApprovedLocalPolicy(actor.getSaccoId(),asOf);require(account.equals(policy.accountMappings().get("LOAN_PRINCIPAL")),"loanMapping");}
+        if(Set.of("LOAN_CONTROL","SUPPLIER","FUNDING").contains(kind)) {
+            var control=provenance().control(actor,account,asOf,(String)a.get("purpose"),clock.now());
+            require(source.compareTo(control.signedBalance())==0,"controlBalance");
         }
         if("STATEMENT".equals(kind))require(repo.statementBalanceExists(actor.getSaccoId(),actor.getStationId(),account,asOf,source),"statementEvidence");
         BigDecimal ledger=repo.balance(actor.getSaccoId(),actor.getStationId(),account,asOf);UUID id=repo.certificate(actor.getSaccoId(),actor.getStationId(),account,asOf,kind,source,ledger,actor.getMemberId(),evidence,clock.now());event(actor,id,"BALANCE_CERTIFICATE_PROPOSED");return id;
@@ -182,10 +183,9 @@ public class ReconciliationService {
     public void reviewCertificate(AppUserPrincipal actor,UUID id,String evidence) {
         authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_APPROVE);text(evidence,500);var c=repo.certificate(actor.getSaccoId(),actor.getStationId(),id).orElseThrow(ReconciliationService::outside);require(repo.openEvidencePeriod(actor.getSaccoId(),c.asOf()),"openPeriod");independent(actor,c.maker());require(c.checker()==null,"alreadyReviewed");
         require(c.ledgerBalance().compareTo(repo.balance(actor.getSaccoId(),actor.getStationId(),c.account(),c.asOf()))==0,"staleEvidence");
-        if("LOAN_CONTROL".equals(c.kind()))require(c.sourceBalance().compareTo(historicalPrincipal(actor,c.account(),c.asOf()))==0,"staleEvidence");
-        if(Set.of("SUPPLIER","FUNDING").contains(c.kind())) {
+        if(Set.of("LOAN_CONTROL","SUPPLIER","FUNDING").contains(c.kind())) {
             String purpose=(String)repo.account(actor.getSaccoId(),c.account()).get("purpose");
-            BigDecimal control=businessControls.flatMap(provider->provider.historicalControlBalance(actor,c.account(),c.asOf(),purpose)).orElseThrow(()->invalid("controlUnavailable"));require(control.compareTo(c.sourceBalance())==0,"staleEvidence");
+            var control=provenance().control(actor,c.account(),c.asOf(),purpose,clock.now());require(control.signedBalance().compareTo(c.sourceBalance())==0,"staleEvidence");
         }
         repo.reviewCertificate(id,actor.getMemberId(),evidence,clock.now());event(actor,id,"BALANCE_DIFFERENCE_REVIEWED");
     }
@@ -194,20 +194,26 @@ public class ReconciliationService {
     @Transactional(readOnly=true)
     public Page<Period> periods(AppUserPrincipal actor,int page) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);return page(repo.periods(actor.getSaccoId(),offset(page)),page);}
     @Transactional(readOnly=true)
-    public List<CloseCheck> closeChecks(AppUserPrincipal actor,UUID period) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);return repo.checks(actor.getSaccoId(),actor.getStationId(),scopedPeriod(actor,period,false));}
+    public List<CloseCheck> closeChecks(AppUserPrincipal actor,UUID period) {
+        authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);var p=scopedPeriod(actor,period,false);var checks=new ArrayList<>(repo.checks(actor.getSaccoId(),actor.getStationId(),p));
+        long blockers=0;try{provenance().prepareControls(actor,p,clock.now());}catch(IllegalArgumentException unavailable){blockers=1;}
+        checks.add(new CloseCheck("businessControlSources",blockers));return List.copyOf(checks);
+    }
     @Transactional
     public UUID proposeClose(AppUserPrincipal actor,UUID period,String evidence,boolean reopen) {
         authorize(actor,reopen?UserClaim.ACCOUNTING_CLOSING_REOPEN:UserClaim.ACCOUNTING_CLOSING_CREATE);text(evidence,500);var p=scopedPeriod(actor,period,false);repo.lockPriorPeriods(actor.getSaccoId(),p.through());p=scopedPeriod(actor,period,true);
         require((reopen?"CLOSED":"OPEN").equals(p.state()),"periodState");require(reopen||!p.through().isAfter(clock.today()),"periodNotEnded");
         policies.requireApprovedLocalPolicy(actor.getSaccoId(),p.through());if(!reopen)checkReady(actor.getSaccoId(),actor.getStationId(),p);
-        String snapshot=snapshot(actor.getSaccoId(),actor.getStationId(),p);UUID id=repo.closeReview(actor.getSaccoId(),actor.getStationId(),p,reopen?"REOPEN":"CLOSE",snapshot,sha(snapshot),actor.getMemberId(),evidence,clock.now());event(actor,id,reopen?"REOPEN_PROPOSED":"CLOSE_PROPOSED");return id;
+        var cutoff=clock.now();var data=snapshotData(actor.getSaccoId(),actor.getStationId(),p);
+        if(!reopen) {data.put("businessControlSources",provenance().prepareControls(actor,p,cutoff));data.put("cashFlowAllocations",provenance().prepareCash(actor,p,cutoff));data.put("automaticCashMovements",repo.automaticCashMovements(actor.getSaccoId(),actor.getStationId(),p));require(((List<?>)data.get("automaticCashMovements")).size()<=1000,"snapshotSize");}
+        String snapshot=JSON.writeValueAsString(data);UUID id=repo.closeReview(actor.getSaccoId(),actor.getStationId(),p,reopen?"REOPEN":"CLOSE",snapshot,sha(snapshot),actor.getMemberId(),evidence,cutoff);event(actor,id,reopen?"REOPEN_PROPOSED":"CLOSE_PROPOSED");return id;
     }
     @Transactional
     public void approveClose(AppUserPrincipal actor,UUID id,String evidence) {
         authorize(actor,UserClaim.ACCOUNTING_CLOSING_APPROVE);text(evidence,500);var r=scopedClose(actor,id);var p=scopedPeriod(actor,r.period(),false);repo.lockPriorPeriods(actor.getSaccoId(),p.through());p=scopedPeriod(actor,r.period(),true);r=scopedClose(actor,id);independent(actor,r.maker());require(r.checker()==null,"alreadyReviewed");
         boolean reopen=r.state().equals("DRAFT_REOPEN");if(reopen)authorize(actor,UserClaim.ACCOUNTING_CLOSING_REOPEN);
         require((reopen?"CLOSED":"OPEN").equals(p.state()),"periodState");
-        if(!reopen) {checkReady(actor.getSaccoId(),actor.getStationId(),p);require(r.checksum().equals(sha(snapshot(actor.getSaccoId(),actor.getStationId(),p))),"staleEvidence");}
+        if(!reopen) {checkReady(actor.getSaccoId(),actor.getStationId(),p);require(r.checksum().equals(sha(revalidatedSnapshot(actor,actor.getStationId(),p,r,false))),"staleEvidence");}
         repo.decideClose(id,actor.getMemberId(),evidence,clock.now());
         if(reopen) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_INSTITUTION);repo.setPeriod(p.id(),false,actor.getMemberId(),clock.now());for(var listener:reopenListeners)listener.periodReopened(actor,p.id(),p.from(),r.evidence()+" | "+evidence);}
         event(actor,id,reopen?"PERIOD_REOPENED":"BRANCH_CLOSE_APPROVED");
@@ -218,7 +224,8 @@ public class ReconciliationService {
         var branches=repo.branches(actor.getSaccoId(),p.through());require(!branches.isEmpty()&&branches.size()<=1000,"branchCoverage");var reviews=repo.branchCloses(actor.getSaccoId(),period);require(reviews.size()<=1000,"branchCoverage");
         for(String branch:branches) {
             var review=reviews.stream().filter(r->r.branch().equals(branch)).findFirst().orElseThrow(()->invalid("branchCoverage"));
-            checkReady(actor.getSaccoId(),branch,p);require(review.checksum().equals(sha(snapshot(actor.getSaccoId(),branch,p))),"staleEvidence");
+            var retained=repo.close(actor.getSaccoId(),branch,review.id()).orElseThrow(ReconciliationService::outside);
+            checkReady(actor.getSaccoId(),branch,p);require(review.checksum().equals(sha(revalidatedSnapshot(actor,branch,p,retained,true))),"staleEvidence");
         }
         repo.setPeriod(period,true,actor.getMemberId(),clock.now());event(actor,period,"INSTITUTION_PERIOD_CLOSED");
     }
@@ -237,18 +244,23 @@ public class ReconciliationService {
     @Transactional(propagation=Propagation.MANDATORY)
     public FinalizedSnapshot finalizedSnapshotForPublication(AppUserPrincipal actor,UUID id) {
         authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);var review=scopedClose(actor,id);repo.lockPeriodForPublication(actor.getSaccoId(),review.period());
-        var result=finalizedSnapshot(actor,id);require(result.periodClosed(),"approvalRequired");return result;
+        var result=finalizedSnapshot(actor,id);require(result.periodClosed(),"approvalRequired");
+        var p=scopedPeriod(actor,review.period(),false);provenance().retainedControls(actor,actor.getStationId(),p,review,clock.now(),false);provenance().retainedCash(actor,actor.getStationId(),p,review,clock.now(),false);return result;
     }
     @Transactional(readOnly=true)
     public OpeningEvidence reviewedOpeningEvidence(AppUserPrincipal actor) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);return repo.opening(actor.getSaccoId(),actor.getStationId()).orElseThrow(()->invalid("approvalRequired"));}
-    private BigDecimal historicalPrincipal(AppUserPrincipal actor,UUID account,LocalDate date) {
-        if(businessControls.isPresent())return businessControls.get().historicalControlBalance(actor,account,date,"LOAN_PRINCIPAL").orElseThrow(()->invalid("controlUnavailable"));
-        require(!repo.hasExpandedLoanMovements(actor.getSaccoId(),actor.getStationId(),date),"controlUnavailable");return repo.loanBalance(actor.getSaccoId(),actor.getStationId(),date);
-    }
-    private String snapshot(String institution,String branch,Period p) {
+    private Map<String,Object> snapshotData(String institution,String branch,Period p) {
         var data=repo.snapshot(institution,branch,p);for(String key:List.of("accounts","cashMovements","certificates","statementEvidence","retainedDifferences","sourcePolicyVersions","cancelledSources"))require(((List<?>)data.get(key)).size()<=1000,"snapshotSize");
         var policy=policies.requireApprovedLocalPolicy(institution,p.through());
         data.put("periodPolicy",data.get("accountingPolicy"));data.put("accountingPolicy",Map.of("id",policy.id().toString(),"policy_version",policy.version(),"authoritative_ledger",policy.authoritativeLedger().name(),"effective_from",policy.effectiveFrom().toString(),"opening_date",policy.openingDate().toString(),"decisions",policy.decisions()));
+        return data;
+    }
+    private ReconciliationProvenance provenance() {return new ReconciliationProvenance(repo,businessControls,cashFlowSources);}
+    private String revalidatedSnapshot(AppUserPrincipal actor,String branch,Period p,CloseReview review,boolean global) {
+        var data=snapshotData(actor.getSaccoId(),branch,p);
+        data.put("businessControlSources",provenance().retainedControls(actor,branch,p,review,clock.now(),global));
+        data.put("cashFlowAllocations",provenance().retainedCash(actor,branch,p,review,clock.now(),global));
+        var automatic=repo.automaticCashMovements(actor.getSaccoId(),branch,p);require(automatic.size()<=1000,"snapshotSize");data.put("automaticCashMovements",automatic);
         return JSON.writeValueAsString(data);
     }
     private void requireOpenRange(AppUserPrincipal actor,LocalDate from,LocalDate through) {
