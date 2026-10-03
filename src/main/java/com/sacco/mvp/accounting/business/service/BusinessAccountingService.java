@@ -6,6 +6,7 @@ import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.*;
 import com.sacco.mvp.accounting.policy.*;
 import com.sacco.mvp.accounting.policy.AccountingPolicyService.PolicySnapshot;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
+import com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import java.math.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,6 +34,7 @@ public class BusinessAccountingService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final SaccoRegistryService institutions;
+    private final AccountingReleaseGateService releaseGate;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     private static final Set<String> MONEY_KEYS=Set.of("CASH","BANK","MOBILE_MONEY");
     private static boolean isReversal(Kind kind){return kind==Kind.BUSINESS_REVERSAL || kind==Kind.LOAN_REPAYMENT_REVERSAL;}
@@ -65,14 +68,19 @@ public class BusinessAccountingService {
             :ledger.draftSourceEvent(actor,d.command().kind().event(),command);
         sources.submitted(d.id(),j.id(),p.principal(),p.interest(),p.fees());event(actor,d,"SOURCE_SUBMITTED");return scoped(actor,id,false);
     }
-    @Transactional
+    @Transactional(isolation=Isolation.READ_COMMITTED)
     public Document approveAndPost(AppUserPrincipal actor,UUID id,String evidence,boolean confirmed) {
         authorize(actor,UserClaim.ACCOUNTING_BUSINESS_APPROVE);text(evidence,500);require(confirmed,"confirmation");
         var d=scoped(actor,id,true);require(!d.makerId().equals(actor.getMemberId()),"checker");
         if("POSTED".equals(d.state())){require(actor.getMemberId().equals(d.checkerId()) && evidence.equals(d.approvalEvidence()),"retry");return d;}
         require("SUBMITTED".equals(d.state()),"state");
-        var policy=policies.requireApprovedLocalPolicy(d.institutionId(),d.command().effectiveDate());var p=plan(actor,d,policy);
-        var journal=ledger.journal(actor,d.journalId());require(sameLines(journal.lines(),p.lines()),"changedBalance");
+        var policy=policies.requireApprovedLocalPolicy(d.institutionId(),d.command().effectiveDate());
+        ledger.lockSourcePostingPeriod(actor,d.command().effectiveDate());
+        releaseGate.requireLiveRelease(actor,policy.id(),policy.version());
+        var p=plan(actor,d,policy);
+        var journal=ledger.journal(actor,d.journalId());
+        require(journal.policyId().equals(policy.id()) && journal.policyVersion()==policy.version(),"changedBalance");
+        require(sameLines(journal.lines(),p.lines()),"changedBalance");
         sources.posting(id,actor.getMemberId(),evidence);
         if(isReversal(d.command().kind()))ledger.approveAndPostSourceReversal(actor,d.journalId(),d.id().toString(),evidence);
         else ledger.approveAndPostSourceEvent(actor,d.journalId(),d.command().kind().event(),d.id().toString(),evidence);

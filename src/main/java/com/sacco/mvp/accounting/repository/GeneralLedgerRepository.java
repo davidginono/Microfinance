@@ -63,6 +63,10 @@ public class GeneralLedgerRepository {
     public List<Period> lockOpenPeriod(String institution, LocalDate date) {
         return jdbc.query("select * from accounting_period where sacco_id=? and ? between starts_on and ends_on for share",this::period,institution,date);
     }
+    public List<Period> lockSourcePeriodHistory(String institution, LocalDate date) {
+        jdbc.queryForList("select pg_advisory_xact_lock_shared(hashtextextended(?,0))", "GL_SETUP/" + institution);
+        return jdbc.query("select * from accounting_period where sacco_id=? and starts_on<=? order by starts_on,id limit 1001 for share",this::period,institution,date);
+    }
     public boolean periodOverlap(String institution, LocalDate start, LocalDate end) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accounting_period where sacco_id=? and starts_on<=? and ends_on>=?)",Boolean.class,institution,end,start));
     }

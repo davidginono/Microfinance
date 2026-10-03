@@ -78,6 +78,7 @@ public class GeneralLedgerService {
     @Transactional
     public void deactivateAccount(AppUserPrincipal actor,UUID id) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");
+        books.lockAccounts(actor.getSaccoId());
         require(books.account(actor.getSaccoId(),id).isPresent(),"account");
         books.deactivate(actor.getSaccoId(),id);event(actor,id,"ACCOUNT_DEACTIVATED",Map.of());
     }
@@ -178,6 +179,16 @@ public class GeneralLedgerService {
         books.outbox(j,clock.now());books.post(id,clock.now());
         event(actor,id,"JOURNAL_POSTED",Map.of("sourceType",j.sourceType(),"sourceReference",j.sourceReference(),"policyVersion",j.policyVersion()));
         return withLines(scoped(actor,id,false));
+    }
+    /** Lock prior and target periods before the release leaf, in the same order as closing/reopening. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void lockSourcePostingPeriod(AppUserPrincipal actor,LocalDate date) {
+        requireActor(actor,"ACCOUNTING_JOURNALS_APPROVE");
+        require(date!=null && !date.isAfter(clock.today()),"effectiveDate");
+        var history=books.lockSourcePeriodHistory(actor.getSaccoId(),date);
+        require(history.size()<=1000,"period");
+        var current=history.stream().filter(p->!date.isBefore(p.startsOn()) && !date.isAfter(p.endsOn())).toList();
+        require(current.size()==1 && "OPEN".equals(current.getFirst().state()),"openPeriodRequired");
     }
     /** Source component must update its source/subledger in this same transaction. Never exposed as a generic HTTP command. */
     @Transactional(propagation=Propagation.MANDATORY)

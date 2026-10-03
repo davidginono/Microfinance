@@ -6,6 +6,8 @@ import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.*;
 import com.sacco.mvp.accounting.policy.*;
 import com.sacco.mvp.accounting.policy.AccountingPolicyService.*;
 import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
+import com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService;
+import com.sacco.mvp.reporting.execution.repository.AccountingReleaseRepository;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -29,7 +31,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003)?")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003|_release_gate_20261003)?")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BusinessAccountingPostgresTest {
     private static final LocalDate OPENING=LocalDate.of(2026,10,1), DAY=OPENING.plusDays(1);
@@ -49,21 +51,25 @@ class BusinessAccountingPostgresTest {
     private AppUserPrincipal maker,checker,third,fourth;
     private Map<String,UUID> mappings;
     private PolicySnapshot policy;
+    private AccountingReleaseGateService releaseGate;
+    private DataSourceTransactionManager transactionManager;
 
     @BeforeAll void start(){
         ds=new HikariDataSource();ds.setJdbcUrl(System.getenv("MICROFINANCE_ACCOUNTING_C_DATABASE_URL"));ds.setUsername("microfinance_test");ds.setPassword("");ds.setMaximumPoolSize(4);ds.setMinimumIdle(0);ds.setConnectionTimeout(30000);ds.addDataSourceProperty("sslmode","disable");ds.addDataSourceProperty("connectTimeout","5");ds.addDataSourceProperty("socketTimeout","30");
         Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
-        jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
+        jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);transactionManager=manager;tx=new TransactionTemplate(manager);
         var mapper=JsonMapper.builder().findAndAddModules().build();
         policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);clock=mock(ApplicationClock.class);
         when(clock.today()).thenReturn(DAY);when(clock.now()).thenReturn(OffsetDateTime.parse("2026-10-02T12:00:00+03:00"));
         books=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,members,institutions),manager);
         repository=new BusinessAccountingRepository(jdbc,mapper);
-        service=proxy(new BusinessAccountingService(repository,books,policies,mock(LoanRepaymentLedgerService.class),mock(ManagerService.class),new AccessControlService(),members,claims,clock,audit,institutions),manager);
+        releaseGate=mock(AccountingReleaseGateService.class);
+        service=businessService(releaseGate);
     }
     @AfterAll void stop(){if(ds!=null)ds.close();}
     @BeforeEach void fixture(){
-        reset(policies,audit,members,claims,institutions);institution="C-"+UUID.randomUUID();
+        reset(policies,audit,members,claims,institutions,releaseGate);institution="C-"+UUID.randomUUID();
+        when(clock.today()).thenReturn(DAY);when(clock.now()).thenReturn(OffsetDateTime.parse("2026-10-02T12:00:00+03:00"));
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic business accounting institution");
         when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
         when(institutions.findStation(institution,"B1")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
@@ -209,6 +215,73 @@ class BusinessAccountingPostgresTest {
         assertThat(books.journal(checker,original.journalId()).state()).isEqualTo("CANCELLED");
         assertThat(balance("OWNER_CAPITAL")).isEqualByComparingTo(openingCapital.subtract(new BigDecimal("2.01")));
         assertThat(repository.remaining(original.id())).isZero();assertThat(repository.remaining(replacement.id())).isEqualByComparingTo("2.01");
+    }
+    @Test void reviewedSourceCannotPostWithoutTheExactLiveRelease() {
+        var leaf=proxy(new AccountingReleaseGateService(new AccountingReleaseRepository(jdbc,JsonMapper.builder().findAndAddModules().build())),transactionManager);
+        var restricted=businessService(leaf);
+        var d=submitted(Kind.DIRECT_EXPENSE,"2.01",null);
+        var originalBank=balance("BANK");clearInvocations(audit);
+        assertThatThrownBy(()->restricted.approveAndPost(checker,d.id(),"Independent source review",true))
+            .hasMessage("accounting.release.error.restricted");
+        assertThat(restricted.view(checker,d.id()).state()).isEqualTo("SUBMITTED");
+        assertThat(books.journal(checker,d.journalId()).state()).isEqualTo("DRAFT");
+        assertThat(balance("BANK")).isEqualByComparingTo(originalBank);
+        assertThat(repository.remaining(d.id())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,d.journalId())).isZero();
+        verifyNoInteractions(audit);
+    }
+    @Test void sourceEvidenceCanBeSubmittedAndRejectedWhileLiveReleaseIsRestricted() {
+        var leaf=proxy(new AccountingReleaseGateService(new AccountingReleaseRepository(jdbc,JsonMapper.builder().findAndAddModules().build())),transactionManager);
+        var restricted=businessService(leaf);
+        var d=restricted.create(maker,command(Kind.CAPITAL_RECEIPT,"2.01",null));
+        var submitted=restricted.submit(maker,d.id());
+        assertThat(restricted.reject(checker,d.id(),"Independent rejection before activation").state()).isEqualTo("REJECTED");
+        assertThat(books.journal(checker,submitted.journalId()).state()).isEqualTo("CANCELLED");
+        assertThat(countSources("POSTED")).isZero();
+    }
+    @Test void releaseWithdrawalBlocksNewMoneyAndRetainsExactPostedRetries() {
+        var posted=posted(Kind.CAPITAL_RECEIPT,"2.01",null);
+        clearInvocations(releaseGate);
+        doThrow(new IllegalArgumentException("accounting.release.error.restricted")).when(releaseGate).requireLiveRelease(any(),any(),anyInt());
+        assertThat(service.approveAndPost(checker,posted.id(),"Synthetic independent evidence",true).id()).isEqualTo(posted.id());
+        verifyNoInteractions(releaseGate);
+        var next=submitted(Kind.CAPITAL_RECEIPT,"1.01",null);
+        assertThatThrownBy(()->service.approveAndPost(checker,next.id(),"Independent next source review",true)).hasMessage("accounting.release.error.restricted");
+        verify(releaseGate).requireLiveRelease(checker,policy.id(),policy.version());
+        assertThat(countSources("POSTED")).isEqualTo(1);
+    }
+    @Test void setupAndPriorAndTargetPeriodsAreLockedBeforeTheFreshReleaseDecision() {
+        var date=LocalDate.of(2026,11,2);
+        when(clock.today()).thenReturn(date);when(clock.now()).thenReturn(OffsetDateTime.parse("2026-11-02T12:00:00+03:00"));
+        UUID target=books.createPeriod(maker,date,date.plusMonths(1));
+        UUID prior=jdbc.queryForObject("select id from accounting_period where sacco_id=? and starts_on=?",UUID.class,institution,OPENING);
+        var c=command(Kind.CAPITAL_RECEIPT,"2.01",null);
+        var dated=new Command(c.requestKey(),c.kind(),date,c.amount(),c.loanId(),c.relatedDocumentId(),c.supplierId(),c.description(),c.evidenceReference(),c.channelReference(),c.moneyAccountKey(),c.destinationBranch(),c.loanNumber(),c.firstRepaymentDate(),c.frequency(),c.installmentAmount());
+        var d=service.create(maker,dated);service.submit(maker,d.id());
+        doAnswer(invocation->{
+            assertThat(jdbc.queryForObject("select current_setting('transaction_isolation')",String.class)).isEqualTo("read committed");
+            try(var pool=Executors.newSingleThreadExecutor()) {
+                for(UUID period:List.of(prior,target)) {
+                    var blocked=pool.submit(()->databaseLockWasBlocked(()->jdbc.queryForObject("select id from accounting_period where id=? for update",UUID.class,period)));
+                    assertThat(blocked.get(30,TimeUnit.SECONDS)).isTrue();
+                }
+                var metadata=pool.submit(()->databaseLockWasBlocked(()->jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","GL_SETUP/"+institution)));
+                assertThat(metadata.get(30,TimeUnit.SECONDS)).isTrue();
+            }
+            return null;
+        }).when(releaseGate).requireLiveRelease(checker,policy.id(),policy.version());
+        assertThat(service.approveAndPost(checker,d.id(),"Independent future-period review",true).state()).isEqualTo("POSTED");
+        verify(releaseGate).requireLiveRelease(checker,policy.id(),policy.version());
+    }
+    private BusinessAccountingService businessService(AccountingReleaseGateService gate) {
+        return proxy(new BusinessAccountingService(repository,books,policies,mock(LoanRepaymentLedgerService.class),mock(ManagerService.class),new AccessControlService(),members,claims,clock,audit,institutions,gate),transactionManager);
+    }
+    private boolean databaseLockWasBlocked(Runnable lock) {
+        try {tx.execute(status->{jdbc.execute("set local lock_timeout='500ms'");lock.run();return null;});return false;}
+        catch(org.springframework.dao.DataAccessException exception) {
+            if(exception.getMostSpecificCause() instanceof java.sql.SQLException sql && "55P03".equals(sql.getSQLState()))return true;
+            throw exception;
+        }
     }
     private Document submitted(Kind kind,String amount,UUID related){var d=service.create(maker,command(kind,amount,related));return service.submit(maker,d.id());}
     private Document posted(Kind kind,String amount,UUID related){var d=submitted(kind,amount,related);var p=service.approveAndPost(checker,d.id(),"Synthetic independent evidence",true);assertThat(service.approveAndPost(checker,d.id(),"Synthetic independent evidence",true).id()).isEqualTo(p.id());assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id=?",BigDecimal.class,p.journalId())).isZero();return p;}
