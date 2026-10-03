@@ -144,3 +144,29 @@ Five added PostgreSQL cases cover the exact pair, unrelated/unreviewed/self-revi
 Remaining phase gates: D01 needs actual institution-approved statement format acceptance; D02–D03 need rendered valid/invalid staff timing flow evidence and real channel settlement examples; D04 real C historical opening/control coverage and actual E allocation adapter integration remain separate owning-source requirements, with missing histories gated; D05–D07 require combined C/G/H release/adjustment acceptance, recovery/query-plan/capacity evidence and institution accountant review. The earlier real PostgreSQL posting/closing/reopening races are retained, but no full phase completion or measured throughput is claimed.
 
 Final frozen timing verification: **49 passed, zero failures/errors/skips** (42 real PostgreSQL, four MVC/CSRF, three validation), Maven 03:46, completed 2026-10-03 22:37:45 +03:00. All 302 main and 138 test sources compiled on Java 25. PostgreSQL cases took 32.84 seconds on isolated loopback PostgreSQL 17.9. Its 49-migration catalog validated, including V45.2 previously applied to the reused disposable D schema; test-local out-of-order remains explicit, while fresh integrated normal-order migration verification belongs to root. The source files remained frozen throughout run75196. Both statement and voucher reference/date/signed amount are present in the reviewed pair projection and frozen source proof. Rendered JSP verification is still pending.
+
+
+## Actual reviewed cash provider integration increment
+
+D imports only exact verified E dependency blobs from commit 617008442a6e820cf3c519597d7f0b01f9906dac; no E worktree was edited and no broad feature-history merge was used. The provider's real repository, allocation service, internal fresh-scope report authorization and closing adapter replace the controlled cash-port double in three focused PostgreSQL scenarios. Real B posted journals, immutable allocation drafts/reviews, D statement matching/certificates/close/publication and exact branch/institution provenance are exercised together. Policy/directory/claim collaborators remain explicit synthetic fixture controls, and no C source-opening or human institution approval is inferred from these cases.
+
+Exact dependency receipt (Java paths are under src/main/java/com/sacco/mvp/accounting/reports/):
+
+| Path | Verified Git blob |
+| --- | --- |
+| CashFlowAllocation.java | b574ea50a04d86c3588017cd07550c51af726969 |
+| CashFlowAllocationRepository.java | 832eebb006f55e3d81040edffe38bc924527e1fe |
+| CashFlowAllocationService.java | 9d4e3f2d24b002403863c7d00388d55988d8fd7b |
+| CashFlowClosingAdapter.java | 8b7a611a5e18a856e616490f18b96af0e5487f7d |
+| LedgerReportRepository.java | 68c7997858c73e308699509f8abfae13ce91c3f3 |
+| LedgerReportService.java | fd08d2007820e726c002c512f17ee89398ca64d7 |
+| src/main/resources/db/migration/V48__reviewed_cash_flow_allocations.sql | 6587e31690cb3a1a0ec7a954fe78f1e497f4bbf9 |
+| src/main/resources/db/migration/V48_1__cash_flow_evidence_scope.sql | c32624b8a685e8da4bc0ad22d0f9c084cf1f4798 |
+
+These are existing owning-feature dependencies already integrated in root. No E exports, unrelated controllers, G code or foreign branch principal were imported. Preflight against exact allowlisted microfinance_accounting_d_test confirmed the reused schema's highest version was 46, with successful retained 43.2/45.1/45.2 evidence. New V48 and V48.1 are above that maximum and should apply in ordinary forward order; no earlier gap or existing database object is silently substituted.
+
+The added cases cover genuine allocation version freezing with branch closing-only claims (while public financial registry access remains denied), explicit missing/unreviewed allocation coverage and posted cutoff rejection, and minimal current foreign-branch proof from a genuine institution financial actor. A new approved allocation version must invalidate new publication while the old close/aggregate bytes and IDs remain immutable. The corrected focused frozen run passed 52 tests with zero failures, errors or skips (45 real PostgreSQL, four MVC/CSRF, three validation), Maven 08:14, completed 2026-10-03 22:55:41 +03:00. PostgreSQL cases took 73.98 seconds; all 308 main and 138 test sources compiled on Java 25 across the initial compile and corrected fixture run. PostgreSQL 17.9 validated the 51-migration catalog and applied V48 followed by V48.1 in ordinary forward order above V46; the test-local reuse flag remains explicit for historical D increments. No source files changed during live run44477. Actual C historical opening/control coverage, rendered timing actions and combined release/performance/human acceptance remain separate.
+
+The initial provider run failed test compilation: the fixture passed JdbcTemplate to E’s NamedParameterJdbcTemplate repository, and an untyped TransactionTemplate return confused AssertJ overload inference. These fixture errors were corrected without changing any verified E dependency; no provider tests passed in that attempt.
+
+Provider query review identified that E617 selects all approved historical versions before choosing the latest in Java. The E owner accepted a follow-up to select the latest per journal in bounded SQL at the exact cutoff after its own frozen run. These dependency blobs remain untouched; no measured query-plan or throughput claim is made. The timing proof pair query also needs SQL deduplication if institutions accumulate repeated independently reviewed proofs for the same pair; its current Set result is bounded by command IDs but duplicate database rows are not yet eliminated before transfer.

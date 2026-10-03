@@ -8,6 +8,12 @@ import com.sacco.mvp.accounting.policy.*;
 import com.sacco.mvp.accounting.policy.AccountingPolicyService.*;
 import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
+import com.sacco.mvp.accounting.reports.CashFlowAllocation;
+import com.sacco.mvp.accounting.reports.CashFlowAllocationRepository;
+import com.sacco.mvp.accounting.reports.CashFlowAllocationService;
+import com.sacco.mvp.accounting.reports.CashFlowClosingAdapter;
+import com.sacco.mvp.accounting.reports.LedgerReportRepository;
+import com.sacco.mvp.accounting.reports.LedgerReportService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -606,5 +612,49 @@ class ReconciliationPostgresTest {
         assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(opening),checker.getMemberId().toString(),"Not a timing receipt")).hasMessage("reconciliation.error.matchSource");
         var repo=new ReconciliationRepository(jdbc);assertThatThrownBy(()->tx.execute(s->repo.match(institution,"B1",bank,"SPLIT",maker.getMemberId(),"Direct opening negative fixture",null,List.of(new Allocation(line,journalLine(opening),new BigDecimal("100.00"))),NOW))).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(jdbc.queryForObject("select count(*) from reconciliation_match where sacco_id=?",Long.class,institution)).isZero();
+    }
+
+    private CashFlowAllocationService actualCashProvider() {
+        var mapper=JsonMapper.builder().findAndAddModules().build();
+        var reports=proxy(new LedgerReportService(new LedgerReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc)),policies,directory,claims,institutions,clock),manager);
+        var allocations=proxy(new CashFlowAllocationService(new CashFlowAllocationRepository(jdbc,mapper),reports,clock,audit,mapper),manager);
+        enableSources(null,new CashFlowClosingAdapter(allocations));return allocations;
+    }
+    private UUID realCashVersion(CashFlowAllocationService allocations,AppUserPrincipal actor,AppUserPrincipal reviewer,UUID journal) {
+        UUID id=allocations.draft(actor,journal,UUID.randomUUID(),List.of(new CashFlowAllocation.Split(journalLine(journal),capital,CashFlowAllocation.Activity.FINANCING,new BigDecimal("10.00"))),"Verified synthetic capital and cash source","Verified synthetic owner-funded noncash expense");
+        allocations.approve(reviewer,id,"Independent actual cash allocation review");return id;
+    }
+    @Test void actualReviewedCashProviderFreezesItsExactVersionAndClosingOnlyClaimsCannotReadFinanceRegistry() {
+        opening();UUID journal=compoundCash();var allocations=actualCashProvider();UUID allocation=realCashVersion(allocations,maker,checker,journal);
+        matchBranchMovement(maker,checker,journal,"CASH-ALLOCATED",new BigDecimal("10.00"));
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.ACCOUNTING_CLOSING_CREATE,UserClaim.ACCOUNTING_CLOSING_VIEW));
+        when(claims.effectiveClaims(eq(checker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.ACCOUNTING_CLOSING_APPROVE,UserClaim.ACCOUNTING_CLOSING_VIEW,UserClaim.ACCOUNTING_CLOSING_INSTITUTION));
+        assertThatThrownBy(()->allocations.versions(maker,0)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        UUID close=service.proposeClose(maker,period,"Actual reviewed cash provider close",false);service.approveClose(checker,close,"Independent frozen allocation review");service.completeInstitutionClose(checker,period,"Actual source proof completion");
+        String frozen=service.finalizedSnapshot(maker,close).snapshot();var json=JsonMapper.builder().findAndAddModules().build().readTree(frozen);assertThat(json.path("cashFlowAllocations").path("missingJournalIds").isEmpty()).isTrue();assertThat(json.path("cashFlowAllocations").path("versions").get(0).path("id").asText()).isEqualTo(allocation.toString());assertThat(json.path("automaticCashMovements").isEmpty()).isTrue();String publicationChecksum=tx.execute(s->service.finalizedSnapshotForPublication(maker,close).checksum());assertThat(publicationChecksum).isEqualTo(ReconciliationService.sha(frozen));
+        when(clock.now()).thenReturn(NOW.plusMinutes(1));UUID later=realCashVersion(allocations,third,fourth,journal);assertThat(later).isNotEqualTo(allocation);
+        assertThatThrownBy(()->tx.execute(s->service.finalizedSnapshotForPublication(maker,close))).hasMessage("reconciliation.error.staleEvidence");assertThat(service.finalizedSnapshot(maker,close).snapshot()).isEqualTo(frozen);
+    }
+    @Test void actualCashProviderRetainsMissingAndCutoffCoverageWithoutInventingAnAllocation() {
+        opening();UUID journal=compoundCash();var allocations=actualCashProvider();UUID draft=allocations.draft(maker,journal,UUID.randomUUID(),List.of(new CashFlowAllocation.Split(journalLine(journal),capital,CashFlowAllocation.Activity.FINANCING,new BigDecimal("10.00"))),"Unreviewed synthetic cash classification","Synthetic noncash source evidence");
+        var missing=allocations.reviewedForClosing(maker,List.of(journal),NOW);assertThat(missing.versions()).isEmpty();assertThat(missing.missingJournalIds()).containsExactly(journal);
+        assertThatThrownBy(()->allocations.reviewedForClosing(maker,List.of(journal),NOW.minusSeconds(1))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        matchBranchMovement(maker,checker,journal,"CASH-ALLOCATED",new BigDecimal("10.00"));UUID close=service.proposeClose(maker,period,"Known unresolved cash classification",false);service.approveClose(checker,close,"Independent source coverage review");service.completeInstitutionClose(checker,period,"Explicit unresolved cash coverage");
+        String retained=service.finalizedSnapshot(maker,close).snapshot();assertThat(retained).contains("missingJournalIds",journal.toString()).doesNotContain(draft.toString());
+        when(clock.now()).thenReturn(NOW.plusMinutes(1));allocations.approve(checker,draft,"Independent later cash classification");
+        assertThatThrownBy(()->tx.execute(s->service.finalizedSnapshotForPublication(maker,close))).hasMessage("reconciliation.error.staleEvidence");assertThat(service.finalizedSnapshot(maker,close).snapshot()).isEqualTo(retained);
+    }
+    @Test void actualCashProviderMinimalForeignProofSupportsInstitutionFinanceWithoutForeignRegistryAccess() {
+        opening();station("B2");var b2maker=operator("B2");var b2checker=operator("B2");secondBranchOpening(b2maker,b2checker);var allocations=actualCashProvider();
+        var b1maker=maker;var b1checker=checker;maker=b2maker;checker=b2checker;UUID journal=compoundCash();maker=b1maker;checker=b1checker;
+        UUID allocation=realCashVersion(allocations,b2maker,b2checker,journal);matchBranchMovement(b2maker,b2checker,journal,"CASH-ALLOCATED",new BigDecimal("10.00"));
+        UUID b2close=service.proposeClose(b2maker,period,"Actual B2 allocation coverage",false);service.approveClose(b2checker,b2close,"Independent B2 close");balancedTimingClose(period,DAY.plusDays(1),"ACTUAL-E-B1");
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.FINANCIAL_REPORTS_INSTITUTION));
+        var frozen=tx.execute(s->service.finalizedInstitutionSnapshotForPublication(maker,period));assertThat(frozen.branches()).hasSize(2);assertThat(frozen.snapshot()).contains(allocation.toString()).doesNotContain("statementEvidence","retainedDifferences");
+        assertThatThrownBy(()->allocations.source(maker,journal)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        when(clock.now()).thenReturn(NOW.plusMinutes(1));realCashVersion(allocations,b2maker,b2checker,journal);
+        assertThatThrownBy(()->tx.execute(s->service.finalizedInstitutionSnapshotForPublication(maker,period))).hasMessage("reconciliation.error.staleEvidence");assertThat(ReconciliationService.sha(frozen.snapshot())).isEqualTo(frozen.checksum());
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.FINANCIAL_REPORTS_VIEW));
+        assertThatThrownBy(()->tx.execute(s->service.finalizedInstitutionSnapshotForPublication(maker,period))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 }
