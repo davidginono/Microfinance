@@ -131,6 +131,9 @@ public class GeneralLedgerRepository {
     public boolean coveredAtCutover(String institution,String branch,LocalDate date) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_cutover_coverage c join gl_journal j on j.id=c.opening_journal_id where c.sacco_id=? and c.station_id=? and c.complete and j.state='POSTED' and c.reconciled_through>=?)",Boolean.class,institution,branch,date));
     }
+    public Optional<UUID> operationalOwner(String institution,String branch,UUID voucher) {
+        return jdbc.queryForList("select journal_id from gl_operational_bridge where sacco_id=? and station_id=? and voucher_id=?",UUID.class,institution,branch,voucher).stream().findFirst();
+    }
     public void bridge(UUID voucher,Journal j) {
         jdbc.update("insert into gl_operational_bridge(voucher_id,sacco_id,station_id,journal_id,evidence_reference) values(?,?,?,?,?) on conflict(voucher_id) do nothing",voucher,j.institutionId(),j.branchId(),j.id(),j.evidenceReference());
     }

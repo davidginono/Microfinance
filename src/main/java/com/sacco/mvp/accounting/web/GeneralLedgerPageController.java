@@ -72,7 +72,7 @@ public class GeneralLedgerPageController {
     String bridge(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID voucher,@RequestParam UUID requestKey,@RequestParam String evidence) {return "redirect:/finance/journals/"+ledger.bridgeOperationalVoucher(actor,voucher,requestKey,evidence).id();}
     @ExceptionHandler(IllegalArgumentException.class)
     String error(IllegalArgumentException failure,Model model,HttpServletRequest request,@AuthenticationPrincipal AppUserPrincipal actor) {
-        String key=failure.getMessage();model.addAttribute("accountingError",key!=null && key.startsWith("accounting.error.")?key:"accounting.error.validation");
+        String key=failure.getMessage();model.addAttribute("accountingError",key!=null && (key.startsWith("accounting.error.") || key.startsWith("accounting.release.error."))?key:"accounting.error.validation");
         if(request.getRequestURI().endsWith("/journals/import")) {
             for(String field:List.of("requestKey","sourceReference","effectiveDate","evidenceReference","reason","content"))model.addAttribute(field,request.getParameter(field));
             model.addAttribute("opening","true".equals(request.getParameter("opening")));

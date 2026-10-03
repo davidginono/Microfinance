@@ -54,7 +54,7 @@ class LedgerReportPostgresTest {
         jdbc=new JdbcTemplate(ds);reports=new LedgerReportRepository(new NamedParameterJdbcTemplate(jdbc));var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         ApplicationClock clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenAnswer(i->OffsetDateTime.now());
-        var raw=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions);
+        var raw=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class));
         var factory=new ProxyFactory(raw);factory.setProxyTargetClass(true);factory.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));
         service=(GeneralLedgerService)factory.getProxy();
     }

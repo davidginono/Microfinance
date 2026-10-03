@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
+import com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -40,6 +42,7 @@ public class GeneralLedgerService {
     private final UserClaimService userClaims;
     private final MemberDirectoryService directory;
     private final SaccoRegistryService institutions;
+    private final AccountingReleaseGateService releaseGate;
     private static final Set<String> TYPES=Set.of("ASSET","LIABILITY","EQUITY","INCOME","EXPENSE");
     private static final Set<String> KINDS=Set.of("HEADING","POSTING","CONTROL");
     private static final Set<String> PURPOSES=Set.of("CASH","BANK","MOBILE_MONEY","CLEARING","SUSPENSE","LOAN_PRINCIPAL",
@@ -152,7 +155,7 @@ public class GeneralLedgerService {
         require("DRAFT".equals(j.state()),"state");books.approve(id,actor.getMemberId(),evidence,clock.now());
         event(actor,id,"JOURNAL_APPROVED",Map.of("evidenceReference",evidence));return withLines(scoped(actor,id,false));
     }
-    @Transactional
+    @Transactional(isolation=Isolation.READ_COMMITTED)
     public Journal post(AppUserPrincipal actor,UUID id,boolean openingReconciled) {
         Journal j=scoped(actor,id,true);requireGenericSource(j);return postInternal(actor,j,openingReconciled);
     }
@@ -164,7 +167,8 @@ public class GeneralLedgerService {
         require("APPROVED".equals(j.state()),"approvalRequired");
         var policy=policies.requireApprovedLocalPolicy(actor.getSaccoId(),j.effectiveDate());
         require(policy.id().equals(j.policyId()),"policyChanged");policies.requireAllowedPosting(policy,postingEvent(j.sourceType()));
-        openPeriod(actor,j.effectiveDate());
+        lockSourcePostingPeriod(actor,j.effectiveDate());
+        if(!"OPENING".equals(j.sourceType()))releaseGate.requireLiveRelease(actor,policy.id(),policy.version());
         if("OPENING".equals(j.sourceType())) {
             require(openingReconciled && j.effectiveDate().equals(policy.openingDate()),"reviewedOpeningRequired");
             require(!books.reviewedOpening(actor.getSaccoId(),actor.getStationId()),"duplicateOpening");
@@ -270,6 +274,13 @@ public class GeneralLedgerService {
     @Transactional
     public Journal bridgeOperationalVoucher(AppUserPrincipal actor,UUID voucher,UUID key,String evidence) {
         requireActor(actor,"ACCOUNTING_JOURNALS_CREATE");
+        var owner=books.operationalOwner(actor.getSaccoId(),actor.getStationId(),voucher);
+        if(owner.isPresent()) {
+            Journal existing=scoped(actor,owner.get(),false);
+            require("OPERATIONAL_BRIDGE".equals(existing.sourceType()),"sourceAlreadyOwned");
+            require(existing.requestKey().equals(key) && existing.makerId().equals(actor.getMemberId()) && Objects.equals(existing.evidenceReference(),evidence),"changedRetry");
+            return withLines(existing);
+        }
         List<GeneralLedgerRepository.OperationalLine> source=books.operationalVoucher(actor.getSaccoId(),actor.getStationId(),voucher);
         require(source.size()>=2 && source.size()<=100,"voucher");LocalDate date=source.getFirst().date();
         require(source.stream().allMatch(l->date.equals(l.date()) && source.getFirst().loanId().equals(l.loanId())),"voucherScope");

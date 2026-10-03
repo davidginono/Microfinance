@@ -61,7 +61,7 @@ class BusinessAccountingPostgresTest {
         var mapper=JsonMapper.builder().findAndAddModules().build();
         policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);clock=mock(ApplicationClock.class);
         when(clock.today()).thenReturn(DAY);when(clock.now()).thenReturn(OffsetDateTime.parse("2026-10-02T12:00:00+03:00"));
-        books=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,members,institutions),manager);
+        books=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,members,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)),manager);
         repository=new BusinessAccountingRepository(jdbc,mapper);
         releaseGate=mock(AccountingReleaseGateService.class);
         service=businessService(releaseGate);

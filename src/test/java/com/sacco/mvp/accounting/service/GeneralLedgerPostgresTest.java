@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_B_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_b_test")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_B_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_b_(test|gate_test)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GeneralLedgerPostgresTest {
     private JdbcTemplate jdbc;
@@ -51,7 +51,7 @@ class GeneralLedgerPostgresTest {
         jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         policies=mock(AccountingPolicyService.class);audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         ApplicationClock clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenReturn(NOW);
-        var raw=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions);
+        var raw=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class));
         var factory=new ProxyFactory(raw);factory.setProxyTargetClass(true);factory.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));
         service=(GeneralLedgerService)factory.getProxy();
     }
@@ -136,16 +136,17 @@ class GeneralLedgerPostgresTest {
         assertThat(service.journal(maker,j.id()).reversed()).isTrue();
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?) and account_id=?",BigDecimal.class,j.id(),reversal.id(),cash)).isZero();
     }
-    @Test void postingPeriodShareLockSerializesClosing() throws Exception {
+    @Test void postingSerializesClosingAndUnreviewedCloseRemainsBlocked() throws Exception {
         opening();var j=service.draftManual(maker,command("CLOSE-RACE","9.00"));service.approve(checker,j.id(),"Reviewed");
         var locked=new CountDownLatch(1);var release=new CountDownLatch(1);
         try(var pool=Executors.newFixedThreadPool(2)) {
             var post=pool.submit(()->tx.execute(s->{service.post(checker,j.id(),false);locked.countDown();try{release.await(10,TimeUnit.SECONDS);}catch(InterruptedException e){throw new IllegalStateException(e);}return true;}));
             assertThat(locked.await(10,TimeUnit.SECONDS)).isTrue();
-            var close=pool.submit(()->jdbc.update("update accounting_period set state='CLOSED',closed_by=?,closed_at=now() where id=?",reverseChecker.getMemberId(),period));
-            Thread.sleep(150);assertThat(close.isDone()).isFalse();release.countDown();assertThat(post.get(10,TimeUnit.SECONDS)).isTrue();assertThat(close.get(10,TimeUnit.SECONDS)).isEqualTo(1);
+            var close=pool.submit(()->{try{jdbc.update("update accounting_period set state='CLOSED',closed_by=?,closed_at=now() where id=?",reverseChecker.getMemberId(),period);return true;}catch(org.springframework.dao.DataAccessException expected){return false;}});
+            Thread.sleep(150);assertThat(close.isDone()).isFalse();release.countDown();assertThat(post.get(10,TimeUnit.SECONDS)).isTrue();assertThat(close.get(10,TimeUnit.SECONDS)).isFalse();
         }
-        assertThatThrownBy(()->service.draftManual(maker,command("AFTER-CLOSE","1.00"))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("select state from accounting_period where id=?",String.class,period)).isEqualTo("OPEN");
+        assertThat(service.journal(maker,j.id()).state()).isEqualTo("POSTED");
     }
     @Test void databaseRejectsUnbalancedPostingEvenWithOutboxAndReviewedOpening() {
         opening();var j=service.draftManual(maker,command("UNBALANCED","3.00"));

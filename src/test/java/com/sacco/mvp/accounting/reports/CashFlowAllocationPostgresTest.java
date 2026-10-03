@@ -40,7 +40,7 @@ class CashFlowAllocationPostgresTest {
         Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);manager=new DataSourceTransactionManager(ds);
         policies=mock(AccountingPolicyService.class);members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);audit=mock(AuditService.class);clock=mock(ApplicationClock.class);
         when(clock.today()).thenReturn(DAY.plusDays(1));when(clock.now()).thenAnswer(i->OffsetDateTime.now());var mapper=JsonMapper.builder().findAndAddModules().build();
-        ledger=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,members,institutions));
+        ledger=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,members,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)));
         var reports=new LedgerReportService(new LedgerReportRepository(new NamedParameterJdbcTemplate(jdbc)),policies,members,claims,institutions,clock);
         ledgerReports=proxy(reports);
         allocations=new CashFlowAllocationRepository(jdbc,mapper);service=proxy(new CashFlowAllocationService(allocations,reports,clock,audit,mapper));
