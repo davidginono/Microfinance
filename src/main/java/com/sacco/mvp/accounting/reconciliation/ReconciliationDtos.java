@@ -19,7 +19,8 @@ public final class ReconciliationDtos {
     public record Candidate(UUID id,UUID journal,LocalDate date,String reference,String source,BigDecimal amount,BigDecimal matched,boolean reversed) { }
     public record Allocation(UUID statementLine,UUID journalLine,BigDecimal amount) { }
     public record Match(UUID id,String kind,String state,UUID maker,UUID checker,String evidence,UUID reverses) { }
-    public record ExceptionRecord(UUID id,UUID statementLine,String kind,UUID assignedTo,String state,UUID maker,UUID checker,String evidence) { }
+    public record TimingSource(UUID journalLine,UUID journal,LocalDate statementDate,LocalDate journalDate,String reference,BigDecimal amount,String statementReference,BigDecimal statementAmount) { }
+    public record ExceptionRecord(UUID id,UUID statementLine,String kind,UUID assignedTo,String state,UUID maker,UUID checker,String evidence,TimingSource timing) { }
     public record Certificate(UUID id,UUID account,String code,LocalDate asOf,String kind,BigDecimal sourceBalance,
         BigDecimal ledgerBalance,BigDecimal difference,String state,UUID maker,UUID checker,String evidence) { }
     public record AccountBalance(UUID id,String code,String name,String purpose,BigDecimal balance) { }

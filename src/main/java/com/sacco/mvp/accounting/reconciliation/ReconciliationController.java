@@ -56,7 +56,7 @@ public class ReconciliationController {
     @PostMapping("/reconciliation/matches/{id}/reverse")
     String reverseMatch(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam String evidence) {service.reverseMatch(actor,id,evidence);return "redirect:/finance/reconciliation";}
     @PostMapping("/reconciliation/exceptions")
-    String exception(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID statementLine,@RequestParam String kind,@RequestParam String assigned,@RequestParam String evidence) {service.assignExceptionToStaff(actor,statementLine,kind,assigned,evidence);return "redirect:/finance/reconciliation";}
+    String exception(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID statementLine,@RequestParam String kind,@RequestParam String assigned,@RequestParam String evidence,@RequestParam(required=false) UUID journalLine) {if(journalLine!=null){if(!"TIMING".equals(kind))throw new IllegalArgumentException("reconciliation.error.kind");service.assignTimingExceptionToStaff(actor,statementLine,journalLine,assigned,evidence);}else service.assignExceptionToStaff(actor,statementLine,kind,assigned,evidence);return "redirect:/finance/reconciliation";}
     @PostMapping("/reconciliation/exceptions/{id}/review")
     String reviewException(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam String evidence) {service.reviewException(actor,id,evidence);return "redirect:/finance/reconciliation";}
     @PostMapping("/reconciliation/certificates")

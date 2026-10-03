@@ -58,7 +58,7 @@ public class ReconciliationRepository {
           coalesce((select sum(a.amount) from reconciliation_active_allocation a where a.journal_line_id=l.id),0) matched,
           (j.reverses_id is not null or exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED')) reversed
           from gl_journal_line l join gl_journal j on j.id=l.journal_id
-          where j.sacco_id=? and j.station_id=? and l.account_id=? and j.state='POSTED' and j.effective_date between ? and ?
+          where j.sacco_id=? and j.station_id=? and l.account_id=? and j.state='POSTED' and j.source_type<>'OPENING' and j.effective_date between ? and ?
           order by j.effective_date,j.id,l.id limit 26 offset ?
           """,(r,n)->new Candidate(uuid(r,"id"),uuid(r,"journal_id"),date(r,"effective_date"),r.getString("source_reference"),r.getString("source_type"),r.getBigDecimal("amount"),r.getBigDecimal("matched"),r.getBoolean("reversed")),institution,branch,account,from,through,offset);
     }
@@ -71,6 +71,13 @@ public class ReconciliationRepository {
             "select l.*,j.effective_date,j.source_reference,j.source_type,j.reverses_id,exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') original_reversed,coalesce((select sum(a.amount) from reconciliation_active_allocation a where a.journal_line_id=l.id),0) allocated from gl_journal_line l join gl_journal j on j.id=l.journal_id where j.sacco_id=? and j.station_id=? and j.state='POSTED' and l.id in (";
         var args=new ArrayList<Object>();args.add(institution);args.add(branch);args.addAll(ids);var result=new HashMap<UUID,Map<String,Object>>();
         for(var row:jdbc.queryForList(sql+String.join(",",Collections.nCopies(ids.size(),"?"))+")",args.toArray()))result.put((UUID)row.get("id"),row);return result;
+    }
+    public void timingSource(UUID exception,UUID journalLine,boolean reversed,OffsetDateTime now) {jdbc.update("insert into reconciliation_timing_source(exception_id,journal_line_id,original_reversed,created_at) values(?,?,?,?)",exception,journalLine,reversed,now);}
+    public Optional<Map<String,Object>> timingSource(UUID exception) {return jdbc.queryForList("select * from reconciliation_timing_source where exception_id=?",exception).stream().findFirst();}
+    public Set<String> reviewedTimingPairs(String institution,String branch,List<Allocation> parts) {
+        if(parts.isEmpty()||parts.size()>100)throw new IllegalArgumentException("Allocation ID limit");
+        var args=new ArrayList<Object>();args.add(institution);args.add(branch);for(var p:parts){args.add(p.statementLine());args.add(p.journalLine());}
+        return new HashSet<>(jdbc.query("select e.statement_line_id::text||'/'||t.journal_line_id::text from reconciliation_exception e join reconciliation_exception_decision d on d.exception_id=e.id join reconciliation_timing_source t on t.exception_id=e.id where e.sacco_id=? and e.station_id=? and (e.statement_line_id,t.journal_line_id) in ("+String.join(",",Collections.nCopies(parts.size(),"(?,?)"))+") and reconciliation_valid_timing_pair(e.id,t.journal_line_id,t.original_reversed)",(r,n)->r.getString(1),args.toArray()));
     }
     public boolean openEvidenceDates(String institution,Collection<LocalDate> dates) {
         if(dates.isEmpty()||dates.size()>100)throw new IllegalArgumentException("Allocation date limit");var args=new ArrayList<Object>();args.add(institution);args.addAll(dates);
@@ -88,7 +95,7 @@ public class ReconciliationRepository {
     public void decideMatch(UUID id,UUID checker,boolean approved,String evidence,OffsetDateTime now) {jdbc.update("insert into reconciliation_match_decision(match_id,checker_id,decision,evidence,decided_at) values(?,?,?,?,?)",id,checker,approved?"APPROVED":"REJECTED",evidence,now);}
     public List<Match> matches(String institution,String branch,int offset) {return jdbc.query("select m.*,coalesce(d.decision,'DRAFT') state,d.checker_id from reconciliation_match m left join reconciliation_match_decision d on d.match_id=m.id where m.sacco_id=? and m.station_id=? order by created_at desc,m.id limit 26 offset ?",MATCH,institution,branch,offset);}
     public UUID exception(String institution,String branch,UUID line,String kind,UUID assigned,UUID maker,String evidence,OffsetDateTime now) {UUID id=UUID.randomUUID();jdbc.update("insert into reconciliation_exception(id,sacco_id,station_id,statement_line_id,kind,assigned_to,maker_id,evidence,created_at) values(?,?,?,?,?,?,?,?,?)",id,institution,branch,line,kind,assigned,maker,evidence,now);return id;}
-    public List<ExceptionRecord> exceptions(String institution,String branch,int offset) {return jdbc.query("select e.*,d.checker_id,case when d.exception_id is null then 'OPEN' else 'REVIEWED_DIFFERENCE' end state from reconciliation_exception e left join reconciliation_exception_decision d on d.exception_id=e.id where e.sacco_id=? and e.station_id=? order by created_at desc,e.id limit 26 offset ?",(r,n)->new ExceptionRecord(uuid(r,"id"),uuid(r,"statement_line_id"),r.getString("kind"),uuid(r,"assigned_to"),r.getString("state"),uuid(r,"maker_id"),uuid(r,"checker_id"),r.getString("evidence")),institution,branch,offset);}
+    public List<ExceptionRecord> exceptions(String institution,String branch,int offset) {return jdbc.query("select e.*,d.checker_id,t.journal_line_id,j.id timing_journal,sl.effective_date statement_date,sl.reference statement_reference,sl.amount statement_amount,j.effective_date journal_date,j.source_reference timing_reference,jl.debit-jl.credit timing_amount,case when d.exception_id is null then 'OPEN' else 'REVIEWED_DIFFERENCE' end state from reconciliation_exception e left join reconciliation_exception_decision d on d.exception_id=e.id left join reconciliation_timing_source t on t.exception_id=e.id left join reconciliation_statement_line sl on sl.id=e.statement_line_id left join gl_journal_line jl on jl.id=t.journal_line_id left join gl_journal j on j.id=jl.journal_id where e.sacco_id=? and e.station_id=? order by e.created_at desc,e.id limit 26 offset ?",(r,n)->new ExceptionRecord(uuid(r,"id"),uuid(r,"statement_line_id"),r.getString("kind"),uuid(r,"assigned_to"),r.getString("state"),uuid(r,"maker_id"),uuid(r,"checker_id"),r.getString("evidence"),r.getObject("journal_line_id")==null?null:new TimingSource(uuid(r,"journal_line_id"),uuid(r,"timing_journal"),date(r,"statement_date"),date(r,"journal_date"),r.getString("timing_reference"),r.getBigDecimal("timing_amount"),r.getString("statement_reference"),r.getBigDecimal("statement_amount"))),institution,branch,offset);}
     public Optional<Map<String,Object>> exception(String institution,String branch,UUID id) {return jdbc.queryForList("select * from reconciliation_exception where sacco_id=? and station_id=? and id=?",institution,branch,id).stream().findFirst();}
     public void reviewException(UUID id,UUID checker,String evidence,OffsetDateTime now) {jdbc.update("insert into reconciliation_exception_decision(exception_id,checker_id,evidence,decided_at) values(?,?,?,?)",id,checker,evidence,now);}
     public boolean approvedSourcePolicy(String institution,UUID id,int version) {
@@ -168,6 +175,16 @@ public class ReconciliationRepository {
             checksum,maker_id,checker_id,evidence,recorded_at from bounded order by station_id limit 1001
           """,CLOSE,institution,period);}
 
+    public long timingBlockers(String institution,String branch,LocalDate through) {return count("""
+select count(*) from reconciliation_active_allocation a join reconciliation_statement_line sl on sl.id=a.statement_line_id
+          join reconciliation_statement s on s.id=sl.statement_id join gl_journal_line jl on jl.id=a.journal_line_id join gl_journal j on j.id=jl.journal_id
+          where s.sacco_id=? and (?::text is null or s.station_id=?::text) and sl.effective_date<=? and (j.source_type='OPENING' or sl.effective_date<>j.effective_date)
+          and not exists(select 1 from reconciliation_exception e join reconciliation_exception_decision d on d.exception_id=e.id
+          join reconciliation_timing_source t on t.exception_id=e.id
+          where e.statement_line_id=sl.id and t.journal_line_id=jl.id and e.kind='TIMING' and j.source_type<>'OPENING'
+          and abs(sl.effective_date-j.effective_date) between 1 and 30
+          and t.original_reversed=exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED' and r.effective_date<=?))
+        """,institution,branch,branch,through,through);}
     public List<CloseCheck> checks(String institution,String branch,Period p) {
         var result=new ArrayList<CloseCheck>();
         result.add(new CloseCheck("opening",count("select count(*) from gl_cutover_coverage c join gl_journal j on j.id=c.opening_journal_id where c.sacco_id=? and c.station_id=? and c.complete and j.state='POSTED'",institution,branch)==1?0:1));
@@ -194,6 +211,7 @@ public class ReconciliationRepository {
           and not exists(select 1 from reconciliation_match m join reconciliation_match_decision d on d.match_id=m.id
           where m.reverses_id=a.match_id and d.decision='APPROVED' and d.decided_at>=r.posted_at)
           """,p.through(),institution,branch,p.through())));
+        result.add(new CloseCheck("timing",timingBlockers(institution,branch,p.through())));
         result.add(new CloseCheck("accountEvidence",count("""
           select count(*) from gl_account a where a.sacco_id=? and a.kind<>'HEADING'
           and (a.active or exists(select 1 from gl_journal_line hl join gl_journal hj on hj.id=hl.journal_id where hl.account_id=a.id and hj.station_id=? and hj.state='POSTED' and hj.effective_date<=?))
@@ -250,6 +268,7 @@ public class ReconciliationRepository {
         out.put("checks",checks(institution,branch,p));out.put("certificates",jdbc.queryForList("select c.id::text,c.account_id::text,c.difference::text,d.evidence,d.checker_id::text from reconciliation_certificate c join reconciliation_certificate_decision d on d.certificate_id=c.id where c.sacco_id=? and c.station_id=? and c.as_of=? order by c.id limit 1001",institution,branch,p.through()));
         out.put("statementEvidence",jdbc.queryForList("select id::text,file_checksum,ends_on::text,closing_balance::text from reconciliation_statement where sacco_id=? and station_id=? and ends_on<=? order by id limit 1001",institution,branch,p.through()));
         out.put("matchingEvidence",jdbc.queryForMap("select count(*) reviewed_matches,max(d.decided_at)::text latest_review from reconciliation_match m join reconciliation_match_decision d on d.match_id=m.id where m.sacco_id=? and m.station_id=?",institution,branch));
+        out.put("timingSources",jdbc.queryForList("select e.id,e.statement_line_id,t.journal_line_id,t.original_reversed,sl.effective_date statement_date,sl.reference statement_reference,sl.amount statement_amount,j.effective_date journal_date,j.source_reference,j.source_type,j.policy_id,j.policy_version,jl.debit-jl.credit signed_amount,e.maker_id,e.evidence,d.checker_id,d.evidence review_evidence,d.decided_at from reconciliation_exception e join reconciliation_timing_source t on t.exception_id=e.id join reconciliation_exception_decision d on d.exception_id=e.id join reconciliation_statement_line sl on sl.id=e.statement_line_id join gl_journal_line jl on jl.id=t.journal_line_id join gl_journal j on j.id=jl.journal_id where e.sacco_id=? and e.station_id=? and sl.effective_date<=? order by e.id limit 1001",institution,branch,p.through()));
         out.put("retainedDifferences",jdbc.queryForList("select e.id::text,e.kind,e.evidence,d.evidence review_evidence from reconciliation_exception e join reconciliation_statement_line l on l.id=e.statement_line_id join reconciliation_exception_decision d on d.exception_id=e.id where e.sacco_id=? and e.station_id=? and l.effective_date<=? order by e.id limit 1001",institution,branch,p.through()));return out;
     }
     public UUID closeReview(String institution,String branch,Period p,String action,String snapshot,String checksum,UUID maker,String evidence,OffsetDateTime now) {UUID id=UUID.randomUUID();int version=jdbc.queryForObject("select coalesce(max(version),0)+1 from accounting_close_review where sacco_id=? and station_id=? and period_id=?",Integer.class,institution,branch,p.id());jdbc.update("insert into accounting_close_review(id,sacco_id,station_id,period_id,version,action,snapshot_json,checksum,evidence,maker_id,recorded_at) values(?,?,?,?,?,?,?,?,?,?,?)",id,institution,branch,p.id(),version,action,snapshot,checksum,evidence,maker,now);return id;}

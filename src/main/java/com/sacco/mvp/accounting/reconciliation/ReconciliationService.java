@@ -110,12 +110,16 @@ public class ReconciliationService {
         var journalRows=repo.matchingLines(actor.getSaccoId(),actor.getStationId(),parts.stream().map(Allocation::journalLine).distinct().toList(),false);
         require(statementRows.size()==parts.stream().map(Allocation::statementLine).distinct().count()&&journalRows.size()==parts.stream().map(Allocation::journalLine).distinct().count(),"allocations");
         require(repo.openEvidenceDates(actor.getSaccoId(),statementRows.values().stream().map(r->((java.sql.Date)r.get("effective_date")).toLocalDate()).distinct().toList()),"openPeriod");
+        var timingPairs=repo.reviewedTimingPairs(actor.getSaccoId(),actor.getStationId(),parts);
         for(var p:parts) {
             require(p!=null&&p.statementLine()!=null&&p.journalLine()!=null,"allocations");money(p.amount(),false);require(duplicates.add(p.statementLine()+"/"+p.journalLine()),"allocations");
             var s=statementRows.get(p.statementLine());var j=journalRows.get(p.journalLine());
-            require(account.equals(s.get("account_id"))&&account.equals(j.get("account_id")),"account");
+            require(account.equals(s.get("account_id"))&&account.equals(j.get("account_id")),"account");require(!"OPENING".equals(j.get("source_type")),"matchSource");
             BigDecimal statement=(BigDecimal)s.get("amount"),ledger=((BigDecimal)j.get("debit")).subtract((BigDecimal)j.get("credit"));
             require(statement.signum()==ledger.signum(),"direction");
+            var statementDate=((java.sql.Date)s.get("effective_date")).toLocalDate();var journalDate=((java.sql.Date)j.get("effective_date")).toLocalDate();
+            require(Math.abs(java.time.temporal.ChronoUnit.DAYS.between(statementDate,journalDate))<=30,"timingWindow");
+            require(statementDate.equals(journalDate)||timingPairs.contains(p.statementLine()+"/"+p.journalLine()),"timingReview");
             if(Boolean.TRUE.equals(s.get("duplicate")))require("BATCH".equals(kind),"duplicateReview");
             if(j.get("reverses_id")!=null||Boolean.TRUE.equals(j.get("original_reversed"))||"REVERSAL".equals(s.get("kind")))require("REVERSAL".equals(kind),"reversalReview");
             if("CHARGE".equals(s.get("kind")))require("CHARGE".equals(kind)||"SETTLEMENT".equals(kind),"feeReview");
@@ -142,6 +146,21 @@ public class ReconciliationService {
     @Transactional(readOnly=true)
     public Page<Match> matches(AppUserPrincipal actor,int page) {authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_VIEW);return page(repo.matches(actor.getSaccoId(),actor.getStationId(),offset(page)),page);}
     @Transactional
+    public UUID assignTimingExceptionToStaff(AppUserPrincipal actor,UUID line,UUID journalLine,String staffNo,String evidence) {
+        authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);text(staffNo,40);
+        UUID assigned=repo.staff(actor.getSaccoId(),actor.getStationId(),staffNo).orElseThrow(ReconciliationService::outside);
+        var source=timingPair(actor,line,journalLine);repo.lock(actor.getSaccoId(),(UUID)source.get("account_id"));
+        UUID id=assignException(actor,line,"TIMING",assigned,evidence);repo.timingSource(id,journalLine,Boolean.TRUE.equals(source.get("original_reversed")),clock.now());return id;
+    }
+    private Map<String,Object> timingPair(AppUserPrincipal actor,UUID line,UUID journalLine) {
+        var s=repo.line(actor.getSaccoId(),actor.getStationId(),line).orElseThrow(ReconciliationService::outside);
+        var j=repo.journalLine(actor.getSaccoId(),actor.getStationId(),journalLine).orElseThrow(ReconciliationService::outside);
+        require(s.get("account_id").equals(j.get("account_id")),"account");require(!"OPENING".equals(j.get("source_type")),"matchSource");BigDecimal ledger=((BigDecimal)j.get("debit")).subtract((BigDecimal)j.get("credit"));
+        require(((BigDecimal)s.get("amount")).signum()==ledger.signum(),"direction");
+        long days=Math.abs(java.time.temporal.ChronoUnit.DAYS.between(((java.sql.Date)s.get("effective_date")).toLocalDate(),((java.sql.Date)j.get("effective_date")).toLocalDate()));
+        require(days>0&&days<=30,"timingWindow");return j;
+    }
+    @Transactional
     public UUID assignExceptionToStaff(AppUserPrincipal actor,UUID line,String kind,String staffNo,String evidence) {
         authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_CREATE);text(staffNo,40);
         UUID assigned=repo.staff(actor.getSaccoId(),actor.getStationId(),staffNo).orElseThrow(ReconciliationService::outside);
@@ -157,7 +176,9 @@ public class ReconciliationService {
     @Transactional
     public void reviewException(AppUserPrincipal actor,UUID id,String evidence) {
         authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_APPROVE);text(evidence,500);var ex=repo.exception(actor.getSaccoId(),actor.getStationId(),id).orElseThrow(ReconciliationService::outside);
-        var source=repo.line(actor.getSaccoId(),actor.getStationId(),(UUID)ex.get("statement_line_id")).orElseThrow(ReconciliationService::outside);require(repo.openEvidencePeriod(actor.getSaccoId(),((java.sql.Date)source.get("effective_date")).toLocalDate()),"openPeriod");independent(actor,(UUID)ex.get("maker_id"));require(actor.getMemberId().equals(ex.get("assigned_to")),"assignee");repo.reviewException(id,actor.getMemberId(),evidence,clock.now());event(actor,id,"EXCEPTION_DIFFERENCE_REVIEWED");
+        var source=repo.line(actor.getSaccoId(),actor.getStationId(),(UUID)ex.get("statement_line_id")).orElseThrow(ReconciliationService::outside);require(repo.openEvidencePeriod(actor.getSaccoId(),((java.sql.Date)source.get("effective_date")).toLocalDate()),"openPeriod");independent(actor,(UUID)ex.get("maker_id"));require(actor.getMemberId().equals(ex.get("assigned_to")),"assignee");
+        var timing=repo.timingSource(id);if(timing.isPresent()){var j=timingPair(actor,(UUID)ex.get("statement_line_id"),(UUID)timing.get().get("journal_line_id"));repo.lock(actor.getSaccoId(),(UUID)j.get("account_id"));require(Objects.equals(timing.get().get("original_reversed"),j.get("original_reversed")),"staleEvidence");}
+        repo.reviewException(id,actor.getMemberId(),evidence,clock.now());event(actor,id,"EXCEPTION_DIFFERENCE_REVIEWED");
     }
     @Transactional(readOnly=true)
     public Page<ExceptionRecord> exceptions(AppUserPrincipal actor,int page) {authorize(actor,UserClaim.ACCOUNTING_RECONCILIATION_VIEW);return page(repo.exceptions(actor.getSaccoId(),actor.getStationId(),offset(page)),page);}
@@ -245,13 +266,13 @@ public class ReconciliationService {
     public FinalizedSnapshot finalizedSnapshotForPublication(AppUserPrincipal actor,UUID id) {
         authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);var review=scopedClose(actor,id);repo.lockPeriodForPublication(actor.getSaccoId(),review.period());
         var result=finalizedSnapshot(actor,id);require(result.periodClosed(),"approvalRequired");
-        var p=scopedPeriod(actor,review.period(),false);provenance().retainedControls(actor,actor.getStationId(),p,review,clock.now(),false);provenance().retainedCash(actor,actor.getStationId(),p,review,clock.now(),false);return result;
+        var p=scopedPeriod(actor,review.period(),false);require(repo.timingBlockers(actor.getSaccoId(),actor.getStationId(),p.through())==0,"timingReview");provenance().retainedControls(actor,actor.getStationId(),p,review,clock.now(),false);provenance().retainedCash(actor,actor.getStationId(),p,review,clock.now(),false);return result;
     }
     /** Trusted institution aggregate for finalizers; no foreign registries or invented common cutoff. */
     @Transactional(propagation=Propagation.MANDATORY)
     public InstitutionSnapshot finalizedInstitutionSnapshotForPublication(AppUserPrincipal actor,UUID period) {
         authorize(actor,UserClaim.FINANCIAL_REPORTS_VIEW);authorize(actor,UserClaim.FINANCIAL_REPORTS_INSTITUTION);
-        repo.lockPeriodForPublication(actor.getSaccoId(),period);var p=scopedPeriod(actor,period,false);require("CLOSED".equals(p.state()),"approvalRequired");
+        repo.lockPeriodForPublication(actor.getSaccoId(),period);var p=scopedPeriod(actor,period,false);require("CLOSED".equals(p.state()),"approvalRequired");require(repo.timingBlockers(actor.getSaccoId(),null,p.through())==0,"timingReview");
         var branches=repo.branches(actor.getSaccoId(),p.through());require(!branches.isEmpty()&&branches.size()<=1000,"branchCoverage");
         var reviews=repo.currentInstitutionCloses(actor.getSaccoId(),period);require(reviews.size()<=1000&&reviews.size()==branches.size(),"branchCoverage");
         require(new HashSet<>(branches).equals(reviews.stream().map(CloseReview::branch).collect(java.util.stream.Collectors.toSet())),"branchCoverage");
@@ -267,7 +288,7 @@ public class ReconciliationService {
     @Transactional(readOnly=true)
     public OpeningEvidence reviewedOpeningEvidence(AppUserPrincipal actor) {authorize(actor,UserClaim.ACCOUNTING_CLOSING_VIEW);return repo.opening(actor.getSaccoId(),actor.getStationId()).orElseThrow(()->invalid("approvalRequired"));}
     private Map<String,Object> snapshotData(String institution,String branch,Period p) {
-        var data=repo.snapshot(institution,branch,p);for(String key:List.of("accounts","cashMovements","certificates","statementEvidence","retainedDifferences","sourcePolicyVersions","cancelledSources"))require(((List<?>)data.get(key)).size()<=1000,"snapshotSize");
+        var data=repo.snapshot(institution,branch,p);for(String key:List.of("accounts","cashMovements","certificates","statementEvidence","retainedDifferences","timingSources","sourcePolicyVersions","cancelledSources"))require(((List<?>)data.get(key)).size()<=1000,"snapshotSize");
         var policy=policies.requireApprovedLocalPolicy(institution,p.through());
         data.put("periodPolicy",data.get("accountingPolicy"));data.put("accountingPolicy",Map.of("id",policy.id().toString(),"policy_version",policy.version(),"authoritative_ledger",policy.authoritativeLedger().name(),"effective_from",policy.effectiveFrom().toString(),"opening_date",policy.openingDate().toString(),"decisions",policy.decisions()));
         return data;

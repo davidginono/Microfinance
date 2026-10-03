@@ -537,4 +537,74 @@ class ReconciliationPostgresTest {
         assertThatThrownBy(()->tx.execute(status->service.finalizedSnapshotForPublication(maker,old))).hasMessage("reconciliation.error.approvalRequired");
     }
 
+
+    private UUID datedMovement(String reference,LocalDate date,String value) {
+        when(clock.today()).thenReturn(date.isAfter(DAY.plusDays(1))?date:DAY.plusDays(1));
+        if(date.isAfter(DAY.plusDays(1))&&!jdbc.queryForObject("select exists(select 1 from accounting_period where sacco_id=? and ? between starts_on and ends_on)",Boolean.class,institution,date))gl.createPeriod(maker,DAY.plusDays(2),date);
+        BigDecimal amount=new BigDecimal(value);UUID id=gl.draftManual(maker,new JournalCommand(UUID.randomUUID(),reference,date,"Synthetic dated movement",null,List.of(new Line(bank,amount,BigDecimal.ZERO),new Line(capital,BigDecimal.ZERO,amount)))).id();
+        gl.approve(checker,id,"Independent dated source review");return gl.post(checker,id,false).id();
+    }
+    @Test void differentDateMatchesRequireExactIndependentlyReviewedTimingPairAndFreezeIt() {
+        opening();UUID journal=datedMovement("TIMED",DAY.plusDays(2),"1.01"),other=datedMovement("OTHER",DAY.plusDays(2),"1.01"),statement=importOne("TIMED","1.01"),line=statementLine(statement);
+        var part=new Allocation(line,journalLine(journal),new BigDecimal("1.01"));
+        for(String kind:List.of("EXACT","SPLIT","BATCH"))assertThatThrownBy(()->service.proposeMatch(maker,kind,"No timing source",List.of(part))).hasMessage("reconciliation.error.timingReview");
+        UUID generic=service.assignException(maker,line,"TIMING",checker.getMemberId(),"Unlinked retained timing difference");service.reviewException(checker,generic,"Independent generic difference");
+        assertThatThrownBy(()->service.proposeMatch(maker,"EXACT","Unrelated timing decision",List.of(part))).hasMessage("reconciliation.error.timingReview");
+        UUID timing=service.assignTimingExceptionToStaff(maker,line,journalLine(journal),checker.getMemberId().toString(),"Verified source dates and reference");
+        assertThatThrownBy(()->service.proposeMatch(maker,"EXACT","Unreviewed pair",List.of(part))).hasMessage("reconciliation.error.timingReview");
+        assertThatThrownBy(()->service.reviewException(maker,timing,"Self review")).hasMessage("reconciliation.error.independentReview");
+        service.reviewException(checker,timing,"Independent source-linked timing evidence");
+        var retained=service.exceptions(checker,0).rows().stream().filter(e->e.id().equals(timing)).findFirst().orElseThrow();assertThat(retained.timing().journal()).isEqualTo(journal);assertThat(retained.timing().statementDate()).isEqualTo(DAY.plusDays(1));assertThat(retained.timing().journalDate()).isEqualTo(DAY.plusDays(2));assertThat(retained.timing().statementReference()).isEqualTo("TIMED");assertThat(retained.timing().statementAmount()).isEqualByComparingTo("1.01");assertThat(retained.timing().amount()).isEqualByComparingTo("1.01");
+        assertThatThrownBy(()->service.proposeMatch(maker,"SPLIT","Different voucher",List.of(new Allocation(line,journalLine(other),new BigDecimal("1.01"))))).hasMessage("reconciliation.error.timingReview");
+        UUID match=service.proposeMatch(maker,"EXACT","Reviewed dated pair",List.of(part));service.reviewMatch(checker,match,true,"Independent exact match");
+        assertThat(service.rows(maker,statement,0).rows().getFirst().status()).isEqualTo("MATCHED");assertThatThrownBy(()->service.proposeMatch(maker,"SPLIT","Second allocation",List.of(new Allocation(line,journalLine(journal),new BigDecimal("0.01"))))).hasMessage("reconciliation.error.overmatch");
+        certify(new BigDecimal("101.01"));UUID close=service.proposeClose(maker,period,"Reviewed timing source close",false);service.approveClose(checker,close,"Independent close");service.completeInstitutionClose(checker,period,"Scoped institution completion");
+        String bytes=service.finalizedSnapshot(maker,close).snapshot();assertThat(bytes).contains("timingSources",timing.toString(),journalLine(journal).toString());
+        assertThatThrownBy(()->jdbc.update("delete from reconciliation_timing_source where exception_id=?",timing)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(service.finalizedSnapshot(maker,close).snapshot()).isEqualTo(bytes);
+    }
+    @Test void timingPairRejectsForeignDirectionSameDateAndOverThirtyDaysWithoutOrphanEvidence() {
+        opening();UUID statement=importOne("TIME","1.00"),line=statementLine(statement),same=post("TIME","1.00",false),wrong=outgoing("WRONG","1.00");
+        long before=jdbc.queryForObject("select count(*) from reconciliation_exception where sacco_id=?",Long.class,institution);
+        assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(same),checker.getMemberId().toString(),"Same date")).hasMessage("reconciliation.error.timingWindow");
+        assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(wrong),checker.getMemberId().toString(),"Wrong direction")).hasMessage("reconciliation.error.direction");
+        station("B2");var foreign=operator("B2");UUID foreignOpening=secondBranchOpening(foreign,operator("B2"));assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(foreignOpening),checker.getMemberId().toString(),"Foreign voucher")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        when(clock.today()).thenReturn(DAY.plusDays(32));gl.createPeriod(maker,DAY.plusDays(2),DAY.plusDays(32));UUID distant=datedMovement("DISTANT",DAY.plusDays(32),"1.00");
+        assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(distant),checker.getMemberId().toString(),"Outside reviewed window")).hasMessage("reconciliation.error.timingWindow");
+        assertThatThrownBy(()->service.proposeMatch(maker,"SPLIT","Unbounded timing",List.of(new Allocation(line,journalLine(distant),BigDecimal.ONE)))).hasMessage("reconciliation.error.timingWindow");
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_exception where sacco_id=?",Long.class,institution)).isEqualTo(before);
+    }
+    @Test void timingReviewAndNewMatchingRejectAChangedVoucherReversalAndAuditRollsBackItsLink() {
+        opening();UUID journal=datedMovement("CHANGE",DAY.plusDays(2),"1.00"),statement=importOne("CHANGE","1.00"),line=statementLine(statement);
+        doThrow(new IllegalStateException("Synthetic timing audit failure")).when(audit).logEvent(anyString(),any(),eq("EXCEPTION_ASSIGNED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+        assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(journal),checker.getMemberId().toString(),"Atomic timing evidence")).hasMessage("Synthetic timing audit failure");
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_exception where sacco_id=?",Long.class,institution)).isZero();reset(audit);
+        UUID pending=service.assignTimingExceptionToStaff(maker,line,journalLine(journal),checker.getMemberId().toString(),"Source before correction");
+        UUID reviewed=service.assignTimingExceptionToStaff(third,line,journalLine(journal),fourth.getMemberId().toString(),"Separate source before correction");service.reviewException(fourth,reviewed,"Independent original timing pair");
+        var part=new Allocation(line,journalLine(journal),BigDecimal.ONE);UUID draft=service.proposeMatch(maker,"EXACT","Pending dated allocation",List.of(part));
+        when(clock.now()).thenReturn(NOW.plusMinutes(1));UUID reversal=gl.reverse(third,journal,UUID.randomUUID(),DAY.plusDays(2),"Verified correction","Evidence").id();gl.approve(fourth,reversal,"Independent reversal");gl.post(fourth,reversal,false);
+        assertThatThrownBy(()->service.reviewException(checker,pending,"Stale source review")).hasMessage("reconciliation.error.staleEvidence");
+        assertThatThrownBy(()->service.reviewMatch(checker,draft,true,"Stale match")).hasMessage("reconciliation.error.timingReview");
+        assertThatThrownBy(()->service.proposeMatch(maker,"REVERSAL","Earlier timing proof cannot discharge correction",List.of(part))).hasMessage("reconciliation.error.timingReview");
+        UUID current=service.assignTimingExceptionToStaff(maker,line,journalLine(journal),checker.getMemberId().toString(),"Linked corrected source");service.reviewException(checker,current,"Independent corrected timing proof");
+        UUID corrected=service.proposeMatch(maker,"REVERSAL","Explicit corrected pair",List.of(part));service.reviewMatch(checker,corrected,true,"Independent corrected pair review");assertThat(service.rows(maker,statement,0).rows().getFirst().status()).isEqualTo("REVERSED");
+    }
+    @Test void databaseTimingGuardRejectsDirectApprovalAndNonAtomicForgedLink() {
+        opening();UUID journal=datedMovement("DB-TIME",DAY.plusDays(2),"0.01"),statement=importOne("DB-TIME","0.01"),line=statementLine(statement);var repo=new ReconciliationRepository(jdbc);
+        UUID draft=tx.execute(s->repo.match(institution,"B1",bank,"EXACT",maker.getMemberId(),"Synthetic database-only negative fixture",null,List.of(new Allocation(line,journalLine(journal),new BigDecimal("0.01"))),NOW));
+        assertThatThrownBy(()->tx.executeWithoutResult(s->repo.decideMatch(draft,checker.getMemberId(),true,"No timing proof",NOW))).satisfies(failure->{Throwable root=failure;while(root.getCause()!=null)root=root.getCause();assertThat(root).isInstanceOf(java.sql.SQLException.class);var sql=(java.sql.SQLException)root;assertThat(sql.getSQLState()).isEqualTo("P0001");assertThat(sql.getMessage()).contains("Date-mismatched allocations require independent reviewed source-linked timing evidence");});
+        assertThat(repo.allocated("statement_line_id",line)).isZero();
+        UUID generic=service.assignException(maker,line,"TIMING",checker.getMemberId(),"Unlinked immutable exception");
+        assertThatThrownBy(()->tx.executeWithoutResult(s->repo.timingSource(generic,journalLine(journal),false,NOW))).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_timing_source t join reconciliation_exception e on e.id=t.exception_id where e.sacco_id=?",Long.class,institution)).isZero();
+    }
+
+    @Test void reviewedOpeningBalancesNeverMasqueradeAsStatementMoneyMovements() {
+        UUID opening=opening(),statement=importOne("OPENING","100.00"),line=statementLine(statement);
+        assertThat(service.candidates(maker,statement,0).rows()).noneMatch(c->c.journal().equals(opening));
+        assertThatThrownBy(()->service.proposeMatch(maker,"SPLIT","Opening is not a receipt",List.of(new Allocation(line,journalLine(opening),new BigDecimal("100.00"))))).hasMessage("reconciliation.error.matchSource");
+        assertThatThrownBy(()->service.assignTimingExceptionToStaff(maker,line,journalLine(opening),checker.getMemberId().toString(),"Not a timing receipt")).hasMessage("reconciliation.error.matchSource");
+        var repo=new ReconciliationRepository(jdbc);assertThatThrownBy(()->tx.execute(s->repo.match(institution,"B1",bank,"SPLIT",maker.getMemberId(),"Direct opening negative fixture",null,List.of(new Allocation(line,journalLine(opening),new BigDecimal("100.00"))),NOW))).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_match where sacco_id=?",Long.class,institution)).isZero();
+    }
 }
