@@ -78,14 +78,14 @@
             state.button.classList.toggle('is-placeholder', placeholderSelected);
             state.button.classList.toggle('is-disabled', select.disabled);
             state.button.disabled = select.disabled;
-            state.buttonText.textContent = selectedLabel || 'Select an option';
-            state.button.title = selectedLabel || 'Select an option';
+            state.buttonText.textContent = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
+            state.button.title = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
             state.menu.innerHTML = '';
 
             if (!visibleOptions.length) {
                 const emptyState = document.createElement('div');
                 emptyState.className = 'neo-select-empty';
-                emptyState.textContent = 'No options available';
+                emptyState.textContent = document.body.dataset.shellNoOptions || 'No options available';
                 state.menu.appendChild(emptyState);
                 if (state.wrapper.classList.contains('neo-select--open')) {
                     positionMenu(state);

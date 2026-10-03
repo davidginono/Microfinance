@@ -3,7 +3,7 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/statement-designer.css' />" />
-<div class="statement-designer"><h1 class="erp-page-title"><spring:message code="statement.selectClose" /></h1><p><spring:message code="statement.closeBoundary" /></p>
+<div class="statement-designer"><div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="statement.selectClose" /></h1></div><p><spring:message code="statement.closeBoundary" /></p>
 <form class="statement-panel" method="post" action="<c:url value='/reports/statements/versions/${version.id}/finalize' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><div class="statement-fields">
 <label><spring:message code="statement.closePeriod" /><select name="closeReview" required><option value=""><spring:message code="statement.select" /></option><c:forEach items="${closes.rows}" var="close"><c:if test="${close.state eq 'APPROVED_CLOSE'}"><option value="${close.id}"><spring:message code="statement.version" /> <c:out value="${close.version}" /> · <c:out value="${close.recordedAt}" /></option></c:if></c:forEach></select></label>
 <c:if test="${version.definition.comparison}"><label><spring:message code="statement.comparisonClose" /><select name="comparisonClose" required><option value=""><spring:message code="statement.select" /></option><c:forEach items="${closes.rows}" var="close"><c:if test="${close.state eq 'APPROVED_CLOSE'}"><option value="${close.id}"><spring:message code="statement.version" /> <c:out value="${close.version}" /> · <c:out value="${close.recordedAt}" /></option></c:if></c:forEach></select></label></c:if>

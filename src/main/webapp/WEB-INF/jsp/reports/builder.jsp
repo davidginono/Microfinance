@@ -59,7 +59,7 @@
   </form>
   </sec:authorize>
   <c:if test="${not empty result}">
-    <section class="erp-table-wrap report-print-root ${result.definition.landscape ? 'report-print-landscape' : 'report-print-portrait'}">
+    <section class="erp-table-wrap report-print-root ${result.definition.landscape ? ' data-aws-table-regionreport-print-landscape' : 'report-print-portrait'}">
       <div class="app-table-titlebar"><h2><c:out value="${result.definition.title}" /></h2><span><c:out value="${result.rowsInScope}" /> <spring:message code="report.rows" /></span></div>
       <div class="report-context"><p><c:out value="${reportCoverage}" /></p>
         <p><spring:message code="report.scope" />: <c:out value="${result.institution}" /> / <c:out value="${result.branch}" /></p>
@@ -68,7 +68,7 @@
         <p><spring:message code="report.printScope" arguments="${result.rows.size()},${result.rowsInScope}" /></p>
         <p><spring:message code="report.untracked" />: <c:out value="${result.untrackedLoans}" /></p></div>
       <div class="erp-table-scroll" data-view-position-key="operational-report-preview"><table class="erp-table"><thead><tr>
-        <c:forEach items="${result.getVisibleColumns()}" var="column"><th style="min-width:${column.width}px"><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><c:out value="${fieldLabels[column.field.name()]}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
+        <c:forEach items="${result.getVisibleColumns()}" var="column"><th data-report-column-width="${column.width}"><c:if test="${not empty column.label}"><c:out value="${column.label}" /> / </c:if><c:out value="${fieldLabels[column.field.name()]}" /><c:if test="${column.field.unit == 'TZS'}"> (TZS)</c:if></th></c:forEach>
       </tr></thead><tbody><c:forEach items="${result.rows}" var="row"><tr><c:forEach items="${result.getVisibleColumns()}" var="column"><td class="${column.field.unit == 'TZS' ? 'report-money' : ''}">
         <c:choose><c:when test="${row[column.field.name()] == null}"><spring:message code="report.unknown" /></c:when><c:when test="${column.field.unit == 'TZS'}"><fmt:formatNumber value="${row[column.field.name()]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise><c:out value="${row[column.field.name()]}" /></c:otherwise></c:choose>
       </td></c:forEach></tr></c:forEach><c:if test="${empty result.rows}"><tr><td colspan="${result.getVisibleColumns().size()}"><spring:message code="report.empty" /></td></tr></c:if></tbody></table></div>
@@ -76,7 +76,7 @@
       <div class="report-actions">
         <c:if test="${not empty runVersion}">
           <c:url var="runUrl" value="/reports/builder/templates/${runVersion}/run" />
-          <form method="get" action="${runUrl}"><input type="hidden" name="from" value="${result.from}" /><input type="hidden" name="through" value="${result.through}" /><input type="hidden" name="cutoff" value="${result.recordedCutoff}" />
+          <form method="get" action="${runUrl}" data-aws-filter-toolbar><input type="hidden" name="from" value="${result.from}" /><input type="hidden" name="through" value="${result.through}" /><input type="hidden" name="cutoff" value="${result.recordedCutoff}" />
             <c:if test="${result.page > 0}"><button class="app-btn btn-neutral" name="page" value="${result.page-1}"><spring:message code="common.previous" /></button></c:if><c:if test="${result.truncated}"><button class="app-btn btn-neutral" name="page" value="${result.page+1}"><spring:message code="common.next" /></button></c:if>
           </form>
         </c:if>
@@ -95,13 +95,13 @@
       <c:if test="${result.rowsInScope > 2000}"><p class="report-context"><spring:message code="report.error.largeExport" /></p></c:if>
     </section>
   </c:if>
-  <section class="erp-table-wrap"><div class="app-table-titlebar"><h2><spring:message code="report.templates" /></h2></div>
+  <section class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar"><h2><spring:message code="report.templates" /></h2></div>
     <div class="erp-table-scroll" data-view-position-key="operational-report-templates"><table class="erp-table"><thead><tr><th><spring:message code="report.name" /></th><th><spring:message code="report.version" /></th><th><spring:message code="report.state" /></th><th><spring:message code="common.actions" /></th></tr></thead><tbody>
       <c:forEach items="${templates}" var="template"><tr><td><c:out value="${template.definition.title}" /></td><td><c:out value="${template.version}" /></td><td><spring:message code="report.state.${template.state}" /></td><td class="report-template-actions">
         <sec:authorize access="@access.has(principal,'REPORT_TEMPLATE_DESIGN')"><a class="app-btn btn-neutral" href="<c:url value='/reports/builder?version=${template.id}' />"><spring:message code="report.clone" /></a></sec:authorize>
         <c:if test="${template.state == 'DRAFT'}"><sec:authorize access="@access.has(principal,'REPORT_TEMPLATE_PUBLISH')"><form method="post" action="<c:url value='/reports/builder/templates/${template.id}/publish' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="report.publish" /></button></form></sec:authorize></c:if>
         <c:if test="${template.state == 'PUBLISHED'}">
-          <sec:authorize access="@access.has(principal,'REPORT_RUN')"><form method="get" action="<c:url value='/reports/builder/templates/${template.id}/run' />"><label><spring:message code="report.from" /><input type="date" name="from" value="${from}" required class="aws-control" /></label><label><spring:message code="report.through" /><input type="date" name="through" value="${through}" required class="aws-control" /></label><button class="app-btn btn-neutral"><spring:message code="report.run" /></button></form></sec:authorize>
+          <sec:authorize access="@access.has(principal,'REPORT_RUN')"><form method="get" action="<c:url value='/reports/builder/templates/${template.id}/run' / data-aws-filter-toolbar>"><label><spring:message code="report.from" /><input type="date" name="from" value="${from}" required class="aws-control" /></label><label><spring:message code="report.through" /><input type="date" name="through" value="${through}" required class="aws-control" /></label><button class="app-btn btn-neutral"><spring:message code="report.run" /></button></form></sec:authorize>
           <sec:authorize access="@access.has(principal,'REPORT_TEMPLATE_PUBLISH')"><form method="post" action="<c:url value='/reports/builder/templates/${template.id}/retire' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="report.retire" /></button></form></sec:authorize>
         </c:if>
       </td></tr></c:forEach><c:if test="${empty templates}"><tr><td colspan="4"><spring:message code="report.noTemplates" /></td></tr></c:if>

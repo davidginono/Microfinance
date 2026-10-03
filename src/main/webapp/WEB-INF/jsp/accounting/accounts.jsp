@@ -7,9 +7,9 @@
 <div class="accounting-workspace">
 <c:if test="${not empty accountingError}"><p role="alert"><spring:message code="${accountingError}" /></p></c:if>
 <c:if test="${not empty accountingSuccess}"><p role="status"><spring:message code="${accountingSuccess}" /></p></c:if>
-<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="accounting.accounts" /></h1></div>
+<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.accounts" /></h1></div>
 <p><spring:message code="accounting.gated" /></p>
-<section class="erp-table-wrap"><div class="erp-table-scroll" data-view-position-key="gl-accounts"><table class="erp-table"><thead><tr>
+<section class="erp-table-wrap" data-aws-table-region><div class="erp-table-scroll" data-view-position-key="gl-accounts"><table class="erp-table"><thead><tr>
 <c:forEach items="${['code','name','type','kind','purpose','active']}" var="label"><th><spring:message code="accounting.${label}" /></th></c:forEach><th><spring:message code="common.actions" /></th></tr></thead><tbody>
 <c:forEach items="${accounts.rows}" var="a"><tr><td><c:out value="${a.code}" /></td><td><c:out value="${a.name}" /></td><td><spring:message code="accounting.option.${a.type}" /></td><td><spring:message code="accounting.option.${a.kind}" /></td><td><spring:message code="accounting.option.${a.purpose}" /></td><td><spring:message code="accounting.active.${a.active}" /></td><td>
 <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${a.active}"><form method="post" action="<c:url value='/finance/accounts/${a.id}/deactivate' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="accounting.deactivate" /></button></form></c:if></sec:authorize>

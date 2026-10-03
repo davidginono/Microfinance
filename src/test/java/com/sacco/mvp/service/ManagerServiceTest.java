@@ -60,6 +60,7 @@ class ManagerServiceTest {
     @Mock private AuditService auditService;
     @Mock private RepaymentScheduleService repaymentScheduleService;
     @Mock private LoanRepaymentLedgerService loanRepaymentLedgerService;
+    @Mock private com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
     @Spy private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @InjectMocks

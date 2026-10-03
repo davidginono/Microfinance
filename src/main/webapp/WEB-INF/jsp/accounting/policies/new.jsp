@@ -5,7 +5,7 @@
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-policy.css' />" />
 <div class="policy-workspace">
-<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="accounting.policy.propose" /></h1></div>
+<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.policy.propose" /></h1></div>
 <p><spring:message code="accounting.policy.gate" /></p>
 <c:if test="${not empty policyError}"><p class="policy-error" role="alert"><spring:message code="${policyError}" /></p></c:if>
 <c:url var="createPolicyUrl" value="/finance/policies" />

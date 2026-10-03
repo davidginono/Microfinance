@@ -5,7 +5,7 @@
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-business.css' />" />
 <div class="business-workspace">
-<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="finance.business.navigation" /></h1></div>
+<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="finance.business.navigation" /></h1></div>
 <p class="business-gate"><spring:message code="finance.business.gate" /></p>
 <c:if test="${not empty sourceError}"><div class="business-error" role="alert"><spring:message code="${sourceError}" /></div></c:if>
 <form:form modelAttribute="sourceForm" method="post" action="${pageContext.request.contextPath}/finance/business" cssClass="business-form"><input type="hidden" name="${_csrf.parameterName}" value="<c:out value='${_csrf.token}' />" /><form:hidden path="requestKey"/><div class="business-grid">

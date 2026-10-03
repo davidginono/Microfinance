@@ -374,7 +374,8 @@
             return nearbyHeading.textContent.trim();
         }
         const pageTitle = document.querySelector('.erp-page-title')?.textContent.trim();
-        return pageTitle ? pageTitle + ' results' : 'Results ' + String(index + 1);
+        const resultsLabel = document.body.dataset.shellResults || 'Results';
+        return pageTitle ? pageTitle + ' — ' + resultsLabel : resultsLabel + ' ' + String(index + 1);
     };
     const isConsoleDownloadAction = function (control) {
         if (!control) {
@@ -439,7 +440,7 @@
                     const refresh = document.createElement('button');
                     refresh.type = 'button';
                     refresh.className = 'app-icon-button btn-neutral';
-                    refresh.setAttribute('aria-label', 'Refresh table');
+                    refresh.setAttribute('aria-label', document.body.dataset.shellRefresh || 'Refresh table');
                     refresh.appendChild(createConsoleIcon([
                         'M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5',
                         'M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5'
@@ -624,7 +625,7 @@
         const spinner = document.createElement('span');
         spinner.className = 'aws-table-loader__spinner';
         spinner.setAttribute('aria-hidden', 'true');
-        loader.setAttribute('aria-label', nearbyRegion.getAttribute('data-loading-label') || 'Loading results...');
+        loader.setAttribute('aria-label', nearbyRegion.getAttribute('data-loading-label') || document.body.dataset.shellLoading || 'Loading results...');
         loader.appendChild(spinner);
         nearbyRegion.appendChild(loader);
     };

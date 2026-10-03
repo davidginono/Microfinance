@@ -76,7 +76,7 @@ class AdminUsersJspLayoutTest {
             .contains(".admin-status-callout")
             .contains(".admin-delete-callout");
         assertThat(editJsp).contains("disabled");
-        assertThat(editJsp).contains("No supported claim");
+        assertThat(editJsp).contains("access.matrix.unsupported");
         assertThat(editJsp).contains("input.checked = defaults.has(input.value)");
         assertThat(editJsp)
             .contains("function syncClaimsForSelectedRoles(editForm)")

@@ -4,9 +4,9 @@
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-policy.css' />" />
 <div class="policy-workspace">
-    <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="accounting.policy.title" /></h1></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.policy.title" /></h1></div>
     <p><spring:message code="accounting.policy.gate" /></p>
-    <section class="erp-table-wrap">
+    <section class="erp-table-wrap" data-aws-table-region>
         <div class="app-table-titlebar"><h2><spring:message code="accounting.policy.versions" /></h2>
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_POLICIES_CREATE')"><a class="app-btn btn-primary" href="<c:url value='/finance/policies/new' />"><spring:message code="accounting.policy.propose" /></a></sec:authorize>
         </div>

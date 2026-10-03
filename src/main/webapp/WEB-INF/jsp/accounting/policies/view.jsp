@@ -4,7 +4,7 @@
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-policy.css' />" />
 <div class="policy-workspace">
-    <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="accounting.policy.title" /> <c:out value="${policy.version}" /></h1></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.policy.title" /> <c:out value="${policy.version}" /></h1></div>
     <c:if test="${not empty policyError}"><p class="policy-error" role="alert"><spring:message code="${policyError}" /></p></c:if>
     <dl class="policy-detail-list"><dt><spring:message code="accounting.policy.books" /></dt><dd><spring:message code="accounting.policy.books.${policy.authoritativeLedger}" /></dd>
         <dt><spring:message code="accounting.policy.opening" /></dt><dd><c:out value="${policy.openingDate}" /></dd><dt><spring:message code="accounting.policy.effective" /></dt><dd><c:out value="${policy.effectiveFrom}" /></dd>

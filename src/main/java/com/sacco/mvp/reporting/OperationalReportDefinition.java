@@ -23,13 +23,16 @@ public record OperationalReportDefinition(int schemaVersion, Dataset dataset, St
         private final Type type;
         private final boolean groupable;
         Field(Type type, boolean groupable) { this.type = type; this.groupable = groupable; }
-        public Type getType() { return type; }
+        public Type getType() { return type(); }
+        public Type type() { return type; }
         public boolean isGroupable() { return groupable; }
-        public String getKey() { return "report.field." + name(); }
+        public String getKey() { return key(); }
+        public String key() { return "report.field." + name(); }
         public String getDescriptionKey() { return getKey() + ".description"; }
         public boolean isSensitive() { return this == LOAN_ID || this == RECEIPT; }
         public int getPrecision() { return type == Type.MONEY ? 2 : 0; }
-        public String getUnit() { return type == Type.MONEY ? "TZS" : ""; }
+        public String getUnit() { return unit(); }
+        public String unit() { return type == Type.MONEY ? "TZS" : ""; }
         public List<Operator> getOperators() { return type == Type.TEXT ? List.of(Operator.EQ) : List.of(Operator.values()); }
     }
     public record Column(Field field, String label, int width, boolean visible) { }

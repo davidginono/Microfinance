@@ -3,7 +3,7 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/statement-designer.css' />" />
-<div class="statement-designer"><h1 class="erp-page-title"><spring:message code="statement.institutionClose" /></h1><p><spring:message code="statement.institutionBoundary" /></p>
+<div class="statement-designer"><div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="statement.institutionClose" /></h1></div><p><spring:message code="statement.institutionBoundary" /></p>
 <form class="statement-panel" method="post" action="<c:url value='/reports/statements/versions/${version.id}/finalize-institution' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><div class="statement-fields">
 <label><spring:message code="statement.closePeriod" /><select name="period" required><option value=""><spring:message code="statement.select" /></option><c:forEach items="${institutionPeriods.rows}" var="p"><c:if test="${p.state eq 'CLOSED'}"><option value="${p.id}"><c:out value="${p.from}" /> — <c:out value="${p.through}" /></option></c:if></c:forEach></select></label>
 <c:if test="${version.definition.comparison}"><label><spring:message code="statement.comparisonClose" /><select name="comparisonPeriod" required><option value=""><spring:message code="statement.select" /></option><c:forEach items="${institutionPeriods.rows}" var="p"><c:if test="${p.state eq 'CLOSED'}"><option value="${p.id}"><c:out value="${p.from}" /> — <c:out value="${p.through}" /></option></c:if></c:forEach></select></label></c:if>

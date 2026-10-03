@@ -13,6 +13,7 @@ public final class AccountingReleaseDtos {
   UUID policy,int policyVersion,UUID period,UUID mapping,UUID template,UUID statementOutput,UUID firstSample,UUID secondSample,
   String dependencyJson,String checksum,String evidence,List<Decision> decisions,boolean invalidated) {
   public Release { decisions=List.copyOf(decisions); }
-  public String getState(){if(invalidated)return "INVALIDATED";if(decisions.stream().anyMatch(d->!d.approved()))return "REJECTED";return decisions.size()==3?"APPROVED":"PENDING";}
+  public String getState(){return state();}
+  public String state(){if(invalidated)return "INVALIDATED";if(decisions.stream().anyMatch(d->!d.approved()))return "REJECTED";return decisions.size()==3?"APPROVED":"PENDING";}
  }
 }

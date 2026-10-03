@@ -1,5 +1,9 @@
 (() => {
   'use strict';
+  document.querySelectorAll('[data-report-column-width]').forEach(header => {
+    const width = Number(header.dataset.reportColumnWidth);
+    if (Number.isInteger(width) && width >= 60 && width <= 300) header.style.minWidth = width + 'px';
+  });
   const form = document.getElementById('report-designer');
   if (!form) return;
   let definition = JSON.parse(document.getElementById('report-seed').value);
