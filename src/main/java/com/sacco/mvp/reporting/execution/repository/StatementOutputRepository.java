@@ -27,4 +27,3 @@ public class StatementOutputRepository {
  public void review(UUID output,UUID reviewer,String evidence,OffsetDateTime now){jdbc.update("INSERT INTO statement_output_reviews(output_id,reviewer,evidence,reviewed_at) VALUES(?,?,?,?)",output,reviewer,evidence,now);}
  private static String sha(String text){return com.sacco.mvp.reporting.execution.service.ReportRunService.sha256(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));}
 }
-
