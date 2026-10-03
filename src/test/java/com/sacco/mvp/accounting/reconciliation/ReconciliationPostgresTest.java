@@ -560,6 +560,8 @@ class ReconciliationPostgresTest {
         assertThatThrownBy(()->service.proposeMatch(maker,"EXACT","Unreviewed pair",List.of(part))).hasMessage("reconciliation.error.timingReview");
         assertThatThrownBy(()->service.reviewException(maker,timing,"Self review")).hasMessage("reconciliation.error.independentReview");
         service.reviewException(checker,timing,"Independent source-linked timing evidence");
+        UUID repeated=service.assignTimingExceptionToStaff(third,line,journalLine(journal),fourth.getMemberId().toString(),"Separately reviewed same source pair");service.reviewException(fourth,repeated,"Independent retained duplicate proof");
+        assertThat(new ReconciliationRepository(jdbc).reviewedTimingPairs(institution,"B1",List.of(part))).containsExactly(line+"/"+journalLine(journal));
         var retained=service.exceptions(checker,0).rows().stream().filter(e->e.id().equals(timing)).findFirst().orElseThrow();assertThat(retained.timing().journal()).isEqualTo(journal);assertThat(retained.timing().statementDate()).isEqualTo(DAY.plusDays(1));assertThat(retained.timing().journalDate()).isEqualTo(DAY.plusDays(2));assertThat(retained.timing().statementReference()).isEqualTo("TIMED");assertThat(retained.timing().statementAmount()).isEqualByComparingTo("1.01");assertThat(retained.timing().amount()).isEqualByComparingTo("1.01");
         assertThatThrownBy(()->service.proposeMatch(maker,"SPLIT","Different voucher",List.of(new Allocation(line,journalLine(other),new BigDecimal("1.01"))))).hasMessage("reconciliation.error.timingReview");
         UUID match=service.proposeMatch(maker,"EXACT","Reviewed dated pair",List.of(part));service.reviewMatch(checker,match,true,"Independent exact match");

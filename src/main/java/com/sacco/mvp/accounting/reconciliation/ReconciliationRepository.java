@@ -77,7 +77,7 @@ public class ReconciliationRepository {
     public Set<String> reviewedTimingPairs(String institution,String branch,List<Allocation> parts) {
         if(parts.isEmpty()||parts.size()>100)throw new IllegalArgumentException("Allocation ID limit");
         var args=new ArrayList<Object>();args.add(institution);args.add(branch);for(var p:parts){args.add(p.statementLine());args.add(p.journalLine());}
-        return new HashSet<>(jdbc.query("select e.statement_line_id::text||'/'||t.journal_line_id::text from reconciliation_exception e join reconciliation_exception_decision d on d.exception_id=e.id join reconciliation_timing_source t on t.exception_id=e.id where e.sacco_id=? and e.station_id=? and (e.statement_line_id,t.journal_line_id) in ("+String.join(",",Collections.nCopies(parts.size(),"(?,?)"))+") and reconciliation_valid_timing_pair(e.id,t.journal_line_id,t.original_reversed)",(r,n)->r.getString(1),args.toArray()));
+        return new HashSet<>(jdbc.query("select distinct e.statement_line_id::text||'/'||t.journal_line_id::text from reconciliation_exception e join reconciliation_exception_decision d on d.exception_id=e.id join reconciliation_timing_source t on t.exception_id=e.id where e.sacco_id=? and e.station_id=? and (e.statement_line_id,t.journal_line_id) in ("+String.join(",",Collections.nCopies(parts.size(),"(?,?)"))+") and reconciliation_valid_timing_pair(e.id,t.journal_line_id,t.original_reversed)",(r,n)->r.getString(1),args.toArray()));
     }
     public boolean openEvidenceDates(String institution,Collection<LocalDate> dates) {
         if(dates.isEmpty()||dates.size()>100)throw new IllegalArgumentException("Allocation date limit");var args=new ArrayList<Object>();args.add(institution);args.addAll(dates);
