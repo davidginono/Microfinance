@@ -619,7 +619,7 @@ class ReconciliationPostgresTest {
     private CashFlowAllocationService actualCashProvider() {
         var mapper=JsonMapper.builder().findAndAddModules().build();
         var reports=proxy(new LedgerReportService(new LedgerReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc)),policies,directory,claims,institutions,clock),manager);
-        var allocations=proxy(new CashFlowAllocationService(new CashFlowAllocationRepository(jdbc,mapper),reports,clock,audit,mapper),manager);
+        var allocations=proxy(new CashFlowAllocationService(new CashFlowAllocationRepository(jdbc,mapper),reports,clock,audit,mapper,List.of()),manager);
         enableSources(null,new CashFlowClosingAdapter(allocations));return allocations;
     }
     private UUID realCashVersion(CashFlowAllocationService allocations,AppUserPrincipal actor,AppUserPrincipal reviewer,UUID journal) {
