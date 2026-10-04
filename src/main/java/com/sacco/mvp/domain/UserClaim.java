@@ -78,6 +78,7 @@ public enum UserClaim {
     REPORT_TEMPLATES_CREATE(AccessFeature.REPORT_TEMPLATES, AccessAction.CREATE),
     REPORT_TEMPLATES_UPDATE(AccessFeature.REPORT_TEMPLATES, AccessAction.UPDATE),
     REPORT_TEMPLATES_PUBLISH(AccessFeature.REPORT_TEMPLATES, AccessAction.PUBLISH),
+    REPORT_TEMPLATES_SHARE(AccessFeature.REPORT_TEMPLATES, AccessAction.SHARE),
     REPORTS_RUN(AccessFeature.REPORTS, AccessAction.RUN),
 
     MEMBER_LOANS_VIEW(AccessFeature.MEMBER_LOANS, AccessAction.VIEW),
