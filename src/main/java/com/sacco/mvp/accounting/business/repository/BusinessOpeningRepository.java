@@ -15,6 +15,9 @@ public class BusinessOpeningRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     public String payload(Preview preview){return mapper.writeValueAsString(preview);}
+    public Optional<UUID> accountByCode(String institution,String code){return jdbc.query("select id from gl_account where sacco_id=? and code=? and active and kind<>'HEADING'",(r,n)->r.getObject(1,UUID.class),institution,code).stream().findFirst();}
+    public Optional<UUID> reviewedGlOpening(String institution,String branch){return jdbc.query("select c.opening_journal_id from gl_cutover_coverage c join gl_journal j on j.id=c.opening_journal_id where c.sacco_id=? and c.station_id=? and c.complete and j.state='POSTED' and j.source_type='OPENING'",(r,n)->r.getObject(1,UUID.class),institution,branch).stream().findFirst();}
+    public Optional<String> accountLabel(String institution,String branch,UUID opening){return jdbc.query("select a.code||' · '||a.name from accounting_business_opening o join gl_account a on (a.id,a.sacco_id)=(o.account_id,o.sacco_id) where o.sacco_id=? and o.station_id=? and o.id=?",(r,n)->r.getString(1),institution,branch,opening).stream().findFirst();}
     public void lockRequest(String institution,String branch,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","BUSINESS_OPENING/"+institution+"/"+branch+"/"+key);}
     public Optional<UUID> byRequest(String institution,String branch,UUID key){return jdbc.query("select id from accounting_business_opening where sacco_id=? and station_id=? and request_key=?",(r,n)->r.getObject(1,UUID.class),institution,branch,key).stream().findFirst();}
     public void insert(UUID id,String institution,String branch,UUID maker,BusinessOpeningImport.Parsed parsed,OffsetDateTime at){

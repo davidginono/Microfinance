@@ -85,4 +85,7 @@
             <spring:message code="accounting.release.title" />
         </a>
     </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW')">
+        <a href="<c:url value='/finance/business/openings' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/business/openings') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="finance.business.opening.title" /></a>
+    </sec:authorize>
 </c:if>

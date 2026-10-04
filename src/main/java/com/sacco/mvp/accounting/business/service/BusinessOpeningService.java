@@ -21,6 +21,12 @@ public class BusinessOpeningService {
     private final BusinessSourceProofAuthorization authorization;
     private final ApplicationClock clock;
     private final AuditService audit;
+    @Transactional(readOnly=true)
+    public Command command(AppUserPrincipal actor,UUID key,String accountCode,java.time.LocalDate through,String purpose,String evidence,boolean complete){
+        authorize(actor,UserClaim.ACCOUNTING_BUSINESS_CREATE);text(accountCode,40);
+        var account=repo.accountByCode(actor.getSaccoId(),accountCode).orElseThrow(()->invalid("account"));
+        return new Command(key,account,repo.reviewedGlOpening(actor.getSaccoId(),actor.getStationId()).orElse(null),through,purpose,evidence,complete);
+    }
     public Preview preview(AppUserPrincipal actor,Command command,MultipartFile file){authorize(actor,UserClaim.ACCOUNTING_BUSINESS_CREATE);require(command!=null&&command.through()!=null&&!command.through().isAfter(clock.today()),"dates");return parse(command,file).preview();}
     @Transactional
     public Opening importFile(AppUserPrincipal actor,Command command,MultipartFile file){
@@ -40,7 +46,8 @@ public class BusinessOpeningService {
         repo.review(o,actor.getMemberId(),decision,evidence,clock.now());event(actor,id,"SOURCE_OPENING_"+decision);return opening(actor,id,false);
     }
     @Transactional(readOnly=true) public Opening view(AppUserPrincipal actor,UUID id){authorize(actor,UserClaim.ACCOUNTING_BUSINESS_VIEW);return opening(actor,id,false);}
-    @Transactional(readOnly=true) public File file(AppUserPrincipal actor,UUID id){authorize(actor,UserClaim.ACCOUNTING_BUSINESS_VIEW);var o=opening(actor,id,false);var file=repo.file(o.institution(),o.branch(),id).orElseThrow(()->invalid("file"));verify(o,file);return file;}
+    @Transactional(readOnly=true) public String accountLabel(AppUserPrincipal actor,UUID id){authorize(actor,UserClaim.ACCOUNTING_BUSINESS_VIEW);return repo.accountLabel(actor.getSaccoId(),actor.getStationId(),id).orElseThrow(()->new AccessDeniedException("Source account outside current workspace"));}
+    @Transactional public File file(AppUserPrincipal actor,UUID id){authorize(actor,UserClaim.ACCOUNTING_BUSINESS_VIEW);var o=opening(actor,id,false);var file=repo.file(o.institution(),o.branch(),id).orElseThrow(()->invalid("file"));verify(o,file);event(actor,id,"SOURCE_OPENING_FILE_DOWNLOADED");return file;}
     @Transactional(readOnly=true) public Page<Summary> list(AppUserPrincipal actor,int page){authorize(actor,UserClaim.ACCOUNTING_BUSINESS_VIEW);require(page>=0&&page<=10000,"validation");var rows=repo.list(actor.getSaccoId(),actor.getStationId(),page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     private Opening opening(AppUserPrincipal actor,UUID id,boolean lock){return repo.opening(actor.getSaccoId(),actor.getStationId(),id,lock).orElseThrow(()->new AccessDeniedException("Source opening outside current workspace"));}
     private void authorize(AppUserPrincipal actor,UserClaim claim){authorization.authorizeBusiness(actor,claim);}
