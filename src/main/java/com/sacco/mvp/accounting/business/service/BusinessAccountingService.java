@@ -35,6 +35,7 @@ public class BusinessAccountingService {
     private final AuditService audit;
     private final SaccoRegistryService institutions;
     private final AccountingReleaseGateService releaseGate;
+    private final BusinessOperationalBridge operationalBridge;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     private static final Set<String> MONEY_KEYS=Set.of("CASH","BANK","MOBILE_MONEY");
     private static boolean isReversal(Kind kind){return kind==Kind.BUSINESS_REVERSAL || kind==Kind.LOAN_REPAYMENT_REVERSAL;}
@@ -100,6 +101,7 @@ public class BusinessAccountingService {
         if(c.kind()==Kind.ASSET_PURCHASE)sources.asset(d);
         if(c.kind()==Kind.DEPRECIATION)sources.depreciate(c.relatedDocumentId(),c.amount());
         if(c.kind()==Kind.ASSET_DISPOSAL)sources.dispose(c.relatedDocumentId());
+        if(Set.of(Kind.LOAN_DISBURSEMENT,Kind.LOAN_REPAYMENT,Kind.LOAN_REPAYMENT_REVERSAL).contains(c.kind()))operationalBridge.attach(actor,id,loanTransaction);
         sources.posted(id,loanTransaction,clock.now());event(actor,d,"SOURCE_POSTED");return scoped(actor,id,false);
     }
     @Transactional

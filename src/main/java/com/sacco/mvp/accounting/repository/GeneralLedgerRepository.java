@@ -137,6 +137,13 @@ public class GeneralLedgerRepository {
     public void bridge(UUID voucher,Journal j) {
         jdbc.update("insert into gl_operational_bridge(voucher_id,sacco_id,station_id,journal_id,evidence_reference) values(?,?,?,?,?) on conflict(voucher_id) do nothing",voucher,j.institutionId(),j.branchId(),j.id(),j.evidenceReference());
     }
+    public Optional<UUID> bridgedJournal(String institution,String branch,UUID voucher) {
+        return jdbc.query("select b.journal_id from gl_operational_bridge b join gl_journal j on j.id=b.journal_id where b.sacco_id=? and b.station_id=? and b.voucher_id=? and j.state='POSTED'",(r,n)->r.getObject(1,UUID.class),institution,branch,voucher).stream().findFirst();
+    }
+    public Optional<SourceMappedBalance> sourceMappedBalance(UUID journal,String key) {
+        return jdbc.query("select a.kind,a.purpose,coalesce(sum(l.debit-l.credit),0) from gl_journal j join accounting_policies p on p.id=j.policy_id join gl_account a on a.id::text=p.account_mappings_json::jsonb->>? and a.sacco_id=j.sacco_id left join gl_journal_line l on l.journal_id=j.id and l.account_id=a.id where j.id=? and j.state='POSTED' group by a.id,a.kind,a.purpose",(r,n)->new SourceMappedBalance(r.getString(1),r.getString(2),r.getBigDecimal(3)),key,journal).stream().findFirst();
+    }
+    public record SourceMappedBalance(String kind,String purpose,java.math.BigDecimal signedBalance) { }
     public record OperationalLine(String accountCode,java.math.BigDecimal debit,java.math.BigDecimal credit,LocalDate date,UUID loanId) { }
     private Account account(ResultSet r,int n) throws SQLException {
         return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("normal_balance"),r.getString("kind"),r.getString("purpose"),r.getObject("parent_id",UUID.class),r.getBoolean("active"));

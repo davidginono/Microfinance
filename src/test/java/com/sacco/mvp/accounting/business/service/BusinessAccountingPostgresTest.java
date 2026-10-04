@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003|_release_gate_20261003)?")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003|_release_gate_20261003|_owned_sources_20261003(?:_v2)?)?")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BusinessAccountingPostgresTest {
     private static final LocalDate OPENING=LocalDate.of(2026,10,1), DAY=OPENING.plusDays(1);
@@ -274,7 +274,7 @@ class BusinessAccountingPostgresTest {
         verify(releaseGate).requireLiveRelease(checker,policy.id(),policy.version());
     }
     private BusinessAccountingService businessService(AccountingReleaseGateService gate) {
-        return proxy(new BusinessAccountingService(repository,books,policies,mock(LoanRepaymentLedgerService.class),mock(ManagerService.class),new AccessControlService(),members,claims,clock,audit,institutions,gate),transactionManager);
+        return proxy(new BusinessAccountingService(repository,books,policies,mock(LoanRepaymentLedgerService.class),mock(ManagerService.class),new AccessControlService(),members,claims,clock,audit,institutions,gate,mock(BusinessOperationalBridge.class)),transactionManager);
     }
     private boolean databaseLockWasBlocked(Runnable lock) {
         try {tx.execute(status->{jdbc.execute("set local lock_timeout='500ms'");lock.run();return null;});return false;}

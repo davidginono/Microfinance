@@ -41,6 +41,9 @@ public class BusinessAccountingRepository {
     public List<Document> list(String institution,String branch,int offset,int limit) {
         return jdbc.query("select * from accounting_business_document where sacco_id=? and station_id=? order by created_at desc,id limit ? offset ?",this::document,institution,branch,limit,offset);
     }
+    public List<UUID> originVouchers(String institution,String branch,UUID loan) {
+        return jdbc.query("select distinct e.voucher_id from loan_journal_entries e join loan_ledgers l on l.loan_application_id=e.loan_application_id where l.sacco_id=? and l.station_id=? and l.loan_application_id=? and e.transaction_id is null order by e.voucher_id limit 2",(r,n)->r.getObject(1,UUID.class),institution,branch,loan);
+    }
     public String payload(Command command) {return mapper.writeValueAsString(command);}
     public void insert(Document d,String hash) {
         Command c=d.command();
