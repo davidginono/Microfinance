@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_d_test(?:_(?:bootstrap|zero)_20261004)?")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/(?:microfinance_accounting_d_test(?:_(?:bootstrap|zero)_20261004)?|microfinance_accounting_h_release_combined_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReconciliationPostgresTest {
     private JdbcTemplate jdbc;private TransactionTemplate tx;private GeneralLedgerService gl;private ReconciliationService service;
@@ -639,8 +639,8 @@ class ReconciliationPostgresTest {
     }
     @Test void actualCashProviderRetainsMissingAndCutoffCoverageWithoutInventingAnAllocation() {
         opening();UUID journal=compoundCash();var allocations=actualCashProvider();UUID draft=allocations.draft(maker,journal,UUID.randomUUID(),List.of(new CashFlowAllocation.Split(journalLine(journal),capital,CashFlowAllocation.Activity.FINANCING,new BigDecimal("10.00"))),"Unreviewed synthetic cash classification","Synthetic noncash source evidence");
-        var missing=allocations.reviewedForClosing(maker,List.of(journal),NOW);assertThat(missing.versions()).isEmpty();assertThat(missing.missingJournalIds()).containsExactly(journal);
-        assertThatThrownBy(()->allocations.reviewedForClosing(maker,List.of(journal),NOW.minusSeconds(1))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var missing=tx.execute(s->allocations.reviewedForClosing(maker,List.of(journal),NOW));assertThat(missing.versions()).isEmpty();assertThat(missing.missingJournalIds()).containsExactly(journal);
+        assertThatThrownBy(()->tx.execute(s->allocations.reviewedForClosing(maker,List.of(journal),NOW.minusSeconds(1)))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         matchBranchMovement(maker,checker,journal,"CASH-ALLOCATED",new BigDecimal("10.00"));UUID close=service.proposeClose(maker,period,"Known unresolved cash classification",false);service.approveClose(checker,close,"Independent source coverage review");service.completeInstitutionClose(checker,period,"Explicit unresolved cash coverage");
         String retained=service.finalizedSnapshot(maker,close).snapshot();assertThat(retained).contains("missingJournalIds",journal.toString()).doesNotContain(draft.toString());
         when(clock.now()).thenReturn(NOW.plusMinutes(1));allocations.approve(checker,draft,"Independent later cash classification");

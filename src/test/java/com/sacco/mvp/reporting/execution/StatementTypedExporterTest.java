@@ -38,4 +38,14 @@ class StatementTypedExporterTest {
    assertThat(content).contains("statement.dimension.INSTITUTION","statement.latestBranchCutoff","statement.latestComparisonBranchCutoff",first.recordedCutoff().toString(),second.recordedCutoff().toString(),"e".repeat(64),"f".repeat(64)).doesNotContain("null / null");
   }
  }
+
+ @Test void largeRequiredEvidenceIsRetainedAndExcessRowsFailExplicitly()throws Exception {
+  var base=result();var rows=new ArrayList<RowValue>();
+  for(int i=0;i<9000;i++)rows.add(new RowValue("TRANSFER_PROOF_"+i,"Required transfer source","Chanzo cha lazima cha uhamisho",StatementDefinition.RowKind.NOTE,StatementDefinition.Unit.NONE,null,null,"TEXT","TEXT",false,false,true,"proof-marker-"+i+"-end","proof-marker-"+i+"-end"));
+  var large=withRows(base,rows);String csv=new String(exporter().export(large,new Layout(1,"en",false,false),null,Format.CSV),StandardCharsets.UTF_8);
+  var markers=java.util.regex.Pattern.compile("proof-marker-[0-9]+-end").matcher(csv).results().map(java.util.regex.MatchResult::group).collect(java.util.stream.Collectors.toSet());assertThat(markers).containsExactlyInAnyOrderElementsOf(java.util.stream.IntStream.range(0,9000).mapToObj(i->"proof-marker-"+i+"-end").toList());
+  while(rows.size()<=10000)rows.add(rows.get(0));var excess=withRows(base,rows);
+  assertThatThrownBy(()->exporter().export(excess,new Layout(1,"en",false,false),null,Format.CSV)).hasMessage("accounting.release.error.source");
+ }
+ static Result withRows(Result b,List<RowValue> rows){return new Result(b.id(),b.versionId(),b.templateId(),b.mappingVersion(),b.calculationVersion(),b.definition(),b.institution(),b.branch(),b.from(),b.through(),b.comparisonFrom(),b.comparisonThrough(),b.recordedCutoff(),b.comparisonCutoff(),b.policyId(),b.policyVersion(),b.closeReviewId(),b.closeChecksum(),b.comparisonCloseId(),b.comparisonCloseChecksum(),b.coverage(),b.status(),rows,b.reconciliations(),b.disclosures(),b.mappingReviewer(),b.mappingApprovalEvidence(),b.generatedAt(),b.priorResultId());}
 }

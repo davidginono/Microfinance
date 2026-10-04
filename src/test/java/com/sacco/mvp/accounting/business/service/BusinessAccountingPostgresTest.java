@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003|_release_gate_20261003|_owned_sources_20261003(?:_v2)?)?")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_C_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/(?:microfinance_accounting_c_test(?:_baseline_20261002|_source_corrections_20261003|_release_gate_20261003|_owned_sources_20261003(?:_v2)?)?|microfinance_accounting_h_release_combined_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BusinessAccountingPostgresTest {
     private static final LocalDate OPENING=LocalDate.of(2026,10,1), DAY=OPENING.plusDays(1);

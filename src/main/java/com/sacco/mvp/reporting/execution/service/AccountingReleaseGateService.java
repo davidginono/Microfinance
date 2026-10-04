@@ -19,7 +19,7 @@ public class AccountingReleaseGateService {
   Integer isolation=TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();if(isolation!=null&&isolation!=TransactionDefinition.ISOLATION_READ_COMMITTED)throw new IllegalStateException("Live release requires a fresh READ_COMMITTED posting transaction");
   if(actor==null||!actor.isStaffSession()||actor.isPlatformIdentity()||actor.getSaccoId()==null||actor.getStationId()==null||policy==null||version<1)throw new IllegalArgumentException("accounting.release.error.restricted");
   UUID release=repository.lockLiveCandidate(actor.getSaccoId(),actor.getStationId(),policy,version).orElseThrow(()->new IllegalArgumentException("accounting.release.error.restricted"));
-  if(!repository.liveId(release))throw new IllegalArgumentException("accounting.release.error.restricted");
+  if(!repository.liveId(release,actor.getSaccoId(),actor.getStationId(),policy,version))throw new IllegalArgumentException("accounting.release.error.restricted");
  }
  @Transactional(readOnly=true) public boolean hasInstitutionHistory(String institution){return repository.hasInstitutionHistory(institution);}
  @Transactional(readOnly=true) public boolean hasMemberHistory(UUID member){return repository.hasMemberHistory(member);}

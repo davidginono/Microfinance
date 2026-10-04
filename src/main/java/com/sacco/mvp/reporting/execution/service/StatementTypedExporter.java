@@ -30,7 +30,7 @@ public class StatementTypedExporter {
  public String unit(Unit unit,Layout layout){return unit==Unit.NONE?"":unit==Unit.RATIO?message("statement.export.ratio",layout):"TZS";}
  public String value(BigDecimal value,Unit unit){return value==null?"—":value.setScale(unit==Unit.RATIO?6:2,RoundingMode.UNNECESSARY).toPlainString();}
  public byte[] export(Result result,Layout layout,Branding branding,Format format){
-  layout.validate();if(!"FINAL".equals(result.status())||result.id()==null||result.rows().size()>3500||result.disclosures().size()>2500)throw new IllegalArgumentException("accounting.release.error.source");
+  layout.validate();if(!"FINAL".equals(result.status())||result.id()==null||result.rows().size()>10_000||result.disclosures().size()>2500)throw new IllegalArgumentException("accounting.release.error.source");
   try{return switch(format){case CSV->csv(result,layout);case XLSX->xlsx(result,layout,branding);case PDF->pdf(result,layout,branding);};}
   catch(IOException|ArithmeticException|IllegalArgumentException ex){throw new IllegalArgumentException("accounting.release.error.export",ex);}
  }

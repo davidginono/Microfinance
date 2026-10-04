@@ -1,0 +1,11 @@
+package com.sacco.mvp.reporting.execution;
+import com.sacco.mvp.reporting.execution.dto.AccountingReleaseDisplay;
+import org.junit.jupiter.api.Test;
+import java.util.*;
+import static org.assertj.core.api.Assertions.*;
+class AccountingReleaseDisplayTest {
+ private Map<String,Object> receipt(){var own=Map.of("branch","B1","opening",Map.of("sourceEvidence","OWN-SOURCE","reviewEvidence","OWN-REVIEW"));var foreign=Map.of("branch","B2","opening",Map.of("sourceEvidence","FOREIGN-SOURCE-SENTINEL","reviewEvidence","FOREIGN-REVIEW-SENTINEL"));var source=Map.of("dimension","INSTITUTION","checksum","a".repeat(64),"branches",List.of(Map.of("branch","B2","checksum","b".repeat(64),"openingChecksum","c".repeat(64),"openingMaker","FOREIGN-MAKER-SENTINEL")),"cashVersions",List.of(Map.of("journalId","FOREIGN-JOURNAL-SENTINEL","reviewEvidence","FOREIGN-CASH-SENTINEL")),"businessControlSources",List.of("FOREIGN-CONTROL-SENTINEL"),"internalTransferOpenings",List.of("FOREIGN-TRANSFER-SENTINEL"),"reviewedOpenings",List.of(own,foreign),"reviewedDifferences",List.of("FOREIGN-DIFFERENCE-SENTINEL"),"retainedDifferenceCount",1);return Map.of("schemaVersion",2,"dimension","INSTITUTION","currentSource",source,"comparisonSource",source,"privateFutureProof","FOREIGN-FUTURE-SENTINEL");}
+ @Test void institutionDisplayKeepsCountsAndDigestsWithoutForeignRawCurrentOrComparisonProof(){var shown=AccountingReleaseDisplay.project(receipt(),"B1",true);assertThat(shown.toString()).contains("OWN-SOURCE","OWN-REVIEW","B2","a".repeat(64),"b".repeat(64),"c".repeat(64)).doesNotContain("FOREIGN-");for(String role:List.of("currentSource","comparisonSource")){var source=(Map<?,?>)shown.get(role);assertThat(source.get("cashVersionCount")).isEqualTo(1);assertThat(source.get("retainedDifferenceCount")).isEqualTo(1);}}
+ @Test void missingFreshClosingViewClaimHidesOwnEvidenceToo(){var shown=AccountingReleaseDisplay.project(receipt(),"B1",false);assertThat(shown.toString()).doesNotContain("OWN-SOURCE","OWN-REVIEW","FOREIGN-");}
+ @Test void unknownForeignProofFieldsRemainInternal(){var shown=AccountingReleaseDisplay.project(receipt(),"B2",false);assertThat(shown).doesNotContainKey("privateFutureProof");assertThat(shown.toString()).doesNotContain("FOREIGN-");}
+}
