@@ -91,6 +91,11 @@ public class LedgerReportRepository {
         return jdbc.queryForObject("""
             SELECT
               (SELECT COUNT(*) FROM sacco_stations s WHERE s.sacco_id=:institution AND (:wide OR s.station_id=:branch)
+                AND (s.created_at<=:cutoff
+                  OR EXISTS(SELECT 1 FROM gl_journal known WHERE known.sacco_id=s.sacco_id AND known.station_id=s.station_id
+                    AND known.state='POSTED' AND known.effective_date<=:through AND known.recorded_at<=:cutoff AND known.posted_at<=:cutoff)
+                  OR EXISTS(SELECT 1 FROM loan_ledgers known WHERE known.sacco_id=s.sacco_id AND known.station_id=s.station_id
+                    AND known.disbursement_date<=:through AND known.created_at<=:cutoff))
                 AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
                   WHERE c.sacco_id=s.sacco_id AND c.station_id=s.station_id AND c.complete AND c.recorded_at<=:cutoff
                     AND c.reconciled_through<=:through AND j.state='POSTED' AND j.posted_at<=:cutoff)) missing,

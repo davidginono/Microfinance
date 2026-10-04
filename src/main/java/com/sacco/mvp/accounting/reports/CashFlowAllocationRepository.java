@@ -103,6 +103,11 @@ public class CashFlowAllocationRepository {
         var result=new LinkedHashMap<UUID,Source>();for(var h:header){UUID id=(UUID)h.get("id");result.put(id,new Source(id,(UUID)h.get("policy_id"),(Integer)h.get("policy_version"),h.get("source_reference").toString(),grouped.getOrDefault(id,List.of())));}return Map.copyOf(result);
     }
     public List<Version> list(String institution,String branch,int page){return query("a.sacco_id=? and a.station_id=? order by a.made_at desc,a.id limit 26 offset ?",institution,branch,page*25);}
+    public Set<UUID> supersededVersions(String institution,String branch,List<UUID> versions){
+        require(versions!=null && versions.size()<=25 && versions.stream().allMatch(Objects::nonNull),"size");if(versions.isEmpty())return Set.of();
+        String marks=String.join(",",Collections.nCopies(versions.size(),"?"));var args=new ArrayList<Object>(List.of(institution,branch));args.addAll(versions);
+        return Set.copyOf(jdbc.query("select a.id from cash_flow_allocations a where a.sacco_id=? and a.station_id=? and a.id in ("+marks+") and exists(select 1 from cash_flow_allocations newer join cash_flow_allocation_reviews r on r.allocation_id=newer.id where newer.sacco_id=a.sacco_id and newer.station_id=a.station_id and newer.journal_id=a.journal_id and newer.version>a.version) order by a.id limit 26",(r,n)->r.getObject("id",UUID.class),args.toArray()));
+    }
     public boolean hasInstitutionHistory(String institution){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from cash_flow_allocations where sacco_id=?)",Boolean.class,institution));}
     public boolean hasMemberHistory(UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from cash_flow_allocations where made_by=?) or exists(select 1 from cash_flow_allocation_reviews where checker_id=?)",Boolean.class,id,id));}
     private List<Version> query(String predicate,Object...args) {
