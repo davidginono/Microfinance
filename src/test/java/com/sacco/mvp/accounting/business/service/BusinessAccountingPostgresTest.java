@@ -347,8 +347,19 @@ class BusinessAccountingPostgresTest {
         var c=openingCommand("SUPPLIER_PAYABLE",true);var original=BusinessOpeningImport.parse(c,openingFile("Supplier-A,-1.01,Proof\n"));byte[] changed=openingFile("Supplier-A,-2.01,Proof\n").getBytes();var v=original.preview();var forged=new com.sacco.mvp.accounting.business.dto.BusinessOpeningDtos.Preview(c,v.filename(),BusinessOpeningImport.sha(changed),v.rows(),v.signedBalance());var repo=new com.sacco.mvp.accounting.business.repository.BusinessOpeningRepository(jdbc,JsonMapper.builder().findAndAddModules().build());assertThatThrownBy(()->tx.execute(status->{repo.insert(UUID.randomUUID(),institution,"B1",maker.getMemberId(),new BusinessOpeningImport.Parsed(forged,changed),clock.now());return null;})).isInstanceOf(org.springframework.dao.DataAccessException.class);assertThat(jdbc.queryForObject("select count(*) from accounting_business_opening where sacco_id=?",Integer.class,institution)).isZero();
     }
     @Test void approvedBranchCloseRequiresControlledReopeningBeforeSourceCoverageChanges(){
-        var openings=openingService();var d=openings.importFile(maker,openingCommand("SUPPLIER_PAYABLE",true),openingFile(""));UUID period=jdbc.queryForObject("select id from accounting_period where sacco_id=?",UUID.class,institution);UUID close=UUID.randomUUID();jdbc.update("insert into accounting_close_review(id,sacco_id,station_id,period_id,version,action,snapshot_json,checksum,evidence,maker_id,recorded_at) values(?,?,?, ?,1,'CLOSE','{}',?,'Synthetic prior approved branch close',?,?)",close,institution,"B1",period,"0".repeat(64),maker.getMemberId(),clock.now());jdbc.update("insert into accounting_close_decision(review_id,checker_id,evidence,decided_at) values(?,?,'Synthetic independent branch close',?)",close,checker.getMemberId(),clock.now());assertThatThrownBy(()->openings.review(checker,d.id(),"APPROVED","Late opening approval",true)).isInstanceOf(org.springframework.dao.DataAccessException.class);assertThat(openings.view(maker,d.id()).decision()).isNull();
+        var openings=openingService();var d=openings.importFile(maker,openingCommand("SUPPLIER_PAYABLE",true),openingFile(""));
+        tx.execute(status->{
+            UUID period=jdbc.queryForObject("select id from accounting_period where sacco_id=?",UUID.class,institution);UUID close=UUID.randomUUID();
+            String snapshot="{}";String checksum=BusinessOpeningImport.sha(snapshot.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            jdbc.update("insert into accounting_close_review(id,sacco_id,station_id,period_id,version,action,snapshot_json,checksum,evidence,maker_id,recorded_at) values(?,?,?, ?,1,'CLOSE',?,?,'Synthetic prior approved branch close',?,?)",close,institution,"B1",period,snapshot,checksum,maker.getMemberId(),clock.now());
+            jdbc.update("insert into accounting_close_decision(review_id,checker_id,evidence,decided_at) values(?,?,'Synthetic independent branch close',?)",close,checker.getMemberId(),clock.now());
+            assertThatThrownBy(()->openings.review(checker,d.id(),"APPROVED","Late opening approval",true)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+            status.setRollbackOnly();return null;
+        });
+        assertThat(openings.view(maker,d.id()).decision()).isNull();
+        assertThat(jdbc.queryForObject("select count(*) from accounting_close_review where sacco_id=?",Integer.class,institution)).isZero();
     }
+
     private BusinessAccountingService businessService(AccountingReleaseGateService gate) {
         return proxy(new BusinessAccountingService(repository,books,policies,mock(LoanRepaymentLedgerService.class),mock(ManagerService.class),new AccessControlService(),members,claims,clock,audit,institutions,gate,mock(BusinessOperationalBridge.class)),transactionManager);
     }
