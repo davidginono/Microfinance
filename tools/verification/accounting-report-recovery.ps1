@@ -1,6 +1,6 @@
 param(
     [ValidateRange(1024,65535)][int]$Port = 55439,
-    [ValidateSet('microfinance_accounting_h_test','microfinance_accounting_h_release_test','microfinance_accounting_h_release_final_test')]
+    [ValidateSet('microfinance_accounting_h_test','microfinance_accounting_h_release_test','microfinance_accounting_h_release_final_test','microfinance_accounting_h_release_combined_test_20261004','microfinance_accounting_h_release_integrity_test_20261004')]
     [string]$SourceDatabase = 'microfinance_accounting_h_test',
     [string]$PostgresBin = 'C:\Program Files\PostgreSQL\17\bin'
 )
@@ -58,7 +58,12 @@ $taskRetainedTables = @(
     'accounting_release_requests','accounting_release_decisions','accounting_release_invalidations',
     'loan_ledgers','loan_ledger_installments','loan_repayment_transactions',
     'loan_repayment_allocations','loan_journal_entries',
-    'operational_report_templates','operational_report_template_versions'
+    'operational_report_templates','operational_report_template_versions',
+    'accounting_business_document','accounting_business_control_entry','accounting_supplier','accounting_fixed_asset',
+    'cash_flow_allocations','cash_flow_allocation_reviews',
+    'accounting_release_branch_sources','accounting_release_cash_sources',
+    'reconciliation_statement_file','reconciliation_certificate_statement','reconciliation_timing_source',
+    'financial_statement_institution_sources','registered_saccos','sacco_stations'
 )
 $taskAvailableTables = @()
 foreach ($taskTable in $taskRetainedTables) {
@@ -78,6 +83,7 @@ if ($taskAvailableTables -contains 'statement_output_sets') {
 if ((Read-SyntheticQuery $taskSourceDatabase $taskMismatchQuery).Trim() -ne '0') { throw 'Source payload checksum verification failed.' }
 $taskSourceSignature = Read-SyntheticQuery $taskSourceDatabase $taskSignatureQuery
 $taskSourceSignature | Set-Content -LiteralPath (Join-Path $taskEvidenceDirectory 'source-signature.txt') -Encoding utf8
+if ((Read-SyntheticQuery 'postgres' "SELECT count(*) FROM pg_database WHERE datname='$taskTargetDatabase'").Trim() -ne '0') { throw 'Synthetic restore target already exists; it will not be overwritten.' }
 $taskStarted = Get-Date
 & $taskDump -h 127.0.0.1 -p $Port -U microfinance_test -d $taskSourceDatabase --format=custom --file=$taskArchive
 if ($LASTEXITCODE -ne 0) { throw 'Synthetic backup failed.' }

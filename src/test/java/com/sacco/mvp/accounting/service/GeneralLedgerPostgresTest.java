@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_B_DATABASE_URL",matches="(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_b_(test|gate_test)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_b_integrity_test_20261004)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_B_DATABASE_URL",matches="(?:(?:(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_b_(test|gate_test)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_b_integrity_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GeneralLedgerPostgresTest {
     private JdbcTemplate jdbc;

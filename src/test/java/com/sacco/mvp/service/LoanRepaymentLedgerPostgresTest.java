@@ -33,7 +33,7 @@ import static org.mockito.Mockito.*;
 
 // Opt-in and restricted to a dedicated loopback test database; never use the application's datasource.
 @EnabledIfEnvironmentVariable(named = "MICROFINANCE_TEST_DATABASE_URL",
-    matches = "jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_ledger_test")
+    matches="(?:(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_ledger_test|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class LoanRepaymentLedgerPostgresTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 1);

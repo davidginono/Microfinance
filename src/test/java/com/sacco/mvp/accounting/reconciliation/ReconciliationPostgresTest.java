@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/(?:microfinance_accounting_d_test(?:_(?:bootstrap|zero)_20261004)?|microfinance_accounting_h_release_combined_test_20261004)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_D_DATABASE_URL",matches="(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/(?:microfinance_accounting_d_test(?:_(?:bootstrap|zero)_20261004)?|microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReconciliationPostgresTest {
     private JdbcTemplate jdbc;private TransactionTemplate tx;private GeneralLedgerService gl;private ReconciliationService service;

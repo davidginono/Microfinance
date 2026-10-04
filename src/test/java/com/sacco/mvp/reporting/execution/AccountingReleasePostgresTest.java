@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /** Actual A/B/D/F/G/H stored sources on a fresh disposable database. Policies are explicit synthetic fixtures. */
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_RELEASE_H_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/(?:microfinance_accounting_h_release_(test|final_test|b_gate_test|institution_test_20261004)|microfinance_accounting_h_release_combined_test_20261004)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_RELEASE_H_DATABASE_URL",matches="(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/(?:microfinance_accounting_h_release_(test|final_test|b_gate_test|institution_test_20261004)|microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AccountingReleasePostgresTest {
  private com.zaxxer.hikari.HikariDataSource ds;

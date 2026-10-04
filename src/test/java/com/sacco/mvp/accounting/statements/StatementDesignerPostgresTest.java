@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_G_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:55439/(?:microfinance_accounting_g_test|microfinance_accounting_h_release_combined_test_20261004)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_G_DATABASE_URL",matches="(?:jdbc:postgresql://127\\.0\\.0\\.1:55439/(?:microfinance_accounting_g_test|microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class StatementDesignerPostgresTest {
     private com.zaxxer.hikari.HikariDataSource dataSource;
