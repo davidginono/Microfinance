@@ -158,6 +158,14 @@ For each implementation increment append: date; item IDs; commit; migrations; au
 
 No implementation completion is asserted by the creation of this checklist.
 
+### 2026-10-04 — Delivery coordination and authorization foundation
+
+- The user requested a separate agent/worktree for every phase A–H. Eight managed worktrees have been created. A (policy), B (ledger), and F (operational builder) are running first; dependent phases will follow as execution slots and prerequisite contracts become available.
+- The user confirmed that approved institution policies and verified opening-balance evidence are unavailable, and explicitly instructed that activation remain gated. No institution/accountant/compliance approval or opening amount has been inferred from this implementation request.
+- Baseline at `20ae9ad`: `mvn test` passed with 747 tests, zero failures/errors, and five opt-in PostgreSQL tests skipped. Those five tests subsequently passed against a fresh disposable PostgreSQL 17 instance at loopback port 55449, with all 41 baseline migrations applied. The operational datasource was not used.
+- Commit `47af6f0` adds explicit policy, account, journal, opening, cutover, period, template, and report-run claims with no automatic role grants; a staff-only scoped finance route gate preserves session/CSRF controls. Focused permission/login/CSRF checks: 26 tests, zero failures/errors/skips. Policy foundation commit `87b7bd5` is integrated as `18323de`; its phase-specific verification is pending.
+- No checklist phase or overall acceptance gate is marked complete by this coordination entry. Full financial, rendered, security, recovery, performance, and human review evidence will be recorded separately as increments are verified.
+
 ## Official Review References
 
 Reviewed for planning on 2026-10-02; verify amendments and institution-specific instructions again at implementation/release.
