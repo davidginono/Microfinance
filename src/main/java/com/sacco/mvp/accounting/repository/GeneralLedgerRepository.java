@@ -86,7 +86,7 @@ public class GeneralLedgerRepository {
         return jdbc.query("select j.*, case when exists(select 1 from gl_source_cancellation c where c.journal_id=j.id) then 'CANCELLED' else j.state end display_state, exists(select 1 from gl_journal r where r.reverses_id=j.id and r.state='POSTED') reversed from gl_journal j where j.sacco_id=? and j.station_id=? order by j.recorded_at desc,j.id limit ? offset ?",this::journal,institution,branch,limit,offset);
     }
     public List<Line> lines(UUID journal) {
-        return jdbc.query("select account_id,debit,credit from gl_journal_line where journal_id=? order by id",(r,n)->new Line(r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)),journal);
+        return jdbc.query("select account_id,debit,credit from gl_journal_line where journal_id=? order by id limit 501",(r,n)->new Line(r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)),journal);
     }
     public void createJournal(Journal j) {
         jdbc.update("insert into gl_journal(id,sacco_id,station_id,policy_id,policy_version,period_id,source_type,source_reference,request_key,payload_hash,currency,state,evidence_reference,reason,effective_date,maker_id,recorded_at,reverses_id) values(?,?,?,?,?,?,?,?,?,?,'TZS','DRAFT',?,?,?,?,?,?)",

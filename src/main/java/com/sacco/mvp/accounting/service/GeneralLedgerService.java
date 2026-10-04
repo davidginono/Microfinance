@@ -150,9 +150,9 @@ public class GeneralLedgerService {
         require(!j.makerId().equals(actor.getMemberId()),"independentChecker");
         if(j.reversesId()!=null) independentOriginal(actor,scoped(actor,j.reversesId(),true));
         if("APPROVED".equals(j.state()) || "POSTED".equals(j.state())) {
-            require(actor.getMemberId().equals(j.checkerId()),"checker");return withLines(j);
+            require(actor.getMemberId().equals(j.checkerId()),"checker");if("APPROVED".equals(j.state()))verifyDraftPayload(j);return withLines(j);
         }
-        require("DRAFT".equals(j.state()),"state");books.approve(id,actor.getMemberId(),evidence,clock.now());
+        require("DRAFT".equals(j.state()),"state");verifyDraftPayload(j);books.approve(id,actor.getMemberId(),evidence,clock.now());
         event(actor,id,"JOURNAL_APPROVED",Map.of("evidenceReference",evidence));return withLines(scoped(actor,id,false));
     }
     @Transactional(isolation=Isolation.READ_COMMITTED)
@@ -165,6 +165,7 @@ public class GeneralLedgerService {
         require(actor.getMemberId().equals(j.checkerId()),"checker");
         if("POSTED".equals(j.state())) return withLines(j);
         require("APPROVED".equals(j.state()),"approvalRequired");
+        verifyDraftPayload(j);
         var policy=policies.requireApprovedLocalPolicy(actor.getSaccoId(),j.effectiveDate());
         require(policy.id().equals(j.policyId()),"policyChanged");policies.requireAllowedPosting(policy,postingEvent(j.sourceType()));
         lockSourcePostingPeriod(actor,j.effectiveDate());
@@ -362,6 +363,13 @@ public class GeneralLedgerService {
             balance=balance.add(l.debit()).subtract(l.credit());
         }
         require(balance.signum()==0,"balanced");
+    }
+    /** Confirm the exact maker command before approval and before new money can be posted. */
+    private void verifyDraftPayload(Journal journal) {
+        var command=new JournalCommand(journal.requestKey(),journal.sourceReference(),journal.effectiveDate(),
+                journal.evidenceReference(),journal.reason(),books.lines(journal.id()));
+        validateCommand(command);
+        require(payloadHash(journal.sourceType(),command,journal.reversesId(),journal.policyId()).equals(journal.payloadHash()),"sourcePayload");
     }
     static String payloadHash(String source,JournalCommand c,UUID reverses,UUID policy) {
         try {

@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_B_DATABASE_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_b_(test|gate_test)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_ACCOUNTING_B_DATABASE_URL",matches="(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_b_(test|gate_test)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_b_integrity_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GeneralLedgerPostgresTest {
     private JdbcTemplate jdbc;
@@ -149,11 +149,30 @@ class GeneralLedgerPostgresTest {
         assertThat(service.journal(maker,j.id()).state()).isEqualTo("POSTED");
     }
     @Test void databaseRejectsUnbalancedPostingEvenWithOutboxAndReviewedOpening() {
-        opening();var j=service.draftManual(maker,command("UNBALANCED","3.00"));
+        opening();var j=service.draftManual(maker,command("UNBALANCED","3.00"));var repository=new GeneralLedgerRepository(jdbc);
+        assertThatThrownBy(()->tx.executeWithoutResult(status->{
+            jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,'B1',?,1.00,0)",UUID.randomUUID(),j.id(),institution,cash);
+            repository.approve(j.id(),checker.getMemberId(),"Synthetic forged approval",NOW);repository.outbox(j,NOW);repository.post(j.id(),NOW);
+        })).hasRootCauseInstanceOf(org.postgresql.util.PSQLException.class);
+        assertThat(service.journal(checker,j.id()).state()).isEqualTo("DRAFT");assertThat(service.journal(checker,j.id()).lines()).hasSize(2);
+        assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,j.id())).isZero();
+    }
+    @Test void approvalRejectsUnbalancedStoredLinesBeforeAnyApprovalOrMoney(){
+        opening();var j=service.draftManual(maker,command("BAD-APPROVAL","3.00"));
         jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,'B1',?,1.00,0)",UUID.randomUUID(),j.id(),institution,cash);
-        service.approve(checker,j.id(),"Reviewed header");
-        assertThatThrownBy(()->service.post(checker,j.id(),false)).hasRootCauseInstanceOf(org.postgresql.util.PSQLException.class);
-        assertThat(service.journal(checker,j.id()).state()).isEqualTo("APPROVED");
+        assertThatThrownBy(()->service.approve(checker,j.id(),"Cannot approve altered draft")).hasMessage("accounting.error.balanced");assertThat(service.journal(checker,j.id()).state()).isEqualTo("DRAFT");
+        assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,j.id())).isZero();
+    }
+    @Test void balancedLineInjectionCannotReplaceTheMakersDraftCommandAtApprovalOrPosting(){
+        opening();var j=service.draftManual(maker,command("BALANCED-INJECTION","3.00"));
+        tx.executeWithoutResult(status->{
+            jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,'B1',?,1.00,0)",UUID.randomUUID(),j.id(),institution,cash);
+            jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,'B1',?,0,1.00)",UUID.randomUUID(),j.id(),institution,capital);
+            assertThatThrownBy(()->service.approve(checker,j.id(),"Cannot approve substituted balanced command")).hasMessage("accounting.error.sourcePayload");
+            new GeneralLedgerRepository(jdbc).approve(j.id(),checker.getMemberId(),"Synthetic prior invalid approval",NOW);
+            assertThatThrownBy(()->service.post(checker,j.id(),false)).hasMessage("accounting.error.sourcePayload");status.setRollbackOnly();
+        });
+        assertThat(service.journal(checker,j.id()).state()).isEqualTo("DRAFT");assertThat(service.journal(checker,j.id()).lines()).hasSize(2);
         assertThat(jdbc.queryForObject("select count(*) from accounting_outbox where journal_id=?",Integer.class,j.id())).isZero();
     }
     @Test void operationalBridgePreservesSourceAndUsesApprovedMappingsExactlyOnce() {
