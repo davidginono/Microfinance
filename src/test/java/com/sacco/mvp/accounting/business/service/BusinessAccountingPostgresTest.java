@@ -78,7 +78,7 @@ class BusinessAccountingPostgresTest {
         mappings=new LinkedHashMap<>();
         for(String key:List.of("CASH","BANK","MOBILE_MONEY","OWNER_CAPITAL","OWNER_DISTRIBUTIONS","SUPPLIER_PAYABLE","OPERATING_EXPENSE","FUNDING_PRINCIPAL","FUNDING_INTEREST_EXPENSE","FIXED_ASSET","DEPRECIATION_EXPENSE","ACCUMULATED_DEPRECIATION","DISPOSAL_GAIN","DISPOSAL_LOSS","PREPAYMENT_ASSET","ACCRUED_LIABILITY","TAX_EXPENSE","TAX_PAYABLE","UNAPPLIED_FUNDS","INTERNAL_DUE_FROM","INTERNAL_DUE_TO")){
             String type=key.contains("EXPENSE")||key.contains("LOSS")?"EXPENSE":Set.of("SUPPLIER_PAYABLE","FUNDING_PRINCIPAL","ACCRUED_LIABILITY","TAX_PAYABLE","UNAPPLIED_FUNDS","INTERNAL_DUE_TO").contains(key)?"LIABILITY":key.startsWith("OWNER")?"EQUITY":key.contains("GAIN")?"INCOME":"ASSET";
-            mappings.put(key,books.createAccount(maker,new AccountCommand(key,"Synthetic "+key,type,Set.of("LIABILITY","EQUITY","INCOME").contains(type)?"CREDIT":"DEBIT","POSTING","OTHER",null)));
+            mappings.put(key,books.createAccount(maker,new AccountCommand(key,"Synthetic "+key,type,Set.of("LIABILITY","EQUITY","INCOME").contains(type)?"CREDIT":"DEBIT","POSTING",Set.of("CASH","BANK","MOBILE_MONEY").contains(key)?key:"OTHER",null)));
         }
         UUID id=UUID.randomUUID();var decisions=new EnumMap<PolicyDecision,String>(PolicyDecision.class);for(var v:PolicyDecision.values())decisions.put(v,"Synthetic independently approved evidence");decisions.put(PolicyDecision.INTEREST_RECOGNITION,"CASH_DUE_INTEREST_V1");
         var matrix=new EnumMap<PostingEvent,PostingRule>(PostingEvent.class);for(var v:PostingEvent.values())matrix.put(v,new PostingRule(PostingPermission.ALLOWED,"Synthetic verified treatment"));
@@ -272,6 +272,42 @@ class BusinessAccountingPostgresTest {
         }).when(releaseGate).requireLiveRelease(checker,policy.id(),policy.version());
         assertThat(service.approveAndPost(checker,d.id(),"Independent future-period review",true).state()).isEqualTo("POSTED");
         verify(releaseGate).requireLiveRelease(checker,policy.id(),policy.version());
+    }
+    private BusinessInternalTransferSource transferProvider(){return proxy(new BusinessInternalTransferSource(new com.sacco.mvp.accounting.business.repository.BusinessTransferSourceRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc)),new BusinessSourceProofAuthorization(members,claims,institutions),clock,JsonMapper.builder().findAndAddModules().build()),transactionManager);}
+    private Document transfer(AppUserPrincipal sourceMaker,AppUserPrincipal sourceChecker,Kind kind,String amount,UUID related,String destination){
+        var command=new Command(UUID.randomUUID(),kind,DAY,new BigDecimal(amount),null,related,null,"Synthetic actual internal transfer","Synthetic independently verified transfer source","TRANSFER-"+UUID.randomUUID(),"BANK",destination,null,null,null,null);
+        var draft=service.create(sourceMaker,command);service.submit(sourceMaker,draft.id());return service.approveAndPost(sourceChecker,draft.id(),"Independent synthetic transfer review",true);
+    }
+    @Test void actualOwningOutgoingAndIncomingTransfersProjectExactScopedJournalLegs(){
+        when(institutions.findStation(institution,"B2")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B2").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
+        jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at,access_status) values(?,?,'B2',true,now(),now(),'ACTIVE')",UUID.randomUUID(),institution);
+        var b2maker=operator("B2");var b2checker=operator("B2");var b2opening=books.importOpening(b2maker,new JournalCommand(UUID.randomUUID(),"SYNTHETIC-B2-OPENING",OPENING,"Synthetic reviewed B2 cash/capital",null,List.of(new Line(mappings.get("BANK"),new BigDecimal("100.00"),BigDecimal.ZERO),new Line(mappings.get("OWNER_CAPITAL"),BigDecimal.ZERO,new BigDecimal("100.00")))));
+        books.approve(b2checker,b2opening.id(),"Independent B2 opening evidence");books.post(b2checker,b2opening.id(),true);
+        var out=transfer(maker,checker,Kind.INTERNAL_TRANSFER_OUT,"10.01",null,"B2");var in=transfer(b2maker,b2checker,Kind.INTERNAL_TRANSFER_IN,"10.01",out.id(),null);var provider=transferProvider();
+        var own=tx.execute(s->provider.reviewedTransfers(maker,OPENING,DAY,clock.now()));var other=tx.execute(s->provider.reviewedTransfers(b2maker,OPENING,DAY,clock.now()));
+        assertThat(own.complete()).isTrue();assertThat(own.unknownJournalIds()).isEmpty();assertThat(own.legs()).hasSize(1);var a=own.legs().getFirst();assertThat(a.documentId()).isEqualTo(out.id());assertThat(a.journalId()).isEqualTo(out.journalId());assertThat(a.transferId()).isEqualTo(out.id());assertThat(a.destinationBranch()).isEqualTo("B2");assertThat(a.signedMoneyAmount()).isEqualByComparingTo("-10.01");assertThat(a.signedCounterpartAmount()).isEqualByComparingTo("10.01");assertThat(a.sourceDigest()).matches("[0-9a-f]{64}");
+        assertThat(other.complete()).isTrue();assertThat(other.legs()).hasSize(1);var b=other.legs().getFirst();assertThat(b.documentId()).isEqualTo(in.id());assertThat(b.journalId()).isEqualTo(in.journalId());assertThat(b.transferId()).isEqualTo(out.id());assertThat(b.relatedDocumentId()).isEqualTo(out.id());assertThat(b.branch()).isEqualTo("B2");assertThat(b.signedMoneyAmount()).isEqualByComparingTo("10.01");assertThat(b.signedCounterpartAmount()).isEqualByComparingTo("-10.01");
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.FINANCIAL_REPORTS_INSTITUTION));
+        assertThatThrownBy(()->service.view(maker,in.id())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);assertThat(tx.<Boolean>execute(s->provider.currentForInstitutionClose(maker,"B2",OPENING,DAY,clock.now(),other))).isTrue();
+        when(institutions.findStation(institution,"B2")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B2").active(false).accessStatus(SaccoAccessStatus.SUSPENDED).build()));
+        assertThat(tx.<Boolean>execute(s->provider.currentForInstitutionClose(maker,"B2",OPENING,DAY,clock.now(),other))).isTrue();
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.FINANCIAL_REPORTS_VIEW));assertThatThrownBy(()->tx.execute(s->provider.currentForInstitutionClose(maker,"B2",OPENING,DAY,clock.now(),other))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void manualInternalMovementsStayUnknownEvenWhenTheyNetToZero(){
+        for(boolean reverse:List.of(false,true)){var debit=mappings.get(reverse?"BANK":"INTERNAL_DUE_FROM");var credit=mappings.get(reverse?"INTERNAL_DUE_FROM":"BANK");var journal=books.draftManual(maker,new JournalCommand(UUID.randomUUID(),"UNKNOWN-INTERNAL-"+reverse,DAY,"Synthetic unidentified internal movement",null,List.of(new Line(debit,new BigDecimal("2.01"),BigDecimal.ZERO),new Line(credit,BigDecimal.ZERO,new BigDecimal("2.01")))));books.approve(checker,journal.id(),"Independent manual review");books.post(checker,journal.id(),false);}
+        var proof=tx.execute(s->transferProvider().reviewedTransfers(maker,OPENING,DAY,clock.now()));assertThat(proof.complete()).isFalse();assertThat(proof.legs()).isEmpty();assertThat(proof.unknownJournalIds()).hasSize(2);assertThat(balance("INTERNAL_DUE_FROM")).isZero();
+    }
+    @Test void transferProjectionRequiresFreshScopeCutoverAndOwningTransaction(){
+        var provider=transferProvider();assertThatThrownBy(()->provider.reviewedTransfers(maker,OPENING,DAY,clock.now())).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        var proof=tx.execute(s->provider.reviewedTransfers(maker,OPENING,OPENING,clock.now()));assertThat(proof.legs()).isEmpty();assertThat(proof.unknownJournalIds()).isEmpty();
+        assertThatThrownBy(()->tx.execute(s->provider.reviewedTransfers(maker,OPENING.minusDays(1),DAY,clock.now()))).hasMessage("business.source.error.opening");
+        assertThatThrownBy(()->tx.execute(s->provider.reviewedTransfers(maker,OPENING,DAY,clock.now().plusSeconds(1)))).hasMessage("business.source.error.dates");
+        when(claims.effectiveClaims(eq(maker.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.ACCOUNTING_BUSINESS_VIEW));assertThatThrownBy(()->tx.execute(s->provider.reviewedTransfers(maker,OPENING,DAY,clock.now()))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void currentTransferProofRejectsAnewBackdatedMovementAfterFrozenCutoff(){
+        var provider=transferProvider();var before=clock.now();var frozen=tx.execute(s->provider.reviewedTransfers(maker,OPENING,DAY,before));when(clock.now()).thenReturn(before.plusMinutes(1));
+        when(institutions.findStation(institution,"B2")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B2").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at,access_status) values(?,?,'B2',true,now(),now(),'ACTIVE')",UUID.randomUUID(),institution);
+        transfer(maker,checker,Kind.INTERNAL_TRANSFER_OUT,"1.01",null,"B2");var historical=tx.execute(s->provider.reviewedTransfers(maker,OPENING,DAY,before));assertThat(historical).isEqualTo(frozen);assertThat(tx.<Boolean>execute(s->provider.currentForInstitutionClose(maker,"B1",OPENING,DAY,before,frozen))).isFalse();
     }
     private BusinessAccountingService businessService(AccountingReleaseGateService gate) {
         return proxy(new BusinessAccountingService(repository,books,policies,mock(LoanRepaymentLedgerService.class),mock(ManagerService.class),new AccessControlService(),members,claims,clock,audit,institutions,gate,mock(BusinessOperationalBridge.class)),transactionManager);
