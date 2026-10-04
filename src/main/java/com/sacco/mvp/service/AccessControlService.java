@@ -103,6 +103,16 @@ public class AccessControlService {
         return principal != null && !isAdminScope(principal);
     }
 
+    public boolean canAccessFinanceArea(AppUserPrincipal principal) {
+        return isStaffSession(principal) && notPlatformIdentity(principal)
+            && principal.getSaccoId() != null && !principal.getSaccoId().isBlank()
+            && principal.getStationId() != null && !principal.getStationId().isBlank()
+            && Arrays.stream(UserClaim.values())
+                .filter(claim -> claim.name().startsWith("ACCOUNTING_")
+                    || claim.name().startsWith("REPORT_TEMPLATES_") || claim.name().startsWith("REPORTS_"))
+                .anyMatch(claim -> has(principal, claim));
+    }
+
     public boolean canAccessAdminArea(AppUserPrincipal principal) {
         return isStaffSession(principal) && isAdminScope(principal) && hasAny(principal,
             UserClaim.ADMIN_DASHBOARD_VIEW,
