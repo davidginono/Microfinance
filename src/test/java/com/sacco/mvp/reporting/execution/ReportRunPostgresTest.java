@@ -29,10 +29,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_REPORT_H_DATABASE_URL",matches="(?:(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_h_(test|release_test|release_final_test)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_REPORT_H_DATABASE_URL",matches="(?:(?:(?:jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_accounting_h_(test|release_test|release_final_test)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_combined_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_release_integrity_test_20261004)|jdbc:postgresql://127\\.0\\.0\\.1:55439/microfinance_accounting_h_source_openings_test_20261004)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReportRunPostgresTest {
  private JdbcTemplate jdbc,outside;
+ private com.zaxxer.hikari.HikariDataSource taskDataSource,taskOutsideDataSource;
  private PlatformTransactionManager manager;
  private TransactionTemplate tx;
  private ReportRunRepository repository;
@@ -51,9 +52,11 @@ class ReportRunPostgresTest {
  private OffsetDateTime now;
  private Set<UserClaim> allowed;
  @BeforeAll void migrate(){
-  var dataSource=new DriverManagerDataSource(System.getenv("MICROFINANCE_REPORT_H_DATABASE_URL"),"microfinance_test","");
-  Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(dataSource);outside=new JdbcTemplate(new DriverManagerDataSource(System.getenv("MICROFINANCE_REPORT_H_DATABASE_URL"),"microfinance_test",""));manager=new DataSourceTransactionManager(dataSource);tx=new TransactionTemplate(manager);tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+  taskDataSource=pooledSource(4);taskOutsideDataSource=pooledSource(2);var dataSource=taskDataSource;
+  Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(dataSource);outside=new JdbcTemplate(taskOutsideDataSource);manager=new DataSourceTransactionManager(dataSource);tx=new TransactionTemplate(manager);tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
  }
+ @AfterAll void closeSyntheticPools(){if(taskOutsideDataSource!=null)taskOutsideDataSource.close();if(taskDataSource!=null)taskDataSource.close();}
+ private com.zaxxer.hikari.HikariDataSource pooledSource(int size){var pool=new com.zaxxer.hikari.HikariDataSource();pool.setJdbcUrl(System.getenv("MICROFINANCE_REPORT_H_DATABASE_URL"));pool.setUsername("microfinance_test");pool.setPassword("");pool.setMaximumPoolSize(size);pool.setMinimumIdle(0);pool.setConnectionTimeout(5000);return pool;}
  @BeforeEach void fixture(){
   now=OffsetDateTime.now();clock=mock(ApplicationClock.class);when(clock.now()).thenAnswer(invocation->OffsetDateTime.now());when(clock.today()).thenReturn(now.toLocalDate());
   members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);var institutions=mock(SaccoRegistryService.class);audit=mock(AuditService.class);
