@@ -18,15 +18,18 @@ public class BusinessAccountingRepository {
     public boolean hasInstitutionHistory(String institution) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             select exists(select 1 from accounting_business_document where sacco_id=?
-                union all select 1 from accounting_supplier where sacco_id=?)
-            """,Boolean.class,institution,institution));
+                union all select 1 from accounting_supplier where sacco_id=?
+                union all select 1 from accounting_business_opening where sacco_id=?)
+            """,Boolean.class,institution,institution,institution));
     }
 
     public boolean hasMemberHistory(UUID member) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             select exists(select 1 from accounting_business_document where maker_id=? or checker_id=?
-                union all select 1 from accounting_supplier where maker_id=?)
-            """,Boolean.class,member,member,member));
+                union all select 1 from accounting_supplier where maker_id=?
+                union all select 1 from accounting_business_opening where maker_id=?
+                union all select 1 from accounting_business_opening_review where reviewer_id=?)
+            """,Boolean.class,member,member,member,member,member));
     }
 
     public void lockRequest(String institution,String branch,UUID key) {

@@ -15,6 +15,20 @@ public class BusinessSourceProofAuthorization {
     private final UserClaimService claims;
     private final SaccoRegistryService institutions;
 
+    /** Registry and approval commands require their own current business claim. Proof access grants none of these. */
+    public void authorizeBusiness(AppUserPrincipal actor,UserClaim claim) {
+        if(actor==null||!actor.isStaffSession()||actor.isPlatformIdentity()||actor.getMemberId()==null
+            ||actor.getSaccoId()==null||actor.getStationId()==null||claim==null||!actor.getClaims().contains(claim.name()))deny();
+        var current=members.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Source staff unavailable"));
+        if(current.getStatus()!=MemberStatus.ACTIVE||!current.isStaffAccessActive()
+            ||current.getActiveStaffRolesResolved().contains(Position.ADMIN)
+            ||!Objects.equals(current.getSaccoId(),actor.getSaccoId())||!Objects.equals(current.getStationId(),actor.getStationId())
+            ||!claims.effectiveClaims(current.getId(),current.getActiveStaffRolesResolved(),current.isMemberAccess()).contains(claim)
+            ||institutions.findActiveSacco(actor.getSaccoId()).isEmpty()
+            ||institutions.findStation(actor.getSaccoId(),actor.getStationId()).filter(SaccoStation::isActive)
+                .filter(s->s.getAccessStatus()==SaccoAccessStatus.ACTIVE).isEmpty())deny();
+    }
+
     public void authorize(AppUserPrincipal actor,String branch,boolean institutionWide) {
         if(actor==null || !actor.isStaffSession() || actor.isPlatformIdentity() || actor.getMemberId()==null
                 || actor.getSaccoId()==null || actor.getSaccoId().isBlank() || actor.getStationId()==null
