@@ -6,6 +6,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
     @Test
+    void accountingAndReportCapabilitiesRequireExplicitGrantsAndDistinctMatrixCells() {
+        var defaults = UserClaim.defaultClaims(java.util.List.of(Position.values()), true);
+        for (UserClaim claim : UserClaim.values()) {
+            if (claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATES_")
+                || claim.name().startsWith("REPORTS_")) {
+                assertThat(defaults).doesNotContain(claim);
+                assertThat(UserClaim.forFeatureAction(claim.getFeature(), claim.getAction())).contains(claim);
+                assertThat(UserClaim.fromStoredName(claim.name())).containsExactly(claim);
+            }
+        }
+    }
+
+    @Test
     void roleLabelsUseMicrofinanceLanguageWithoutRenamingStoredRoles() {
         assertThat(Position.MEMBER.getDisplayName()).isEqualTo("Client");
         assertThat(Position.MINOR_ADMIN.getDisplayName()).isEqualTo("Institution Admin");
