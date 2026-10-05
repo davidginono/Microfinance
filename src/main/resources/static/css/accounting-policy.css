@@ -1,0 +1,19 @@
+.policy-workspace { min-width: 0; padding: 1rem; }
+.policy-heading, .policy-actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: space-between; }
+.policy-form { display: grid; gap: 1rem; margin-top: 1rem; }
+.policy-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; }
+.policy-field { display: grid; gap: .35rem; min-width: 0; }
+.policy-field textarea, .policy-field input, .policy-field select { width: 100%; max-width: 100%; min-width: 0; }
+.policy-field textarea { resize: vertical; }
+.policy-section { background: #fff; border: 1px solid #d7dde3; border-radius: 6px; padding: 1rem; min-width: 0; }
+.policy-section h2 { margin: 0 0 .7rem; font-size: 1rem; }
+.policy-section summary { cursor: pointer; font-weight: 600; }
+.policy-rule { border-top: 1px solid #d7dde3; padding-top: .7rem; margin-top: .7rem; }
+.policy-rule .policy-fields { margin-top: .7rem; }
+.policy-copy { margin: .5rem 0; color: #475569; }
+.policy-error { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; padding: .7rem; }
+.policy-success { color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; padding: .7rem; }
+.policy-value { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: .35rem; }
+.policy-hash { overflow-wrap: anywhere; font-family: monospace; font-size: .8rem; }
+.policy-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding: .8rem; }
+@media (max-width: 767px) { .policy-fields { grid-template-columns: minmax(0,1fr); } .policy-workspace { padding: .6rem; } }
