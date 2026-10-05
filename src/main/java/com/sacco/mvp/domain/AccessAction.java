@@ -18,6 +18,7 @@ public enum AccessAction {
     PUBLISH("Publish"),
     RUN("Run"),
     SHARE("Share"),
+    AGGREGATE("Aggregate"),
     DELETE("Delete");
 
     private final String displayName;

@@ -9,7 +9,7 @@ class UserClaimTest {
     void accountingAndReportCapabilitiesRequireExplicitGrantsAndDistinctMatrixCells() {
         var defaults = UserClaim.defaultClaims(java.util.List.of(Position.values()), true);
         for (UserClaim claim : UserClaim.values()) {
-            if (claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATES_")
+            if (claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("FINANCIAL_") || claim.name().startsWith("REPORT_TEMPLATES_")
                 || claim.name().startsWith("REPORTS_")) {
                 assertThat(defaults).doesNotContain(claim);
                 assertThat(UserClaim.forFeatureAction(claim.getFeature(), claim.getAction())).contains(claim);

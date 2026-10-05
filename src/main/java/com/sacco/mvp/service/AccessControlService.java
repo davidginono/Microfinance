@@ -109,6 +109,7 @@ public class AccessControlService {
             && principal.getStationId() != null && !principal.getStationId().isBlank()
             && Arrays.stream(UserClaim.values())
                 .filter(claim -> claim.name().startsWith("ACCOUNTING_")
+                    || claim.name().startsWith("FINANCIAL_")
                     || claim.name().startsWith("REPORT_TEMPLATES_") || claim.name().startsWith("REPORTS_"))
                 .anyMatch(claim -> has(principal, claim));
     }

@@ -25,6 +25,12 @@ class AccessControlServiceTest {
             .isFalse();
         assertThat(access.canAccessFinanceArea(principal(List.of(Position.MANAGER), false, true,
             Set.of(UserClaim.ACCOUNTING_JOURNAL_APPROVE)))).isTrue();
+        assertThat(access.canAccessFinanceArea(principal(List.of(Position.ACCOUNTANT), false, true,
+            Set.of(UserClaim.FINANCIAL_REPORTS_VIEW)))).isTrue();
+        assertThat(access.canAccessFinanceArea(principal(List.of(Position.ACCOUNTANT), false, true,
+            Set.of(UserClaim.ACCOUNTING_BUSINESS_VIEW)))).isTrue();
+        assertThat(access.canAccessFinanceArea(principal(List.of(), true, false,
+            Set.of(UserClaim.FINANCIAL_REPORTS_RUN)))).isFalse();
         assertThat(access.canAccessFinanceArea(principal(List.of(Position.ADMIN), false, true,
             Set.of(UserClaim.ACCOUNTING_VIEW)))).isFalse();
         assertThat(access.canAccessFinanceArea(principal(List.of(), true, false,
