@@ -1,0 +1,5 @@
+<div class="ledger-pagination">
+ <c:if test="${rows.hasPrevious()}"><c:url var="ledgerPrevious" value="${ledgerPagePath}"><c:param name="page" value="${rows.number-1}" /></c:url><a class="app-btn btn-neutral" href="${ledgerPrevious}"><spring:message code="common.previous" /></a></c:if>
+ <span><spring:message code="repayment.page" /> <c:out value="${rows.number+1}" /></span>
+ <c:if test="${rows.hasNext()}"><c:url var="ledgerNext" value="${ledgerPagePath}"><c:param name="page" value="${rows.number+1}" /></c:url><a class="app-btn btn-neutral" href="${ledgerNext}"><spring:message code="common.next" /></a></c:if>
+</div>
