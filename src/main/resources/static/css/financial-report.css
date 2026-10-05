@@ -1,0 +1,13 @@
+.financial-report .financial-number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.financial-report .financial-context { display: flex; flex-wrap: wrap; gap: .35rem 1rem; margin-block: .65rem; }
+.financial-report .financial-evidence { overflow-wrap: anywhere; max-width: 26rem; }
+.financial-report .accounting-grid label { min-width: 0; }
+.financial-report .accounting-actions { flex-wrap: wrap; }
+@media print {
+  .financial-report .financial-filters, .financial-report .accounting-actions { display: none; }
+  .financial-report .erp-table-scroll { max-height: none; overflow: visible; }
+  .financial-report .erp-table { font-size: 9pt; }
+  .financial-report .erp-table thead { display: table-header-group; }
+}
+
+.financial-report .financial-definition { overflow-wrap: anywhere; }

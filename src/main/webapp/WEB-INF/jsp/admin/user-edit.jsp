@@ -104,25 +104,27 @@
     <section class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header admin-user-section-header--actions">
             <div>
-                <h2>Access Matrix</h2>
-                <p>Unsupported combinations remain visible and disabled.</p>
+                <h2><spring:message code="access.matrix.title" /></h2>
+                <p><spring:message code="access.matrix.unsupported" /></p>
             </div>
             <div class="admin-user-section-actions">
                 <button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims>
-                    Restore Default Permissions
+                    <spring:message code="access.matrix.restore" />
                 </button>
             </div>
         </div>
         <div class="admin-user-section-body">
-            <div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+            <spring:message code="access.matrix.loading" var="accessMatrixLoading" />
+            <div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="${accessMatrixLoading}">
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th class="admin-matrix-feature-cell">Feature</th>
+                        <th class="admin-matrix-feature-cell"><spring:message code="access.matrix.feature" /></th>
                         <c:forEach items="${accessActions}" var="action">
                             <th class="admin-matrix-action-cell">
                                 <label class="admin-matrix-toggle">
-                                    <span>${action.displayName}</span>
+                                    <spring:message code="access.action.${action}" text="${action.displayName}" var="matrixActionLabel" />
+                                    <span><c:out value="${matrixActionLabel}" /></span>
                                     <input type="checkbox"
                                            data-access-column-toggle="${action}"
                                            class="admin-cloud-checkbox" />
@@ -133,16 +135,19 @@
                     </thead>
                     <tbody>
                     <c:forEach items="${accessMatrixRows}" var="row">
+                        <spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" />
                         <tr>
                             <td class="admin-matrix-feature-cell">
                                 <label class="admin-matrix-toggle">
                                     <input type="checkbox"
                                            data-access-row-toggle="${row.feature}"
                                            class="admin-cloud-checkbox" />
-                                    <span><c:out value="${row.label}" /></span>
+                                    <span><c:out value="${matrixFeatureLabel}" /></span>
                                 </label>
                             </td>
                             <c:forEach items="${accessActions}" var="action">
+                                <spring:message code="access.action.${action}" text="${action.displayName}" var="matrixActionLabel" />
+                                <spring:message code="access.matrix.unsupportedClaim" arguments="${matrixFeatureLabel},${matrixActionLabel}" var="unsupportedClaimLabel" />
                                 <c:set var="matrixClaim" value="${row.claimsByAction[action]}" />
                                 <td class="admin-matrix-action-cell">
                                     <c:choose>
@@ -153,7 +158,7 @@
                                                    data-access-row="${row.feature}"
                                                    data-access-column="${action}"
                                                    data-access-claim="${matrixClaim}"
-                                                   title="${matrixClaim.displayName}"
+                                                   title="<c:out value='${matrixFeatureLabel}' /> - <c:out value='${matrixActionLabel}' />"
                                                    ${user.claims.contains(matrixClaim) ? 'checked' : ''}
                                                    class="admin-cloud-checkbox" />
                                         </c:when>
@@ -162,7 +167,7 @@
                                                    disabled
                                                    data-access-row="${row.feature}"
                                                    data-access-column="${action}"
-                                                   title="No supported claim for ${row.label} ${action.displayName}"
+                                                   title="<c:out value='${unsupportedClaimLabel}' />"
                                                    class="admin-cloud-checkbox" />
                                         </c:otherwise>
                                     </c:choose>

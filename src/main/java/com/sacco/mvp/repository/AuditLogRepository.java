@@ -18,7 +18,15 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
 
     long deleteByCreatedAtBefore(OffsetDateTime cutoff);
 
-    long deleteByCreatedAtBeforeAndEntityTypeNot(OffsetDateTime cutoff, String retainedEntityType);
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("""
+        delete from AuditLog a where a.createdAt < :cutoff
+        and a.entityType <> 'LOAN_REPAYMENT'
+        and a.entityType not like 'ACCOUNTING%'
+        and a.entityType not like '%REPORT%'
+        and a.entityType not like '%STATEMENT%'
+        """)
+    int deleteExpiredOperationalAudit(@Param("cutoff") OffsetDateTime cutoff);
 
     @Query(
         value = """

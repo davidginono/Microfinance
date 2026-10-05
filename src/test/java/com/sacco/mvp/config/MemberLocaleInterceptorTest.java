@@ -98,6 +98,43 @@ class MemberLocaleInterceptorTest {
         verifyNoInteractions(userSettings, saccoRegistry);
     }
 
+    @Test
+    void financialStaffRoutesUseOneCachedPersonalLocale() {
+        UUID id=UUID.randomUUID();var settings=mock(UserSettingsService.class);var registry=mock(SaccoRegistryService.class);
+        when(settings.languageOrDefault(id)).thenReturn("sw");authenticateStaff(id,Position.ACCOUNTANT);
+        var interceptor=new MemberLocaleInterceptor(settings,registry);
+        org.springframework.mock.web.MockHttpSession session=new org.springframework.mock.web.MockHttpSession();
+        for(String path:java.util.List.of("/finance/accounts","/finance/policies","/reports/builder","/reports/statements")) {
+            var request=new MockHttpServletRequest("GET",path);request.setSession(session);
+            var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
+            request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);
+            interceptor.preHandle(request,new MockHttpServletResponse(),new Object());
+            assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.of("sw"));
+        }
+        verify(settings,times(1)).languageOrDefault(id);verifyNoInteractions(registry);
+    }
+
+    @Test
+    void financialWorkspaceAdminRoutesRetainInstitutionDefaultLanguage() {
+        UUID id=UUID.randomUUID();var settings=mock(UserSettingsService.class);var registry=mock(SaccoRegistryService.class);
+        when(registry.defaultLanguage("SACCO-1")).thenReturn(java.util.Optional.of("sw"));authenticateStaff(id,Position.MINOR_ADMIN);
+        var interceptor=new MemberLocaleInterceptor(settings,registry);
+        for(String path:java.util.List.of("/finance/accounts","/reports/builder")) {
+            var request=new MockHttpServletRequest("GET",path);var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
+            request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);
+            interceptor.preHandle(request,new MockHttpServletResponse(),new Object());
+            assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.of("sw"));
+        }
+        verifyNoInteractions(settings);verify(registry,times(2)).defaultLanguage("SACCO-1");
+    }
+
+    private void authenticateStaff(UUID id,Position position) {
+        Member member=Member.builder().id(id).saccoId("SACCO-1").stationId("B1").memberNo("STAFF-1")
+            .fullName("Synthetic staff").position(position).memberAccount(false).passwordHash("test-only").build();
+        AppUserPrincipal principal=new AppUserPrincipal(member,Collections.emptySet(),true);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,principal.getPassword(),principal.getAuthorities()));
+    }
+
     private void authenticateMember(UUID memberId) {
         Member member = Member.builder()
             .id(memberId)

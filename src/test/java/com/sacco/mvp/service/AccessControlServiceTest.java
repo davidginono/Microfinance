@@ -20,29 +20,6 @@ class AccessControlServiceTest {
     private final AccessControlService access = new AccessControlService();
 
     @Test
-    void financeWorkspaceRequiresExplicitClaimAndScopedStaffSession() {
-        assertThat(access.canAccessFinanceArea(principal(List.of(Position.ACCOUNTANT), false, true, Set.of())))
-            .isFalse();
-        assertThat(access.canAccessFinanceArea(principal(List.of(Position.MANAGER), false, true,
-            Set.of(UserClaim.ACCOUNTING_JOURNAL_APPROVE)))).isTrue();
-        assertThat(access.canAccessFinanceArea(principal(List.of(Position.ACCOUNTANT), false, true,
-            Set.of(UserClaim.FINANCIAL_REPORTS_VIEW)))).isTrue();
-        assertThat(access.canAccessFinanceArea(principal(List.of(Position.ACCOUNTANT), false, true,
-            Set.of(UserClaim.ACCOUNTING_BUSINESS_VIEW)))).isTrue();
-        assertThat(access.canAccessFinanceArea(principal(List.of(), true, false,
-            Set.of(UserClaim.FINANCIAL_REPORTS_RUN)))).isFalse();
-        assertThat(access.canAccessFinanceArea(principal(List.of(Position.ADMIN), false, true,
-            Set.of(UserClaim.ACCOUNTING_VIEW)))).isFalse();
-        assertThat(access.canAccessFinanceArea(principal(List.of(), true, false,
-            Set.of(UserClaim.REPORTS_RUN)))).isFalse();
-        AppUserPrincipal missingBranch = org.mockito.Mockito.mock(AppUserPrincipal.class);
-        org.mockito.Mockito.when(missingBranch.isStaffSession()).thenReturn(true);
-        org.mockito.Mockito.when(missingBranch.getSaccoId()).thenReturn("I1");
-        org.mockito.Mockito.when(missingBranch.getClaims()).thenReturn(Set.of("ACCOUNTING_VIEW"));
-        assertThat(access.canAccessFinanceArea(missingBranch)).isFalse();
-    }
-
-    @Test
     void staffQueueRequiresStaffSessionAndGranularClaim() {
         assertThat(access.canAccessManagerArea(principal(List.of(Position.MANAGER), false, true, Set.of())))
             .isFalse();

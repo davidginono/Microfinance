@@ -20,7 +20,12 @@
     <script src="<c:url value='/js/vendor/lucide-repayments.js' />" defer></script>
 <%@ include file="select-enhancer.jspf" %>
 </head>
-<body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
+<spring:message code="shell.control.results" var="shellControlresults" />
+<spring:message code="shell.control.refresh" var="shellControlrefresh" />
+<spring:message code="shell.control.loading" var="shellControlloading" />
+<spring:message code="shell.control.select" var="shellControlselect" />
+<spring:message code="shell.control.noOptions" var="shellControlnoOptions" />
+<body class="aws-console min-h-screen font-sans text-sacco-ink antialiased" data-shell-results="<c:out value='${shellControlresults}' />" data-shell-refresh="<c:out value='${shellControlrefresh}' />" data-shell-loading="<c:out value='${shellControlloading}' />" data-shell-select="<c:out value='${shellControlselect}' />" data-shell-no-options="<c:out value='${shellControlnoOptions}' />">
 <a class="aws-skip-link" href="#main-content"><spring:message code="common.skipToContent" text="Skip to main content" /></a>
 <script>
     try {

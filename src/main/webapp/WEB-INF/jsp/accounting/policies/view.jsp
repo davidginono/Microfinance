@@ -4,41 +4,26 @@
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-policy.css' />" />
 <div class="policy-workspace">
-    <div class="erp-page-header policy-heading" data-aws-page-header><h1 class="erp-page-title"><spring:message code="policy.title" /> <c:out value="${policy.version()}" /></h1><span><spring:message code="policy.state.${policy.state()}" /></span></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.policy.title" /> <c:out value="${policy.version}" /></h1></div>
     <c:if test="${not empty policyError}"><p class="policy-error" role="alert"><spring:message code="${policyError}" /></p></c:if>
-    <c:if test="${not empty policySuccess}"><p class="policy-success" role="status"><spring:message code="${policySuccess}" /></p></c:if>
-    <p class="policy-copy"><spring:message code="policy.immutableHelp" /></p>
-    <sec:authorize access="@access.has(principal,'ACCOUNTING_POLICY_CREATE')"><a class="app-btn btn-neutral" href="<c:url value='/accounting/policies/new?source=${policy.id()}' />"><spring:message code="policy.new" /></a></sec:authorize>
-    <div class="policy-form">
-        <section class="policy-section"><h2><spring:message code="policy.books" /></h2><div class="policy-fields">
-            <div><strong><spring:message code="policy.authority" /></strong><p><spring:message code="policy.authority.${policy.content().authority()}" /></p></div>
-            <div><strong><spring:message code="policy.authorityEvidence" /></strong><p class="policy-value"><c:out value="${policy.content().authorityEvidence()}" /></p></div>
-            <div><strong><spring:message code="policy.effectiveFrom" /></strong><p><c:out value="${policy.content().effectiveFrom()}" /></p></div>
-            <div><strong><spring:message code="policy.openingDate" /></strong><p><c:out value="${policy.content().openingDate()}" /></p></div>
-            <div><strong><spring:message code="policy.recordedAt" /></strong><p><c:out value="${policy.createdAt()}" /></p></div>
-            <div><strong><spring:message code="policy.contentHash" /></strong><p class="policy-hash"><c:out value="${policy.contentHash()}" /></p></div>
-        </div></section>
-        <section class="policy-section"><h2><spring:message code="policy.decisions" /></h2><div class="policy-fields">
-            <c:forEach items="${policy.content().decisions()}" var="entry"><div><strong><spring:message code="policy.decision.${entry.key}" /></strong><p class="policy-value"><c:out value="${entry.value}" /></p></div></c:forEach>
-        </div></section>
-        <section class="policy-section"><h2><spring:message code="policy.postingMatrix" /></h2>
-            <c:forEach items="${policy.content().postingRules()}" var="entry"><details class="policy-rule"><summary><spring:message code="policy.event.${entry.key}" /> · <spring:message code="${entry.value.enabled() ? 'policy.enabled' : 'policy.disabled'}" /></summary>
-                <p class="policy-value"><c:out value="${entry.value.treatment()}" /></p><p class="policy-value"><spring:message code="policy.evidence" />: <c:out value="${entry.value.evidenceReference()}" /></p>
-                <div class="policy-fields"><c:forEach items="${entry.value.accountCodes()}" var="mapping"><div><strong><spring:message code="policy.role.${mapping.key}" /></strong><p><c:out value="${mapping.value}" /></p></div></c:forEach></div>
-            </details></c:forEach>
-        </section>
-        <c:if test="${policy.state() == 'DRAFT'}"><section class="policy-section"><h2><spring:message code="policy.review" /></h2><p class="policy-copy"><spring:message code="policy.reviewHelp" /></p>
-            <form method="post" action="<c:url value='/accounting/policies/${policy.id()}/approve' />" class="policy-form">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="expectedHash" value="<c:out value='${policy.contentHash()}' />" />
-                <label class="policy-field" for="reviewEvidence"><spring:message code="policy.evidence" /><input class="aws-control" id="reviewEvidence" name="evidence" maxlength="500" required value="<c:out value='${reviewEvidence}' />" /></label>
-                <label class="policy-field" for="reviewReason"><spring:message code="policy.reviewReason" /><textarea class="aws-control" id="reviewReason" name="reason" rows="3" maxlength="2000" required><c:out value="${reviewReason}" /></textarea></label>
-                <div class="policy-actions">
-                    <sec:authorize access="@access.has(principal,'ACCOUNTING_POLICY_APPROVE')"><button class="app-btn btn-primary" type="submit"><spring:message code="policy.approve" /></button></sec:authorize>
-                    <sec:authorize access="@access.has(principal,'ACCOUNTING_POLICY_REJECT')"><button class="app-btn btn-neutral" type="submit" formaction="<c:url value='/accounting/policies/${policy.id()}/reject' />"><spring:message code="policy.reject" /></button></sec:authorize>
-                </div>
-            </form>
-        </section></c:if>
-        <c:if test="${policy.state() != 'DRAFT'}"><section class="policy-section"><h2><spring:message code="policy.review" /></h2><p class="policy-value"><c:out value="${policy.reviewEvidence()}" /></p><p class="policy-value"><c:out value="${policy.reviewReason()}" /></p><p><c:out value="${policy.checkedAt()}" /></p></section></c:if>
-    </div>
+    <dl class="policy-detail-list"><dt><spring:message code="accounting.policy.books" /></dt><dd><spring:message code="accounting.policy.books.${policy.authoritativeLedger}" /></dd>
+        <dt><spring:message code="accounting.policy.opening" /></dt><dd><c:out value="${policy.openingDate}" /></dd><dt><spring:message code="accounting.policy.effective" /></dt><dd><c:out value="${policy.effectiveFrom}" /></dd>
+        <dt><spring:message code="accounting.policy.evidence" /></dt><dd><c:out value="${policy.evidenceReference}" /></dd><dt><spring:message code="accounting.policy.status" /></dt><dd><c:choose><c:when test="${empty policy.approvalDecision}"><spring:message code="accounting.policy.pending" /></c:when><c:otherwise><spring:message code="accounting.policy.status.${policy.approvalDecision}" /></c:otherwise></c:choose></dd>
+    </dl>
+    <details class="policy-section" open><summary><spring:message code="accounting.policy.decisions" /></summary><c:forEach items="${decisionFields}" var="field"><h3><spring:message code="accounting.policy.decision.${field}" /></h3><p class="policy-decision"><c:out value="${policy.decisions[field]}" /></p></c:forEach></details>
+    <details class="policy-section" open><summary><spring:message code="accounting.policy.matrix" /></summary><c:forEach items="${postingEvents}" var="event"><h3><spring:message code="accounting.policy.event.${event}" />: <spring:message code="accounting.policy.permission.${policy.postingMatrix[event].permission}" /></h3><p class="policy-decision"><c:out value="${policy.postingMatrix[event].treatment}" /></p></c:forEach></details>
+    <details class="policy-section"><summary><spring:message code="accounting.policy.mappings" /></summary><c:forEach items="${policy.accountMappings}" var="mapping"><p class="policy-decision"><c:out value="${mapping.key}" /> = <c:out value="${mapping.value}" /></p></c:forEach></details>
+    <c:if test="${not empty policy.approvalDecision}"><p class="policy-decision"><c:out value="${policy.approvalEvidence}" /><br /><c:out value="${policy.approvalReason}" /><br /><c:out value="${policy.approvedAt}" /></p></c:if>
+    <sec:authorize access="@access.has(principal, 'ACCOUNTING_POLICIES_APPROVE')"><c:if test="${empty policy.approvalDecision and policy.makerId ne pageContext.request.userPrincipal.principal.memberId}">
+        <c:url var="policyDecisionUrl" value="/finance/policies/${policy.id}/decision" />
+        <form class="policy-form" method="post" action="${policyDecisionUrl}">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <div class="policy-field"><label for="decision"><spring:message code="accounting.policy.decision" /></label><select id="decision" name="decision" class="aws-control" required><option value=""><spring:message code="accounting.policy.select" /></option><option value="APPROVED"><spring:message code="accounting.policy.approve" /></option><option value="REJECTED"><spring:message code="accounting.policy.reject" /></option></select></div>
+            <div class="policy-field"><label for="decisionEvidence"><spring:message code="accounting.policy.evidence" /></label><input id="decisionEvidence" name="evidenceReference" maxlength="1000" class="aws-control" required value="<c:out value='${decisionEvidence}' />" /></div>
+            <div class="policy-field"><label for="decisionReason"><spring:message code="accounting.policy.reason" /></label><textarea id="decisionReason" name="reason" maxlength="2000" class="aws-control" required><c:out value="${decisionReason}" /></textarea></div>
+            <label><input type="checkbox" name="confirmed" value="true" required /> <spring:message code="accounting.policy.confirm" /></label>
+            <div class="policy-actions"><button type="submit" class="app-btn btn-primary"><spring:message code="accounting.policy.recordDecision" /></button></div>
+        </form>
+    </c:if></sec:authorize>
 </div>
 <%@ include file="../../fragments/footer.jspf" %>

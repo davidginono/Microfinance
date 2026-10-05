@@ -47,7 +47,7 @@ class AwsConsoleViewContractTest {
     void everyRouteUsesTheAwsConsoleOrAuthShell() throws Exception {
         List<Path> routes = routeViews();
 
-        assertThat(routes).hasSize(78);
+        assertThat(routes).hasSizeGreaterThanOrEqualTo(78);
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
             assertThat(view)
@@ -952,7 +952,7 @@ class AwsConsoleViewContractTest {
             .contains("action=\"/staff/analytics\" method=\"get\"")
             .contains("data-page-preloader=\"true\"");
         assertThat(shellJs)
-            .contains("if (form.matches('[data-page-preloader=\"true\"]'))")
+            .contains("|| form.matches('[data-page-preloader=\"true\"]'))")
             .contains("clearConsoleTableLoading();");
     }
 

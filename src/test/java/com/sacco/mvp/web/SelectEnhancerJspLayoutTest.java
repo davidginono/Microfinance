@@ -56,7 +56,8 @@ class SelectEnhancerJspLayoutTest {
         String shellStyles = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(fragment)
-            .contains("state.button.title = selectedLabel || 'Select an option'");
+            .contains("state.button.title = selectedLabel || document.body.dataset.shellSelect || 'Select an option'")
+            .contains("state.buttonText.textContent = selectedLabel || document.body.dataset.shellSelect || 'Select an option'");
         assertThat(styles)
             .contains(".neo-select-button-text")
             .contains("overflow: visible")

@@ -97,10 +97,12 @@ public class SecurityConfig {
                     auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
                 }
                 auth
-                .requestMatchers("/accounting/**", "/reports/**").access((authentication, context) -> {
+                .requestMatchers("/finance/**", "/reports/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessFinanceArea(appUser));
+                        && appUser.isStaffSession()
+                        && appUser.getSaccoId() != null && !appUser.getSaccoId().isBlank()
+                        && appUser.getStationId() != null && !appUser.getStationId().isBlank());
                 })
                 .requestMatchers("/admin/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();

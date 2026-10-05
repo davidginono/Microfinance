@@ -60,6 +60,7 @@ class ManagerServiceTest {
     @Mock private AuditService auditService;
     @Mock private RepaymentScheduleService repaymentScheduleService;
     @Mock private LoanRepaymentLedgerService loanRepaymentLedgerService;
+    @Mock private com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
     @Spy private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @InjectMocks
@@ -204,9 +205,8 @@ class ManagerServiceTest {
         verify(loanApplicationRepository).save(app);
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void disburseTopUpSettlesOnlyLegacySources(boolean sourceTracked) {
+    @Test
+    void disburseTopUpNeverTreatsLegacySnapshotAsVerifiedSettlement() {
         UUID loanId = UUID.randomUUID();
         UUID sourceLoanId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
@@ -251,7 +251,6 @@ class ManagerServiceTest {
             .thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(false).build()));
-        when(loanRepaymentLedgerService.hasLedger(sourceLoanId)).thenReturn(sourceTracked);
         stubRepaymentSchedule(LocalDate.of(2026, 12, 3), new BigDecimal("83333.33"));
 
         Runnable disburse = () -> managerService.disburseLoan(
@@ -268,25 +267,14 @@ class ManagerServiceTest {
             null
         );
 
-        if (sourceTracked) {
-            assertThatThrownBy(disburse::run).isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("verified settlement transaction");
-            assertThat(sourceLoan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
-            verify(loanApplicationRepository, never()).save(sourceLoan);
-            verify(loanRepaymentLedgerService, never()).openAtDisbursement(any());
-            return;
-        }
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        disburse.run();
-
-        assertThat(app.getStatus()).isEqualTo(LoanStatus.DISBURSED);
-        assertThat(app.getDepositAmount()).isEqualByComparingTo("75000.00");
-        assertThat(sourceLoan.getStatus()).isEqualTo(LoanStatus.PAID);
-        assertThat(sourceLoan.getPaidAt()).isNotNull();
-        assertThat(sourceLoan.getPaidMarkedByManagerId()).isEqualTo(officerId);
-        verify(loanApplicationRepository).save(sourceLoan);
-        verify(loanApplicationRepository).save(app);
-        verify(loanRepaymentLedgerService).openAtDisbursement(app);
+        assertThatThrownBy(disburse::run).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("verified source balances");
+        assertThat(sourceLoan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+        assertThat(sourceLoan.getPaidAt()).isNull();
+        assertThat(app.getStatus()).isEqualTo(LoanStatus.READY_FOR_DISBURSEMENT);
+        verify(loanApplicationRepository, never()).save(sourceLoan);
+        verify(loanApplicationRepository, never()).save(app);
+        verify(loanRepaymentLedgerService, never()).openAtDisbursement(any());
     }
 
     @Test

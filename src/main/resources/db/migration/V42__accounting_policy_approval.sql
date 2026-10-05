@@ -1,83 +1,103 @@
--- No accounting policy or approval is seeded. Institution decisions must be supplied by people.
-CREATE TABLE accounting_policy (
+-- No policy, date, opening amount or approval is seeded. Assignment of claims is explicit.
+CREATE TABLE accounting_policies (
     id uuid PRIMARY KEY,
     sacco_id varchar(255) NOT NULL REFERENCES registered_saccos(sacco_id),
-    station_id varchar(255) NOT NULL,
     policy_version integer NOT NULL CHECK (policy_version > 0),
-    state varchar(16) NOT NULL CHECK (state IN ('DRAFT','APPROVED','REJECTED')),
-    authority varchar(16) NOT NULL CHECK (authority IN ('LOCAL','EXTERNAL')),
     effective_from date NOT NULL,
-    content_json text NOT NULL CHECK (octet_length(content_json) <= 131072),
-    content_hash varchar(64) NOT NULL CHECK (content_hash ~ '^[a-f0-9]{64}$'),
-    created_by uuid NOT NULL REFERENCES members(id),
-    created_at timestamptz NOT NULL,
-    checked_by uuid REFERENCES members(id),
-    checked_at timestamptz,
-    review_evidence varchar(500),
-    review_reason varchar(2000),
+    opening_date date NOT NULL CHECK (opening_date <= effective_from),
+    authoritative_ledger varchar(20) NOT NULL CHECK (authoritative_ledger IN ('LOCAL_GL', 'EXTERNAL_GL')),
+    decisions_json text NOT NULL CHECK (jsonb_typeof(decisions_json::jsonb) = 'object'),
+    posting_matrix_json text NOT NULL CHECK (jsonb_typeof(posting_matrix_json::jsonb) = 'object'),
+    account_mappings_json text NOT NULL CHECK (jsonb_typeof(account_mappings_json::jsonb) = 'object'),
+    evidence_reference text NOT NULL CHECK (length(trim(evidence_reference)) BETWEEN 1 AND 1000),
+    maker_id uuid NOT NULL REFERENCES members(id),
     request_key uuid NOT NULL,
+    created_at timestamptz NOT NULL,
     UNIQUE (sacco_id, policy_version),
     UNIQUE (sacco_id, request_key),
-    UNIQUE (sacco_id, id),
-    CHECK ((state = 'DRAFT' AND checked_by IS NULL AND checked_at IS NULL AND review_evidence IS NULL AND review_reason IS NULL)
-       OR (state IN ('APPROVED','REJECTED') AND checked_by IS NOT NULL AND checked_at IS NOT NULL
-           AND checked_by <> created_by AND length(btrim(review_evidence)) > 0 AND length(btrim(review_reason)) > 0))
+    UNIQUE (id, sacco_id, policy_version, effective_from)
 );
-CREATE UNIQUE INDEX ux_accounting_policy_effective ON accounting_policy(sacco_id, effective_from) WHERE state = 'APPROVED';
-CREATE INDEX ix_accounting_policy_listing ON accounting_policy(sacco_id, policy_version DESC);
-CREATE INDEX ix_accounting_policy_applicable ON accounting_policy(sacco_id, effective_from DESC) WHERE state = 'APPROVED';
-
-CREATE TABLE accounting_policy_audit (
-    id uuid PRIMARY KEY,
+CREATE TABLE accounting_policy_approvals (
+    policy_id uuid PRIMARY KEY,
     sacco_id varchar(255) NOT NULL,
-    policy_id uuid NOT NULL,
-    station_id varchar(255) NOT NULL,
-    event varchar(16) NOT NULL CHECK (event IN ('CREATED','APPROVED','REJECTED')),
-    actor_id uuid NOT NULL REFERENCES members(id),
-    recorded_at timestamptz NOT NULL,
-    evidence_reference varchar(500) NOT NULL,
-    reason varchar(2000) NOT NULL,
-    content_hash varchar(64) NOT NULL,
-    FOREIGN KEY (sacco_id, policy_id) REFERENCES accounting_policy(sacco_id, id)
+    policy_version integer NOT NULL,
+    effective_from date NOT NULL,
+    checker_id uuid NOT NULL REFERENCES members(id),
+    decision varchar(10) NOT NULL CHECK (decision IN ('APPROVED', 'REJECTED')),
+    evidence_reference text NOT NULL CHECK (length(trim(evidence_reference)) BETWEEN 1 AND 1000),
+    reason text NOT NULL CHECK (length(trim(reason)) BETWEEN 1 AND 2000),
+    decided_at timestamptz NOT NULL,
+    FOREIGN KEY (policy_id, sacco_id, policy_version, effective_from)
+        REFERENCES accounting_policies(id, sacco_id, policy_version, effective_from)
 );
-CREATE INDEX ix_accounting_policy_audit ON accounting_policy_audit(sacco_id, policy_id, recorded_at, id);
+-- Latest applicable approved policy; scope precedes date/order, no portfolio loading.
+CREATE INDEX ix_accounting_policy_effective ON accounting_policies(sacco_id, effective_from DESC, policy_version DESC);
+CREATE INDEX ix_accounting_policy_approved ON accounting_policy_approvals(sacco_id, effective_from DESC)
+    WHERE decision = 'APPROVED';
 
-CREATE FUNCTION protect_accounting_policy() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE previous accounting_policy%ROWTYPE;
+CREATE FUNCTION protect_accounting_policy_history() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'INSERT' THEN
-        IF NEW.state <> 'DRAFT' THEN RAISE EXCEPTION 'Accounting policy must start as a draft'; END IF;
-        RETURN NEW;
+    RAISE EXCEPTION 'Accounting policies and decisions are immutable; create a new version';
+END;
+$$;
+CREATE TRIGGER accounting_policy_immutable BEFORE UPDATE OR DELETE ON accounting_policies
+    FOR EACH ROW EXECUTE FUNCTION protect_accounting_policy_history();
+CREATE TRIGGER accounting_policy_approval_immutable BEFORE UPDATE OR DELETE ON accounting_policy_approvals
+    FOR EACH ROW EXECUTE FUNCTION protect_accounting_policy_history();
+
+CREATE FUNCTION validate_accounting_policy() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE item text; rule jsonb;
+BEGIN
+    FOREACH item IN ARRAY ARRAY['REPORTING_FRAMEWORK','FINANCIAL_YEAR','CHART_OF_ACCOUNTS','ACCOUNT_MAPPINGS',
+        'ROUNDING','INTEREST_RECOGNITION','CONTRACTUAL_INTEREST','FEES_AND_TAXES','IMPAIRMENT',
+        'NON_PERFORMING_INTEREST','EARLY_SETTLEMENT','CLOSING_AND_REOPENING','AUTHORIZATION_MATRIX',
+        'CUTOVER_AND_BACKOUT','AUDIT_RETENTION_AND_RECOVERY','EXTERNAL_INTEGRATION_BOUNDARY'] LOOP
+        IF jsonb_typeof(NEW.decisions_json::jsonb->item) IS DISTINCT FROM 'string' OR
+            length(trim(NEW.decisions_json::jsonb->>item)) NOT BETWEEN 1 AND 6000 THEN
+            RAISE EXCEPTION 'Accounting decision % is missing or invalid', item;
+        END IF;
+    END LOOP;
+    FOREACH item IN ARRAY ARRAY['OPENING_BALANCE','DISBURSEMENT','REPAYMENT','INTEREST_ACCRUAL','FEE','REFUND',
+        'ADVANCE','SETTLEMENT','TOP_UP','EXPENSE','FUNDING','CAPITAL','PROVISION','WRITE_OFF','RECOVERY','REVERSAL','MANUAL_JOURNAL','OPERATIONAL_BRIDGE'] LOOP
+        rule := NEW.posting_matrix_json::jsonb->item;
+        IF rule->>'permission' IS NULL OR rule->>'permission' NOT IN ('ALLOWED', 'DISABLED') OR
+            jsonb_typeof(rule->'treatment') IS DISTINCT FROM 'string' OR
+            length(trim(rule->>'treatment')) NOT BETWEEN 1 AND 6000 THEN
+            RAISE EXCEPTION 'Posting rule % is missing or invalid', item;
+        END IF;
+    END LOOP;
+    IF NOT EXISTS (SELECT 1 FROM members WHERE id = NEW.maker_id AND sacco_id = NEW.sacco_id) THEN
+        RAISE EXCEPTION 'Policy maker must belong to the institution';
     END IF;
-    IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Accounting policies cannot be deleted'; END IF;
-    IF ROW(NEW.id, NEW.sacco_id, NEW.station_id, NEW.policy_version, NEW.authority, NEW.effective_from,
-           NEW.content_json, NEW.content_hash, NEW.created_by, NEW.created_at, NEW.request_key)
-       IS DISTINCT FROM
-       ROW(OLD.id, OLD.sacco_id, OLD.station_id, OLD.policy_version, OLD.authority, OLD.effective_from,
-           OLD.content_json, OLD.content_hash, OLD.created_by, OLD.created_at, OLD.request_key) THEN
-        RAISE EXCEPTION 'Accounting policy content is immutable; create a new version';
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER accounting_policy_complete BEFORE INSERT ON accounting_policies
+    FOR EACH ROW EXECUTE FUNCTION validate_accounting_policy();
+
+CREATE FUNCTION validate_accounting_policy_approval() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE p accounting_policies; previous accounting_policies;
+BEGIN
+    -- Policy approvals are rare administrative operations; serialize only this institution's boundary.
+    PERFORM pg_advisory_xact_lock(hashtextextended('accounting-policy:' || NEW.sacco_id, 0));
+    SELECT * INTO p FROM accounting_policies WHERE id = NEW.policy_id;
+    IF p.maker_id = NEW.checker_id OR NOT EXISTS
+        (SELECT 1 FROM members WHERE id = NEW.checker_id AND sacco_id = NEW.sacco_id) THEN
+        RAISE EXCEPTION 'An independent institution checker is required';
     END IF;
-    IF OLD.state <> 'DRAFT' OR NEW.state NOT IN ('APPROVED','REJECTED') THEN
-        RAISE EXCEPTION 'Invalid accounting policy transition';
-    END IF;
-    IF NEW.state = 'APPROVED' THEN
-        -- Narrow governance lock, never acquired by ordinary posting commands.
-        PERFORM pg_advisory_xact_lock(hashtextextended(NEW.sacco_id, 4201));
-        SELECT * INTO previous FROM accounting_policy WHERE sacco_id=NEW.sacco_id AND state='APPROVED'
-            ORDER BY effective_from DESC LIMIT 1;
-        IF FOUND AND (previous.authority <> NEW.authority OR NEW.effective_from <= previous.effective_from
-            OR NEW.effective_from <= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')::date) THEN
-            RAISE EXCEPTION 'Authority switching or retrospective policy replacement is prohibited';
+    IF NEW.decision = 'APPROVED' THEN
+        SELECT policy.* INTO previous FROM accounting_policies policy
+            JOIN accounting_policy_approvals approval ON approval.policy_id = policy.id
+            WHERE policy.sacco_id = NEW.sacco_id AND approval.decision = 'APPROVED'
+            ORDER BY policy.effective_from DESC, policy.policy_version DESC LIMIT 1;
+        IF previous.id IS NOT NULL AND (p.policy_version <= previous.policy_version OR
+            p.effective_from <= previous.effective_from OR p.opening_date <> previous.opening_date OR
+            p.authoritative_ledger <> previous.authoritative_ledger) THEN
+            RAISE EXCEPTION 'A new policy must preserve the official books and move the version boundary forward';
         END IF;
     END IF;
     RETURN NEW;
 END;
 $$;
-CREATE TRIGGER accounting_policy_immutable BEFORE INSERT OR UPDATE OR DELETE ON accounting_policy
-    FOR EACH ROW EXECUTE FUNCTION protect_accounting_policy();
-
-CREATE FUNCTION protect_accounting_policy_audit() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN RAISE EXCEPTION 'Accounting policy audit is append-only'; END;
-$$;
-CREATE TRIGGER accounting_policy_audit_immutable BEFORE UPDATE OR DELETE ON accounting_policy_audit
-    FOR EACH ROW EXECUTE FUNCTION protect_accounting_policy_audit();
+CREATE TRIGGER accounting_policy_independent_approval BEFORE INSERT ON accounting_policy_approvals
+    FOR EACH ROW EXECUTE FUNCTION validate_accounting_policy_approval();

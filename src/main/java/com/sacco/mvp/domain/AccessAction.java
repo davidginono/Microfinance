@@ -12,13 +12,6 @@ public enum AccessAction {
     EXPORT("Export"),
     DISBURSE("Disburse"),
     REVERSE("Reverse"),
-    MANAGE("Manage"),
-    DRAFT("Draft"),
-    POST("Post"),
-    PUBLISH("Publish"),
-    RUN("Run"),
-    SHARE("Share"),
-    AGGREGATE("Aggregate"),
     DELETE("Delete");
 
     private final String displayName;

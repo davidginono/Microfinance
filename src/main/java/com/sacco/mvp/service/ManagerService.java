@@ -46,6 +46,7 @@ public class ManagerService {
     private final ObjectMapper objectMapper;
     private final RepaymentScheduleService repaymentScheduleService;
     private final LoanRepaymentLedgerService loanRepaymentLedgerService;
+    private final com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -436,6 +437,7 @@ public class ManagerService {
         app.setInstallmentAmount(schedule.installmentAmount());
         app.setFinalDueDate(schedule.finalDueDate());
         app.setRepaymentScheduleJson(schedule.scheduleJson());
+        accountingGuard.disbursement(app, disbursementOfficerId);
         if (hasUploadedProof) {
             app.setAttachmentsJson(loanAttachmentService.store(
                 app.getId(),
@@ -498,24 +500,9 @@ public class ManagerService {
         if (sourceLoan.getStatus() != LoanStatus.DISBURSED) {
             throw new IllegalStateException("Top-up source loan must still be disbursed before settlement.");
         }
-        if (loanRepaymentLedgerService.hasLedger(sourceLoan.getId())) {
-            throw new IllegalStateException("Ledger-backed top-up settlement requires a verified settlement transaction.");
-        }
-        if (sourceLoan.getFinalDueDate() != null && sourceLoan.getFinalDueDate().isBefore(LocalDate.now())) {
-            throw new IllegalStateException("Top-up source loan has already reached its final due date.");
-        }
-        sourceLoan.setStatus(LoanStatus.PAID);
-        sourceLoan.setPaidAt(now);
-        sourceLoan.setPaidMarkedByManagerId(actorId);
-        sourceLoan.setUpdatedAt(now);
-        LoanApplication savedSourceLoan = loanApplicationRepository.save(sourceLoan);
-        Map<String, Object> details = new LinkedHashMap<>();
-        details.put("settledByTopUpApplicationId", topUpApplication.getId().toString());
-        details.put("topUpLoanId", topUpApplication.getLoanId());
-        outboxService.enqueue("LOAN", savedSourceLoan.getId(), savedSourceLoan.getStatus().name(), savedSourceLoan.getApplicantMemberId(),
-            actorId, savedSourceLoan.getSaccoId(), savedSourceLoan.getStationId(), details);
-        auditLoan(savedSourceLoan, actorId, "LOAN_SETTLED_BY_TOP_UP", "Loan settled by top-up", details);
-        return savedSourceLoan;
+        // Approval and a projected legacy balance do not prove a financial settlement.
+        // Keep this route gated until a reviewed source settlement and net cash movement exist.
+        throw new IllegalStateException("Top-up settlement requires verified source balances and a separately approved settlement transaction.");
     }
 
     private boolean sameStation(LoanApplication first, LoanApplication second) {

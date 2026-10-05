@@ -374,7 +374,8 @@
             return nearbyHeading.textContent.trim();
         }
         const pageTitle = document.querySelector('.erp-page-title')?.textContent.trim();
-        return pageTitle ? pageTitle + ' results' : 'Results ' + String(index + 1);
+        const resultsLabel = document.body.dataset.shellResults || 'Results';
+        return pageTitle ? pageTitle + ' — ' + resultsLabel : resultsLabel + ' ' + String(index + 1);
     };
     const isConsoleDownloadAction = function (control) {
         if (!control) {
@@ -385,7 +386,7 @@
         return control.getAttribute?.('data-download-action') === 'true'
             || control.hasAttribute?.('download')
             || /\.(pdf|xlsx?|csv|zip)(?:$|[?#])/i.test(href)
-            || /^(export|csv|pdf|excel|download)/.test(label);
+            || /^(export|csv|xlsx?|pdf|excel|download)/.test(label);
     };
     const isConsolePrintAction = function (control) {
         return !!control && control.getAttribute?.('data-print-action') === 'true';
@@ -439,7 +440,7 @@
                     const refresh = document.createElement('button');
                     refresh.type = 'button';
                     refresh.className = 'app-icon-button btn-neutral';
-                    refresh.setAttribute('aria-label', 'Refresh table');
+                    refresh.setAttribute('aria-label', document.body.dataset.shellRefresh || 'Refresh table');
                     refresh.appendChild(createConsoleIcon([
                         'M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5',
                         'M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5'
@@ -624,15 +625,18 @@
         const spinner = document.createElement('span');
         spinner.className = 'aws-table-loader__spinner';
         spinner.setAttribute('aria-hidden', 'true');
-        loader.setAttribute('aria-label', nearbyRegion.getAttribute('data-loading-label') || 'Loading results...');
+        loader.setAttribute('aria-label', nearbyRegion.getAttribute('data-loading-label') || document.body.dataset.shellLoading || 'Loading results...');
         loader.appendChild(spinner);
         nearbyRegion.appendChild(loader);
     };
     const initConsoleTableLoading = function () {
         clearConsoleTableLoading();
         document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
-            form.addEventListener('submit', function () {
-                if (form.matches('[data-page-preloader="true"]')) {
+            form.addEventListener('submit', function (event) {
+                if (event.defaultPrevented
+                    || resolveExportFormUrl(form, event.submitter)
+                    || isConsolePrintAction(event.submitter)
+                    || form.matches('[data-page-preloader="true"]')) {
                     clearConsoleTableLoading();
                     return;
                 }

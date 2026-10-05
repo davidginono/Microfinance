@@ -211,6 +211,7 @@ public class SaccoRegistryService {
             throw new IllegalStateException("Enter at least one station ID.");
         }
 
+        lockAccountingSetup(normalizedSaccoId);
         OffsetDateTime now = OffsetDateTime.now();
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, now, false);
         saccoLogoStorageService.store(normalizedSaccoId, logoFile);
@@ -246,6 +247,7 @@ public class SaccoRegistryService {
             throw new IllegalStateException("Enter at least one station ID.");
         }
 
+        lockAccountingSetup(normalizedSaccoId);
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, OffsetDateTime.now(), true);
         updateStationAddressLocations(normalizedSaccoId, stationAddressLocations, OffsetDateTime.now());
         saccoLogoStorageService.store(normalizedSaccoId, logoFile);
@@ -263,6 +265,7 @@ public class SaccoRegistryService {
             throw new IllegalStateException("Enter at least one station ID.");
         }
 
+        lockAccountingSetup(normalizedSaccoId);
         RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
             .filter(RegisteredSacco::isActive)
             .orElseThrow(() -> new IllegalStateException("SACCO not found."));
@@ -368,6 +371,7 @@ public class SaccoRegistryService {
             throw new IllegalStateException("Enter the station address or location.");
         }
 
+        lockAccountingSetup(normalizedSaccoId);
         RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
             .filter(RegisteredSacco::isActive)
             .orElseThrow(() -> new IllegalStateException("SACCO not found."));
@@ -386,6 +390,12 @@ public class SaccoRegistryService {
         station.setUpdatedAt(OffsetDateTime.now());
         saccoStationRepository.save(station);
         invalidateRegisteredSaccoCache();
+    }
+
+    // Same institution metadata boundary as immutable closing/publication sources.
+    // Acquire before reading the cohort, then period locks, then release locks.
+    private void lockAccountingSetup(String saccoId) {
+        jdbcTemplate.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))", "GL_SETUP/" + saccoId);
     }
 
     private void upsertSacco(String saccoId,

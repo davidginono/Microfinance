@@ -1,8 +1,5 @@
 package com.sacco.mvp.accounting.policy;
 
-import com.sacco.mvp.accounting.policy.controller.AccountingPolicyController;
-import com.sacco.mvp.accounting.policy.dto.*;
-import com.sacco.mvp.accounting.policy.service.AccountingPolicyService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
@@ -27,74 +24,49 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class AccountingPolicyControllerTest {
-    private AnnotationConfigWebApplicationContext context;
-    private AccountingPolicyService service;
-    private MockMvc mvc;
-    @BeforeEach void setup() {
-        context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());
-        context.register(Config.class);context.refresh();service=context.getBean(AccountingPolicyService.class);
-        mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    AnnotationConfigWebApplicationContext context; AccountingPolicyService service; MockMvc mvc;
+    @BeforeEach void start() {
+        context = new AnnotationConfigWebApplicationContext(); context.setServletContext(new MockServletContext());
+        context.register(Config.class); context.refresh(); service = context.getBean(AccountingPolicyService.class);
+        mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
-    @AfterEach void close() { context.close(); }
-
-    @Test void viewClaimLoadsOnlyServiceScopedPage() throws Exception {
-        when(service.list(any(),eq(0))).thenReturn(new PolicyPage(List.of(),0,false));
-        mvc.perform(get("/accounting/policies").with(user(actor(UserClaim.ACCOUNTING_POLICY_VIEW))))
-            .andExpect(status().isOk()).andExpect(view().name("accounting/policies/index"));
-        verify(service).list(argThat(a->a.getSaccoId().equals("I1") && a.getStationId().equals("B1")),eq(0));
-    }
-    @Test void viewClaimCannotApproveOrCreate() throws Exception {
-        mvc.perform(post("/accounting/policies").with(user(actor(UserClaim.ACCOUNTING_POLICY_VIEW))).with(csrf()))
-            .andExpect(status().isForbidden());
-        mvc.perform(post("/accounting/policies/"+UUID.randomUUID()+"/approve")
-            .param("expectedHash","a".repeat(64)).param("evidence","A").param("reason","A")
-            .with(user(actor(UserClaim.ACCOUNTING_POLICY_VIEW))).with(csrf())).andExpect(status().isForbidden());
+    @AfterEach void stop() { context.close(); }
+    @Test void missingCsrfCannotCreateOrApprove() throws Exception {
+        mvc.perform(post("/finance/policies").with(user(actor(UserClaim.ACCOUNTING_POLICIES_CREATE)))).andExpect(status().isForbidden());
+        mvc.perform(post("/finance/policies/" + UUID.randomUUID() + "/decision").with(user(actor(UserClaim.ACCOUNTING_POLICIES_APPROVE)))).andExpect(status().isForbidden());
         verifyNoInteractions(service);
     }
-    @Test void csrfIsRequiredForCreationAndReview() throws Exception {
-        mvc.perform(post("/accounting/policies").with(user(actor(UserClaim.ACCOUNTING_POLICY_CREATE)))).andExpect(status().isForbidden());
-        mvc.perform(post("/accounting/policies/"+UUID.randomUUID()+"/approve")
-            .param("expectedHash","a".repeat(64)).param("evidence","A").param("reason","A")
-            .with(user(actor(UserClaim.ACCOUNTING_POLICY_APPROVE)))).andExpect(status().isForbidden());
+    @Test void viewingDoesNotGrantPostingOrApproval() throws Exception {
+        mvc.perform(post("/finance/policies").with(user(actor(UserClaim.ACCOUNTING_POLICIES_VIEW))).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/finance/policies/" + UUID.randomUUID() + "/decision").param("decision", "APPROVED")
+            .param("evidenceReference", "Synthetic evidence").param("reason", "Synthetic reason")
+            .with(user(actor(UserClaim.ACCOUNTING_POLICIES_VIEW))).with(csrf())).andExpect(status().isForbidden());
         verifyNoInteractions(service);
     }
-    @Test void invalidUuidDateUnknownFieldsAndOversizedTextStayOnDraftForm() throws Exception {
-        for(var entry:Map.of("requestKey","invalid","effectiveFrom","bad-date","saccoId","foreign","authorityEvidence","A".repeat(2001)).entrySet()) {
-            var request=post("/accounting/policies").param("requestKey",entry.getKey().equals("requestKey")?entry.getValue():UUID.randomUUID().toString())
-                .param("authority","LOCAL").param("effectiveFrom",entry.getKey().equals("effectiveFrom")?entry.getValue():"2026-10-04")
-                .param("openingDate","2026-09-01").param("authorityEvidence",entry.getKey().equals("authorityEvidence")?entry.getValue():"A");
-            if(entry.getKey().equals("saccoId")) request.param("saccoId",entry.getValue());
-            mvc.perform(request.with(user(actor(UserClaim.ACCOUNTING_POLICY_CREATE))).with(csrf()))
-                .andExpect(status().isOk()).andExpect(view().name("accounting/policies/new"))
-                .andExpect(model().attribute("policyError","policy.error.invalid"));
-        }
-        mvc.perform(post("/accounting/policies").param("authority","LOCAL").param("effectiveFrom","2026-10-04")
-            .param("openingDate","2026-09-01").param("authorityEvidence","A")
-            .with(user(actor(UserClaim.ACCOUNTING_POLICY_CREATE))).with(csrf()))
-            .andExpect(status().isOk()).andExpect(model().attribute("policyError","policy.error.invalid"));
-        verifyNoInteractions(service);
+    @Test void malformedDatesPreserveProposalAndDoNotReachService() throws Exception {
+        mvc.perform(post("/finance/policies").param("openingDate", "invalid-date")
+            .with(user(actor(UserClaim.ACCOUNTING_POLICIES_CREATE))).with(csrf())).andExpect(status().isOk())
+            .andExpect(view().name("accounting/policies/new")).andExpect(model().attribute("policyError", "accounting.policy.error.validation"));
+        verify(service, never()).create(any(), any());
     }
-    @Test void independentReviewFailureIsLocalizedAndRetainsInput() throws Exception {
-        UUID id=UUID.randomUUID();
-        when(service.approve(any(),eq(id),anyString(),anyString(),anyString())).thenThrow(new IllegalArgumentException("policy.error.independent"));
-        mvc.perform(post("/accounting/policies/"+id+"/approve").param("expectedHash","a".repeat(64)).param("evidence","Minute A").param("reason","Review")
-            .with(user(actor(UserClaim.ACCOUNTING_POLICY_APPROVE))).with(csrf()))
-            .andExpect(status().is3xxRedirection()).andExpect(flash().attribute("policyError","policy.error.independent"))
-            .andExpect(flash().attribute("reviewEvidence","Minute A")).andExpect(redirectedUrl("/accounting/policies/"+id));
+    @Test void eventMapsBindTypedValuesAndScopeFieldsAreIgnored() throws Exception {
+        var request = post("/finance/policies").param("requestKey", UUID.randomUUID().toString())
+            .param("authoritativeLedger", "LOCAL_GL").param("openingDate", "2026-10-02").param("effectiveFrom", "2026-10-02")
+            .param("evidenceReference", "Synthetic evidence").param("saccoId", "OTHER").param("makerId", UUID.randomUUID().toString());
+        for (var d : PolicyDecision.values()) request.param("decisions[" + d + "]", "Synthetic decision");
+        for (var e : PostingEvent.values()) { request.param("permissions[" + e + "]", "DISABLED"); request.param("treatments[" + e + "]", "Synthetic disabled treatment"); }
+        when(service.create(any(), any())).thenThrow(new IllegalArgumentException("accounting.policy.error.incomplete"));
+        mvc.perform(request.with(user(actor(UserClaim.ACCOUNTING_POLICIES_CREATE))).with(csrf())).andExpect(status().isOk());
+        verify(service).create(any(), argThat(c -> c.decisions().size() == PolicyDecision.values().length
+            && c.postingMatrix().get(PostingEvent.FEE).permission() == AccountingPolicyService.PostingPermission.DISABLED));
     }
-    @Test void unauthenticatedRequestIsDenied() throws Exception {
-        mvc.perform(get("/accounting/policies")).andExpect(status().isForbidden());verifyNoInteractions(service);
-    }
-    private AppUserPrincipal actor(UserClaim claim) {
-        return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("C1")
-            .memberAccount(true).position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).build(),Set.of(claim),true);
-    }
+    AppUserPrincipal actor(UserClaim claim) { return new AppUserPrincipal(AccountingPolicyServiceTest.member(UUID.randomUUID(), "I1"), Set.of(claim), true); }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc @EnableWebSecurity @EnableMethodSecurity
     static class Config {
-        @Bean(name="access") AccessControlService access() { return new AccessControlService(); }
-        @Bean AccountingPolicyService service() { return mock(AccountingPolicyService.class); }
-        @Bean AccountingPolicyController controller(AccountingPolicyService service) { return new AccountingPolicyController(service); }
-        @Bean InternalResourceViewResolver views() { return new InternalResourceViewResolver("/WEB-INF/jsp/",".jsp"); }
-        @Bean SecurityFilterChain security(HttpSecurity http) throws Exception { return http.authorizeHttpRequests(a->a.anyRequest().authenticated()).build(); }
+        @Bean AccountingPolicyService policies() { return mock(AccountingPolicyService.class); }
+        @Bean AccountingPolicyController controller(AccountingPolicyService p) { return new AccountingPolicyController(p); }
+        @Bean AccessControlService access() { return new AccessControlService(); }
+        @Bean SecurityFilterChain filter(HttpSecurity http) throws Exception { return http.authorizeHttpRequests(a -> a.anyRequest().authenticated()).build(); }
+        @Bean InternalResourceViewResolver views() { return new InternalResourceViewResolver("/WEB-INF/jsp/", ".jsp"); }
     }
 }
