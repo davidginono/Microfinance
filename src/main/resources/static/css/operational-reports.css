@@ -1,0 +1,23 @@
+.opreport-workspace { min-width:0; display:grid; gap:14px; }
+.opreport-panel { min-width:0; padding:16px; background:#fff; border:1px solid var(--panel-border); border-radius:6px; }
+.opreport-panel h2 { margin:0 0 10px; font-size:1rem; }
+.opreport-flex { display:flex; flex-wrap:wrap; gap:10px; align-items:center; min-width:0; }
+.opreport-flex form { margin:0; }
+.opreport-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; margin:12px 0; }
+.opreport-grid label, .opreport-columns label { display:grid; gap:5px; min-width:0; }
+.opreport-grid input,.opreport-grid select,.opreport-columns input { max-width:100%; min-width:0; width:100%; }
+.opreport-muted { color:var(--text-muted); margin:0; padding:8px 12px; overflow-wrap:anywhere; }
+.opreport-error { color:#991b1b; border:1px solid #fecaca; background:#fff7f7; padding:12px; }
+.opreport-small { font-size:.75rem; color:var(--text-muted); }
+.opreport-columns { list-style:none; padding:0; margin:0 0 14px; }
+.opreport-columns li { display:grid; grid-template-columns:minmax(160px,1fr) minmax(120px,1fr) 85px 78px; align-items:end; gap:10px; border-bottom:1px solid var(--panel-border); padding:10px 0; }
+.opreport-columns .opreport-column-choice { display:flex; align-items:center; gap:6px; padding:8px 0; }
+.opreport-columns .opreport-column-choice input { width:auto; }
+.opreport-workspace fieldset { border:0; min-width:0; padding:0; margin:10px 0; }
+.opreport-workspace legend { font-weight:600; margin:10px 0; }
+.opreport-pagination,.opreport-actions { padding:12px; }
+.opreport-workspace .money { text-align:right; font-variant-numeric:tabular-nums; }
+.opreport-workspace details p { font-size:.82rem; overflow-wrap:anywhere; }
+.opreport-logo { max-width:120px; height:44px; object-fit:contain; }
+@media(max-width:767px) { .opreport-columns li { grid-template-columns:minmax(0,1fr) 85px 78px; }.opreport-columns .opreport-column-choice { grid-column:1/-1; }.opreport-panel { padding:12px; } }
+@media print { .opreport-workspace thead { display:table-header-group; }.opreport-workspace .erp-table-scroll { overflow:visible; max-height:none; }.opreport-pagination { display:none; } }
