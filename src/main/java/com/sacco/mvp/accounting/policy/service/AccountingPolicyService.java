@@ -31,7 +31,7 @@ public class AccountingPolicyService {
         requireActor(actor, "ACCOUNTING_POLICY_VIEW");
         int number = Math.max(0, Math.min(page, 10000));
         var rows = policies.list(actor.getSaccoId(), number * 25);
-        return new PolicyPage(rows.stream().limit(25).map(this::view).toList(), number, rows.size() > 25);
+        return new PolicyPage(rows.stream().limit(25).toList(), number, rows.size() > 25);
     }
 
     @Transactional(readOnly = true)
@@ -45,7 +45,7 @@ public class AccountingPolicyService {
         requireActor(actor, "ACCOUNTING_POLICY_CREATE");
         require(requestKey != null, "invalid");
         validate(content, false);
-        String json = mapper.writeValueAsString(content);
+        String json = canonicalJson(content);
         require(json.getBytes(StandardCharsets.UTF_8).length <= 131072, "invalid");
         String hash = hash(json);
         policies.lockGovernance(actor.getSaccoId());
@@ -92,6 +92,7 @@ public class AccountingPolicyService {
             validate(content(record),true);
             policies.latestApproved(actor.getSaccoId()).ifPresent(previous -> {
                 require(previous.authority() == record.authority(), "authority");
+                require(content(previous).openingDate().equals(content(record).openingDate()), "openingDate");
                 require(record.effectiveFrom().isAfter(previous.effectiveFrom()) && record.effectiveFrom().isAfter(clock.today()), "future");
             });
         }
@@ -136,6 +137,35 @@ public class AccountingPolicyService {
         return policies.find(actor.getSaccoId(),id,lock).orElseThrow(() -> new AccessDeniedException("Forbidden"));
     }
 
+    /** End-of-date initial opening only; never authorizes arbitrary historical source events. */
+    @Transactional(readOnly = true)
+    public ApprovedAccountingPolicy requireOpeningPolicy(String saccoId, LocalDate cutoff) {
+        require(saccoId != null && !saccoId.isBlank() && cutoff != null,"unavailable");
+        var p = policies.firstApproved(saccoId).orElseThrow(() -> new IllegalArgumentException("policy.error.unavailable"));
+        require(p.authority() == GlAuthority.LOCAL,"external");
+        var c = content(p); validate(c,true);
+        require(c.openingDate().equals(cutoff),"openingDate");
+        var rule = c.postingRules().get(AccountingEvent.OPENING_BALANCE);
+        require(rule != null && rule.enabled(),"disabled");
+        return new ApprovedAccountingPolicy(p.id(),p.version(),p.effectiveFrom(),p.authority(),p.contentHash(),c.decisions(),c.postingRules());
+    }
+
+    @Transactional(readOnly = true)
+    public ApprovedAccountingPolicy requireOpeningPolicy(String saccoId, UUID policyId, int policyVersion, LocalDate cutoff) {
+        var policy = requireOpeningPolicy(saccoId,cutoff);
+        require(policy.id().equals(policyId) && policy.version() == policyVersion,"conflict");
+        return policy;
+    }
+
+    @Transactional(readOnly = true)
+    public LocalDate approvedOpeningDate(String saccoId, LocalDate effectiveDate) {
+        require(saccoId != null && !saccoId.isBlank() && effectiveDate != null,"unavailable");
+        var p = policies.applicable(saccoId,effectiveDate).orElseThrow(() -> new IllegalArgumentException("policy.error.unavailable"));
+        require(p.authority() == GlAuthority.LOCAL,"external");
+        var c = content(p); validate(c,true);
+        return c.openingDate();
+    }
+
     private void requireActor(AppUserPrincipal actor, String claim) {
         if (actor == null || !actor.isStaffSession() || actor.isPlatformIdentity() || actor.getMemberId() == null
             || actor.getSaccoId() == null || actor.getSaccoId().isBlank() || actor.getStationId() == null
@@ -162,6 +192,26 @@ public class AccountingPolicyService {
     private PolicyContent content(AccountingPolicyRecord p) {
         require(hash(p.contentJson()).equals(p.contentHash()),"conflict");
         return mapper.readValue(p.contentJson(),PolicyContent.class);
+    }
+
+    private String canonicalJson(PolicyContent p) {
+        Map<String,Object> value = new LinkedHashMap<>();
+        value.put("authority",p.authority()); value.put("effectiveFrom",p.effectiveFrom());
+        value.put("openingDate",p.openingDate()); value.put("authorityEvidence",p.authorityEvidence());
+        Map<String,String> decisions = new TreeMap<>();
+        p.decisions().forEach((key,text) -> decisions.put(key.name(),text));
+        value.put("decisions",decisions);
+        Map<String,Object> rules = new TreeMap<>();
+        p.postingRules().forEach((event,rule) -> {
+            Map<String,String> codes = new TreeMap<>();
+            rule.accountCodes().forEach((role,code) -> codes.put(role.name(),code));
+            Map<String,Object> decision = new LinkedHashMap<>();
+            decision.put("enabled",rule.enabled()); decision.put("accountCodes",codes);
+            decision.put("treatment",rule.treatment()); decision.put("evidenceReference",rule.evidenceReference());
+            rules.put(event.name(),decision);
+        });
+        value.put("postingRules",rules);
+        return mapper.writeValueAsString(value);
     }
 
     private PolicyView view(AccountingPolicyRecord p) {

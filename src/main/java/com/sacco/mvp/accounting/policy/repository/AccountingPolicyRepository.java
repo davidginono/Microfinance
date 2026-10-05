@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.policy.repository;
 
 import com.sacco.mvp.accounting.policy.model.*;
+import com.sacco.mvp.accounting.policy.dto.PolicyListRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -36,8 +37,12 @@ public class AccountingPolicyRepository {
     public Optional<AccountingPolicyRecord> latestApproved(String institution) {
         return jdbc.query("SELECT * FROM accounting_policy WHERE sacco_id=? AND state='APPROVED' ORDER BY effective_from DESC LIMIT 1", ROW, institution).stream().findFirst();
     }
-    public List<AccountingPolicyRecord> list(String institution, int offset) {
-        return jdbc.query("SELECT * FROM accounting_policy WHERE sacco_id=? ORDER BY policy_version DESC LIMIT 26 OFFSET ?", ROW, institution, offset);
+    public Optional<AccountingPolicyRecord> firstApproved(String institution) {
+        return jdbc.query("SELECT * FROM accounting_policy WHERE sacco_id=? AND state='APPROVED' ORDER BY effective_from ASC LIMIT 1", ROW, institution).stream().findFirst();
+    }
+    public List<PolicyListRow> list(String institution, int offset) {
+        return jdbc.query("SELECT id,policy_version,effective_from,authority,state FROM accounting_policy WHERE sacco_id=? ORDER BY policy_version DESC LIMIT 26 OFFSET ?",
+            (rs,n) -> new PolicyListRow(rs.getObject("id",UUID.class),rs.getInt("policy_version"),rs.getObject("effective_from",LocalDate.class),GlAuthority.valueOf(rs.getString("authority")),rs.getString("state")), institution, offset);
     }
     public void insert(AccountingPolicyRecord p) {
         jdbc.update("INSERT INTO accounting_policy(id,sacco_id,station_id,policy_version,state,authority,effective_from,content_json,content_hash,created_by,created_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
