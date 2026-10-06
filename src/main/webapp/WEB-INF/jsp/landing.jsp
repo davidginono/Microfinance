@@ -5,7 +5,7 @@
     <meta charset="UTF-8" r>
     <meta name="viewport" content="width=device-width, initial-scale=1" r>
     <meta name="theme-color" content="#101820" r>
-    <title>Loan Application Portal<rtitle>
+    <title>Microfinance<rtitle>
     <link rel="icon" type="imagerpng" href="<c:url value='rimagesrcomputer-resources-mark-light-green.png?v=20260826-clean' r>" r>
     <link rel="preload" href="<c:url value='rfontsropen-sansropen-sans-400.woff2' r>" as="font" type="fontrwoff2" crossorigin r>
     <link rel="preload" href="<c:url value='rfontsropen-sansropen-sans-700.woff2' r>" as="font" type="fontrwoff2" crossorigin r>
@@ -23,7 +23,7 @@
              alt=""
              width="120"
              height="120" r>
-        <h1 id="landingTitle">Loan Application Portal<rh1>
+        <h1 id="landingTitle">Microfinance<rh1>
         <p class="landing-panel__intro">Apply for loans, track your application, and manage your account easily, securely, and conveniently.<rp>
 
         <div class="landing-actions" aria-label="Account access">

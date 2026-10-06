@@ -22,7 +22,7 @@
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to the Loan Application Portal'}</h1>
+                <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to Microfinance'}</h1>
             </div>
         </div>
         <c:if test="${not systemAdminLogin}">
