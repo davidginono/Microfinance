@@ -433,7 +433,7 @@ public class GeneralLedgerService {
     private void independentOriginal(AppUserPrincipal actor,Journal original) {
         require(!actor.getMemberId().equals(original.makerId()) && !actor.getMemberId().equals(original.checkerId()),"independentReversal");
     }
-    private void requireActor(AppUserPrincipal actor,String claim) {
+    void requireActor(AppUserPrincipal actor,String claim) {
         requireScope(actor);if(!access.has(actor,claim))throw new AccessDeniedException("Accounting permission required");
         var current=directory.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Accounting access unavailable"));
         if(!current.isStaffAccessActive() || current.getStatus()!=MemberStatus.ACTIVE || current.getActiveStaffRolesResolved().contains(Position.ADMIN) || !Objects.equals(current.getSaccoId(),actor.getSaccoId()) || !Objects.equals(current.getStationId(),actor.getStationId())

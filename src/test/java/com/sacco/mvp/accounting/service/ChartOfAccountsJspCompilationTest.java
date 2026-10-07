@@ -21,9 +21,10 @@ class ChartOfAccountsJspCompilationTest {
         var context=tomcat.addContext("",Path.of("src/main/webapp").toAbsolutePath().toString());
         context.setParentClassLoader(getClass().getClassLoader());
         context.addServletContainerInitializer(new JasperInitializer(),null);
-        String[] pages={"accounts.jsp","account-form.jsp"};
+        String[] pages={"accounts.jsp","account-form.jsp","library.jsp","library-code-form.jsp","library-transaction.jsp","library-template-form.jsp"};
         for(int n=0;n<pages.length;n++) {
             var servlet=Tomcat.addServlet(context,"coa-"+n,new JspServlet());
+            servlet.setLoadOnStartup(1);
             servlet.addInitParameter("jspFile","/WEB-INF/jsp/accounting/"+pages[n]);
             servlet.addInitParameter("development","true");
             context.addServletMappingDecoded("/coa-"+n,"coa-"+n);

@@ -7,3 +7,4 @@
 .coa-description{display:block;color:#52606d;overflow-wrap:anywhere}.coa-wide{grid-column:1/-1}.coa-location{padding:.6rem 0;border-bottom:1px solid #d7dde3}
 .coa-error{color:#a12622;overflow-wrap:anywhere}.coa-success{color:#166534}.accounting-grid small{color:#52606d}.coa-filters input,.coa-filters select{max-width:100%}
 @media(max-width:767px){.coa-filters>label,.coa-filters>.erp-table-toolbar__actions{flex:1 1 100%}.coa-titlebar{align-items:flex-start}.accounting-grid{grid-template-columns:minmax(0,1fr)}}
+.library-rule{padding:.75rem 0;border-bottom:1px solid #d7dde3;align-items:end}.library-rule .library-remove{align-self:end}.library-note{padding:0 1rem}.library-rule+.library-rule{margin-top:.5rem}
