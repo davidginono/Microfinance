@@ -31,12 +31,11 @@ class AccountingCodeLibraryMvcTest {
         reset(library);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         actor=principal(true,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
         lenient().when(library.activity(any(),eq(activity))).thenReturn(new Activity(activity,"OPS","Operations","Shughuli","",true));
-        lenient().when(library.transaction(any(),eq(transaction))).thenReturn(new TransactionCode(transaction,activity,"OPS","Operations","Shughuli","CASH-EXPENSE","Cash expense","","","MANUAL_JOURNAL",true,0,null));
+        lenient().when(library.transaction(any(),eq(transaction))).thenReturn(new TransactionCode(transaction,activity,"OPS","Operations","Shughuli","CASH-EXPENSE","Cash expense","","","MANUAL_JOURNAL",true,false));
         lenient().when(library.accounts(any(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.activities(any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
-        lenient().when(library.versions(any(),any(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
     }
     @Test void filtersReachTheScopedList() throws Exception {
         when(library.activities(any(),eq("Office"),eq("ACTIVE"),eq(2))).thenReturn(new Page<>(List.of(),2,false));
@@ -79,42 +78,40 @@ class AccountingCodeLibraryMvcTest {
         mvc.perform(get("/finance/library/activities/"+foreign).with(user(actor))).andExpect(status().isForbidden());
         verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt());
     }
-    @Test void transactionDetailsPreselectContextAndRetainTheRequestedHistoricalVersion() throws Exception {
+    @Test void transactionDetailsPreselectContextAndIgnoreObsoleteHistoryParameters() throws Exception {
         UUID version=UUID.randomUUID();
         mvc.perform(get("/finance/library/transactions/"+transaction).with(user(actor)).param("version",version.toString()).param("page","2"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction"))
             .andExpect(model().attribute("sourceEvent","MANUAL_JOURNAL")).andExpect(model().attribute("state","ACTIVE"))
-            .andExpect(model().attribute("selectedVersion",version)).andExpect(model().attribute("isTransactions",true));
+            .andExpect(model().attributeDoesNotExist("selectedVersion","versions")).andExpect(model().attribute("isTransactions",true));
         verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);
-        verify(library).template(actor,transaction,version);verify(library).versions(actor,transaction,2);
+        verify(library).template(actor,transaction);
     }
     @Test void templateFiltersSelectTheRequestedTransactionWithinTheirScope() throws Exception {
         mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("activityId",activity.toString()).param("sourceEvent","MANUAL_JOURNAL").param("state","ACTIVE"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction")).andExpect(model().attributeExists("transaction","activityFilters","transactionChoices"));
-        verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);verify(library).template(actor,transaction,null);
+        verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);verify(library).template(actor,transaction);
     }
-    @Test void changedTemplateFiltersSelectAMatchingTransactionAndResetTheOldVersion() throws Exception {
-        UUID next=UUID.randomUUID();var expense=new TransactionCode(next,activity,"OPS","Operations","","EXPENSE","Expense","","","EXPENSE",true,0,null);
+    @Test void changedTemplateFiltersSelectAMatchingTransaction() throws Exception {
+        UUID next=UUID.randomUUID();var expense=new TransactionCode(next,activity,"OPS","Operations","","EXPENSE","Expense","","","EXPENSE",true,false);
         when(library.transactionRegister(actor,activity,"","ACTIVE","EXPENSE",0)).thenReturn(new Page<>(List.of(expense),0,false));
         mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("activityId",activity.toString()).param("sourceEvent","EXPENSE").param("state","ACTIVE").param("version",UUID.randomUUID().toString()).param("page","2"))
             .andExpect(redirectedUrl("/finance/library/templates?transactionId="+next+"&activityId="+activity+"&sourceEvent=EXPENSE&state=ACTIVE"));
-        verify(library).template(actor,next,null);verify(library).versions(actor,next,0);verify(library,never()).template(eq(actor),eq(transaction),any());
+        verify(library).template(actor,next);verify(library,never()).template(eq(actor),eq(transaction));
     }
-    @Test void emptyTemplateFiltersDoNotLoadOrOfferAnotherTransactionsHistory() throws Exception {
+    @Test void emptyTemplateFiltersDoNotLoadAnotherTransaction() throws Exception {
         mvc.perform(get("/finance/library/templates").with(user(actor)).param("state","INACTIVE"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction"));
-        verify(library).transactionRegister(actor,null,"","INACTIVE","",0);verify(library,never()).template(any(),any(),any());verify(library,never()).versions(any(),any(),anyInt());
+        verify(library).transactionRegister(actor,null,"","INACTIVE","",0);verify(library,never()).template(any(),any());
     }
-    @Test void templateSelectionRejectsForeignTransactionsAndVersions() throws Exception {
+    @Test void templateSelectionRejectsForeignTransactions() throws Exception {
         UUID foreign=UUID.randomUUID();when(library.transaction(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
         mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",foreign.toString())).andExpect(status().isForbidden());
-        when(library.template(actor,transaction,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
-        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("version",foreign.toString())).andExpect(status().isForbidden());
     }
     @Test void modalCreatesTransactionWithInitialAccountTemplateAndIgnoresOwnershipFields() throws Exception {
         when(library.onboardTransaction(any(),any())).thenReturn(transaction);
         mvc.perform(post("/finance/library/transactions").with(user(actor)).with(csrf()).param("activityCode","OPS").param("code","PAY").param("name","Office payment")
-            .param("template.rules[0].component","TOTAL").param("template.rules[0].debitCode","EXPENSE").param("template.rules[0].creditCode","CASH").param("template.reason","Office payment")
+            .param("template.rules[0].component","TOTAL").param("template.rules[0].debitCode","EXPENSE").param("template.rules[0].creditCode","CASH")
             .param("activityId",UUID.randomUUID().toString()).param("saccoId","FOREIGN").param("active","false").param("nameSw","ignored"))
             .andExpect(redirectedUrl("/finance/library/transactions?search=PAY")).andExpect(flash().attribute("createdCode","PAY"));
         verify(library).onboardTransaction(eq(actor),argThat(f->f.getActivityId()==null && f.getNameSw()==null && f.getActivityCode().equals("OPS") && f.getTemplate().getRules().getFirst().getDebitCode().equals("EXPENSE")));
@@ -122,7 +119,7 @@ class AccountingCodeLibraryMvcTest {
     @Test void modalErrorsKeepTransactionAndAccountDetailsOnTheRegister() throws Exception {
         when(library.onboardTransaction(any(),any())).thenThrow(new IllegalArgumentException("library.error.templateAccount"));
         var result=mvc.perform(post("/finance/library/transactions").with(user(actor)).with(csrf()).param("activityCode","OPS").param("code","PAY").param("name","Office payment")
-            .param("template.rules[0].debitCode","EXPENSE").param("template.rules[0].creditCode","UNKNOWN").param("template.reason","Office payment"))
+            .param("template.rules[0].debitCode","EXPENSE").param("template.rules[0].creditCode","UNKNOWN"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/library")).andExpect(model().attribute("modalOpen",true)).andExpect(model().attributeHasErrors("transactionForm")).andReturn();
         var form=(TransactionForm)result.getModelAndView().getModel().get("transactionForm");assertThat(form.getCode()).isEqualTo("PAY");assertThat(form.getTemplate().getRules().getFirst().getCreditCode()).isEqualTo("UNKNOWN");
     }
@@ -132,19 +129,27 @@ class AccountingCodeLibraryMvcTest {
         mvc.perform(post("/finance/library/transactions").with(user(actor)).with(csrf()).param("template.rules[99].component","TOTAL")).andExpect(status().isBadRequest());
         verify(library,never()).onboardTransaction(any(),any());
     }
-    @Test void saveTemplateBindsOnlyDefinitionFieldsAndRedirectsToSavedVersion() throws Exception {
+    @Test void saveTemplateBindsOnlyDefinitionFieldsAndRedirectsToConfiguration() throws Exception {
         UUID version=UUID.randomUUID(),request=UUID.randomUUID();when(library.saveTemplate(any(),eq(transaction),any())).thenReturn(version);
-        mvc.perform(post("/finance/library/transactions/"+transaction+"/templates").with(user(actor)).with(csrf()).param("requestKey",request.toString()).param("expectedRevision","0")
-            .param("rules[0].component","TOTAL").param("rules[0].debitCode","EXPENSE").param("rules[0].creditCode","CASH").param("reason","Office payment").param("sourceEvent","REPAYMENT").param("saccoId","FOREIGN"))
-            .andExpect(redirectedUrl("/finance/library/transactions/"+transaction+"?version="+version));
+        mvc.perform(post("/finance/library/transactions/"+transaction+"/templates").with(user(actor)).with(csrf()).param("requestKey",request.toString())
+            .param("rules[0].component","TOTAL").param("rules[0].debitCode","EXPENSE").param("rules[0].creditCode","CASH").param("sourceEvent","REPAYMENT").param("saccoId","FOREIGN"))
+            .andExpect(redirectedUrl("/finance/library/transactions/"+transaction));
         verify(library).saveTemplate(eq(actor),eq(transaction),argThat(f->f.getRequestKey().equals(request) && f.getRules().size()==1 && f.getRules().getFirst().getDebitCode().equals("EXPENSE")));
+    }
+    @Test void editingLoadsTheCurrentAccountsAndConcurrencyReference() throws Exception {
+        UUID key=UUID.randomUUID();when(library.template(actor,transaction)).thenReturn(new Template(transaction,key,List.of(new Rule("TOTAL","EXPENSE","Expense","CASH","Cash"))));
+        var result=mvc.perform(get("/finance/library/transactions/"+transaction+"/template").with(user(actor)))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library-template-form")).andReturn();
+        var form=(TemplateForm)result.getModelAndView().getModel().get("templateForm");
+        assertThat(form.getExpectedRequestKey()).isEqualTo(key);assertThat(form.getRequestKey()).isNotEqualTo(key);
+        assertThat(form.getRules().getFirst().getDebitCode()).isEqualTo("EXPENSE");
     }
     @Test void staleTemplatePreservesRequestAndEnteredRules() throws Exception {
         UUID request=UUID.randomUUID();when(library.saveTemplate(any(),any(),any())).thenThrow(new IllegalArgumentException("library.error.staleTemplate"));
-        var result=mvc.perform(post("/finance/library/transactions/"+transaction+"/templates").with(user(actor)).with(csrf()).param("requestKey",request.toString()).param("expectedRevision","1")
-            .param("rules[0].component","TOTAL").param("rules[0].debitCode","EXPENSE").param("rules[0].creditCode","CASH").param("reason","Office payment"))
+        var result=mvc.perform(post("/finance/library/transactions/"+transaction+"/templates").with(user(actor)).with(csrf()).param("requestKey",request.toString()).param("expectedRequestKey",request.toString())
+            .param("rules[0].component","TOTAL").param("rules[0].debitCode","EXPENSE").param("rules[0].creditCode","CASH"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/library-template-form")).andExpect(model().attributeHasErrors("templateForm")).andReturn();
-        var form=(TemplateForm)result.getModelAndView().getModel().get("templateForm");assertThat(form.getRequestKey()).isEqualTo(request);assertThat(form.getExpectedRevision()).isEqualTo(1);assertThat(form.getRules().getFirst().getCreditCode()).isEqualTo("CASH");
+        var form=(TemplateForm)result.getModelAndView().getModel().get("templateForm");assertThat(form.getRequestKey()).isEqualTo(request);assertThat(form.getExpectedRequestKey()).isEqualTo(request);assertThat(form.getRules().getFirst().getCreditCode()).isEqualTo("CASH");
     }
     @Test void invalidRequestReferenceCannotMutate() throws Exception {
         mvc.perform(post("/finance/library/transactions/"+transaction+"/templates").with(user(actor)).with(csrf()).param("requestKey","invalid"))

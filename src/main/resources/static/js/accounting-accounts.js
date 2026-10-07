@@ -5,7 +5,6 @@
     const view = document.getElementById('coa-view'), create = document.getElementById('coa-create');
     const status = document.getElementById('coa-status');
     const statusForm = document.getElementById('coa-status-form'), summary = document.getElementById('coa-selection-status');
-    const clear = document.getElementById('coa-clear-selection');
     const selected = () => inputs.find(input => input.checked && input.getClientRects().length)?.closest('[data-coa-row]');
     const update = () => {
         const row = selected();
@@ -26,7 +25,6 @@
             else statusForm.removeAttribute('action');
         }
         summary.textContent = row ? summary.dataset.selected + ' ' + row.cells[1].textContent.trim() + ' · ' + row.querySelector('[data-coa-name]').firstChild.textContent.trim() : summary.dataset.empty;
-        clear.hidden = !row;
     };
     inputs.forEach(input => input.addEventListener('change', () => {
         if (input.checked) inputs.forEach(other => { if (other !== input) other.checked = false; });
@@ -39,7 +37,6 @@
         input.checked = checked; input.focus(); update();
     }));
     const reset = () => { inputs.forEach(input => input.checked = false); update(); };
-    clear.addEventListener('click', () => { const input = inputs.find(input => input.checked); reset(); input?.focus(); });
     view.addEventListener('click', () => {
         const row = selected(); if (!row || view.disabled) return;
         const url = new URL(view.dataset.url, location.href); url.searchParams.set('parentId', row.dataset.id); location.assign(url.href);

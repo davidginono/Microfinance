@@ -56,7 +56,7 @@ public class AccountingCodeLibraryService {
     public UUID onboardTransaction(AppUserPrincipal actor,TransactionForm form) {
         authorize(actor,"CREATE");authorize(actor,"UPDATE");
         require(form!=null && form.getTemplate()!=null,"validation");validateCode(form);validateTemplate(form.getTemplate());
-        require(form.getTemplate().getExpectedRevision()==0,"staleTemplate");
+        require(form.getTemplate().getExpectedRequestKey()==null,"staleTemplate");
         form.setActivityCode(clean(form.getActivityCode()).toUpperCase(Locale.ROOT));
         var parent=library.activityByCode(actor.getSaccoId(),form.getActivityCode()).orElseThrow(()->new IllegalArgumentException("library.error.activityCode"));
         form.setActivityId(parent.id());
@@ -90,28 +90,24 @@ public class AccountingCodeLibraryService {
         authorize(actor,"VIEW");validateQuery(search,"",page);return slice(library.accounts(actor.getSaccoId(),term(search),page*25),page);
     }
     @Transactional(readOnly=true)
-    public Page<Version> versions(AppUserPrincipal actor,UUID transaction,int page) {
-        authorize(actor,"VIEW");transaction(actor,transaction,false);validateQuery("","",page);return slice(library.versions(actor.getSaccoId(),transaction,page*25),page);
-    }
-    @Transactional(readOnly=true)
-    public Template template(AppUserPrincipal actor,UUID transaction,UUID version) {
-        authorize(actor,"VIEW");var code=transaction(actor,transaction,false);UUID selected=version==null?code.templateId():version;
-        if(selected==null)return null;
-        var v=library.template(actor.getSaccoId(),transaction,selected).orElseThrow(()->new AccessDeniedException("Template unavailable"));
-        return new Template(v.id(),v.transactionId(),v.version(),v.sourceEvent(),v.reason(),v.createdAt(),library.rules(actor.getSaccoId(),v.id()));
+    public Template template(AppUserPrincipal actor,UUID transaction) {
+        authorize(actor,"VIEW");transaction(actor,transaction,false);
+        return library.template(actor.getSaccoId(),transaction)
+            .map(t->new Template(t.transactionId(),t.requestKey(),library.rules(actor.getSaccoId(),transaction))).orElse(null);
     }
     @Transactional
     public UUID saveTemplate(AppUserPrincipal actor,UUID id,TemplateForm form) {
         authorize(actor,"UPDATE");validateTemplate(form);
         var initial=transaction(actor,id,false);var parent=activity(actor,initial.activityId(),true);var code=transaction(actor,id,true);
         String hash=hash(form);var prior=library.request(actor.getSaccoId(),id,form.getRequestKey());
-        if(prior.isPresent()) {require(prior.get().actor().equals(actor.getMemberId()) && prior.get().hash().equals(hash),"changedRetry");return prior.get().id();}
-        require(parent.active() && code.active(),"inactiveTransaction");require(form.getExpectedRevision()==code.revision(),"staleTemplate");
+        if(prior.isPresent()) {require(prior.get().actor().equals(actor.getMemberId()) && prior.get().hash().equals(hash),"changedRetry");return id;}
+        require(parent.active() && code.active(),"inactiveTransaction");var current=library.template(actor.getSaccoId(),id);
+        require(Objects.equals(form.getExpectedRequestKey(),current.map(Template::requestKey).orElse(null)),"staleTemplate");
         var accountCodes=form.getRules().stream().flatMap(r->java.util.stream.Stream.of(r.getDebitCode(),r.getCreditCode())).distinct().sorted().toList();
         var accounts=library.lockAccounts(actor.getSaccoId(),accountCodes);
         require(accounts.size()==accountCodes.size() && accounts.stream().allMatch(a->a.active() && !"HEADING".equals(a.kind())),"templateAccount");
         require(!"MANUAL_JOURNAL".equals(code.sourceEvent()) || accounts.stream().noneMatch(a->"CONTROL".equals(a.kind())),"manualControl");
-        UUID version=library.saveTemplate(actor.getSaccoId(),code,form,hash,accounts,actor.getMemberId(),clock.now());event(actor,version,"TEMPLATE_VERSION_SAVED");return version;
+        library.saveTemplate(actor.getSaccoId(),code,form,hash,accounts,actor.getMemberId());event(actor,id,"TEMPLATE_SAVED");return id;
     }
     private void authorize(AppUserPrincipal actor,String action) {ledger.requireActor(actor,"ACCOUNTING_ACCOUNTS_"+action);}
     private void event(AppUserPrincipal actor,UUID id,String action) {
@@ -127,7 +123,7 @@ public class AccountingCodeLibraryService {
         require(form.getCode().matches("[A-Z0-9][A-Z0-9_.-]{0,39}"),"code");text(form.getName(),160,true,"name");text(form.getNameSw(),160,false,"nameSw");text(form.getDescription(),500,false,"description");
     }
     static void validateTemplate(TemplateForm form) {
-        require(form!=null && form.getRequestKey()!=null && form.getExpectedRevision()>=0,"validation");form.setReason(clean(form.getReason()));text(form.getReason(),500,true,"reason");
+        require(form!=null && form.getRequestKey()!=null,"validation");
         require(form.getRules()!=null && !form.getRules().isEmpty() && form.getRules().size()<=5,"rules");var components=new HashSet<String>();
         for(var rule:form.getRules()) {
             require(rule!=null && rule.getComponent()!=null && COMPONENTS.contains(rule.getComponent()) && components.add(rule.getComponent()),"components");
@@ -140,7 +136,7 @@ public class AccountingCodeLibraryService {
     private static void text(String value,int max,boolean required,String key) {require((!required || !value.isBlank()) && value.length()<=max && value.chars().noneMatch(c->c<32),key);}
     private static String hash(TemplateForm form) {
         try {
-            var canonical=new StringBuilder(form.getExpectedRevision()+":"+form.getReason().length()+":"+form.getReason());
+            var canonical=new StringBuilder(String.valueOf(form.getExpectedRequestKey()));
             form.getRules().stream().sorted(Comparator.comparing(RuleForm::getComponent)).forEach(r->canonical.append('|').append(r.getComponent()).append(':').append(r.getDebitCode()).append(':').append(r.getCreditCode()));
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
         } catch(java.security.NoSuchAlgorithmException failure) {throw new IllegalStateException(failure);}

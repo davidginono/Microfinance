@@ -10,7 +10,7 @@
                     <c:url value="/finance/library/lookup/activities" var="activityLookupUrl" /><c:url value="/finance/library/lookup/accounts" var="accountLookupUrl" />
                     <c:url value="/finance/library/transactions" var="transactionSaveUrl" />
                     <form:form method="post" modelAttribute="transactionForm" action="${transactionSaveUrl}" cssClass="library-modal-form accounting-create-form">
-                        <form:hidden path="template.requestKey" /><form:hidden path="template.expectedRevision" />
+                        <form:hidden path="template.requestKey" />
                         <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>
                         <fieldset class="accounting-form-section"><legend><spring:message code="library.transactionDetails" /></legend><div class="accounting-grid">
                             <label><spring:message code="library.activityCode" /><form:input path="activityCode" cssClass="aws-control" maxlength="40" list="library-activity-codes" data-library-lookup="${activityLookupUrl}" required="required" /><small><spring:message code="library.lookupHelp" /></small><form:errors path="activityCode" cssClass="coa-error" /></label>
@@ -23,7 +23,6 @@
                         <fieldset class="accounting-form-section library-account-section"><legend><spring:message code="library.involvedAccounts" /></legend><p><spring:message code="library.templateHelp" /></p>
                             <c:set var="ruleForms" value="${transactionForm.template.rules}" /><c:set var="rulePrefix" value="template." />
                             <%@ include file="library-rule-fields.jspf" %>
-                        <label><spring:message code="library.reason" /><form:textarea path="template.reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /><form:errors path="template.reason" cssClass="coa-error" /></label>
                         </fieldset>
                         <p class="library-lookup-status" role="status" data-lookup-failure="<spring:message code='library.lookupUnavailable' />"></p>
                         <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-primary"><spring:message code="library.createTransaction" /></button></div>

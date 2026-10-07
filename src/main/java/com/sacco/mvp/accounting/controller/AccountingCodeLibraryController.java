@@ -23,10 +23,10 @@ public class AccountingCodeLibraryController {
     private final AccountingCodeLibraryService library;
     @InitBinder("codeForm") void bindCode(WebDataBinder binder) {binder.setAllowedFields("code","name","nameSw","description","sourceEvent");}
     @InitBinder("templateForm") void bindTemplate(WebDataBinder binder) {
-        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("requestKey","expectedRevision","reason","rules[*].component","rules[*].debitCode","rules[*].creditCode");
+        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("requestKey","expectedRequestKey","rules[*].component","rules[*].debitCode","rules[*].creditCode");
     }
     @InitBinder("transactionForm") void bindTransaction(WebDataBinder binder) {
-        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("activityCode","code","name","description","sourceEvent","template.requestKey","template.expectedRevision","template.reason","template.rules[*].component","template.rules[*].debitCode","template.rules[*].creditCode");
+        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("activityCode","code","name","description","sourceEvent","template.requestKey","template.rules[*].component","template.rules[*].debitCode","template.rules[*].creditCode");
     }
     @GetMapping
     String activities(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,
@@ -80,16 +80,15 @@ public class AccountingCodeLibraryController {
         return codeForm(model,library.activity(actor,id));
     }
     @GetMapping("/transactions/{id}")
-    String transaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(required=false) UUID version,
-            @RequestParam(defaultValue="0") int page,Model model) {
+    String transaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Model model) {
         var code=library.transaction(actor,id);
-        return templates(actor,code,code.activityId(),code.sourceEvent(),code.active()?"ACTIVE":"INACTIVE",version,page,model);
+        return templates(actor,code,code.activityId(),code.sourceEvent(),code.active()?"ACTIVE":"INACTIVE",model);
     }
     @GetMapping("/templates")
     String templates(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID transactionId,
             @RequestParam(required=false) UUID activityId,@RequestParam(defaultValue="") String sourceEvent,@RequestParam(defaultValue="") String state,
-            @RequestParam(required=false) UUID version,@RequestParam(defaultValue="0") int page,Model model,RedirectAttributes redirect) {
-        String view=templates(actor,transactionId==null?null:library.transaction(actor,transactionId),activityId,sourceEvent,state,version,page,model);
+            Model model,RedirectAttributes redirect) {
+        String view=templates(actor,transactionId==null?null:library.transaction(actor,transactionId),activityId,sourceEvent,state,model);
         var selected=(TransactionCode)model.getAttribute("transaction");
         if(transactionId!=null && (selected==null || !transactionId.equals(selected.id()))) {
             if(selected!=null)redirect.addAttribute("transactionId",selected.id());if(activityId!=null)redirect.addAttribute("activityId",activityId);
@@ -98,18 +97,19 @@ public class AccountingCodeLibraryController {
         return view;
     }
     @GetMapping("/transactions/{id}/template") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
-    String newTemplate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
+    String editTemplate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
             @RequestParam(defaultValue="") String accountSearch,@RequestParam(defaultValue="0") int accountPage,Model model) {
-        var code=library.transaction(actor,id);var form=new TemplateForm();form.setExpectedRevision(code.revision());
-        var current=library.template(actor,id,null);
+        library.transaction(actor,id);var form=new TemplateForm();
+        var current=library.template(actor,id);
+        if(current!=null)form.setExpectedRequestKey(current.requestKey());
         if(current!=null)for(var rule:current.rules()) {var r=new RuleForm();r.setComponent(rule.component());r.setDebitCode(rule.debitCode());r.setCreditCode(rule.creditCode());form.getRules().add(r);}
         if(form.getRules().isEmpty())form.getRules().add(new RuleForm());
         model.addAttribute("templateForm",form);return templateForm(actor,id,accountSearch,accountPage,model);
     }
-    @PostMapping("/transactions/{id}/templates") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
+    @PostMapping({"/transactions/{id}/template","/transactions/{id}/templates"}) @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
     String saveTemplate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@ModelAttribute("templateForm") TemplateForm form,
             BindingResult errors,Model model,RedirectAttributes flash) {
-        if(!errors.hasErrors())try {UUID version=library.saveTemplate(actor,id,form);success(flash);return "redirect:/finance/library/transactions/"+id+"?version="+version;}
+        if(!errors.hasErrors())try {library.saveTemplate(actor,id,form);success(flash);return "redirect:/finance/library/transactions/"+id;}
         catch(IllegalArgumentException failure){errors.reject(key(failure));}catch(DataIntegrityViolationException failure){errors.reject("library.error.conflict");}
         return templateForm(actor,id,"",0,model);
     }
@@ -121,18 +121,17 @@ public class AccountingCodeLibraryController {
     String transactionState(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@PathVariable String action,RedirectAttributes flash) {
         library.transactionState(actor,id,action.equals("reactivate"));success(flash);return "redirect:/finance/library/transactions/"+id;
     }
-    private String templates(AppUserPrincipal actor,TransactionCode selected,UUID activityId,String sourceEvent,String state,UUID version,int page,Model model) {
+    private String templates(AppUserPrincipal actor,TransactionCode selected,UUID activityId,String sourceEvent,String state,Model model) {
         var choices=library.transactionRegister(actor,activityId,"",state,sourceEvent,0);
         if(selected!=null && ((activityId!=null && !activityId.equals(selected.activityId())) || (!sourceEvent.isEmpty() && !sourceEvent.equals(selected.sourceEvent())) || (!state.isEmpty() && selected.active()!=state.equals("ACTIVE")))) {
-            selected=null;version=null;page=0;
+            selected=null;
         }
-        if(selected==null) {selected=choices.rows().isEmpty()?null:choices.rows().getFirst();version=null;page=0;}
+        if(selected==null) {selected=choices.rows().isEmpty()?null:choices.rows().getFirst();}
         model.addAttribute("transaction",selected);model.addAttribute("transactionChoices",choices);
         model.addAttribute("isTransactions",true);
         model.addAttribute("activity",activityId==null?null:library.activity(actor,activityId));model.addAttribute("activityFilters",library.activities(actor,"","",0));
         model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());model.addAttribute("sourceEvent",sourceEvent);model.addAttribute("state",state);
-        model.addAttribute("selectedVersion",version);
-        if(selected!=null) {model.addAttribute("template",library.template(actor,selected.id(),version));model.addAttribute("versions",library.versions(actor,selected.id(),page));}
+        if(selected!=null) {model.addAttribute("template",library.template(actor,selected.id()));}
         return "accounting/library-transaction";
     }
     private String templateForm(AppUserPrincipal actor,UUID id,String search,int page,Model model) {

@@ -13,7 +13,7 @@ import java.util.*;
 public class AccountingCodeLibraryRepository {
     private final JdbcTemplate jdbc;
     private static final String ACTIVITY="select id,code,name,name_sw,description,active from gl_activity";
-    private static final String TRANSACTION="select t.id,t.activity_id,a.code activity_code,a.name activity_name,a.name_sw activity_name_sw,t.code,t.name,t.name_sw,t.description,t.source_event,t.active,t.revision,t.current_template_id from gl_transaction_code t join gl_activity a on a.id=t.activity_id and a.sacco_id=t.sacco_id";
+    private static final String TRANSACTION="select t.id,t.activity_id,a.code activity_code,a.name activity_name,a.name_sw activity_name_sw,t.code,t.name,t.name_sw,t.description,t.source_event,t.active,exists(select 1 from gl_transaction_template p where p.transaction_id=t.id and p.sacco_id=t.sacco_id) has_template from gl_transaction_code t join gl_activity a on a.id=t.activity_id and a.sacco_id=t.sacco_id";
     public List<Activity> activities(String institution,String search,String state,int offset) {
         return jdbc.query(ACTIVITY+" where sacco_id=? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) and (?='' or active=(?='ACTIVE')) order by code,id limit 26 offset ?",
             this::activity,institution,search,search,search,state,state,offset);
@@ -61,39 +61,34 @@ public class AccountingCodeLibraryRepository {
     }
     public record TemplateAccount(UUID id,String code,String kind,boolean active) { }
     public Optional<SavedRequest> request(String institution,UUID transaction,UUID key) {
-        return jdbc.query("select id,payload_hash,created_by from gl_template_version where sacco_id=? and transaction_id=? and request_key=?",
-            (r,n)->new SavedRequest(r.getObject("id",UUID.class),r.getString("payload_hash"),r.getObject("created_by",UUID.class)),institution,transaction,key).stream().findFirst();
+        return jdbc.query("select payload_hash,saved_by from gl_transaction_template where sacco_id=? and transaction_id=? and request_key=?",
+            (r,n)->new SavedRequest(r.getString("payload_hash"),r.getObject("saved_by",UUID.class)),institution,transaction,key).stream().findFirst();
     }
-    public record SavedRequest(UUID id,String hash,UUID actor) { }
-    public UUID saveTemplate(String institution,TransactionCode transaction,TemplateForm form,String hash,List<TemplateAccount> accounts,UUID actor,OffsetDateTime now) {
-        UUID id=UUID.randomUUID();int version=transaction.revision()+1;
-        jdbc.update("insert into gl_template_version(id,sacco_id,transaction_id,version,source_event,reason,request_key,payload_hash,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?)",
-            id,institution,transaction.id(),version,transaction.sourceEvent(),form.getReason(),form.getRequestKey(),hash,actor,now);
+    public record SavedRequest(String hash,UUID actor) { }
+    public void saveTemplate(String institution,TransactionCode transaction,TemplateForm form,String hash,List<TemplateAccount> accounts,UUID actor) {
+        jdbc.update("insert into gl_transaction_template(transaction_id,sacco_id,request_key,payload_hash,saved_by) values(?,?,?,?,?) on conflict(transaction_id) do update set request_key=excluded.request_key,payload_hash=excluded.payload_hash,saved_by=excluded.saved_by",
+            transaction.id(),institution,form.getRequestKey(),hash,actor);
+        jdbc.update("delete from gl_transaction_template_line where sacco_id=? and transaction_id=?",institution,transaction.id());
         var ids=new HashMap<String,UUID>();accounts.forEach(a->ids.put(a.code(),a.id()));
         var lines=new ArrayList<Object[]>();
         for(var rule:form.getRules()) {
-            lines.add(new Object[]{id,institution,rule.getComponent(),"DEBIT",ids.get(rule.getDebitCode())});
-            lines.add(new Object[]{id,institution,rule.getComponent(),"CREDIT",ids.get(rule.getCreditCode())});
+            lines.add(new Object[]{transaction.id(),institution,rule.getComponent(),"DEBIT",ids.get(rule.getDebitCode())});
+            lines.add(new Object[]{transaction.id(),institution,rule.getComponent(),"CREDIT",ids.get(rule.getCreditCode())});
         }
-        jdbc.batchUpdate("insert into gl_template_line(template_id,sacco_id,component,side,account_id) values(?,?,?,?,?)",lines);
-        jdbc.update("update gl_transaction_code set revision=?,current_template_id=? where sacco_id=? and id=?",version,id,institution,transaction.id());return id;
+        jdbc.batchUpdate("insert into gl_transaction_template_line(transaction_id,sacco_id,component,side,account_id) values(?,?,?,?,?)",lines);
     }
-    public Optional<Template> template(String institution,UUID transaction,UUID id) {
-        return jdbc.query("select id,transaction_id,version,source_event,reason,created_at from gl_template_version where sacco_id=? and transaction_id=? and id=?",
-            (r,n)->new Template(r.getObject("id",UUID.class),r.getObject("transaction_id",UUID.class),r.getInt("version"),r.getString("source_event"),r.getString("reason"),r.getObject("created_at",OffsetDateTime.class),List.of()),institution,transaction,id).stream().findFirst();
+    public Optional<Template> template(String institution,UUID transaction) {
+        return jdbc.query("select transaction_id,request_key from gl_transaction_template where sacco_id=? and transaction_id=?",
+            (r,n)->new Template(r.getObject("transaction_id",UUID.class),r.getObject("request_key",UUID.class),List.of()),institution,transaction).stream().findFirst();
     }
-    public List<Rule> rules(String institution,UUID template) {
-        return jdbc.query("select d.component,da.code debit_code,da.name debit_name,ca.code credit_code,ca.name credit_name from gl_template_line d join gl_template_line c on c.template_id=d.template_id and c.sacco_id=d.sacco_id and c.component=d.component and c.side='CREDIT' join gl_account da on da.id=d.account_id and da.sacco_id=d.sacco_id join gl_account ca on ca.id=c.account_id and ca.sacco_id=c.sacco_id where d.sacco_id=? and d.template_id=? and d.side='DEBIT' order by d.component limit 5",
-            (r,n)->new Rule(r.getString("component"),r.getString("debit_code"),r.getString("debit_name"),r.getString("credit_code"),r.getString("credit_name")),institution,template);
-    }
-    public List<Version> versions(String institution,UUID transaction,int offset) {
-        return jdbc.query("select id,version,reason,created_at from gl_template_version where sacco_id=? and transaction_id=? order by version desc limit 26 offset ?",
-            (r,n)->new Version(r.getObject("id",UUID.class),r.getInt("version"),r.getString("reason"),r.getObject("created_at",OffsetDateTime.class)),institution,transaction,offset);
+    public List<Rule> rules(String institution,UUID transaction) {
+        return jdbc.query("select d.component,da.code debit_code,da.name debit_name,ca.code credit_code,ca.name credit_name from gl_transaction_template_line d join gl_transaction_template_line c on c.transaction_id=d.transaction_id and c.sacco_id=d.sacco_id and c.component=d.component and c.side='CREDIT' join gl_account da on da.id=d.account_id and da.sacco_id=d.sacco_id join gl_account ca on ca.id=c.account_id and ca.sacco_id=c.sacco_id where d.sacco_id=? and d.transaction_id=? and d.side='DEBIT' order by d.component limit 5",
+            (r,n)->new Rule(r.getString("component"),r.getString("debit_code"),r.getString("debit_name"),r.getString("credit_code"),r.getString("credit_name")),institution,transaction);
     }
     private Activity activity(ResultSet r,int n) throws SQLException {
         return new Activity(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("name_sw"),r.getString("description"),r.getBoolean("active"));
     }
     private TransactionCode transaction(ResultSet r,int n) throws SQLException {
-        return new TransactionCode(r.getObject("id",UUID.class),r.getObject("activity_id",UUID.class),r.getString("activity_code"),r.getString("activity_name"),r.getString("activity_name_sw"),r.getString("code"),r.getString("name"),r.getString("name_sw"),r.getString("description"),r.getString("source_event"),r.getBoolean("active"),r.getInt("revision"),r.getObject("current_template_id",UUID.class));
+        return new TransactionCode(r.getObject("id",UUID.class),r.getObject("activity_id",UUID.class),r.getString("activity_code"),r.getString("activity_name"),r.getString("activity_name_sw"),r.getString("code"),r.getString("name"),r.getString("name_sw"),r.getString("description"),r.getString("source_event"),r.getBoolean("active"),r.getBoolean("has_template"));
     }
 }

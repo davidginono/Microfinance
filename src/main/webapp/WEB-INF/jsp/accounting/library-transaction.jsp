@@ -34,31 +34,11 @@
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
     <p class="accounting-definition-note"><spring:message code="library.definitionOnly" /></p>
     <section class="erp-table-wrap" data-aws-table-region>
-        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${transaction.active}"><a class="app-btn btn-primary" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="library.newVersion" /></a></c:if></sec:authorize></div>
-        <form method="get" action="<c:url value='/finance/library/templates' />" class="erp-table-toolbar coa-filters library-template-filters">
-            <input type="hidden" name="transactionId" value="${transaction.id}" /><input type="hidden" name="activityId" value="${activity.id}" /><input type="hidden" name="sourceEvent" value="<c:out value='${sourceEvent}' />" /><input type="hidden" name="state" value="<c:out value='${state}' />" /><input type="hidden" name="page" value="${versions.page}" />
-            <label class="erp-table-toolbar__control"><spring:message code="library.templateVersion" /><select class="aws-control" name="version"><option value=""><spring:message code="library.currentVersion" /></option>
-                <c:if test="${not empty selectedVersion}"><option value="${template.id}" selected><spring:message code="library.version" arguments="${template.version}" /></option></c:if>
-                <c:forEach items="${versions.rows}" var="v"><c:if test="${v.id ne selectedVersion}"><option value="${v.id}"><spring:message code="library.version" arguments="${v.version}" /></option></c:if></c:forEach>
-            </select></label><button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button>
-        </form>
-        <c:if test="${not empty template}"><p class="library-note"><c:out value="${template.reason}" /></p></c:if>
+        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${transaction.active}"><a class="app-btn btn-primary" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="${empty template?'library.addTemplate':'library.editTemplate'}" /></a></c:if></sec:authorize></div>
         <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="library-template"><table class="erp-table">
             <thead><tr><th><spring:message code="library.component" /></th><th><spring:message code="library.debitAccount" /></th><th><spring:message code="library.creditAccount" /></th></tr></thead>
             <tbody><c:forEach items="${template.rules}" var="rule"><tr><td><spring:message code="library.component.${rule.component}" /></td><td><c:out value="${rule.debitCode}" /> · <c:out value="${rule.debitName}" /></td><td><c:out value="${rule.creditCode}" /> · <c:out value="${rule.creditName}" /></td></tr></c:forEach><c:if test="${empty template}"><tr><td colspan="3"><spring:message code="library.noTemplate" /></td></tr></c:if></tbody>
         </table></div>
-    </section>
-    <section class="erp-table-wrap" data-aws-table-region>
-        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.history" /></h2></div>
-        <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="library-history"><table class="erp-table">
-            <thead><tr><th><spring:message code="library.template" /></th><th><spring:message code="library.reason" /></th><th><spring:message code="library.savedAt" /></th><th><spring:message code="common.actions" /></th></tr></thead>
-            <tbody><c:forEach items="${versions.rows}" var="v"><tr><td><spring:message code="library.version" arguments="${v.version}" /></td><td><c:out value="${v.reason}" /></td><td><c:out value="${v.createdAt}" /></td><td><c:url value="/finance/library/templates" var="viewVersion"><c:param name="transactionId" value="${transaction.id}" /><c:param name="activityId" value="${activity.id}" /><c:param name="sourceEvent" value="${sourceEvent}" /><c:param name="state" value="${state}" /><c:param name="version" value="${v.id}" /><c:param name="page" value="${versions.page}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${viewVersion}' />"><spring:message code="library.open" /></a></td></tr></c:forEach><c:if test="${empty versions.rows}"><tr><td colspan="4"><spring:message code="library.noTemplate" /></td></tr></c:if></tbody>
-        </table></div>
-        <div class="erp-table-footer accounting-actions">
-            <c:if test="${versions.page>0}"><c:url value="/finance/library/templates" var="previous"><c:param name="transactionId" value="${transaction.id}" /><c:param name="activityId" value="${activity.id}" /><c:param name="sourceEvent" value="${sourceEvent}" /><c:param name="state" value="${state}" /><c:param name="version" value="${selectedVersion}" /><c:param name="page" value="${versions.page-1}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${previous}' />"><spring:message code="common.previous" /></a></c:if>
-            <span><spring:message code="coa.page" arguments="${versions.page+1}" /></span>
-            <c:if test="${versions.hasNext}"><c:url value="/finance/library/templates" var="next"><c:param name="transactionId" value="${transaction.id}" /><c:param name="activityId" value="${activity.id}" /><c:param name="sourceEvent" value="${sourceEvent}" /><c:param name="state" value="${state}" /><c:param name="version" value="${selectedVersion}" /><c:param name="page" value="${versions.page+1}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${next}' />"><spring:message code="common.next" /></a></c:if>
-        </div>
     </section>
     </c:if>
 </div>
