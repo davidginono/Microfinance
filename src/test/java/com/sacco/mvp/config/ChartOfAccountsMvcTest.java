@@ -66,10 +66,11 @@ class ChartOfAccountsMvcTest {
             .andExpect(status().isOk()).andExpect(model().attributeHasFieldErrors("accountForm","parentId"));
         verify(ledger,never()).onboardAccount(any(),any(),anyBoolean());
     }
-    @Test void setupAndSaveRequireCsrfAndClientSessionsCannotEnter() throws Exception {
+    @Test void mainGroupSetupIsUnavailableAndSaveRequiresCsrfAndStaffAccess() throws Exception {
         mvc.perform(post("/finance/accounts/initialize").with(user(accountant))).andExpect(status().isForbidden());
         mvc.perform(post("/finance/accounts/posting").with(user(accountant))).andExpect(status().isForbidden());
-        mvc.perform(post("/finance/accounts/initialize").with(user(accountant)).with(csrf())).andExpect(redirectedUrl("/finance/accounts"));
+        mvc.perform(post("/finance/accounts/initialize").with(user(accountant)).with(csrf())).andExpect(status().isNotFound());
+        verify(ledger,never()).initializeChart(any());
         var member=Member.builder().id(UUID.randomUUID()).memberNo("CLIENT").saccoId("I1").stationId("B1").fullName("Client").status(MemberStatus.ACTIVE).build();
         var client=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),false);
         mvc.perform(get("/finance/accounts").with(user(client))).andExpect(status().isForbidden());

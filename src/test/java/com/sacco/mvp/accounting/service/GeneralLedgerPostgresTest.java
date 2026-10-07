@@ -95,6 +95,8 @@ class GeneralLedgerPostgresTest {
         verify(policies,never()).requireApprovedLocalPolicy(anyString(),any());
     }
     @Test void chartRejectsWrongHierarchyDuplicateAndForeignParentsAndProtectsMainGroups() {
+        assertThatThrownBy(()->service.createAccount(maker,new AccountCommand("100000","Assets","ASSET","DEBIT","HEADING","OTHER",null))).hasMessage("accounting.error.parent");
+        assertThatThrownBy(()->service.onboardAccount(maker,coaForm("100000",null,"Assets"),true)).hasMessage("accounting.error.parent");
         service.initializeChart(maker);
         UUID root=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='100000'",UUID.class,institution);
         UUID subgroup=service.onboardAccount(maker,coaForm("110000",root,"Current assets"),true);
@@ -107,7 +109,7 @@ class GeneralLedgerPostgresTest {
         assertThatThrownBy(()->service.onboardAccount(maker,control,false)).hasMessage("accounting.error.loanControl");
         control.setKind("CONTROL");service.onboardAccount(maker,control,false);
         UUID foreign=UUID.randomUUID();
-        jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,'FOREIGN','100000','Foreign assets','ASSET','DEBIT','HEADING','OTHER',?,?)",foreign,maker.getMemberId(),NOW);
+        jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,?,'100000','Foreign assets','ASSET','DEBIT','HEADING','OTHER',?,?)",foreign,"F-"+UUID.randomUUID(),maker.getMemberId(),NOW);
         assertThatThrownBy(()->service.onboardAccount(maker,coaForm("120000",foreign,"Foreign parent"),true)).hasMessage("accounting.error.parent");
         assertThatThrownBy(()->service.chart(maker,new AccountFilter("","","","",foreign),0)).hasMessage("accounting.error.parent");
         assertThatThrownBy(()->service.chartPath(maker,foreign)).hasMessage("accounting.error.parent");

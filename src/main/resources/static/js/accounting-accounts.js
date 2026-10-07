@@ -11,6 +11,7 @@
         const row = selected();
         inputs.forEach(input => input.closest('tr').classList.toggle('coa-row-selected', input.checked));
         view.disabled = !row || row.dataset.heading !== 'true';
+        view.textContent = row?.dataset.family === 'true' ? view.dataset.accountsLabel : view.dataset.groupsLabel;
         if (create) {
             const mode = row?.dataset.group === 'true' ? 'group' : row?.dataset.posting === 'true' ? 'account' : null;
             create.disabled = !mode;
@@ -27,14 +28,22 @@
         summary.textContent = row ? summary.dataset.selected + ' ' + row.cells[1].textContent.trim() + ' · ' + row.querySelector('[data-coa-name]').firstChild.textContent.trim() : summary.dataset.empty;
         clear.hidden = !row;
     };
-    inputs.forEach(input => input.addEventListener('change', update));
+    inputs.forEach(input => input.addEventListener('change', () => {
+        if (input.checked) inputs.forEach(other => { if (other !== input) other.checked = false; });
+        update();
+    }));
     register.querySelectorAll('[data-coa-row]').forEach(row => row.addEventListener('click', event => {
         if (event.target.closest('a,button,input,label')) return;
-        const input = row.querySelector('input[name="coa-selection"]'); input.checked = true; input.focus(); update();
+        const input = row.querySelector('input[name="coa-selection"]');
+        const checked = !input.checked; inputs.forEach(other => other.checked = false);
+        input.checked = checked; input.focus(); update();
     }));
     const reset = () => { inputs.forEach(input => input.checked = false); update(); };
     clear.addEventListener('click', () => { const input = inputs.find(input => input.checked); reset(); input?.focus(); });
-    view.addEventListener('click', () => { const link = selected()?.querySelector('[data-coa-view]'); if (link && !view.disabled) location.assign(link.href); });
+    view.addEventListener('click', () => {
+        const row = selected(); if (!row || view.disabled) return;
+        const url = new URL(view.dataset.url, location.href); url.searchParams.set('parentId', row.dataset.id); location.assign(url.href);
+    });
     create?.addEventListener('click', () => {
         const row = selected(); if (!row || create.disabled) return;
         const url = new URL(create.dataset.url, location.href); url.searchParams.set('parentId', row.dataset.id); location.assign(url.href);

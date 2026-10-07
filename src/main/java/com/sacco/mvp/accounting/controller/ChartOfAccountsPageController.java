@@ -41,10 +41,6 @@ public class ChartOfAccountsPageController {
         model.addAttribute("accountKinds",List.of("HEADING","POSTING","CONTROL"));
         return "accounting/accounts";
     }
-    @PostMapping("/initialize")
-    String initialize(@AuthenticationPrincipal AppUserPrincipal actor,RedirectAttributes flash) {
-        ledger.initializeChart(actor);flash.addFlashAttribute("accountingSuccess","coa.initialized");return "redirect:/finance/accounts";
-    }
     @GetMapping({"/groups/new","/posting/new"})
     @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String form(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("accountForm") AccountOnboardingForm form,

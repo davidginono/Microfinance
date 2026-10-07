@@ -88,7 +88,7 @@ public class GeneralLedgerService {
         int base=Integer.parseInt(parent.code());
         return books.availableChartCode(actor.getSaccoId(),base+step,base+(groups?9*step:999),step).orElse("");
     }
-    /** Explicit, idempotent setup; existing codes/classifications are never rewritten. */
+    /** Internal provisioning helper; not exposed by accountant onboarding routes. */
     @Transactional
     public void initializeChart(AppUserPrincipal actor) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");books.lockAccounts(actor.getSaccoId());
@@ -155,6 +155,7 @@ public class GeneralLedgerService {
     @Transactional
     public UUID createAccount(AppUserPrincipal actor,AccountCommand c) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");
+        require(c!=null && !("HEADING".equals(c.kind()) && c.parentId()==null),"parent");
         books.lockAccounts(actor.getSaccoId());return persistAccount(actor,c);
     }
     private UUID persistAccount(AppUserPrincipal actor,AccountCommand c) {
