@@ -24,11 +24,11 @@ public class AccountingCodeLibraryRepository {
     public Optional<Activity> activityByCode(String institution,String code) {
         return jdbc.query(ACTIVITY+" where sacco_id=? and code=?",this::activity,institution,code).stream().findFirst();
     }
-    public List<TransactionCode> transactionRegister(String institution,UUID activity,String search,String state,int offset) {
+    public List<TransactionCode> transactionRegister(String institution,UUID activity,String search,String state,String sourceEvent,int offset) {
         String parent=activity==null?"":" and t.activity_id=?";
         var args=new ArrayList<Object>();args.add(institution);if(activity!=null)args.add(activity);
-        Collections.addAll(args,search,search,search,state,state,offset);
-        return jdbc.query(TRANSACTION+" where t.sacco_id=?"+parent+" and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) order by t.code,t.id limit 26 offset ?",this::transaction,args.toArray());
+        Collections.addAll(args,search,search,search,state,state,sourceEvent,sourceEvent,offset);
+        return jdbc.query(TRANSACTION+" where t.sacco_id=?"+parent+" and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) and (?='' or t.source_event=?) order by t.code,t.id limit 26 offset ?",this::transaction,args.toArray());
     }
     public UUID createActivity(String institution,CodeForm form,UUID actor,OffsetDateTime now) {
         UUID id=UUID.randomUUID();

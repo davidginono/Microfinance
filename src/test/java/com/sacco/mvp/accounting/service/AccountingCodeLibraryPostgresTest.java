@@ -79,10 +79,13 @@ class AccountingCodeLibraryPostgresTest {
     }
     @Test void transactionRegisterStaysScopedAndBoundedAcrossActivities() {
         UUID first=service.createActivity(actor,code("OPS",null)),second=service.createActivity(actor,code("BANK",null));
-        for(int n=0;n<30;n++)service.createTransaction(actor,code("PAY"+n,n%2==0?first:second));
+        for(int n=0;n<30;n++) {var form=code("PAY"+n,n%2==0?first:second);form.setSourceEvent(n%2==0?"MANUAL_JOURNAL":"EXPENSE");service.createTransaction(actor,form);}
         var page=service.transactionRegister(actor,null,"","",0);assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
         assertThat(service.transactionRegister(actor,null,"","",1).rows()).hasSize(5);
         assertThat(service.transactionRegister(actor,first,"","",0).rows()).hasSize(15).allMatch(c->c.activityId().equals(first));
+        assertThat(service.transactionRegister(actor,null,"","ACTIVE","EXPENSE",0).rows()).hasSize(15).allMatch(c->c.sourceEvent().equals("EXPENSE"));
+        assertThat(service.transactionRegister(actor,first,"","ACTIVE","EXPENSE",0).rows()).isEmpty();
+        assertThatThrownBy(()->service.transactionRegister(actor,null,"","","UNKNOWN",0)).hasMessage("library.error.sourceEvent");
         assertThatThrownBy(()->service.transactionRegister(actor,UUID.randomUUID(),"","",0)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
     @Test void activityOwnsMultipleCodesAndVersionHistoryIsImmutable() {

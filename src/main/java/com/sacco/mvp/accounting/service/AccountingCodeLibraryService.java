@@ -44,8 +44,13 @@ public class AccountingCodeLibraryService {
     }
     @Transactional(readOnly=true)
     public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,int page) {
+        return transactionRegister(actor,activity,search,state,"",page);
+    }
+    @Transactional(readOnly=true)
+    public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,String sourceEvent,int page) {
         authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);
-        return slice(library.transactionRegister(actor.getSaccoId(),activity,term(search),state,page*25),page);
+        require(sourceEvent!=null && (sourceEvent.isEmpty() || Arrays.stream(PostingEvent.values()).anyMatch(e->e.name().equals(sourceEvent))),"sourceEvent");
+        return slice(library.transactionRegister(actor.getSaccoId(),activity,term(search),state,sourceEvent,page*25),page);
     }
     @Transactional
     public UUID onboardTransaction(AppUserPrincipal actor,TransactionForm form) {

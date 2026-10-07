@@ -35,6 +35,8 @@ class AccountingCodeLibraryMvcTest {
         lenient().when(library.accounts(any(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.activities(any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
+        lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
+        lenient().when(library.versions(any(),any(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
     }
     @Test void filtersReachTheScopedList() throws Exception {
         when(library.activities(any(),eq("Office"),eq("ACTIVE"),eq(2))).thenReturn(new Page<>(List.of(),2,false));
@@ -76,6 +78,38 @@ class AccountingCodeLibraryMvcTest {
         UUID foreign=UUID.randomUUID();when(library.activity(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
         mvc.perform(get("/finance/library/activities/"+foreign).with(user(actor))).andExpect(status().isForbidden());
         verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt());
+    }
+    @Test void transactionDetailsPreselectContextAndRetainTheRequestedHistoricalVersion() throws Exception {
+        UUID version=UUID.randomUUID();
+        mvc.perform(get("/finance/library/transactions/"+transaction).with(user(actor)).param("version",version.toString()).param("page","2"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction"))
+            .andExpect(model().attribute("sourceEvent","MANUAL_JOURNAL")).andExpect(model().attribute("state","ACTIVE"))
+            .andExpect(model().attribute("selectedVersion",version)).andExpect(model().attribute("isTransactions",true));
+        verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);
+        verify(library).template(actor,transaction,version);verify(library).versions(actor,transaction,2);
+    }
+    @Test void templateFiltersSelectTheRequestedTransactionWithinTheirScope() throws Exception {
+        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("activityId",activity.toString()).param("sourceEvent","MANUAL_JOURNAL").param("state","ACTIVE"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction")).andExpect(model().attributeExists("transaction","activityFilters","transactionChoices"));
+        verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);verify(library).template(actor,transaction,null);
+    }
+    @Test void changedTemplateFiltersSelectAMatchingTransactionAndResetTheOldVersion() throws Exception {
+        UUID next=UUID.randomUUID();var expense=new TransactionCode(next,activity,"OPS","Operations","","EXPENSE","Expense","","","EXPENSE",true,0,null);
+        when(library.transactionRegister(actor,activity,"","ACTIVE","EXPENSE",0)).thenReturn(new Page<>(List.of(expense),0,false));
+        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("activityId",activity.toString()).param("sourceEvent","EXPENSE").param("state","ACTIVE").param("version",UUID.randomUUID().toString()).param("page","2"))
+            .andExpect(redirectedUrl("/finance/library/templates?transactionId="+next+"&activityId="+activity+"&sourceEvent=EXPENSE&state=ACTIVE"));
+        verify(library).template(actor,next,null);verify(library).versions(actor,next,0);verify(library,never()).template(eq(actor),eq(transaction),any());
+    }
+    @Test void emptyTemplateFiltersDoNotLoadOrOfferAnotherTransactionsHistory() throws Exception {
+        mvc.perform(get("/finance/library/templates").with(user(actor)).param("state","INACTIVE"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction"));
+        verify(library).transactionRegister(actor,null,"","INACTIVE","",0);verify(library,never()).template(any(),any(),any());verify(library,never()).versions(any(),any(),anyInt());
+    }
+    @Test void templateSelectionRejectsForeignTransactionsAndVersions() throws Exception {
+        UUID foreign=UUID.randomUUID();when(library.transaction(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
+        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",foreign.toString())).andExpect(status().isForbidden());
+        when(library.template(actor,transaction,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
+        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("version",foreign.toString())).andExpect(status().isForbidden());
     }
     @Test void modalCreatesTransactionWithInitialAccountTemplateAndIgnoresOwnershipFields() throws Exception {
         when(library.onboardTransaction(any(),any())).thenReturn(transaction);

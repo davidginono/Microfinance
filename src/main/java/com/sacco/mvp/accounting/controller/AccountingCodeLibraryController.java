@@ -82,8 +82,20 @@ public class AccountingCodeLibraryController {
     @GetMapping("/transactions/{id}")
     String transaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(required=false) UUID version,
             @RequestParam(defaultValue="0") int page,Model model) {
-        model.addAttribute("transaction",library.transaction(actor,id));model.addAttribute("template",library.template(actor,id,version));
-        model.addAttribute("versions",library.versions(actor,id,page));return "accounting/library-transaction";
+        var code=library.transaction(actor,id);
+        return templates(actor,code,code.activityId(),code.sourceEvent(),code.active()?"ACTIVE":"INACTIVE",version,page,model);
+    }
+    @GetMapping("/templates")
+    String templates(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID transactionId,
+            @RequestParam(required=false) UUID activityId,@RequestParam(defaultValue="") String sourceEvent,@RequestParam(defaultValue="") String state,
+            @RequestParam(required=false) UUID version,@RequestParam(defaultValue="0") int page,Model model,RedirectAttributes redirect) {
+        String view=templates(actor,transactionId==null?null:library.transaction(actor,transactionId),activityId,sourceEvent,state,version,page,model);
+        var selected=(TransactionCode)model.getAttribute("transaction");
+        if(transactionId!=null && (selected==null || !transactionId.equals(selected.id()))) {
+            if(selected!=null)redirect.addAttribute("transactionId",selected.id());if(activityId!=null)redirect.addAttribute("activityId",activityId);
+            redirect.addAttribute("sourceEvent",sourceEvent);redirect.addAttribute("state",state);return "redirect:/finance/library/templates";
+        }
+        return view;
     }
     @GetMapping("/transactions/{id}/template") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
     String newTemplate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
@@ -108,6 +120,20 @@ public class AccountingCodeLibraryController {
     @PostMapping("/transactions/{id}/{action:deactivate|reactivate}") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
     String transactionState(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@PathVariable String action,RedirectAttributes flash) {
         library.transactionState(actor,id,action.equals("reactivate"));success(flash);return "redirect:/finance/library/transactions/"+id;
+    }
+    private String templates(AppUserPrincipal actor,TransactionCode selected,UUID activityId,String sourceEvent,String state,UUID version,int page,Model model) {
+        var choices=library.transactionRegister(actor,activityId,"",state,sourceEvent,0);
+        if(selected!=null && ((activityId!=null && !activityId.equals(selected.activityId())) || (!sourceEvent.isEmpty() && !sourceEvent.equals(selected.sourceEvent())) || (!state.isEmpty() && selected.active()!=state.equals("ACTIVE")))) {
+            selected=null;version=null;page=0;
+        }
+        if(selected==null) {selected=choices.rows().isEmpty()?null:choices.rows().getFirst();version=null;page=0;}
+        model.addAttribute("transaction",selected);model.addAttribute("transactionChoices",choices);
+        model.addAttribute("isTransactions",true);
+        model.addAttribute("activity",activityId==null?null:library.activity(actor,activityId));model.addAttribute("activityFilters",library.activities(actor,"","",0));
+        model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());model.addAttribute("sourceEvent",sourceEvent);model.addAttribute("state",state);
+        model.addAttribute("selectedVersion",version);
+        if(selected!=null) {model.addAttribute("template",library.template(actor,selected.id(),version));model.addAttribute("versions",library.versions(actor,selected.id(),page));}
+        return "accounting/library-transaction";
     }
     private String templateForm(AppUserPrincipal actor,UUID id,String search,int page,Model model) {
         if(model.getAttribute("templateForm") instanceof TemplateForm form && (form.getRules()==null || form.getRules().isEmpty()))
