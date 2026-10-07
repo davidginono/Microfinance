@@ -57,8 +57,25 @@ class AccountingCodeLibraryMvcTest {
     }
     @Test void separateTransactionRegisterPreservesActivityAndPaginationFilters() throws Exception {
         mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId",activity.toString()).param("search","cash").param("state","ACTIVE").param("page","1"))
-            .andExpect(status().isOk()).andExpect(model().attribute("isTransactions",true));
+            .andExpect(status().isOk()).andExpect(model().attribute("isTransactions",true))
+            .andExpect(model().attribute("activity",new Activity(activity,"OPS","Operations","Shughuli","",true)))
+            .andExpect(model().attributeExists("activityFilters"));
         verify(library).transactionRegister(actor,activity,"cash","ACTIVE",1);
+    }
+    @Test void activityTransactionsLinkRedirectsToTheFilteredRegisterWithItsSearchContext() throws Exception {
+        mvc.perform(get("/finance/library/activities/"+activity).with(user(actor)).param("search","cash").param("state","ACTIVE").param("page","1"))
+            .andExpect(redirectedUrl("/finance/library/transactions?activityId="+activity+"&search=cash&state=ACTIVE&page=1"));
+        verify(library).activity(actor,activity);verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt());
+    }
+    @Test void allActivitiesFilterRemovesActivityScopeWithoutDroppingSearchOrStatus() throws Exception {
+        mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId","").param("search","cash").param("state","ACTIVE"))
+            .andExpect(status().isOk()).andExpect(model().attribute("isTransactions",true));
+        verify(library).transactionRegister(actor,null,"cash","ACTIVE",0);verify(library,never()).activity(any(),any());
+    }
+    @Test void activityRedirectRejectsForeignRecordsBeforeBuildingALocation() throws Exception {
+        UUID foreign=UUID.randomUUID();when(library.activity(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
+        mvc.perform(get("/finance/library/activities/"+foreign).with(user(actor))).andExpect(status().isForbidden());
+        verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt());
     }
     @Test void modalCreatesTransactionWithInitialAccountTemplateAndIgnoresOwnershipFields() throws Exception {
         when(library.onboardTransaction(any(),any())).thenReturn(transaction);

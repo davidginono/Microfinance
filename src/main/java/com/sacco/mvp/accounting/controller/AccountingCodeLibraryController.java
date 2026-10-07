@@ -41,8 +41,9 @@ public class AccountingCodeLibraryController {
     }
     @GetMapping("/activities/{id}")
     String activity(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="") String search,
-            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,Model model) {
-        return register(actor,true,id,search,state,page,model);
+            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,RedirectAttributes redirect) {
+        library.activity(actor,id);redirect.addAttribute("activityId",id);redirect.addAttribute("search",search);redirect.addAttribute("state",state);redirect.addAttribute("page",page);
+        return "redirect:/finance/library/transactions";
     }
     @GetMapping("/activities/new") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String newActivity() {return "redirect:/finance/library?create=true";}
@@ -121,6 +122,7 @@ public class AccountingCodeLibraryController {
         model.addAttribute("isTransactions",transactions);filters(model,search,state);
         if(transactions) {
             Activity parent=activityId==null?null:library.activity(actor,activityId);model.addAttribute("activity",parent);
+            model.addAttribute("activityFilters",library.activities(actor,"","",0));
             model.addAttribute("records",library.transactionRegister(actor,activityId,search,state,page));
             if(!model.containsAttribute("transactionForm")) {var form=new TransactionForm();if(parent!=null)form.setActivityCode(parent.code());model.addAttribute("transactionForm",form);}
             var form=(TransactionForm)model.getAttribute("transactionForm");

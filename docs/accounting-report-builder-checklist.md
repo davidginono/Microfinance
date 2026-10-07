@@ -199,6 +199,13 @@ No implementation completion is asserted by the creation of this checklist.
 - Rendered verification was attempted against a disposable institution/database on port 8087. The application started and the staff login rendered, but repeated browser-control timeouts prevented completion of modal, scrolling and viewport checks. No responsive/rendered pass or screenshot is claimed for this increment. The verification app was stopped. Full-suite testing, packaging, money reconciliation and throughput benchmarks were not rerun.
 - Commit: the local commit containing this entry, titled `Improve transaction configuration onboarding workflows`. The user's existing server-port configuration edit is excluded. No database migration is required and broader accounting release gates remain unchanged.
 
+### 2026-10-07 — Activity-filtered transaction navigation
+
+- Activity row Transactions actions now open the canonical Transactions register with `activityId` selected automatically. The activity context is shown in a visible Activity filter alongside search/status; the separate line above the register is removed. Search and pagination retain scope, All removes activity scope, and Clear resets filters. The selected activity remains available even outside the bounded first page of filter options, including inactive activities.
+- Existing activity-detail links redirect after institution ownership verification, retaining search/status/page context. Existing scoped transaction queries, claims, modal creation and immutable templates remain unchanged. No migration or financial mutation is introduced.
+- `mvn -Dtest=AccountingCodeLibraryMvcTest,ChartOfAccountsJspCompilationTest test` passed: 17 tests, zero failures/errors/skips, including all six JSP compilation checks. Coverage includes the redirect, preselected activity model, search/page persistence, empty/all activity selection and foreign-activity denial. Java 25 compilation and `git diff --check` passed. Live browser verification remains pending: the available Chrome connection reported the user unavailable and the earlier disposable UI server is stopped. No mobile/rendered pass is claimed.
+- Commit: the local commit containing this entry, titled `Show activity scope in transaction register filters`. The user's existing port configuration edit is excluded; broader accounting acceptance gates are unchanged.
+
 ## Official Review References
 
 Reviewed for planning on 2026-10-02; verify amendments and institution-specific instructions again at implementation/release.
