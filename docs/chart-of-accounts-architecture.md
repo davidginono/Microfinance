@@ -64,6 +64,8 @@ Each save creates an immutable version with its accounting event, purpose, reque
 
 The library shares the existing COA `VIEW`, `CREATE`, and `UPDATE` claims and their current staff/institution/branch checks. Metadata is institution-wide by design. All lists and account lookup use 25 rows plus a next-page sentinel; template line reads are bounded by five component pairs. Search output is bounded but substring searches may scan an institution's definitions. Session authentication, CSRF, allowlisted form fields, escaped output, localized errors and responsive shared controls remain in place.
 
+V52 retains its original applied checksum (`1498718278`). V53 corrects the shared balance trigger using separate PL/pgSQL branches for the version and line record fields. Existing V52 installations upgrade normally; Flyway validation remains enabled and no schema-history repair is required.
+
 Future posting integration must explicitly select and retain the immutable template version on each journal occurrence, obtain verified amounts from the owning workflow, and keep the ledger's current period, policy, source ownership, idempotency, subledger and reconciliation protections. That integration is outside the library onboarding forms implemented here.
 
 ## Verification and capacity

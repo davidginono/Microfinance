@@ -31,7 +31,9 @@ class AccountingCodeLibraryPostgresTest {
     AppUserPrincipal actor;String institution;UUID cash,expense,control;
     @BeforeAll void database() {
         var ds=new DriverManagerDataSource(System.getenv("MICROFINANCE_LIBRARY_DATABASE_URL"),"microfinance_test","");
-        Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);
+        Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("52").load().migrate();jdbc=new JdbcTemplate(ds);
+        assertThat(jdbc.queryForObject("select checksum from flyway_schema_history where version='52' and success",Integer.class)).isEqualTo(1498718278);
+        Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
         var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         var clock=mock(ApplicationClock.class);when(clock.now()).thenReturn(OffsetDateTime.now());
@@ -53,6 +55,16 @@ class AccountingCodeLibraryPostgresTest {
         cash=ledger.createAccount(actor,new AccountCommand("CASH","Cash","ASSET","DEBIT","POSTING","CASH",null));
         expense=ledger.createAccount(actor,new AccountCommand("EXPENSE","Office expense","EXPENSE","DEBIT","POSTING","EXPENSE",null));
         control=ledger.createAccount(actor,new AccountCommand("PRINCIPAL","Principal","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL",null));
+    }
+    @Test void forwardMigrationRepairsBothTriggerRecordShapes() {
+        assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version='53' and success",Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select prosrc from pg_proc where oid='gl_template_balance_guard()'::regprocedure",String.class))
+            .contains("IF TG_TABLE_NAME='gl_template_version' THEN t:=NEW.id; ELSE t:=NEW.template_id; END IF;")
+            .doesNotContain("t:=CASE");
+        UUID activity=service.createActivity(actor,code("MIGRATION",null));
+        UUID transaction=service.createTransaction(actor,code("REPAIRED",activity));
+        UUID version=service.saveTemplate(actor,transaction,template(0,"EXPENSE","CASH"));
+        assertThat(service.template(actor,transaction,version).rules()).hasSize(1);
     }
     @Test void activityOwnsMultipleCodesAndVersionHistoryIsImmutable() {
         var activity=service.createActivity(actor,code("ops",null));

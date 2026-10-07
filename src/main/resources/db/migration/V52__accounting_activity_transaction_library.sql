@@ -61,7 +61,7 @@ CREATE TRIGGER gl_template_line_valid BEFORE INSERT ON gl_template_line FOR EACH
 CREATE FUNCTION gl_template_balance_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE t uuid;
 BEGIN
- IF TG_TABLE_NAME='gl_template_version' THEN t:=NEW.id; ELSE t:=NEW.template_id; END IF;
+ t:=CASE WHEN TG_TABLE_NAME='gl_template_version' THEN NEW.id ELSE NEW.template_id END;
  IF (SELECT count(*) FROM gl_template_line WHERE template_id=t) NOT BETWEEN 2 AND 10
     OR EXISTS(SELECT 1 FROM gl_template_line WHERE template_id=t GROUP BY component HAVING count(*)<>2 OR count(DISTINCT account_id)<>2)
     OR EXISTS(SELECT 1 FROM gl_template_line WHERE template_id=t AND component='TOTAL') AND (SELECT count(DISTINCT component) FROM gl_template_line WHERE template_id=t)>1
