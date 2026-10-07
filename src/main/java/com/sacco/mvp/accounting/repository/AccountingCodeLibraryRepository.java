@@ -21,6 +21,15 @@ public class AccountingCodeLibraryRepository {
     public Optional<Activity> activity(String institution,UUID id,boolean lock) {
         return jdbc.query(ACTIVITY+" where sacco_id=? and id=?"+(lock?" for update":""),this::activity,institution,id).stream().findFirst();
     }
+    public Optional<Activity> activityByCode(String institution,String code) {
+        return jdbc.query(ACTIVITY+" where sacco_id=? and code=?",this::activity,institution,code).stream().findFirst();
+    }
+    public List<TransactionCode> transactionRegister(String institution,UUID activity,String search,String state,int offset) {
+        String parent=activity==null?"":" and t.activity_id=?";
+        var args=new ArrayList<Object>();args.add(institution);if(activity!=null)args.add(activity);
+        Collections.addAll(args,search,search,search,state,state,offset);
+        return jdbc.query(TRANSACTION+" where t.sacco_id=?"+parent+" and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) order by t.code,t.id limit 26 offset ?",this::transaction,args.toArray());
+    }
     public UUID createActivity(String institution,CodeForm form,UUID actor,OffsetDateTime now) {
         UUID id=UUID.randomUUID();
         jdbc.update("insert into gl_activity(id,sacco_id,code,name,name_sw,description,created_by,created_at) values(?,?,?,?,?,?,?,?)",id,institution,form.getCode(),form.getName(),form.getNameSw(),form.getDescription(),actor,now);return id;

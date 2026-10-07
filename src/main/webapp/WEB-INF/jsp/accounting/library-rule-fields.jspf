@@ -1,0 +1,7 @@
+<div id="library-rule-list"><c:forEach items="${ruleForms}" var="rule" varStatus="n"><div class="library-rule accounting-grid">
+    <label><spring:message code="library.component" /><form:select path="${rulePrefix}rules[${n.index}].component" cssClass="aws-control"><c:forEach items="${components}" var="component"><form:option value="${component}"><spring:message code="library.component.${component}" /></form:option></c:forEach></form:select></label>
+    <label><spring:message code="library.debitCode" /><form:input path="${rulePrefix}rules[${n.index}].debitCode" cssClass="aws-control" maxlength="40" list="library-account-codes" data-library-lookup="${accountLookupUrl}" required="required" /></label>
+    <label><spring:message code="library.creditCode" /><form:input path="${rulePrefix}rules[${n.index}].creditCode" cssClass="aws-control" maxlength="40" list="library-account-codes" data-library-lookup="${accountLookupUrl}" required="required" /></label>
+    <button type="button" class="app-btn btn-neutral library-remove"><spring:message code="library.removeRule" /></button>
+</div></c:forEach></div>
+<button type="button" class="app-btn btn-neutral" id="library-add-rule"><spring:message code="library.addRule" /></button>

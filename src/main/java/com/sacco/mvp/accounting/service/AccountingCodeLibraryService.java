@@ -43,6 +43,21 @@ public class AccountingCodeLibraryService {
         return slice(library.transactions(actor.getSaccoId(),activity,term(search),state,page*25),page);
     }
     @Transactional(readOnly=true)
+    public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,int page) {
+        authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);
+        return slice(library.transactionRegister(actor.getSaccoId(),activity,term(search),state,page*25),page);
+    }
+    @Transactional
+    public UUID onboardTransaction(AppUserPrincipal actor,TransactionForm form) {
+        authorize(actor,"CREATE");authorize(actor,"UPDATE");
+        require(form!=null && form.getTemplate()!=null,"validation");validateCode(form);validateTemplate(form.getTemplate());
+        require(form.getTemplate().getExpectedRevision()==0,"staleTemplate");
+        form.setActivityCode(clean(form.getActivityCode()).toUpperCase(Locale.ROOT));
+        var parent=library.activityByCode(actor.getSaccoId(),form.getActivityCode()).orElseThrow(()->new IllegalArgumentException("library.error.activityCode"));
+        form.setActivityId(parent.id());
+        UUID id=createTransaction(actor,form);saveTemplate(actor,id,form.getTemplate());return id;
+    }
+    @Transactional(readOnly=true)
     public TransactionCode transaction(AppUserPrincipal actor,UUID id) {authorize(actor,"VIEW");return transaction(actor,id,false);}
     private TransactionCode transaction(AppUserPrincipal actor,UUID id,boolean lock) {
         return library.transaction(actor.getSaccoId(),id,lock).orElseThrow(()->new AccessDeniedException("Library record unavailable"));

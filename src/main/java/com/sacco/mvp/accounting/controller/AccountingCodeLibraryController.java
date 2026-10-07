@@ -25,28 +25,51 @@ public class AccountingCodeLibraryController {
     @InitBinder("templateForm") void bindTemplate(WebDataBinder binder) {
         binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("requestKey","expectedRevision","reason","rules[*].component","rules[*].debitCode","rules[*].creditCode");
     }
+    @InitBinder("transactionForm") void bindTransaction(WebDataBinder binder) {
+        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("activityCode","code","name","description","sourceEvent","template.requestKey","template.expectedRevision","template.reason","template.rules[*].component","template.rules[*].debitCode","template.rules[*].creditCode");
+    }
     @GetMapping
     String activities(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,
-            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,Model model) {
-        model.addAttribute("activities",library.activities(actor,search,state,page));filters(model,search,state);return "accounting/library";
+            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="false") boolean create,Model model) {
+        model.addAttribute("modalOpen",create);return register(actor,false,null,search,state,page,model);
+    }
+    @GetMapping("/transactions")
+    String transactions(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID activityId,
+            @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,
+            @RequestParam(defaultValue="false") boolean create,Model model) {
+        model.addAttribute("modalOpen",create);return register(actor,true,activityId,search,state,page,model);
     }
     @GetMapping("/activities/{id}")
     String activity(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="") String search,
             @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,Model model) {
-        model.addAttribute("activity",library.activity(actor,id));model.addAttribute("transactions",library.transactions(actor,id,search,state,page));
-        filters(model,search,state);return "accounting/library";
+        return register(actor,true,id,search,state,page,model);
     }
     @GetMapping("/activities/new") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
-    String newActivity(@ModelAttribute("codeForm") CodeForm form,Model model) {return codeForm(model,null);}
+    String newActivity() {return "redirect:/finance/library?create=true";}
     @GetMapping("/activities/{id}/transactions/new") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String newTransaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@ModelAttribute("codeForm") CodeForm form,Model model) {
-        return codeForm(model,library.activity(actor,id));
+        library.activity(actor,id);return "redirect:/finance/library/transactions?create=true&activityId="+id;
     }
     @PostMapping("/activities") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String saveActivity(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("codeForm") CodeForm form,BindingResult errors,Model model,RedirectAttributes flash) {
-        if(!errors.hasErrors())try {UUID id=library.createActivity(actor,form);success(flash);return "redirect:/finance/library/activities/"+id;}
+        if(!errors.hasErrors())try {library.createActivity(actor,form);created(flash,form);return "redirect:/finance/library";}
         catch(IllegalArgumentException failure){codeError(errors,key(failure));}catch(DataIntegrityViolationException failure){errors.rejectValue("code","library.error.duplicate");}
-        return codeForm(model,null);
+        model.addAttribute("modalOpen",true);return register(actor,false,null,"","",0,model);
+    }
+    @PostMapping("/transactions") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE') and @access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
+    String onboardTransaction(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("transactionForm") TransactionForm form,
+            BindingResult errors,Model model,RedirectAttributes flash) {
+        if(!errors.hasErrors())try {library.onboardTransaction(actor,form);created(flash,form);return "redirect:/finance/library/transactions";}
+        catch(IllegalArgumentException failure){errors.reject(key(failure));}catch(DataIntegrityViolationException failure){errors.reject("library.error.conflict");}
+        model.addAttribute("modalOpen",true);return register(actor,true,null,"","",0,model);
+    }
+    @GetMapping(value="/lookup/activities",produces="application/json") @ResponseBody
+    java.util.List<Activity> activityChoices(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search) {
+        return library.activities(actor,search,"ACTIVE",0).rows();
+    }
+    @GetMapping(value="/lookup/accounts",produces="application/json") @ResponseBody
+    java.util.List<AccountChoice> accountChoices(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search) {
+        return library.accounts(actor,search,0).rows();
     }
     @PostMapping("/activities/{id}/transactions") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String saveTransaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@ModelAttribute("codeForm") CodeForm form,BindingResult errors,Model model,RedirectAttributes flash) {
@@ -93,6 +116,26 @@ public class AccountingCodeLibraryController {
     }
     private String codeForm(Model model,Activity activity) {
         model.addAttribute("activity",activity);model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());return "accounting/library-code-form";
+    }
+    private String register(AppUserPrincipal actor,boolean transactions,UUID activityId,String search,String state,int page,Model model) {
+        model.addAttribute("isTransactions",transactions);filters(model,search,state);
+        if(transactions) {
+            Activity parent=activityId==null?null:library.activity(actor,activityId);model.addAttribute("activity",parent);
+            model.addAttribute("records",library.transactionRegister(actor,activityId,search,state,page));
+            if(!model.containsAttribute("transactionForm")) {var form=new TransactionForm();if(parent!=null)form.setActivityCode(parent.code());model.addAttribute("transactionForm",form);}
+            var form=(TransactionForm)model.getAttribute("transactionForm");
+            if(form.getTemplate().getRules()==null)form.getTemplate().setRules(new java.util.ArrayList<>());
+            if(form.getTemplate().getRules().isEmpty())form.getTemplate().getRules().add(new RuleForm());
+            model.addAttribute("activityChoices",library.activities(actor,"","ACTIVE",0));model.addAttribute("accountChoices",library.accounts(actor,"",0));
+            model.addAttribute("components",AccountingCodeLibraryService.COMPONENTS);model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());
+        } else {
+            model.addAttribute("records",library.activities(actor,search,state,page));
+            if(!model.containsAttribute("codeForm"))model.addAttribute("codeForm",new CodeForm());
+        }
+        return "accounting/library";
+    }
+    private static void created(RedirectAttributes flash,CodeForm form) {
+        success(flash);flash.addFlashAttribute("createdCode",form.getCode());flash.addFlashAttribute("createdName",form.getName());flash.addAttribute("search",form.getCode());
     }
     private static void filters(Model model,String search,String state) {model.addAttribute("search",search);model.addAttribute("state",state);}
     private static void success(RedirectAttributes flash) {flash.addFlashAttribute("librarySuccess","library.saved");}

@@ -26,6 +26,10 @@ public final class AccountingLibraryDtos {
         private String reason;
         private List<RuleForm> rules=new ArrayList<>();
     }
+    @Data @lombok.EqualsAndHashCode(callSuper=true) public static class TransactionForm extends CodeForm {
+        private String activityCode;
+        private TemplateForm template=new TemplateForm();
+    }
     @Data public static class RuleForm {
         private String component="TOTAL",debitCode,creditCode;
     }

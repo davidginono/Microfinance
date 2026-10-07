@@ -1,3 +1,4 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
@@ -5,8 +6,9 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
-<div class="accounting-workspace">
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="coa.registry" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.accounts" /></h1></div>
+<div class="accounting-workspace">
     <p><spring:message code="coa.intro" /></p>
     <c:if test="${not empty accountingError}"><p class="coa-error" role="alert"><spring:message code="${accountingError}" /></p></c:if>
     <c:if test="${not empty accountingSuccess}"><p class="coa-success" role="status"><spring:message code="${accountingSuccess}" /></p></c:if>

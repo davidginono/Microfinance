@@ -487,6 +487,7 @@
         registerExpandableMenu(memberSettingsToggle, memberSettingsPanel, memberSettingsChevron, "memberSettingsExpanded");
         registerExpandableMenu(staffDashboardToggle, staffDashboardPanel, staffDashboardChevron, "staffDashboardExpanded");
         registerExpandableMenu(staffSettingsToggle, staffSettingsPanel, staffSettingsChevron, "staffSettingsExpanded");
+        registerExpandableMenu(document.getElementById('transactionsConfigToggle'), document.getElementById('transactionsConfigPanel'), document.getElementById('transactionsConfigChevron'), 'transactionsConfigExpanded');
         registerExpandableMenu(staffSupportToggle, staffSupportPanel, staffSupportChevron, "staffSupportExpanded");
         registerExpandableMenu(MemberArchiveToggle, MemberArchivePanel, MemberArchiveChevron, "MemberArchiveExpanded");
         registerExpandableMenu(MembersupportToggle, MembersupportPanel, MembersupportChevron, "MembersupportExpanded");

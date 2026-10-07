@@ -66,6 +66,25 @@ class AccountingCodeLibraryPostgresTest {
         UUID version=service.saveTemplate(actor,transaction,template(0,"EXPENSE","CASH"));
         assertThat(service.template(actor,transaction,version).rules()).hasSize(1);
     }
+    @Test void transactionOnboardingSavesAccountsAtomicallyAndRollsBackOnFailure() {
+        service.createActivity(actor,code("OPS",null));
+        var form=onboarding("OPS","PAY","EXPENSE","CASH");UUID id=service.onboardTransaction(actor,form);
+        assertThat(service.transaction(actor,id).revision()).isEqualTo(1);assertThat(service.template(actor,id,null).rules().getFirst().debitCode()).isEqualTo("EXPENSE");
+        assertThatThrownBy(()->service.onboardTransaction(actor,onboarding("OPS","FAILED","UNKNOWN","CASH"))).hasMessage("library.error.templateAccount");
+        assertThat(service.transactionRegister(actor,null,"FAILED","",0).rows()).isEmpty();
+        assertThat(jdbc.queryForObject("select count(*) from gl_template_version where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+        assertThatThrownBy(()->service.onboardTransaction(actor,onboarding("FOREIGN","FOREIGN-PAY","EXPENSE","CASH"))).hasMessage("library.error.activityCode");
+        assertThatThrownBy(()->service.onboardTransaction(actor,form)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isZero();
+    }
+    @Test void transactionRegisterStaysScopedAndBoundedAcrossActivities() {
+        UUID first=service.createActivity(actor,code("OPS",null)),second=service.createActivity(actor,code("BANK",null));
+        for(int n=0;n<30;n++)service.createTransaction(actor,code("PAY"+n,n%2==0?first:second));
+        var page=service.transactionRegister(actor,null,"","",0);assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
+        assertThat(service.transactionRegister(actor,null,"","",1).rows()).hasSize(5);
+        assertThat(service.transactionRegister(actor,first,"","",0).rows()).hasSize(15).allMatch(c->c.activityId().equals(first));
+        assertThatThrownBy(()->service.transactionRegister(actor,UUID.randomUUID(),"","",0)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
     @Test void activityOwnsMultipleCodesAndVersionHistoryIsImmutable() {
         var activity=service.createActivity(actor,code("ops",null));
         UUID first=service.createTransaction(actor,code("CASH-EXPENSE",activity)),second=service.createTransaction(actor,code("BANK-EXPENSE",activity));
@@ -153,5 +172,6 @@ class AccountingCodeLibraryPostgresTest {
         assertThat(service.accounts(actor,"expense",0).rows()).extracting(AccountChoice::code).containsExactly("EXPENSE");
     }
     static CodeForm code(String code,UUID activity) {var form=new CodeForm();form.setCode(code);form.setName(code);form.setActivityId(activity);return form;}
+    static TransactionForm onboarding(String activity,String code,String debit,String credit) {var form=new TransactionForm();form.setActivityCode(activity);form.setCode(code);form.setName(code);form.setTemplate(template(0,debit,credit));return form;}
     static TemplateForm template(int revision,String debit,String credit) {var form=new TemplateForm();form.setExpectedRevision(revision);form.setReason("Synthetic template");var pair=new RuleForm();pair.setDebitCode(debit);pair.setCreditCode(credit);form.getRules().add(pair);return form;}
 }

@@ -13,9 +13,16 @@
         </a>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')">
-        <a href="<c:url value='/finance/library' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/library') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-            <spring:message code="library.navigation" />
-        </a>
+        <div class="shell-sidebar-group space-y-1">
+            <button type="button" id="transactionsConfigToggle" aria-controls="transactionsConfigPanel" aria-expanded="${fn:startsWith(requestUri, '/finance/library')}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition">
+                <span class="min-w-0 flex-1"><spring:message code="library.navigation" /></span>
+                <svg id="transactionsConfigChevron" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+            </button>
+            <div id="transactionsConfigPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2">
+                <a href="<c:url value='/finance/library' />" class="block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/library') and not fn:startsWith(requestUri, '/finance/library/transactions') and not isTransactions ? 'shell-nav-active' : ''}"><spring:message code="library.activities" /></a>
+                <a href="<c:url value='/finance/library/transactions' />" class="block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/library/transactions') or isTransactions ? 'shell-nav-active' : ''}"><spring:message code="library.transactions" /></a>
+            </div>
+        </div>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_JOURNALS_VIEW')">
         <a href="<c:url value='/finance/journals' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/journals') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">

@@ -1,3 +1,4 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
@@ -6,8 +7,9 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <c:set var="formBase" value="${groupMode?'/finance/accounts/groups':'/finance/accounts/posting'}" />
-<div class="accounting-workspace">
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="${groupMode?'coa.newGroup':'coa.newAccount'}" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${groupMode?'coa.newGroup':'coa.newAccount'}" /></h1></div>
+<div class="accounting-workspace">
     <p><spring:message code="${groupMode?'coa.groupHelp':'coa.accountHelp'}" /></p>
     <c:if test="${not empty parentError}"><p class="coa-error" role="alert"><spring:message code="${parentError}" /></p></c:if>
     <details class="coa-parent-picker" ${empty selectedParent?'open':''}>
@@ -37,8 +39,7 @@
             <div role="alert"><form:errors path="*" cssClass="coa-error" element="p" /></div>
             <div class="accounting-grid">
                 <label><spring:message code="accounting.code" /><form:input path="code" cssClass="aws-control" maxlength="6" pattern="[1-5][0-9]{5}" required="required" /><small><spring:message code="coa.codeHelp" /></small></label>
-                <label><spring:message code="coa.nameEn" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
-                <label><spring:message code="coa.nameSw" /><form:input path="nameSw" cssClass="aws-control" maxlength="160" /></label>
+                <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
                 <c:if test="${not groupMode}">
                     <label><spring:message code="accounting.normalBalance" /><form:select path="normalBalance" cssClass="aws-control"><form:option value="DEBIT"><spring:message code="accounting.debit" /></form:option><form:option value="CREDIT"><spring:message code="accounting.credit" /></form:option></form:select><small><spring:message code="coa.balanceHelp" /></small></label>
                     <label><spring:message code="coa.postingAccess" /><form:select path="kind" cssClass="aws-control"><form:option value="POSTING"><spring:message code="accounting.option.POSTING" /></form:option><form:option value="CONTROL"><spring:message code="coa.control" /></form:option></form:select></label>

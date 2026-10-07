@@ -33,6 +33,8 @@ class AccountingCodeLibraryMvcTest {
         lenient().when(library.activity(any(),eq(activity))).thenReturn(new Activity(activity,"OPS","Operations","Shughuli","",true));
         lenient().when(library.transaction(any(),eq(transaction))).thenReturn(new TransactionCode(transaction,activity,"OPS","Operations","Shughuli","CASH-EXPENSE","Cash expense","","","MANUAL_JOURNAL",true,0,null));
         lenient().when(library.accounts(any(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
+        lenient().when(library.activities(any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
+        lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
     }
     @Test void filtersReachTheScopedList() throws Exception {
         when(library.activities(any(),eq("Office"),eq("ACTIVE"),eq(2))).thenReturn(new Page<>(List.of(),2,false));
@@ -49,9 +51,35 @@ class AccountingCodeLibraryMvcTest {
     @Test void duplicateCodeKeepsEnteredValues() throws Exception {
         when(library.createActivity(any(),any())).thenThrow(new org.springframework.dao.DuplicateKeyException("duplicate"));
         var result=mvc.perform(post("/finance/library/activities").with(user(actor)).with(csrf()).param("code","OPS").param("name","Operations").param("nameSw","Shughuli"))
-            .andExpect(status().isOk()).andExpect(view().name("accounting/library-code-form"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library")).andExpect(model().attribute("modalOpen",true))
             .andExpect(model().attributeHasFieldErrors("codeForm","code")).andReturn();
         assertThat(((CodeForm)result.getModelAndView().getModel().get("codeForm")).getNameSw()).isEqualTo("Shughuli");
+    }
+    @Test void separateTransactionRegisterPreservesActivityAndPaginationFilters() throws Exception {
+        mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId",activity.toString()).param("search","cash").param("state","ACTIVE").param("page","1"))
+            .andExpect(status().isOk()).andExpect(model().attribute("isTransactions",true));
+        verify(library).transactionRegister(actor,activity,"cash","ACTIVE",1);
+    }
+    @Test void modalCreatesTransactionWithInitialAccountTemplateAndIgnoresOwnershipFields() throws Exception {
+        when(library.onboardTransaction(any(),any())).thenReturn(transaction);
+        mvc.perform(post("/finance/library/transactions").with(user(actor)).with(csrf()).param("activityCode","OPS").param("code","PAY").param("name","Office payment")
+            .param("template.rules[0].component","TOTAL").param("template.rules[0].debitCode","EXPENSE").param("template.rules[0].creditCode","CASH").param("template.reason","Office payment")
+            .param("activityId",UUID.randomUUID().toString()).param("saccoId","FOREIGN").param("active","false").param("nameSw","ignored"))
+            .andExpect(redirectedUrl("/finance/library/transactions?search=PAY")).andExpect(flash().attribute("createdCode","PAY"));
+        verify(library).onboardTransaction(eq(actor),argThat(f->f.getActivityId()==null && f.getNameSw()==null && f.getActivityCode().equals("OPS") && f.getTemplate().getRules().getFirst().getDebitCode().equals("EXPENSE")));
+    }
+    @Test void modalErrorsKeepTransactionAndAccountDetailsOnTheRegister() throws Exception {
+        when(library.onboardTransaction(any(),any())).thenThrow(new IllegalArgumentException("library.error.templateAccount"));
+        var result=mvc.perform(post("/finance/library/transactions").with(user(actor)).with(csrf()).param("activityCode","OPS").param("code","PAY").param("name","Office payment")
+            .param("template.rules[0].debitCode","EXPENSE").param("template.rules[0].creditCode","UNKNOWN").param("template.reason","Office payment"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library")).andExpect(model().attribute("modalOpen",true)).andExpect(model().attributeHasErrors("transactionForm")).andReturn();
+        var form=(TransactionForm)result.getModelAndView().getModel().get("transactionForm");assertThat(form.getCode()).isEqualTo("PAY");assertThat(form.getTemplate().getRules().getFirst().getCreditCode()).isEqualTo("UNKNOWN");
+    }
+    @Test void modalRequiresBothClaimsCsrfAndBoundedRuleBinding() throws Exception {
+        mvc.perform(post("/finance/library/transactions").with(user(actor))).andExpect(status().isForbidden());
+        mvc.perform(post("/finance/library/transactions").with(user(principal(true,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE)))).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/finance/library/transactions").with(user(actor)).with(csrf()).param("template.rules[99].component","TOTAL")).andExpect(status().isBadRequest());
+        verify(library,never()).onboardTransaction(any(),any());
     }
     @Test void saveTemplateBindsOnlyDefinitionFieldsAndRedirectsToSavedVersion() throws Exception {
         UUID version=UUID.randomUUID(),request=UUID.randomUUID();when(library.saveTemplate(any(),eq(transaction),any())).thenReturn(version);

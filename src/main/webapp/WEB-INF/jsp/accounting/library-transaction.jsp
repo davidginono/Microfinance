@@ -6,8 +6,9 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
-<div class="accounting-workspace">
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library' />"><spring:message code="library.navigation" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library/transactions' />"><spring:message code="library.transactions" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><c:out value="${transaction.code}" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${transaction.code}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty transaction.nameSw?transaction.nameSw:transaction.name}" /></h1></div>
+<div class="accounting-workspace">
     <p><spring:message code="library.activity" />: <c:url value="/finance/library/activities/${transaction.activityId}" var="activityUrl" /><a href="<c:out value='${activityUrl}' />"><c:out value="${transaction.activityCode}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty transaction.activityNameSw?transaction.activityNameSw:transaction.activityName}" /></a> · <spring:message code="accounting.active.${transaction.active}" /></p>
     <p><spring:message code="library.sourceEvent" />: <spring:message code="accounting.policy.event.${transaction.sourceEvent}" /></p>
     <c:if test="${not empty transaction.description}"><p><c:out value="${transaction.description}" /></p></c:if>

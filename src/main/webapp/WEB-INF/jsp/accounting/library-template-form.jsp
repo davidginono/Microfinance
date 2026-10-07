@@ -6,8 +6,9 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
-<div class="accounting-workspace">
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library' />"><spring:message code="library.navigation" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library/transactions' />"><spring:message code="library.transactions" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library/transactions/${transaction.id}' />"><c:out value="${transaction.code}" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="library.newVersion" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="library.newVersion" /></h1></div>
+<div class="accounting-workspace">
     <p class="coa-location"><strong><c:out value="${transaction.code}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty transaction.nameSw?transaction.nameSw:transaction.name}" /></strong> · <spring:message code="accounting.policy.event.${transaction.sourceEvent}" /></p>
     <p><spring:message code="library.templateHelp" /></p>
     <details class="coa-parent-picker"><summary><spring:message code="library.findAccounts" /></summary>
@@ -23,13 +24,10 @@
         <form:form method="post" modelAttribute="templateForm" action="${saveUrl}" id="library-template-form">
             <form:hidden path="requestKey" /><form:hidden path="expectedRevision" />
             <div role="alert"><form:errors path="*" cssClass="coa-error" element="p" /></div>
-            <div id="library-rule-list"><c:forEach items="${templateForm.rules}" var="rule" varStatus="n"><div class="library-rule accounting-grid">
-                <label><spring:message code="library.component" /><form:select path="rules[${n.index}].component" cssClass="aws-control"><c:forEach items="${components}" var="component"><form:option value="${component}"><spring:message code="library.component.${component}" /></form:option></c:forEach></form:select></label>
-                <label><spring:message code="library.debitCode" /><form:input path="rules[${n.index}].debitCode" cssClass="aws-control" maxlength="40" list="library-account-codes" required="required" /></label>
-                <label><spring:message code="library.creditCode" /><form:input path="rules[${n.index}].creditCode" cssClass="aws-control" maxlength="40" list="library-account-codes" required="required" /></label>
-                <button type="button" class="app-btn btn-neutral library-remove"><spring:message code="library.removeRule" /></button>
-            </div></c:forEach></div>
-            <button type="button" class="app-btn btn-neutral" id="library-add-rule"><spring:message code="library.addRule" /></button>
+            <c:url value="/finance/library/lookup/accounts" var="accountLookupUrl" />
+            <c:set var="ruleForms" value="${templateForm.rules}" /><c:set var="rulePrefix" value="" />
+            <%@ include file="library-rule-fields.jspf" %>
+            <p class="library-lookup-status" role="status" data-lookup-failure="<spring:message code='library.lookupUnavailable' />"></p>
             <label><spring:message code="library.reason" /><form:textarea path="reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /></label>
             <div class="accounting-actions"><button class="app-btn btn-primary" ${not transaction.active?'disabled':''}><spring:message code="library.saveVersion" /></button><a class="app-btn btn-neutral" href="<c:url value='/finance/library/transactions/${transaction.id}' />"><spring:message code="common.cancel" /></a></div>
         </form:form>

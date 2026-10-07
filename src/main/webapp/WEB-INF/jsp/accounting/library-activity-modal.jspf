@@ -1,0 +1,21 @@
+<div class="app-modal-overlay library-modal" id="library-create-modal" data-auto-open="${modalOpen or not empty createdCode}" data-created="${not empty createdCode}" hidden>
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="library-modal-title" tabindex="-1">
+        <div class="app-modal-scroll">
+            <div class="app-modal-header"><h2 class="erp-panel-title" id="library-modal-title"><spring:message code="library.addActivity" /></h2><button type="button" class="app-modal-close" data-library-close aria-label="<spring:message code='common.closeModal' />"><i data-lucide="x" aria-hidden="true"></i></button></div>
+            <div class="app-modal-body">
+                <c:choose><c:when test="${not empty createdCode}"><p class="coa-success" role="status"><spring:message code="library.activityCreated" /></p><p><strong><c:out value="${createdCode}" /></strong> · <c:out value="${createdName}" /></p><p><spring:message code="library.closeToRegister" /></p></c:when><c:otherwise>
+                    <c:url value="/finance/library/activities" var="activitySaveUrl" />
+                    <form:form method="post" modelAttribute="codeForm" action="${activitySaveUrl}" cssClass="library-modal-form">
+                        <div role="alert"><form:errors path="*" cssClass="coa-error" element="p" /></div>
+                        <div class="accounting-grid">
+                            <label><spring:message code="library.code" /><form:input path="code" cssClass="aws-control" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,39}" required="required" /></label>
+                            <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
+                            <label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /></label>
+                        </div>
+                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-primary"><spring:message code="coa.save" /></button></div>
+                    </form:form>
+                </c:otherwise></c:choose>
+            </div>
+        </div>
+    </div>
+</div>
