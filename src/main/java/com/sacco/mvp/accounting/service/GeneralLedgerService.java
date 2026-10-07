@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.*;
+import com.sacco.mvp.accounting.dto.AccountOnboardingForm;
 import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.policy.PostingEvent;
 import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
@@ -47,6 +48,90 @@ public class GeneralLedgerService {
     private static final Set<String> KINDS=Set.of("HEADING","POSTING","CONTROL");
     private static final Set<String> PURPOSES=Set.of("CASH","BANK","MOBILE_MONEY","CLEARING","SUSPENSE","LOAN_PRINCIPAL",
         "INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE","PAYABLE","FUNDING","CAPITAL","INCOME","EXPENSE","FIXED_ASSET","PREPAYMENT","TAX","INTERNAL_TRANSFER","OTHER");
+    private static final List<String> ROOT_TYPES=List.of("ASSET","LIABILITY","EQUITY","EXPENSE","INCOME");
+    private static final List<String> ROOT_NAMES=List.of("Assets","Liabilities","Equity","Expenses","Income");
+    private static final List<String> ROOT_NAMES_SW=List.of("Mali","Madeni","Mtaji","Gharama","Mapato");
+
+    public static boolean mainGroup(Account account) {
+        return account.parentId()==null && "HEADING".equals(account.kind()) && account.code().matches("[1-5]00000");
+    }
+    @Transactional(readOnly=true)
+    public Page<AccountRow> chart(AppUserPrincipal actor,AccountFilter filter,int page) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");int n=page(page);validateFilter(filter);
+        var rows=books.chart(actor.getSaccoId(),filter,n*25,26);
+        return new Page<>(rows.stream().limit(25).toList(),n,rows.size()>25);
+    }
+    @Transactional(readOnly=true)
+    public Page<Account> chartParents(AppUserPrincipal actor,boolean groups,String search,int page) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");int n=page(page);
+        require(search!=null && search.length()<=100,"search");
+        var rows=books.chartParents(actor.getSaccoId(),groups,search,n*25,26);
+        return new Page<>(rows.stream().limit(25).toList(),n,rows.size()>25);
+    }
+    @Transactional(readOnly=true)
+    public Account chartParent(AppUserPrincipal actor,UUID id,boolean groups) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");return onboardingParent(actor,id,groups);
+    }
+    @Transactional(readOnly=true)
+    public String suggestChartCode(AppUserPrincipal actor,UUID parentId,boolean groups) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");var parent=onboardingParent(actor,parentId,groups);
+        int step=groups?(mainGroup(parent)?10000:1000):1;
+        int base=Integer.parseInt(parent.code());
+        return books.availableChartCode(actor.getSaccoId(),base+step,base+(groups?9*step:999),step).orElse("");
+    }
+    /** Explicit, idempotent setup; existing codes/classifications are never rewritten. */
+    @Transactional
+    public void initializeChart(AppUserPrincipal actor) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");books.lockAccounts(actor.getSaccoId());
+        for(int index=0;index<ROOT_TYPES.size();index++) {
+            String code=(index+1)+"00000",type=ROOT_TYPES.get(index);
+            var existing=books.accountCode(actor.getSaccoId(),code);
+            if(existing.isPresent()) {
+                var a=existing.get();
+                require(mainGroup(a) && a.active() && a.type().equals(type) && a.normalBalance().equals(normalBalance(type)),"mainGroupConflict");
+            } else {
+                persistAccount(actor,new AccountCommand(code,ROOT_NAMES.get(index),type,normalBalance(type),"HEADING","OTHER",null,ROOT_NAMES_SW.get(index),null));
+            }
+        }
+    }
+    @Transactional
+    public UUID onboardAccount(AppUserPrincipal actor,AccountOnboardingForm form,boolean group) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");books.lockAccounts(actor.getSaccoId());
+        var parent=onboardingParent(actor,form.getParentId(),group);
+        String code=trim(form.getCode());
+        boolean validCode=group
+            ? (mainGroup(parent)?code.matches(parent.code().substring(0,1)+"[1-9]0000"):code.matches(parent.code().substring(0,2)+"[1-9]000"))
+            : code.matches(parent.code().substring(0,3)+"[0-9]{3}") && !code.endsWith("000");
+        require(validCode,"chartCode");require(books.accountCode(actor.getSaccoId(),code).isEmpty(),"duplicate");
+        String kind=group?"HEADING":form.getKind(),purpose=group?"OTHER":form.getPurpose();
+        require(group || Set.of("POSTING","CONTROL").contains(kind),"accountClassification");
+        return persistAccount(actor,new AccountCommand(code,trim(form.getName()),parent.type(),group?normalBalance(parent.type()):form.getNormalBalance(),kind,purpose,parent.id(),trim(form.getNameSw()),trim(form.getDescription())));
+    }
+    private Account onboardingParent(AppUserPrincipal actor,UUID id,boolean groups) {
+        require(id!=null,"parent");
+        var parent=books.account(actor.getSaccoId(),id).orElseThrow(()->invalid("parent"));
+        require(parent.active() && "HEADING".equals(parent.kind()),"parent");
+        require(groups?parent.code().matches("[1-5][0-9]0000"):parent.code().matches("[1-5][1-9][1-9]000"),"chartParent");
+        // Verify the actual hierarchy, not just the readable code prefix.
+        var node=parent;
+        while(!mainGroup(node)) {
+            require(node.parentId()!=null,"chartParent");
+            var ancestor=books.account(actor.getSaccoId(),node.parentId()).orElseThrow(()->invalid("parent"));
+            require(ancestor.active() && "HEADING".equals(ancestor.kind()) && ancestor.type().equals(parent.type()) &&
+                (node.code().matches("[1-5][1-9]0000")?mainGroup(ancestor) && node.code().startsWith(ancestor.code().substring(0,1)):
+                    ancestor.code().matches("[1-5][1-9]0000") && node.code().startsWith(ancestor.code().substring(0,2))),"chartParent");
+            node=ancestor;
+        }
+        require(ROOT_TYPES.get(Integer.parseInt(node.code().substring(0,1))-1).equals(parent.type()),"chartParent");
+        return parent;
+    }
+    private static String normalBalance(String type) {return Set.of("ASSET","EXPENSE").contains(type)?"DEBIT":"CREDIT";}
+    private static String trim(String value) {return value==null?"":value.strip();}
+    private static void validateFilter(AccountFilter filter) {
+        require(filter!=null && filter.search()!=null && filter.search().length()<=100,"search");
+        require(filter.type()!=null && (filter.type().isEmpty() || TYPES.contains(filter.type())) && filter.kind()!=null &&
+            (filter.kind().isEmpty() || KINDS.contains(filter.kind())) && Set.of("","ACTIVE","INACTIVE").contains(filter.state()),"accountClassification");
+    }
 
     @Transactional(readOnly=true)
     public boolean hasInstitutionHistory(String institution) {return institution!=null && books.hasInstitutionHistory(institution);}
@@ -61,11 +146,15 @@ public class GeneralLedgerService {
     @Transactional
     public UUID createAccount(AppUserPrincipal actor,AccountCommand c) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");
+        books.lockAccounts(actor.getSaccoId());return persistAccount(actor,c);
+    }
+    private UUID persistAccount(AppUserPrincipal actor,AccountCommand c) {
         require(c!=null && c.code()!=null && c.code().matches("[A-Z0-9][A-Z0-9_.-]{0,39}"),"accountCode");
         text(c.name(),160,"name");
+        require(c.nameSw()==null || c.nameSw().length()<=160,"nameSw");
+        require(c.description()==null || c.description().length()<=500,"description");
         require(TYPES.contains(c.type()) && Set.of("DEBIT","CREDIT").contains(c.normalBalance()) && KINDS.contains(c.kind()) && PURPOSES.contains(c.purpose()),"accountClassification");
         require(!Set.of("LOAN_PRINCIPAL","INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE").contains(c.purpose()) || "CONTROL".equals(c.kind()),"loanControl");
-        books.lockAccounts(actor.getSaccoId());
         if(c.parentId()!=null) {
             Account parent=books.account(actor.getSaccoId(),c.parentId()).orElseThrow(()->invalid("parent"));
             require(parent.active() && "HEADING".equals(parent.kind()) && parent.type().equals(c.type()),"parent");
@@ -82,8 +171,17 @@ public class GeneralLedgerService {
     public void deactivateAccount(AppUserPrincipal actor,UUID id) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");
         books.lockAccounts(actor.getSaccoId());
-        require(books.account(actor.getSaccoId(),id).isPresent(),"account");
+        var account=books.account(actor.getSaccoId(),id).orElseThrow(()->invalid("account"));
+        require(!mainGroup(account),"mainGroupProtected");
+        require(!books.activeChildren(actor.getSaccoId(),id),"activeChildren");
         books.deactivate(actor.getSaccoId(),id);event(actor,id,"ACCOUNT_DEACTIVATED",Map.of());
+    }
+    @Transactional
+    public void reactivateAccount(AppUserPrincipal actor,UUID id) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");books.lockAccounts(actor.getSaccoId());
+        var account=books.account(actor.getSaccoId(),id).orElseThrow(()->invalid("account"));
+        if(account.parentId()!=null) require(books.account(actor.getSaccoId(),account.parentId()).map(Account::active).orElse(false),"parent");
+        books.reactivate(actor.getSaccoId(),id);event(actor,id,"ACCOUNT_REACTIVATED",Map.of());
     }
     @Transactional
     public UUID createPeriod(AppUserPrincipal actor,LocalDate start,LocalDate end) {

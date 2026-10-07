@@ -76,6 +76,75 @@ class GeneralLedgerPostgresTest {
         when(policies.requireApprovedLocalPolicy(eq(institution),any())).thenReturn(snapshot);
         period=service.createPeriod(maker,DAY,DAY.plusMonths(1));
     }
+    @Test void chartSetupAndOnboardingNeedNoPolicyApprovalAndPreserveBilingualMetadata() {
+        clearInvocations(policies);
+        service.initializeChart(maker);service.initializeChart(maker);
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code ~ '^[1-5]00000$'",Integer.class,institution)).isEqualTo(5);
+        UUID root=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='100000'",UUID.class,institution);
+        var subgroup=coaForm("120000",root,"Non-current assets");UUID sub=service.onboardAccount(maker,subgroup,true);
+        UUID family=service.onboardAccount(maker,coaForm("121000",sub,"Property, plant and equipment"),true);
+        assertThat(service.suggestChartCode(maker,family,false)).isEqualTo("121001");
+        var land=coaForm("121001",family,"Land — cost");land.setNameSw("Ardhi — gharama");land.setDescription("Owned land");
+        UUID landId=service.onboardAccount(maker,land,false);
+        assertThat(service.suggestChartCode(maker,family,false)).isEqualTo("121002");
+        var depreciation=coaForm("121003",family,"Accumulated depreciation");depreciation.setNormalBalance("CREDIT");service.onboardAccount(maker,depreciation,false);
+        var rows=service.chart(maker,new AccountFilter("Ardhi","ASSET","POSTING","ACTIVE"),0).rows();
+        assertThat(rows).hasSize(1);assertThat(rows.getFirst().parentCode()).isEqualTo("121000");
+        assertThat(rows.getFirst().account().id()).isEqualTo(landId);assertThat(rows.getFirst().account().nameSw()).isEqualTo("Ardhi — gharama");
+        assertThat(rows.getFirst().account().description()).isEqualTo("Owned land");
+        verify(policies,never()).requireApprovedLocalPolicy(anyString(),any());
+    }
+    @Test void chartRejectsWrongHierarchyDuplicateAndForeignParentsAndProtectsMainGroups() {
+        service.initializeChart(maker);
+        UUID root=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='100000'",UUID.class,institution);
+        UUID subgroup=service.onboardAccount(maker,coaForm("110000",root,"Current assets"),true);
+        UUID family=service.onboardAccount(maker,coaForm("111000",subgroup,"Cash and bank"),true);
+        assertThatThrownBy(()->service.onboardAccount(maker,coaForm("211001",family,"Wrong type"),false)).hasMessage("accounting.error.chartCode");
+        assertThatThrownBy(()->service.onboardAccount(maker,coaForm("111001",subgroup,"Wrong level"),false)).hasMessage("accounting.error.chartParent");
+        service.onboardAccount(maker,coaForm("111001",family,"Cash"),false);
+        assertThatThrownBy(()->service.onboardAccount(maker,coaForm("111001",family,"Duplicate"),false)).hasMessage("accounting.error.duplicate");
+        var control=coaForm("111002",family,"Loan principal");control.setPurpose("LOAN_PRINCIPAL");
+        assertThatThrownBy(()->service.onboardAccount(maker,control,false)).hasMessage("accounting.error.loanControl");
+        control.setKind("CONTROL");service.onboardAccount(maker,control,false);
+        UUID foreign=UUID.randomUUID();
+        jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,'FOREIGN','100000','Foreign assets','ASSET','DEBIT','HEADING','OTHER',?,?)",foreign,maker.getMemberId(),NOW);
+        assertThatThrownBy(()->service.onboardAccount(maker,coaForm("120000",foreign,"Foreign parent"),true)).hasMessage("accounting.error.parent");
+        assertThatThrownBy(()->service.deactivateAccount(maker,root)).hasMessage("accounting.error.mainGroupProtected");
+        assertThatThrownBy(()->service.deactivateAccount(maker,family)).hasMessage("accounting.error.activeChildren");
+    }
+    @Test void chartListsAndParentSearchAreBoundedAndReactivationChecksTheParent() {
+        service.initializeChart(maker);
+        UUID root=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='100000'",UUID.class,institution);
+        UUID sub=service.onboardAccount(maker,coaForm("110000",root,"Current assets"),true);
+        UUID family=service.onboardAccount(maker,coaForm("111000",sub,"Cash"),true);
+        for(int n=1;n<=30;n++)service.onboardAccount(maker,coaForm(String.format("111%03d",n),family,"Account "+n),false);
+        var filter=new AccountFilter("","ASSET","POSTING","ACTIVE");
+        assertThat(service.chart(maker,filter,0).rows()).hasSize(25);assertThat(service.chart(maker,filter,0).hasNext()).isTrue();
+        assertThat(service.chart(maker,filter,1).rows()).hasSize(6); // fixture CASH plus 30 new accounts
+        assertThat(service.chartParents(maker,false,"Cash",0).rows()).extracting(Account::id).containsExactly(family);
+        UUID posting=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='111001'",UUID.class,institution);
+        service.deactivateAccount(maker,posting);service.reactivateAccount(maker,posting);
+        assertThat(service.chart(maker,new AccountFilter("111001","","","ACTIVE"),0).rows()).hasSize(1);
+        for(int n=1;n<=30;n++)service.deactivateAccount(maker,jdbc.queryForObject("select id from gl_account where sacco_id=? and code=?",UUID.class,institution,String.format("111%03d",n)));
+        service.deactivateAccount(maker,family);
+        assertThatThrownBy(()->service.reactivateAccount(maker,posting)).hasMessage("accounting.error.parent");
+    }
+    @Test void chartConcurrentDuplicateCodesPersistOnceAndAuditFailureRollsBackSetup() throws Exception {
+        doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).logEvent(anyString(),any(),eq("ACCOUNT_CREATED"),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+        assertThatThrownBy(()->service.initializeChart(maker)).isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code='100000'",Integer.class,institution)).isZero();
+        reset(audit);service.initializeChart(maker);
+        UUID root=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='100000'",UUID.class,institution);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            Callable<Boolean> create=()->{try{service.onboardAccount(maker,coaForm("110000",root,"Current assets"),true);return true;}catch(IllegalArgumentException duplicate){return false;}};
+            var first=pool.submit(create);var second=pool.submit(create);
+            assertThat(List.of(first.get(15,TimeUnit.SECONDS),second.get(15,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+        }
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code='110000'",Integer.class,institution)).isEqualTo(1);
+    }
+    private com.sacco.mvp.accounting.dto.AccountOnboardingForm coaForm(String code,UUID parent,String name) {
+        var form=new com.sacco.mvp.accounting.dto.AccountOnboardingForm();form.setCode(code);form.setParentId(parent);form.setName(name);form.setNormalBalance("DEBIT");return form;
+    }
     @Test void reviewedOpeningAndExactRetryAreBalancedAndTraceable() {
         var c=command("OPEN-1","1000.01");var j=service.importOpening(maker,c);
         assertThat(service.importOpening(maker,c).id()).isEqualTo(j.id());

@@ -61,10 +61,13 @@ class FinanceWorkspaceSecurityTest {
         mvc.perform(post("/finance/test-boundary").with(user(actor)).with(csrf())).andExpect(status().isOk());
     }
 
-    @Test void financialPermissionsAreNeverImplicitRoleDefaults() {
+    @Test void onlyAccountantsReceiveChartOnboardingDefaults() {
         for (Position role : Position.values()) {
-            assertThat(UserClaim.defaultClaims(Set.of(role), true)).noneMatch(claim ->
-                claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATE_"));
+            var financial=UserClaim.defaultClaims(Set.of(role), true).stream().filter(claim ->
+                claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATE_")).toList();
+            if(role==Position.ACCOUNTANT) assertThat(financial).containsExactlyInAnyOrder(
+                UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
+            else assertThat(financial).isEmpty();
         }
     }
 

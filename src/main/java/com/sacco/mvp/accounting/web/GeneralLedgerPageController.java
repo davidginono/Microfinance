@@ -20,20 +20,11 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping("/finance")
 public class GeneralLedgerPageController {
     private final GeneralLedgerService ledger;
-    @GetMapping("/accounts")
-    String accounts(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,Model model) {
-        model.addAttribute("accounts",ledger.accounts(actor,page));
-        model.addAttribute("accountTypes",List.of("ASSET","LIABILITY","EQUITY","INCOME","EXPENSE"));
-        model.addAttribute("accountKinds",List.of("HEADING","POSTING","CONTROL"));
-        model.addAttribute("accountPurposes",List.of("CASH","BANK","MOBILE_MONEY","CLEARING","SUSPENSE","LOAN_PRINCIPAL","INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE","PAYABLE","FUNDING","CAPITAL","INCOME","EXPENSE","FIXED_ASSET","PREPAYMENT","TAX","INTERNAL_TRANSFER","OTHER"));
-        return "accounting/accounts";
-    }
+    /** Compatibility endpoint; the onboarding forms use /accounts/groups and /accounts/posting. */
     @PostMapping("/accounts")
     String createAccount(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String code,@RequestParam String name,@RequestParam String type,@RequestParam String normalBalance,@RequestParam String kind,@RequestParam String purpose,@RequestParam(required=false) UUID parentId,RedirectAttributes flash) {
         ledger.createAccount(actor,new AccountCommand(code,name,type,normalBalance,kind,purpose,parentId));flash.addFlashAttribute("accountingSuccess","accounting.saved");return "redirect:/finance/accounts";
     }
-    @PostMapping("/accounts/{id}/deactivate")
-    String deactivate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id) {ledger.deactivateAccount(actor,id);return "redirect:/finance/accounts";}
     @PostMapping("/periods")
     String period(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam LocalDate start,@RequestParam LocalDate end,RedirectAttributes flash) {
         ledger.createPeriod(actor,start,end);flash.addFlashAttribute("accountingSuccess","accounting.saved");return "redirect:/finance/accounts";

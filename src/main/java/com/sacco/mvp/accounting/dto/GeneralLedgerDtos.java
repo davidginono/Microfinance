@@ -10,9 +10,19 @@ import java.util.UUID;
 public final class GeneralLedgerDtos {
     private GeneralLedgerDtos() { }
     public record AccountCommand(String code, String name, String type, String normalBalance,
-                                 String kind, String purpose, UUID parentId) { }
+                                 String kind, String purpose, UUID parentId, String nameSw, String description) {
+        public AccountCommand(String code,String name,String type,String normalBalance,String kind,String purpose,UUID parentId) {
+            this(code,name,type,normalBalance,kind,purpose,parentId,null,null);
+        }
+    }
     public record Account(UUID id, String code, String name, String type, String normalBalance,
-                          String kind, String purpose, UUID parentId, boolean active) { }
+                          String kind, String purpose, UUID parentId, boolean active, String nameSw, String description) {
+        public Account(UUID id,String code,String name,String type,String normalBalance,String kind,String purpose,UUID parentId,boolean active) {
+            this(id,code,name,type,normalBalance,kind,purpose,parentId,active,null,null);
+        }
+    }
+    public record AccountRow(Account account,String parentCode,String parentName,String parentNameSw) { }
+    public record AccountFilter(String search,String type,String kind,String state) { }
     public record DisplayLine(String code,String name,BigDecimal debit,BigDecimal credit) { }
     public record Line(UUID accountId, BigDecimal debit, BigDecimal credit) { }
     public record JournalCommand(UUID requestKey, String sourceReference, LocalDate effectiveDate,

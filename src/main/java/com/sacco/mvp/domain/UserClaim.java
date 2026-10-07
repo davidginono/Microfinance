@@ -302,7 +302,10 @@ public enum UserClaim {
                 }
                 case LOAN_OFFICER -> claims.addAll(legacyClaims("REVIEW_LOAN_OFFICER_QUEUE"));
                 case MANAGER -> claims.addAll(legacyClaims("REVIEW_MANAGER_QUEUE"));
-                case ACCOUNTANT -> claims.addAll(legacyClaims("REVIEW_ACCOUNTANT_QUEUE"));
+                case ACCOUNTANT -> {
+                    claims.addAll(legacyClaims("REVIEW_ACCOUNTANT_QUEUE"));
+                    addAll(claims, ACCOUNTING_ACCOUNTS_VIEW, ACCOUNTING_ACCOUNTS_CREATE, ACCOUNTING_ACCOUNTS_UPDATE);
+                }
                 case DISBURSEMENT_OFFICER -> {
                     claims.addAll(legacyClaims("ACCESS_DISBURSEMENT_QUEUE"));
                     claims.addAll(legacyClaims("DISBURSE_LOAN"));

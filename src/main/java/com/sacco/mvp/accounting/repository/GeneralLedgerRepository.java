@@ -34,6 +34,34 @@ public class GeneralLedgerRepository {
     public List<Account> accounts(String institution, int offset, int limit) {
         return jdbc.query("select * from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
     }
+    public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit) {
+        var args=new java.util.ArrayList<Object>();args.add(institution);
+        String where=" where a.sacco_id=?";
+        if(!filter.search().isEmpty()) {
+            where+=" and (strpos(lower(a.code),?)>0 or strpos(lower(a.name),?)>0 or strpos(lower(coalesce(a.name_sw,'')),?)>0)";
+            String search=filter.search().toLowerCase(java.util.Locale.ROOT);args.add(search);args.add(search);args.add(search);
+        }
+        if(!filter.type().isEmpty()){where+=" and a.type=?";args.add(filter.type());}
+        if(!filter.kind().isEmpty()){where+=" and a.kind=?";args.add(filter.kind());}
+        if(!filter.state().isEmpty()){where+=" and a.active=?";args.add("ACTIVE".equals(filter.state()));}
+        args.add(limit);args.add(offset);
+        return jdbc.query("select a.*,p.code parent_code,p.name parent_name,p.name_sw parent_name_sw from gl_account a left join gl_account p on p.id=a.parent_id and p.sacco_id=a.sacco_id"+where+" order by a.code,a.id limit ? offset ?",
+            (r,n)->new AccountRow(account(r,n),r.getString("parent_code"),r.getString("parent_name"),r.getString("parent_name_sw")),args.toArray());
+    }
+    public List<Account> chartParents(String institution,boolean groups,String search,int offset,int limit) {
+        String pattern=groups?"^[1-5]([0-9]0000)$":"^[1-5][1-9][1-9]000$";
+        String term=search.toLowerCase(java.util.Locale.ROOT);
+        return jdbc.query("select * from gl_account where sacco_id=? and active and kind='HEADING' and code ~ ? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) order by code,id limit ? offset ?",
+            this::account,institution,pattern,term,term,term,limit,offset);
+    }
+    public Optional<String> availableChartCode(String institution,int start,int end,int step) {
+        return jdbc.query("select lpad(n::text,6,'0') code from generate_series(?,?,?) n where not exists(select 1 from gl_account where sacco_id=? and code=lpad(n::text,6,'0')) order by n limit 1",
+            (r,n)->r.getString("code"),start,end,step,institution).stream().findFirst();
+    }
+    public boolean activeChildren(String institution,UUID parent) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where sacco_id=? and parent_id=? and active)",Boolean.class,institution,parent));
+    }
+    public void reactivate(String institution,UUID id) {jdbc.update("update gl_account set active=true where sacco_id=? and id=?",institution,id);}
     /** Validate the bounded local mapping set and hold mapped accounts stable until review commits. */
     public boolean validPolicyMappings(String institution, java.util.Collection<UUID> mappings) {
         var ids=new java.util.HashSet<>(mappings);
@@ -55,8 +83,8 @@ public class GeneralLedgerRepository {
         return jdbc.query("select a.code,a.name,l.debit,l.credit from gl_journal_line l join gl_account a on a.id=l.account_id where l.journal_id=? order by a.code,l.id limit 500",(r,n)->new DisplayLine(r.getString(1),r.getString(2),r.getBigDecimal(3),r.getBigDecimal(4)),journal);
     }
     public void createAccount(String institution, UUID id, AccountCommand c, UUID maker, OffsetDateTime now) {
-        jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",
-            id,institution,c.code(),c.name(),c.type(),c.normalBalance(),c.kind(),c.purpose(),c.parentId(),maker,now);
+        jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at,name_sw,description) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            id,institution,c.code(),c.name(),c.type(),c.normalBalance(),c.kind(),c.purpose(),c.parentId(),maker,now,c.nameSw(),c.description());
     }
     public void deactivate(String institution, UUID id) {
         jdbc.update("update gl_account set active=false where sacco_id=? and id=?",institution,id);
@@ -146,7 +174,7 @@ public class GeneralLedgerRepository {
     public record SourceMappedBalance(String kind,String purpose,java.math.BigDecimal signedBalance) { }
     public record OperationalLine(String accountCode,java.math.BigDecimal debit,java.math.BigDecimal credit,LocalDate date,UUID loanId) { }
     private Account account(ResultSet r,int n) throws SQLException {
-        return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("normal_balance"),r.getString("kind"),r.getString("purpose"),r.getObject("parent_id",UUID.class),r.getBoolean("active"));
+        return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("normal_balance"),r.getString("kind"),r.getString("purpose"),r.getObject("parent_id",UUID.class),r.getBoolean("active"),r.getString("name_sw"),r.getString("description"));
     }
     private Period period(ResultSet r,int n) throws SQLException {
         return new Period(r.getObject("id",UUID.class),r.getString("sacco_id"),r.getObject("starts_on",LocalDate.class),r.getObject("ends_on",LocalDate.class),r.getString("state"),r.getObject("policy_id",UUID.class));

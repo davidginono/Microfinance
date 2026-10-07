@@ -166,6 +166,15 @@ No implementation completion is asserted by the creation of this checklist.
 - Commit `47af6f0` adds explicit policy, account, journal, opening, cutover, period, template, and report-run claims with no automatic role grants; a staff-only scoped finance route gate preserves session/CSRF controls. Focused permission/login/CSRF checks: 26 tests, zero failures/errors/skips. Policy foundation commit `87b7bd5` is integrated as `18323de`; its phase-specific verification is pending.
 - No checklist phase or overall acceptance gate is marked complete by this coordination entry. Full financial, rendered, security, recovery, performance, and human review evidence will be recorded separately as increments are verified.
 
+### 2026-10-07 — Direct accountant COA onboarding
+
+- User instruction supersedes approval requirements for COA setup: the authorized accountant creates active main groups, subgroups, account families, and posting/control accounts directly. Existing journal, repayment, policy, opening, reconciliation, and closing processes are outside this increment. No opening amounts or accounting-policy decisions were inferred.
+- Partial B01/B02 foundation: institution-owned six-digit hierarchy, parent-derived classification, bilingual metadata, contra balances, account lifecycle protections, audited atomic setup, and bounded registry/parent search. Architecture and usage are documented in `docs/chart-of-accounts-architecture.md`. The activity/transaction library is an architecture proposal only.
+- Migration V51 adds optional account metadata and lookup indexes, and supplies the three COA claims to existing active scoped accountants while preserving other claims. Session refresh requires signing in again. Current explicit claim revocation remains authoritative.
+- Verification: `mvn -DskipTests compile` passed. The final `mvn -Dtest=GeneralLedger*Test,ChartOfAccounts*Test,FinanceWorkspaceSecurityTest,LoginCsrfAccessDeniedTest,UserClaimTest,UserClaimServiceTest test` passed with 55 tests, zero failures/errors/skips, including Java 25 recompilation, both JSP views with shared includes, the V50-to-V51 permission upgrade, and 17 live ledger/hierarchy/concurrency/rollback tests. Both disposable PostgreSQL 17 databases applied all 67 migrations through V51; the operational datasource was not used. `git diff --check` passed.
+- The broader suite was interrupted after 15 minutes; it had reported 405 tests, zero assertion failures/errors, and 210 skipped checks before interruption. This is not a full-suite pass. Packaging was not rerun. Commit: the local commit containing this evidence entry, titled `Add direct accountant chart-of-accounts onboarding`.
+- Browser timeouts prevented final rendered English/Kiswahili and mobile-width checks. Responsive CSS and localized labels are implemented; rendered verification remains pending. No throughput benchmark, recovery exercise, financial reconciliation, or overall accounting-package completion is claimed.
+
 ## Official Review References
 
 Reviewed for planning on 2026-10-02; verify amendments and institution-specific instructions again at implementation/release.

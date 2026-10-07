@@ -1,1 +1,9 @@
 .accounting-workspace{min-width:0;display:grid;gap:1rem}.accounting-form{min-width:0;background:white;border:1px solid #d7dde3;border-radius:4px;padding:1rem}.accounting-form form{display:grid;gap:.8rem}.accounting-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:.8rem}.accounting-form label{display:grid;gap:.35rem;min-width:0}.accounting-form .aws-control{width:100%;min-width:0}.accounting-actions{display:flex;gap:.5rem;flex-wrap:wrap;padding:.5rem 0}.accounting-money{text-align:right;font-variant-numeric:tabular-nums}.accounting-workspace p{overflow-wrap:anywhere}.accounting-form .app-btn{justify-self:start}
+
+/* Chart onboarding follows the shared compact ERP shell. */
+.coa-titlebar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.75rem 1rem}
+.coa-titlebar h2{margin:0}.coa-filters{padding:.75rem 1rem;align-items:flex-end}.coa-filters label{display:grid;gap:.35rem;min-width:0}.coa-filters .aws-control{width:100%;min-width:0}
+.coa-parent-picker{min-width:0}.coa-parent-picker summary{cursor:pointer;padding:.5rem 0;font-weight:600}.coa-parent-picker .erp-table-wrap{margin-top:.5rem}
+.coa-description{display:block;color:#52606d;overflow-wrap:anywhere}.coa-wide{grid-column:1/-1}.coa-location{padding:.6rem 0;border-bottom:1px solid #d7dde3}
+.coa-error{color:#a12622;overflow-wrap:anywhere}.coa-success{color:#166534}.accounting-grid small{color:#52606d}.coa-filters input,.coa-filters select{max-width:100%}
+@media(max-width:767px){.coa-filters>label,.coa-filters>.erp-table-toolbar__actions{flex:1 1 100%}.coa-titlebar{align-items:flex-start}.accounting-grid{grid-template-columns:minmax(0,1fr)}}
