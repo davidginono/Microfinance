@@ -6,23 +6,25 @@
         const triggers = document.querySelectorAll('[data-library-open]');
         let previousFocus;
         let previousOverflow;
+        let previousRootOverflow;
         let submitting = false;
         const focusable = () => Array.from(panel.querySelectorAll('button:not([disabled]), input:not([type="hidden"]), textarea, select, a[href], [tabindex="0"]')).filter(el => el.getClientRects().length);
         const open = () => {
-            previousFocus = document.activeElement; previousOverflow = document.body.style.overflow;
-            modal.hidden = false; modal.classList.add('is-open'); document.body.style.overflow = 'hidden';
+            previousFocus = document.activeElement; previousOverflow = document.body.style.overflow; previousRootOverflow = document.documentElement.style.overflow;
+            modal.hidden = false; modal.classList.add('is-open'); document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden';
             (panel.querySelector('.coa-error') ? panel : panel.querySelector('input:not([type="hidden"])') || focusable()[0] || panel).focus();
         };
-        const close = () => {
+        const close = (discard = false) => {
             if (submitting) return;
-            modal.classList.remove('is-open'); modal.hidden = true; document.body.style.overflow = previousOverflow || '';
+            if (!discard && !document.dispatchEvent(new CustomEvent('accounting:before-close', {cancelable:true, detail:{close:() => close(true)}}))) return;
+            modal.classList.remove('is-open'); modal.hidden = true; document.body.style.overflow = previousOverflow || ''; document.documentElement.style.overflow = previousRootOverflow || '';
             (previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : triggers[0])?.focus();
             const url = new URL(location.href); url.searchParams.delete('create');
             if (modal.dataset.created === 'true') location.replace(url.href);
             else history.replaceState(null, '', url.href);
         };
         triggers.forEach(button => button.addEventListener('click', open));
-        modal.querySelectorAll('[data-library-close]').forEach(button => button.addEventListener('click', close));
+        modal.querySelectorAll('[data-library-close]').forEach(button => button.addEventListener('click', () => close()));
         modal.addEventListener('keydown', event => {
             if (event.key === 'Escape') { event.preventDefault(); close(); }
             if (event.key === 'Tab') {
@@ -79,6 +81,8 @@
         if (enhancedWrapper) enhancedWrapper.replaceWith(select);
         select.removeAttribute('data-neo-enhanced');
         select.classList.remove('neo-select-native');
+        row.querySelectorAll('.coa-error').forEach(error => error.remove());
+        row.querySelectorAll('[aria-invalid],[aria-describedby]').forEach(control => { control.removeAttribute('aria-invalid'); control.removeAttribute('aria-describedby'); });
         row.querySelectorAll('input').forEach(input => input.value = '');
         select.selectedIndex = 0;
         list.appendChild(row); renumber();

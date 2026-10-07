@@ -8,7 +8,11 @@
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library' />"><spring:message code="library.navigation" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library/transactions' />"><spring:message code="library.transactions" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="library.transactionTemplates" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="library.transactionTemplates" /></h1></div>
-<div class="accounting-workspace">
+<div class="accounting-workspace accounting-resource-workspace">
+    <section class="erp-table-wrap accounting-filter-section">
+        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="coa.filterBy" /></h2>
+            <c:if test="${not empty transaction}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" action="<c:url value='/finance/library/transactions/${transaction.id}/${transaction.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${transaction.active?'accounting.deactivate':'coa.reactivate'}" /></button></form></sec:authorize></c:if>
+        </div>
     <form method="get" action="<c:url value='/finance/library/templates' />" class="erp-table-toolbar coa-filters library-template-filters">
         <label class="erp-table-toolbar__control"><spring:message code="library.activity" /><select class="aws-control" name="activityId"><option value=""><spring:message code="coa.all" /></option>
             <c:if test="${not empty activity}"><option value="${activity.id}" selected><c:out value="${activity.code}" /> · <c:out value="${activity.name}" /></option></c:if>
@@ -23,17 +27,14 @@
         <label class="erp-table-toolbar__control"><spring:message code="coa.status" /><select class="aws-control" name="state"><option value=""><spring:message code="coa.all" /></option><option value="ACTIVE" ${state=='ACTIVE'?'selected':''}><spring:message code="accounting.active.true" /></option><option value="INACTIVE" ${state=='INACTIVE'?'selected':''}><spring:message code="accounting.active.false" /></option></select></label>
         <div class="erp-table-toolbar__actions"><button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button><a class="app-btn btn-neutral" href="<c:url value='/finance/library/templates' />"><spring:message code="coa.clear" /></a></div>
     </form>
+    </section>
     <c:if test="${empty transaction}"><p role="status"><spring:message code="library.noMatchingTransactions" /></p></c:if>
     <c:if test="${not empty transaction}">
     <c:if test="${not empty transaction.description}"><p><c:out value="${transaction.description}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
-    <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><div class="accounting-actions">
-        <c:if test="${transaction.active}"><a class="app-btn btn-primary" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="library.newVersion" /></a></c:if>
-        <form method="post" action="<c:url value='/finance/library/transactions/${transaction.id}/${transaction.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${transaction.active?'accounting.deactivate':'coa.reactivate'}" /></button></form>
-    </div></sec:authorize>
-    <p><spring:message code="library.definitionOnly" /></p>
+    <p class="accounting-definition-note"><spring:message code="library.definitionOnly" /></p>
     <section class="erp-table-wrap" data-aws-table-region>
-        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2></div>
+        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${transaction.active}"><a class="app-btn btn-primary" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="library.newVersion" /></a></c:if></sec:authorize></div>
         <form method="get" action="<c:url value='/finance/library/templates' />" class="erp-table-toolbar coa-filters library-template-filters">
             <input type="hidden" name="transactionId" value="${transaction.id}" /><input type="hidden" name="activityId" value="${activity.id}" /><input type="hidden" name="sourceEvent" value="<c:out value='${sourceEvent}' />" /><input type="hidden" name="state" value="<c:out value='${state}' />" /><input type="hidden" name="page" value="${versions.page}" />
             <label class="erp-table-toolbar__control"><spring:message code="library.templateVersion" /><select class="aws-control" name="version"><option value=""><spring:message code="library.currentVersion" /></option>

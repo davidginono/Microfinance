@@ -9,7 +9,7 @@
 <c:set var="formBase" value="${groupMode?'/finance/accounts/groups':'/finance/accounts/posting'}" />
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="${groupMode?'coa.newGroup':'coa.newAccount'}" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${groupMode?'coa.newGroup':'coa.newAccount'}" /></h1></div>
-<div class="accounting-workspace">
+<div class="accounting-workspace accounting-create-workspace">
     <p><spring:message code="${groupMode?'coa.groupHelp':'coa.accountHelp'}" /></p>
     <c:if test="${not empty parentError}"><p class="coa-error" role="alert"><spring:message code="${parentError}" /></p></c:if>
     <details class="coa-parent-picker" ${empty selectedParent?'open':''}>
@@ -30,25 +30,29 @@
             </div>
         </section>
     </details>
-    <section class="accounting-form">
-        <h2><spring:message code="coa.details" /></h2>
-        <c:if test="${not empty selectedParent}"><p class="coa-location"><spring:message code="coa.parentGroup" />: <strong><c:out value="${selectedParent.code}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty selectedParent.nameSw?selectedParent.nameSw:selectedParent.name}" /></strong> · <spring:message code="accounting.option.${selectedParent.type}" /></p></c:if>
+    <section class="accounting-form accounting-create-card">
+        <h2><spring:message code="${groupMode?'coa.groupDetails':'coa.accountDetails'}" /></h2>
+        <c:if test="${not empty selectedParent}"><dl class="accounting-context"><div><dt><spring:message code="coa.parentGroup" /></dt><dd><c:out value="${selectedParent.code}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty selectedParent.nameSw?selectedParent.nameSw:selectedParent.name}" /></dd></div><div><dt><spring:message code="accounting.type" /></dt><dd><spring:message code="accounting.option.${selectedParent.type}" /></dd></div></dl></c:if>
         <c:url value="${formBase}" var="saveUrl" />
-        <form:form method="post" action="${saveUrl}" modelAttribute="accountForm">
+        <form:form method="post" action="${saveUrl}" modelAttribute="accountForm" cssClass="accounting-create-form">
             <form:hidden path="parentId" />
-            <div role="alert"><form:errors path="*" cssClass="coa-error" element="p" /></div>
+            <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>
+            <form:errors path="parentId" cssClass="coa-error" element="p" />
             <div class="accounting-grid">
-                <label><spring:message code="accounting.code" /><form:input path="code" cssClass="aws-control" maxlength="6" pattern="[1-5][0-9]{5}" required="required" /><small><spring:message code="coa.codeHelp" /></small></label>
-                <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
-                <c:if test="${not groupMode}">
-                    <label><spring:message code="accounting.normalBalance" /><form:select path="normalBalance" cssClass="aws-control"><form:option value="DEBIT"><spring:message code="accounting.debit" /></form:option><form:option value="CREDIT"><spring:message code="accounting.credit" /></form:option></form:select><small><spring:message code="coa.balanceHelp" /></small></label>
-                    <label><spring:message code="coa.postingAccess" /><form:select path="kind" cssClass="aws-control"><form:option value="POSTING"><spring:message code="accounting.option.POSTING" /></form:option><form:option value="CONTROL"><spring:message code="coa.control" /></form:option></form:select></label>
-                    <label><spring:message code="accounting.purpose" /><form:select path="purpose" cssClass="aws-control"><c:forEach items="${accountPurposes}" var="p"><form:option value="${p}"><spring:message code="accounting.option.${p}" /></form:option></c:forEach></form:select></label>
-                </c:if>
-                <label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /></label>
+                <label><spring:message code="accounting.code" /><form:input path="code" cssClass="aws-control" maxlength="6" pattern="[1-5][0-9]{5}" required="required" /><small><spring:message code="coa.codeHelp" /></small><form:errors path="code" cssClass="coa-error" /></label>
+                <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /><form:errors path="name" cssClass="coa-error" /></label>
             </div>
-            <div class="accounting-actions"><button class="app-btn btn-primary" ${empty selectedParent?'disabled':''}><spring:message code="coa.save" /></button><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts' />"><spring:message code="common.cancel" /></a></div>
+                <c:if test="${not groupMode}">
+                    <fieldset class="accounting-form-section"><legend><spring:message code="coa.accountSettings" /></legend><div class="accounting-grid">
+                    <label><spring:message code="accounting.normalBalance" /><form:select path="normalBalance" cssClass="aws-control"><form:option value="DEBIT"><spring:message code="accounting.debit" /></form:option><form:option value="CREDIT"><spring:message code="accounting.credit" /></form:option></form:select><small><spring:message code="coa.balanceHelp" /></small></label>
+                    <label><spring:message code="coa.postingAccess" /><form:select path="kind" cssClass="aws-control"><form:option value="POSTING"><spring:message code="accounting.option.POSTING" /></form:option><form:option value="CONTROL"><spring:message code="coa.control" /></form:option></form:select><form:errors path="kind" cssClass="coa-error" /></label>
+                    <label><spring:message code="accounting.purpose" /><form:select path="purpose" cssClass="aws-control"><c:forEach items="${accountPurposes}" var="p"><form:option value="${p}"><spring:message code="accounting.option.${p}" /></form:option></c:forEach></form:select></label>
+                    </div></fieldset>
+                </c:if>
+            <details class="accounting-additional" ${not empty accountForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>
+            <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-primary"><spring:message code="${groupMode?'coa.createGroup':'coa.createAccount'}" /></button></div>
         </form:form>
     </section>
 </div>
+<%@ include file="accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

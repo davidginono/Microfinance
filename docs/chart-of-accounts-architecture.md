@@ -76,4 +76,14 @@ Future posting integration must explicitly select and retain the immutable templ
 
 ## Verification and capacity
 
+### Cloudscape UX adaptation (2026-10-07)
+
+Reviewed the [create resource](https://cloudscape.design/patterns/resource-management/create/), [single-page create](https://cloudscape.design/patterns/resource-management/create/single-page-create/), [resource details](https://cloudscape.design/patterns/resource-management/details/), [details page](https://cloudscape.design/patterns/resource-management/details/details-page/), and [sub-resource create](https://cloudscape.design/patterns/resource-management/create/sub-resource-create/) guidance.
+
+- Creation uses a bounded 960-pixel workspace, task-based sections, visible required configuration, expandable optional descriptions, verb-led page titles, matching breadcrumbs and Cancel/Create footer actions. Code/name ordering remains consistent with the registers. Parent-derived defaults and the existing account/event choices remain authoritative. Missing inputs receive validation rather than a disabled COA Create button.
+- Details remain on one page because posting lines and history fit two related sections; tabs or a resource hub would add navigation without a separate task. The existing transaction filters retain record context as requested. Template creation belongs beside the posting-template heading; activation belongs with the selected transaction context. Creation and details share compact section headers and scoped responsive controls.
+- Account pairs remain an embedded dependency saved atomically with a transaction. Existing activity/transaction register modals are retained under the user's explicit workflow requirement, an intentional adaptation of Cloudscape's full-page/sub-resource recommendations. No nested activity/account creation or new approval flow is introduced.
+- Optional sections open when they contain values or errors. Server errors appear in a summary and beside bound fields with accessible associations; failed submissions retain values. Changed forms use the shared discard dialog on Cancel/navigation and a browser leave warning on reload/close. Duplicate submission protection complements existing service idempotency. Successful register creation still waits for X before returning to the register.
+- The shared JSP shell, session/CSRF security, institution checks, bounded queries, immutable codes/history and financial-definition-only scope remain unchanged. Wide tables scroll inside their existing viewports; only form/filter presentation changes.
+
 Relevant MVC/CSRF/claim tests, live PostgreSQL hierarchy/concurrency/rollback tests, and runtime JSP checks are recorded in the accounting checklist evidence log. This increment makes no throughput claim; sustained 1,000 requests/second remains unproven. Substring searches are bounded in output but may scan an institution's chart; measure real chart sizes before adopting additional search indexes.

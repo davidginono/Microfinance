@@ -6,9 +6,9 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
-    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="coa.registry" /></span></nav>
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="accounting.accounts" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.accounts" /></h1></div>
-<div class="accounting-workspace">
+<div class="accounting-workspace accounting-resource-workspace">
     <p><spring:message code="coa.intro" /></p>
     <c:if test="${not empty accountingError}"><p class="coa-error" role="alert"><spring:message code="${accountingError}" /></p></c:if>
     <c:if test="${not empty accountingSuccess}"><p class="coa-success" role="status"><spring:message code="${accountingSuccess}" /></p></c:if>
@@ -51,7 +51,7 @@
                         <c:url value="/finance/accounts/${a.id}/${a.active?'deactivate':'reactivate'}" var="statusUrl" /><form method="post" action="${statusUrl}"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${a.active?'accounting.deactivate':'coa.reactivate'}" /></button></form>
                     </c:if></sec:authorize>
                 </div></td>
-            </tr></c:forEach><c:if test="${empty accounts.rows}"><tr><td colspan="8"><spring:message code="coa.empty" /></td></tr></c:if></tbody>
+            </tr></c:forEach><c:if test="${empty accounts.rows}"><tr><td colspan="8"><div class="accounting-empty"><spring:message code="${not empty filter.search or not empty filter.type or not empty filter.kind or not empty filter.state?'coa.noMatches':'coa.empty'}" /></div></td></tr></c:if></tbody>
         </table></div>
         <div class="erp-table-footer accounting-actions">
             <c:if test="${accounts.page>0}"><c:url value="/finance/accounts" var="previous"><c:param name="page" value="${accounts.page-1}" /><c:param name="search" value="${filter.search}" /><c:param name="type" value="${filter.type}" /><c:param name="kind" value="${filter.kind}" /><c:param name="state" value="${filter.state}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${previous}' />"><spring:message code="common.previous" /></a></c:if>

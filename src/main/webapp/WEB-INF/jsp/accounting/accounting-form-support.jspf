@@ -1,0 +1,7 @@
+<div class="app-modal-overlay accounting-discard" id="accounting-discard-modal" hidden>
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="accounting-discard-title" aria-describedby="accounting-discard-description" tabindex="-1">
+        <div class="app-modal-header"><h2 class="erp-panel-title" id="accounting-discard-title"><spring:message code="coa.discardTitle" /></h2><button type="button" class="app-modal-close" data-accounting-keep aria-label="<spring:message code='common.closeModal' />"><i data-lucide="x" aria-hidden="true"></i></button></div>
+        <div class="app-modal-body"><p id="accounting-discard-description"><spring:message code="coa.discardDescription" /></p><div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-accounting-keep><spring:message code="coa.keepEditing" /></button><button type="button" class="app-btn btn-primary" data-accounting-discard><spring:message code="coa.discard" /></button></div></div>
+    </div>
+</div>
+<script src="<c:url value='/js/accounting-form-ux.js' />" defer></script>

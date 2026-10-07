@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <div class="app-modal-overlay library-modal" id="library-create-modal" data-auto-open="${modalOpen or not empty createdCode}" data-created="${not empty createdCode}" hidden>
     <div class="app-modal-panel" role="dialog" aria-modal="true" aria-labelledby="library-modal-title" tabindex="-1">
         <div class="app-modal-scroll">
@@ -8,23 +9,24 @@
                     <datalist id="library-account-codes"><c:forEach items="${accountChoices.rows}" var="a"><option value="<c:out value='${a.code}' />"><c:out value="${a.name}" /></option></c:forEach></datalist>
                     <c:url value="/finance/library/lookup/activities" var="activityLookupUrl" /><c:url value="/finance/library/lookup/accounts" var="accountLookupUrl" />
                     <c:url value="/finance/library/transactions" var="transactionSaveUrl" />
-                    <form:form method="post" modelAttribute="transactionForm" action="${transactionSaveUrl}" cssClass="library-modal-form">
+                    <form:form method="post" modelAttribute="transactionForm" action="${transactionSaveUrl}" cssClass="library-modal-form accounting-create-form">
                         <form:hidden path="template.requestKey" /><form:hidden path="template.expectedRevision" />
-                        <div role="alert"><form:errors path="*" cssClass="coa-error" element="p" /></div>
-                        <div class="accounting-grid">
-                            <label><spring:message code="library.activityCode" /><form:input path="activityCode" cssClass="aws-control" maxlength="40" list="library-activity-codes" data-library-lookup="${activityLookupUrl}" required="required" /><small><spring:message code="library.lookupHelp" /></small></label>
-                            <label><spring:message code="library.code" /><form:input path="code" cssClass="aws-control" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,39}" required="required" /></label>
-                            <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
-                            <label><spring:message code="library.sourceEvent" /><form:select path="sourceEvent" cssClass="aws-control"><c:forEach items="${sourceEvents}" var="event"><form:option value="${event}"><spring:message code="accounting.policy.event.${event}" /></form:option></c:forEach></form:select></label>
-                            <label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /></label>
-                        </div>
-                        <fieldset class="library-account-section"><legend><spring:message code="library.involvedAccounts" /></legend><p><spring:message code="library.templateHelp" /></p>
+                        <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>
+                        <fieldset class="accounting-form-section"><legend><spring:message code="library.transactionDetails" /></legend><div class="accounting-grid">
+                            <label><spring:message code="library.activityCode" /><form:input path="activityCode" cssClass="aws-control" maxlength="40" list="library-activity-codes" data-library-lookup="${activityLookupUrl}" required="required" /><small><spring:message code="library.lookupHelp" /></small><form:errors path="activityCode" cssClass="coa-error" /></label>
+                            <label><spring:message code="library.code" /><form:input path="code" cssClass="aws-control" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,39}" required="required" /><form:errors path="code" cssClass="coa-error" /></label>
+                            <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /><form:errors path="name" cssClass="coa-error" /></label>
+                            <label><spring:message code="library.sourceEvent" /><form:select path="sourceEvent" cssClass="aws-control"><c:forEach items="${sourceEvents}" var="event"><form:option value="${event}"><spring:message code="accounting.policy.event.${event}" /></form:option></c:forEach></form:select><form:errors path="sourceEvent" cssClass="coa-error" /></label>
+
+                        </div></fieldset>
+                        <details class="accounting-additional" ${not empty transactionForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>
+                        <fieldset class="accounting-form-section library-account-section"><legend><spring:message code="library.involvedAccounts" /></legend><p><spring:message code="library.templateHelp" /></p>
                             <c:set var="ruleForms" value="${transactionForm.template.rules}" /><c:set var="rulePrefix" value="template." />
                             <%@ include file="library-rule-fields.jspf" %>
+                        <label><spring:message code="library.reason" /><form:textarea path="template.reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /><form:errors path="template.reason" cssClass="coa-error" /></label>
                         </fieldset>
-                        <label><spring:message code="library.reason" /><form:textarea path="template.reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /></label>
                         <p class="library-lookup-status" role="status" data-lookup-failure="<spring:message code='library.lookupUnavailable' />"></p>
-                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-primary"><spring:message code="coa.save" /></button></div>
+                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-primary"><spring:message code="library.createTransaction" /></button></div>
                     </form:form>
                 </c:otherwise></c:choose>
             </div>

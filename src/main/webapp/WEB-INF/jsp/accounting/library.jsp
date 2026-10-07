@@ -12,7 +12,7 @@
 <c:set var="listBase" value="${isActivity?'/finance/library':'/finance/library/transactions'}" />
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library' />"><spring:message code="library.navigation" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" aria-current="page" href="<c:url value='${listBase}' />"><spring:message code="${isActivity?'library.activities':'library.transactions'}" /></a></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${isActivity?'library.activities':'library.transactions'}" /></h1></div>
-<div class="accounting-workspace">
+<div class="accounting-workspace accounting-resource-workspace">
     <c:if test="${not empty libraryError}"><p class="coa-error" role="alert"><spring:message code="${libraryError}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
     <section class="erp-table-wrap" data-aws-table-region>
@@ -40,7 +40,7 @@
                 <td><div class="accounting-actions"><c:choose><c:when test="${isActivity}"><c:url value="/finance/library/transactions" var="recordUrl"><c:param name="activityId" value="${r.id}" /></c:url></c:when><c:otherwise><c:url value="/finance/library/transactions/${r.id}" var="recordUrl" /></c:otherwise></c:choose><a class="app-btn btn-neutral" href="<c:out value='${recordUrl}' />"><spring:message code="${isActivity?'library.transactions':'library.open'}" /></a>
                     <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" action="<c:url value='/finance/library/${isActivity?"activities":"transactions"}/${r.id}/${r.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${r.active?'accounting.deactivate':'coa.reactivate'}" /></button></form></sec:authorize>
                 </div></td>
-            </tr></c:forEach><c:if test="${empty records.rows}"><tr><td colspan="${isActivity?4:7}"><spring:message code="${isActivity?'library.emptyActivities':'library.emptyTransactions'}" /></td></tr></c:if></tbody>
+            </tr></c:forEach><c:if test="${empty records.rows}"><tr><td colspan="${isActivity?4:7}"><div class="accounting-empty"><spring:message code="${not empty search or not empty state or not empty activity?'coa.noMatches':isActivity?'library.emptyActivities':'library.emptyTransactions'}" /></div></td></tr></c:if></tbody>
         </table></div>
         <div class="erp-table-footer accounting-actions">
             <c:if test="${records.page>0}"><c:url value="${listBase}" var="previous"><c:param name="page" value="${records.page-1}" /><c:param name="search" value="${search}" /><c:param name="state" value="${state}" /><c:if test="${not empty activity}"><c:param name="activityId" value="${activity.id}" /></c:if></c:url><a class="app-btn btn-neutral" href="<c:out value='${previous}' />"><spring:message code="common.previous" /></a></c:if>
@@ -53,5 +53,6 @@
     <c:if test="${isActivity}"><%@ include file="library-activity-modal.jspf" %></c:if>
     <c:if test="${not isActivity}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><%@ include file="library-transaction-modal.jspf" %></sec:authorize></c:if>
 </sec:authorize>
+<%@ include file="accounting-form-support.jspf" %>
 <script src="<c:url value='/js/accounting-library.js' />" defer></script>
 <%@ include file="../fragments/footer.jspf" %>
