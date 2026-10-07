@@ -1,6 +1,6 @@
 ---
 name: microfinance-table-standard
-description: Create, edit, or review Microfinance JSP client registries, review queues, repayments, collections, archives, and reports using the shared ERP table layout and scoped server-side pagination.
+description: Create, edit, or review Microfinance JSP registries, accounting configuration lists, review queues, repayments, collections, archives, and reports using the shared ERP table layout and scoped server-side pagination.
 ---
 
 # Microfinance Table Standard
@@ -43,6 +43,8 @@ Use the existing JSP table contract rather than introducing a React/Cloudscape a
 - Preserve sort and filter parameters through pagination and exports. Use deterministic sorting with an ID tie-breaker; cap page sizes and validate filter input on the server.
 - A displayed total must match the authorized filter scope and be computed from the financial source of truth. Do not sum only the current page and label it a portfolio total.
 - Search, clear, loading, empty, error, and refresh states must be functional. Keep table dimensions stable as data loads; show an empty-state row with the correct `colspan`.
+- Distinguish an empty register from a filtered search with no matches. Give no-match states a short recovery instruction to change or clear filters. Keep a register's Add New action compact and top right in its titlebar.
+- When navigating to a register from a parent row, preselect the parent in a visible filter and preserve it through search/pagination. Avoid repeating the selected parent as a separate page-body label when the filter already conveys it; the filter is context, not authorization.
 - Keep exports and receipts subject to the same authorization as the list. Large reports should be batchable rather than unbounded synchronous downloads.
 
 ## Verification

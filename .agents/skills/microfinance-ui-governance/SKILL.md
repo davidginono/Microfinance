@@ -1,6 +1,6 @@
 ---
 name: microfinance-ui-governance
-description: Design, edit, or review JSP page flows, navigation, loan assessments, approval screens, and financial-action states in the Microfinance repository. Use for domain-specific interface work, not standalone backend changes.
+description: Design, edit, or review Microfinance JSP navigation, resource creation and details, accounting onboarding, lending reviews, and financial-action states. Use for domain-specific interface work, not standalone backend changes.
 ---
 
 # Microfinance UI Governance
@@ -20,6 +20,29 @@ description: Design, edit, or review JSP page flows, navigation, loan assessment
 - On lending review screens, group income and expenses, existing debt, affordability, business/employment evidence, repayment history, guarantors, collateral, and documents around the current loan.
 - Distinguish declared values from verified values and identify missing or stale evidence. A missing record is not a zero balance, a positive credit result, or verified identity.
 - Guarantor views must explain the specific liability and approval state without exposing unrelated client finances or full credit records.
+
+## Resource Creation And Details
+
+Use Cloudscape's [create](https://cloudscape.design/patterns/resource-management/create/), [details](https://cloudscape.design/patterns/resource-management/details/), and [sub-resource create](https://cloudscape.design/patterns/resource-management/create/sub-resource-create/) guidance as UX references, adapted to the existing JSP shell. These references do not authorize installing React components or replacing a user-requested workflow.
+
+- Choose a single-page form for a manageable task with related configuration. Use a wizard only when distinct steps or substantial dependencies justify it. Prefer a full page for complex creation; preserve an explicitly requested modal workflow.
+- Put essential identity and configuration first, with parent-derived defaults and read-only parent context. Group related fields into task-based sections. Collapse optional settings when empty; expand them when they contain values or validation errors. Preserve existing fields and bindings.
+- Use task titles and matching current breadcrumb labels. Breadcrumbs provide clickable ancestor context below the top bar and above the title, and stay sticky while scrolling; they are not another global navigation menu.
+- Place Cancel followed by a verb-led primary action at the form's bottom right. Allow incomplete forms to reach validation rather than disabling Create merely for missing inputs. Keep permission, inactive-parent, pending-command, and other service-backed restrictions.
+- Preserve values on failure, show a concise error summary and errors beside bound fields, and focus the summary or dialog appropriately. Protect changed forms from accidental exit using the shared discard dialog; Continue editing preserves values, while Discard exits deliberately. This is recovery protection, not an accounting approval step.
+- Keep details self-contained in related sections when they fit one page. Use tabs only for distinct substantial tasks. Place actions beside the affected resource or section, and preserve list filters and return context where supported.
+- For dependent creation, show parent context and return to the relevant parent/register. Embed simple related definitions when the existing service saves them atomically. Add nested creation only when required by the task and supported by existing scope and validation.
+
+## Accounting Configuration Conventions
+
+For COA or activity/transaction configuration, read [the accounting architecture](../../../docs/chart-of-accounts-architecture.md) and [accounting implementation gates](../../../docs/accounting-report-builder-checklist.md). These are configuration flows; saving definitions does not post money.
+
+- The authorized accountant onboards COA groups/accounts and library definitions directly, without an approval queue. Preserve current claims, institution/branch checks, CSRF, and lifecycle protections; this convention does not change lending approvals or financial posting controls.
+- COA creation selects a valid parent, shows its code/name and derived classification, then captures code, one Name field, accounting settings where applicable, and optional description. Retain stored language metadata; do not reintroduce separate English/Kiswahili name inputs into these forms. Translate UI labels using the existing bundles.
+- Keep the sidebar destination Transactions Config with Activities and Transactions children. Each register has a compact top-right Add New action and the existing creation modal. Successful creation keeps the success dialog open until X is clicked, then the saved record appears in the register.
+- Activity-row Transactions opens the canonical Transactions register with the activity selected automatically in its Activity filter. Keep context in the filter rather than repeating an Activity line above the register. Search/pagination preserve scope; Clear resets filters.
+- Transaction creation captures activity code, transaction identity/accounting event, debit/credit account pairs, and version purpose. Keep pairs embedded in the atomic onboarding command. Subsequent versions remain immutable; do not turn the form into journal posting or balance entry.
+- Transaction details use the stable Transaction templates title with Activity, Transaction, Accounting event and Status filters, plus the Template version selector above posting lines. Put New template version beside Posting template and lifecycle actions with the selected transaction context.
 
 ## Financial Information
 
