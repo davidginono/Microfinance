@@ -29,8 +29,13 @@ public class ChartOfAccountsPageController {
     @GetMapping
     String chart(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String type,
-            @RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="") String state,Model model) {
-        var filter=new AccountFilter(search.strip(),type,kind,state);
+            @RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="") String state,
+            @RequestParam(required=false) UUID parentId,Model model) {
+        var filter=new AccountFilter(search.strip(),type,kind,state,parentId);
+        if(parentId!=null) {
+            var path=ledger.chartPath(actor,parentId);
+            model.addAttribute("groupPath",path);model.addAttribute("selectedGroup",path.getLast());
+        }
         model.addAttribute("accounts",ledger.chart(actor,filter,page));model.addAttribute("filter",filter);
         model.addAttribute("accountTypes",List.of("ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"));
         model.addAttribute("accountKinds",List.of("HEADING","POSTING","CONTROL"));
@@ -62,7 +67,7 @@ public class ChartOfAccountsPageController {
         if(!errors.hasErrors()) {
             try {
                 ledger.onboardAccount(actor,form,group);
-                flash.addFlashAttribute("accountingSuccess","coa.saved");return "redirect:/finance/accounts";
+                flash.addFlashAttribute("accountingSuccess","coa.saved");return "redirect:/finance/accounts?parentId="+form.getParentId();
             } catch(IllegalArgumentException failure) {
                 String key=errorKey(failure);
                 String field=switch(key) {

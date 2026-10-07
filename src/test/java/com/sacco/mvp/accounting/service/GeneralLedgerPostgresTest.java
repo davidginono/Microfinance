@@ -109,6 +109,9 @@ class GeneralLedgerPostgresTest {
         UUID foreign=UUID.randomUUID();
         jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,'FOREIGN','100000','Foreign assets','ASSET','DEBIT','HEADING','OTHER',?,?)",foreign,maker.getMemberId(),NOW);
         assertThatThrownBy(()->service.onboardAccount(maker,coaForm("120000",foreign,"Foreign parent"),true)).hasMessage("accounting.error.parent");
+        assertThatThrownBy(()->service.chart(maker,new AccountFilter("","","","",foreign),0)).hasMessage("accounting.error.parent");
+        assertThatThrownBy(()->service.chartPath(maker,foreign)).hasMessage("accounting.error.parent");
+        assertThatThrownBy(()->service.chartPath(maker,cash)).hasMessage("accounting.error.parent");
         assertThatThrownBy(()->service.deactivateAccount(maker,root)).hasMessage("accounting.error.mainGroupProtected");
         assertThatThrownBy(()->service.deactivateAccount(maker,family)).hasMessage("accounting.error.activeChildren");
     }
@@ -121,12 +124,20 @@ class GeneralLedgerPostgresTest {
         var filter=new AccountFilter("","ASSET","POSTING","ACTIVE");
         assertThat(service.chart(maker,filter,0).rows()).hasSize(25);assertThat(service.chart(maker,filter,0).hasNext()).isTrue();
         assertThat(service.chart(maker,filter,1).rows()).hasSize(6); // fixture CASH plus 30 new accounts
+        var children=new AccountFilter("","ASSET","POSTING","ACTIVE",family);
+        assertThat(service.chart(maker,children,0).rows()).hasSize(25);assertThat(service.chart(maker,children,0).hasNext()).isTrue();
+        assertThat(service.chart(maker,children,1).rows()).hasSize(5).allSatisfy(row->assertThat(row.account().parentId()).isEqualTo(family));
+        assertThat(service.chart(maker,new AccountFilter("","","","",root),0).rows()).extracting(row->row.account().id()).containsExactly(sub);
+        assertThat(service.chart(maker,new AccountFilter("Account 30","","","",family),0).rows()).hasSize(1);
+        assertThat(service.chartPath(maker,family)).extracting(Account::id).containsExactly(root,sub,family);
         assertThat(service.chartParents(maker,false,"Cash",0).rows()).extracting(Account::id).containsExactly(family);
         UUID posting=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='111001'",UUID.class,institution);
         service.deactivateAccount(maker,posting);service.reactivateAccount(maker,posting);
         assertThat(service.chart(maker,new AccountFilter("111001","","","ACTIVE"),0).rows()).hasSize(1);
         for(int n=1;n<=30;n++)service.deactivateAccount(maker,jdbc.queryForObject("select id from gl_account where sacco_id=? and code=?",UUID.class,institution,String.format("111%03d",n)));
         service.deactivateAccount(maker,family);
+        assertThat(service.chartPath(maker,family)).extracting(Account::id).containsExactly(root,sub,family);
+        assertThat(service.chart(maker,new AccountFilter("","","","INACTIVE",family),0).rows()).hasSize(25);
         assertThatThrownBy(()->service.reactivateAccount(maker,posting)).hasMessage("accounting.error.parent");
     }
     @Test void chartConcurrentDuplicateCodesPersistOnceAndAuditFailureRollsBackSetup() throws Exception {

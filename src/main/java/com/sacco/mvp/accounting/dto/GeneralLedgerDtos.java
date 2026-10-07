@@ -22,7 +22,9 @@ public final class GeneralLedgerDtos {
         }
     }
     public record AccountRow(Account account,String parentCode,String parentName,String parentNameSw) { }
-    public record AccountFilter(String search,String type,String kind,String state) { }
+    public record AccountFilter(String search,String type,String kind,String state,UUID parentId) {
+        public AccountFilter(String search,String type,String kind,String state) {this(search,type,kind,state,null);}
+    }
     public record DisplayLine(String code,String name,BigDecimal debit,BigDecimal credit) { }
     public record Line(UUID accountId, BigDecimal debit, BigDecimal credit) { }
     public record JournalCommand(UUID requestKey, String sourceReference, LocalDate effectiveDate,

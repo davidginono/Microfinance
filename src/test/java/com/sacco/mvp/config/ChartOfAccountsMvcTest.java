@@ -50,7 +50,7 @@ class ChartOfAccountsMvcTest {
         mvc.perform(post("/finance/accounts/posting").with(user(accountant)).with(csrf()).param("parentId",parent.toString())
             .param("code","121001").param("name","Land").param("normalBalance","DEBIT").param("saccoId","FOREIGN")
             .param("type","INCOME").param("active","false"))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/accounts"));
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/accounts?parentId="+parent));
         verify(ledger).onboardAccount(eq(accountant),argThat(f->f.getName().equals("Land") && f.getParentId().equals(parent)),eq(false));
     }
     @Test void duplicatePreservesValuesAndShowsInlineCodeError() throws Exception {
@@ -79,6 +79,28 @@ class ChartOfAccountsMvcTest {
             .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
         mvc.perform(get("/finance/accounts/groups/new").with(user(reader))).andExpect(status().isForbidden());
         mvc.perform(post("/finance/accounts/groups").with(user(reader)).with(csrf())).andExpect(status().isForbidden());
+    }
+    @Test void childRegisterRetainsParentSearchAndPageAndAllowsReadOnlyViewing() throws Exception {
+        var root=new Account(parent,"100000","Assets","ASSET","DEBIT","HEADING","OTHER",null,true);
+        when(ledger.chartPath(any(),eq(parent))).thenReturn(List.of(root));
+        when(ledger.chart(any(),any(),eq(1))).thenReturn(new Page<>(List.of(),1,false));
+        var reader=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).memberNo("READER").saccoId("I1").stationId("B1")
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
+        mvc.perform(get("/finance/accounts").param("parentId",parent.toString()).param("search","assets").param("state","ACTIVE").param("page","1").with(user(reader)))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/accounts"))
+            .andExpect(model().attribute("selectedGroup",root)).andExpect(model().attribute("groupPath",List.of(root)))
+            .andExpect(model().attribute("filter",new AccountFilter("assets","","","ACTIVE",parent)));
+        verify(ledger).chart(eq(reader),eq(new AccountFilter("assets","","","ACTIVE",parent)),eq(1));
+    }
+    @Test void foreignGroupAndInvalidParentCannotLoadChildRows() throws Exception {
+        when(ledger.chartPath(any(),eq(parent))).thenThrow(new IllegalArgumentException("accounting.error.parent"));
+        mvc.perform(get("/finance/accounts").param("parentId",parent.toString()).with(user(accountant)))
+            .andExpect(redirectedUrl("/finance/accounts")).andExpect(flash().attribute("accountingError","accounting.error.parent"));
+        verify(ledger,never()).chart(any(),any(),anyInt());
+        clearInvocations(ledger);
+        mvc.perform(get("/finance/accounts").param("parentId","invalid").with(user(accountant)))
+            .andExpect(redirectedUrl("/finance/accounts")).andExpect(flash().attribute("accountingError","accounting.error.validation"));
+        verifyNoInteractions(ledger);
     }
     @Configuration @EnableWebMvc
     static class Config {

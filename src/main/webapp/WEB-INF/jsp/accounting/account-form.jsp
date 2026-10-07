@@ -50,7 +50,7 @@
                     </div></fieldset>
                 </c:if>
             <details class="accounting-additional" ${not empty accountForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>
-            <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-primary"><spring:message code="${groupMode?'coa.createGroup':'coa.createAccount'}" /></button></div>
+            <c:url value="/finance/accounts" var="cancelChart"><c:param name="parentId" value="${selectedParent.id}" /></c:url><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:out value='${cancelChart}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-primary"><spring:message code="${groupMode?'coa.createGroup':'coa.createAccount'}" /></button></div>
         </form:form>
     </section>
 </div>

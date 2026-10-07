@@ -58,8 +58,17 @@ public class GeneralLedgerService {
     @Transactional(readOnly=true)
     public Page<AccountRow> chart(AppUserPrincipal actor,AccountFilter filter,int page) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");int n=page(page);validateFilter(filter);
+        if(filter.parentId()!=null) require(books.account(actor.getSaccoId(),filter.parentId()).map(a->"HEADING".equals(a.kind())).orElse(false),"parent");
         var rows=books.chart(actor.getSaccoId(),filter,n*25,26);
         return new Page<>(rows.stream().limit(25).toList(),n,rows.size()>25);
+    }
+    @Transactional(readOnly=true)
+    public List<Account> chartPath(AppUserPrincipal actor,UUID id) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");
+        var path=books.chartPath(actor.getSaccoId(),id);
+        require(!path.isEmpty() && path.size()<=16 && path.getFirst().parentId()==null &&
+            path.stream().allMatch(a->"HEADING".equals(a.kind())) && path.stream().map(Account::id).distinct().count()==path.size(),"parent");
+        return path;
     }
     @Transactional(readOnly=true)
     public Page<Account> chartParents(AppUserPrincipal actor,boolean groups,String search,int page) {

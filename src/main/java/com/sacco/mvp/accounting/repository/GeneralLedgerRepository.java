@@ -37,6 +37,7 @@ public class GeneralLedgerRepository {
     public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit) {
         var args=new java.util.ArrayList<Object>();args.add(institution);
         String where=" where a.sacco_id=?";
+        if(filter.parentId()!=null){where+=" and a.parent_id=?";args.add(filter.parentId());}
         if(!filter.search().isEmpty()) {
             where+=" and (strpos(lower(a.code),?)>0 or strpos(lower(a.name),?)>0 or strpos(lower(coalesce(a.name_sw,'')),?)>0)";
             String search=filter.search().toLowerCase(java.util.Locale.ROOT);args.add(search);args.add(search);args.add(search);
@@ -53,6 +54,10 @@ public class GeneralLedgerRepository {
         String term=search.toLowerCase(java.util.Locale.ROOT);
         return jdbc.query("select * from gl_account where sacco_id=? and active and kind='HEADING' and code ~ ? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) order by code,id limit ? offset ?",
             this::account,institution,pattern,term,term,term,limit,offset);
+    }
+    public List<Account> chartPath(String institution,UUID id) {
+        return jdbc.query("with recursive path as (select a.*,0 depth from gl_account a where a.sacco_id=? and a.id=? union all select a.*,p.depth+1 from gl_account a join path p on a.id=p.parent_id and a.sacco_id=p.sacco_id where p.depth<16) select * from path order by depth desc limit 17",
+            this::account,institution,id);
     }
     public Optional<String> availableChartCode(String institution,int start,int end,int step) {
         return jdbc.query("select lpad(n::text,6,'0') code from generate_series(?,?,?) n where not exists(select 1 from gl_account where sacco_id=? and code=lpad(n::text,6,'0')) order by n limit 1",
