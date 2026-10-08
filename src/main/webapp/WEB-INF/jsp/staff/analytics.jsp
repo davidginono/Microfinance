@@ -17,13 +17,6 @@
         <c:param name="loanType" value="${loanType}" />
         <c:param name="viewAs" value="${viewAs}" />
     </c:url>
-    <c:url var="staffExcelExportUrl" value="/documents/reports/staff-loan-analytics.xlsx">
-        <c:param name="fromDate" value="${fromDate}" />
-        <c:param name="toDate" value="${toDate}" />
-        <c:param name="loanProductId" value="${loanProductId}" />
-        <c:param name="loanType" value="${loanType}" />
-        <c:param name="viewAs" value="${viewAs}" />
-    </c:url>
     <c:url var="staffAnalyticsRefreshUrl" value="/staff/analytics">
         <c:param name="fromDate" value="${fromDate}" />
         <c:param name="toDate" value="${toDate}" />
@@ -47,12 +40,6 @@
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
                 </span>
                 <spring:message code="common.print" text="Print" />
-            </a>
-            <a href="${staffExcelExportUrl}" class="app-btn btn-neutral staff-filter-action" data-download-action="true">
-                <span class="staff-action-icon is-excel" aria-hidden="true">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
-                </span>
-                <spring:message code="reports.exportExcel" text="Export Excel" />
             </a>
             <a href="${staffAnalyticsRefreshUrl}" class="app-icon-button btn-neutral" aria-label="<spring:message code='common.refresh' text='Refresh' />" title="<spring:message code='common.refresh' text='Refresh' />">
                 <span class="staff-action-icon is-refresh" aria-hidden="true">

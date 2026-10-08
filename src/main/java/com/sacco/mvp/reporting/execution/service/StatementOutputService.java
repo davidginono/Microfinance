@@ -43,7 +43,7 @@ public class StatementOutputService {
   if(!limiter.tryAcquire())invalid("busy");
   try{
    repository.create(output);
-   for(var format:OperationalReportExportService.Format.values()){statements.authorizeExport(actor);byte[] bytes=exporter.export(result,layout,branding,format);if(bytes.length>32*1024*1024)invalid("size");repository.artifact(id,format,bytes,ReportRunService.sha256(bytes));}
+   for(var format:List.of(OperationalReportExportService.Format.PDF)){statements.authorizeExport(actor);byte[] bytes=exporter.export(result,layout,branding,format);if(bytes.length>32*1024*1024)invalid("size");repository.artifact(id,format,bytes,ReportRunService.sha256(bytes));}
    statements.authorizeExport(actor);event(actor,id,"CAPTURED");return id;
   }finally{limiter.release();}
  }
@@ -52,13 +52,13 @@ public class StatementOutputService {
  @Transactional(readOnly=true)
  public List<Summary> list(AppUserPrincipal actor,int page){actor=authorizeView(actor);if(page<0||page>10000)invalid("page");return repository.list(actor.getSaccoId(),actor.getStationId(),page,access.has(actor,UserClaim.FINANCIAL_REPORTS_VIEW)&&access.has(actor,UserClaim.FINANCIAL_REPORTS_INSTITUTION));}
  @Transactional(readOnly=true)
- public List<Artifact> artifacts(AppUserPrincipal actor,UUID id){get(actor,id,false);return repository.artifacts(id);}
+ public List<Artifact> artifacts(AppUserPrincipal actor,UUID id){get(actor,id,false);return repository.artifacts(id).stream().filter(a->a.format()==OperationalReportExportService.Format.PDF).toList();}
  @Transactional(readOnly=true)
  public List<Artifact> verifiedArtifacts(AppUserPrincipal actor,UUID id){get(actor,id,false);var artifacts=repository.artifacts(id);for(var artifact:artifacts){var bytes=repository.download(id,artifact.id()).orElseThrow();if(!ReportRunService.sha256(bytes.bytes()).equals(bytes.checksum()))throw new IllegalStateException("Statement artifact checksum failed");}return artifacts;}
  @Transactional
  public void review(AppUserPrincipal actor,UUID id,String evidence){actor=statements.authorizeExport(actor);if(!access.has(actor,UserClaim.REPORT_RUN_APPROVE))throw new AccessDeniedException("Independent output review required");OperationalReportDefinition.safeText(evidence,1000,false);var output=get(actor,id,true);if(output.generatedBy().equals(actor.getMemberId())||output.reviewer()!=null)invalid("checker");repository.review(id,actor.getMemberId(),evidence,clock.now());event(actor,id,"REVIEWED");}
  @Transactional
- public Download download(AppUserPrincipal actor,UUID id,UUID artifact){actor=statements.authorizeExport(actor);get(actor,id,false);var data=repository.download(id,artifact).orElseThrow(()->new AccessDeniedException("Statement artifact unavailable"));if(!ReportRunService.sha256(data.bytes()).equals(data.checksum()))throw new IllegalStateException("Statement artifact checksum failed");event(actor,id,"DOWNLOADED");return data;}
+ public Download download(AppUserPrincipal actor,UUID id,UUID artifact){actor=statements.authorizeExport(actor);get(actor,id,false);var data=repository.download(id,artifact).orElseThrow(()->new AccessDeniedException("Statement artifact unavailable"));if(data.format()!=OperationalReportExportService.Format.PDF)throw new AccessDeniedException("Only PDF output is enabled");if(!ReportRunService.sha256(data.bytes()).equals(data.checksum()))throw new IllegalStateException("Statement artifact checksum failed");event(actor,id,"DOWNLOADED");return data;}
  private Output get(AppUserPrincipal actor,UUID id,boolean lock){actor=authorizeView(actor);var output=repository.get(id,actor.getSaccoId(),actor.getStationId(),lock).orElseThrow(()->new AccessDeniedException("Statement output unavailable in branch"));var retained=statements.verifiedResult(actor,output.resultId());if(!statements.verifiedResultDigest(actor,output.resultId()).equals(output.sourceChecksum())||retained.dimension()!=output.result().dimension())throw new IllegalStateException("Statement source checksum or scope failed");if(!layoutChecksum(output.layout(),output.fontChecksum(),output.branding()).equals(output.layoutChecksum()))throw new IllegalStateException("Statement layout checksum failed");if(output.branding()!=null&&!ReportRunService.sha256(output.branding().logo()).equals(output.branding().sha256()))throw new IllegalStateException("Statement logo checksum failed");return output;}
  private AppUserPrincipal authorizeView(AppUserPrincipal actor){actor=actors.currentActor(actor);if(!access.has(actor,UserClaim.STATEMENT_VIEW))throw new AccessDeniedException("Statement view required");return actor;}
  private String layoutChecksum(Layout layout,String font,OperationalReportService.Branding logo){return ReportRunService.sha256((mapper.writeValueAsString(layout)+"|"+font+"|"+(logo==null?"":logo.sha256())).getBytes(StandardCharsets.UTF_8));}

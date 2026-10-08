@@ -81,7 +81,7 @@ public class LedgerReportExporter {
     private static List<Object> pair(Object key,Object value){return List.of(key,value);}
     private static String safe(String value){return value==null?"":value;}
     private Output write(Table table,Format format) {
-        if(format==null)throw new IllegalArgumentException("financial.export.format");
+        if(format!=Format.PDF)throw new IllegalArgumentException("financial.export.format");
         try{return switch(format){
             case CSV->new Output(csv(table),"text/csv;charset=UTF-8","posted-ledger.csv");
             case XLSX->new Output(xlsx(table),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","posted-ledger.xlsx");

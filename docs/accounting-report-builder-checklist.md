@@ -2,6 +2,8 @@
 
 Created: 2026-10-02. Target: Tanzania Mainland Tier 2, non-deposit-taking microfinance, initially individual business lending.
 
+2026-10-08 user mandate: core receipt/payment/journal vouchers now use direct accountant posting, not approval or verification queues. PDF and print are the only accounting/report outputs. Earlier CSV/XLSX and core maker/checker items below are superseded for this scope, not completion claims. See [core voucher architecture](core-accounting-vouchers.md); legacy specialized accounting/lending safeguards remain separate.
+
 This is an agent implementation checklist, not completed functionality, accountant approval, or compliance certification. All implementation items start unchecked. It supplements the [conversion backlog](microfinance-gap-checklist.md), [repayment ledger boundaries](repayment-ledger-increment.md), and [credit calculation conventions](credit-estimate-increment.md).
 
 ## Goal For Agents

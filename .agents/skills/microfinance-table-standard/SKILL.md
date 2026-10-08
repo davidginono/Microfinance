@@ -5,6 +5,10 @@ description: Create, edit, or review Microfinance JSP registries, accounting con
 
 # Microfinance Table Standard
 
+## Permanent accounting register reference
+
+Apply Cloudscape [table view](https://cloudscape.design/patterns/resource-management/view/table-view/) with [create](https://cloudscape.design/patterns/resource-management/create/) and [details](https://cloudscape.design/patterns/resource-management/details/) navigation. Receipt, payment and journal registers are separate full-width scoped resources. Use single-row checkbox selection, keyboard access, a live selected-record announcement, disabled View/PDF/Print until selection, and an always-independent Create action. Never add a row Actions column. Clear selection on filters, sorting, pagination and restored navigation; provide explicit empty/no-match states and pagination even on one page. Outputs are PDF/print, never CSV/Excel. Creation supports multiple transactions and direct accountant posting, not approval queues.
+
 ## Shared Structure
 
 Use the existing JSP table contract rather than introducing a React/Cloudscape adapter:

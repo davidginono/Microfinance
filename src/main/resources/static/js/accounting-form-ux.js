@@ -6,7 +6,7 @@
     const panel = modal.querySelector('[role="dialog"]');
     let submitting = false, pending, previousFocus, previousOverflow, previousRootOverflow;
     const disabledOnSubmit = new Set();
-    const values = () => JSON.stringify(Array.from(form.elements).filter(el => el.name && el.type !== 'hidden' && el.type !== 'submit').map(el => [el.name, el.value, el.checked]));
+    const values = () => JSON.stringify(Array.from(form.elements).filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action').map(el => [el.name, el.value, el.checked]));
     let initial = values();
     const errors = form.querySelector('.accounting-error-summary .coa-error');
     let restoredErrors = Boolean(errors);

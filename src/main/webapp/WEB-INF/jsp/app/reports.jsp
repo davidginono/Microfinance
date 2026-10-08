@@ -54,12 +54,6 @@
             </span>
             <spring:message code="common.print" text="Print" />
         </a>
-        <a href="/documents/reports/member-loans.xlsx?${currentQuery}" class="app-btn btn-neutral" data-download-action="true">
-            <span class="loan-report-action-icon is-excel" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
-            </span>
-            <spring:message code="reports.exportExcel" text="Export Excel" />
-        </a>
         <a href="/app/reports" class="app-btn btn-neutral">
             <span class="loan-report-action-icon is-refresh" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.6 6.1"/><path d="M3 12A9 9 0 0 1 18.6 5.9"/><path d="M3 18h5v-5"/><path d="M21 6h-5v5"/></svg>

@@ -29,7 +29,7 @@ public class ReportRunService {
  @Transactional(propagation=Propagation.REQUIRES_NEW,isolation=Isolation.READ_COMMITTED)
  public UUID request(AppUserPrincipal actor,Request request){
   actor=reports.currentActor(actor);
-  if(request==null||request.requestKey()==null||request.templateVersion()==null||request.formats()==null||request.formats().isEmpty()||request.formats().size()>3||request.formats().stream().anyMatch(Objects::isNull))invalid();
+  if(request==null||request.requestKey()==null||request.templateVersion()==null||!Set.of(com.sacco.mvp.reporting.OperationalReportExportService.Format.PDF).equals(request.formats()))invalid();
   OperationalReportDefinition.validateDates(request.from(),request.through());
   if(request.through().isAfter(clock.today())||request.recordedCutoff()==null||request.recordedCutoff().isAfter(clock.now()))invalid();
   var version=templates.get(request.templateVersion(),actor,true);
@@ -52,7 +52,7 @@ public class ReportRunService {
  @Transactional(readOnly=true)
  public Run get(UUID id,AppUserPrincipal actor){return scoped(id,actor,false);}
  @Transactional(readOnly=true)
- public List<Artifact> artifacts(UUID id,AppUserPrincipal actor){scoped(id,actor,false);return repository.artifacts(id);}
+ public List<Artifact> artifacts(UUID id,AppUserPrincipal actor){scoped(id,actor,false);return repository.artifacts(id).stream().filter(a->a.format()==com.sacco.mvp.reporting.OperationalReportExportService.Format.PDF).toList();}
  @Transactional(readOnly=true)
  public OperationalReportService.Result frozen(UUID id,AppUserPrincipal actor,int page){
   Run run=scoped(id,actor,false);if(!Set.of("READY","APPROVED").contains(run.status())||page<0||page>800)invalid();
@@ -66,6 +66,7 @@ public class ReportRunService {
   var run=scoped(id,actor,false);reports.authorize(actor,run.definition().dataset(),UserClaim.REPORT_EXPORT);
   if(!Set.of("READY","APPROVED").contains(run.status()))invalid();
   var result=repository.artifact(id,artifact).orElseThrow(()->new AccessDeniedException("Report artifact unavailable"));
+  if(result.format()!=com.sacco.mvp.reporting.OperationalReportExportService.Format.PDF)throw new AccessDeniedException("Only PDF output is enabled");
   if(!sha256(result.bytes()).equals(result.checksum()))throw new IllegalStateException("Report checksum verification failed");
   log(id,"DOWNLOAD",actor);return result;
  }

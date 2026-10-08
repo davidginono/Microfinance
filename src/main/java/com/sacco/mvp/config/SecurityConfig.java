@@ -97,6 +97,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
                 }
                 auth
+                .requestMatchers("/documents/reports/*.xlsx", "/documents/reports/*.csv").denyAll()
                 .requestMatchers("/finance/**", "/reports/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser

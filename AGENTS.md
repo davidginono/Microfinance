@@ -137,6 +137,15 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 ## UI Conventions
 
+### Core accounting mandate (2026-10-08)
+
+- Receipt vouchers, payment vouchers and journal vouchers support multiple transactions and accountant **direct posting**. Do not add submission, verification, maker/checker, approval or release-gate steps to these core workflows or fabricate approval evidence. Server-side accounting validation, scope, closed-period protection, audit, idempotency and linked reversals remain mandatory.
+- Accounting/report outputs are **PDF and print only**. Do not add CSV or Excel exports, UI choices, generation jobs or download paths. Historical non-PDF artifacts remain retained but are not downloadable; statement/other imports are separate from exports.
+- Core vouchers use ordinary posting accounts. They must not bypass loan-control/subledger rules or claim to record loan repayments. Existing lending approvals and historical specialized accounting records retain their own safeguards.
+- Permanent UI architecture references: [Cloudscape create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/). Apply their behavior using the existing JSP/shared ERP shell; these references do not authorize a React/framework migration.
+- Use separate receipt, payment and journal registers; bounded server-side filters/pagination, single-row selection, disabled selection-dependent toolbar actions, independent Create, focused full-page multi-transaction creation, and record-specific details with PDF/print. Clear selection on query, sort, page or history restoration; no row Actions column.
+- The feature architecture and limitations are recorded in `docs/core-accounting-vouchers.md`. This mandate supersedes earlier checklist approval gates for core vouchers only; it does not declare the complete accounting/report-builder backlog finished.
+
 - Shared shell styling lives primarily in:
   - `src/main/webapp/WEB-INF/jsp/fragments/header.jspf`
   - `src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf`

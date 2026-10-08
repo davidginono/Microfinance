@@ -25,6 +25,7 @@ public class OperationalReportExportService {
     private final MessageSource messages;
     public enum Format { CSV, XLSX, PDF }
     public byte[] export(OperationalReportService.Result result, Format format) {
+        if(format!=Format.PDF)throw new IllegalArgumentException("report.error.export");
         if (result.page() != 0 || result.truncated() || result.rows().size() != result.rowsInScope())
             throw new IllegalArgumentException("report.error.largeExport");
         try {

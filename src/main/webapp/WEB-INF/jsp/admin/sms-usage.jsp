@@ -162,11 +162,6 @@
     <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" />
     <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
-<c:url var="loanUsageExcelUrl" value="/documents/reports/sms-usage.xlsx">
-    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" />
-    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" />
-    <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
-</c:url>
 
 <section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage">
     <div class="app-table-titlebar">
@@ -177,7 +172,6 @@
         <div class="app-table-toolbar">
             <a class="app-icon-button" href="${smsRefreshUrl}" aria-label="Refresh loan application SMS usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg></a>
             <a class="app-btn btn-neutral" href="${loanUsagePdfUrl}" data-download-action="true">PDF</a>
-            <a class="app-btn btn-neutral" href="${loanUsageExcelUrl}" data-download-action="true">Excel</a>
             <span class="admin-register-count">Page ${loanSmsUsage.number + 1} of ${loanSmsUsage.totalPages gt 0 ? loanSmsUsage.totalPages : 1}</span>
             <c:choose><c:when test="${loanSmsUsage.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${loanUsagePreviousUrl}" aria-label="Previous loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
             <c:choose><c:when test="${loanSmsUsage.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${loanUsageNextUrl}" aria-label="Next loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>

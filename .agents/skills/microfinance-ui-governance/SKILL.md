@@ -5,6 +5,10 @@ description: Design, edit, or review Microfinance JSP navigation, resource creat
 
 # Microfinance UI Governance
 
+## Core accounting architecture reference
+
+Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/) as permanent behavioral references, translated into this repository's JSP/shared shell. Core receipt/payment/journal vouchers have focused full-page creation, 1–50 repeated transactions, separate registers and record-specific details. Accountants post directly: no submit/verify/approve/checker stage. Retain server accounting checks, idempotency, scope, closed periods and append-only reversals. PDF and print are the only accounting/report outputs; never add CSV/Excel exports. This changes core vouchers, not lending approvals or legacy subledger protections.
+
 ## Domain And Compatibility
 
 - Use Institution, Branch, Client, Borrower, Loan Product, Guarantor, Repayment, and Collateral in visible text. Use Client Number for the existing `memberNo` when it identifies a borrower; retain Staff Number for staff.

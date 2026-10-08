@@ -22,8 +22,8 @@
         </div>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_JOURNALS_VIEW')">
-        <a href="<c:url value='/finance/journals' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/journals') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-            <spring:message code="finance.nav.journals" />
+        <a href="<c:url value='/finance/vouchers/journals' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/vouchers/journals') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+            <spring:message code="voucher.register.JOURNAL" />
         </a>
     </sec:authorize>
     <sec:authorize access="@access.hasAny(principal, 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'REPORT_TEMPLATE_PUBLISH')">
@@ -32,9 +32,10 @@
         </a>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW')">
-        <a href="<c:url value='/finance/business' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/business') and not fn:startsWith(requestUri, '/finance/business/suppliers') and not fn:startsWith(requestUri, '/finance/business/assets') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-            <spring:message code="finance.business.navigation" />
-        </a>
+        <a href="<c:url value='/finance/vouchers/receipts' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/vouchers/receipts') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="voucher.register.RECEIPT" /></a>
+    </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW')">
+        <a href="<c:url value='/finance/vouchers/payments' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/vouchers/payments') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="voucher.register.PAYMENT" /></a>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW')">
         <a href="<c:url value='/finance/business/suppliers' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/business/suppliers') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">

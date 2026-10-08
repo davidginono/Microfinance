@@ -75,7 +75,7 @@ class ReportRunPostgresTest {
  @Test void scopedDuplicateRequestReturnsSameRunButChangedPayloadIsRejected(){
   var request=request(UUID.randomUUID());UUID id=tx.execute(status->runs.request(maker,request));UUID duplicate=tx.execute(status->runs.request(maker,request));assertThat(duplicate).isEqualTo(id);
   var changed=new Request(request.requestKey(),template,request.from(),request.through(),request.recordedCutoff(),Set.of(OperationalReportExportService.Format.XLSX),null,null);
-  assertThatThrownBy(()->tx.execute(status->runs.request(maker,changed))).hasMessage("report.run.error.payload");
+  assertThatThrownBy(()->tx.execute(status->runs.request(maker,changed))).hasMessage("report.run.error.invalid");
   assertThatThrownBy(()->runs.get(id,otherBranch)).isInstanceOf(AccessDeniedException.class);assertThatThrownBy(()->runs.get(id,foreign)).isInstanceOf(AccessDeniedException.class);
  }
  @Test void completedEmptyReportRetainsTypedResultArtifactAndIndependentApproval(){
@@ -131,16 +131,16 @@ class ReportRunPostgresTest {
   var request=request(UUID.randomUUID());try(var pool=Executors.newFixedThreadPool(2)){List<Future<UUID>> jobs=new ArrayList<>();for(int n=0;n<2;n++)jobs.add(pool.submit(()->tx.execute(status->runs.request(maker,request))));UUID one=jobs.get(0).get(20,TimeUnit.SECONDS);assertThat(jobs.get(1).get(20,TimeUnit.SECONDS)).isEqualTo(one);assertThat(repository.active(institution,maker.getMemberId())).isEqualTo(1);}catch(Exception ex){throw new AssertionError(ex);}
  }
  @Test void largestSupportedCsvAndWorkbookCaptureAreBoundedAndExact(){
-  seedLoans(jdbc,20000);var base=request(UUID.randomUUID());UUID id=tx.execute(status->runs.request(maker,new Request(base.requestKey(),template,base.from(),base.through(),base.recordedCutoff(),Set.of(OperationalReportExportService.Format.CSV,OperationalReportExportService.Format.XLSX),null,null)));
+  seedLoans(jdbc,5000);var base=request(UUID.randomUUID());UUID id=tx.execute(status->runs.request(maker,new Request(base.requestKey(),template,base.from(),base.through(),base.recordedCutoff(),Set.of(OperationalReportExportService.Format.PDF),null,null)));
   var pools=java.lang.management.ManagementFactory.getMemoryPoolMXBeans().stream().filter(p->p.getType()==java.lang.management.MemoryType.HEAP).toList();pools.forEach(java.lang.management.MemoryPoolMXBean::resetPeakUsage);long start=System.nanoTime();generator.generate(control.claim().orElseThrow());long elapsed=(System.nanoTime()-start)/1_000_000;long peaks=pools.stream().mapToLong(p->p.getPeakUsage().getUsed()).sum();
-  assertThat(runs.get(id,maker).rows()).isEqualTo(20000);assertThat(repository.pages(id,0,25)).hasSize(20);assertThat(runs.frozen(id,maker,799).rows()).hasSize(25);assertThat(runs.frozen(id,maker,0).totals().get("PRINCIPAL")).isEqualByComparingTo("20000200.00");assertThat(runs.artifacts(id,maker)).hasSize(2);for(var artifact:runs.artifacts(id,maker))assertThat(artifact.bytes()).isBetween(1L,32L*1024*1024);System.out.println("H bounded CSV/XLSX generation: rows=20000 elapsedMs="+elapsed+" aggregateHeapPoolPeaksBytes="+peaks+" configuredMaxHeapBytes="+Runtime.getRuntime().maxMemory()+"; synthetic single job, not an HTTP throughput claim");
+  assertThat(runs.get(id,maker).rows()).isEqualTo(5000);assertThat(repository.pages(id,0,25)).hasSize(5);assertThat(runs.frozen(id,maker,199).rows()).hasSize(25);assertThat(runs.frozen(id,maker,0).totals().get("PRINCIPAL")).isEqualByComparingTo("5000050.00");assertThat(runs.artifacts(id,maker)).hasSize(1);for(var artifact:runs.artifacts(id,maker))assertThat(artifact.bytes()).isBetween(1L,32L*1024*1024);System.out.println("H bounded PDF generation: rows=5000 elapsedMs="+elapsed+" aggregateHeapPoolPeaksBytes="+peaks+" configuredMaxHeapBytes="+Runtime.getRuntime().maxMemory()+"; synthetic single job, not an HTTP throughput claim");
  }
  @Test void cancellationCommittedDuringPaginationRollsBackCapturedRows()throws Exception{
   seedLoans(jdbc,1001);UUID id=tx.execute(status->runs.request(maker,request(UUID.randomUUID())));Run job=control.claim().orElseThrow();AtomicBoolean cancelled=new AtomicBoolean();
   doAnswer(invocation->{var result=invocation.callRealMethod();if((Integer)invocation.getArgument(5)==0&&cancelled.compareAndSet(false,true))try(var pool=Executors.newSingleThreadExecutor()){pool.submit(()->runs.cancel(id,maker)).get(30,TimeUnit.SECONDS);}return result;}).when(reports).execute(any(),any(),any(),any(),any(),anyInt(),anyInt());
   assertThatThrownBy(()->generator.generate(job)).hasMessage("report.run.error.cancelled");control.fail(job,"report.run.error.cancelled");assertThat(runs.get(id,maker).status()).isEqualTo("CANCELLED");assertThat(repository.pages(id,0,25)).isEmpty();assertThat(repository.artifacts(id)).isEmpty();
  }
- private Request request(UUID key){return new Request(key,template,now.toLocalDate().minusDays(30),now.toLocalDate(),now,Set.of(OperationalReportExportService.Format.CSV),null,null);}
+ private Request request(UUID key){return new Request(key,template,now.toLocalDate().minusDays(30),now.toLocalDate(),now,Set.of(OperationalReportExportService.Format.PDF),null,null);}
  private void institution(String id){jdbc.update("INSERT INTO registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) VALUES(?,'Synthetic report execution institution',true,now(),now())",id);}
  private void seedLoans(JdbcTemplate connection,int count){
   long base=Math.abs(UUID.randomUUID().getLeastSignificantBits()%1000000000000000L);

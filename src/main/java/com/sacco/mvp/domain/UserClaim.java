@@ -305,6 +305,8 @@ public enum UserClaim {
                 case ACCOUNTANT -> {
                     claims.addAll(legacyClaims("REVIEW_ACCOUNTANT_QUEUE"));
                     addAll(claims, ACCOUNTING_ACCOUNTS_VIEW, ACCOUNTING_ACCOUNTS_CREATE, ACCOUNTING_ACCOUNTS_UPDATE);
+                    addAll(claims, ACCOUNTING_BUSINESS_VIEW, ACCOUNTING_BUSINESS_CREATE, ACCOUNTING_BUSINESS_REVERSE,
+                        ACCOUNTING_JOURNALS_VIEW, ACCOUNTING_JOURNALS_CREATE, ACCOUNTING_JOURNALS_REVERSE, FINANCIAL_REPORTS_EXPORT);
                 }
                 case DISBURSEMENT_OFFICER -> {
                     claims.addAll(legacyClaims("ACCESS_DISBURSEMENT_QUEUE"));

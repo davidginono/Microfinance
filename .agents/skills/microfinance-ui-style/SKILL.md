@@ -5,6 +5,10 @@ description: Build or restyle Microfinance JSP interfaces using the existing com
 
 # Microfinance UI Style
 
+## Permanent resource-management patterns
+
+Follow Cloudscape [create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/) using existing JSP/shared ERP components. Focused create pages use grouped primary fields, expandable optional information, repeated numbered transaction fieldsets, preserved validation values, dirty-exit confirmation and bottom Cancel/Preview/Post actions. Details show the institution, branch, transaction breakdown, totals, posting identity and linked corrections. Core accountants post directly without approval/verification steps. PDF/print only; PDF vouchers repeat table headings and page numbers and never clip long descriptions.
+
 ## Start With The Shared Shell
 
 Read the relevant definitions before changing individual pages:

@@ -27,7 +27,7 @@
       <form class="accounting-actions" method="get" action="<c:url value='${reportRoute}/export' / data-aws-filter-toolbar>">
         <input type="hidden" name="from" value="<c:out value='${parameters.from}' />" /><input type="hidden" name="through" value="<c:out value='${parameters.through}' />" />
         <input type="hidden" name="recordedThrough" value="<c:out value='${cutoffInput}' />" /><input type="hidden" name="institutionWide" value="<c:out value='${scope.institutionWide}' />" />
-        <label><spring:message code="financial.export.format" /><select class="aws-control" name="format"><option value="CSV">CSV</option><option value="XLSX">XLSX</option><option value="PDF">PDF</option></select></label>
+        <label><spring:message code="financial.export.format" /><select class="aws-control" name="format"><option value="PDF">PDF</option></select></label>
         <button class="app-btn btn-neutral" type="submit" data-download-action="true"><spring:message code="financial.export.download" /></button>
       </form>
     </sec:authorize>

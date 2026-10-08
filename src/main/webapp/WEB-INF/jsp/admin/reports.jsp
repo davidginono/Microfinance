@@ -66,8 +66,6 @@
                 <p class="text-sm font-semibold text-sacco-ink">Recommended export formats</p>
                 <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
                     <li>PDF</li>
-                    <li>Excel</li>
-                    <li>CSV</li>
                 </ul>
             </div>
             <div>

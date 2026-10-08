@@ -89,7 +89,7 @@
           <button type="button" class="app-btn btn-neutral report-print-action" data-no-page-preloader="true"><spring:message code="common.print" /></button>
           <c:choose><c:when test="${not empty runVersion}"><c:url var="exportUrl" value="/reports/builder/templates/${runVersion}/export" /></c:when><c:otherwise><c:url var="exportUrl" value="/reports/builder/preview/export" /></c:otherwise></c:choose>
           <form action="${exportUrl}" method="${not empty runVersion ? 'get' : 'post'}"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="definition" value="<c:out value='${definitionJson}' />" /><input type="hidden" name="from" value="${result.from}" /><input type="hidden" name="through" value="${result.through}" /><input type="hidden" name="cutoff" value="${result.recordedCutoff}" />
-          <c:forEach items="${['CSV','XLSX','PDF']}" var="format"><button class="app-btn btn-neutral" data-download-action="true" name="format" value="${format}"><c:out value="${format}" /></button></c:forEach></form>
+          <c:forEach items="${['PDF']}" var="format"><button class="app-btn btn-neutral" data-download-action="true" name="format" value="${format}"><c:out value="${format}" /></button></c:forEach></form>
         </sec:authorize>
       </div>
       <c:if test="${result.rowsInScope > 2000}"><p class="report-context"><spring:message code="report.error.largeExport" /></p></c:if>
