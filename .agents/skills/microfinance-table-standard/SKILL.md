@@ -34,8 +34,15 @@ Use the existing JSP table contract rather than introducing a React/Cloudscape a
 - In repayment tables, distinguish actual received payments, allocation components, unapplied amounts, reversals, and projected instalments. Do not mix a repayment schedule into transaction history without clear separation.
 - Collections tables distinguish days past due, overdue amount, and outstanding principal; PAR is not the same as the sum of missed instalments.
 - Keep identifying information and financial consequences visible on mobile. Let the inner viewport scroll horizontally instead of hiding essential amounts, statuses, or receipt actions.
-- Allow names and descriptions to wrap. Reserve `whitespace-nowrap` for short identifiers, dates, amounts, and stable action cells.
-- Put record-specific actions in the last column. Use shared compact controls, accessible tooltips for icons, and service-backed permission states.
+- Allow names and descriptions to wrap. Reserve `whitespace-nowrap` for short identifiers, dates and amounts.
+
+## Selection And Record Commands
+
+- Do not add an Actions column or command buttons to table rows. Put record-specific commands in the compact table-header/toolbar action group, outside the row scroll viewport. This applies to new and edited tables; do not migrate unrelated pages without a requested scope.
+- Disable record commands until the required selection is present. For a single-record workflow, use one selected row with a leading, accessibly named checkbox: selecting another replaces selection, and clicking the selected checkbox or row body again clears it. Support native Tab/Space, a visible row highlight/focus indicator and a screen-reader-only selection announcement. Do not add a visible selection summary or Clear selection button.
+- Bind navigation and lifecycle commands to the selected record, derive labels such as Deactivate/Reactivate from its state, and retain service-backed permission and eligibility restrictions. Keep CSRF on POST commands; UI selection is not authorization.
+- Clear selection on filter changes, pagination and cached-page restoration so commands cannot target a stale record. Row-body selection must ignore links, buttons and form controls. Keep independent Create/Add New commands available without selection.
+- Reuse the accounting register behavior in `src/main/resources/static/js/accounting-accounts.js` and `accounting-library.js` and the scoped selection styles in `accounting-ledger.css` for these workspaces.
 
 ## Data And Interaction
 
@@ -49,4 +56,4 @@ Use the existing JSP table contract rather than introducing a React/Cloudscape a
 
 ## Verification
 
-Check sticky headers, pagination, sorting, filter persistence, long labels, zero/missing amounts, empty/error states, row actions, and branch/client isolation. At mobile and desktop widths, confirm the page does not overflow and table tools remain outside the scrolling rows. Verify reversed transactions cannot be mistaken for new receipts or silently removed from history.
+Check sticky headers, pagination, sorting, filter persistence, long labels, zero/missing amounts, empty/error states, selection toggling/replacement/reset, command targets/states, and branch/client isolation. Confirm there is no Actions column or row command button. At mobile and desktop widths, confirm the page does not overflow and table tools remain outside the scrolling rows. Verify reversed transactions cannot be mistaken for new receipts or silently removed from history.

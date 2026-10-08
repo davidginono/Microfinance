@@ -15,12 +15,16 @@
 <div class="accounting-workspace accounting-resource-workspace">
     <c:if test="${not empty libraryError}"><p class="coa-error" role="alert"><spring:message code="${libraryError}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
-    <section class="erp-table-wrap" data-aws-table-region>
+    <section class="erp-table-wrap" data-aws-table-region id="library-register">
         <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="${isActivity?'library.activityRegister':'library.transactionRegister'}" /></h2>
+            <div class="accounting-actions">
+            <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" id="library-status-form" data-url="<c:url value='/finance/library/${isActivity?"activities":"transactions"}/' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button type="submit" class="app-btn btn-neutral" id="library-status" disabled data-deactivate="<spring:message code='accounting.deactivate' />" data-reactivate="<spring:message code='coa.reactivate' />"><spring:message code="accounting.deactivate" /></button></form></sec:authorize>
+            <button type="button" class="app-btn btn-neutral" id="library-view" disabled><spring:message code="${isActivity?'library.transactions':'library.open'}" /></button>
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')">
                 <c:if test="${isActivity}"><button type="button" class="app-btn btn-primary" data-library-open><spring:message code="library.addActivity" /></button></c:if>
                 <c:if test="${not isActivity}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><button type="button" class="app-btn btn-primary" data-library-open><spring:message code="library.addTransaction" /></button></sec:authorize></c:if>
             </sec:authorize>
+            </div>
         </div>
         <form method="get" action="<c:url value='${listBase}' />" class="erp-table-toolbar coa-filters">
             <label class="erp-table-toolbar__search"><spring:message code="coa.search" /><input class="aws-control" name="search" value="<c:out value='${search}' />" maxlength="100" /></label>
@@ -31,15 +35,16 @@
             <label class="erp-table-toolbar__control"><spring:message code="coa.status" /><select class="aws-control" name="state"><option value=""><spring:message code="coa.all" /></option><option value="ACTIVE" ${state=='ACTIVE'?'selected':''}><spring:message code="accounting.active.true" /></option><option value="INACTIVE" ${state=='INACTIVE'?'selected':''}><spring:message code="accounting.active.false" /></option></select></label>
             <div class="erp-table-toolbar__actions"><button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button><a class="app-btn btn-neutral" href="<c:url value='${listBase}' />"><spring:message code="coa.clear" /></a></div>
         </form>
+        <p class="sr-only" id="library-selection-status" role="status" data-empty="<spring:message code='coa.selectHint' />" data-selected="<spring:message code='coa.selected' />"><spring:message code="coa.selectHint" /></p>
         <div class="erp-table-scroll" data-view-position-key="${isActivity?'activity-register':'transaction-register'}"><table class="erp-table">
-            <thead><tr><th><spring:message code="library.code" /></th><th><spring:message code="library.name" /></th><c:if test="${not isActivity}"><th><spring:message code="library.activityCode" /></th><th><spring:message code="library.sourceEvent" /></th><th><spring:message code="library.template" /></th></c:if><th><spring:message code="coa.status" /></th><th><spring:message code="common.actions" /></th></tr></thead>
-            <tbody><c:forEach items="${records.rows}" var="r"><tr>
-                <td><c:out value="${r.code}" /></td><td><c:out value="${r.name}" /><c:if test="${not empty r.description}"><small class="coa-description"><c:out value="${r.description}" /></small></c:if></td>
+            <thead><tr><th class="coa-selection-cell"><span class="sr-only"><spring:message code="coa.select" /></span></th><th><spring:message code="library.code" /></th><th><spring:message code="library.name" /></th><c:if test="${not isActivity}"><th><spring:message code="library.activityCode" /></th><th><spring:message code="library.sourceEvent" /></th><th><spring:message code="library.template" /></th></c:if><th><spring:message code="coa.status" /></th></tr></thead>
+            <tbody><c:forEach items="${records.rows}" var="r">
+                <c:choose><c:when test="${isActivity}"><c:url value="/finance/library/transactions" var="recordUrl"><c:param name="activityId" value="${r.id}" /></c:url></c:when><c:otherwise><c:url value="/finance/library/transactions/${r.id}" var="recordUrl" /></c:otherwise></c:choose>
+                <tr data-library-row data-id="${r.id}" data-active="${r.active}" data-url="<c:out value='${recordUrl}' />">
+                <td class="coa-selection-cell"><input type="checkbox" name="library-selection" value="${r.id}" aria-label="<spring:message code='coa.select' /> <c:out value='${r.code}' />" /></td>
+                <td data-library-code><c:out value="${r.code}" /></td><td data-library-name><c:out value="${r.name}" /><c:if test="${not empty r.description}"><small class="coa-description"><c:out value="${r.description}" /></small></c:if></td>
                 <c:if test="${not isActivity}"><td><c:out value="${r.activityCode}" /></td><td><spring:message code="accounting.policy.event.${r.sourceEvent}" /></td><td><c:choose><c:when test="${r.hasTemplate}"><spring:message code="library.configured" /></c:when><c:otherwise><spring:message code="library.noTemplate" /></c:otherwise></c:choose></td></c:if>
                 <td><spring:message code="accounting.active.${r.active}" /></td>
-                <td><div class="accounting-actions"><c:choose><c:when test="${isActivity}"><c:url value="/finance/library/transactions" var="recordUrl"><c:param name="activityId" value="${r.id}" /></c:url></c:when><c:otherwise><c:url value="/finance/library/transactions/${r.id}" var="recordUrl" /></c:otherwise></c:choose><a class="app-btn btn-neutral" href="<c:out value='${recordUrl}' />"><spring:message code="${isActivity?'library.transactions':'library.open'}" /></a>
-                    <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" action="<c:url value='/finance/library/${isActivity?"activities":"transactions"}/${r.id}/${r.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${r.active?'accounting.deactivate':'coa.reactivate'}" /></button></form></sec:authorize>
-                </div></td>
             </tr></c:forEach><c:if test="${empty records.rows}"><tr><td colspan="${isActivity?4:7}"><div class="accounting-empty"><spring:message code="${not empty search or not empty state or not empty activity?'coa.noMatches':isActivity?'library.emptyActivities':'library.emptyTransactions'}" /></div></td></tr></c:if></tbody>
         </table></div>
         <div class="erp-table-footer accounting-actions">
