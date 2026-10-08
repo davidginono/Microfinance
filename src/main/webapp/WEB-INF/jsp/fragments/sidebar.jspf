@@ -2,7 +2,7 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
-<c:set var="requestUri" value="${pageContext.request.requestURI}" />
+<c:set var="requestUri" value="${empty requestScope['jakarta.servlet.forward.request_uri']?pageContext.request.requestURI:requestScope['jakarta.servlet.forward.request_uri']}" />
 <c:set var="memberWorkspace" value="${not empty currentMember and currentMember.memberAccess and not currentMember.staffSession}" />
 <c:set var="staffWorkspace" value="${not empty currentMember and currentMember.staffSession}" />
 <aside id="appSidebar" class="app-sidebar shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0">
@@ -31,7 +31,6 @@
             </button>
         </div>
         <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0" data-view-position-key="sidebar-navigation">
-            <%@ include file="finance-navigation.jspf" %>
             <c:if test="${staffWorkspace}">
                 <sec:authorize access="@access.has(principal, 'LOAN_REPAYMENTS_VIEW')">
                     <a href="<c:url value='/repayments' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/repayments') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
@@ -599,8 +598,8 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="@access.canAccessAccountantArea(principal)">
-                <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant')}" />
+            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'ACCOUNTING_POLICIES_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'REPORT_TEMPLATE_PUBLISH', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'ACCOUNTING_CLOSING_VIEW', 'STATEMENT_VIEW', 'STATEMENT_DESIGN', 'STATEMENT_APPROVE', 'REGULATORY_SUBMISSION_VIEW', 'REGULATORY_SUBMISSION_CREATE', 'REGULATORY_SUBMISSION_APPROVE', 'ACCOUNTING_RELEASE_VIEW')">
+                <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant') or fn:startsWith(requestUri, '/finance/') or fn:startsWith(requestUri, '/reports/builder') or fn:startsWith(requestUri, '/reports/runs') or fn:startsWith(requestUri, '/reports/statements') or fn:startsWith(requestUri, '/reports/financial')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.accountant" text="Accountant" /></p>
                 </div>
@@ -617,10 +616,13 @@
                         </svg>
                     </button>
                     <div id="accountantOfficePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <sec:authorize access="@access.canAccessAccountantArea(principal)">
                         <a href="/accountant/dashboard" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/accountant/dashboard' ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantDashboard" text="Accountant Dashboard" /></a>
                         <a href="/accountant/loan-applications?filter=AWAITING_ACCOUNTANT" class="block px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/accountant/loan-applications') ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantQueue" text="Accountant Queue" /></a>
                         <a href="/accountant/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/accountant/archive' ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantArchive" text="Accountant Archive" /></a>
                         <a href="/accountant/reports" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/accountant/reports' ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantReports" text="Accountant Reports" /></a>
+                        </sec:authorize>
+                        <%@ include file="finance-navigation.jspf" %>
                     </div>
                 </div>
             </sec:authorize>

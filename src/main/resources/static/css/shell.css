@@ -5356,7 +5356,8 @@ body.aws-console,
     overflow: visible !important;
 }
 
-.shell-sidebar-group > div > a {
+.shell-sidebar-group > div > a,
+.shell-sidebar-group > div button.shell-sidebar-subitem {
     position: relative;
     display: flex !important;
     align-items: center;
@@ -5385,7 +5386,8 @@ body.aws-console,
 
 .shell-sidebar-group > div > a > .shell-sidebar-subitem-label,
 .shell-sidebar-scroll a.shell-sidebar-subitem > span:first-child,
-.shell-sidebar-scroll a.shell-sidebar-subitem > .shell-sidebar-subitem-label {
+.shell-sidebar-scroll a.shell-sidebar-subitem > .shell-sidebar-subitem-label,
+.shell-sidebar-scroll button.shell-sidebar-subitem > .shell-sidebar-subitem-label {
     display: inline-block;
     width: auto !important;
     min-width: 0 !important;
@@ -5405,14 +5407,16 @@ body.aws-console,
     text-overflow: clip !important;
 }
 
-.shell-sidebar-group > div > a:hover {
+.shell-sidebar-group > div > a:hover,
+.shell-sidebar-group > div button.shell-sidebar-subitem:hover {
     border-color: transparent !important;
     border-left-color: #ec7211 !important;
     background: #232e36 !important;
     color: #ffffff !important;
 }
 
-.shell-sidebar-group > div > a:focus-visible {
+.shell-sidebar-group > div > a:focus-visible,
+.shell-sidebar-group > div button.shell-sidebar-subitem:focus-visible {
     border-left-color: #ec7211 !important;
     background: #232e36 !important;
     color: #ffffff !important;
@@ -5420,7 +5424,8 @@ body.aws-console,
     outline-offset: -2px !important;
 }
 
-.shell-sidebar-group > div > a.shell-nav-active {
+.shell-sidebar-group > div > a.shell-nav-active,
+.shell-sidebar-group > div button.shell-sidebar-subitem.shell-nav-active {
     border: 0 !important;
     border-left: 3px solid #ec7211 !important;
     background: #25313a !important;
@@ -5430,7 +5435,9 @@ body.aws-console,
 }
 
 .shell-sidebar-group > div > a.shell-nav-active:hover,
-.shell-sidebar-group > div > a.shell-nav-active:focus-visible {
+.shell-sidebar-group > div > a.shell-nav-active:focus-visible,
+.shell-sidebar-group > div button.shell-sidebar-subitem.shell-nav-active:hover,
+.shell-sidebar-group > div button.shell-sidebar-subitem.shell-nav-active:focus-visible {
     border-color: transparent !important;
     border-left-color: #ec7211 !important;
     background: #34434d !important;

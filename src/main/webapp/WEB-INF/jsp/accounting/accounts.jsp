@@ -6,8 +6,9 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
+<c:set var="chartTitleKey" value="${empty selectedGroup?'accounting.accounts':selectedGroup.code.matches('[1-5][1-9][1-9]000')?'coa.postingAccountsTitle':'coa.subgroupsTitle'}" />
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><c:choose><c:when test="${empty selectedGroup}"><span class="erp-page-path__item" aria-current="page"><spring:message code="accounting.accounts" /></span></c:when><c:otherwise><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><c:forEach items="${groupPath}" var="g" varStatus="pathStatus"><span aria-hidden="true">›</span><c:choose><c:when test="${pathStatus.last}"><span class="erp-page-path__item" aria-current="page"><c:out value="${g.code}" /></span></c:when><c:otherwise><c:url value="/finance/accounts" var="groupUrl"><c:param name="parentId" value="${g.id}" /></c:url><a class="erp-page-path__item erp-page-path__link" href="<c:out value='${groupUrl}' />"><c:out value="${g.code}" /></a></c:otherwise></c:choose></c:forEach></c:otherwise></c:choose></nav>
-    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.accounts" /></h1></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${chartTitleKey}" /></h1></div>
 <div class="accounting-workspace accounting-resource-workspace">
     <p><spring:message code="coa.intro" /></p>
     <c:if test="${not empty accountingError}"><p class="coa-error" role="alert"><spring:message code="${accountingError}" /></p></c:if>
