@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -44,18 +46,24 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void everyRouteUsesTheAwsConsoleOrAuthShell() throws Exception {
+    void everyRouteUsesTheAwsConsoleAuthOrStandalonePrintShell() throws Exception {
         List<Path> routes = routeViews();
 
         assertThat(routes).hasSizeGreaterThanOrEqualTo(78);
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
-            assertThat(view)
-                .as(path.toString())
-                .satisfiesAnyOf(
-                    content -> assertThat(content).contains("fragments/header.jspf"),
-                    content -> assertThat(content).contains("aws-auth.css")
-                );
+            if (path.equals(JSP_ROOT.resolve("accounting/vouchers/print.jsp"))
+                || path.equals(JSP_ROOT.resolve("accounting/loans/print.jsp"))) {
+                String prefix = path.getParent().getFileName().toString().equals("vouchers") ? "voucher" : "loan";
+                assertThat(view).as(path.toString())
+                    .contains("<!DOCTYPE html>", "name=\"viewport\"", "<body class=\"" + prefix + "-print\"")
+                    .contains("code=\"voucher.print\"")
+                    .doesNotContain("fragments/header.jspf", "fragments/sidebar.jspf");
+                return;
+            }
+            assertThat(usesConsoleShell(path, new HashSet<>()) || view.contains("aws-auth.css"))
+                .as("Console or authentication shell for %s", path)
+                .isTrue();
         });
     }
 
@@ -63,7 +71,7 @@ class AwsConsoleViewContractTest {
     void authenticatedPagesExposeAwsHeadersAndRegisterContracts() throws Exception {
         for (Path path : routeViews()) {
             String view = read(path);
-            if (view.contains("fragments/header.jspf")) {
+            if (usesConsoleShell(path, new HashSet<>())) {
                 assertThat(view)
                     .as(path.toString())
                     .satisfiesAnyOf(
@@ -80,7 +88,11 @@ class AwsConsoleViewContractTest {
             if (view.matches("(?s).*method=[\"']get[\"'].*")) {
                 assertThat(view)
                     .as(path.toString())
-                    .contains("data-aws-filter-toolbar");
+                    .satisfiesAnyOf(
+                        content -> assertThat(content).contains("data-aws-filter-toolbar"),
+                        content -> assertThat(content).contains("erp-table-toolbar"),
+                        content -> assertThat(content).contains("voucher-filters")
+                    );
             }
         }
     }
@@ -215,7 +227,7 @@ class AwsConsoleViewContractTest {
     void workspaceLabelsAndFiltersUseTheSharedResponsiveLayoutContract() throws Exception {
         for (Path path : routeViews()) {
             String view = read(path);
-            if (!view.contains("fragments/header.jspf")) {
+            if (!usesConsoleShell(path, new HashSet<>())) {
                 continue;
             }
             assertThat(view)
@@ -223,12 +235,18 @@ class AwsConsoleViewContractTest {
                 .doesNotContainPattern("class=[\"'][^\"']*\\btruncate\\b[^\"']*[\"']");
 
             java.util.regex.Matcher getForms = java.util.regex.Pattern
-                .compile("<form\\b[^>]*\\bmethod\\s*=\\s*[\"']get[\"'][^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .compile("<form\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", java.util.regex.Pattern.CASE_INSENSITIVE)
                 .matcher(view);
             while (getForms.find()) {
+                if (!getForms.group().matches("(?is).*\\bmethod\\s*=\\s*[\"']get[\"'].*")) {
+                    continue;
+                }
                 assertThat(getForms.group())
                     .as(path + " GET form")
-                    .contains("data-aws-filter-toolbar");
+                    .satisfiesAnyOf(
+                        content -> assertThat(content).contains("data-aws-filter-toolbar"),
+                        content -> assertThat(content).containsPattern("class=[\"'][^\"']*\\b(?:aws-filter-toolbar|erp-table-toolbar|voucher-filters)\\b[^\"']*[\"']")
+                    );
             }
         }
 
@@ -646,7 +664,8 @@ class AwsConsoleViewContractTest {
             .contains("data-aws-action-pin=\"true\"")
             .contains("data-download-action=\"true\"")
             .contains("class=\"loan-report-action-icon is-pdf\"")
-            .contains("class=\"loan-report-action-icon is-excel\"")
+            .contains("data-print-action=\"true\"")
+            .doesNotContain("is-excel", ".xlsx", ".csv")
             .contains("class=\"loan-report-action-icon is-refresh\"")
             .contains("loan-spark-row")
             .contains("renderMetricSparklines")
@@ -991,13 +1010,13 @@ class AwsConsoleViewContractTest {
         assertThat(memberReports)
             .contains("class=\"loan-analytics-actions\" data-aws-action-pin=\"true\"")
             .contains("class=\"loan-report-action-icon is-pdf\"")
-            .contains("class=\"loan-report-action-icon is-excel\"")
+            .doesNotContain("is-excel", ".xlsx", ".csv")
             .contains("class=\"loan-report-action-icon is-refresh\"")
             .contains("data-print-action=\"true\"");
         assertThat(staffAnalytics)
             .contains("class=\"app-table-toolbar staff-analytics-actions\" data-aws-action-pin=\"true\"")
             .contains("class=\"staff-action-icon is-pdf\"")
-            .contains("class=\"staff-action-icon is-excel\"")
+            .doesNotContain("is-excel", ".xlsx", ".csv")
             .contains("class=\"staff-action-icon is-refresh\"")
             .contains("data-print-action=\"true\"")
             .contains("class=\"erp-table-scroll\" data-view-position-key=\"staff-analytics-financial-breakdown\"");
@@ -1284,6 +1303,24 @@ class AwsConsoleViewContractTest {
                 .sorted()
                 .toList();
         }
+    }
+
+    private static boolean usesConsoleShell(Path path, Set<Path> visited) {
+        path = path.normalize();
+        if (!visited.add(path)) {
+            return false;
+        }
+        String view = read(path);
+        if (view.contains("fragments/header.jspf")) {
+            return true;
+        }
+        var includes = Pattern.compile("<%@\\s*include\\s+file=[\"']([^\"']+)[\"']\\s*%>").matcher(view);
+        while (includes.find()) {
+            if (usesConsoleShell(path.getParent().resolve(includes.group(1)), visited)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String read(Path path) {

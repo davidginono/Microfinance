@@ -38,12 +38,15 @@ import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
@@ -67,11 +70,13 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringJUnitWebConfig(LoanDocumentControllerSmsUsageSecurityTest.TestConfig.class)
@@ -105,7 +110,7 @@ class LoanDocumentControllerSmsUsageSecurityTest {
     }
 
     @Test
-    void workspaceSmsUsageExcelExportUsesScopedSaccoAndStation() throws Exception {
+    void workspaceSmsUsagePdfExportUsesScopedSaccoAndStation() throws Exception {
         UUID applicantId = UUID.randomUUID();
         LocalDate fromDate = LocalDate.of(2026, 9, 1);
         LocalDate toDate = LocalDate.of(2026, 9, 23);
@@ -145,9 +150,9 @@ class LoanDocumentControllerSmsUsageSecurityTest {
             List.of(applicantId)
         )).thenReturn(criteria);
         when(smsUsageManagementService.loanUsageExport(criteria, "Workspace Admin")).thenReturn(report);
-        when(loanReportService.buildSmsUsageExcel(report)).thenReturn(new byte[]{1, 2, 3});
+        when(loanReportService.buildSmsUsagePdf(report)).thenReturn(new byte[]{1, 2, 3});
 
-        mockMvc.perform(get("/documents/reports/sms-usage.xlsx")
+        mockMvc.perform(get("/documents/reports/sms-usage.pdf")
                 .param("saccoId", "OTHER")
                 .param("stationId", "OTHER")
                 .param("fromDate", "2026-09-01")
@@ -156,7 +161,9 @@ class LoanDocumentControllerSmsUsageSecurityTest {
                 .param("applicantIds", applicantId.toString())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().isOk())
-            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("sms-usage-2026-09-01-to-2026-09-23.xlsx")));
+            .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+            .andExpect(content().bytes(new byte[]{1, 2, 3}))
+            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("sms-usage-2026-09-01-to-2026-09-23.pdf")));
 
         verify(smsUsageManagementService).loanUsageCriteria(
             "SACCO-01",
@@ -174,6 +181,21 @@ class LoanDocumentControllerSmsUsageSecurityTest {
             LoanStatus.READY_FOR_MANAGER,
             List.of(applicantId)
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"xlsx", "csv"})
+    void retiredSmsUsageExportsAreDeniedEvenWithViewPermission(String extension) throws Exception {
+        AppUserPrincipal principal = principal(Set.of(UserClaim.SMS_USAGE_VIEW));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+
+        mockMvc.perform(get("/documents/reports/sms-usage." + extension)
+                .param("saccoId", "OTHER")
+                .param("stationId", "OTHER")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+
+        verifyNoInteractions(smsUsageManagementService, loanReportService);
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {

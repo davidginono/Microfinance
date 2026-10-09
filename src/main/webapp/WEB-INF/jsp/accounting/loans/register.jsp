@@ -1,7 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
-<div class="accounting-workspace" data-voucher-register data-base="<c:url value='${base}' />"><div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="recording.register.${kind}" /></h1></div>
-<section class="erp-table-wrap"><div class="app-table-titlebar voucher-toolbar"><h2 class="erp-panel-title"><spring:message code="voucher.records" /></h2><div class="accounting-actions">
+<div class="accounting-workspace" data-voucher-register data-base="<c:url value='${base}' />"><div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="recording.register.${kind}" /></h1></div>
+<section class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar voucher-toolbar"><h2 class="erp-panel-title"><spring:message code="voucher.records" /></h2><div class="accounting-actions">
 <button class="app-btn btn-neutral" data-selection-action="details" disabled><spring:message code="common.view" /></button>
 <sec:authorize access="@access.has(principal,'LOAN_RECORDING_EXPORT')"><button class="app-btn btn-neutral" data-selection-action="pdf" disabled><spring:message code="voucher.pdf" /></button><button class="app-btn btn-neutral" data-selection-action="print" disabled><spring:message code="voucher.print" /></button></sec:authorize>
 <sec:authorize access="@access.has(principal,'${createClaim}')"><a class="app-btn btn-primary" href="<c:url value='${base}/new' />"><spring:message code="recording.create.${kind}" /></a></sec:authorize>
