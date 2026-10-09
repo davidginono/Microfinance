@@ -499,6 +499,7 @@ public class PlatformAdminService {
             case CHAIRPERSON_APPROVED -> "Reviewed By Chairperson";
             case LOAN_OFFICER_APPROVED -> "Reviewed By Loan Officer";
             case ACCOUNTANT_APPROVED -> "Reviewed By Accountant";
+            case RECORDED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("recording.status.RECORDED");
             case DRAFT -> "Draft";
         };
     }

@@ -1,0 +1,12 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+<%@ include file="../../fragments/header.jspf" %>
+<%@ include file="../../fragments/sidebar.jspf" %>
+<spring:htmlEscape defaultHtmlEscape="true" />
+<link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
+<link rel="stylesheet" href="<c:url value='/css/accounting-vouchers.css' />" />
+<link rel="stylesheet" href="<c:url value='/css/loan-recording.css' />" />
+<spring:message code="recording.choose" var="chooseLabel" />

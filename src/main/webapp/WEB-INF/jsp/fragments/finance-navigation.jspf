@@ -1,4 +1,17 @@
 <c:if test="${staffWorkspace}">
+    <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
+        <a href="<c:url value='/finance/loan-records' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-records') ? 'shell-nav-active' : ''}"><spring:message code="recording.register.LOAN" /></a>
+    </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
+        <a href="<c:url value='/finance/loan-disbursements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-disbursements') ? 'shell-nav-active' : ''}"><spring:message code="recording.register.DISBURSEMENT" /></a>
+    </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
+        <a href="<c:url value='/finance/loan-repayments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-repayments') ? 'shell-nav-active' : ''}"><spring:message code="recording.register.PAYMENT" /></a>
+    </sec:authorize>
+    <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
+        <a href="<c:url value='/finance/client-ledgers' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/client-ledgers') ? 'shell-nav-active' : ''}"><spring:message code="recording.clientLedgers" /></a>
+    </sec:authorize>
+
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_POLICIES_VIEW')">
         <a href="<c:url value='/finance/policies' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/policies') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
             <spring:message code="finance.nav.policies" />

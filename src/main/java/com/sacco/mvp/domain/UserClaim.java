@@ -64,6 +64,12 @@ public enum UserClaim {
     PAYMENT_DETAILS_UPDATE(AccessFeature.PAYMENT_DETAILS, AccessAction.UPDATE),
 
     LOAN_REPAYMENTS_VIEW(AccessFeature.LOAN_REPAYMENTS, AccessAction.VIEW),
+    LOAN_RECORDING_VIEW(AccessFeature.LOAN_RECORDING, AccessAction.VIEW),
+    LOAN_RECORDING_CREATE(AccessFeature.LOAN_RECORDING, AccessAction.CREATE),
+    LOAN_RECORDING_DISBURSE(AccessFeature.LOAN_RECORDING, AccessAction.DISBURSE),
+    LOAN_RECORDING_POST(AccessFeature.LOAN_RECORDING, AccessAction.ADD),
+    LOAN_RECORDING_REVERSE(AccessFeature.LOAN_RECORDING, AccessAction.REVERSE),
+    LOAN_RECORDING_EXPORT(AccessFeature.LOAN_RECORDING, AccessAction.EXPORT),
     LOAN_REPAYMENTS_CREATE(AccessFeature.LOAN_REPAYMENTS, AccessAction.CREATE),
     LOAN_REPAYMENTS_REVERSE(AccessFeature.LOAN_REPAYMENTS, AccessAction.REVERSE),
 
@@ -303,6 +309,8 @@ public enum UserClaim {
                 case LOAN_OFFICER -> claims.addAll(legacyClaims("REVIEW_LOAN_OFFICER_QUEUE"));
                 case MANAGER -> claims.addAll(legacyClaims("REVIEW_MANAGER_QUEUE"));
                 case ACCOUNTANT -> {
+                    addAll(claims, LOAN_RECORDING_VIEW, LOAN_RECORDING_CREATE, LOAN_RECORDING_DISBURSE,
+                        LOAN_RECORDING_POST, LOAN_RECORDING_REVERSE, LOAN_RECORDING_EXPORT);
                     claims.addAll(legacyClaims("REVIEW_ACCOUNTANT_QUEUE"));
                     addAll(claims, ACCOUNTING_ACCOUNTS_VIEW, ACCOUNTING_ACCOUNTS_CREATE, ACCOUNTING_ACCOUNTS_UPDATE);
                     addAll(claims, ACCOUNTING_BUSINESS_VIEW, ACCOUNTING_BUSINESS_CREATE, ACCOUNTING_BUSINESS_REVERSE,

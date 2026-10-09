@@ -65,6 +65,15 @@ public class LoanRepaymentLedgerService {
         return ledgers.existsById(loanId);
     }
 
+    public record PaymentBalance(BigDecimal duePrincipal, BigDecimal dueInterest, BigDecimal outstandingPrincipal) {}
+    @Transactional(readOnly = true)
+    public PaymentBalance paymentBalance(UUID id, AppUserPrincipal actor, LocalDate effectiveDate) {
+        LoanLedger ledger = readableLedger(id, actor);
+        require(effectiveDate != null && !effectiveDate.isBefore(ledger.getDisbursementDate()) && !effectiveDate.isAfter(clock.today()), "date");
+        Totals t = totals(rows(id), effectiveDate);
+        return new PaymentBalance(t.duePrincipal(), t.dueInterest(), ledger.getPrincipal().subtract(ledger.getPrincipalPaid()));
+    }
+
     @Transactional(readOnly = true)
     public Page<LedgerListRow> list(AppUserPrincipal actor, String loanNumber, int page) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_VIEW);
@@ -114,6 +123,17 @@ public class LoanRepaymentLedgerService {
     @Transactional
     public Receipt post(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_CREATE);
+        return postInternal(loanId, actor, command);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Receipt postRecorded(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
+        requireStaff(actor, UserClaim.LOAN_RECORDING_POST);
+        require(accountingGuard.recordedLoan(loanId), "state");
+        return postInternal(loanId, actor, command);
+    }
+
+    private Receipt postInternal(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
         accountingGuard.repayment(loanId, actor, command);
         LoanLedger ledger = lockedLedger(loanId, actor);
         BigDecimal amount = money(command.amount());
@@ -199,6 +219,17 @@ public class LoanRepaymentLedgerService {
     @Transactional
     public Receipt reverseAt(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason, LocalDate effectiveDate) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_REVERSE);
+        return reverseInternal(loanId,paymentId,actor,requestKey,reason,effectiveDate);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Receipt reverseRecorded(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason, LocalDate effectiveDate) {
+        requireStaff(actor, UserClaim.LOAN_RECORDING_REVERSE);
+        require(accountingGuard.recordedLoan(loanId), "state");
+        return reverseInternal(loanId,paymentId,actor,requestKey,reason,effectiveDate);
+    }
+
+    private Receipt reverseInternal(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason, LocalDate effectiveDate) {
         accountingGuard.reversal(loanId, actor, requestKey);
         LoanLedger ledger = lockedLedger(loanId, actor);
         String explanation = text(reason, 500);
@@ -294,7 +325,8 @@ public class LoanRepaymentLedgerService {
         LoanLedger l = ledgers.findById(id).orElseThrow(() -> new AccessDeniedException("Forbidden"));
         boolean owner = !actor.isStaffSession() && actor.isMemberAccess()
             && access.has(actor, UserClaim.MEMBER_LOANS_VIEW) && l.getApplicantMemberId().equals(actor.getMemberId());
-        boolean staff = actor.isStaffSession() && access.has(actor, UserClaim.LOAN_REPAYMENTS_VIEW)
+        boolean staff = actor.isStaffSession() && (access.has(actor, UserClaim.LOAN_REPAYMENTS_VIEW)
+            || (access.has(actor, UserClaim.LOAN_RECORDING_VIEW) && accountingGuard.recordedLoan(id)))
             && l.getStationId().equals(actor.getStationId());
         if (!l.getSaccoId().equals(actor.getSaccoId()) || (!owner && !staff)) throw new AccessDeniedException("Forbidden");
         return l;

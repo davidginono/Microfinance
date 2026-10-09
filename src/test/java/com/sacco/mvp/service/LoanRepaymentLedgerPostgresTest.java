@@ -10,7 +10,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.orm.jpa.*;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.security.access.AccessDeniedException;
@@ -236,8 +236,13 @@ class LoanRepaymentLedgerPostgresTest {
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = "com.sacco.mvp.repository")
     static class TestConfig {
-        @Bean DataSource dataSource() {
-            return new DriverManagerDataSource(System.getenv("MICROFINANCE_TEST_DATABASE_URL"), "microfinance_test", "");
+        @Bean(destroyMethod = "close") DataSource dataSource() {
+            var source = new HikariDataSource();
+            source.setJdbcUrl(System.getenv("MICROFINANCE_TEST_DATABASE_URL"));
+            source.setUsername("microfinance_test");source.setPassword("");
+            source.addDataSourceProperty("sslmode", "disable");
+            source.setMinimumIdle(1);source.setMaximumPoolSize(4);source.setConnectionTimeout(60000);
+            return source;
         }
         @Bean(initMethod = "migrate") Flyway flyway(DataSource source) {
             return Flyway.configure().dataSource(source).locations("classpath:db/migration").load();

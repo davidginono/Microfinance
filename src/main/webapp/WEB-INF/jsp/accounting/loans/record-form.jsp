@@ -1,0 +1,33 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ include file="support.jspf" %>
+<nav class="erp-page-path"><a href="<c:url value='/finance/loan-records' />"><spring:message code="recording.register.LOAN" /></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="recording.create.LOAN" /></span></nav>
+<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="recording.create.LOAN" /></h1></div>
+<div class="accounting-workspace accounting-create-workspace"><c:url value="/finance/loan-records" var="saveUrl" />
+<form:form modelAttribute="recordForm" action="${saveUrl}" method="post" data-loan-form="true" cssClass="accounting-create-form"><form:hidden path="requestKey" />
+<form:errors path="*" cssClass="loan-error-summary" element="div" role="alert" tabindex="-1" />
+<section class="accounting-section"><h2><spring:message code="recording.identity" /></h2><div class="loan-form-grid">
+<div data-loan-choice data-category="clients"><label for="clientId"><spring:message code="recording.client" /><form:select path="clientId" id="clientId" cssClass="aws-control" data-choice-select="true"><form:option value="" label="${chooseLabel}" /><c:if test="${not empty recordForm.clientId}"><form:option value="${recordForm.clientId}" label="${recordForm.clientId}" /></c:if></form:select></label><%@ include file="choice-search.jspf" %></div>
+<div data-loan-choice data-category="products"><label for="productId"><spring:message code="recording.product" /><form:select path="productId" id="productId" cssClass="aws-control" data-choice-select="true"><form:option value="" label="${chooseLabel}" /><c:if test="${not empty recordForm.productId}"><form:option value="${recordForm.productId}" label="${recordForm.productId}" /></c:if></form:select></label><%@ include file="choice-search.jspf" %></div>
+<label for="applicationDate"><spring:message code="recording.applicationDate" /><form:input path="applicationDate" id="applicationDate" type="date" cssClass="aws-control" required="required" /></label>
+<label for="purpose"><spring:message code="recording.purpose" /><form:input path="purpose" id="purpose" maxlength="500" cssClass="aws-control" required="required" /></label>
+</div></section>
+<section class="accounting-section"><h2><spring:message code="recording.terms" /></h2><div class="loan-form-grid">
+<label for="requestedPrincipal"><spring:message code="recording.requestedPrincipal" /> (TZS)<form:input path="requestedPrincipal" id="requestedPrincipal" type="number" min="0.01" step="0.01" cssClass="aws-control" required="required" /></label>
+<label for="principal"><spring:message code="recording.principal" /> (TZS)<form:input path="principal" id="principal" type="number" min="0.01" step="0.01" cssClass="aws-control" required="required" /></label>
+<label for="months"><spring:message code="recording.months" /><form:input path="months" id="months" type="number" min="1" max="600" cssClass="aws-control" required="required" /></label>
+<label for="firstPaymentDate"><spring:message code="recording.firstPaymentDate" /><form:input path="firstPaymentDate" id="firstPaymentDate" type="date" cssClass="aws-control" required="required" /></label>
+</div><p><spring:message code="recording.productTerms" /></p></section>
+<details class="accounting-section"><summary><spring:message code="recording.supporting" /></summary><div class="loan-form-grid">
+<label><spring:message code="recording.business" /><form:textarea path="business" cssClass="aws-control" maxlength="1000" rows="3" /></label>
+<label><spring:message code="recording.information" /><form:select path="informationSource" cssClass="aws-control"><c:forEach items="${['DECLARED','DOCUMENTED','UNAVAILABLE']}" var="s"><form:option value="${s}"><spring:message code="recording.source.${s}" /></form:option></c:forEach></form:select></label>
+<label><spring:message code="recording.income" /> (TZS)<form:input path="income" type="number" min="0" step="0.01" cssClass="aws-control" /></label>
+<label><spring:message code="recording.expenses" /> (TZS)<form:input path="expenses" type="number" min="0" step="0.01" cssClass="aws-control" /></label>
+<label><spring:message code="recording.otherDebt" /> (TZS)<form:input path="otherDebt" type="number" min="0" step="0.01" cssClass="aws-control" /></label>
+<label><spring:message code="recording.guarantors" /><form:textarea path="guarantors" cssClass="aws-control" maxlength="1000" rows="3" /></label>
+<label><spring:message code="recording.collateral" /><form:textarea path="collateral" cssClass="aws-control" maxlength="1000" rows="3" /></label>
+<label><spring:message code="voucher.evidence" /><form:textarea path="evidence" cssClass="aws-control" maxlength="500" rows="3" /></label>
+<label><spring:message code="voucher.description" /><form:textarea path="notes" cssClass="aws-control" maxlength="500" rows="3" /></label>
+</div></details>
+<c:if test="${not empty quote}"><section class="accounting-section"><h2><spring:message code="recording.preview" /></h2><p><c:out value="${quote.product}" /> &#183; <fmt:formatNumber value="${quote.rate*100}" />% <spring:message code="recording.annual" /> &#183; <spring:message code="recording.method.${quote.method}" /> &#183; <spring:message code="recording.frequency.${quote.frequency}" /></p><p><spring:message code="recording.installment" />: TZS ${quote.installment} &#183; <spring:message code="recording.contractInterest" />: TZS ${quote.interest}</p><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th>#</th><th><spring:message code="recording.dueDate" /></th><th><spring:message code="recording.principal" /></th><th><spring:message code="recording.interest" /></th><th><spring:message code="voucher.amount" /> (TZS)</th></tr></thead><tbody><c:forEach items="${quote.schedule}" var="s"><tr><td>${s.number}</td><td>${s.date}</td><td>${s.principal}</td><td>${s.interest}</td><td>${s.amount}</td></tr></c:forEach></tbody></table></div></section></c:if>
+<div class="accounting-actions loan-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-neutral" name="action" value="preview"><spring:message code="recording.preview" /></button><button class="app-btn btn-primary" name="action" value="save"><spring:message code="recording.save" /></button></div>
+</form:form></div><%@ include file="../accounting-form-support.jspf" %><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../../fragments/footer.jspf" %>

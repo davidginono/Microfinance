@@ -14,6 +14,7 @@ public enum AccessFeature {
     MEMBER_SETTINGS("Member Settings"),
     PAYMENT_DETAILS("Payment Details"),
     LOAN_REPAYMENTS("Repayments"),
+    LOAN_RECORDING("Accountant loan recording"),
     ACCOUNTING_ACCOUNTS("Chart of accounts"),
     ACCOUNTING_JOURNALS("Accounting journals"),
     ACCOUNTING_OPENINGS("Opening balances"),

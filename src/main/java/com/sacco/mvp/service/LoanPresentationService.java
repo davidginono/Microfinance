@@ -347,6 +347,12 @@ public class LoanPresentationService {
             return List.of(progressItem("Draft", true, true, "current"));
         }
 
+        if (isAccountantRecorded(app)) {
+            String label = messageSource.getMessage("recording.status." + app.getStatus().name(), null,
+                org.springframework.context.i18n.LocaleContextHolder.getLocale());
+            return List.of(progressItem(label, true, true, "current"));
+        }
+
         List<String> labels = new ArrayList<>();
         boolean hasGuarantorStage = app.getRequiredGuarantors() != null && app.getRequiredGuarantors() > 0;
         LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
@@ -437,6 +443,15 @@ public class LoanPresentationService {
             items.add(progressItem(progressDisplayLabel(labels.get(i)), active, current, state));
         }
         return items;
+    }
+
+    private boolean isAccountantRecorded(LoanApplication app) {
+        if (app.getStatus() == LoanStatus.RECORDED) return true;
+        if (app.getFinancialSnapshot() == null) return false;
+        try {
+            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
+            return "ACCOUNTANT_DIRECT".equals(raw.get("recordingSource"));
+        } catch (Exception invalidLegacySnapshot) { return false; }
     }
 
     public List<Map<String, Object>> parseAttachments(String json) {

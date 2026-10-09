@@ -443,10 +443,12 @@ public class GeneralLedgerService {
     private void independentOriginal(AppUserPrincipal actor,Journal original) {
         require(!actor.getMemberId().equals(original.makerId()) && !actor.getMemberId().equals(original.checkerId()),"independentReversal");
     }
-    void requireActor(AppUserPrincipal actor,String claim) {
+    public void requireActor(AppUserPrincipal actor,String claim) {
         requireScope(actor);if(!access.has(actor,claim))throw new AccessDeniedException("Accounting permission required");
         var current=directory.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Accounting access unavailable"));
-        if(!current.isStaffAccessActive() || current.getStatus()!=MemberStatus.ACTIVE || current.getActiveStaffRolesResolved().contains(Position.ADMIN) || !Objects.equals(current.getSaccoId(),actor.getSaccoId()) || !Objects.equals(current.getStationId(),actor.getStationId())
+        if(!current.isStaffAccessActive() || current.getStatus()!=MemberStatus.ACTIVE || current.getActiveStaffRolesResolved().contains(Position.ADMIN)
+            || (claim.startsWith("LOAN_RECORDING_") && !current.getActiveStaffRolesResolved().contains(Position.ACCOUNTANT))
+            || !Objects.equals(current.getSaccoId(),actor.getSaccoId()) || !Objects.equals(current.getStationId(),actor.getStationId())
             || institutions.findActiveSacco(actor.getSaccoId()).isEmpty()
             || institutions.findStation(actor.getSaccoId(),actor.getStationId()).filter(SaccoStation::isActive)
                 .filter(station->station.getAccessStatus()==SaccoAccessStatus.ACTIVE).isEmpty()

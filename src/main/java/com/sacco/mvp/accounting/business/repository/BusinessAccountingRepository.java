@@ -1,5 +1,7 @@
 package com.sacco.mvp.accounting.business.repository;
 
+import com.sacco.mvp.security.AppUserPrincipal;
+
 import com.sacco.mvp.accounting.business.dto.BusinessAccountingDtos.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,6 +16,24 @@ import java.util.*;
 public class BusinessAccountingRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+
+    public boolean recordedLoan(UUID loan) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_record where loan_id=?)",Boolean.class,loan));
+    }
+    public boolean recordedCommand(UUID loan, AppUserPrincipal actor, UUID key, String kind, String reference, BigDecimal amount, LocalDate date) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from accountant_loan_post p join accountant_loan_record r on r.loan_id=p.loan_id
+            where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.actor_id=? and p.request_key=? and p.kind=?
+            and p.reference=? and p.amount=? and p.effective_date=? and p.state='POSTING')
+            """,Boolean.class,loan,actor.getSaccoId(),actor.getStationId(),actor.getMemberId(),key,kind,reference,amount,date));
+    }
+    public boolean recordedReversal(UUID loan, AppUserPrincipal actor, UUID key, LocalDate date, UUID original) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from accountant_loan_post p join accountant_loan_post o on o.id=p.reverses_id
+            where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.actor_id=? and p.request_key=? and p.kind='REVERSAL'
+            and (?::date is null or p.effective_date=?::date) and (?::uuid is null or o.transaction_id=?::uuid) and p.state='POSTING')
+            """,Boolean.class,loan,actor.getSaccoId(),actor.getStationId(),actor.getMemberId(),key,date,date,original,original));
+    }
 
     public boolean hasInstitutionHistory(String institution) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""

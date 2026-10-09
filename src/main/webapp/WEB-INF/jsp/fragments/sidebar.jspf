@@ -598,7 +598,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'ACCOUNTING_POLICIES_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'REPORT_TEMPLATE_PUBLISH', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'ACCOUNTING_CLOSING_VIEW', 'STATEMENT_VIEW', 'STATEMENT_DESIGN', 'STATEMENT_APPROVE', 'REGULATORY_SUBMISSION_VIEW', 'REGULATORY_SUBMISSION_CREATE', 'REGULATORY_SUBMISSION_APPROVE', 'ACCOUNTING_RELEASE_VIEW')">
+            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'LOAN_RECORDING_VIEW', 'ACCOUNTING_POLICIES_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'REPORT_TEMPLATE_PUBLISH', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'ACCOUNTING_CLOSING_VIEW', 'STATEMENT_VIEW', 'STATEMENT_DESIGN', 'STATEMENT_APPROVE', 'REGULATORY_SUBMISSION_VIEW', 'REGULATORY_SUBMISSION_CREATE', 'REGULATORY_SUBMISSION_APPROVE', 'ACCOUNTING_RELEASE_VIEW')">
                 <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant') or fn:startsWith(requestUri, '/finance/') or fn:startsWith(requestUri, '/reports/builder') or fn:startsWith(requestUri, '/reports/runs') or fn:startsWith(requestUri, '/reports/statements') or fn:startsWith(requestUri, '/reports/financial')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.accountant" text="Accountant" /></p>

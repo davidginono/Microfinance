@@ -11,6 +11,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.jdbc.datasource.*;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
@@ -27,11 +28,12 @@ import static org.mockito.Mockito.*;
 @EnabledIfEnvironmentVariable(named="MICROFINANCE_VOUCHER_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_vouchers_test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class VoucherPostgresTest {
+ HikariDataSource dataSource;
  JdbcTemplate jdbc; VoucherService service; TransactionTemplate tx; AuditService audit; UserClaimService claims; MemberDirectoryService directory;
  SaccoRegistryService institutions; AccountingPolicyService policies; String institution; AppUserPrincipal actor; UUID cash,capital,expense,control;
  final LocalDate day=LocalDate.of(2026,10,1); final OffsetDateTime now=OffsetDateTime.parse("2026-10-08T10:00:00+03:00");
  @BeforeAll void start(){
-  var ds=new DriverManagerDataSource(System.getenv("MICROFINANCE_VOUCHER_TEST_URL"),"microfinance_test","");
+  var ds=new HikariDataSource();dataSource=ds;ds.setJdbcUrl(System.getenv("MICROFINANCE_VOUCHER_TEST_URL"));ds.setUsername("microfinance_test");ds.setPassword("");ds.addDataSourceProperty("sslmode","disable");ds.setMinimumIdle(1);ds.setMaximumPoolSize(4);ds.setConnectionTimeout(60000);
   Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);
   var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
   audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);policies=mock(AccountingPolicyService.class);
@@ -40,6 +42,7 @@ class VoucherPostgresTest {
   var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build());
   var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(VoucherService)proxy.getProxy();
  }
+ @AfterAll void stop(){if(dataSource!=null)dataSource.close();}
  @BeforeEach void fixture(){
   reset(audit,claims,directory,institutions,policies);institution="V-"+UUID.randomUUID();
   jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?, 'Synthetic voucher institution',true,now(),now())",institution);

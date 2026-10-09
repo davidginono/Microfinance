@@ -90,6 +90,7 @@ public class WorkflowStatusPresentationService {
 
     public String dashboardStatusLabel(LoanStatus status) {
         return switch (status) {
+            case RECORDED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("recording.status.RECORDED");
             case SUBMITTED -> "Submitted";
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
@@ -122,6 +123,7 @@ public class WorkflowStatusPresentationService {
 
     public String dashboardStatusColor(LoanStatus status) {
         return switch (status) {
+            case RECORDED -> "#64748B";
             case DRAFT -> "#60A5FA";
             case SUBMITTED -> "#94A3B8";
             case AWAITING_GUARANTORS -> "#F59E0B";

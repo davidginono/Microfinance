@@ -61,12 +61,17 @@ class FinanceWorkspaceSecurityTest {
         mvc.perform(post("/finance/test-boundary").with(user(actor)).with(csrf())).andExpect(status().isOk());
     }
 
-    @Test void onlyAccountantsReceiveChartOnboardingDefaults() {
+    @Test void onlyAccountantsReceiveDirectAccountingAndLoanRecordingDefaults() {
         for (Position role : Position.values()) {
             var financial=UserClaim.defaultClaims(Set.of(role), true).stream().filter(claim ->
-                claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATE_")).toList();
+                claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATE_")
+                    || claim.name().startsWith("LOAN_RECORDING_")).toList();
             if(role==Position.ACCOUNTANT) assertThat(financial).containsExactlyInAnyOrder(
-                UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
+                UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE,
+                UserClaim.ACCOUNTING_JOURNALS_VIEW,UserClaim.ACCOUNTING_JOURNALS_CREATE,UserClaim.ACCOUNTING_JOURNALS_REVERSE,
+                UserClaim.ACCOUNTING_BUSINESS_VIEW,UserClaim.ACCOUNTING_BUSINESS_CREATE,UserClaim.ACCOUNTING_BUSINESS_REVERSE,
+                UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,UserClaim.LOAN_RECORDING_DISBURSE,
+                UserClaim.LOAN_RECORDING_POST,UserClaim.LOAN_RECORDING_REVERSE,UserClaim.LOAN_RECORDING_EXPORT);
             else assertThat(financial).isEmpty();
         }
     }

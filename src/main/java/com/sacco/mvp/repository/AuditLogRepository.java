@@ -22,6 +22,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
     @Query("""
         delete from AuditLog a where a.createdAt < :cutoff
         and a.entityType <> 'LOAN_REPAYMENT'
+        and a.entityType <> 'LOAN_RECORDING'
         and a.entityType not like 'ACCOUNTING%'
         and a.entityType not like '%REPORT%'
         and a.entityType not like '%STATEMENT%'

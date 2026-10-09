@@ -15,6 +15,8 @@ import java.time.LocalDate;
 public class BusinessAccountingGuard {
     private final BusinessAccountingRepository sources;
 
+    public boolean recordedLoan(UUID loan) { return sources.recordedLoan(loan); }
+
     @Transactional(propagation=Propagation.MANDATORY)
     public void disbursement(LoanApplication loan,UUID officer) {
         if(sources.activated(loan.getSaccoId()) && !sources.trustedLoanCommand(loan.getSaccoId(),loan.getStationId(),loan.getId(),officer,
@@ -23,18 +25,31 @@ public class BusinessAccountingGuard {
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void repayment(UUID loan,AppUserPrincipal actor,PaymentCommand command) {
+        if(sources.recordedLoan(loan)) {
+            if(!sources.recordedCommand(loan,actor,command.requestKey(),"PAYMENT",command.reference(),command.amount(),command.paymentDate()))
+                throw new IllegalArgumentException("recording.error.directPath");
+            return;
+        }
         if(sources.activated(actor.getSaccoId()) && !sources.trustedLoanCommand(actor.getSaccoId(),actor.getStationId(),loan,actor.getMemberId(),
             "LOAN_REPAYMENT",command.requestKey(),command.reference(),command.amount(),command.paymentDate()))
             throw new IllegalArgumentException("finance.business.error.reviewedSource");
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void reversal(UUID loan,AppUserPrincipal actor,UUID requestKey) {
+        if(sources.recordedLoan(loan)) {
+            if(!sources.recordedReversal(loan,actor,requestKey,null,null))throw new IllegalArgumentException("recording.error.directPath");
+            return;
+        }
         if(sources.activated(actor.getSaccoId()) && !sources.byRequest(actor.getSaccoId(),actor.getStationId(),requestKey)
             .filter(d->"POSTING".equals(d.state()) && "LOAN_REPAYMENT_REVERSAL".equals(d.command().kind().name()) && loan.equals(d.command().loanId()) && actor.getMemberId().equals(d.checkerId())).isPresent())
             throw new IllegalArgumentException("finance.business.error.reviewedSource");
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void reversal(UUID loan,AppUserPrincipal actor,UUID requestKey,LocalDate effectiveDate,UUID originalTransaction) {
+        if(sources.recordedLoan(loan)) {
+            if(!sources.recordedReversal(loan,actor,requestKey,effectiveDate,originalTransaction))throw new IllegalArgumentException("recording.error.directPath");
+            return;
+        }
         if(sources.activated(actor.getSaccoId()) && !sources.trustedReversal(actor.getSaccoId(),actor.getStationId(),loan,
             actor.getMemberId(),requestKey,effectiveDate,originalTransaction))
             throw new IllegalArgumentException("finance.business.error.reviewedSource");
