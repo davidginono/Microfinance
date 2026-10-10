@@ -3,6 +3,7 @@
         <c:set var="loanAccountingActive" value="${fn:startsWith(requestUri, '/finance/loan-records') or fn:startsWith(requestUri, '/finance/loan-disbursements') or fn:startsWith(requestUri, '/finance/loan-repayments') or fn:startsWith(requestUri, '/finance/client-ledgers') or fn:startsWith(requestUri, '/finance/loan-postings')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="loanAccountingToggle" aria-controls="loanAccountingPanel" aria-expanded="${loanAccountingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${loanAccountingActive ? 'shell-nav-active' : ''}">
+                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.loanAccounting" /></span>
                 <svg id="loanAccountingChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
@@ -26,6 +27,7 @@
         <c:set var="financeVouchersActive" value="${fn:startsWith(requestUri, '/finance/vouchers/receipts') or fn:startsWith(requestUri, '/finance/vouchers/payments') or fn:startsWith(requestUri, '/finance/vouchers/journals') or fn:startsWith(requestUri, '/finance/journals')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="financeVouchersToggle" aria-controls="financeVouchersPanel" aria-expanded="${financeVouchersActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeVouchersActive ? 'shell-nav-active' : ''}">
+                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.vouchers" /></span>
                 <svg id="financeVouchersChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
@@ -48,6 +50,7 @@
         <c:set var="accountingSetupActive" value="${fn:startsWith(requestUri, '/finance/policies') or fn:startsWith(requestUri, '/finance/accounts') or fn:startsWith(requestUri, '/finance/library') or fn:startsWith(requestUri, '/finance/business/suppliers') or fn:startsWith(requestUri, '/finance/business/assets') or fn:startsWith(requestUri, '/finance/business/openings') or fn:startsWith(requestUri, '/finance/accounting-release')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="accountingSetupToggle" aria-controls="accountingSetupPanel" aria-expanded="${accountingSetupActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${accountingSetupActive ? 'shell-nav-active' : ''}">
+                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.setup" /></span>
                 <svg id="accountingSetupChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
@@ -99,6 +102,7 @@
         <c:set var="financeReconciliationActive" value="${fn:startsWith(requestUri, '/finance/reconciliation') or fn:startsWith(requestUri, '/finance/closing')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="financeReconciliationToggle" aria-controls="financeReconciliationPanel" aria-expanded="${financeReconciliationActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeReconciliationActive ? 'shell-nav-active' : ''}">
+                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m8 3-4 4 4 4M4 7h16m-4 6 4 4-4 4M20 17H4" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.reconciliation" /></span>
                 <svg id="financeReconciliationChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
@@ -120,6 +124,7 @@
         <c:set var="financeReportsActive" value="${fn:startsWith(requestUri, '/reports/builder') or fn:startsWith(requestUri, '/reports/runs') or fn:startsWith(requestUri, '/reports/financial') or fn:startsWith(requestUri, '/reports/financial/cash-flow') or fn:startsWith(requestUri, '/reports/financial/portfolio') or fn:startsWith(requestUri, '/reports/statements') or fn:startsWith(requestUri, '/reports/statements/regulatory') or fn:startsWith(requestUri, '/finance/statement-outputs')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="financeReportsToggle" aria-controls="financeReportsPanel" aria-expanded="${financeReportsActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeReportsActive ? 'shell-nav-active' : ''}">
+                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 3v18h18M7 14v3M12 9v8M17 5v12" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.reports" /></span>
                 <svg id="financeReportsChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
