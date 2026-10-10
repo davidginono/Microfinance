@@ -12,7 +12,7 @@
 <div class="accounting-workspace financial-report">
   <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${activityMode ? 'financial.report.activity' : 'financial.report.trial'}" /></h1></div>
   <p><spring:message code="financial.report.basis" /></p>
-  <form class="accounting-form financial-filters" method="get" action="<c:url value='${reportRoute}' / data-aws-filter-toolbar>">
+  <form class="accounting-form financial-filters" method="get" action="<c:url value='${reportRoute}' />" data-aws-filter-toolbar>
     <div class="accounting-grid">
       <label><spring:message code="financial.report.from" /><input type="date" name="from" class="aws-control" value="<c:out value='${parameters.from}' />" required /></label>
       <label><spring:message code="financial.report.through" /><input type="date" name="through" class="aws-control" value="<c:out value='${parameters.through}' />" required /></label>
@@ -24,11 +24,12 @@
   <c:if test="${not empty reportError}"><p role="alert"><spring:message code="${reportError}" /></p></c:if>
   <c:if test="${not empty coverage}">
     <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')">
-      <form class="accounting-actions" method="get" action="<c:url value='${reportRoute}/export' / data-aws-filter-toolbar>">
+      <form class="accounting-actions" method="get" action="<c:url value='${reportRoute}/export' />" data-aws-filter-toolbar>
         <input type="hidden" name="from" value="<c:out value='${parameters.from}' />" /><input type="hidden" name="through" value="<c:out value='${parameters.through}' />" />
         <input type="hidden" name="recordedThrough" value="<c:out value='${cutoffInput}' />" /><input type="hidden" name="institutionWide" value="<c:out value='${scope.institutionWide}' />" />
-        <label><spring:message code="financial.export.format" /><select class="aws-control" name="format"><option value="PDF">PDF</option></select></label>
+        <input type="hidden" name="format" value="PDF" />
         <button class="app-btn btn-neutral" type="submit" data-download-action="true"><spring:message code="financial.export.download" /></button>
+        <button class="app-btn btn-neutral" type="submit" name="inline" value="true" formtarget="_blank" data-download-action="true" data-print-action="true"><spring:message code="voucher.print" /></button>
       </form>
     </sec:authorize>
     <div class="financial-context"><span><spring:message code="financial.report.draft" /></span><span><spring:message code="financial.report.currency" /></span><span><spring:message code="${scope.institutionWide ? 'financial.report.institution' : 'financial.report.branch'}" /></span></div>

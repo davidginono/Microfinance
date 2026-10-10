@@ -13,6 +13,7 @@ import java.awt.Color;
 import java.io.*;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
@@ -29,53 +30,78 @@ public class VoucherPdfService {
         }catch(IOException failure){throw new IllegalStateException("Voucher PDF generation failed",failure);}
     });}
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
+    static String amountInWords(BigDecimal amount,Locale locale){
+        boolean sw="sw".equals(locale.getLanguage());var value=amount.abs().setScale(2,java.math.RoundingMode.UNNECESSARY);
+        // Convert the integral part separately: cents never pass through floating point.
+        var whole=value.toBigInteger();int cents=value.remainder(BigDecimal.ONE).movePointRight(2).intValueExact();
+        String words=numberWords(whole,sw);
+        return (amount.signum()<0?(sw?"Hasi ":"Minus "):"")+(sw?"Shilingi za Tanzania "+words+" na senti "+underThousand(cents,true):words+" Tanzanian "+(whole.equals(java.math.BigInteger.ONE)?"shilling":"shillings")+" and "+underThousand(cents,false)+(cents==1?" cent":" cents"));
+    }
+    private static String numberWords(java.math.BigInteger value,boolean sw){
+        if(value.signum()==0)return sw?"sifuri":"zero";
+        String[] scales=sw?new String[]{"","elfu","milioni","bilioni","trilioni","kwadrilioni","kwintilioni"}:new String[]{"","thousand","million","billion","trillion","quadrillion","quintillion"};
+        var parts=new ArrayList<String>();int group=0;
+        while(value.signum()>0){var split=value.divideAndRemainder(java.math.BigInteger.valueOf(1000));int n=split[1].intValueExact();
+            if(n!=0)parts.add(sw&&group>0?scales[group]+" "+underThousand(n,true):underThousand(n,sw)+(group==0?"":" "+scales[group]));value=split[0];group++;}
+        Collections.reverse(parts);return String.join(sw?" na ":" ",parts);
+    }
+    private static String underThousand(int n,boolean sw){
+        String[] small=sw?new String[]{"sifuri","moja","mbili","tatu","nne","tano","sita","saba","nane","tisa","kumi","kumi na moja","kumi na mbili","kumi na tatu","kumi na nne","kumi na tano","kumi na sita","kumi na saba","kumi na nane","kumi na tisa"}:new String[]{"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"};
+        String[] tens=sw?new String[]{"","","ishirini","thelathini","arobaini","hamsini","sitini","sabini","themanini","tisini"}:new String[]{"","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"};
+        if(n<20)return small[n];if(n<100)return tens[n/10]+(n%10==0?"":(sw?" na ":"-")+small[n%10]);
+        return (sw?"mia "+small[n/100]:small[n/100]+" hundred")+(n%100==0?"":(sw?" na ":" and ")+underThousand(n%100,sw));
+    }
     private final class Layout implements AutoCloseable {
         private final PDDocument document;private final PDType0Font font;private final Voucher v;private final Locale locale;
         private PDPageContentStream stream;private float y;private int page;
-        private final Color ink=new Color(31,41,55),muted=new Color(82,96,109),teal=new Color(15,91,100),border=new Color(215,221,227);
+        private final Color ink=Color.BLACK,muted=new Color(70,70,70),border=new Color(130,130,130);
         Layout(PDDocument document,PDType0Font font,Voucher voucher,Locale locale){this.document=document;this.font=font;this.v=voucher;this.locale=locale;}
         void write()throws IOException{
             page();
-            pair(label("voucher.date",locale),v.effectiveDate().toString(),label("voucher.reference",locale),v.reference());
-            pair(label(v.type().name().equals("RECEIPT")?"voucher.receivedFrom":v.type().name().equals("PAYMENT")?"voucher.paidTo":"voucher.party",locale),v.party(),label("voucher.status",locale),label("voucher.status."+v.status(),locale));
-            if(!v.description().isBlank())paragraph(label("voucher.description",locale)+": "+v.description(),9,muted);
+            pair(label("voucher.date",locale),v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),label("voucher.reference",locale),v.reference());
+            section(label(v.type().name().equals("RECEIPT")?"voucher.print.payer":v.type().name().equals("PAYMENT")?"voucher.print.payee":"voucher.party",locale));
+            pair(label("voucher.print.name",locale),v.party(),label(v.moneyAccountId()==null?"voucher.type":"voucher.print.paymentDetails",locale),moneyAccount());
             if(!v.evidence().isBlank())paragraph(label("voucher.evidence",locale)+": "+v.evidence(),9,muted);
             y-=10;tableHeader();
             for(var t:v.transactions()){
                 String text=t.description();if(!t.transactionName().isBlank())text+="\n"+t.transactionName();
-                text+="\n"+label("accounting.debit",locale)+": "+t.debit().code()+" - "+t.debit().name();
-                text+="\n"+label("accounting.credit",locale)+": "+t.credit().code()+" - "+t.credit().name();
                 if(!"TOTAL".equals(t.component()))text+="\n"+label("library.component."+t.component(),locale);
-                var lines=wrap(text,9,328);int n=0;
-                while(n<lines.size()){
+                String accounts=label("accounting.debit",locale)+": "+t.debit().code()+" - "+t.debit().name()+"\n"+label("accounting.credit",locale)+": "+t.credit().code()+" - "+t.credit().name();
+                var lines=wrap(text,9,v.type().name().equals("RECEIPT")?239:176);var refs=wrap(accounts,8,v.type().name().equals("RECEIPT")?147:115);int n=0;int count=Math.max(lines.size(),refs.size());
+                while(n<count){
                     if(y<95){page();tableHeader();}
-                    int take=Math.min(lines.size()-n,Math.max(1,(int)((y-82)/13)));
-                    float height=take*13+14;fill(36,y-height,523,height,t.lineNo()%2==0?new Color(247,249,250):Color.WHITE);
+                    int take=Math.min(count-n,Math.max(1,(int)((y-82)/13)));
+                    float height=take*13+14;
                     draw(44,y-14,9,ink,Integer.toString(t.lineNo()));
-                    for(int j=0;j<take;j++)draw(76,y-14-j*13,9,ink,lines.get(n+j));
-                    if(n==0)right(548,y-14,10,ink,money(t.amount()));
+                    for(int j=0;j<take;j++){if(n+j<lines.size())draw(66,y-14-j*13,9,ink,lines.get(n+j));if(n+j<refs.size())draw(v.type().name().equals("RECEIPT")?315:253,y-14-j*13,8,ink,refs.get(n+j));}
+                    if(n==0){amount(553,y-14,t.amount());if(v.type()!=com.sacco.mvp.accounting.dto.VoucherDtos.Type.RECEIPT)amount(463,y-14,t.amount());}
                     y-=height;rule(y);n+=take;
                 }
             }
-            if(y<160)page();y-=14;fill(340,y-38,219,38,new Color(233,243,244));
-            draw(352,y-15,10,teal,label("voucher.total",locale)+" (TZS)");right(548,y-30,15,teal,money(v.total()));y-=60;
+            // Keep short vouchers on formal stationery without creating fictitious transaction rows.
+            for(int blank=v.transactions().size();blank<10 && y>370;blank++){y-=18;rule(y);}
+            if(y<245)page();y-=18;
+            section(label("voucher.print.amountWords",locale));paragraph(amountInWords(v.total(),locale),10,ink);
+            if(v.type()!=com.sacco.mvp.accounting.dto.VoucherDtos.Type.RECEIPT){total("voucher.print.totalDebit");total("voucher.print.totalCredit");}
+            total("voucher.total");y-=10;
+            section(label("voucher.print.narration",locale));paragraph(v.description().isBlank()?"-":v.description(),9,ink);
+            section(label("voucher.print.postingRecord",locale));
             paragraph(label("voucher.postedBy",locale)+": "+v.postedByName(),9,ink);
-            paragraph(label("voucher.postedAt",locale)+": "+v.postedAt().toLocalDateTime().toString().replace('T',' '),9,muted);
+            paragraph(label("voucher.postedAt",locale)+": "+v.postedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),9,muted);
             if(v.reversesId()!=null)paragraph(label("voucher.reversal",locale)+": "+v.reference(),9,muted);
+            if(v.reversedBy()!=null)paragraph(label("voucher.reversedHelp",locale)+" "+v.reversedBy(),9,muted);
             close();
             for(int n=0;n<document.getNumberOfPages();n++)try(var footer=new PDPageContentStream(document,document.getPage(n),PDPageContentStream.AppendMode.APPEND,true,true)){
-                stream=footer;draw(36,30,8,muted,v.number()+" | "+label("voucher.posted",locale));
+                stream=footer;draw(36,30,8,muted,v.number()+" | "+label("voucher.status."+v.status(),locale));
                 right(559,30,8,muted,label("voucher.page",locale)+" "+(n+1)+" / "+document.getNumberOfPages());
             }stream=null;
         }
         private void page()throws IOException{
             close();var p=new PDPage(PDRectangle.A4);document.addPage(p);stream=new PDPageContentStream(document,p);page++;
-            fill(0,763,595,79,teal);
-            var institution=wrap(v.institutionName(),14,520);int line=0;
-            for(String name:institution){if(line==2)break;draw(36,814-line*18,14,Color.WHITE,name);line++;}
-            draw(36,775,9,Color.WHITE,wrap(v.branchName(),9,520).getFirst());y=738;
-            draw(36,y,18,teal,label("voucher.title."+v.type(),locale));y-=25;
-            draw(36,y,11,ink,v.number());right(559,y,10,teal,label("voucher.status."+v.status(),locale));y-=24;rule(y);y-=18;
+            y=803;var institution=wrap(v.institutionName(),13,246);var title=wrap(label("voucher.title."+v.type(),locale),17,250);
+            for(int n=0;n<Math.max(institution.size(),title.size());n++){if(n<institution.size())draw(36,y,13,ink,institution.get(n));if(n<title.size())draw(309,y,17,ink,title.get(n));y-=20;}
+            paragraph(v.branchName(),9,muted);
+            draw(36,y,10,ink,label("voucher.print.number",locale)+": "+v.number());right(559,y,9,ink,label("voucher.status."+v.status(),locale));y-=20;rule(y);y-=18;
             if(page>1){draw(36,y,9,muted,label("voucher.continued",locale));y-=22;}
         }
         private void pair(String leftLabel,String left,String rightLabel,String right)throws IOException{
@@ -83,15 +109,32 @@ public class VoucherPdfService {
             if(y-height*14-35<65)page();draw(36,y,8,muted,leftLabel);draw(310,y,8,muted,rightLabel);y-=16;
             for(int n=0;n<height;n++){if(n<l.size())draw(36,y,10,ink,l.get(n));if(n<r.size())draw(310,y,10,ink,r.get(n));y-=14;}y-=13;
         }
-        private void tableHeader()throws IOException{fill(36,y-27,523,27,teal);draw(44,y-17,9,Color.WHITE,"#");draw(76,y-17,9,Color.WHITE,label("voucher.transactions",locale));right(548,y-17,9,Color.WHITE,label("voucher.amount",locale)+" (TZS)");y-=27;}
+        private void section(String title)throws IOException{if(y<100)page();draw(36,y,10,ink,title.toUpperCase(locale));y-=8;rule(y);y-=18;}
+        private void total(String key)throws IOException{
+            var lines=wrap(label(key,locale)+" (TZS)",9,95);if(y-lines.size()*13<70)page();
+            for(int n=0;n<lines.size();n++)draw(310,y-n*13,9,ink,lines.get(n));
+            String value=money(v.total());right(553,y,Math.min(11,140*1000/font.getStringWidth(value)),ink,value);
+            y-=lines.size()*13;rule(y+3);y-=13;
+        }
+        private String moneyAccount(){if(v.moneyAccountId()==null)return label("voucher.title.JOURNAL",locale);return v.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit(),t.credit())).filter(a->a.id().equals(v.moneyAccountId())).findFirst().map(a->a.code()+" - "+a.name()).orElse("-");}
+        private void tableHeader()throws IOException{
+            fill(36,y-38,523,38,new Color(235,235,235));draw(44,y-20,8,ink,"#");draw(66,y-20,8,ink,label("voucher.print.particulars",locale));
+            draw(v.type().name().equals("RECEIPT")?315:253,y-20,8,ink,label("voucher.print.ledger",locale));
+            if(v.type()!=com.sacco.mvp.accounting.dto.VoucherDtos.Type.RECEIPT){right(463,y-16,8,ink,label("accounting.debit",locale));right(553,y-16,8,ink,label("accounting.credit",locale));right(463,y-30,8,ink,"TZS");right(553,y-30,8,ink,"TZS");}
+            else{right(553,y-16,8,ink,label("voucher.amount",locale));right(553,y-30,8,ink,"TZS");}y-=38;
+        }
         private void paragraph(String text,float size,Color color)throws IOException{for(var line:wrap(text,size,523)){if(y<70)page();draw(36,y,size,color,line);y-=14;}y-=5;}
         private String money(BigDecimal value){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(value);}
+        private void amount(float x,float top,BigDecimal value)throws IOException{String text=money(value);right(x,top,Math.min(8,80*1000/font.getStringWidth(text)),ink,text);}
         private List<String> wrap(String value,float size,float width)throws IOException{
             var result=new ArrayList<String>();var line=new StringBuilder();
             for(int cp:value.codePoints().toArray()){
                 if(cp=='\n'){result.add(line.toString());line.setLength(0);continue;}
                 String c=new String(Character.toChars(cp));try{font.encode(c);}catch(IllegalArgumentException unsupported){c="?";}
-                if(line.length()>0 && font.getStringWidth(line+c)*size/1000>width){result.add(line.toString());line.setLength(0);}line.append(c);
+                if(line.length()>0 && font.getStringWidth(line+c)*size/1000>width){
+                    int space=line.lastIndexOf(" ");String rest=space>0?line.substring(space+1):"";
+                    result.add(space>0?line.substring(0,space):line.toString());line.setLength(0);line.append(rest);
+                }line.append(c);
             }result.add(line.toString());return result;
         }
         private void draw(float x,float top,float size,Color color,String value)throws IOException{stream.beginText();stream.setNonStrokingColor(color);stream.setFont(font,size);stream.newLineAtOffset(x,top);stream.showText(value);stream.endText();}

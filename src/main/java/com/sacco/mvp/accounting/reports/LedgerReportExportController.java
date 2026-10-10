@@ -27,12 +27,13 @@ public class LedgerReportExportController {
             @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,
             @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) LocalDateTime recordedThrough,
             @RequestParam(defaultValue="false") boolean institutionWide,
-            @RequestParam LedgerReportExporter.Format format,Locale locale) {
+            @RequestParam LedgerReportExporter.Format format,@RequestParam(defaultValue="false") boolean inline,Locale locale) {
         var parameters=new LedgerReportService.Parameters(from,through,recordedThrough.atZone(clock.zoneId()).toOffsetDateTime(),0);
         var result=accountId==null?exports.trial(actor,parameters,institutionWide,format,locale)
             :exports.activity(actor,accountId,parameters,institutionWide,format,locale);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType(result.contentType()))
-            .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(result.filename(),StandardCharsets.UTF_8).build().toString())
+            .header(HttpHeaders.CONTENT_DISPOSITION,(inline?ContentDisposition.inline():ContentDisposition.attachment()).filename(result.filename(),StandardCharsets.UTF_8).build().toString())
+            .header("X-Content-Type-Options","nosniff")
             .body(result.bytes());
     }
     @ExceptionHandler(IllegalArgumentException.class)

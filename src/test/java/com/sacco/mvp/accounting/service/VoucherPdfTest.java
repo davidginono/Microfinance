@@ -13,6 +13,24 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class VoucherPdfTest {
+ @Test void formalVoucherSamplesAndExactAmountWords()throws Exception {
+  assertThat(VoucherPdfService.amountInWords(new BigDecimal("1000.10"),Locale.ENGLISH)).isEqualTo("one thousand Tanzanian shillings and ten cents");
+  assertThat(VoucherPdfService.amountInWords(new BigDecimal("0.01"),Locale.ENGLISH)).isEqualTo("zero Tanzanian shillings and one cent");
+  assertThat(VoucherPdfService.amountInWords(new BigDecimal("500000.50"),Locale.forLanguageTag("sw"))).isEqualTo("Shilingi za Tanzania elfu mia tano na senti hamsini");
+  assertThat(VoucherPdfService.amountInWords(new BigDecimal("9999999999999999.99"),Locale.ENGLISH)).contains("quadrillion","ninety-nine cents");
+  var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+  var cash=new Account(UUID.randomUUID(),"111001","Branch bank account","BANK");var other=new Account(UUID.randomUUID(),"411001","Service income","OTHER");
+  for(var type:Type.values()){
+   var rows=new ArrayList<Transaction>();for(int i=1;i<=3;i++)rows.add(new Transaction(UUID.randomUUID(),i,null,null,"","TOTAL","Office services - transaction "+i,new BigDecimal("10000.25"),type==Type.PAYMENT?other:cash,type==Type.PAYMENT?cash:other));
+   var v=new Voucher(UUID.randomUUID(),type+"-SAMPLE",type,LocalDate.of(2026,10,11),"Synthetic Example Company","REF-2026-1042","Office services and materials. Synthetic demonstration only.","INV-2026-114",type==Type.JOURNAL?null:cash.id(),new BigDecimal("30000.75"),3,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-11T11:30:00+03:00"),null,null,"Example Microfinance Limited","Dar es Salaam - Main branch",rows);
+   var output=new VoucherPdfService(messages,new ReportExportLimiter(1)).render(v,Locale.ENGLISH);
+   try(var doc=Loader.loadPDF(output.bytes())){
+    assertThat(doc.getNumberOfPages()).isEqualTo(1);String text=new PDFTextStripper().getText(doc);
+    assertThat(text).contains("AMOUNT IN WORDS","REMARKS / NARRATION","POSTING RECORD","30,000.75","thirty thousand").doesNotContain("APPROVALS","CHECKED BY","APPROVED BY","Details");
+    Files.write(Path.of("target/"+type.name().toLowerCase()+"-format.pdf"),output.bytes());
+   }
+  }
+ }
  @Test void receiptPaymentAndJournalPdfsRetainMultiPageRowsAmountsAndBilingualLabels()throws Exception{
   var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
   var exporter=new VoucherPdfService(messages,new ReportExportLimiter(1));

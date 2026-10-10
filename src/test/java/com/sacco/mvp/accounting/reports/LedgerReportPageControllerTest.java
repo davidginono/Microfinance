@@ -20,12 +20,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class LedgerReportPageControllerTest {
-    LedgerReportService reports; ApplicationClock clock; AppUserPrincipal actor; MockMvc mvc;
+    LedgerReportService reports; LedgerReportExporter exports; ApplicationClock clock; AppUserPrincipal actor; MockMvc mvc;
     final LedgerReportService.Scope scope=new LedgerReportService.Scope("I1","B1",false);
     @BeforeEach void setup() {
         reports=mock(LedgerReportService.class);clock=new ApplicationClock("Africa/Nairobi");actor=mock(AppUserPrincipal.class);
         when(reports.authorize(actor,false)).thenReturn(scope);
-        mvc=MockMvcBuilders.standaloneSetup(new LedgerReportPageController(reports,clock))
+        exports=mock(LedgerReportExporter.class);var messages=new org.springframework.context.support.StaticMessageSource();messages.setUseCodeAsDefaultMessage(true);
+        mvc=MockMvcBuilders.standaloneSetup(new LedgerReportPageController(reports,clock),new LedgerReportExportController(exports,clock,messages))
             .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                 public boolean supportsParameter(MethodParameter p){return p.getParameterType()==AppUserPrincipal.class;}
                 public Object resolveArgument(MethodParameter p,ModelAndViewContainer m,NativeWebRequest r,WebDataBinderFactory b){return actor;}
@@ -51,5 +52,12 @@ class LedgerReportPageControllerTest {
         assertThatThrownBy(()->mvc.perform(get("/reports/financial").param("institutionWide","true")))
             .hasRootCauseInstanceOf(AccessDeniedException.class);
         verify(reports,never()).trialBalance(any(),any(),anyBoolean());
+    }
+    @Test void printRetainsScopedDatesCutoffAndPdfExportGuard()throws Exception {
+        var p=new LedgerReportService.Parameters(LocalDate.of(2026,10,1),LocalDate.of(2026,10,2),OffsetDateTime.parse("2026-10-02T09:15:30+03:00"),0);
+        byte[] bytes={1,2,3};when(exports.trial(eq(actor),eq(p),eq(false),eq(LedgerReportExporter.Format.PDF),any())).thenReturn(new LedgerReportExporter.Output(bytes,"application/pdf","trial-balance.pdf"));
+        mvc.perform(get("/reports/financial/export").param("from","2026-10-01").param("through","2026-10-02").param("recordedThrough","2026-10-02T09:15:30").param("format","PDF").param("inline","true"))
+            .andExpect(status().isOk()).andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.startsWith("inline;"))).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(content().contentType("application/pdf")).andExpect(content().bytes(bytes));
+        verify(exports).trial(eq(actor),eq(p),eq(false),eq(LedgerReportExporter.Format.PDF),any());
     }
 }

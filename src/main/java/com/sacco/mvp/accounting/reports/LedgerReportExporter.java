@@ -28,25 +28,15 @@ public class LedgerReportExporter {
     private record Table(String title,List<List<Object>> context,List<String> headers,List<List<Object>> rows) { }
 
     public Output trial(AppUserPrincipal actor,LedgerReportService.Parameters parameters,boolean wide,Format format,Locale locale) {
-        return limiter.run(()->write(trialTable(reports.exportTrialBalance(actor,parameters,wide),locale),format));
+        if(format!=Format.PDF)throw new IllegalArgumentException("financial.export.format");
+        return limiter.run(()->{
+            var source=reports.exportTrialBalance(actor,parameters,wide);
+            try{return new Output(trialPdf(source,locale),"application/pdf","trial-balance.pdf");}
+            catch(IOException failure){throw new IllegalStateException("Posted-book export failed",failure);}
+        });
     }
     public Output activity(AppUserPrincipal actor,UUID account,LedgerReportService.Parameters parameters,boolean wide,Format format,Locale locale) {
         return limiter.run(()->write(activityTable(reports.exportAccountActivity(actor,account,parameters,wide),locale),format));
-    }
-    private Table trialTable(LedgerReportService.TrialBalance source,Locale locale) {
-        var context=context(source.scope(),source.parameters(),source.coverage(),locale);
-        context.add(pair(text("accounting.policy.version",locale),source.policyVersion()));
-        context.add(pair(text("financial.export.policyId",locale),source.policyId().toString()));
-        var t=source.totals();
-        context.add(pair(text("financial.export.openingDebit",locale),available(t.openingDebit(),locale)));
-        context.add(pair(text("financial.export.openingCredit",locale),available(t.openingCredit(),locale)));
-        context.add(pair(text("financial.export.movementDebit",locale),t.movementDebit()));
-        context.add(pair(text("financial.export.movementCredit",locale),t.movementCredit()));
-        context.add(pair(text("financial.export.closingDebit",locale),available(t.closingDebit(),locale)));
-        context.add(pair(text("financial.export.closingCredit",locale),available(t.closingCredit(),locale)));
-        var rows=new ArrayList<List<Object>>();
-        for(var a:source.accounts())rows.add(List.of(a.code(),a.name(),available(a.opening(),locale),a.debit(),a.credit(),available(a.closing(),locale)));
-        return new Table(text("financial.report.trial",locale),context,labels(locale,"accounting.code","accounting.name","financial.report.opening","financial.report.debit","financial.report.credit","financial.report.closing"),rows);
     }
     private Table activityTable(LedgerReportService.AccountActivityExport exported,Locale locale) {
         var source=exported.activity();
@@ -76,6 +66,32 @@ public class LedgerReportExporter {
         return result;
     }
     private String text(String key,Locale locale){return messages.getMessage(key,null,locale);}
+    private byte[] trialPdf(LedgerReportService.TrialBalance source,Locale locale)throws IOException {
+        try(var document=new PDDocument();var input=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
+            var font=PDType0Font.load(document,input);var p=source.parameters();var scope=source.scope();
+            var summary=List.of(scope.institution()+" / "+(scope.institutionWide()?text("financial.report.institution",locale):scope.branch()),
+                text("financial.report.from",locale)+": "+p.from()+"  |  "+text("financial.report.through",locale)+": "+p.through()+"  |  TZS",
+                text("financial.report.draft",locale)+"  |  "+text("financial.report.recordedThrough",locale)+": "+p.recordedCutoff());
+            try(var page=new AccountingPdfDocument(document,font,true,text("financial.report.trial",locale),summary)){
+                page.columns(labels(locale,"accounting.code","accounting.name","financial.report.opening","financial.report.debit","financial.report.credit","financial.print.netChange","financial.report.closing"),new float[]{.09f,.23f,.136f,.136f,.136f,.136f,.136f},new boolean[]{false,false,true,true,true,true,true});
+                for(var a:source.accounts())page.row(List.of(a.code(),a.name(),printed(a.opening(),locale),printed(a.debit(),locale),printed(a.credit(),locale),printed(a.debit().subtract(a.credit()),locale),printed(a.closing(),locale)),false);
+                var t=source.totals();page.row(List.of(text("financial.print.total",locale),"",printed(difference(t.openingDebit(),t.openingCredit()),locale),printed(t.movementDebit(),locale),printed(t.movementCredit(),locale),printed(t.movementDebit().subtract(t.movementCredit()),locale),printed(difference(t.closingDebit(),t.closingCredit()),locale)),true);
+                page.endTable();page.section(text("financial.print.reportContext",locale));
+                page.text(text("financial.report.balanceSign",locale));
+                for(var pair:context(scope,p,source.coverage(),locale))page.text(pair.getFirst()+": "+pair.get(1));
+                page.text(text("accounting.policy.version",locale)+": "+source.policyVersion()+" / "+source.policyId());
+                // Preserve the gross debit/credit totals, not just their net value.
+                page.text(text("financial.export.openingDebit",locale)+": "+printed(t.openingDebit(),locale)+" / "+text("financial.export.openingCredit",locale)+": "+printed(t.openingCredit(),locale));
+                page.text(text("financial.export.closingDebit",locale)+": "+printed(t.closingDebit(),locale)+" / "+text("financial.export.closingCredit",locale)+": "+printed(t.closingCredit(),locale));
+            }document.save(out);return out.toByteArray();
+        }
+    }
+    private static BigDecimal difference(BigDecimal debit,BigDecimal credit){return debit==null||credit==null?null:debit.subtract(credit);}
+    private String printed(BigDecimal value,Locale locale){
+        if(value==null)return text("financial.report.unknown",locale);
+        var format=new java.text.DecimalFormat("#,##0.00;(#,##0.00)",java.text.DecimalFormatSymbols.getInstance(Locale.ENGLISH));
+        format.setRoundingMode(java.math.RoundingMode.UNNECESSARY);return format.format(value);
+    }
     private List<String> labels(Locale locale,String... keys){return Arrays.stream(keys).map(k->text(k,locale)).toList();}
     private Object available(BigDecimal amount,Locale locale){return amount==null?text("financial.report.unknown",locale):amount;}
     private static List<Object> pair(Object key,Object value){return List.of(key,value);}

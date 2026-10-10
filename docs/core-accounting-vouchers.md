@@ -7,7 +7,7 @@ User mandate: 2026-10-08. Receipt, payment and journal vouchers post directly, i
 - `/finance/vouchers/receipts`, `/payments`, `/journals`: separate institution/branch-scoped registers, 25 records per page, date/search/status/sort filters and single-row selection. View/PDF/Print are enabled only for one selected record, with an independent Create action.
 - `/{kind}/new`: focused full-page creation, primary header fields, optional context and 1–50 numbered transactions. Preview resolves balanced entries on the server without saving; Post creates all entries atomically. A shared money account is used for every receipt/payment transaction. Journal transactions each supply a debit and credit account; split amounts into pairs for compound entries.
 - `/{kind}/{id}`: immutable document details, account snapshots, exact TZS totals, poster/time, PDF, printable document, and linked direct reversal. Reversals preserve original evidence and swap all entries, not overwrite them. The authorized accountant may reverse their own posting; there is no checker requirement.
-- `/{id}/pdf` and `/{id}/print`: authorization and branch scope are checked again. PDF uses embedded Noto Sans, institution/branch identity, a teal document masthead, transaction/account details, totals, repeated headings and page numbers. Print has a clean A4 stylesheet and an explicit Print button.
+- `/{id}/pdf` and `/{id}/print`: authorization and branch scope are checked again. Both now use the same embedded-font A4 PDF layout with monochrome institution/branch identity, transaction/account columns, exact totals, amount in words, narration, posting identity, repeated headings and page numbers. Print uses the browser PDF viewer rather than a separate HTML print layout. See [accounting document formats](accounting-document-formats.md) for the supplied screenshot references and financial-report formats.
 
 ## Posting boundaries
 
@@ -30,6 +30,8 @@ Accounting/report exporters and queued report requests accept only PDF. Retained
 Use [Cloudscape create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/) as behavioral architecture references, implemented in the maintained JSP/shared ERP shell. Keep a bounded create workspace, full-width registers, concise descriptions, optional information progressively disclosed, responsive repeated rows, keyboard selection, dirty-exit protection and resource-specific actions. Use an explicit shared table titlebar to keep View/PDF/Print/Create together, with a screen-reader selection announcement and pagination outside the scroll viewport. Do not introduce React merely to copy these patterns.
 
 ## Verification
+
+The following database and live workflow evidence is from the 2026-10-08 core-voucher increment. The 2026-10-11 document-layout increment has separate evidence in the accounting/report-builder checklist.
 
 Validated all 71 migrations on an isolated PostgreSQL 17 database through V55. Focused tests cover decimal bounds, direct multi-row posting, configured template revisions, retries/concurrent duplicates, immutable records, linked reversal, revoked permissions, foreign branches, closed periods, audit rollback, CSRF/binding limits, JSP compilation and PDF-only report output. Voucher PDF tests exercise English/Kiswahili, all three types, 50 rows, long descriptions and large amounts; first/last pages were rendered and inspected.
 

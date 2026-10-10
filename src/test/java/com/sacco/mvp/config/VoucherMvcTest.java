@@ -58,9 +58,10 @@ class VoucherMvcTest {
  @Test void pdfAndPrintReauthorizeTheExactResource()throws Exception{
   var v=voucher();when(service.export(actor,Type.RECEIPT,id)).thenReturn(v);when(pdf.render(eq(v),any())).thenReturn(new VoucherPdfService.Output(new byte[]{1,2,3},"RV-2026-00000001.pdf"));
   mvc.perform(get("/finance/vouchers/receipts/"+id+"/pdf").with(user(actor))).andExpect(status().isOk()).andExpect(content().contentType("application/pdf")).andExpect(header().string("Cache-Control","no-store"));
-  mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(view().name("accounting/vouchers/print"));verify(service,times(2)).export(actor,Type.RECEIPT,id);
+  mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(status().isOk()).andExpect(content().contentType("application/pdf")).andExpect(header().string("Content-Disposition","inline; filename=RV-2026-00000001.pdf")).andExpect(header().string("Cache-Control","no-store"));verify(service,times(2)).export(actor,Type.RECEIPT,id);verify(pdf,times(2)).render(eq(v),any());
  }
  Voucher voucher(){return new Voucher(id,"RV-2026-00000001",Type.RECEIPT,LocalDate.of(2026,10,8),"Payer","REF","","",UUID.randomUUID(),new BigDecimal("3.03"),2,UUID.randomUUID(),actor.getMemberId(),"Accountant",OffsetDateTime.now(),null,null,"Institution","Branch",List.of());}
+ @Test void printCannotBypassResourceExportAuthorization()throws Exception {when(service.export(actor,Type.RECEIPT,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Outside branch"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(pdf);}
  @Configuration @EnableWebMvc static class Config {
   @Bean("access") @Primary com.sacco.mvp.service.AccessControlService access(){return new com.sacco.mvp.service.AccessControlService();}
   @Bean VoucherService service(){return mock(VoucherService.class);}

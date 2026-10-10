@@ -2,6 +2,8 @@ package com.sacco.mvp.reporting.execution.service;
 
 import com.sacco.mvp.accounting.statements.StatementDesignerService.*;
 import com.sacco.mvp.accounting.statements.StatementDefinition.Unit;
+import com.sacco.mvp.accounting.statements.StatementDefinition.RowKind;
+import com.sacco.mvp.accounting.reports.AccountingPdfDocument;
 import com.sacco.mvp.reporting.OperationalReportExportService.Format;
 import com.sacco.mvp.reporting.OperationalReportService.Branding;
 import com.sacco.mvp.reporting.execution.dto.StatementOutputDtos.Layout;
@@ -56,18 +58,53 @@ public class StatementTypedExporter {
  }
  private void writeNumber(Cell cell,BigDecimal amount,Unit unit,CellStyle money,CellStyle ratio){if(amount==null){cell.setCellValue("—");return;}String exact=value(amount,unit);if(amount.precision()>15)cell.setCellValue(exact);else{cell.setCellValue(amount.doubleValue());cell.setCellStyle(unit==Unit.RATIO?ratio:money);}}
  private byte[] pdf(Result r,Layout l,Branding logo)throws IOException{
+  if(l.version()==1)return legacyPdf(r,l,logo);
+  try(var document=new PDDocument();var out=new ByteArrayOutputStream();var in=new ByteArrayInputStream(font)){
+   PDFont pdfFont=PDType0Font.load(document,in);boolean comparative=r.definition().comparison();
+   String period=r.definition().kind()==com.sacco.mvp.accounting.statements.StatementDefinition.Kind.BALANCE_SHEET?message("financial.print.asAt",l)+": "+r.through():message("report.period",l)+": "+r.from()+" / "+r.through();
+   var summary=List.of(message("report.scope",l)+": "+r.institution()+" / "+r.branch(),period+"  |  TZS  |  "+r.status(),message("statement.export.generated",l)+": "+r.generatedAt());
+   String title=l.language().equals("sw")?r.definition().titleSw():r.definition().titleEn();
+   var image=logo==null?null:PDImageXObject.createFromByteArray(document,logo.logo(),"institution-logo");
+   try(var page=new AccountingPdfDocument(document,pdfFont,l.landscape(),title,summary,image)){
+    var headings=new ArrayList<>(List.of(message("statement.export.line",l),message("financial.print.notes",l),message("statement.export.current",l)));
+    if(comparative)headings.add(message("statement.export.comparison",l));
+    page.columns(headings,comparative?new float[]{.46f,.06f,.24f,.24f}:new float[]{.64f,.08f,.28f},comparative?new boolean[]{false,false,true,true}:new boolean[]{false,false,true});
+    var notes=new ArrayList<String>();
+    for(var row:r.getVisibleRows()){
+     String note=l.language().equals("sw")?row.noteSw():row.noteEn();boolean hasNote=note!=null&&!note.isBlank();
+     if(row.kind()==RowKind.HEADING){page.section(label(row,l));if(hasNote)notes.add(note);continue;}
+     // Required source evidence is appendix text, not a financial amount or an invented account code.
+     if(row.kind()==RowKind.NOTE){notes.add(label(row,l)+(hasNote?": "+note:""));continue;}
+     String noteNumber="";if(hasNote){notes.add(note);noteNumber=Integer.toString(notes.size());}
+     var values=new ArrayList<>(List.of(label(row,l)+(row.unit()==Unit.RATIO?" ("+unit(row.unit(),l)+")":""),noteNumber,printed(row.current(),row.unit(),row.status(),l)));
+     if(comparative)values.add(printed(row.comparison(),row.unit(),row.comparisonStatus(),l));
+     page.row(values,row.kind()==RowKind.SUBTOTAL || row.mandatory());
+    }
+    page.endTable();
+    if(!notes.isEmpty()){page.section(message("financial.print.notes",l));for(int n=0;n<notes.size();n++)page.text((n+1)+". "+notes.get(n));}
+    page.section(message("financial.print.reportContext",l));for(String line:context(r,l).subList(1,context(r,l).size()))page.text(line);
+    for(var text:r.disclosures())page.text(disclosure(text,l));
+   }
+   document.save(out);return out.toByteArray();
+  }
+ }
+ private String printed(BigDecimal amount,Unit unit,String state,Layout layout){
+  if(amount==null)return "TEXT".equals(state)?"":status(state,layout);
+  var format=new java.text.DecimalFormat(unit==Unit.RATIO?"0.000000;(0.000000)":"#,##0.00;(#,##0.00)",java.text.DecimalFormatSymbols.getInstance(Locale.ENGLISH));format.setRoundingMode(RoundingMode.UNNECESSARY);return format.format(amount);
+ }
+ private byte[] legacyPdf(Result r,Layout l,Branding logo)throws IOException{
   try(var document=new PDDocument();var out=new ByteArrayOutputStream();var in=new ByteArrayInputStream(font)){
    PDFont pdfFont=PDType0Font.load(document,in);PDImageXObject image=logo==null?null:PDImageXObject.createFromByteArray(document,logo.logo(),"institution-logo");
-   try(var page=new PdfWriter(document,pdfFont,l,context(r,l),headers(l,r.definition().comparison()),image)){
+   try(var page=new LegacyPdfWriter(document,pdfFont,l,context(r,l),headers(l,r.definition().comparison()),image)){
     for(var row:r.getVisibleRows()){List<String> values=new ArrayList<>(List.of(label(row,l),unit(row.unit(),l),value(row.current(),row.unit()),status(row.status(),l)));if(r.definition().comparison()){values.add(value(row.comparison(),row.unit()));values.add(status(row.comparisonStatus(),l));}page.row(values);String note=l.language().equals("sw")?row.noteSw():row.noteEn();if(note!=null&&!note.isBlank())page.text(note);}
     for(var text:r.disclosures())page.text(disclosure(text,l));
    }
    int n=0;for(var page:document.getPages())try(var stream=new PDPageContentStream(document,page,PDPageContentStream.AppendMode.APPEND,true)){stream.beginText();stream.setFont(pdfFont,8);stream.newLineAtOffset(35,20);stream.showText(++n+" / "+document.getNumberOfPages());stream.endText();}document.save(out);return out.toByteArray();
   }
  }
- private static final class PdfWriter implements AutoCloseable {
+ private static final class LegacyPdfWriter implements AutoCloseable {
   private final PDDocument document;private final PDFont font;private final Layout layout;private final List<String> context,headers;private final PDImageXObject logo;private PDPageContentStream stream;private float y,width;
-  PdfWriter(PDDocument d,PDFont f,Layout l,List<String> context,List<String> headers,PDImageXObject logo)throws IOException{document=d;font=f;layout=l;this.context=context;this.headers=headers;this.logo=logo;next();}
+  LegacyPdfWriter(PDDocument d,PDFont f,Layout l,List<String> context,List<String> headers,PDImageXObject logo)throws IOException{document=d;font=f;layout=l;this.context=context;this.headers=headers;this.logo=logo;next();}
   private void next()throws IOException{if(stream!=null)stream.close();var size=layout.landscape()?new PDRectangle(PDRectangle.A4.getHeight(),PDRectangle.A4.getWidth()):PDRectangle.A4;var page=new PDPage(size);document.addPage(page);stream=new PDPageContentStream(document,page);y=size.getHeight()-35;width=size.getWidth()-70;if(logo!=null){float scale=Math.min(100f/logo.getWidth(),35f/logo.getHeight());stream.drawImage(logo,35,y-35,logo.getWidth()*scale,logo.getHeight()*scale);y-=45;}for(String line:context)writeText(line);draw(headers);}
   void text(String value)throws IOException{for(String line:wrap(value,width)){if(y<45)next();write(line,35,y);y-=11;}y-=3;}
   private void writeText(String value)throws IOException{for(String line:wrap(value,width)){write(line,35,y);y-=11;}y-=3;}

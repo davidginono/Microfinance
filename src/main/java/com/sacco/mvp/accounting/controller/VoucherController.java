@@ -77,7 +77,7 @@ public class VoucherController {
             .header(HttpHeaders.CONTENT_DISPOSITION,(inline?"inline":"attachment")+"; filename="+result.filename()).header("X-Content-Type-Options","nosniff").body(result.bytes());
     }
     @GetMapping("/{id}/print")
-    public String print(@PathVariable String kind,@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,Model model){context(kind,model);model.addAttribute("voucher",vouchers.export(actor,type(kind),id));return "accounting/vouchers/print";}
+    public ResponseEntity<byte[]> print(@PathVariable String kind,@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,Locale locale){return pdf(kind,id,true,actor,locale);}
     @GetMapping("/accounts") @ResponseBody
     public List<Account> accounts(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return vouchers.accounts(actor,type(kind),search,page);}
     @GetMapping("/transactions") @ResponseBody
