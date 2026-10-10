@@ -531,10 +531,14 @@ class AdminServiceTest {
     }
 
     private LoanProductSetting createProductWithStage(ApprovalWorkflowStage stage, List<UUID> reviewers) {
+        return createProductWithStage(stage, reviewers, null);
+    }
+
+    private LoanProductSetting createProductWithStage(ApprovalWorkflowStage stage, List<UUID> reviewers, Integer maximumActiveLoans) {
         return adminService.createLoanProduct("SACCO-01", UUID.randomUUID(), "ELIGIBILITY", "Eligibility Loan",
             "Workflow eligibility", 1, new BigDecimal("100"), new BigDecimal("1000"), 0,
             BigDecimal.ONE, false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            InterestMethod.FLAT_RATE, 1, 12, false, false,
+            InterestMethod.FLAT_RATE, 1, 12, maximumActiveLoans != null, false,
             stage == ApprovalWorkflowStage.MANAGER, stage == ApprovalWorkflowStage.LOAN_OFFICER,
             ApprovalWorkflowStage.MANAGER, 1, 2,
             stage == ApprovalWorkflowStage.CHAIRPERSON, 3, List.of(),
@@ -542,7 +546,7 @@ class AdminServiceTest {
             stage == ApprovalWorkflowStage.CREDIT_COMMITTEE, 5, 1, 1,
             reviewers,
             stage == ApprovalWorkflowStage.ACCOUNTANT, 6, true, true, false, false,
-            BigDecimal.ZERO, LoanProductStatus.ACTIVE);
+            BigDecimal.ZERO, LoanProductStatus.ACTIVE, maximumActiveLoans);
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -572,6 +576,29 @@ class AdminServiceTest {
         when(loanProductSettingRepository.save(any())).thenAnswer(call -> call.getArgument(0));
         assertThat(createProductWithStage(stage, List.of(approver.getId()))).isNotNull();
         verify(loanProductSettingRepository).save(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 11})
+    void createLoanProductRejectsInvalidActiveLoanLimitBeforeSaving(int limit) {
+        assertThatThrownBy(() -> createProductWithStage(ApprovalWorkflowStage.MANAGER, List.of(), limit))
+            .hasMessage("Allowed active loans must be between 1 and 10.");
+        verify(loanProductSettingRepository, never()).save(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {1, 10})
+    void createLoanProductPersistsActiveLoanLimit(int limit) {
+        Member approver = Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Approver")
+            .position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        Member teller = Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Teller")
+            .position(Position.DISBURSEMENT_OFFICER).status(MemberStatus.ACTIVE)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        stubActiveRoleDirectory("SACCO-01", List.of(approver, teller));
+        when(loanProductSettingRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        LoanProductSetting product = createProductWithStage(ApprovalWorkflowStage.MANAGER, List.of(), limit);
+        assertThat(product.getMaximumActiveLoans()).isEqualTo(limit);
+        assertThat(product.isApplicationWithActiveLoanAllowed()).isTrue();
     }
 
     @Test
@@ -2078,7 +2105,8 @@ class AdminServiceTest {
             false,
             false,
             BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE
+            LoanProductStatus.ACTIVE,
+            null
         );
 
         assertThat(product.getManagerPriority()).isEqualTo(4);

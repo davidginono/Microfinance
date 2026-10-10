@@ -40,6 +40,9 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
 
     List<LoanApplication> findByApplicantMemberIdOrderByCreatedAtDesc(UUID applicantMemberId);
 
+    long countBySaccoIdAndApplicantMemberIdAndStatusIn(String saccoId, UUID applicantMemberId,
+                                                     Collection<LoanStatus> statuses);
+
     @Query("""
         select l
         from LoanApplication l

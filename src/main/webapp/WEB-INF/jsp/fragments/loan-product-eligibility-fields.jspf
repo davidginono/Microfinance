@@ -1,0 +1,42 @@
+<div class="product-eligibility-options" data-product-eligibility-options>
+    <input name="maxLoanSavingsPercent" type="hidden" value="${eligibilityProduct ne null ? eligibilityProduct.maxLoanSavingsRatio * 100 : 300}" data-savings-percent />
+    <div class="product-eligibility-option">
+        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <input name="savingsLimitCheckRequired" type="checkbox" value="true" ${eligibilityProduct eq null or eligibilityProduct.savingsLimitCheckRequired ? 'checked' : ''} data-savings-limit-check />
+            <span>
+                <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" /></span>
+                <span class="block text-xs text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" /></span>
+            </span>
+        </label>
+        <label class="product-eligibility-dependent block text-xs font-semibold uppercase tracking-wide text-slate-500" data-savings-ratio-field ${eligibilityProduct ne null and not eligibilityProduct.savingsLimitCheckRequired ? 'hidden' : ''}>
+            <spring:message code="admin.settings.loanProducts.savingsMultiple" />
+            <select class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" required data-savings-multiplier>
+                <c:forEach begin="0" end="20" var="multipleIndex">
+                    <option value="${multipleIndex / 2}">${multipleIndex / 2} <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" /></option>
+                </c:forEach>
+            </select>
+        </label>
+    </div>
+    <div class="product-eligibility-option">
+        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <input name="freshFinancialDataRequired" type="checkbox" value="true" ${eligibilityProduct ne null and eligibilityProduct.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
+            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" /></span>
+        </label>
+    </div>
+    <div class="product-eligibility-option">
+        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${eligibilityProduct ne null and eligibilityProduct.applicationWithActiveLoanAllowed ? 'checked' : ''} data-active-loan-toggle />
+            <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" /></span>
+        </label>
+        <label class="product-eligibility-dependent block text-xs font-semibold uppercase tracking-wide text-slate-500" data-active-loan-field ${eligibilityProduct eq null or not eligibilityProduct.applicationWithActiveLoanAllowed ? 'hidden' : ''}>
+            <spring:message code="admin.settings.loanProducts.maximumActiveLoans" />
+            <select name="maximumActiveLoans" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" data-active-loan-limit>
+                <option value="" ${eligibilityProduct ne null and eligibilityProduct.maximumActiveLoans eq null ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.noActiveLoanLimit" /></option>
+                <c:forEach begin="1" end="10" var="activeLoanIndex">
+                    <option value="${activeLoanIndex}" ${eligibilityProduct.maximumActiveLoans eq activeLoanIndex or (eligibilityProduct eq null and activeLoanIndex eq 1) ? 'selected' : ''}>${activeLoanIndex}</option>
+                </c:forEach>
+            </select>
+            <span class="block mt-1 text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.maximumActiveLoansHelp" /></span>
+        </label>
+    </div>
+</div>

@@ -8981,3 +8981,30 @@ html.session-timeout-active,
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
+
+/* Loan-product eligibility toggles and their dependent fields. */
+.product-eligibility-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1rem;
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+.product-eligibility-option {
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+.product-eligibility-option .settings-checkbox-card {
+    min-height: 7rem;
+}
+.product-eligibility-dependent {
+    margin-top: 0.75rem;
+}
+.product-eligibility-dependent[hidden] {
+    display: none !important;
+}
+@media (max-width: 640px) {
+    .product-eligibility-option { flex-basis: 100%; }
+    .product-eligibility-option .settings-checkbox-card { min-height: 0; }
+}

@@ -98,6 +98,9 @@ public class LoanProductSetting {
     @Column(name = "allow_application_with_active_loan")
     private Boolean allowApplicationWithActiveLoan;
 
+    @Column(name = "maximum_active_loans")
+    private Integer maximumActiveLoans;
+
     @Column(name = "fresh_financial_data_required")
     private Boolean freshFinancialDataRequired;
 

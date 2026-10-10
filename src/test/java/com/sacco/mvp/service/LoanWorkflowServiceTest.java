@@ -93,6 +93,45 @@ class LoanWorkflowServiceTest {
         lenient().when(applicationClock.now()).thenReturn(OffsetDateTime.parse("2026-08-24T13:00:00+03:00"));
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(longs = {0, 1, 2, 3})
+    void activeLoanLimitCountsOnlyTheApplicantsInstitutionAndAllowsTheBoundary(long count) {
+        UUID applicant = UUID.randomUUID();
+        LoanProductSetting product = LoanProductSetting.builder().saccoId("SACCO-01").active(true)
+            .allowApplicationWithActiveLoan(true).maximumActiveLoans(2).build();
+        when(loanApplicationRepository.countBySaccoIdAndApplicantMemberIdAndStatusIn(
+            eq("SACCO-01"), eq(applicant), any())).thenReturn(count);
+        if (count <= 2) {
+            loanWorkflowService.assertCanApplyForProduct("SACCO-01", applicant, product);
+        } else {
+            assertThatThrownBy(() -> loanWorkflowService.assertCanApplyForProduct("SACCO-01", applicant, product))
+                .hasMessage("This product allows applications with at most 2 existing active loans.");
+        }
+        verify(loanApplicationRepository).countBySaccoIdAndApplicantMemberIdAndStatusIn(
+            "SACCO-01", applicant, List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED));
+    }
+
+    @Test
+    void activeLoanLimitRejectsAnotherInstitutionsProductBeforeCounting() {
+        LoanProductSetting product = LoanProductSetting.builder().saccoId("OTHER").active(true)
+            .allowApplicationWithActiveLoan(true).maximumActiveLoans(2).build();
+        assertThatThrownBy(() -> loanWorkflowService.assertCanApplyForProduct("SACCO-01", UUID.randomUUID(), product))
+            .hasMessage("Loan product not found");
+        verifyNoInteractions(loanApplicationRepository);
+    }
+
+    @Test
+    void existingProductWithoutActiveLoanLimitStillAllowsActiveLoans() {
+        UUID applicant = UUID.randomUUID();
+        LoanProductSetting product = LoanProductSetting.builder().saccoId("SACCO-01").active(true)
+            .allowApplicationWithActiveLoan(true).build();
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(applicant), any()))
+            .thenReturn(List.of())
+            .thenReturn(List.of(LoanApplication.builder().id(UUID.randomUUID()).status(LoanStatus.DISBURSED).build()));
+        loanWorkflowService.assertCanApplyForProduct("SACCO-01", applicant, product);
+        verify(loanApplicationRepository, never()).countBySaccoIdAndApplicantMemberIdAndStatusIn(any(), any(), any());
+    }
+
     @Test
     void memberDashboardUsesFocusedAggregateAndCurrentLoanQueries() {
         UUID memberId = UUID.randomUUID();

@@ -1064,6 +1064,7 @@ public class AdminController {
                                     @RequestParam Integer minRepaymentMonths,
                                     @RequestParam Integer maxRepaymentMonths,
                                     @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
+                                    @RequestParam(required = false) Integer maximumActiveLoans,
                                     @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
                                     @RequestParam(defaultValue = "false") boolean managerReviewRequired,
                                     @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
@@ -1113,7 +1114,7 @@ public class AdminController {
                 boardReviewRequired, boardPriority, boardReviewerIds,
                 committeeReviewRequired, committeePriority, committeeMinimumVotes,
                 committeeApprovalThreshold, creditCommitteeReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
-                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
+                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -1211,6 +1212,7 @@ public class AdminController {
                                               @RequestParam Integer minRepaymentMonths,
                                               @RequestParam Integer maxRepaymentMonths,
                                               @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
+                                              @RequestParam(required = false) Integer maximumActiveLoans,
                                               @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
                                               @RequestParam(defaultValue = "false") boolean managerReviewRequired,
                                               @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
@@ -1294,7 +1296,8 @@ public class AdminController {
                 applicantAttachmentRequired,
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
-                productStatus
+                productStatus,
+                maximumActiveLoans
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Loan product created successfully.");
@@ -1570,6 +1573,8 @@ public class AdminController {
                 fieldErrors.put("requiredAttachmentMaxSizeMb", message);
             case "Attachment name must be 120 characters or fewer." ->
                 fieldErrors.put("requiredAttachmentName", message);
+            case "Allowed active loans must be between 1 and 10." ->
+                fieldErrors.put("maximumActiveLoans", message);
             case "Guarantors required cannot be negative." ->
                 fieldErrors.put("guarantorsRequired", "Guarantors required cannot be negative.");
             case "Guarantors required must be between 0 and 15." ->

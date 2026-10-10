@@ -153,31 +153,8 @@
                             <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
                         </label>
 
-                        <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
-                            <input name="maxLoansavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
-                            <div class="savings-ratio-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Disposable Income" />
-                                <div class="savings-multiplier-control mt-1">
-                                    <input type="number" min="0" max="10" step="0.01" required class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan Disposable Income multiplier" data-savings-multiplier />
-                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of Disposable Income" /></span>
-                                </div>
-                            </div>
-                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                <input name="savingsLimitCheckRequired" type="checkbox" value="true" ${product.savingsLimitCheckRequired ? 'checked' : ''} data-savings-limit-check />
-                                <span>
-                                    <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check Disposable Income against loan amount" /></span>
-                                    <span class="block text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" text="When unchecked, only the product minimum and maximum amount range is enforced." /></span>
-                                </span>
-                            </label>
-                        </div>
-                        <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="freshFinancialDataRequired" type="checkbox" value="true" ${product.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
-                            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Credit Assessment Data) At Submission" /></span>
-                        </label>
-                        <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${product.applicationWithActiveLoanAllowed ? 'checked' : ''} />
-                            <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
-                        </label>
+                        <c:set var="eligibilityProduct" value="${product}" />
+                        <%@ include file="../fragments/loan-product-eligibility-fields.jspf" %>
                     </div>
                 </section>
 
@@ -433,10 +410,10 @@
                                 </label>
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Minimum Guarantor Disposable Income
-                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedguarantorMinimumSavings}" />
+                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedGuarantorMinimumSavings}" />
                                 </label>
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <input name="guarantorMinsavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinsavingsCheckRequired ? 'checked' : ''} />
+                                    <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinSavingsCheckRequired ? 'checked' : ''} />
                                     <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum Disposable Income before selection" /></span>
                                 </label>
                             </div>

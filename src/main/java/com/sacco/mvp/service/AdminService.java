@@ -868,7 +868,8 @@ public class AdminService {
             false,
             false,
             null,
-            productStatus
+            productStatus,
+            null
         );
     }
 
@@ -948,7 +949,8 @@ public class AdminService {
             false,
             false,
             null,
-            productStatus
+            productStatus,
+            null
         );
     }
 
@@ -1031,7 +1033,8 @@ public class AdminService {
             false,
             guarantorMinSavingsCheckRequired,
             guarantorMinimumSavings,
-            productStatus
+            productStatus,
+            null
         );
     }
 
@@ -1080,7 +1083,8 @@ public class AdminService {
                                   boolean applicantAttachmentRequired,
                                   boolean guarantorMinSavingsCheckRequired,
                                   BigDecimal guarantorMinimumSavings,
-                                  LoanProductStatus productStatus) {
+                                  LoanProductStatus productStatus,
+                                  Integer maximumActiveLoans) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
         if (!saccoId.equals(product.getSaccoId())) {
@@ -1105,6 +1109,7 @@ public class AdminService {
         product.setMinRepaymentMonths(normalizeMinimumRepaymentMonths(minRepaymentMonths));
         product.setMaxRepaymentMonths(normalizeMaximumRepaymentMonths(product.getMinimumRepaymentMonths(), maxRepaymentMonths));
         product.setAllowApplicationWithActiveLoan(allowApplicationWithActiveLoan);
+        product.setMaximumActiveLoans(normalizeMaximumActiveLoans(allowApplicationWithActiveLoan, maximumActiveLoans));
         product.setFreshFinancialDataRequired(freshFinancialDataRequired);
         List<UUID> normalizedChairpersonReviewerIds = singleChairpersonReviewerIds(saccoId, chairpersonReviewRequired);
         List<UUID> normalizedBoardReviewerIds = boardReviewRequired
@@ -1181,6 +1186,16 @@ public class AdminService {
         auditService.log("LOAN_PRODUCT", productId, "ADMIN_UPDATE_LOAN_PRODUCT", adminId, before, snapshotProduct(product));
     }
 
+    private Integer normalizeMaximumActiveLoans(boolean allowed, Integer maximumActiveLoans) {
+        if (!allowed) {
+            return null;
+        }
+        if (maximumActiveLoans != null && (maximumActiveLoans < 1 || maximumActiveLoans > 10)) {
+            throw new IllegalArgumentException("Allowed active loans must be between 1 and 10.");
+        }
+        return maximumActiveLoans;
+    }
+
     @Transactional
     public void archiveLoanProduct(String saccoId, UUID adminId, UUID productId) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
@@ -1240,7 +1255,8 @@ public class AdminService {
                                                 boolean applicantAttachmentRequired,
                                                 boolean guarantorMinSavingsCheckRequired,
                                                 BigDecimal guarantorMinimumSavings,
-                                                LoanProductStatus productStatus) {
+                                                LoanProductStatus productStatus,
+                                                Integer maximumActiveLoans) {
         return createCustomizedLoanProduct(
             saccoId,
             adminId,
@@ -1285,7 +1301,8 @@ public class AdminService {
             applicantAttachmentRequired,
             guarantorMinSavingsCheckRequired,
             guarantorMinimumSavings,
-            productStatus
+            productStatus,
+            maximumActiveLoans
         );
     }
 
@@ -1368,7 +1385,8 @@ public class AdminService {
             false,
             guarantorMinSavingsCheckRequired,
             guarantorMinimumSavings,
-            productStatus
+            productStatus,
+            null
         );
     }
 
@@ -1416,7 +1434,9 @@ public class AdminService {
                                                           boolean applicantAttachmentRequired,
                                                           boolean guarantorMinSavingsCheckRequired,
                                                           BigDecimal guarantorMinimumSavings,
-                                                          LoanProductStatus productStatus) {
+                                                          LoanProductStatus productStatus,
+                                                          Integer maximumActiveLoans) {
+        Integer normalizedActiveLoanLimit = normalizeMaximumActiveLoans(allowApplicationWithActiveLoan, maximumActiveLoans);
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         List<UUID> normalizedChairpersonReviewerIds = singleChairpersonReviewerIds(saccoId, chairpersonReviewRequired);
         List<UUID> normalizedBoardReviewerIds = boardReviewRequired
@@ -1509,6 +1529,7 @@ public class AdminService {
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.CHAIRPERSON, normalizedChairpersonReviewerIds);
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.BOARD, normalizedBoardReviewerIds);
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.CREDIT_COMMITTEE, normalizedCreditCommitteeReviewerIds);
+        product.setMaximumActiveLoans(normalizedActiveLoanLimit);
         auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CREATE_LOAN_PRODUCT", adminId, null, snapshotProduct(product));
         return product;
     }
@@ -3603,6 +3624,7 @@ public class AdminService {
         data.put("minRepaymentMonths", product.getMinimumRepaymentMonths());
         data.put("maxRepaymentMonths", product.getMaxRepaymentMonths());
         data.put("allowApplicationWithActiveLoan", Boolean.TRUE.equals(product.getAllowApplicationWithActiveLoan()));
+        data.put("maximumActiveLoans", product.getMaximumActiveLoans());
         data.put("freshFinancialDataRequired", Boolean.TRUE.equals(product.getFreshFinancialDataRequired()));
         data.put("managerReviewRequired", Boolean.TRUE.equals(product.getManagerReviewRequired()));
         data.put("managerPriority", product.getResolvedManagerPriority());

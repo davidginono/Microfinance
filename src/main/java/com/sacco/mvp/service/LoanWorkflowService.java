@@ -304,6 +304,15 @@ public class LoanWorkflowService {
                         + " (" + humanizeApplicationLockStatus(application.getStatus()) + "). Continue or complete it before applying again."
                 );
             });
+        Integer maximumActiveLoans = product.getMaximumActiveLoans();
+        if (product.isApplicationWithActiveLoanAllowed() && maximumActiveLoans != null) {
+            long activeLoanCount = loanApplicationRepository.countBySaccoIdAndApplicantMemberIdAndStatusIn(
+                saccoId, memberId, ACTIVE_LOAN_LOCK_STATUSES);
+            if (activeLoanCount > maximumActiveLoans) {
+                throw new IllegalStateException("This product allows applications with at most " + maximumActiveLoans + " existing active loans.");
+            }
+            return;
+        }
         List<LoanApplication> activeLoans = findActiveDisbursedLoans(memberId);
         if (!activeLoans.isEmpty()) {
             if (!product.isApplicationWithActiveLoanAllowed()) {

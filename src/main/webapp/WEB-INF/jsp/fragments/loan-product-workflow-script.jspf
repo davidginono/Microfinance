@@ -473,9 +473,13 @@
             const productNameField = form.querySelector('[data-product-name-field]');
             const productCodeField = form.querySelector('[data-product-code-field][data-product-code-generated="true"]');
             const savingsPercentInput = form.querySelector('[data-savings-percent]');
+            const initialSavingsPercent = savingsPercentInput ? savingsPercentInput.value : '';
             const savingsMultiplierInput = form.querySelector('[data-savings-multiplier]');
             const savingsLimitCheckInput = form.querySelector('[data-savings-limit-check]');
-            const savingsMultiplierControl = form.querySelector('.savings-multiplier-control');
+            const savingsRatioField = form.querySelector('[data-savings-ratio-field]');
+            const activeLoanToggle = form.querySelector('[data-active-loan-toggle]');
+            const activeLoanField = form.querySelector('[data-active-loan-field]');
+            const activeLoanLimit = form.querySelector('[data-active-loan-limit]');
             let syncingSavingsRatio = false;
             let workflowWarningsInitialized = false;
             let previousWorkflowWarningKeys = new Set();
@@ -589,7 +593,14 @@
                     return;
                 }
                 syncingSavingsRatio = true;
-                savingsMultiplierInput.value = (percent / 100).toFixed(2);
+                const multiplier = percent / 100;
+                if (!Array.from(savingsMultiplierInput.options).some(option => Number(option.value) === multiplier)) {
+                    const option = document.createElement('option');
+                    option.value = String(multiplier);
+                    option.textContent = String(multiplier) + savingsMultiplierInput.options[0].textContent.replace(/^[\d.]+/, '');
+                    savingsMultiplierInput.appendChild(option);
+                }
+                savingsMultiplierInput.value = Array.from(savingsMultiplierInput.options).find(option => Number(option.value) === multiplier).value;
                 syncingSavingsRatio = false;
             }
 
@@ -731,8 +742,12 @@
                 if (savingsMultiplierInput) {
                     savingsMultiplierInput.disabled = savingsLimitCheckInput && !savingsLimitCheckInput.checked;
                 }
-                if (savingsMultiplierControl) {
-                    savingsMultiplierControl.classList.toggle('opacity-60', savingsLimitCheckInput && !savingsLimitCheckInput.checked);
+                if (savingsRatioField) {
+                    savingsRatioField.hidden = !savingsLimitCheckInput.checked;
+                }
+                if (activeLoanField) {
+                    activeLoanField.hidden = !activeLoanToggle.checked;
+                    activeLoanLimit.disabled = !activeLoanToggle.checked;
                 }
 
                 const managerPriorityValue = numericValue(managerPriority, 1);
@@ -833,7 +848,7 @@
                 const productDescription = form.querySelector('[name="productDescription"]');
                 const minimumAmount = numberOrNull(form.querySelector('[name="minimumAmount"]'));
                 const maximumAmount = numberOrNull(form.querySelector('[name="maximumAmount"]'));
-                const savingsPercent = numberOrNull(form.querySelector('[name="maxLoansavingsPercent"]'));
+                const savingsPercent = numberOrNull(form.querySelector('[name="maxLoanSavingsPercent"]'));
                 const applicationFee = numberOrNull(form.querySelector('[name="applicationFee"]'));
                 const insurancePercent = numberOrNull(form.querySelector('[name="insurancePercent"]'));
                 const processingFeePercent = numberOrNull(form.querySelector('[name="processingFeePercent"]'));
@@ -877,7 +892,7 @@
                     addValidationError(errors, 'maximumAmount', productSettingsText.validationMaximumBelowMinimum);
                 }
                 if (savingsPercent === null || Number.isNaN(savingsPercent) || savingsPercent < 0 || savingsPercent > 1000) {
-                    addValidationError(errors, 'maxLoansavingsPercent', productSettingsText.validationsavingsPercent);
+                    addValidationError(errors, 'maxLoanSavingsPercent', productSettingsText.validationsavingsPercent);
                 }
                 if (applicationFee === null || Number.isNaN(applicationFee) || applicationFee < 0) {
                     addValidationError(errors, 'applicationFee', productSettingsText.validationApplicationFee);
@@ -956,7 +971,7 @@
                 return errors;
             }
 
-            [managerToggle, loanOfficerToggle, chairpersonToggle, chairpersonPriority, boardToggle, boardPriority, committeeToggle, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput, savingsLimitCheckInput, boardReviewerSearch, creditCommitteeReviewerSearch]
+            [managerToggle, loanOfficerToggle, chairpersonToggle, chairpersonPriority, boardToggle, boardPriority, committeeToggle, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput, savingsLimitCheckInput, activeLoanToggle, boardReviewerSearch, creditCommitteeReviewerSearch]
                 .filter(Boolean)
                 .forEach((field) => {
                     field.addEventListener('change', () => applyRules({ notify: true }));
@@ -986,6 +1001,17 @@
                         applyRules();
                     });
                 });
+            form.addEventListener('reset', () => setTimeout(() => {
+                if (savingsPercentInput) {
+                    savingsPercentInput.value = initialSavingsPercent;
+                }
+                syncsavingsMultiplierFromPercent();
+                applyRules();
+            }, 0));
+            window.addEventListener('pageshow', () => {
+                syncsavingsMultiplierFromPercent();
+                applyRules();
+            });
             if (savingsPercentInput) {
                 savingsPercentInput.addEventListener('change', syncsavingsMultiplierFromPercent);
                 savingsPercentInput.addEventListener('input', syncsavingsMultiplierFromPercent);

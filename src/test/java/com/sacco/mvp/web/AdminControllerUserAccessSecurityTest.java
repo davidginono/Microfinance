@@ -350,6 +350,15 @@ class AdminControllerUserAccessSecurityTest {
         verify(saccoRegistryService, never()).updateLoanTopUpFeature(any(), anyBoolean(), any());
     }
 
+    private String productRatioParameterFromForm() throws Exception {
+        String form = java.nio.file.Files.readString(java.nio.file.Path.of(
+            "src/main/webapp/WEB-INF/jsp/fragments/loan-product-eligibility-fields.jspf"));
+        java.util.regex.Matcher field = java.util.regex.Pattern.compile(
+            "<input name=\"([^\"]+)\"[^>]*data-savings-percent").matcher(form);
+        org.assertj.core.api.Assertions.assertThat(field.find()).isTrue();
+        return field.group(1);
+    }
+
     @Test
     void createLoanProductSuccessClosesModalAndTargetsCreatedProductCard() throws Exception {
         UUID productId = UUID.randomUUID();
@@ -361,9 +370,9 @@ class AdminControllerUserAccessSecurityTest {
             "SACCO-01", principal.getMemberId(), null, "School Fees Booster", "Created product", 5,
             new BigDecimal("0"), new BigDecimal("500000"), 2, new BigDecimal("3.000000"), false,
             new BigDecimal("15000"), new BigDecimal("0.015000"), new BigDecimal("0.000000"),
-            new BigDecimal("0.100000"), InterestMethod.FLAT_RATE, 1, 12, false, false, true, false,
+            new BigDecimal("0.100000"), InterestMethod.FLAT_RATE, 1, 12, true, false, true, false,
             ApprovalWorkflowStage.MANAGER, 1, 2, false, null, null, false, null, null, false, null,
-            null, null, null, false, null, false, false, false, false, null, LoanProductStatus.ACTIVE
+            null, null, null, false, null, false, false, false, false, null, LoanProductStatus.ACTIVE, 2
         )).thenReturn(createdProduct);
 
         mockMvc.perform(post("/admin/settings-controls/loan-products")
@@ -374,7 +383,9 @@ class AdminControllerUserAccessSecurityTest {
                 .param("minimumAmount", "0")
                 .param("maximumAmount", "500000")
                 .param("guarantorsRequired", "2")
-                .param("maxLoanSavingsPercent", "300")
+                .param(productRatioParameterFromForm(), "300")
+                .param("allowApplicationWithActiveLoan", "true")
+                .param("maximumActiveLoans", "2")
                 .param("applicationFee", "15000")
                 .param("insurancePercent", "1.5")
                 .param("processingFeePercent", "0")
