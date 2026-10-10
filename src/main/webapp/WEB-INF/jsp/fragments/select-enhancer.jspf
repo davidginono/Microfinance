@@ -80,7 +80,13 @@
             state.button.disabled = select.disabled;
             state.buttonText.textContent = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
             state.button.title = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
-            state.menu.innerHTML = '';
+            const controls = state.menu.querySelector('[data-neo-select-controls]');
+            const focusedControl = controls && controls.contains(document.activeElement) ? document.activeElement : null;
+            state.menu.replaceChildren(...(controls ? [controls] : []));
+            select.dispatchEvent(new CustomEvent('neo-select:render', { detail: { menu: state.menu } }));
+            if (focusedControl) {
+                focusedControl.focus({ preventScroll: true });
+            }
 
             if (!visibleOptions.length) {
                 const emptyState = document.createElement('div');
@@ -159,8 +165,10 @@
             const compactRowHeight = 30;
             const rect = state.button.getBoundingClientRect();
             const availableBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding);
-            const visibleRows = Math.max(1, Math.min(maxVisibleRows, state.menu.children.length || 1));
-            const contentHeight = visibleRows * compactRowHeight + 2;
+            const controls = state.menu.querySelector('[data-neo-select-controls]');
+            const optionCount = state.menu.children.length - (controls ? 1 : 0);
+            const visibleRows = Math.max(1, Math.min(maxVisibleRows, optionCount || 1));
+            const contentHeight = visibleRows * compactRowHeight + (controls ? controls.offsetHeight : 0) + 2;
             const desiredHeight = Math.min(state.menu.scrollHeight || contentHeight, contentHeight);
             const menuHeight = Math.min(desiredHeight, Math.max(compactRowHeight + 2, availableBelow));
 

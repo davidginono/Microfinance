@@ -599,7 +599,8 @@
                 </div>
             </sec:authorize>
             <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'LOAN_RECORDING_VIEW', 'ACCOUNTING_POLICIES_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'REPORT_TEMPLATE_PUBLISH', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'ACCOUNTING_CLOSING_VIEW', 'STATEMENT_VIEW', 'STATEMENT_DESIGN', 'STATEMENT_APPROVE', 'REGULATORY_SUBMISSION_VIEW', 'REGULATORY_SUBMISSION_CREATE', 'REGULATORY_SUBMISSION_APPROVE', 'ACCOUNTING_RELEASE_VIEW')">
-                <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant') or fn:startsWith(requestUri, '/finance/') or fn:startsWith(requestUri, '/reports/builder') or fn:startsWith(requestUri, '/reports/runs') or fn:startsWith(requestUri, '/reports/statements') or fn:startsWith(requestUri, '/reports/financial')}" />
+                <sec:authorize access="@access.canAccessAccountantArea(principal)">
+                <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.accountant" text="Accountant" /></p>
                 </div>
@@ -622,9 +623,10 @@
                         <a href="/accountant/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/accountant/archive' ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantArchive" text="Accountant Archive" /></a>
                         <a href="/accountant/reports" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/accountant/reports' ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantReports" text="Accountant Reports" /></a>
                         </sec:authorize>
-                        <%@ include file="finance-navigation.jspf" %>
                     </div>
                 </div>
+                </sec:authorize>
+                <%@ include file="finance-navigation.jspf" %>
             </sec:authorize>
             <sec:authorize access="@access.canAccessDisbursementArea(principal)">
                 <c:set var="disbursementOfficeActive" value="${fn:startsWith(requestUri, '/disbursement')}" />

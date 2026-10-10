@@ -38,7 +38,7 @@ public class LoanRecordingController {
         @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="newest") String sort,@RequestParam(defaultValue="0") int page,
         jakarta.servlet.http.HttpServletRequest request,Model model){
         String kind=kind(request);var f=new Filter(search,from,through,state,sort,page,null);context(kind,model);model.addAttribute("filter",f);
-        if(kind.equals("LOAN"))model.addAttribute("records",service.list(a,f));else {model.addAttribute("records",service.register(a,kind,f));model.addAttribute("totals",service.totals(a,kind,f));}return "accounting/loans/register";
+        if(kind.equals("LOAN"))model.addAttribute("records",service.list(a,f));else model.addAttribute("records",service.register(a,kind,f));return "accounting/loans/register";
     }
     @GetMapping("/loan-records/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,Model model){service.authorize(a,"CREATE");var f=new RecordForm();f.setApplicationDate(clock.today());model.addAttribute("recordForm",f);return "accounting/loans/record-form";}
     @PostMapping("/loan-records") public String save(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute RecordForm recordForm,BindingResult errors,@RequestParam(defaultValue="save") String action,Model model,RedirectAttributes flash){

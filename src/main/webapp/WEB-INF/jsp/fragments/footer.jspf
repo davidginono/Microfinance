@@ -498,6 +498,9 @@
         registerExpandableMenu(boardOfficeToggle, boardOfficePanel, boardOfficeChevron, "boardOfficeExpanded");
         registerExpandableMenu(loanOfficerOfficeToggle, loanOfficerOfficePanel, loanOfficerOfficeChevron, "loanOfficerOfficeExpanded");
         registerExpandableMenu(accountantOfficeToggle, accountantOfficePanel, accountantOfficeChevron, "accountantOfficeExpanded");
+        ['loanAccounting', 'financeVouchers', 'accountingSetup', 'financeReconciliation', 'financeReports'].forEach(function (group) {
+            registerExpandableMenu(document.getElementById(group + 'Toggle'), document.getElementById(group + 'Panel'), document.getElementById(group + 'Chevron'), group + 'Expanded');
+        });
         registerExpandableMenu(disbursementOfficeToggle, disbursementOfficePanel, disbursementOfficeChevron, "disbursementOfficeExpanded");
         restoreLastClickedSidebarLink();
     })();

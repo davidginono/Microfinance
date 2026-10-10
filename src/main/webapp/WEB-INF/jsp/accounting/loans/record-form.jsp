@@ -5,7 +5,7 @@
 <div class="accounting-workspace accounting-create-workspace"><c:url value="/finance/loan-records" var="saveUrl" />
 <form:form modelAttribute="recordForm" action="${saveUrl}" method="post" data-loan-form="true" cssClass="accounting-create-form"><form:hidden path="requestKey" />
 <form:errors path="*" cssClass="loan-error-summary" element="div" role="alert" tabindex="-1" />
-<section class="accounting-section"><h2><spring:message code="recording.identity" /></h2><div class="loan-form-grid">
+<section class="accounting-section"><div class="loan-form-grid">
 <div data-loan-choice data-category="clients"><label for="clientId"><spring:message code="recording.client" /><form:select path="clientId" id="clientId" cssClass="aws-control" data-choice-select="true"><form:option value="" label="${chooseLabel}" /><c:if test="${not empty recordForm.clientId}"><form:option value="${recordForm.clientId}" label="${recordForm.clientId}" /></c:if></form:select></label><%@ include file="choice-search.jspf" %></div>
 <div data-loan-choice data-category="products"><label for="productId"><spring:message code="recording.product" /><form:select path="productId" id="productId" cssClass="aws-control" data-choice-select="true"><form:option value="" label="${chooseLabel}" /><c:if test="${not empty recordForm.productId}"><form:option value="${recordForm.productId}" label="${recordForm.productId}" /></c:if></form:select></label><%@ include file="choice-search.jspf" %></div>
 <label for="applicationDate"><spring:message code="recording.applicationDate" /><form:input path="applicationDate" id="applicationDate" type="date" cssClass="aws-control" required="required" /></label>
