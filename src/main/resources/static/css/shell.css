@@ -910,7 +910,7 @@ button:active {
 .page-submit-preloader {
     position: fixed;
     inset: 0;
-    z-index: 120;
+    z-index: 10001;
     display: none;
     align-items: center;
     justify-content: center;
@@ -2650,12 +2650,21 @@ body.aws-console {
     opacity: .28;
 }
 
+.erp-table-wrap.is-loading {
+    isolation: isolate;
+    overflow: hidden !important;
+}
+
+.erp-table-wrap.is-loading > :not(.aws-table-loader) {
+    pointer-events: none;
+}
+
 .aws-table-loader {
     position: absolute;
-    inset: 29px 0 0;
-    z-index: 5;
+    inset: 0;
+    z-index: 200;
     display: flex;
-    min-height: 64px;
+    pointer-events: auto;
     align-items: center;
     justify-content: center;
     gap: 7px;

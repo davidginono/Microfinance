@@ -237,6 +237,9 @@
     if (toastContainer && toastContainer.parentElement !== document.body) {
         document.body.appendChild(toastContainer);
     }
+    if (pageSubmitPreloader && pageSubmitPreloader.parentElement !== document.body) {
+        document.body.appendChild(pageSubmitPreloader);
+    }
     const syncShellNavHeight = function () {
         if (!shellTopNav) {
             return;
@@ -629,8 +632,44 @@
         loader.appendChild(spinner);
         nearbyRegion.appendChild(loader);
     };
+    const observeLoadingInteraction = function (container, loadingHost, loadingClass, loaderSelector) {
+        const lockedChildren = new Set();
+        const syncInteractionLock = function () {
+            const loading = loadingHost.classList.contains(loadingClass);
+            lockedChildren.forEach(function (child) {
+                if (!loading || child.parentElement !== container) {
+                    child.inert = false;
+                    lockedChildren.delete(child);
+                }
+            });
+            if (loading) {
+                Array.from(container.children).forEach(function (child) {
+                    // Keep the loading status accessible and preserve existing inert state.
+                    if (!child.matches(loaderSelector) && !child.inert) {
+                        child.inert = true;
+                        lockedChildren.add(child);
+                    }
+                });
+            }
+        };
+        const observer = new MutationObserver(syncInteractionLock);
+        observer.observe(container, { childList: true });
+        observer.observe(loadingHost, {
+            attributes: true,
+            attributeFilter: ['class'],
+            childList: loadingHost === container
+        });
+        syncInteractionLock();
+    };
     const initConsoleTableLoading = function () {
         clearConsoleTableLoading();
+        document.querySelectorAll('.erp-table-wrap').forEach(function (region) {
+            // Async hydration also uses these regions, independently of form navigation.
+            observeLoadingInteraction(region, region, 'is-loading', '.aws-table-loader');
+        });
+        if (pageSubmitPreloader) {
+            observeLoadingInteraction(document.body, pageSubmitPreloader, 'is-active', '#pageSubmitPreloader');
+        }
         document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
             form.addEventListener('submit', function (event) {
                 if (event.defaultPrevented
