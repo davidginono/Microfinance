@@ -1,0 +1,41 @@
+@page client-loan-statement { size: A4 landscape; margin: 8mm; }
+.client-statement-print { margin: 0; padding: 20px; color: #000; background: #fff; font-family: "Times New Roman", serif; }
+.client-loan-statement { max-width: 1120px; margin: 0 auto; }
+.client-loan-statement h1 { margin: 0 0 18px; font-size: 16pt; text-align: center; text-decoration: underline; }
+.statement-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 12px; margin: 0 0 12px; }
+.statement-facts > div { min-width: 0; }
+.statement-facts dt { font-size: 8pt; font-weight: bold; text-transform: uppercase; }
+.statement-facts dd { margin: 3px 0 0; font-size: 9pt; overflow-wrap: anywhere; }
+.statement-transactions { max-width: 100%; overflow-x: auto; }
+.statement-transactions table { width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; font-size: 8pt; }
+.statement-transactions th, .statement-transactions td { padding: 5px 4px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.statement-transactions th { background: #dedede; }
+.statement-transactions td.statement-money { text-align: right; font-variant-numeric: tabular-nums; }
+.statement-note { margin-top: 16px; font-size: 7pt; }
+.statement-print-tools { max-width: 1120px; margin: 0 auto 16px; text-align: right; }
+.statement-print-tools button { padding: 7px 14px; }
+@media (max-width: 640px) { .statement-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .client-statement-print { padding: 12px; } }
+@media print {
+    .client-statement-print { page: client-loan-statement; padding: 0; margin: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .statement-print-tools { display: none; }
+    .statement-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); break-inside: avoid; }
+    .statement-loan + .statement-loan { break-before: page; }
+    .statement-transactions { overflow: visible; }
+    .statement-transactions table { min-width: 0; font-size: 7pt; }
+    .statement-transactions thead { display: table-header-group; }
+    .statement-transactions tr { break-inside: avoid; }
+    .client-loan-statement h1 { font-size: 12pt; break-after: avoid; }
+    .statement-facts dt { font-size: 7pt; }
+    .statement-facts dd { font-size: 8pt; }
+}
+
+.statement-transactions col:nth-child(1) { width: 8.6%; }
+.statement-transactions col:nth-child(2) { width: 9.8%; }
+.statement-transactions col:nth-child(3) { width: 8.8%; }
+.statement-transactions col:nth-child(4) { width: 9.1%; }
+.statement-transactions col:nth-child(5) { width: 8.6%; }
+.statement-transactions col:nth-child(6) { width: 24.7%; }
+.statement-transactions col:nth-child(7) { width: 7.6%; }
+.statement-transactions col:nth-child(8) { width: 7.6%; }
+.statement-transactions col:nth-child(9) { width: 7.3%; }
+.statement-transactions col:nth-child(10) { width: 7.9%; }

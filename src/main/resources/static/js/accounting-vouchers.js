@@ -6,7 +6,7 @@ if(register){
  const buttons=[...register.querySelectorAll('[data-selection-action]')],status=register.querySelector('[data-selection-status]');
  const clear=()=>{selected=null;register.querySelectorAll('[data-voucher-id]').forEach(r=>{r.classList.remove('is-selected');r.querySelector('input').checked=false;});buttons.forEach(b=>b.disabled=true);status.textContent=status.dataset.empty;};
  register.addEventListener('click',e=>{const row=e.target.closest('[data-voucher-id]');if(!row || e.target.closest('a,button'))return;const next=row.dataset.voucherId===selected?null:row;clear();if(next){selected=next.dataset.voucherId;next.classList.add('is-selected');next.querySelector('input').checked=true;buttons.forEach(b=>b.disabled=false);status.textContent=status.dataset.selected+' '+next.querySelector('a').textContent;}});
- buttons.forEach(b=>b.addEventListener('click',()=>{if(!selected)return;const url=register.dataset.base+'/'+encodeURIComponent(selected);if(b.dataset.selectionAction==='print')window.open(url+'/print','_blank','noopener');else location.assign(url+(b.dataset.selectionAction==='pdf'?'/pdf':''));}));
+ buttons.forEach(b=>b.addEventListener('click',()=>{if(!selected)return;const url=register.dataset.base+'/'+encodeURIComponent(selected);if(b.dataset.selectionAction==='print')window.printExport(url+'/print');else location.assign(url+(b.dataset.selectionAction==='pdf'?'/pdf':''));}));
  window.addEventListener('pageshow',clear);
 }
 const form=document.querySelector('[data-voucher-form]');

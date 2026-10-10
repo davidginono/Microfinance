@@ -1079,51 +1079,64 @@
         }, 1000);
     };
 
-    const triggerBrowserPrint = function (blob) {
-        const objectUrl = window.URL.createObjectURL(blob);
-        const frame = document.createElement('iframe');
-        let cleaned = false;
-        const cleanup = function () {
-            if (cleaned) {
-                return;
-            }
-            cleaned = true;
-            frame.remove();
-            window.URL.revokeObjectURL(objectUrl);
-        };
-        frame.setAttribute('aria-hidden', 'true');
-        frame.setAttribute('data-export-print-frame', 'true');
-        frame.title = 'Print export';
-        frame.style.position = 'fixed';
-        frame.style.right = '0';
-        frame.style.bottom = '0';
-        frame.style.width = '1px';
-        frame.style.height = '1px';
-        frame.style.border = '0';
-        frame.style.opacity = '0';
-        frame.addEventListener('load', function () {
-            window.setTimeout(function () {
+    const triggerBrowserPrint = function (blob, target, signal) {
+        return new Promise(function (resolve, reject) {
+            const objectUrl = window.URL.createObjectURL(blob);
+            const frame = document.createElement('iframe');
+            let cleaned = false;
+            const cleanup = function () {
+                if (cleaned) return;
+                cleaned = true;
+                signal.removeEventListener('abort', abort);
+                frame.remove();
+                window.URL.revokeObjectURL(objectUrl);
+            };
+            const abort = function () {
+                cleanup();
+                reject(new DOMException('Print preparation timed out', 'AbortError'));
+            };
+            signal.addEventListener('abort', abort, { once: true });
+            frame.setAttribute('aria-hidden', 'true');
+            frame.setAttribute('data-export-print-frame', 'true');
+            frame.title = 'Print export';
+            frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+            frame.addEventListener('load', async function () {
                 try {
-                    if (!frame.contentWindow) {
-                        throw new Error('Print frame is not available');
-                    }
+                    if (!frame.contentWindow) throw new Error('Print frame is not available');
+                    if (blob.type.includes('html')) await frame.contentDocument.fonts.ready;
+                    if (signal.aborted) return;
+                    frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+                    hidePageSubmitPreloader();
                     frame.contentWindow.focus();
                     frame.contentWindow.print();
+                    signal.removeEventListener('abort', abort);
                     window.setTimeout(cleanup, exportPrintFrameCleanupDelayMs);
-                } catch (ignored) {
-                    const printWindow = window.open(objectUrl, '_blank');
-                    if (printWindow) {
-                        printWindow.opener = null;
-                    } else if (typeof window.showToast === 'function') {
-                        window.showToast('error', 'The print preview could not be opened. Please allow pop-ups and try again.');
-                    }
-                    window.setTimeout(cleanup, exportPrintFrameCleanupDelayMs);
+                    resolve();
+                } catch (error) {
+                    cleanup();
+                    reject(error);
                 }
-            }, 100);
-        }, { once: true });
-        frame.addEventListener('error', cleanup, { once: true });
-        document.body.appendChild(frame);
-        frame.src = objectUrl;
+            }, { once: true });
+            frame.addEventListener('error', function () {
+                cleanup();
+                reject(new Error('Print document could not be loaded'));
+            }, { once: true });
+            if (blob.type.includes('html')) {
+                blob.text().then(function (html) {
+                    if (signal.aborted) return;
+                    const printable = new DOMParser().parseFromString(html, 'text/html');
+                    printable.querySelectorAll('script, base').forEach(function (node) { node.remove(); });
+                    const base = printable.createElement('base');
+                    base.href = target.toString();
+                    printable.head.prepend(base);
+                    frame.srcdoc = '<!DOCTYPE html>' + printable.documentElement.outerHTML;
+                    document.body.appendChild(frame);
+                }).catch(function (error) { cleanup(); reject(error); });
+            } else {
+                frame.src = objectUrl;
+                document.body.appendChild(frame);
+            }
+        });
     };
 
     const downloadWithPagePreloader = async function (url) {
@@ -1168,6 +1181,8 @@
     };
 
     const printWithPagePreloader = async function (url) {
+        const target = new URL(url, window.location.href);
+        if (target.origin !== window.location.origin) return;
         if (exportPrintActive) {
             return;
         }
@@ -1179,7 +1194,6 @@
             controller.abort();
         }, exportDownloadTimeoutMs);
         try {
-            const target = new URL(url, window.location.href);
             const response = await window.fetch(target.toString(), {
                 credentials: 'same-origin',
                 signal: controller.signal
@@ -1189,7 +1203,7 @@
                 throw new Error('Print request failed');
             }
             const blob = await response.blob();
-            triggerBrowserPrint(blob);
+            await triggerBrowserPrint(blob, target, controller.signal);
         } catch (error) {
             const timedOut = error && error.name === 'AbortError';
             if (typeof window.showToast === 'function') {
@@ -1203,6 +1217,8 @@
             hidePageSubmitPreloader();
         }
     };
+
+    window.printExport = printWithPagePreloader;
 
     const resolvePrintControlUrl = function (control) {
         const url = control?.getAttribute?.('data-print-url') || control?.getAttribute?.('href') || '';

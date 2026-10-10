@@ -62,4 +62,12 @@ public final class LoanRecordingDtos {
     public record Statement(String client, String clientNumber, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
         BigDecimal futureInterest, long loans, Page<LoanRow> page) {}
     public record Totals(long count, BigDecimal amount, BigDecimal principal, BigDecimal interest) {}
+    public record StatementTerms(UUID loanId, BigDecimal rate, String frequency, int months, int installments,
+        LocalDate firstPaymentDate, BigDecimal installment, String institution, String branch) {
+        public LocalDate lastPaymentDate() {
+            if (firstPaymentDate == null || installments < 1 || !("WEEKLY".equals(frequency) || "MONTHLY".equals(frequency))) return null;
+            return "WEEKLY".equals(frequency) ? firstPaymentDate.plusWeeks(installments - 1L)
+                : firstPaymentDate.plusMonths(installments - 1L);
+        }
+    }
 }

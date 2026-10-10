@@ -140,12 +140,12 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public Posting posting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.posting(a,id);}
     @Transactional(readOnly=true) public Page<Posting> history(AppUserPrincipal a,UUID id,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");records.record(a,id,false);var rows=records.loanPosts(a,id,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional(readOnly=true) public Page<Posting> movements(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");check(records.ledgerClient(a,client).isPresent(),"client");var rows=records.clientPosts(a,client,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
-    public record StatementExport(String client,List<LoanRow> loans,List<Posting> movements) {}
+    public record StatementExport(String client,List<LoanRow> loans,List<Posting> movements,List<StatementTerms> terms) {}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public StatementExport exportStatement(AppUserPrincipal a,UUID client){
         authorize(a,"EXPORT");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
         var f=new Filter("",null,null,"","oldest",0,client);var loans=records.loans(a,f,clock.today(),501,0);var movements=records.clientPosts(a,client,501,0);
-        check(loans.size()<=500 && movements.size()<=500,"reportLimit");return new StatementExport(c.label(),loans,movements);
+        check(loans.size()<=500 && movements.size()<=500,"reportLimit");return new StatementExport(c.label(),loans,movements,records.statementTerms(a,client));
     }
     @Transactional(readOnly=true) public Statement statement(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));var f=new Filter("",null,null,"","newest",page,client);filter(f,false);var t=records.clientTotals(a,f,clock.today());var rows=records.loans(a,f,clock.today(),26,page*25);return new Statement(c.label(),c.label().split(" - ",2)[0],(BigDecimal)t.get("principal"),(BigDecimal)t.get("interest"),(BigDecimal)t.get("arrears"),(BigDecimal)t.get("future_interest"),((Number)t.get("loans")).longValue(),new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25));}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public List<Posting> report(AppUserPrincipal a,String kind,Filter f){authorize(a,"EXPORT");filter(f,true);kind(kind);var total=records.totals(a,kind,f);check(total.count()<=500,"reportLimit");return records.posts(a,kind,f,500,0);}

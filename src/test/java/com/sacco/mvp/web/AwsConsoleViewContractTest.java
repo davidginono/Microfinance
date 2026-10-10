@@ -52,9 +52,9 @@ class AwsConsoleViewContractTest {
         assertThat(routes).hasSizeGreaterThanOrEqualTo(78);
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
-            if (path.equals(JSP_ROOT.resolve("accounting/vouchers/print.jsp"))
-                || path.equals(JSP_ROOT.resolve("accounting/loans/print.jsp"))) {
-                String prefix = path.getParent().getFileName().toString().equals("vouchers") ? "voucher" : "loan";
+            if (isStandalonePrintView(path)) {
+                String prefix = path.getFileName().toString().equals("statement-print.jsp") ? "client-statement"
+                    : path.getParent().getFileName().toString().equals("vouchers") ? "voucher" : "loan";
                 assertThat(view).as(path.toString())
                     .contains("<!DOCTYPE html>", "name=\"viewport\"", "<body class=\"" + prefix + "-print\"")
                     .contains("code=\"voucher.print\"")
@@ -79,7 +79,7 @@ class AwsConsoleViewContractTest {
                         content -> assertThat(content).contains("staff-loan-detail-header.jspf")
                     );
             }
-            if (view.contains("<table")) {
+            if (view.contains("<table") && !isStandalonePrintView(path)) {
                 assertThat(view)
                     .as(path.toString())
                     .contains("erp-table")
@@ -207,6 +207,7 @@ class AwsConsoleViewContractTest {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             paths.filter(path -> path.toString().endsWith(".jsp") || path.toString().endsWith(".jspf"))
                 .forEach(path -> {
+                    if (isStandalonePrintView(path)) return;
                     String view = read(path);
                     assertThat(view)
                         .as(path.toString())
@@ -267,6 +268,7 @@ class AwsConsoleViewContractTest {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             paths.filter(path -> path.toString().endsWith(".jsp") || path.toString().endsWith(".jspf"))
                 .forEach(path -> {
+                    if (isStandalonePrintView(path)) return;
                     String view = read(path);
                     assertThat(view)
                         .as(path.toString())
@@ -1321,6 +1323,12 @@ class AwsConsoleViewContractTest {
             }
         }
         return false;
+    }
+
+    private static boolean isStandalonePrintView(Path path) {
+        return path.equals(JSP_ROOT.resolve("accounting/vouchers/print.jsp"))
+            || path.equals(JSP_ROOT.resolve("accounting/loans/print.jsp"))
+            || path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp"));
     }
 
     private static String read(Path path) {

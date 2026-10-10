@@ -73,6 +73,21 @@ public class LoanRecordingRepository {
     public Optional<Choice> client(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no||' - '||full_name label from members where id=? and sacco_id=? and station_id=? and status='ACTIVE' and is_member",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Choice> ledgerClients(AppUserPrincipal a,String search,int page){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.sacco_id=? and ((m.station_id=? and m.is_member) or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?)) and strpos(lower(m.member_no||' '||m.full_name),?)>0 order by m.member_no,m.id limit 26 offset ?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
     public Optional<Choice> ledgerClient(AppUserPrincipal a,UUID id){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.id=? and m.sacco_id=? and (m.station_id=? or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?))",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId()).stream().findFirst();}
+    public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client){return jdbc.query("""
+        select a.id,a.tenor_months,r.first_payment_date,
+        (a.financial_snapshot::jsonb->>'interestRate')::numeric rate,
+        a.financial_snapshot::jsonb->>'repaymentFrequency' frequency,
+        (a.financial_snapshot::jsonb->>'numberOfPayments')::integer installments,
+        (a.financial_snapshot::jsonb->>'periodicRepaymentAmount')::numeric installment,
+        i.sacco_name,coalesce(nullif(s.address_location,''),r.station_id) branch_name
+        from accountant_loan_record r join loan_applications a on a.id=r.loan_id
+        join registered_saccos i on i.sacco_id=r.sacco_id
+        join sacco_stations s on s.sacco_id=r.sacco_id and s.station_id=r.station_id
+        where a.applicant_member_id=? and r.sacco_id=? and r.station_id=?
+        order by r.application_date,a.id limit 501
+        """,(r,n)->new StatementTerms(r.getObject("id",UUID.class),r.getBigDecimal("rate"),r.getString("frequency"),
+            r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
+            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name")),client,a.getSaccoId(),a.getStationId());}
     public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and active
         and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
