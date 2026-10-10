@@ -47,3 +47,13 @@ Validation on 9 October 2026:
 - The final full suite passed: 1,250 tests, 993 passed, 257 opt-in tests skipped, and zero failures or errors.
 
 Rendered end-to-end evidence uses an isolated application and synthetic accountant/client/product/accounts, never the operational datasource.
+
+## Startup migration correction — 10 October 2026
+
+The configured database had already applied the original `V55` with checksum `-1305472888`. Later edits to that file changed its checksum to `450367604`, so Flyway validation prevented JPA initialization and produced the dependent `webConfig`/repository bean errors. Restore the original migration rather than repairing schema history or disabling validation, following the [Flyway versioned migration guidance](https://documentation.red-gate.com/fd/versioned-migrations-273973333.html).
+
+`V57` carries the transaction-name size increase and deferred voucher/journal commit triggers forward. The existing `V56` retains the hardened voucher validation and loan-aware commit function. Financial history, posting authorization, append-only safeguards and configuration remain intact.
+
+- `mvn -Dtest=VoucherPostgresTest,LoanRecordingPostgresTest test` passed all 19 checks without failures, errors or skips against fresh disposable PostgreSQL 17 databases. Tests verify the original V55 checksum, upgrade to V57, long transaction names, deferred commit rejection/rollback, and existing voucher and loan posting safeguards. Java 25 compilation passed.
+- The configured PostgreSQL 18.3 database validated normally, retained V55's original checksum, and applied V56 through V57. JPA and Tomcat started successfully; `/login` returned HTTP 200 with the password input. The temporary verification launch used port 8082 and disabled SMS, outbox scheduling and retention cleanup only for that launch. The verification application and disposable database server were stopped afterward. No configuration change or schema-history repair was made.
+- The full suite, browser financial workflow, packaging and throughput benchmark were not rerun for this migration fix; their earlier results remain documented above. Local commit: `Preserve applied voucher migration checksum`.

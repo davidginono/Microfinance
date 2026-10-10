@@ -34,7 +34,12 @@ class VoucherPostgresTest {
  final LocalDate day=LocalDate.of(2026,10,1); final OffsetDateTime now=OffsetDateTime.parse("2026-10-08T10:00:00+03:00");
  @BeforeAll void start(){
   var ds=new HikariDataSource();dataSource=ds;ds.setJdbcUrl(System.getenv("MICROFINANCE_VOUCHER_TEST_URL"));ds.setUsername("microfinance_test");ds.setPassword("");ds.addDataSourceProperty("sslmode","disable");ds.setMinimumIdle(1);ds.setMaximumPoolSize(4);ds.setConnectionTimeout(60000);
-  Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);
+  var migration=Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("55").load();
+  migration.migrate();jdbc=new JdbcTemplate(ds);
+  assertThat(jdbc.queryForObject("select checksum from flyway_schema_history where version='55' and success",Integer.class)).isEqualTo(-1305472888);
+  Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
+  assertThat(jdbc.queryForObject("select character_maximum_length from information_schema.columns where table_schema=current_schema() and table_name='accounting_voucher_transaction' and column_name='transaction_name'",Integer.class)).isEqualTo(240);
+  assertThat(jdbc.queryForObject("select count(*) from pg_trigger where tgname in ('core_voucher_commit','core_journal_commit') and tgdeferrable and tginitdeferred",Integer.class)).isEqualTo(2);
   var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
   audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);policies=mock(AccountingPolicyService.class);
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate());when(clock.now()).thenReturn(now);
@@ -66,6 +71,17 @@ class VoucherPostgresTest {
   var payment=service.post(actor,Type.PAYMENT,form(Type.PAYMENT));assertThat(payment.transactions()).allSatisfy(t->assertThat(t.credit().id()).isEqualTo(cash));
   var journal=service.post(actor,Type.JOURNAL,form(Type.JOURNAL));assertThat(journal.transactions()).allSatisfy(t->{assertThat(t.debit().id()).isEqualTo(expense);assertThat(t.credit().id()).isEqualTo(capital);});
   assertThat(service.list(actor,Type.RECEIPT,new Filter("",null,null,"","newest",0)).rows()).isEmpty();
+ }
+ @Test void directJournalCannotCommitWithoutItsPostedDocument(){
+  var original=service.post(actor,Type.RECEIPT,form(Type.RECEIPT));var draft=UUID.randomUUID();
+  assertThatThrownBy(()->tx.executeWithoutResult(s->jdbc.update("""
+   insert into gl_journal(id,sacco_id,station_id,policy_version,period_id,source_type,source_reference,
+    request_key,payload_hash,currency,state,evidence_reference,reason,effective_date,maker_id,recorded_at,direct_post)
+   select ?,sacco_id,station_id,policy_version,period_id,source_type,?, ?,payload_hash,currency,'DRAFT',
+    evidence_reference,reason,effective_date,maker_id,recorded_at,true from gl_journal where id=?
+   """,draft,"DRAFT-"+draft,UUID.randomUUID(),original.journalId())))
+   .isInstanceOf(org.springframework.transaction.TransactionSystemException.class).hasStackTraceContaining("Core vouchers must commit as posted documents");
+  assertThat(jdbc.queryForObject("select count(*) from gl_journal where id=?",Integer.class,draft)).isZero();
  }
  @Test void sameAccountantReversesAllRowsOnceWithLinkedOriginalAndRetry(){
   var original=service.post(actor,Type.RECEIPT,form(Type.RECEIPT));var key=UUID.randomUUID();
@@ -109,13 +125,13 @@ class VoucherPostgresTest {
   var library=new AccountingCodeLibraryService(new AccountingCodeLibraryRepository(jdbc),
    new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,configClock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)),audit,configClock);
   var activityForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();activityForm.setCode("OPS");activityForm.setName("Operations");
-  UUID activity=tx.execute(s->library.createActivity(actor,activityForm));var transactionForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();transactionForm.setActivityId(activity);transactionForm.setCode("RECEIVE");transactionForm.setName("Operating income");
+  UUID activity=tx.execute(s->library.createActivity(actor,activityForm));var transactionForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();transactionForm.setActivityId(activity);transactionForm.setCode("RECEIVE");transactionForm.setName("Operating income "+"x".repeat(143));
   UUID transaction=tx.execute(s->library.createTransaction(actor,transactionForm));
   var template=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.TemplateForm();var rule=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.RuleForm();rule.setComponent("TOTAL");rule.setDebitCode("CASH");rule.setCreditCode("CAPITAL");template.setRules(List.of(rule));
   tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   UUID revision=library.template(actor,transaction).requestKey();var f=form(Type.RECEIPT);
   for(var row:f.getRows()){row.setTransactionId(transaction);row.setTemplateKey(revision);row.setCreditAccountId(control);}
-  var v=service.post(actor,Type.RECEIPT,f);assertThat(v.transactions()).allSatisfy(t->{assertThat(t.credit().id()).isEqualTo(capital);assertThat(t.transactionName()).contains("Operating income");});
+  var v=service.post(actor,Type.RECEIPT,f);assertThat(v.transactions()).allSatisfy(t->{assertThat(t.credit().id()).isEqualTo(capital);assertThat(t.transactionName()).contains("Operating income").hasSizeGreaterThan(160);});
   template.setRequestKey(UUID.randomUUID());template.setExpectedRequestKey(revision);rule.setCreditCode("EXPENSE");tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   assertThat(service.post(actor,Type.RECEIPT,f).id()).isEqualTo(v.id());
   f.setRequestKey(UUID.randomUUID());f.setReference("New reference");assertThatThrownBy(()->service.post(actor,Type.RECEIPT,f)).hasMessage("voucher.error.staleTemplate");

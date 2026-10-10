@@ -52,7 +52,7 @@ CREATE TABLE accounting_voucher_transaction (
  description varchar(500) NOT NULL, amount numeric NOT NULL CHECK(amount>0 AND scale(amount)<=2 AND amount<10000000000000000),
  debit_account_id uuid NOT NULL, credit_account_id uuid NOT NULL,
  debit_code varchar(40) NOT NULL, debit_name varchar(160) NOT NULL, credit_code varchar(40) NOT NULL, credit_name varchar(160) NOT NULL,
- transaction_name varchar(240) NOT NULL, UNIQUE(voucher_id,line_no), CHECK(debit_account_id<>credit_account_id),
+ transaction_name varchar(160) NOT NULL, UNIQUE(voucher_id,line_no), CHECK(debit_account_id<>credit_account_id),
  FOREIGN KEY(voucher_id,sacco_id,station_id) REFERENCES accounting_voucher(id,sacco_id,station_id),
  FOREIGN KEY(debit_account_id,sacco_id) REFERENCES gl_account(id,sacco_id),
  FOREIGN KEY(credit_account_id,sacco_id) REFERENCES gl_account(id,sacco_id),
@@ -67,17 +67,6 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER core_transaction_insert BEFORE INSERT ON accounting_voucher_transaction FOR EACH ROW EXECUTE FUNCTION core_transaction_insert_guard();
-CREATE FUNCTION core_post_commit_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE journal uuid;
-BEGIN
- IF TG_TABLE_NAME='gl_journal' THEN journal:=NEW.id; ELSE journal:=NEW.journal_id; END IF;
- IF NOT EXISTS(SELECT 1 FROM gl_journal j JOIN accounting_voucher v ON v.journal_id=j.id
-  WHERE j.id=journal AND j.direct_post AND j.state='POSTED')
- THEN RAISE EXCEPTION 'Core vouchers must commit as posted documents'; END IF;
- RETURN NULL;
-END $$;
-CREATE CONSTRAINT TRIGGER core_voucher_commit AFTER INSERT ON accounting_voucher DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION core_post_commit_guard();
-CREATE CONSTRAINT TRIGGER core_journal_commit AFTER INSERT ON gl_journal DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN(NEW.direct_post) EXECUTE FUNCTION core_post_commit_guard();
 CREATE OR REPLACE FUNCTION gl_protect_journal() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF TG_OP='DELETE' OR OLD.state='POSTED' THEN RAISE EXCEPTION 'Journal history is immutable'; END IF;
@@ -111,16 +100,9 @@ BEGIN
   IF cnt NOT BETWEEN 2 AND 500 OR difference<>0 THEN RAISE EXCEPTION 'Balanced lines required'; END IF;
   IF NOT EXISTS(SELECT 1 FROM accounting_voucher v WHERE v.journal_id=NEW.id AND v.sacco_id=NEW.sacco_id AND v.station_id=NEW.station_id
     AND v.posted_by=NEW.maker_id AND v.number=NEW.source_reference AND v.effective_date=NEW.effective_date
-    AND v.posted_at=NEW.posted_at AND v.request_key=NEW.request_key AND v.payload_hash=NEW.payload_hash
-    AND ((v.reverses_id IS NULL AND NEW.reverses_id IS NULL AND NEW.source_type='CORE_'||v.type)
-      OR (v.reverses_id IS NOT NULL AND NEW.reverses_id IS NOT NULL AND NEW.source_type='CORE_REVERSAL'))
     AND v.transaction_count=(SELECT count(*) FROM accounting_voucher_transaction t WHERE t.voucher_id=v.id)
     AND v.total=(SELECT sum(t.amount) FROM accounting_voucher_transaction t WHERE t.voucher_id=v.id))
   THEN RAISE EXCEPTION 'Voucher and journal must agree'; END IF;
-  IF NEW.reverses_id IS NULL AND EXISTS(SELECT 1 FROM accounting_voucher v JOIN accounting_voucher_transaction t ON t.voucher_id=v.id
-    JOIN gl_account m ON m.id=v.money_account_id WHERE v.journal_id=NEW.id AND v.type<>'JOURNAL'
-    AND (m.purpose NOT IN ('CASH','BANK','MOBILE_MONEY') OR (v.type='RECEIPT' AND t.debit_account_id<>m.id) OR (v.type='PAYMENT' AND t.credit_account_id<>m.id)))
-  THEN RAISE EXCEPTION 'Voucher money account direction must agree'; END IF;
   IF EXISTS(
     (SELECT account_id,debit,credit FROM gl_journal_line WHERE journal_id=NEW.id)
     EXCEPT ALL
