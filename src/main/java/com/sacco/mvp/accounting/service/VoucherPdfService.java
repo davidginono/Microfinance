@@ -2,6 +2,9 @@ package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.VoucherDtos.Voucher;
 import com.sacco.mvp.service.ReportExportLimiter;
+import com.sacco.mvp.accounting.reports.VoucherPdfDocument;
+import com.sacco.mvp.accounting.reports.VoucherPdfDocument.Field;
+import com.sacco.mvp.accounting.reports.VoucherPdfDocument.Source;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -21,22 +24,63 @@ public class VoucherPdfService {
     private final MessageSource messages;
     private final ReportExportLimiter limiter;
     public record Output(byte[] bytes,String filename) {}
-    public Output render(Voucher voucher,Locale locale){return limiter.run(()->{
+    public Output render(Voucher voucher,Locale locale){return render(voucher,locale,null);}
+    public Output render(Voucher voucher,Locale locale,byte[] logo){return limiter.run(()->{
         try(var document=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
             var font=PDType0Font.load(document,fontStream);
-            try(var layout=new Layout(document,font,voucher,locale)){layout.write();}
+            if(voucher.type()==com.sacco.mvp.accounting.dto.VoucherDtos.Type.JOURNAL){
+                try(var layout=new Layout(document,font,voucher,locale)){layout.write();}
+            }else try(var layout=new VoucherPdfDocument(document,font,stationery(voucher,locale,logo))){layout.write();}
             document.getDocumentInformation().setTitle(label("voucher.title."+voucher.type(),locale)+" "+voucher.number());
             document.save(out);return new Output(out.toByteArray(),voucher.number()+".pdf");
         }catch(IOException failure){throw new IllegalStateException("Voucher PDF generation failed",failure);}
     });}
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
-    static String amountInWords(BigDecimal amount,Locale locale){
+    public static String amountInWords(BigDecimal amount,Locale locale){
         boolean sw="sw".equals(locale.getLanguage());var value=amount.abs().setScale(2,java.math.RoundingMode.UNNECESSARY);
         // Convert the integral part separately: cents never pass through floating point.
         var whole=value.toBigInteger();int cents=value.remainder(BigDecimal.ONE).movePointRight(2).intValueExact();
         String words=numberWords(whole,sw);
         return (amount.signum()<0?(sw?"Hasi ":"Minus "):"")+(sw?"Shilingi za Tanzania "+words+" na senti "+underThousand(cents,true):words+" Tanzanian "+(whole.equals(java.math.BigInteger.ONE)?"shilling":"shillings")+" and "+underThousand(cents,false)+(cents==1?" cent":" cents"));
     }
+    private Source stationery(Voucher v,Locale locale,byte[] logo){
+        boolean receipt=v.type()==com.sacco.mvp.accounting.dto.VoucherDtos.Type.RECEIPT;
+        var rows=new ArrayList<List<String>>();
+        for(var t:v.transactions()){
+            String description=t.description();if(!t.transactionName().isBlank())description+="\n"+t.transactionName();
+            if(!"TOTAL".equals(t.component()))description+="\n"+label("library.component."+t.component(),locale);
+            String accounts=label("accounting.debit",locale)+": "+t.debit().code()+" - "+t.debit().name()+"\n"+label("accounting.credit",locale)+": "+t.credit().code()+" - "+t.credit().name();
+            rows.add(receipt?List.of(Integer.toString(t.lineNo()),description,accounts,money(t.amount(),locale)):
+                List.of(Integer.toString(t.lineNo()),description,accounts,money(t.amount(),locale),money(t.amount(),locale),money(t.amount(),locale)));
+        }
+        var moneyAccount=v.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit(),t.credit()))
+            .filter(a->a.id().equals(v.moneyAccountId())).findFirst();
+        String account=moneyAccount.map(a->a.code()+" - "+a.name()).orElse("");
+        String channel=moneyAccount.map(a->a.purpose()).orElse("");
+        var totals=new ArrayList<Field>();
+        if(!receipt){totals.add(field("voucher.print.totalDebit",money(v.total(),locale),locale));totals.add(field("voucher.print.totalCredit",money(v.total(),locale),locale));}
+        totals.add(field("voucher.print.totalAmount",money(v.total(),locale),locale));
+        var posting=new ArrayList<Field>(List.of(field("voucher.postedBy",v.postedByName(),locale),
+            field("voucher.postedAt",v.postedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),locale),
+            field("voucher.status",label("voucher.status."+v.status(),locale),locale)));
+        if(v.reversesId()!=null)posting.add(field("voucher.reversal",v.reference(),locale));
+        if(v.reversedBy()!=null)posting.add(field("voucher.reversal",v.reversedBy().toString(),locale));
+        return new Source(label("voucher.title."+v.type(),locale),v.institutionName(),v.branchName(),v.number(),label("voucher.status."+v.status(),locale),
+            List.of(field("voucher.print.number",v.number(),locale),field(receipt?"voucher.print.receiptDate":"voucher.print.paymentDate",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),locale),field("voucher.print.branch",v.branchName(),locale)),
+            label(receipt?"voucher.print.payerDetails":"voucher.print.payeeDetails",locale),
+            List.of(field("voucher.print.name",v.party(),locale),field("voucher.print.company","",locale),field("voucher.print.address","",locale),field("voucher.print.phone","",locale),field("voucher.print.email","",locale)),
+            label(receipt?"voucher.print.receiptDetails":"voucher.print.paymentHeading",locale),
+            List.of(field("voucher.print.moneyAccount",account,locale),field("voucher.print.reference",v.reference(),locale),field("voucher.date",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),locale)),
+            receipt?List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("voucher.amount",locale)+" (TZS)"):
+                List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"),
+            receipt?new float[]{.06f,.44f,.30f,.20f}:new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
+            label("voucher.print.amountWords",locale),amountInWords(v.total(),locale),totals,label("voucher.print.narration",locale),v.description()+(v.evidence().isBlank()?"":"\n"+label("voucher.evidence",locale)+": "+v.evidence()),
+            label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,
+            label("voucher.print.method",locale),List.of(method("CASH",channel,locale),method("BANK",channel,locale),method("CHEQUE",channel,locale),method("MOBILE_MONEY",channel,locale)));
+    }
+    private Field method(String code,String channel,Locale locale){return new Field(label("voucher.print.method."+code,locale),Boolean.toString(code.equals(channel)));}
+    private Field field(String key,String value,Locale locale){return new Field(label(key,locale),value);}
+    private String money(BigDecimal value,Locale locale){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(value);}
     private static String numberWords(java.math.BigInteger value,boolean sw){
         if(value.signum()==0)return sw?"sifuri":"zero";
         String[] scales=sw?new String[]{"","elfu","milioni","bilioni","trilioni","kwadrilioni","kwintilioni"}:new String[]{"","thousand","million","billion","trillion","quadrillion","quintillion"};

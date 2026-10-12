@@ -1,3 +1,49 @@
+# Design QA - Receipt and payment PDFs (2026-10-12)
+
+## Comparison target and normalization
+
+- Source visual truth: `C:/Users/USER/AppData/Local/Temp/codex-clipboard-1b28164f-5ccb-4add-bd52-0bfbabc4a94f.png`, screenshot 3, 1536 x 1024 pixels. Each stationery panel is 768 x 1024 pixels.
+- Implementation: `C:/Users/USER/Desktop/Microfinance/target/receipt-format.png` (992 x 1403) and `target/payment-format.png` (992 x 1403), rendered from the actual embedded-font PDF at 120 DPI.
+- Viewport: portrait A4, 595.28 x 841.89 points. This task changes printable documents, not a website prototype; no CSS viewport or browser device scale applies.
+- Density normalization: crop each reference panel, reduce the PDF raster to 768 pixels wide while preserving aspect ratio (768 x 1086), and pad the reference's bottom with white to equalize canvas height. Neither document is stretched.
+- State: blank reference stationery compared with posted synthetic transactions. Actual institution, accounts, amounts, TZS currency and posting provenance intentionally replace the reference's sample data.
+
+## Full-view and focused evidence
+
+- Source and final implementation were opened together in `target/receipt-comparison.png` and `target/payment-comparison.png`, each 1536 x 1086 pixels, source on the left.
+- Focused header/details evidence: `target/receipt-header-comparison.png` and `target/payment-header-comparison.png`. Table, totals and footer were also inspected in the full comparisons.
+- Additional PDF rasters inspected: `target/loan-payment-format.png`, `target/loan-disbursement-format.png`, `target/loan-reversal-format.png`, `target/ledger-receipt-format.png`, and the first/last pages `target/voucher-preview.png` / `target/voucher-preview-last.png`.
+- Current long-value evidence: `target/voucher-long-0.png` and `target/voucher-long-1.png`, the two pages from the final run. Higher numbered files from earlier iterations are stale and were excluded.
+
+## Comparison history
+
+1. [P1] Posting fields flowed to separate nearly empty pages in a short payment document. Fixed by measuring and keeping the posting group together, reserving its space, and correcting field spacing. Final receipt/payment and loan posting samples are one page; their values stay together.
+2. [P2] Details and the transaction table sat too low relative to the reference. Shortened the account label, placed supporting evidence with narration, matched the reference's address-to-phone gap, and reduced the fixed details region. Final paired comparisons show the intended two-column details and pale grey open table.
+3. [P1] Extreme branch/institution values consumed the repeated header and pushed fields into the footer. Bounded the repeated header with an explicit continuation ellipsis; retained the full values in narration. Final two-page long-value rasters show the last transaction, exact large amount and complete provenance without clipping.
+4. [P2] A short disbursement's ten writing slots pushed its posting record onto a second page. Writing space now reserves room for the actual narration/totals/posting group. All loan posting types and both languages pass the one-page sample assertion.
+
+## Findings and intentional adaptations
+
+No unresolved P0/P1/P2 document-rendering findings remain.
+
+- Three-column header, two-column party/payment details, method boxes, grey table headings, open rows, words/totals, narration and aligned provenance reproduce the selected layout.
+- The reference logo is a placeholder. Production uses an available institution-owned image in that slot, otherwise leaves the space empty. Sample US company contacts are not invented.
+- Approval/checker signatures are replaced with actual posting evidence under the existing direct-posting mandate. There are no new approval stages or fabricated signatures.
+- Unknown channels/contact fields remain unselected/blank. Receipts do not invent other charges. Payment totals represent actual posted amounts, not the zero difference between equal debit and credit totals.
+- Long descriptions and account snapshots can expand rows and reduce the number of blank writing slots. Required information continues onto additional pages when necessary.
+
+## Verification and remaining gaps
+
+- Final Maven compilation and focused run: 47 tests, zero failures/errors/skips across VoucherPdfTest, VoucherMvcTest, LoanRecordingPdfTest, LoanPostingDocumentTest, ClientLoanStatementDocumentTest, LoanRepaymentReceiptPdfServiceTest, LoanRepaymentControllerTest and LoanRepaymentLedgerServiceTest.
+- Checked exact amounts/words, large values, 50 transactions, English/Kiswahili, print/download PDF responses, resource authorization, denied institution access and existing repayment behavior.
+- Live browser verification of the receipt-page links remains unavailable: the in-app browser returned `ERR_BLOCKED_BY_CLIENT`, and the Chrome fallback timed out. This is a PDF-rendering pass, not a live JSP/navigation, database-integration, full-suite or throughput claim.
+
+final result: passed
+
+---
+
+## Earlier QA evidence retained
+
 # Design QA — SIMS Shell Restoration
 
 ## Comparison Target

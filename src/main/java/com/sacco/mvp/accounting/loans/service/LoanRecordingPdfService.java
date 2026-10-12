@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.loans.service;
 
 import com.sacco.mvp.service.ReportExportLimiter;
+import com.sacco.mvp.accounting.reports.VoucherPdfDocument;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -18,6 +19,13 @@ public class LoanRecordingPdfService {
     public record StatementField(String label,String value) {}
     public record StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows) {}
     public record StatementDocument(String title,List<StatementField> client,List<StatementSection> sections,String empty,String note) {}
+    public byte[] renderPosting(VoucherPdfDocument.Source source){return limiter.run(()->{
+        try(var doc=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
+            var font=PDType0Font.load(doc,fontStream);
+            try(var layout=new VoucherPdfDocument(doc,font,source)){layout.write();}
+            doc.getDocumentInformation().setTitle(source.title());doc.save(out);return out.toByteArray();
+        }catch(IOException e){throw new IllegalStateException("Loan posting document generation failed",e);}
+    });}
     public byte[] renderStatement(StatementDocument source){return limiter.run(()->{
         try(var doc=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
             var font=PDType0Font.load(doc,fontStream);

@@ -3,6 +3,8 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.LoanRepaymentLedgerService;
+import com.sacco.mvp.service.LoanRepaymentReceiptPdfService;
+import org.springframework.http.*;
 import com.sacco.mvp.web.form.LoanRepaymentForm;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
+import java.util.Locale;
 
 @Controller
 @RequiredArgsConstructor
@@ -22,6 +25,7 @@ import java.util.UUID;
 public class LoanRepaymentController {
     private final LoanRepaymentLedgerService ledger;
     private final ApplicationClock clock;
+    private final LoanRepaymentReceiptPdfService receiptPdf;
 
     @GetMapping
     @PreAuthorize("@access.has(principal, 'LOAN_REPAYMENTS_VIEW')")
@@ -93,6 +97,15 @@ public class LoanRepaymentController {
                           @AuthenticationPrincipal AppUserPrincipal actor, Model model) {
         model.addAttribute("receipt", ledger.receipt(id, receiptId, actor));
         return "repayments/receipt";
+    }
+
+    @GetMapping({"/loans/{id}/receipts/{receiptId}/pdf","/loans/{id}/receipts/{receiptId}/print"})
+    @PreAuthorize("@access.hasAny(principal, 'LOAN_REPAYMENTS_VIEW', 'MEMBER_LOANS_VIEW')")
+    public ResponseEntity<byte[]> receiptExport(@PathVariable UUID id,@PathVariable UUID receiptId,
+        @AuthenticationPrincipal AppUserPrincipal actor,Locale locale,jakarta.servlet.http.HttpServletRequest request){
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=receipt-"+receiptId+".pdf")
+            .header("X-Content-Type-Options","nosniff").body(receiptPdf.render(id,receiptId,actor,locale));
     }
 
     private void populate(UUID id, AppUserPrincipal actor, int page, int schedulePage, Model model) {

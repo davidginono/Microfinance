@@ -6,6 +6,7 @@ import com.sacco.mvp.accounting.service.VoucherService;
 import com.sacco.mvp.accounting.service.VoucherPdfService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.SaccoLogoStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -26,6 +27,7 @@ public class VoucherController {
     private final VoucherService vouchers;
     private final VoucherPdfService pdf;
     private final ApplicationClock clock;
+    private final SaccoLogoStorageService logos;
     @ExceptionHandler({Invalid.class, org.springframework.beans.InvalidPropertyException.class})
     public ResponseEntity<String> invalidRequest(RuntimeException invalid){return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body("Invalid voucher request");}
     public static Type type(String kind){return switch(kind){case "receipts"->Type.RECEIPT;case "payments"->Type.PAYMENT;case "journals"->Type.JOURNAL;default->throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);};}
@@ -72,7 +74,9 @@ public class VoucherController {
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> pdf(@PathVariable String kind,@PathVariable UUID id,@RequestParam(defaultValue="false") boolean inline,
                                      @AuthenticationPrincipal AppUserPrincipal actor,Locale locale){
-        var result=pdf.render(vouchers.export(actor,type(kind),id),locale);
+        var voucher=vouchers.export(actor,type(kind),id);
+        byte[] logo=logos.hasLogo(actor.getSaccoId())?logos.load(actor.getSaccoId()).content():null;
+        var result=pdf.render(voucher,locale,logo);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,(inline?"inline":"attachment")+"; filename="+result.filename()).header("X-Content-Type-Options","nosniff").body(result.bytes());
     }

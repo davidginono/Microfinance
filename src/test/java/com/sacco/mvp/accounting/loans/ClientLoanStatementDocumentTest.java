@@ -35,7 +35,7 @@ class ClientLoanStatementDocumentTest {
             post(loan,"REVERSAL",date.plusDays(2),"R001","100","10","1000"));
         when(service.exportStatement(actor,client)).thenReturn(new LoanRecordingService.StatementExport("0001 - James Mafumba",List.of(row),movements,List.of(terms)));
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
-        var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));var controller=new LoanRecordingController(service,renderer,clock,messages);
+        var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));var controller=new LoanRecordingController(service,renderer,clock,messages,mock(com.sacco.mvp.service.SaccoLogoStorageService.class));
         var model=new ExtendedModelMap();var request=new MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/print");
         assertThat(controller.statementExport(actor,client,request,Locale.ENGLISH,model)).isEqualTo("accounting/loans/statement-print");
         var document=(StatementDocument)model.get("document");var section=document.sections().getFirst();

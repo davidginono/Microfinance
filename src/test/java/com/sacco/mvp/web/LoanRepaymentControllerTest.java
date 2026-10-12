@@ -155,7 +155,7 @@ class LoanRepaymentControllerTest {
         @Bean LoanRepaymentLedgerService ledger() { return mock(LoanRepaymentLedgerService.class); }
         @Bean ApplicationClock clock() { return mock(ApplicationClock.class); }
         @Bean LoanRepaymentController controller(LoanRepaymentLedgerService ledger, ApplicationClock clock) {
-            return new LoanRepaymentController(ledger, clock);
+            return new LoanRepaymentController(ledger, clock, mock(com.sacco.mvp.service.LoanRepaymentReceiptPdfService.class));
         }
         @Bean InternalResourceViewResolver views() { return new InternalResourceViewResolver("/WEB-INF/jsp/", ".jsp"); }
         @Bean SecurityFilterChain security(HttpSecurity http) throws Exception {

@@ -28,6 +28,7 @@ class VoucherPdfTest {
     assertThat(doc.getNumberOfPages()).isEqualTo(1);String text=new PDFTextStripper().getText(doc);
     assertThat(text).contains("AMOUNT IN WORDS","REMARKS / NARRATION","POSTING RECORD","30,000.75","thirty thousand").doesNotContain("APPROVALS","CHECKED BY","APPROVED BY","Details");
     Files.write(Path.of("target/"+type.name().toLowerCase()+"-format.pdf"),output.bytes());
+    javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(0,120),"png",Path.of("target/"+type.name().toLowerCase()+"-format.png").toFile());
    }
   }
  }
@@ -41,7 +42,7 @@ class VoucherPdfTest {
    var result=exporter.render(v,locale);
    try(var doc=Loader.loadPDF(result.bytes())){
     assertThat(doc.getNumberOfPages()).isGreaterThan(3);
-    String text=new PDFTextStripper().getText(doc);assertThat(text).contains("last-marker","RV-2026-00000001","111001","411001",messages.getMessage("voucher.title."+type,null,locale));
+    String text=new PDFTextStripper().getText(doc);assertThat(text).contains("last-marker","RV-2026-00000001","111001","411001",type==Type.JOURNAL?messages.getMessage("voucher.title."+type,null,locale):messages.getMessage("voucher.title."+type,null,locale).toUpperCase(locale));
     assertThat(text.replaceAll("\\s+","")).contains("500,000.50");
     if(type==Type.RECEIPT && locale.equals(Locale.ENGLISH)){
      Files.write(Path.of("target/voucher-preview.pdf"),result.bytes());
@@ -57,7 +58,8 @@ class VoucherPdfTest {
   var t=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","X".repeat(490)+"-last",new BigDecimal("9999999999999999.99"),a,b);
   var v=new Voucher(UUID.randomUUID(),"PV-2026-99999999",Type.PAYMENT,LocalDate.of(2026,10,8),"P".repeat(160),"R".repeat(160),"D".repeat(500),"E".repeat(500),a.id(),t.amount(),1,UUID.randomUUID(),UUID.randomUUID(),"Test staff",OffsetDateTime.now(),null,null,"I".repeat(160),"B".repeat(500),List.of(t));
   try(var doc=Loader.loadPDF(new VoucherPdfService(messages,new ReportExportLimiter(1)).render(v,Locale.ENGLISH).bytes())){
-   assertThat(new PDFTextStripper().getText(doc)).contains("-last","Posted by");
+   assertThat(new PDFTextStripper().getText(doc)).contains("-last","POSTED BY");
+   for(int n=0;n<doc.getNumberOfPages();n++)javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(n,100),"png",Path.of("target/voucher-long-"+n+".png").toFile());
   }
  }
 }
