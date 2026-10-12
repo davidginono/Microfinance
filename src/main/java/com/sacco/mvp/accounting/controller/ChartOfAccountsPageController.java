@@ -55,6 +55,17 @@ public class ChartOfAccountsPageController {
         }
         return populateForm(actor,form,group,parentSearch,parentPage,model);
     }
+    @GetMapping("/children")
+    @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')")
+    String children(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID parentId,
+            @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="") String search,
+            @RequestParam(defaultValue="") String type,@RequestParam(defaultValue="") String kind,
+            @RequestParam(defaultValue="") String state,jakarta.servlet.http.HttpServletResponse response,Model model) {
+        model.addAttribute("accounts",ledger.chart(actor,new AccountFilter(search.strip(),type,kind,state,parentId),page));
+        model.addAttribute("childFragment",true);
+        response.setHeader("X-COA-Children","true");response.setHeader("Cache-Control","no-store");
+        return "accounting/account-rows";
+    }
     @PostMapping({"/groups","/posting"})
     @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String save(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("accountForm") AccountOnboardingForm form,
@@ -99,7 +110,9 @@ public class ChartOfAccountsPageController {
         ledger.reactivateAccount(actor,id);flash.addFlashAttribute("accountingSuccess","coa.reactivated");return "redirect:/finance/accounts";
     }
     @ExceptionHandler(IllegalArgumentException.class)
-    String error(IllegalArgumentException failure,RedirectAttributes flash) {
+    String error(IllegalArgumentException failure,RedirectAttributes flash,jakarta.servlet.http.HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse response) {
+        if(request.getRequestURI().endsWith("/children")) {response.setStatus(400);return "accounting/account-rows";}
         flash.addFlashAttribute("accountingError",errorKey(failure));return "redirect:/finance/accounts";
     }
     @ExceptionHandler(DataIntegrityViolationException.class)

@@ -123,6 +123,8 @@ class GeneralLedgerPostgresTest {
         UUID sub=service.onboardAccount(maker,coaForm("110000",root,"Current assets"),true);
         UUID family=service.onboardAccount(maker,coaForm("111000",sub,"Cash"),true);
         for(int n=1;n<=30;n++)service.onboardAccount(maker,coaForm(String.format("111%03d",n),family,"Account "+n),false);
+        assertThat(service.chart(maker,new AccountFilter("","","",""),0).rows()).hasSize(8)
+            .allSatisfy(row->assertThat(row.account().parentId()).isNull()); // five main groups and three legacy roots
         var filter=new AccountFilter("","ASSET","POSTING","ACTIVE");
         assertThat(service.chart(maker,filter,0).rows()).hasSize(25);assertThat(service.chart(maker,filter,0).hasNext()).isTrue();
         assertThat(service.chart(maker,filter,1).rows()).hasSize(6); // fixture CASH plus 30 new accounts

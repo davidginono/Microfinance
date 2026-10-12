@@ -46,6 +46,26 @@ class ChartOfAccountsMvcTest {
             .andExpect(status().isOk()).andExpect(view().name("accounting/accounts"))
             .andExpect(model().attribute("filter",new AccountFilter("Land","ASSET","POSTING","ACTIVE")));
     }
+    @Test void childFragmentPreservesParentFiltersAndBoundedPageWithoutRenderingTheShell() throws Exception {
+        when(ledger.chart(any(),any(),eq(2))).thenReturn(new Page<>(List.of(),2,true));
+        mvc.perform(get("/finance/accounts/children").param("parentId",parent.toString()).param("page","2")
+                .param("search","Bank").param("state","ACTIVE").header("X-Requested-With","XMLHttpRequest").with(user(accountant)))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/account-rows"))
+            .andExpect(header().string("X-COA-Children","true")).andExpect(header().string("Cache-Control","no-store"))
+            .andExpect(model().attribute("childFragment",true));
+        verify(ledger).chart(eq(accountant),eq(new AccountFilter("Bank","","","ACTIVE",parent)),eq(2));
+    }
+    @Test void childFragmentRejectsForeignParentsAndMissingViewClaimsWithoutPageRedirects() throws Exception {
+        when(ledger.chart(any(),any(),anyInt())).thenThrow(new IllegalArgumentException("accounting.error.parent"));
+        mvc.perform(get("/finance/accounts/children").param("parentId",parent.toString()).with(user(accountant)))
+            .andExpect(status().isBadRequest()).andExpect(header().doesNotExist("Location"));
+        clearInvocations(ledger);
+        var noView=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).memberNo("NO-COA-VIEW").saccoId("I1").stationId("B1")
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTANT_QUEUE_VIEW),true);
+        mvc.perform(get("/finance/accounts/children").param("parentId",parent.toString()).with(user(noView)))
+            .andExpect(status().isForbidden());
+        verifyNoInteractions(ledger);
+    }
     @Test void savesDirectlyAndIgnoresSubmittedInstitutionClassificationAndActiveState() throws Exception {
         mvc.perform(post("/finance/accounts/posting").with(user(accountant)).with(csrf()).param("parentId",parent.toString())
             .param("code","121001").param("name","Land").param("normalBalance","DEBIT").param("saccoId","FOREIGN")

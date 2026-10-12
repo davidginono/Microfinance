@@ -38,6 +38,7 @@ public class GeneralLedgerRepository {
         var args=new java.util.ArrayList<Object>();args.add(institution);
         String where=" where a.sacco_id=?";
         if(filter.parentId()!=null){where+=" and a.parent_id=?";args.add(filter.parentId());}
+        else if(filter.search().isEmpty() && filter.type().isEmpty() && filter.kind().isEmpty() && filter.state().isEmpty())where+=" and a.parent_id is null";
         if(!filter.search().isEmpty()) {
             where+=" and (strpos(lower(a.code),?)>0 or strpos(lower(a.name),?)>0 or strpos(lower(coalesce(a.name_sw,'')),?)>0)";
             String search=filter.search().toLowerCase(java.util.Locale.ROOT);args.add(search);args.add(search);args.add(search);

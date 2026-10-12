@@ -1,0 +1,15 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<spring:htmlEscape defaultHtmlEscape="true" />
+<c:forEach items="${accounts.rows}" var="row"><c:set var="a" value="${row.account}" /><tr data-coa-row data-id="${a.id}" data-heading="${a.kind=='HEADING'}" data-group="${a.active and a.kind=='HEADING' and a.code.matches('[1-5][0-9]0000')}" data-posting="${a.active and a.kind=='HEADING' and a.code.matches('[1-5][1-9][1-9]000')}" data-family="${a.kind=='HEADING' and a.code.matches('[1-5][1-9][1-9]000')}" data-active="${a.active}" data-lifecycle="${not (empty a.parentId and a.kind=='HEADING' and a.code.matches('[1-5]00000'))}">
+                <td class="coa-selection-cell"><input type="checkbox" name="coa-selection" value="${a.id}" aria-label="<spring:message code='coa.select' /> <c:out value='${a.code}' />" /></td>
+                <td><div class="coa-tree-code"><c:if test="${a.kind=='HEADING'}"><button type="button" class="erp-icon-btn coa-tree-toggle" aria-expanded="false" aria-label="<spring:message code='coa.expand' /> <c:out value='${a.code}' />" title="<spring:message code='coa.expand' />"><span aria-hidden="true">▸</span></button></c:if><span class="coa-account-code"><c:out value="${a.code}" /></span></div></td>
+                <td data-coa-name><c:out value="${pageContext.response.locale.language=='sw' and not empty a.nameSw?a.nameSw:a.name}" /><c:if test="${not empty a.description}"><small class="coa-description"><c:out value="${a.description}" /></small></c:if></td>
+                <td><c:choose><c:when test="${not empty row.parentCode}"><c:out value="${row.parentCode}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty row.parentNameSw?row.parentNameSw:row.parentName}" /></c:when><c:when test="${a.kind=='HEADING' and a.code.matches('[1-5]00000')}"><spring:message code="coa.mainGroup" /></c:when><c:otherwise><spring:message code="coa.noParent" /></c:otherwise></c:choose></td>
+                <td><spring:message code="accounting.option.${a.type}" /></td>
+                <td><c:choose><c:when test="${a.kind=='HEADING'}"><spring:message code="coa.group" /></c:when><c:otherwise><spring:message code="accounting.option.${a.kind}" /></c:otherwise></c:choose></td>
+                <td><spring:message code="${a.normalBalance=='DEBIT'?'accounting.debit':'accounting.credit'}" /></td>
+                <td><spring:message code="accounting.active.${a.active}" /></td>
+            </tr></c:forEach>
+<c:if test="${childFragment and accounts.hasNext}"><tr data-coa-more="${accounts.page+1}"><td></td><td colspan="7"><button type="button" class="app-btn btn-neutral" data-coa-load-more><spring:message code="coa.loadMore" /></button></td></tr></c:if>
