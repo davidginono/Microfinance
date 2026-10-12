@@ -66,10 +66,13 @@ class ErpTableAlignmentContractTest {
     }
 
     @Test
-    void everyJspTableUsesTheSharedErpTableAndDedicatedScrollContract() throws Exception {
+    void everyWorkspaceJspTableUsesTheSharedErpTableAndDedicatedScrollContract() throws Exception {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             for (Path path : paths.filter(Files::isRegularFile)
                 .filter(this::isJspView)
+                // Standalone A4 stationery uses its own screen/print table layout.
+                // ClientLoanStatementDocumentTest covers its document and PDF contract.
+                .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp")))
                 .toList()) {
                 String view = Files.readString(path);
                 Matcher tableMatcher = TABLE_TAG.matcher(view);
