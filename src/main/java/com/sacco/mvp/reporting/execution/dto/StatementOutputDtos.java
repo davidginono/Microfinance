@@ -9,7 +9,7 @@ import java.util.*;
 public final class StatementOutputDtos {
  private StatementOutputDtos() { }
  public record Layout(int version,String language,boolean landscape,boolean institutionLogo) {
-  public void validate(){if((version!=1&&version!=2)||!Set.of("en","sw").contains(language))throw new IllegalArgumentException("accounting.release.error.layout");}
+  public void validate(){if((version!=1&&version!=2&&version!=3)||!Set.of("en","sw").contains(language))throw new IllegalArgumentException("accounting.release.error.layout");}
  }
  public record Output(UUID id,String institution,String branch,UUID resultId,String sourceChecksum,Result result,
   Layout layout,String layoutChecksum,String fontChecksum,Branding branding,UUID generatedBy,OffsetDateTime generatedAt,

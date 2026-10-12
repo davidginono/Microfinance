@@ -37,9 +37,14 @@ public class StatementTypedExporter {
   try{return switch(format){case CSV->csv(result,layout);case XLSX->xlsx(result,layout,branding);case PDF->pdf(result,layout,branding);};}
   catch(IOException|ArithmeticException|IllegalArgumentException ex){throw new IllegalArgumentException("accounting.release.error.export",ex);}
  }
+ /** Draft files remain explicitly marked drafts and never enter the retained final-output workflow. */
+ public byte[] exportDraft(Result result,Layout layout){
+  layout.validate();if(layout.version()!=3||!"DRAFT".equals(result.status())||result.id()!=null||result.rows().size()>10_000||result.disclosures().size()>2500)throw new IllegalArgumentException("accounting.release.error.source");
+  try{return pdf(result,layout,null);}catch(IOException|ArithmeticException|IllegalArgumentException ex){throw new IllegalArgumentException("accounting.release.error.export",ex);}
+ }
  private String message(String key,Layout layout){return messages.getMessage(key,null,key,Locale.forLanguageTag(layout.language()));}
- private List<String> context(Result r,Layout l){var context=new ArrayList<String>();context.add(l.language().equals("sw")?r.definition().titleSw():r.definition().titleEn());context.add(message("report.scope",l)+": "+r.institution()+" / "+r.branch());context.add(message("statement.dimension",l)+": "+message("statement.dimension."+r.dimension().name(),l));context.add(message("report.period",l)+": "+r.from()+" / "+r.through());context.add(message(r.dimension()==com.sacco.mvp.accounting.statements.RegulatoryFormatCatalog.Scope.INSTITUTION?"statement.latestBranchCutoff":"report.cutoff",l)+": "+r.recordedCutoff());if(r.comparisonFrom()!=null){context.add(message("statement.export.comparison",l)+": "+r.comparisonFrom()+" / "+r.comparisonThrough());context.add(message(r.dimension()==com.sacco.mvp.accounting.statements.RegulatoryFormatCatalog.Scope.INSTITUTION?"statement.latestComparisonBranchCutoff":"statement.export.comparisonCutoff",l)+": "+r.comparisonCutoff());}context.add(message("statement.export.versions",l)+": "+r.policyVersion()+" / "+r.mappingVersion()+" / "+r.calculationVersion());context.add(message("statement.export.source",l)+": "+(r.dimension()==com.sacco.mvp.accounting.statements.RegulatoryFormatCatalog.Scope.INSTITUTION?r.institutionPeriodId()+" / "+r.institutionSourceChecksum():r.closeReviewId()+" / "+r.closeChecksum()));if(r.comparisonInstitutionPeriodId()!=null)context.add(message("statement.export.comparisonSource",l)+": "+r.comparisonInstitutionPeriodId()+" / "+r.comparisonInstitutionSourceChecksum());else if(r.comparisonCloseId()!=null)context.add(message("statement.export.comparisonSource",l)+": "+r.comparisonCloseId()+" / "+r.comparisonCloseChecksum());if(r.priorResultId()!=null)context.add(message("statement.export.prior",l)+": "+r.priorResultId());context.add(message("statement.export.generated",l)+": "+r.generatedAt());return List.copyOf(context);}
- public String disclosure(String text,Layout layout){if(text.equals("REVIEWED_DIFFERENCES_RETAINED"))return message("statement.export.reviewedCoverage",layout);if(text.equals("MEMO_DISCLOSURES_EXCLUDED_FROM_CALCULATIONS"))return message("statement.export.memo",layout);if(text.equals("RESTATEMENT"))return message("statement.export.restatement",layout);if(text.startsWith("REVIEWED_DIFFERENCE: "))return message("statement.export.reviewedDifference",layout)+": "+text.substring(21);if(text.startsWith("ACCOUNTING_BASIS: "))return message("statement.export.basis",layout)+": "+text.substring(18);if(text.equals("TZS; POSTED_ENTRIES; EFFECTIVE_DATE; RECORDED_CUTOFF; NOT_AN_AUDIT_OPINION"))return message("statement.export.postedBasis",layout);return text;}
+ private List<String> context(Result r,Layout l){var context=new ArrayList<String>();context.add(l.language().equals("sw")?r.definition().titleSw():r.definition().titleEn());context.add(message("report.scope",l)+": "+r.institution()+" / "+r.branch());context.add(message("statement.dimension",l)+": "+message("statement.dimension."+r.dimension().name(),l));context.add(message("report.period",l)+": "+r.from()+" / "+r.through());context.add(message(r.dimension()==com.sacco.mvp.accounting.statements.RegulatoryFormatCatalog.Scope.INSTITUTION?"statement.latestBranchCutoff":"report.cutoff",l)+": "+r.recordedCutoff());if(r.comparisonFrom()!=null){context.add(message("statement.export.comparison",l)+": "+r.comparisonFrom()+" / "+r.comparisonThrough());context.add(message(r.dimension()==com.sacco.mvp.accounting.statements.RegulatoryFormatCatalog.Scope.INSTITUTION?"statement.latestComparisonBranchCutoff":"statement.export.comparisonCutoff",l)+": "+r.comparisonCutoff());}context.add(message("statement.export.versions",l)+": "+r.policyVersion()+" / "+r.mappingVersion()+" / "+r.calculationVersion());context.add(message("statement.export.source",l)+": "+("DRAFT".equals(r.status())?message("statements.draftSource",l):r.dimension()==com.sacco.mvp.accounting.statements.RegulatoryFormatCatalog.Scope.INSTITUTION?r.institutionPeriodId()+" / "+r.institutionSourceChecksum():r.closeReviewId()+" / "+r.closeChecksum()));if(r.comparisonInstitutionPeriodId()!=null)context.add(message("statement.export.comparisonSource",l)+": "+r.comparisonInstitutionPeriodId()+" / "+r.comparisonInstitutionSourceChecksum());else if(r.comparisonCloseId()!=null)context.add(message("statement.export.comparisonSource",l)+": "+r.comparisonCloseId()+" / "+r.comparisonCloseChecksum());if(r.priorResultId()!=null)context.add(message("statement.export.prior",l)+": "+r.priorResultId());context.add(message("statement.export.generated",l)+": "+r.generatedAt());return List.copyOf(context);}
+ public String disclosure(String text,Layout layout){if(text.equals("INCOMPLETE_NOT_AUTHORITATIVE"))return message("statement.coverage.incomplete",layout);if(text.equals("REVIEWED_COVERAGE"))return message("statement.coverage.reviewed",layout);if(text.equals("REVIEWED_DIFFERENCES_RETAINED"))return message("statement.export.reviewedCoverage",layout);if(text.equals("MEMO_DISCLOSURES_EXCLUDED_FROM_CALCULATIONS"))return message("statement.export.memo",layout);if(text.equals("RESTATEMENT"))return message("statement.export.restatement",layout);if(text.startsWith("REVIEWED_DIFFERENCE: "))return message("statement.export.reviewedDifference",layout)+": "+text.substring(21);if(text.startsWith("ACCOUNTING_BASIS: "))return message("statement.export.basis",layout)+": "+text.substring(18);if(text.equals("TZS; POSTED_ENTRIES; EFFECTIVE_DATE; RECORDED_CUTOFF; NOT_AN_AUDIT_OPINION"))return message("statement.export.postedBasis",layout);return text;}
  private List<String> headers(Layout l,boolean comparison){var h=new ArrayList<>(List.of(message("statement.export.line",l),message("statement.export.unit",l),message("statement.export.current",l),message("statement.export.status",l)));if(comparison){h.add(message("statement.export.comparison",l));h.add(message("statement.export.comparisonStatus",l));}return h;}
  private static String quote(String value){String leading=value.stripLeading();if(!leading.isEmpty()&&"=+-@".indexOf(leading.charAt(0))>=0)value="'"+value;return "\""+value.replace("\"","\"\"")+"\"";}
  private String status(String status,Layout layout){return message("statement.export.status."+status,layout);}
@@ -65,12 +70,13 @@ public class StatementTypedExporter {
    var summary=List.of(message("report.scope",l)+": "+r.institution()+" / "+r.branch(),period+"  |  TZS  |  "+r.status(),message("statement.export.generated",l)+": "+r.generatedAt());
    String title=l.language().equals("sw")?r.definition().titleSw():r.definition().titleEn();
    var image=logo==null?null:PDImageXObject.createFromByteArray(document,logo.logo(),"institution-logo");
-   try(var page=new AccountingPdfDocument(document,pdfFont,l.landscape(),title,summary,image)){
+   try(var page=new AccountingPdfDocument(document,pdfFont,l.landscape()||l.version()==3&&r.definition().kind()==com.sacco.mvp.accounting.statements.StatementDefinition.Kind.CHANGES_IN_EQUITY,title,summary,image)){
+    boolean matrix=l.version()==3&&!r.getEquityRows().isEmpty();if(matrix)equityMatrix(page,r,l);
     var headings=new ArrayList<>(List.of(message("statement.export.line",l),message("financial.print.notes",l),message("statement.export.current",l)));
     if(comparative)headings.add(message("statement.export.comparison",l));
-    page.columns(headings,comparative?new float[]{.46f,.06f,.24f,.24f}:new float[]{.64f,.08f,.28f},comparative?new boolean[]{false,false,true,true}:new boolean[]{false,false,true});
+    if(!matrix||comparative||r.getStatementRows().stream().anyMatch(row->row.kind()==RowKind.SUBTOTAL||row.kind()==RowKind.RATIO))page.columns(headings,comparative?new float[]{.46f,.06f,.24f,.24f}:new float[]{.64f,.08f,.28f},comparative?new boolean[]{false,false,true,true}:new boolean[]{false,false,true});
     var notes=new ArrayList<String>();
-    for(var row:r.getVisibleRows()){
+    for(var row:l.version()==3?r.getStatementRows():r.getVisibleRows()){
      String note=l.language().equals("sw")?row.noteSw():row.noteEn();boolean hasNote=note!=null&&!note.isBlank();
      if(row.kind()==RowKind.HEADING){page.section(label(row,l));if(hasNote)notes.add(note);continue;}
      // Required source evidence is appendix text, not a financial amount or an invented account code.
@@ -78,14 +84,26 @@ public class StatementTypedExporter {
      String noteNumber="";if(hasNote){notes.add(note);noteNumber=Integer.toString(notes.size());}
      var values=new ArrayList<>(List.of(label(row,l)+(row.unit()==Unit.RATIO?" ("+unit(row.unit(),l)+")":""),noteNumber,printed(row.current(),row.unit(),row.status(),l)));
      if(comparative)values.add(printed(row.comparison(),row.unit(),row.comparisonStatus(),l));
-     page.row(values,row.kind()==RowKind.SUBTOTAL || row.mandatory());
+     if(l.version()!=3||r.getEquityRows().isEmpty()||comparative||row.kind()!=RowKind.ACCOUNT_GROUP)page.row(values,row.kind()==RowKind.SUBTOTAL || row.mandatory());
     }
     page.endTable();
     if(!notes.isEmpty()){page.section(message("financial.print.notes",l));for(int n=0;n<notes.size();n++)page.text((n+1)+". "+notes.get(n));}
     page.section(message("financial.print.reportContext",l));for(String line:context(r,l).subList(1,context(r,l).size()))page.text(line);
+    if(l.version()==3)for(var row:r.getSupportingRows())page.text(label(row,l)+": "+printed(row.current(),row.unit(),row.status(),l)+(comparative?" / "+printed(row.comparison(),row.unit(),row.comparisonStatus(),l):""));
     for(var text:r.disclosures())page.text(disclosure(text,l));
    }
    document.save(out);return out.toByteArray();
+  }
+ }
+ private void equityMatrix(AccountingPdfDocument page,Result result,Layout layout)throws IOException{
+  var components=result.getEquityRows();
+  // Bounded panels preserve readable columns when the institution has many equity components.
+  for(int start=0;start<components.size();start+=4){
+   var panel=components.subList(start,Math.min(start+4,components.size()));var headings=new ArrayList<String>();headings.add(message("statement.export.line",layout));panel.forEach(r->headings.add(label(r,layout)));headings.add(message("statements.equity.total",layout));
+   float[] widths=new float[panel.size()+2];boolean[] numeric=new boolean[widths.length];widths[0]=.25f;for(int n=1;n<widths.length;n++){widths[n]=.75f/(panel.size()+1);numeric[n]=true;}
+   page.columns(headings,widths,numeric);
+   for(String measure:List.of("opening","movement","closing")){var values=new ArrayList<String>();values.add(message("statements.equity."+measure,layout));for(var component:panel){BigDecimal amount=switch(measure){case "opening"->component.opening();case "closing"->component.closing();default->component.current();};values.add(printed(amount,Unit.TZS,amount==null?"UNAVAILABLE":"KNOWN",layout));}BigDecimal total=result.reconciliations().get(switch(measure){case "opening"->"OPENING_EQUITY";case "closing"->"EQUITY";default->"EQUITY_MOVEMENT";});values.add(printed(total,Unit.TZS,total==null?"UNAVAILABLE":"KNOWN",layout));page.row(values,measure.equals("closing"));}
+   page.endTable();
   }
  }
  private String printed(BigDecimal amount,Unit unit,String state,Layout layout){

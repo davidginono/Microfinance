@@ -17,6 +17,8 @@ public class StatementRepository {
     public record Version(UUID id,UUID template,int version,String state,UUID maker,UUID checker,String evidence,String reviewEvidence,StatementDefinition definition) { }
     public record Balance(StatementDefinition.Account account,BigDecimal opening,BigDecimal debit,BigDecimal credit,BigDecimal closing) { }
     public record StoredResult(UUID id,String institution,String branch,String json,String checksum) { }
+    public record ResultSummary(UUID id,LocalDate from,LocalDate through,OffsetDateTime generatedAt,int mappingVersion) { }
+    public record ChartNode(UUID id,UUID parent,String code,String name,String kind) { }
     public record OfficialFormat(UUID id,String authority,String key,String version,String json,String checksum,String reference) { }
     public record Submission(UUID id,UUID format,UUID result,LocalDate from,LocalDate through,LocalDate deadline,String file,String fileChecksum,String evidence,UUID corrects,UUID maker,UUID checker,String reviewEvidence) { }
     public List<StatementDefinition.Account> accounts(String institution) {
@@ -43,6 +45,14 @@ public class StatementRepository {
         UUID id=UUID.randomUUID();jdbc.update("insert into financial_statement_versions(id,template_id,sacco_id,version,definition,made_by,made_at,evidence) values(?,?,?,?,?,?,?,?)",id,template,institution,version,mapper.writeValueAsString(definition),actor,now,evidence);return id;
     }
     public List<Version> versions(String institution,int page){return jdbc.query("select * from financial_statement_versions where sacco_id=? order by made_at desc,id limit 26 offset ?",(r,n)->version(r),institution,page*25);}
+    public List<Version> versions(String institution,StatementDefinition.Kind kind,int page){return jdbc.query("select * from financial_statement_versions where sacco_id=? and definition::jsonb->>'kind'=? order by made_at desc,id limit 26 offset ?",(r,n)->version(r),institution,kind.name(),page*25);}
+    public List<ResultSummary> results(String institution,String branch,StatementDefinition.Kind kind,int page){return jdbc.query("""
+        select r.id,r.result_json::jsonb->>'from' period_from,r.result_json::jsonb->>'through' period_through,r.made_at,v.version
+        from financial_statement_results r join financial_statement_versions v on v.id=r.version_id and v.sacco_id=r.sacco_id
+        where r.sacco_id=? and r.station_id=? and r.dimension='BRANCH' and v.definition::jsonb->>'kind'=?
+        order by r.made_at desc,r.id limit 26 offset ?
+        """,(r,n)->new ResultSummary(r.getObject("id",UUID.class),LocalDate.parse(r.getString("period_from")),LocalDate.parse(r.getString("period_through")),r.getObject("made_at",OffsetDateTime.class),r.getInt("version")),institution,branch,kind.name(),page*25);}
+    public List<ChartNode> chart(String institution){return jdbc.query("select id,parent_id,code,name,kind from gl_account where sacco_id=? order by code,id limit 1001",(r,n)->new ChartNode(r.getObject("id",UUID.class),r.getObject("parent_id",UUID.class),r.getString("code"),r.getString("name"),r.getString("kind")),institution);}
     public List<com.sacco.mvp.accounting.reconciliation.ReconciliationDtos.Period> institutionPeriods(String institution,int page){return jdbc.query("select id,starts_on,ends_on,state from accounting_period where sacco_id=? and state='CLOSED' order by ends_on desc,id limit 26 offset ?",(r,n)->new com.sacco.mvp.accounting.reconciliation.ReconciliationDtos.Period(r.getObject("id",UUID.class),r.getObject("starts_on",LocalDate.class),r.getObject("ends_on",LocalDate.class),r.getString("state")),institution,page*25);}
     public Version version(String institution,UUID id,boolean lock){var rows=jdbc.query("select * from financial_statement_versions where sacco_id=? and id=?"+(lock?" for update":""),(r,n)->version(r),institution,id);if(rows.size()!=1)throw new org.springframework.security.access.AccessDeniedException("Statement unavailable");return rows.getFirst();}
     public Version versionForPublication(String institution,UUID id){var rows=jdbc.query("select * from financial_statement_versions where sacco_id=? and id=? for share",(r,n)->version(r),institution,id);if(rows.size()!=1)throw new org.springframework.security.access.AccessDeniedException("Statement unavailable");return rows.getFirst();}

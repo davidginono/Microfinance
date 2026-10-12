@@ -1,0 +1,27 @@
+# Standard financial statements
+
+2026-10-12 user request: replace the operational report-builder page/path with standard accounting statements and use the supplied print/export layouts without a Details column. Images supply layout references, not balances, reserve percentages, cooperative funds, deposit products or accounting-policy evidence.
+
+## Routes and use
+
+- `/reports/builder` and its template, preview and export handlers are removed, together with the obsolete JSP and static assets. Retained operational templates, runs and evidence remain in their existing storage; removal does not delete financial history.
+- `/reports/statements` is the financial-statement workspace. Choose Profit and Loss, Balance Sheet, Cash Flow or Changes in Equity, select an institution-owned mapping, and enter the period. The finalized-statement register is branch-scoped, kind-filtered and paginated on the server. View/PDF/Print operate on one selected record; selection clears on filter changes and history restoration.
+- Trial Balance remains at `/reports/financial`, using its existing ledger source and landscape PDF with account, description, brought-forward balance, debits, credits, net change and ending balance.
+- `/reports/statements/mappings` is separate configuration. Standard starting mappings use the account's type and purpose and remain drafts until reviewed. Cash-flow headings deliberately contain no guessed activity assignments: every eligible account needs explicit placement/exclusion before saving. The existing mapping validation/review and finalization safeguards remain.
+- A mapping line can include a COA heading's current descendant posting/control accounts. The saved definition contains explicit account IDs, with no live inheritance that could change an archived report. Account-level selection allows exceptions; omitted, duplicated, foreign or incompatible placements are rejected by the existing server validation. New accounts require a reviewed mapping revision.
+
+## PDF and print
+
+PDF is the only export format. Print serves the same PDF with inline disposition. Draft PDFs come from a fresh authorized preview using the displayed effective period and recorded cutoff, are marked DRAFT, and cannot be captured as finalized output. Finalized PDF/Print captures layout version 3 through the existing immutable output service and downloads its verified retained artifact. Current permissions, institution/branch scope, source/layout integrity and checksums are rechecked. CSRF protects both PDF POST routes.
+
+Balance Sheet, Profit and Loss and Cash Flow retain headings, notes, right-aligned amounts, parentheses for negative amounts and underlined totals. Cash Flow uses actual approved cash movements/classifications, not income totals or a guessed indirect-method reconciliation. Missing classification/opening/closing evidence remains unavailable or blocks finalization. Supporting reconciliation totals and provenance remain in the appendix.
+
+Changes in Equity shows the institution's mapped components as columns and opening balance, net movement and closing balance as rows, with total equity. All component values are calculated from the same posted-ledger/closed snapshot with the mapping's display sign. Up to four components appear per PDF panel to prevent clipped columns; headers/page numbers repeat on continuation. Comparative period movements remain in the supporting financial table. This increment does not create profit allocations, reserve-transfer journals or dividend policy. Historical results lacking component opening/closing measurements retain their original movement table; archived layout 1/2 artifacts retain their bytes and presentation.
+
+No database migration, lending/posting workflow change, operational datasource change or throughput claim is included. The existing edited `application.yml` was outside this request and is excluded from its commit.
+
+## Verification
+
+The initial focused run passed 56 tests with zero failures/errors/skips, including standard account coverage, retired routes, report-kind matching, export permission denial, identical PDF/print bytes, CSRF, PDF-only output, bilingual/large-amount rendering, output boundaries and compilation of the changed JSPs and shared shell. Java 25 compiled the application successfully. The final focused run passed 81 tests with zero failures/errors/skips, including 24 actual PostgreSQL statement tests. The database cases additionally verify kind-filtered mapping/history queries, branch isolation, empty pagination, the chart projection and component opening + movement = closing. The regenerated equity PDF was visually inspected: readable landscape columns, exact parentheses, total equity and no Details column or empty extra table. A final Jasper recheck and executable WAR package succeeded; the archive contains the replacement pages/controller and no retired builder assets/classes. The first packaging attempt found obsolete application classes in the incremental generated WAR directory; removing those generated artifacts resolved it. The isolated PostgreSQL server was stopped after verification.
+
+Live browser verification is unavailable: the browser tool rejected the localhost application URL with `ERR_BLOCKED_BY_CLIENT`. This is not rendered mobile acceptance, a full-suite result, a load test or institution accounting approval.

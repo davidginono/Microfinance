@@ -21,20 +21,21 @@ public class StatementDesignerController {
     private final ReconciliationService closing;
     private final ApplicationClock clock;
     private final ObjectMapper mapper;
-    @GetMapping String index(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false)UUID version,@RequestParam(defaultValue="0")int page,Model model){
+    @GetMapping("/mappings") String index(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false)UUID version,@RequestParam(defaultValue="0")int page,Model model){
         var versions=service.versions(actor,page);model.addAttribute("versions",versions.size()>25?versions.subList(0,25):versions);model.addAttribute("hasNext",versions.size()>25);model.addAttribute("page",page);
         var catalog=service.catalog(actor);model.addAttribute("catalogJson",mapper.writeValueAsString(catalog));model.addAttribute("emptyCatalog",catalog.isEmpty());
-        StatementDefinition definition=new StatementDefinition(1,1,Kind.BALANCE_SHEET,"Financial statement","Taarifa ya fedha",List.of(new Row("HEADING","Financial position","Hali ya fedha",RowKind.HEADING,Section.ASSETS,Unit.NONE,List.of(),null,null,null,null,true,false,false,null)),List.of(),false);
+        StatementDefinition definition=StandardStatementTemplates.create(Kind.BALANCE_SHEET,catalog);
         if(version!=null){var selected=service.version(actor,version);model.addAttribute("selected",selected);definition=selected.definition();}
-        model.addAttribute("definitionJson",mapper.writeValueAsString(definition));model.addAttribute("today",clock.today());return "reports/statements";
+        model.addAttribute("chartJson",mapper.writeValueAsString(service.chart(actor)));model.addAttribute("definitionJson",mapper.writeValueAsString(definition));model.addAttribute("today",clock.today());return "reports/statement-mappings";
     }
+    @GetMapping("/mappings/new") String newMapping(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam Kind kind,Model model){index(actor,null,0,model);model.addAttribute("definitionJson",mapper.writeValueAsString(StandardStatementTemplates.create(kind,service.catalog(actor))));return "reports/statement-mappings";}
     @PostMapping("/versions") String save(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String definition,@RequestParam(required=false)UUID template,@RequestParam String evidence,RedirectAttributes flash,Model model,jakarta.servlet.http.HttpServletResponse response){
         require(definition.length()<=200000,"size");StatementDefinition parsed=mapper.readValue(definition,StatementDefinition.class);
-        try{UUID id=service.save(actor,template,parsed,evidence);flash.addFlashAttribute("statementSuccess","statement.saved");return "redirect:/reports/statements?version="+id;}
-        catch(IllegalArgumentException error){index(actor,null,0,model);model.addAttribute("definitionJson",mapper.writeValueAsString(parsed));model.addAttribute("draftTemplate",template);model.addAttribute("draftEvidence",evidence);model.addAttribute("statementError",validationKey(error));response.setStatus(400);return "reports/statements";}
+        try{UUID id=service.save(actor,template,parsed,evidence);flash.addFlashAttribute("statementSuccess","statement.saved");return "redirect:/reports/statements/mappings?version="+id;}
+        catch(IllegalArgumentException error){index(actor,null,0,model);model.addAttribute("definitionJson",mapper.writeValueAsString(parsed));model.addAttribute("draftTemplate",template);model.addAttribute("draftEvidence",evidence);model.addAttribute("statementError",validationKey(error));response.setStatus(400);return "reports/statement-mappings";}
     }
-    @PostMapping("/versions/{id}/approve") String approve(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam String evidence,RedirectAttributes flash){service.approve(actor,id,evidence);flash.addFlashAttribute("statementSuccess","statement.approved");return "redirect:/reports/statements?version="+id;}
-    @PostMapping("/versions/{id}/retire") String retire(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash){service.retire(actor,id);flash.addFlashAttribute("statementSuccess","statement.retired");return "redirect:/reports/statements?version="+id;}
+    @PostMapping("/versions/{id}/approve") String approve(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam String evidence,RedirectAttributes flash){service.approve(actor,id,evidence);flash.addFlashAttribute("statementSuccess","statement.approved");return "redirect:/reports/statements/mappings?version="+id;}
+    @PostMapping("/versions/{id}/retire") String retire(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash){service.retire(actor,id);flash.addFlashAttribute("statementSuccess","statement.retired");return "redirect:/reports/statements/mappings?version="+id;}
     @PostMapping("/versions/{id}/preview") String preview(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam LocalDate from,@RequestParam LocalDate through,@RequestParam(required=false)LocalDate comparisonFrom,@RequestParam(required=false)LocalDate comparisonThrough,Model model){
         model.addAttribute("result",service.preview(actor,id,from,through,comparisonFrom,comparisonThrough,clock.now()));return "reports/statement-result";
     }

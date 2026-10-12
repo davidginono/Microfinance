@@ -3,6 +3,15 @@
  document.getElementById('statement-back')?.addEventListener('click',()=>history.back());
  const form=document.getElementById('statement-form');if(!form)return;
  const definition=JSON.parse(document.getElementById('statement-seed').value),catalog=JSON.parse(document.getElementById('statement-catalog').value);
+ const chart=JSON.parse(document.getElementById('statement-chart')?.value||'[]');
+ const eligible=(a,row)=>{
+  if(definition.kind==='PROFIT_AND_LOSS'&&!['INCOME','EXPENSE'].includes(a.type))return false;
+  if(definition.kind==='CHANGES_IN_EQUITY'&&!['EQUITY','INCOME','EXPENSE'].includes(a.type))return false;
+  if(definition.kind==='CASH_FLOW')return !['CASH','BANK','MOBILE_MONEY'].includes(a.purpose);
+  if(row.memo||row.section==='NOTES')return true;
+  return ({ASSETS:['ASSET'],LIABILITIES:['LIABILITY'],EQUITY:['EQUITY','INCOME','EXPENSE'],INCOME:['INCOME'],EXPENSES:['EXPENSE']}[row.section]||[]).includes(a.type);
+ };
+ const descendants=id=>{const found=new Set([id]);for(let depth=0;depth<chart.length;depth++){let changed=false;chart.forEach(n=>{if(found.has(n.parent)&&!found.has(n.id)){found.add(n.id);changed=true;}});if(!changed)break;}return found;};
  const words=Object.fromEntries([...document.querySelectorAll('#statement-words [data-word]')].map(e=>[e.dataset.word,e.textContent]));
  let serial=definition.rows.length;
  const node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
@@ -23,7 +32,10 @@
    const fields=node('div');fields.className='statement-fields';label(fields,words.labelEn,input(row.labelEn,v=>{row.labelEn=v;heading.firstChild.textContent=v;}));label(fields,words.labelSw,input(row.labelSw,v=>row.labelSw=v));
    label(fields,words.kind,select(types.map(k=>[k,words['kind_'+k]]),row.kind,v=>changeKind(row,v)));label(fields,words.section,select(sections.map(k=>[k,words['section_'+k]]),row.section,v=>{row.section=v;if(row.kind==='ACCOUNT_GROUP')row.sign=['LIABILITIES','EQUITY','INCOME'].includes(v)?'CREDIT_POSITIVE':'DEBIT_POSITIVE';render();}));panel.append(fields);
    if(row.kind==='ACCOUNT_GROUP'){
-    const fields=node('div');fields.className='statement-fields';label(fields,words.accounts,select(catalog.map(a=>[a.id,a.code+' · '+a.name]),row.accounts,v=>row.accounts=v,true));label(fields,words.sign,select([['DEBIT_POSITIVE',words.normal],['CREDIT_POSITIVE',words.reverse]],row.sign,v=>row.sign=v));panel.append(fields);
+    const fields=node('div');fields.className='statement-fields';const available=catalog.filter(a=>eligible(a,row)||row.accounts.includes(a.id));label(fields,words.accounts,select(available.map(a=>[a.id,a.code+' · '+a.name]),row.accounts,v=>row.accounts=v,true));label(fields,words.sign,select([['DEBIT_POSITIVE',words.normal],['CREDIT_POSITIVE',words.reverse]],row.sign,v=>row.sign=v));panel.append(fields);
+    const groupFields=node('div');groupFields.className='statement-fields';let groupId='';const groupLabel=document.getElementById('statement-group-label').textContent;
+    label(groupFields,groupLabel,select([['',groupLabel],...chart.filter(n=>n.kind==='HEADING').map(n=>[n.id,n.code+' · '+n.name])],'',v=>groupId=v));
+    groupFields.append(button(document.getElementById('statement-group-add').textContent,()=>{if(!groupId)return;const ids=descendants(groupId);row.accounts=[...new Set([...row.accounts,...catalog.filter(a=>ids.has(a.id)&&eligible(a,row)).map(a=>a.id)])];render();}));panel.append(groupFields,node('p',document.getElementById('statement-group-help').textContent));
     checkbox(panel,'memo',row.memo,v=>{row.memo=v;if(v)row.section='NOTES';render();});if(row.memo)label(panel,words.exceptionEvidence,input(row.exceptionEvidence,v=>row.exceptionEvidence=v,500));
     if(definition.kind==='CASH_FLOW'&&!row.memo){checkbox(panel,'cashSplit',row.exceptionEvidence!=null,v=>{row.exceptionEvidence=v?'':null;render();});if(row.exceptionEvidence!=null)label(panel,words.exceptionEvidence,input(row.exceptionEvidence,v=>row.exceptionEvidence=v,500));}
    }

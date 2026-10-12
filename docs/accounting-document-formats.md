@@ -11,6 +11,10 @@ Updated 2026-10-11 from the supplied receipt voucher, payment voucher, trial bal
 
 ## Boundaries and verification
 
+### Standard financial statements (2026-10-12)
+
+The operational builder page/path is replaced by the standard financial-statement workspace, with account mappings maintained separately. New statement captures use layout version 3; Balance Sheet/P&L/Cash Flow keep the grouped format without Details, while Changes in Equity adds a landscape component matrix with opening, net movement and closing balances. Original mapping/source checks and archived layout 1/2 bytes remain intact. Draft PDF/print is explicitly marked DRAFT and is separate from finalized captures. See [standard financial statements](standard-financial-statements.md) for routes, mapping behavior, source limitations and verification.
+
 ### Receipt/payment stationery (2026-10-12)
 
 Receipt and payment outputs follow the third supplied screenshot: a three-column institution/logo/document header, payer/payee details beside payment details, payment-method boxes, a pale grey transaction-table heading, open writing rows, amount in words beside totals, narration and a four-column posting area. Institution-owned logos are loaded locally after document authorization; when absent the logo space remains empty. Unknown contact/cheque fields remain blank. Only a recorded channel is selected, and no extra charges are invented. Receipt/payment currency is TZS. Actual account snapshots and the posted amount remain present, with a continued table for long transactions.
