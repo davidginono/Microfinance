@@ -56,6 +56,28 @@ Choose one money account for each real channel/account. Owner capital is equity;
 
 Activities/Transactions configuration stores accounting definitions. It is not a prerequisite for this direct loan path, and saving a definition does not itself post money.
 
+## Activities and transaction codes
+
+The demo library was initially empty because only accounts and direct financial transactions were prepared. On 12 October 2026 the following three activities and four transaction codes were created through the accountant UI, with active posting templates verified in the register and database.
+
+Open **Accounting Setup > Transactions Config > Activities**. An activity groups related transaction definitions. Use **Add New Activity**, enter Code and Name, create, then close the success modal. Select an activity row and use **Transactions** to view its transaction codes.
+
+Open **Transactions > Add New Transaction**. Choose the activity code, enter the transaction code/name and accounting event, and provide the account pairs for Total alone or separate components. Create the transaction and close the success modal. Select its row and **Open** to inspect its template; **Edit posting template** changes its configured account pairs.
+
+| Activity code and name | Transaction code | Event | Component | Debit | Credit |
+| --- | --- | --- | --- | --- | --- |
+| FUNDING - Institution funding | CAP-RECEIPT | Owner capital | Total | 111002 Bank | 311001 Owner capital |
+| LENDING - Loan operations | LN-DISB | Loan disbursement | Principal | 112001 Principal control | 111002 Bank |
+| LENDING - Loan operations | LN-REPAY | Loan repayment | Principal | 111002 Bank | 112001 Principal control |
+| LENDING - Loan operations | LN-REPAY | Loan repayment | Interest | 111002 Bank | 211001 Interest collections clearing |
+| EXPENSES - Operating expenses | OFFICE-EXPENSE | Expenses | Total | 411001 Office expenses | 111002 Bank |
+
+A transaction code describes a reusable type. A document/payment reference such as DEMO-REPAY-001 identifies an individual occurrence; they are not interchangeable.
+
+**Current implementation boundary:** the library stores definitions only. It does not automatically execute these templates in the direct loan-recording or core voucher workflows. Loan recording still uses its selected validated accounts, and core vouchers still use their entered transaction rows. A Configured template proves configuration exists, not that a posting adapter consumes it. Do not promise clients that changing a library account pair changes automatic loan postings. Integrating that behavior requires separate implementation and financial validation.
+
+No fees, accruals, recognition, statutory approvals or additional financial movements were fabricated to populate the library. These definitions belong only to the synthetic demonstration institution. Screenshots: target/presentation/transaction-codes.jpg and target/presentation/repayment-template.jpg. Creation, success modals, the complete register, and principal/interest repayment template details were verified live. No backend code changed for this setup follow-up, so the Maven suite was not rerun.
+
 ## Suggested presentation sequence
 
 ### 1. Show ordinary funding before lending
