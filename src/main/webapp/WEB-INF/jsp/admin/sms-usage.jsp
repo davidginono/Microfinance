@@ -253,7 +253,8 @@
         const saccoField = form.querySelector('[data-sms-filter-sacco]');
         const stationField = form.querySelector('[data-sms-filter-station]');
         const searchUrl = form.querySelector('[data-search-url]') ? form.querySelector('[data-search-url]').dataset.searchUrl : form.dataset.searchUrl;
-        let timer = null;
+        let searchVersion = 0, searchController;
+        const invalidateSearch = () => { searchVersion++; searchController?.abort(); };
 
         function selectedIds() {
             return new Set(Array.from(form.querySelectorAll('[data-sms-applicant-input]')).map((input) => input.value));
@@ -295,6 +296,7 @@
             selected.appendChild(input);
             hideResults();
             search.value = '';
+            searchBinding.cancel(); invalidateSearch();
         }
 
         function removeApplicant(id) {
@@ -355,28 +357,27 @@
             addApplicant(option.dataset.applicantId, option.dataset.applicantLabel);
         });
 
-        search.addEventListener('input', function () {
-            window.clearTimeout(timer);
+        const searchBinding = window.AppSearch.bind(search, async () => {
             const term = search.value.trim();
-            if (term.length < 2) {
-                hideResults();
-                return;
+            if (term.length < 2) { hideResults(); return; }
+            const version = ++searchVersion;
+            searchController = new AbortController();
+            const params = new URLSearchParams({q:term});
+            if (saccoField?.value) params.set('saccoId', saccoField.value);
+            if (stationField?.value) params.set('stationId', stationField.value);
+            try {
+                const response = await fetch(searchUrl + '?' + params, {headers:{Accept:'application/json'}, signal:searchController.signal, cache:'no-store'});
+                if (!response.ok) throw new Error('Lookup unavailable');
+                const items = await response.json();
+                if (version === searchVersion) renderResults(Array.isArray(items) ? items : []);
+            } catch (error) {
+                if (version === searchVersion && error.name !== 'AbortError') {hideResults(); searchBinding.cancel();}
             }
-            timer = window.setTimeout(function () {
-                const params = new URLSearchParams();
-                params.set('q', term);
-                if (saccoField && saccoField.value) {
-                    params.set('saccoId', saccoField.value);
-                }
-                if (stationField && stationField.value) {
-                    params.set('stationId', stationField.value);
-                }
-                fetch(searchUrl + '?' + params.toString(), {headers: {'Accept': 'application/json'}})
-                    .then((response) => response.ok ? response.json() : [])
-                    .then((items) => renderResults(Array.isArray(items) ? items : []))
-                    .catch(hideResults);
-            }, 220);
-        });
+        }, () => { invalidateSearch(); hideResults(); });
+        [saccoField, stationField].filter(Boolean).forEach(field => field.addEventListener('change', () => {
+            searchBinding.cancel(); invalidateSearch(); hideResults();
+            if (search.value.trim().length >= 2) searchBinding.run();
+        }));
 
         document.addEventListener('click', function (event) {
             if (!form.contains(event.target)) {

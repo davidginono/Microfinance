@@ -80,24 +80,32 @@
         if (modal.dataset.autoOpen === 'true') open();
     }
     // Search suggestions without navigating away or losing entered form values.
-    const timers = new Map(), requests = new Map();
-    document.addEventListener('input', event => {
-        const input = event.target;
-        if (!input.matches('[data-library-lookup]') || !input.dataset.libraryLookup) return;
-        const key = input.getAttribute('list'); clearTimeout(timers.get(key)); requests.get(key)?.abort();
-        timers.set(key, setTimeout(async () => {
-            const controller = new AbortController(); requests.set(key, controller);
+    const lookups = new Map(), bound = new WeakSet();
+    function bindLookup(input) {
+        if (!input.matches('[data-library-lookup]') || bound.has(input)) return;
+        bound.add(input);
+        const key = input.getAttribute('list');
+        const invalidate = () => {
+            lookups.get(key)?.abort(); lookups.delete(key);
+        };
+        const binding = window.AppSearch.bind(input, async () => {
+            const controller = new AbortController(); lookups.set(key, controller);
             const status = input.closest('form')?.querySelector('.library-lookup-status');
             try {
                 const url = new URL(input.dataset.libraryLookup, location.href); url.searchParams.set('search', input.value);
-                const response = await fetch(url, {headers: {'Accept':'application/json'}, signal:controller.signal});
+                const response = await fetch(url, {headers: {'Accept':'application/json'}, signal:controller.signal, cache:'no-store'});
                 if (!response.ok) throw new Error('Lookup unavailable');
                 const choices = await response.json(), list = document.getElementById(key);
+                if (lookups.get(key) !== controller || controller.signal.aborted || !input.isConnected) return;
                 list.replaceChildren(...choices.map(choice => {const option=document.createElement('option'); option.value=choice.code; option.textContent=choice.name; return option;}));
                 if (status) status.textContent = '';
-            } catch (error) { if (error.name !== 'AbortError' && status) status.textContent = status.dataset.lookupFailure; }
-        }, 250));
-    });
+            } catch (error) {
+                if (lookups.get(key) === controller && error.name !== 'AbortError') {if (status) status.textContent = status.dataset.lookupFailure; binding.cancel();}
+            }
+        }, invalidate);
+    }
+    document.querySelectorAll('[data-library-lookup]').forEach(bindLookup);
+    document.addEventListener('focusin', event => {if (event.target instanceof HTMLInputElement) bindLookup(event.target);});
     const list = document.getElementById('library-rule-list');
     const add = document.getElementById('library-add-rule');
     const renumber = () => {

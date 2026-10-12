@@ -1584,6 +1584,8 @@
             const serverGuarantorErrorMessage = validationMarker ? validationMarker.dataset.message : "";
             let serverGuarantorErrorRevealed = false;
             const selected = new Map();
+            let searchBinding, searchVersion = 0, searchController;
+            const invalidateSearch = () => {searchVersion++; searchController?.abort(); setSearchLoading(false);};
             const msgSelectedSuffix = "<spring:message code='newloan.js.selectedSuffix' />";
             const msgNoMatches = "<spring:message code='newloan.js.noMatches' />";
             const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' />";
@@ -1770,6 +1772,7 @@
             }
 
             function setApprovalMode(mode) {
+                searchBinding?.cancel(); invalidateSearch();
                 const previous = currentApprovalMode();
                 const normalized = mode === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
                 if (approvalModeInput) {
@@ -1976,6 +1979,7 @@
             }
 
             function selectCandidate(item) {
+                searchBinding.cancel(); invalidateSearch();
                 if (selected.size >= required) {
                     hint.textContent = msgOnlySelectGuarantors.replace("{0}", required);
                     hideDropdown();
@@ -2041,13 +2045,14 @@
             }
 
             async function runSearch() {
+                const version = ++searchVersion;
+                searchController = new AbortController();
                 const approvalMode = currentApprovalMode();
                 const mode = searchMode.value;
-                const validation = refreshSearchValidation(true);
+                const validation = refreshSearchValidation(false);
                 if (!validation.valid) {
                     hint.textContent = validation.message;
                     hideDropdown();
-                    searchInput.focus();
                     return;
                 }
                 const term = validation.term;
@@ -2057,10 +2062,12 @@
                 const unavailableMessage = approvalMode === "DIRECT_OTP" ? msgMemberDirectoryUnavailable : msgUnableSearchGuarantors;
                 try {
                     const response = await fetch(endpoint + "?" + query.toString(), {
+                        signal:searchController.signal, cache:"no-store",
                         headers: {"X-Requested-With":"XMLHttpRequest"
                         }
                     });
                     const payload = await response.json().catch(function () { return approvalMode === "DIRECT_OTP" ? { items: [], message: unavailableMessage } : []; });
+                    if (version !== searchVersion) return;
                     if (!response.ok) {
                         const message = payload.message || unavailableMessage;
                         hint.textContent = message;
@@ -2072,30 +2079,25 @@
                     const filtered = data.filter(function (item) { return !selected.has(itemKey(item)); });
                     hint.textContent = filtered.length + " " + msgMatchingMembers;
                     showResults(filtered);
+                } catch (error) {
+                    if (version === searchVersion && error.name !== "AbortError") {
+                        hint.textContent = unavailableMessage; showResults([], unavailableMessage, true);
+                        searchBinding.cancel();
+                    }
                 } finally {
-                    setSearchLoading(false);
+                    if (version === searchVersion) setSearchLoading(false);
                 }
             }
 
+            searchBinding = window.AppSearch.bind(searchInput, () => void runSearch(), () => {
+                invalidateSearch(); refreshSearchValidation(false); hideDropdown();
+            });
             searchButton.addEventListener("click", function () {
-                runSearch().catch(function () {
-                    const message = currentApprovalMode() === "DIRECT_OTP" ? msgMemberDirectoryUnavailable : msgUnableSearchGuarantors;
-                    hint.textContent = message;
-                    showResults([], message, true);
-                    window.showToast?.("error", message);
-                });
-            });
-
-            searchInput.addEventListener("input", function () {
-                refreshSearchValidation(false);
-                hideDropdown();
-            });
-
-            searchInput.addEventListener("blur", function () {
-                refreshSearchValidation(false);
+                refreshSearchValidation(true); searchBinding.run();
             });
 
             searchMode.addEventListener("change", function () {
+                searchBinding.cancel(); invalidateSearch();
                 const config = searchConfigForCurrentMode();
                 searchInput.value = "";
                 searchInput.placeholder = config ? config.placeholder : numberPlaceholder;

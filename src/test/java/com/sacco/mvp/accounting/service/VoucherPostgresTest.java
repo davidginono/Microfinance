@@ -129,12 +129,22 @@ class VoucherPostgresTest {
   UUID transaction=tx.execute(s->library.createTransaction(actor,transactionForm));
   var template=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.TemplateForm();var rule=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.RuleForm();rule.setComponent("TOTAL");rule.setDebitCode("CASH");rule.setCreditCode("CAPITAL");template.setRules(List.of(rule));
   tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
+  // Searches must match the visible component and both account codes/names, without broadening scope.
+  var lookup=new VoucherRepository(jdbc);
+  for(String query:List.of("receive","operating income","total","cash","synthetic capital"))
+   assertThat(lookup.mappings(institution,query,0)).singleElement().satisfies(m->assertThat(m.transactionId()).isEqualTo(transaction));
+  assertThat(lookup.mappings("OTHER-INSTITUTION","total",0)).isEmpty();
+  assertThat(lookup.mappings(institution,"no-match",0)).isEmpty();
+  assertThat(lookup.mappings(institution,"total",26)).isEmpty();
   UUID revision=library.template(actor,transaction).requestKey();var f=form(Type.RECEIPT);
   for(var row:f.getRows()){row.setTransactionId(transaction);row.setTemplateKey(revision);row.setCreditAccountId(control);}
   var v=service.post(actor,Type.RECEIPT,f);assertThat(v.transactions()).allSatisfy(t->{assertThat(t.credit().id()).isEqualTo(capital);assertThat(t.transactionName()).contains("Operating income").hasSizeGreaterThan(160);});
   template.setRequestKey(UUID.randomUUID());template.setExpectedRequestKey(revision);rule.setCreditCode("EXPENSE");tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   assertThat(service.post(actor,Type.RECEIPT,f).id()).isEqualTo(v.id());
   f.setRequestKey(UUID.randomUUID());f.setReference("New reference");assertThatThrownBy(()->service.post(actor,Type.RECEIPT,f)).hasMessage("voucher.error.staleTemplate");
+  template.setExpectedRequestKey(library.template(actor,transaction).requestKey());template.setRequestKey(UUID.randomUUID());rule.setComponent("INTEREST");
+  tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
+  assertThat(lookup.mappings(institution,"interest",0)).singleElement().satisfies(m->assertThat(m.component()).isEqualTo("INTEREST"));
  }
  Form form(Type type){var f=new Form();f.setEffectiveDate(day);f.setParty("Synthetic payer");f.setReference("REF-"+UUID.randomUUID());if(type!=Type.JOURNAL)f.setMoneyAccountId(cash);var rows=new ArrayList<RowForm>();for(String amount:List.of("10.01","20.02")){var r=new RowForm();r.setDescription("Synthetic transaction "+amount);r.setAmount(new BigDecimal(amount));r.setDebitAccountId(expense);r.setCreditAccountId(capital);rows.add(r);}f.setRows(rows);return f;}
  UUID account(String code,String type,String balance,String kind,String purpose){UUID id=UUID.randomUUID();jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,?,?,?,?,?,?,?,?,?)",id,institution,code,"Synthetic "+code,type,balance,kind,purpose,actor.getMemberId(),now);return id;}

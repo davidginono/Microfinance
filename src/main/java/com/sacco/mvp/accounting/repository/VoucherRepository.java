@@ -44,7 +44,7 @@ public class VoucherRepository {
     private List<Mapping> mappingQuery(String institution,List<UUID> ids,String search,int offset,boolean lock){
         var args=new ArrayList<Object>();args.add(institution);
         String filter;
-        if(ids==null){filter=" and strpos(lower(t.code||' '||t.name),?)>0";args.add(search.toLowerCase(Locale.ROOT));}
+        if(ids==null){filter=" and strpos(lower(concat_ws(' ',t.code,t.name,d.component,da.code,da.name,ca.code,ca.name)),?)>0";args.add(search.toLowerCase(Locale.ROOT));}
         else {filter=" and t.id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+")";args.addAll(ids);}
         if(!lock)args.add(offset);
         return jdbc.query("""

@@ -6536,3 +6536,15 @@ body.aws-console,
         overflow: visible !important;
     }
 }
+
+.app-navigation-search-results {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 100;
+    width: max(100%, 260px); max-width: calc(100vw - 32px); max-height: 320px;
+    overflow-y: auto; background: #fff; color: #16191f; border: 1px solid #aab7b8;
+    border-radius: 4px; box-shadow: 0 4px 12px #0002;
+}
+.app-navigation-search-results[hidden] {display: none;}
+.app-navigation-search-results a, .app-navigation-search-results p {
+    display: block; margin: 0; padding: 8px 12px; color: #16191f; font-size: 13px; white-space: normal;
+}
+.app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #eaf3fa; color: #0073bb;}

@@ -17,13 +17,13 @@
     select.addEventListener('neo-select:render', event => {
       if (!event.detail.menu.contains(controls)) event.detail.menu.prepend(controls);
     });
-    let page = 0, request = 0, timer;
+    let page = 0, request = 0, controller;
     async function load(targetPage = 0) {
-      clearTimeout(timer);
+      controller?.abort(); controller = new AbortController();
       const version = ++request;
       previous.disabled = true; next.disabled = true;
       try {
-        const response = await fetch(root + '/finance/loan-recording/choices/' + box.dataset.category + '?' + new URLSearchParams({search: search.value, page: targetPage}), {headers: {Accept: 'application/json'}});
+        const response = await fetch(root + '/finance/loan-recording/choices/' + box.dataset.category + '?' + new URLSearchParams({search: search.value, page: targetPage}), {headers: {Accept: 'application/json'}, signal:controller.signal, cache:'no-store'});
         if (!response.ok) throw new Error('Lookup failed');
         const choices = await response.json(); if (version !== request) return;
         const value = select.value, selected = select.selectedOptions[0];
@@ -32,12 +32,11 @@
         choices.slice(0, 25).forEach(c => select.add(new Option(c.label, c.id)));
         select.value = value; page = targetPage;
         previous.disabled = page === 0; next.disabled = choices.length <= 25; error.textContent = '';
-      } catch (_) { if (version === request) {error.textContent = error.dataset.error; previous.disabled = page === 0;} }
+      } catch (_) { if (version === request) {error.textContent = error.dataset.error; previous.disabled = page === 0; binding.cancel();} }
     }
-    previous.addEventListener('click', () => load(page - 1));
-    next.addEventListener('click', () => load(page + 1));
-    search.addEventListener('input', () => {++request; previous.disabled = true; next.disabled = true; timer = setTimeout(() => load(), 250);});
-    search.addEventListener('keydown', event => {if (event.key === 'Enter') {event.preventDefault(); load();}});
+    const binding = window.AppSearch.bind(search, () => load(), () => {++request; controller?.abort(); previous.disabled = true; next.disabled = true;});
+    previous.addEventListener('click', () => {binding.cancel(); load(page - 1);});
+    next.addEventListener('click', () => {binding.cancel(); load(page + 1);});
     load();
   });
   document.querySelectorAll('[data-loan-form]').forEach(form => {

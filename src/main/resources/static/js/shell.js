@@ -267,31 +267,39 @@
     const initConsoleNavigationSearch = function () {
         const search = document.getElementById('consoleNavigationSearch');
         const sidebar = document.getElementById('appSidebar');
-        if (!search || !sidebar) {
-            return;
-        }
-        search.addEventListener('keydown', function (event) {
-            if (event.key !== 'Enter') {
-                return;
-            }
-            event.preventDefault();
+        if (!search || !sidebar) return;
+        const results = document.createElement('div');
+        results.className = 'app-navigation-search-results'; results.id = 'navigation-search-results'; results.hidden = true;
+        search.parentElement.append(results); search.setAttribute('aria-controls', results.id);
+        const hide = () => {results.hidden = true; search.setAttribute('aria-expanded', 'false');};
+        const matches = () => {
             const query = search.value.trim().toLocaleLowerCase();
-            if (!query) {
-                return;
-            }
-            const destination = Array.from(sidebar.querySelectorAll('a[href]')).find(function (link) {
-                return !link.closest('[hidden]') && (link.textContent || '').trim().toLocaleLowerCase().includes(query);
+            return query ? Array.from(sidebar.querySelectorAll('a[href]')).filter(link =>
+                !link.closest('[hidden]') && (link.textContent || '').trim().toLocaleLowerCase().includes(query)).slice(0,25) : [];
+        };
+        const render = () => {
+            results.replaceChildren();
+            if (!search.value.trim()) {hide(); return;}
+            matches().forEach(link => {
+                const option = document.createElement('a'); option.href = link.href; option.textContent = link.textContent.trim(); results.append(option);
             });
-            if (destination) {
-                window.location.assign(destination.href);
-                return;
-            }
-            search.setCustomValidity('No matching navigation item was found.');
-            search.reportValidity();
-            window.setTimeout(function () {
-                search.setCustomValidity('');
-            }, 1800);
+            if (!results.childElementCount) {const empty = document.createElement('p'); empty.setAttribute('role', 'status'); empty.textContent = document.body.dataset.shellNoOptions; results.append(empty);}
+            results.hidden = false; search.setAttribute('aria-expanded', 'true');
+        };
+        const binding = window.AppSearch.bind(search, render, hide);
+        search.addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.isComposing) {const destination = matches()[0]; if (destination) window.location.assign(destination.href);}
+            if (event.key === 'ArrowDown') {event.preventDefault(); binding.run(true); results.querySelector('a')?.focus();}
         });
+        search.parentElement.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {event.preventDefault(); binding.cancel(); hide(); search.focus();}
+            const links = Array.from(results.querySelectorAll('a')); const index = links.indexOf(document.activeElement);
+            if (event.target !== search && index >= 0 && ['ArrowDown','ArrowUp'].includes(event.key)) {
+                event.preventDefault(); links[(index + (event.key === 'ArrowDown' ? 1 : links.length - 1)) % links.length]?.focus();
+            }
+        });
+        document.addEventListener('click', event => {if (!search.parentElement.contains(event.target)) {binding.cancel(); hide();}});
+        hide();
     };
     const initUppercaseInputs = function () {
         document.querySelectorAll('[data-uppercase-input]').forEach(function (input) {

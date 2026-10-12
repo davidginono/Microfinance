@@ -65,7 +65,8 @@
         const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' text='You can only select {0} guarantors.' />";
         const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' text='Guarantor selected.' />";
         const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' text='matching client(s) found.' />";
-        let debounceHandle;
+        let searchVersion = 0, searchController;
+        const invalidateSearch = () => { searchVersion++; searchController?.abort(); };
 
         function updateCounter() {
             counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
@@ -136,6 +137,7 @@
                         selected.set(item.id, item);
                         renderSelected();
                         searchInput.value = "";
+                        searchBinding.cancel(); invalidateSearch();
                         hint.textContent = msgGuarantorSelected;
                         hideDropdown();
                     });
@@ -145,26 +147,28 @@
             dropdown.classList.remove("hidden");
         }
 
-        searchInput.addEventListener("input", function () {
-            clearTimeout(debounceHandle);
-            const term = this.value.trim();
-            if (term.length < 2) {
-                hint.textContent = msgTypeTwo;
-                hideDropdown();
-                return;
-            }
-            debounceHandle = setTimeout(async function () {
+        const searchBinding = window.AppSearch.bind(searchInput, async () => {
+            const term = searchInput.value.trim();
+            if (term.length < 2) {hint.textContent = msgTypeTwo; hideDropdown(); return;}
+            const version = ++searchVersion;
+            searchController = new AbortController();
+            try {
                 const response = await fetch("/app/guarantors/search?q=" + encodeURIComponent(term), {
-                    headers: {
-                        "X-Requested-With": "XMLHttpRequest"
-                    }
+                    headers: {"X-Requested-With":"XMLHttpRequest"}, signal:searchController.signal, cache:'no-store'
                 });
-                const data = response.ok ? await response.json() : [];
-                const filtered = data.filter(function (item) { return !selected.has(item.id); });
+                if (!response.ok) throw new Error('Lookup unavailable');
+                const data = await response.json();
+                if (version !== searchVersion) return;
+                const filtered = data.filter(item => !selected.has(item.id));
                 hint.textContent = filtered.length + " " + msgMatchingMembers;
                 showResults(filtered);
-            }, 250);
-        });
+            } catch (error) {
+                if (version === searchVersion && error.name !== 'AbortError') {
+                    hint.textContent = "<spring:message code='newloan.js.unableSearchGuarantors' />";
+                    hideDropdown(); searchBinding.cancel();
+                }
+            }
+        }, () => {invalidateSearch(); hideDropdown();});
 
         document.addEventListener("click", function (event) {
             if (!dropdown.contains(event.target) && event.target !== searchInput) {
