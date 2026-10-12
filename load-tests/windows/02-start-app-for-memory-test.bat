@@ -7,7 +7,7 @@ echo.
 echo SACCOS LMS - start app for memory testing
 echo.
 echo This window will stay open while the app is running.
-echo Wait until you see "Started SaccoLoanApplication", then run 03-run-memory-test.bat.
+echo Wait until you see "Started MicrofinanceApplication", then run 03-run-memory-test.bat.
 echo.
 
 if not exist "load-tests\results" mkdir "load-tests\results"

@@ -24,7 +24,7 @@ Using one account still creates many browser sessions because each k6 virtual us
 Easy option:
 
 1. Double-click `load-tests/windows/02-start-app-for-memory-test.bat`.
-2. Wait until the window says `Started SaccoLoanApplication`.
+2. Wait until the window says `Started MicrofinanceApplication`.
 3. Leave that window open.
 
 If you already start the app from your IDE, that is also fine. For memory metrics, start it with the `benchmark` profile and use port `8080`.
