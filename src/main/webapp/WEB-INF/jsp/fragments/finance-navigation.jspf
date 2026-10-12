@@ -120,8 +120,8 @@
             </div>
         </div>
     </sec:authorize>
-    <sec:authorize access="@access.hasAny(principal, 'REPORT_RUN', 'REPORT_TEMPLATE_DESIGN', 'REPORT_TEMPLATE_PUBLISH', 'FINANCIAL_REPORTS_VIEW', 'STATEMENT_VIEW', 'STATEMENT_DESIGN', 'STATEMENT_APPROVE', 'REGULATORY_SUBMISSION_VIEW', 'REGULATORY_SUBMISSION_CREATE', 'REGULATORY_SUBMISSION_APPROVE')">
-        <c:set var="financeReportsActive" value="${fn:startsWith(requestUri, '/reports/runs') or fn:startsWith(requestUri, '/reports/financial') or fn:startsWith(requestUri, '/reports/financial/cash-flow') or fn:startsWith(requestUri, '/reports/financial/portfolio') or fn:startsWith(requestUri, '/reports/statements') or fn:startsWith(requestUri, '/reports/statements/regulatory') or fn:startsWith(requestUri, '/finance/statement-outputs')}" />
+    <sec:authorize access="@access.has(principal, 'STATEMENT_VIEW') or (@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW'))">
+        <c:set var="financeReportsActive" value="${fn:startsWith(requestUri, '/reports/financial/portfolio') or fn:startsWith(requestUri, '/reports/statements')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="financeReportsToggle" aria-controls="financeReportsPanel" aria-expanded="${financeReportsActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeReportsActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 3v18h18M7 14v3M12 9v8M17 5v12" /></svg></span>
@@ -129,41 +129,12 @@
                 <svg id="financeReportsChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
             <div id="financeReportsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-
-                <sec:authorize access="@access.has(principal, 'REPORT_RUN')">
-                    <a href="<c:url value='/reports/runs' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/runs') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                        <spring:message code="report.run.title" />
-                    </a>
-                </sec:authorize>
-                <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')">
-                    <a href="<c:url value='/reports/financial' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial') and not fn:startsWith(requestUri, '/reports/financial/cash-flow') and not fn:startsWith(requestUri, '/reports/financial/portfolio') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                        <spring:message code="financial.report.trial" />
-                    </a>
-                </sec:authorize>
-                <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')">
-                    <a href="<c:url value='/reports/financial/cash-flow' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial/cash-flow') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                        <spring:message code="financial.cash.title" />
-                    </a>
-                </sec:authorize>
                 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW')">
                     <a href="<c:url value='/reports/financial/portfolio' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial/portfolio') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="financial.portfolio.menu" /></a>
                 </sec:authorize>
                 <sec:authorize access="@access.hasAny(principal, 'STATEMENT_VIEW')">
-                    <a href="<c:url value='/reports/statements' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/statements') and not fn:startsWith(requestUri, '/reports/statements/regulatory') and not fn:startsWith(requestUri, '/reports/statements/mappings') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                    <a href="<c:url value='/reports/statements' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/statements') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                         <spring:message code="statements.title" />
-                    </a>
-                </sec:authorize>
-                <sec:authorize access="@access.hasAny(principal, 'STATEMENT_DESIGN', 'STATEMENT_APPROVE')">
-                    <a href="<c:url value='/reports/statements/mappings' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/reports/statements/mappings') ? 'shell-nav-active' : ''}"><spring:message code="statements.mappings" /></a>
-                </sec:authorize>
-                <sec:authorize access="@access.hasAny(principal, 'REGULATORY_SUBMISSION_VIEW', 'REGULATORY_SUBMISSION_CREATE', 'REGULATORY_SUBMISSION_APPROVE')">
-                    <a href="<c:url value='/reports/statements/regulatory' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/statements/regulatory') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                        <spring:message code="statement.regulatory" />
-                    </a>
-                </sec:authorize>
-                <sec:authorize access="@access.has(principal, 'STATEMENT_VIEW')">
-                    <a href="<c:url value='/finance/statement-outputs' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/statement-outputs') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                        <spring:message code="statement.export.title" />
                     </a>
                 </sec:authorize>
             </div>

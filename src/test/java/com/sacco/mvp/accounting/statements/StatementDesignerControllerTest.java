@@ -32,7 +32,7 @@ class StatementDesignerControllerTest {
     @BeforeEach void start(){context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.register(Config.class);context.refresh();service=context.getBean(StatementDesignerService.class);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
     @AfterEach void stop(){context.close();}
     @Test void csrfProtectsEveryFinancialMutation()throws Exception{
-        UUID id=UUID.randomUUID();for(String route:List.of("/versions","/versions/"+id+"/approve","/versions/"+id+"/retire","/versions/"+id+"/preview","/versions/"+id+"/pdf","/results/"+id+"/pdf","/versions/"+id+"/finalize","/versions/"+id+"/finalize-institution","/regulatory","/regulatory/"+id+"/review"))mvc.perform(post("/reports/statements"+route).with(user(actor()))).andExpect(status().isForbidden());verifyNoInteractions(service);
+        UUID id=UUID.randomUUID();for(String route:List.of("/versions","/versions/"+id+"/approve","/versions/"+id+"/retire","/versions/"+id+"/preview","/versions/"+id+"/pdf","/results/"+id+"/pdf","/versions/"+id+"/finalize","/versions/"+id+"/finalize-institution"))mvc.perform(post("/reports/statements"+route).with(user(actor()))).andExpect(status().isForbidden());verifyNoInteractions(service);
     }
     @Test void finalizationPassesOnlyAuthenticatedActorAndSourceIdentifiers()throws Exception{
         var actor=actor();UUID version=UUID.randomUUID(),close=UUID.randomUUID(),prior=UUID.randomUUID(),result=UUID.randomUUID();when(service.finalize(any(),any(),any(),nullable(UUID.class),nullable(UUID.class))).thenReturn(result);
