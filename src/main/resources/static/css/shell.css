@@ -5672,7 +5672,7 @@ details.erp-detail-card:not([open]) > summary { margin-bottom: -14px; border-bot
 }
 
 .shell-main {
-    padding-top: 0 !important;
+    padding-top: 12px !important;
 }
 
 .erp-page-path {
