@@ -29,6 +29,18 @@ Interest collections use an explicitly selected clearing account. The contractua
 
 ## Verification
 
+### Register and detail UI — 12 October 2026
+
+Loan Records, Disbursements and Repayments filter by created loan product ID instead of a visible status selector. Product choices are institution-scoped and searched/paged in bounded batches; inactive products remain available for historical records. Pagination and PDF/print reports preserve the product filter. Stored product terms and posting rules are unchanged.
+
+These registers and both client-ledger tables include a Loan Product column. Posting details also identify the product. Names come from the original recorded loan snapshot, so renaming a configured product does not relabel historical transactions.
+
+The column follow-up passed 44 focused database, document, Jasper, record-accessor and shared UI checks. Live rendering confirmed matching header/body columns in all three registers and both ledger tables, with horizontal scrolling contained inside the tables at 360px.
+
+Record commands use the shared grey disabled state until selection, and selection clears on filter input/change/submission and restored navigation. Create and whole-register report commands remain independent. Detail actions stay beside the page title; nested breadcrumbs move with the title. Unframed loan, posting, client-ledger, journal, policy, source-opening, reconciliation and statement-result sections now use shared white surfaces and responsive fact grids.
+
+Verification: all 24 accounting/report JSPs in the expanded Jasper check compiled. The full suite ran 1,273 tests with 248 opt-in skips; its sole error was an invalid date in the new product-filter test fixture. After correcting that fixture, all 11 loan-recording PostgreSQL tests passed, including identity-based filtering, inactive/renamed products, reports/totals, pagination and branch isolation. Synthetic live checks covered loan/disbursement product filtering, selection replacement/reset, detail/ledger rendering, login/logout, mobile navigation and representative 360/768/1366/1920px layouts without page overflow. Packaging passed. These checks do not establish throughput or complete the accounting backlog.
+
 The opt-in PostgreSQL test uses only a disposable loopback database named `microfinance_recording_test`, with user `microfinance_test`. It covers recording without moving money, frozen terms, partial allocation, retry identity, independent corrections and original-actor rejection, settlement, concurrent duplicate settlement, scope/current permissions, closed periods, reference uniqueness, filtered reversal totals and full rollback on audit failure. PDF tests check pagination and embedded multilingual text. Financial PostgreSQL fixtures use bounded connection pools and close them after testing.
 
 ```powershell

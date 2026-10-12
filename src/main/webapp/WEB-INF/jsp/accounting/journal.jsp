@@ -8,8 +8,12 @@
 <c:if test="${not empty accountingError}"><p role="alert"><spring:message code="${accountingError}" /></p></c:if>
 <c:if test="${not empty accountingSuccess}"><p role="status"><spring:message code="${accountingSuccess}" /></p></c:if>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${journal.sourceReference}" /></h1></div>
-<p><spring:message code="accounting.state.${journal.state}" /> <c:if test="${journal.reversed}"><spring:message code="accounting.reversed" /></c:if> · <c:out value="${journal.effectiveDate}" /> · TZS</p>
-<p><spring:message code="accounting.evidence" />: <c:out value="${journal.evidenceReference}" /></p><p><c:out value="${journal.reason}" /></p>
+<section class="erp-detail-card"><dl class="erp-detail-facts">
+<div><dt><spring:message code="accounting.state" /></dt><dd><spring:message code="accounting.state.${journal.state}" /> <c:if test="${journal.reversed}"><spring:message code="accounting.reversed" /></c:if></dd></div>
+<div><dt><spring:message code="accounting.date" /></dt><dd><c:out value="${journal.effectiveDate}" /></dd></div>
+<div><dt><spring:message code="accounting.evidence" /></dt><dd><c:out value="${journal.evidenceReference}" /></dd></div>
+<div><dt><spring:message code="accounting.reason" /></dt><dd><c:out value="${journal.reason}" /></dd></div>
+</dl><p>TZS</p></section>
 <section class="erp-table-wrap" data-aws-table-region><div class="erp-table-scroll" data-view-position-key="gl-journal-lines"><table class="erp-table"><thead><tr><th><spring:message code="accounting.code" /></th><th><spring:message code="accounting.name" /></th><th><spring:message code="accounting.debit" /> TZS</th><th><spring:message code="accounting.credit" /> TZS</th></tr></thead><tbody><c:forEach items="${lines}" var="l"><tr><td><c:out value="${l.code}" /></td><td><c:out value="${l.name}" /></td><td class="accounting-money"><c:out value="${l.debit}" /></td><td class="accounting-money"><c:out value="${l.credit}" /></td></tr></c:forEach></tbody></table></div></section>
 <c:set var="genericJournal" value="${journal.sourceType=='MANUAL' or journal.sourceType=='OPENING' or journal.sourceType=='REVERSAL' or journal.sourceType=='OPERATIONAL_BRIDGE'}" />
 <c:if test="${not genericJournal and journal.state=='DRAFT'}"><p><spring:message code="accounting.sourceReview" /></p></c:if>

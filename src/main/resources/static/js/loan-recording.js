@@ -42,6 +42,8 @@
   });
   document.querySelectorAll('[data-loan-form]').forEach(form => {
     const summary = form.querySelector('.loan-error-summary'); if (summary) {form.querySelectorAll('details').forEach(d => d.open = true); summary.focus();}
+    const submitButtons = [...form.querySelectorAll('button[type="submit"],button:not([type])')];
+    const initiallyDisabled = new Set(submitButtons.filter(button => button.disabled));
     let submitting = false;
     form.addEventListener('submit', event => {
       if (submitting) {event.preventDefault(); return;}
@@ -54,6 +56,6 @@
       // Defer disabling so the clicked action remains part of the submitted form.
       setTimeout(() => form.querySelectorAll('button[type="submit"],button:not([type])').forEach(b => b.disabled = true), 0);
     });
-    window.addEventListener('pageshow', event => {if(event.persisted){submitting=false;form.querySelectorAll('button[type="submit"],button:not([type])').forEach(b=>b.disabled=false);}});
+    window.addEventListener('pageshow', event => {if(event.persisted){submitting=false;submitButtons.forEach(b=>b.disabled=initiallyDisabled.has(b));}});
   });
 })();

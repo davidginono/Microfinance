@@ -42,7 +42,11 @@ public final class LoanRecordingDtos {
         private String notes = "";
     }
     public record Choice(UUID id, String label, String purpose) {}
-    public record Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId) {}
+    public record Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId, UUID productId) {
+        public Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId) {
+            this(search, from, through, status, sort, page, clientId, null);
+        }
+    }
     public record Page<T>(List<T> rows, int page, boolean hasNext) {}
     public record LoanRow(UUID id, String number, UUID clientId, String client, String clientNumber,
         String product, LocalDate applicationDate, BigDecimal requestedPrincipal, BigDecimal principal,
@@ -52,7 +56,7 @@ public final class LoanRecordingDtos {
         String kind, LocalDate date, String reference, BigDecimal amount, BigDecimal principal, BigDecimal interest,
         String moneyAccount, String principalAccount, String interestAccount, String evidence, String notes,
         UUID actorId, String actor, OffsetDateTime recordedAt, UUID journalId, UUID transactionId,
-        UUID reversesId, UUID reversedBy, BigDecimal principalBalance) {}
+        UUID reversesId, UUID reversedBy, BigDecimal principalBalance, String product) {}
     public record Detail(LoanRow loan, String institution, String branch, String recordedBy, OffsetDateTime recordedAt,
         String purpose, String business, BigDecimal income, BigDecimal expenses, BigDecimal otherDebt,
         String informationSource, String guarantors, String collateral, String evidence, String notes,

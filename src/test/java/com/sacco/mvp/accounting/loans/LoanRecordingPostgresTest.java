@@ -62,6 +62,38 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->jdbc.update("update loan_applications set amount=1 where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(jdbc.queryForMap("select direct_post,checker_id,policy_id,state from gl_journal where id=?",disbursement.journalId())).containsEntry("direct_post",true).containsEntry("checker_id",null).containsEntry("policy_id",null).containsEntry("state","POSTED");
     }
+    @Test void productFiltersUseCreatedProductIdentityAcrossLoansPostingsReportsAndTotals(){
+        var other=UUID.randomUUID();
+        jdbc.update("""
+            insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,
+            guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at)
+            select ?,sacco_id,loan_type,active,product_status,'OTHER','Other business loan',form_schema,
+            guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,now(),now()
+            from loan_product_settings where id=?
+            """,other,product);
+        var first=service.save(actor,form());var secondForm=form();secondForm.setProductId(other);var second=service.save(actor,secondForm);
+        service.disburse(actor,post(first,"1000.00","D-PRODUCT-1"));service.disburse(actor,post(second,"1000.00","D-PRODUCT-2"));
+        var payment=post(first,"120.00","PRODUCT-R1");payment.setInterestAccountId(interest);service.repay(actor,payment);
+        var secondPayment=post(second,"120.00","PRODUCT-R2");secondPayment.setInterestAccountId(interest);service.repay(actor,secondPayment);
+        var filter=new Filter("",null,null,"","newest",0,null,product);
+        assertThat(service.list(actor,filter).rows()).extracting(LoanRow::id).containsExactly(first);
+        for(var kind:List.of("DISBURSEMENT","PAYMENT")){
+            assertThat(service.register(actor,kind,filter).rows()).extracting(Posting::loanId).containsExactly(first);
+            assertThat(service.report(actor,kind,filter)).extracting(Posting::loanId).containsExactly(first);
+            assertThat(service.totals(actor,kind,filter).count()).isEqualTo(1);
+        }
+        assertThat(service.totals(actor,"PAYMENT",filter).amount()).isEqualByComparingTo("120.00");
+        jdbc.update("update loan_product_settings set active=false,product_name='Renamed business loan' where id=?",product);
+        assertThat(service.list(actor,filter).rows()).extracting(LoanRow::id).containsExactly(first);
+        assertThat(service.choices(actor,"filter-products","",0)).extracting(Choice::id).contains(product,other);
+        assertThat(service.filterProduct(actor,product).label()).isEqualTo("Renamed business loan");
+        assertThat(service.register(actor,"PAYMENT",filter).rows()).extracting(Posting::product).containsExactly("Synthetic business loan");
+        assertThat(service.movements(actor,client,0).rows()).extracting(Posting::product).contains("Synthetic business loan","Other business loan");
+        assertThat(service.list(operator("B2"),filter).rows()).isEmpty();
+        assertThat(service.report(operator("B2"),"PAYMENT",filter)).isEmpty();
+        assertThat(service.list(actor,new Filter("",null,null,"","newest",1,null,product)).rows()).isEmpty();
+        assertThatThrownBy(()->service.filterProduct(actor,UUID.randomUUID())).hasMessage("recording.error.filter");
+    }
     @Test void directPaymentRetryIndependentReversalAndClientBalanceAgree(){
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));var f=post(id,"120.00","R1");f.setPrincipalAccountId(null);f.setInterestAccountId(interest);
         var paid=service.repay(actor,f);assertThat(paid.principal()).isEqualByComparingTo("100.00");assertThat(paid.interest()).isEqualByComparingTo("20.00");assertThat(paid.principalBalance()).isEqualByComparingTo("900.00");

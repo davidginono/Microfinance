@@ -26,10 +26,11 @@ public class LoanRecordingRepository {
         """;
     private static final String POST_FROM="""
         from accountant_loan_post p join loan_applications a on a.id=p.loan_id
+        join accountant_loan_record r on r.loan_id=p.loan_id and r.sacco_id=p.sacco_id and r.station_id=p.station_id
         join members m on m.id=a.applicant_member_id join members u on u.id=p.actor_id
         """;
     private static final String POSTS="""
-        select p.*,a.loan_id loan_number,m.full_name,m.member_no,u.full_name actor_name,
+        select p.*,a.loan_id loan_number,m.full_name,m.member_no,u.full_name actor_name,r.product_name,
         (select x.id from accountant_loan_post x where x.reverses_id=p.id) reversed_by
         """+POST_FROM;
     public void lockRequest(AppUserPrincipal a,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_RECORD/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);}
@@ -59,8 +60,9 @@ public class LoanRecordingRepository {
         where r.sacco_id=? and r.station_id=? and (?='' or strpos(lower(a.loan_id||' '||m.full_name||' '||m.member_no),?)>0)
         and (?::date is null or r.application_date>=?::date) and (?::date is null or r.application_date<=?::date)
         and (?='' or a.status=?) and (?::uuid is null or m.id=?::uuid)
+        and (?::uuid is null or a.loan_product_setting_id=?::uuid)
         """;}
-    private Object[] loanArgs(AppUserPrincipal a,Filter f,LocalDate today){return new Object[]{today,today,today,a.getSaccoId(),a.getStationId(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.clientId(),f.clientId()};}
+    private Object[] loanArgs(AppUserPrincipal a,Filter f,LocalDate today){return new Object[]{today,today,today,a.getSaccoId(),a.getStationId(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.clientId(),f.clientId(),f.productId(),f.productId()};}
     public List<LoanRow> loans(AppUserPrincipal a,Filter f,LocalDate today,int limit,int offset){
         var args=new ArrayList<>(Arrays.asList(loanArgs(a,f,today)));args.add(limit);args.add(offset);
         String order=switch(f.sort()){case "oldest"->"r.application_date,a.id";case "amount"->"a.amount desc,a.id";default->"r.application_date desc,a.id desc";};
@@ -93,6 +95,12 @@ public class LoanRecordingRepository {
         and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
         order by coalesce(display_order,2147483647),id limit 26 offset ?
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),search.toLowerCase(Locale.ROOT),page*25);}
+    public List<Choice> filterProducts(AppUserPrincipal a,String search,int page){return jdbc.query("""
+        select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=?
+        and strpos(lower(coalesce(product_name,loan_type)),?)>0
+        order by coalesce(display_order,2147483647),id limit 26 offset ?
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),search.toLowerCase(Locale.ROOT),page*25);}
+    public Optional<Choice> filterProduct(AppUserPrincipal a,UUID id){return jdbc.query("select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and id=?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),id).stream().findFirst();}
     public List<Choice> accounts(AppUserPrincipal a,String purpose,String search,int page){return jdbc.query("""
         select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and
         ((?='MONEY' and kind='POSTING' and purpose in ('CASH','BANK','MOBILE_MONEY') and type='ASSET')
@@ -133,8 +141,9 @@ public class LoanRecordingRepository {
         and (?='' or strpos(lower(a.loan_id||' '||m.full_name||' '||m.member_no||' '||p.reference),?)>0)
         and (?::date is null or p.effective_date>=?::date) and (?::date is null or p.effective_date<=?::date)
         and (?='' or (case when p.reverses_id is not null then 'REVERSAL' when exists(select 1 from accountant_loan_post x where x.reverses_id=p.id) then 'REVERSED' else 'POSTED' end)=?)
+        and (?::uuid is null or a.loan_product_setting_id=?::uuid)
         """;}
-    private Object[] postArgs(AppUserPrincipal a,String kind,Filter f){return new Object[]{a.getSaccoId(),a.getStationId(),kind,kind,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status()};}
+    private Object[] postArgs(AppUserPrincipal a,String kind,Filter f){return new Object[]{a.getSaccoId(),a.getStationId(),kind,kind,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.productId(),f.productId()};}
     public List<Posting> posts(AppUserPrincipal a,String kind,Filter f,int limit,int offset){
         var args=new ArrayList<>(Arrays.asList(postArgs(a,kind,f)));args.add(limit);args.add(offset);String order=switch(f.sort()){case "oldest"->"p.effective_date,p.id";case "amount"->"p.amount desc,p.id";default->"p.effective_date desc,p.id desc";};
         return jdbc.query(POSTS+postWhere()+" order by "+order+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,args.toArray());
@@ -152,5 +161,5 @@ public class LoanRecordingRepository {
     public List<Object[]> reversedLines(UUID journal){return jdbc.query("select account_id,credit,debit from gl_journal_line where journal_id=? order by account_id",(r,n)->new Object[]{r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)},journal);}
     public UUID principalAccount(UUID loan){return jdbc.queryForObject("select principal_account_id from accountant_loan_post where loan_id=? and kind='DISBURSEMENT'",UUID.class,loan);}
     private LoanRow loan(ResultSet r,int n)throws SQLException{return new LoanRow(r.getObject("id",UUID.class),r.getString("loan_id"),r.getObject("client_id",UUID.class),r.getString("full_name"),r.getString("member_no"),r.getString("product_name"),r.getObject("application_date",LocalDate.class),r.getBigDecimal("requested_principal"),r.getBigDecimal("amount"),r.getString("status"),r.getBigDecimal("outstanding"),r.getBigDecimal("due_interest"),r.getBigDecimal("arrears"),r.getBigDecimal("future_interest"),r.getBigDecimal("principal_paid"),r.getBigDecimal("interest_paid"));}
-    private Posting posting(ResultSet r,int n)throws SQLException{return new Posting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("full_name"),r.getString("member_no"),r.getString("kind"),r.getObject("effective_date",LocalDate.class),r.getString("reference"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("evidence"),r.getString("notes"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("journal_id",UUID.class),r.getObject("transaction_id",UUID.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getBigDecimal("principal_balance"));}
+    private Posting posting(ResultSet r,int n)throws SQLException{return new Posting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("full_name"),r.getString("member_no"),r.getString("kind"),r.getObject("effective_date",LocalDate.class),r.getString("reference"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("evidence"),r.getString("notes"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("journal_id",UUID.class),r.getObject("transaction_id",UUID.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getBigDecimal("principal_balance"),r.getString("product_name"));}
 }

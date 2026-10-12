@@ -40,9 +40,12 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public List<Choice> choices(AppUserPrincipal a,String category,String search,int page){authorize(a,"VIEW");check(search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");return switch(category){
         case "clients"->records.clients(a,search,page);case "ledger-clients"->records.ledgerClients(a,search,page);case "products"->records.products(a,search,page);
+        case "filter-products"->records.filterProducts(a,search,page);
         case "money"->records.accounts(a,"MONEY",search,page);case "principal"->records.accounts(a,"PRINCIPAL",search,page);case "interest"->records.accounts(a,"INTEREST",search,page);
         case "loans"->records.loans(a,new Filter(search,null,null,"","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.number()+" - "+l.client(),l.status())).toList();
         default->throw new IllegalArgumentException("recording.error.filter");};}
+    @Transactional(readOnly=true)
+    public Choice filterProduct(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.filter"));}
     public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule) {}
     public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance) {}
     @Transactional(readOnly=true)

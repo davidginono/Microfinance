@@ -71,6 +71,6 @@ class ClientLoanStatementDocumentTest {
     private static BigDecimal money(String value){return new BigDecimal(value);}
     private static Posting post(UUID loan,String kind,LocalDate date,String reference,String principal,String interest,String balance){
         return new Posting(UUID.randomUUID(),loan,"7526","James Mafumba","0001",kind,date,reference,money(principal).add(money(interest)),money(principal),money(interest),
-            "120 - Bank","Loans","Interest","","Marejesho ya mkopo",UUID.randomUUID(),"Accountant",date.atStartOfDay().atOffset(ZoneOffset.UTC),UUID.randomUUID(),UUID.randomUUID(),null,null,money(balance));
+            "120 - Bank","Loans","Interest","","Marejesho ya mkopo",UUID.randomUUID(),"Accountant",date.atStartOfDay().atOffset(ZoneOffset.UTC),UUID.randomUUID(),UUID.randomUUID(),null,null,money(balance),"Business loan");
     }
 }

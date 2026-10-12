@@ -493,6 +493,7 @@
         const tableActions = Array.from(document.querySelectorAll('a.app-btn, button.app-btn')).filter(function (control) {
             if (control.closest('table')
                 || control.closest('.app-table-titlebar')
+                || control.closest('.erp-page-header')
                 || control.closest('.aws-filter-toolbar')
                 || control.closest('.app-modal-overlay')
                 || control.closest('[data-aws-action-pin="true"]')) {
@@ -761,7 +762,7 @@
             const path = header.previousElementSibling?.classList.contains('erp-page-path')
                 ? header.previousElementSibling
                 : null;
-            if (path && path.parentElement === contentFrame) {
+            if (path) {
                 shellMain.insertBefore(path, contentFrame);
             }
             shellMain.insertBefore(header, contentFrame);
