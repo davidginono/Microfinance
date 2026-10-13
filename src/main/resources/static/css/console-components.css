@@ -357,8 +357,8 @@ body {
     }
     .member-dashboard-pagination-button:hover:not(:disabled),
     .member-dashboard-pagination-button[aria-current="page"] {
-        border-color: #2563eb;
-        background: #2563eb;
+        border-color: #b65b0a;
+        background: var(--aws-orange, #ec7211);
         color: #ffffff;
     }
     .member-dashboard-pagination-button:disabled {

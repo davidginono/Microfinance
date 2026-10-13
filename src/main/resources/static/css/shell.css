@@ -2507,25 +2507,17 @@ body.aws-console {
     background: #f2f3f3 !important;
 }
 
-.btn-primary {
-    border-color: #075fae !important;
-    background: var(--aws-blue) !important;
-    color: #ffffff !important;
-}
-
-.btn-primary:hover {
-    border-color: var(--aws-blue-dark) !important;
-    background: #075fae !important;
-    color: #ffffff !important;
-}
-
+.btn-primary,
 .btn-launch {
     border-color: #b65b0a !important;
     background: var(--aws-orange) !important;
     color: #ffffff !important;
 }
 
-.btn-launch:hover {
+.btn-primary:hover,
+.btn-primary:focus-visible,
+.btn-launch:hover,
+.btn-launch:focus-visible {
     border-color: #8f4808 !important;
     background: #eb5f07 !important;
     color: #ffffff !important;
