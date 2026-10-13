@@ -363,3 +363,31 @@ test('sort links preserve server queries, expose direction and clear selected ro
     link.addEventListener('click',event=>event.preventDefault());link.click();assert.equal(d.querySelector('tbody input').checked,false);
     assert.equal(d.querySelectorAll('.resource-table-sort').length,1);dom.window.close();
 });
+
+test('register sort headings bind actual date and amount options with AWS caret states', async () => {
+    const markup=table('register-sort',row).replace('<input name="search">','<input name="search" value="cash"><input name="from" value="2026-10-01"><input name="productId" value="product"><select name="sort"><option value="newest" selected>Newest</option><option value="oldest">Oldest</option><option value="amount">Amount</option></select>')
+        .replace('<th>Reference</th>','<th data-table-sort-asc="oldest" data-table-sort-desc="newest">Date</th>')
+        .replace('<th>Amount</th>','<th data-table-sort-desc="amount">Amount</th>');
+    const {dom,document:d}=await setup(markup);
+    const links=[...d.querySelectorAll('.resource-table-sort')];assert.equal(links.length,2);
+    assert.equal(links[0].closest('th').getAttribute('aria-sort'),'descending');
+    assert.equal(links[1].closest('th').getAttribute('aria-sort'),'none');
+    for(const link of links) {
+        const url=new URL(link.href);assert.equal(url.searchParams.get('search'),'cash');assert.equal(url.searchParams.get('from'),'2026-10-01');assert.equal(url.searchParams.get('productId'),'product');assert.equal(url.searchParams.get('page'),'0');
+        assert.equal(link.querySelector('svg path').getAttribute('d'),'M8 11L12 5H4L8 11Z');assert.equal(link.querySelector('svg').getAttribute('fill'),'none');
+    }
+    assert.equal(new URL(links[0].href).searchParams.get('sort'),'oldest');assert.equal(new URL(links[1].href).searchParams.get('sort'),'amount');
+    assert.equal(d.querySelector('th:last-child svg'),null);dom.window.close();
+});
+
+test('separate direction headers retain scoped filters and size and toggle ascending', async () => {
+    const markup=table('chart-sort',row,'data-table-page-size="50"').replace('<input name="search">','<input name="search" value="Bank"><input type="hidden" name="parentId" value="group"><input type="hidden" name="sort" value="code"><input type="hidden" name="direction" value="asc">')
+        .replace('<th>Reference</th>','<th data-table-sort-key="code" data-table-sort-asc="asc" data-table-sort-desc="desc">Code</th>')
+        .replace('<th>Amount</th>','<th data-table-sort-key="name" data-table-sort-asc="asc" data-table-sort-desc="desc">Name</th>');
+    const {dom,document:d}=await setup(markup);const links=[...d.querySelectorAll('.resource-table-sort')];
+    assert.equal(links[0].closest('th').getAttribute('aria-sort'),'ascending');assert.equal(links[1].closest('th').getAttribute('aria-sort'),'none');
+    const active=new URL(links[0].href),other=new URL(links[1].href);
+    assert.equal(active.searchParams.get('direction'),'desc');assert.equal(other.searchParams.get('sort'),'name');assert.equal(other.searchParams.get('direction'),'asc');
+    for(const url of [active,other]){assert.equal(url.searchParams.get('size'),'50');assert.equal(url.searchParams.get('parentId'),'group');assert.equal(url.searchParams.get('search'),'Bank');assert.equal(url.searchParams.get('page'),'0');}
+    dom.window.close();
+});

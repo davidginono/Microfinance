@@ -30,13 +30,15 @@ public class ChartOfAccountsPageController {
     String chart(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String type,
             @RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="") String state,
-            @RequestParam(required=false) UUID parentId,@RequestParam(defaultValue="30") int size,Model model) {
+            @RequestParam(required=false) UUID parentId,@RequestParam(defaultValue="30") int size,
+            @RequestParam(defaultValue="code") String sort,@RequestParam(defaultValue="asc") String direction,Model model) {
         var filter=new AccountFilter(search.strip(),type,kind,state,parentId);
         if(parentId!=null) {
             var path=ledger.chartPath(actor,parentId);
             model.addAttribute("groupPath",path);model.addAttribute("selectedGroup",path.getLast());
         }
-        model.addAttribute("accounts",ledger.chart(actor,filter,page,size));model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
+        model.addAttribute("accounts",ledger.chart(actor,filter,page,size,sort,direction));model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
+        model.addAttribute("sort",sort);model.addAttribute("direction",direction);
         model.addAttribute("accountTypes",List.of("ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"));
         model.addAttribute("accountKinds",List.of("HEADING","POSTING","CONTROL"));
         return "accounting/accounts";
@@ -60,8 +62,9 @@ public class ChartOfAccountsPageController {
     String children(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID parentId,
             @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="") String search,
             @RequestParam(defaultValue="") String type,@RequestParam(defaultValue="") String kind,
-            @RequestParam(defaultValue="") String state,jakarta.servlet.http.HttpServletResponse response,Model model) {
-        model.addAttribute("accounts",ledger.chart(actor,new AccountFilter(search.strip(),type,kind,state,parentId),page));
+            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="code") String sort,
+            @RequestParam(defaultValue="asc") String direction,jakarta.servlet.http.HttpServletResponse response,Model model) {
+        model.addAttribute("accounts",ledger.chart(actor,new AccountFilter(search.strip(),type,kind,state,parentId),page,25,sort,direction));
         model.addAttribute("childFragment",true);
         response.setHeader("X-COA-Children","true");response.setHeader("Cache-Control","no-store");
         return "accounting/account-rows";

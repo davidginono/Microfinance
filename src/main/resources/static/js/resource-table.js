@@ -238,7 +238,25 @@
         const headers = [...head.cells];
         headers.forEach(header => {
             header.scope = 'col';
-            const link = header.querySelector('a[data-table-sort]');
+            let link = header.querySelector('a[data-table-sort]');
+            // Explicit server sort values; never infer ordering from translated labels.
+            if (!link && (header.dataset.tableSortAsc || header.dataset.tableSortDesc)) {
+                const sort = filters?.querySelector('[name=sort]');
+                if (sort && filters instanceof HTMLFormElement) {
+                    const asc = header.dataset.tableSortAsc, desc = header.dataset.tableSortDesc;
+                    const direction = filters.querySelector('[name=direction]');
+                    const active = direction ? sort.value === header.dataset.tableSortKey : [asc,desc].includes(sort.value);
+                    const ascending = active && (direction ? direction.value === 'asc' : sort.value === asc);
+                    header.setAttribute('aria-sort', active ? ascending ? 'ascending' : 'descending' : 'none');
+                    const url = new URL(filters.action || location.href, location.href);
+                    new FormData(filters).forEach((value,key) => { if (typeof value === 'string') url.searchParams.set(key,value); });
+                    url.searchParams.set('sort', direction ? header.dataset.tableSortKey : ascending ? desc || asc : asc || desc);
+                    if (direction) url.searchParams.set('direction', ascending ? 'desc' : 'asc');
+                    url.searchParams.set('page','0');
+                    link = node('a'); link.href = url.href; link.dataset.tableSort = '';
+                    link.append(...header.childNodes); header.append(link);
+                }
+            }
             if (!link) return;
             link.classList.add('resource-table-sort');
             const label = node('span'); label.append(...link.childNodes); link.append(label,icon('sort'));

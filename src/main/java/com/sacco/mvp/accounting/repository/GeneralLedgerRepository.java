@@ -35,6 +35,15 @@ public class GeneralLedgerRepository {
         return jdbc.query("select * from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
     }
     public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit) {
+        return chart(institution,filter,offset,limit,"code","asc");
+    }
+    public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit,String sort,String direction) {
+        String column=switch(sort) {
+            case "code" -> "a.code"; case "name" -> "a.name"; case "parent" -> "p.name";
+            case "type" -> "a.type"; case "kind" -> "a.kind"; case "normalBalance" -> "a.normal_balance";
+            case "status" -> "a.active"; default -> throw new IllegalArgumentException("filter");
+        };
+        String order=switch(direction) { case "asc" -> " asc"; case "desc" -> " desc"; default -> throw new IllegalArgumentException("filter"); };
         var args=new java.util.ArrayList<Object>();args.add(institution);
         String where=" where a.sacco_id=?";
         if(filter.parentId()!=null){where+=" and a.parent_id=?";args.add(filter.parentId());}
@@ -47,7 +56,7 @@ public class GeneralLedgerRepository {
         if(!filter.kind().isEmpty()){where+=" and a.kind=?";args.add(filter.kind());}
         if(!filter.state().isEmpty()){where+=" and a.active=?";args.add("ACTIVE".equals(filter.state()));}
         args.add(limit);args.add(offset);
-        return jdbc.query("select a.*,p.code parent_code,p.name parent_name,p.name_sw parent_name_sw from gl_account a left join gl_account p on p.id=a.parent_id and p.sacco_id=a.sacco_id"+where+" order by a.code,a.id limit ? offset ?",
+        return jdbc.query("select a.*,p.code parent_code,p.name parent_name,p.name_sw parent_name_sw from gl_account a left join gl_account p on p.id=a.parent_id and p.sacco_id=a.sacco_id"+where+" order by "+column+order+",a.id"+order+" limit ? offset ?",
             (r,n)->new AccountRow(account(r,n),r.getString("parent_code"),r.getString("parent_name"),r.getString("parent_name_sw")),args.toArray());
     }
     public List<Account> chartParents(String institution,boolean groups,String search,int offset,int limit) {

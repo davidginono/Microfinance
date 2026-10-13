@@ -24,6 +24,17 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class GeneralLedgerAccessTest {
+    @Test void chartSortingIsWhitelistedAndOrderedBeforeScopedPagination() {
+        var filter=new com.sacco.mvp.accounting.dto.GeneralLedgerDtos.AccountFilter("cash","ASSET","POSTING","ACTIVE");
+        when(books.chart("I1",filter,100,51,"name","desc")).thenReturn(java.util.List.of());
+        service.chart(actor,filter,2,50,"name","desc");
+        verify(books).chart("I1",filter,100,51,"name","desc");
+        clearInvocations(books);
+        for(String sort:new String[]{"name desc;drop table gl_account","unknown"})
+            assertThatThrownBy(()->service.chart(actor,filter,0,30,sort,"asc")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->service.chart(actor,filter,0,30,"name","invalid")).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(books);
+    }
     @Test void chartPageSizeIsBoundedBeforeQueryAndRetainsInstitutionScope() {
         var filter=new com.sacco.mvp.accounting.dto.GeneralLedgerDtos.AccountFilter("cash","ASSET","POSTING","ACTIVE");
         when(books.chart("I1",filter,100,51)).thenReturn(java.util.List.of());
