@@ -4,39 +4,34 @@
   const root = document.querySelector('meta[name="app-context-path"]')?.content || '';
   document.querySelectorAll('[data-loan-choice]').forEach(box => {
     const select = box.querySelector('[data-choice-select]'), error = box.querySelector('[data-choice-error]');
-    const controls = document.createElement('div');
-    controls.className = 'loan-choice-controls'; controls.dataset.neoSelectControls = 'true';
-    const search = document.createElement('input');
-    search.type = 'search'; search.className = 'aws-control'; search.maxLength = 100;
+    const picker = window.NeoSelect.search(select), search = picker.input, more = picker.more;
     search.setAttribute('aria-label', error.dataset.searchLabel);
-    const previous = document.createElement('button'), next = document.createElement('button');
-    [previous, next].forEach(button => {button.type = 'button'; button.className = 'app-btn btn-neutral'; button.disabled = true;});
-    previous.textContent = error.dataset.previousLabel; next.textContent = error.dataset.nextLabel;
-    const pagination = document.createElement('div'); pagination.className = 'accounting-actions';
-    pagination.append(previous, next); controls.append(search, pagination);
-    select.addEventListener('neo-select:render', event => {
-      if (!event.detail.menu.contains(controls)) event.detail.menu.prepend(controls);
-    });
-    let page = 0, request = 0, controller;
+    let page = 0, request = 0, controller, loading = false, loadedSearch;
     async function load(targetPage = 0) {
       controller?.abort(); controller = new AbortController();
-      const version = ++request;
-      previous.disabled = true; next.disabled = true;
+      const version = ++request, query = search.value, normalized = query.trim().toLocaleLowerCase();
+      loading = true; picker.setLoading(true); more.disabled = true;
       try {
-        const response = await fetch(root + '/finance/loan-recording/choices/' + box.dataset.category + '?' + new URLSearchParams({search: search.value, page: targetPage}), {headers: {Accept: 'application/json'}, signal:controller.signal, cache:'no-store'});
-        if (!response.ok) throw new Error('Lookup failed');
-        const choices = await response.json(); if (version !== request) return;
-        const value = select.value, selected = select.selectedOptions[0];
-        const blank = select.options[0].cloneNode(true); select.replaceChildren(blank);
-        if (value && !choices.some(c => c.id === value)) select.add(new Option(selected.textContent, value));
-        choices.slice(0, 25).forEach(c => select.add(new Option(c.label, c.id)));
-        select.value = value; page = targetPage;
-        previous.disabled = page === 0; next.disabled = choices.length <= 25; error.textContent = '';
-      } catch (_) { if (version === request) {error.textContent = error.dataset.error; previous.disabled = page === 0; binding.cancel();} }
+        const response = await fetch(root + '/finance/loan-recording/choices/' + box.dataset.category + '?' + new URLSearchParams({search: query, page: targetPage}), {headers: {Accept: 'application/json'}, signal:controller.signal, cache:'no-store', credentials:'same-origin'});
+        if (!response.ok || response.redirected) throw new Error('Lookup failed');
+        const choices = await response.json(); if (version !== request || controller.signal.aborted || !select.isConnected) return;
+        const value = select.value, selected = select.selectedOptions[0]?.cloneNode(true);
+        const blank = [...select.options].find(option => option.value === '')?.cloneNode(true) || new Option('', '');
+        const previous = targetPage ? [...select.options].filter(option => option.value && option.dataset.searchQuery === normalized) : [];
+        const options = new Map(previous.map(option => [option.value, option]));
+        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized; options.set(choice.id, option);});
+        const visible = [...options.values()].slice(-100); select.replaceChildren(blank, ...visible);
+        if (value && !visible.some(option => option.value === value) && selected) select.add(selected);
+        select.value = value; page = targetPage; loadedSearch = query;
+        more.hidden = choices.length <= 25; error.textContent = '';
+      } catch (failure) { if (version === request && failure.name !== 'AbortError') {error.textContent = error.dataset.error; more.hidden = true; binding.cancel();} }
+      finally {if (version === request) {loading = false; picker.setLoading(false); more.disabled = false;}}
     }
-    const binding = window.AppSearch.bind(search, () => load(), () => {++request; controller?.abort(); previous.disabled = true; next.disabled = true;});
-    previous.addEventListener('click', () => {binding.cancel(); load(page - 1);});
-    next.addEventListener('click', () => {binding.cancel(); load(page + 1);});
+    const binding = window.AppSearch.bind(search, () => load(), () => {++request; controller?.abort(); loading = false; picker.setLoading(true); more.hidden = true;});
+    more.addEventListener('click', () => {binding.cancel(); load(page + 1);});
+    select.addEventListener('neo-select:close', () => {binding.cancel(); ++request; controller?.abort(); loading = false; picker.setLoading(false);});
+    select.addEventListener('neo-select:open', () => {if (!loading && (loadedSearch !== search.value || error.textContent)) {binding.cancel(); load();}});
+    window.addEventListener('pagehide', () => {binding.cancel(); ++request; controller?.abort();});
     load();
   });
   document.querySelectorAll('[data-loan-form]').forEach(form => {

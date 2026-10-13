@@ -1,1 +1,1 @@
-<span data-choice-error role="status" data-error="<spring:message code='recording.lookupError' />" data-search-label="<spring:message code='voucher.search' />" data-previous-label="<spring:message code='common.previous' />" data-next-label="<spring:message code='common.next' />"></span>
+<span data-choice-error role="status" data-error="<spring:message code='recording.lookupError' />" data-search-label="<spring:message code='voucher.search' />"></span>

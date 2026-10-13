@@ -27,7 +27,10 @@
 <spring:message code="shell.control.select" var="shellControlselect" />
 <spring:message code="shell.control.noOptions" var="shellControlnoOptions" />
 <spring:message code="search.unavailable" var="searchUnavailable" />
-<body data-search-unavailable="<c:out value='${searchUnavailable}' />" class="aws-console min-h-screen font-sans text-sacco-ink antialiased" data-shell-results="<c:out value='${shellControlresults}' />" data-shell-refresh="<c:out value='${shellControlrefresh}' />" data-shell-loading="<c:out value='${shellControlloading}' />" data-shell-select="<c:out value='${shellControlselect}' />" data-shell-no-options="<c:out value='${shellControlnoOptions}' />">
+<spring:message code="select.search" var="selectSearch" />
+<spring:message code="select.noMatches" var="selectNoMatches" />
+<spring:message code="select.loadMore" var="selectLoadMore" />
+<body data-select-search="<c:out value='${selectSearch}' />" data-select-no-matches="<c:out value='${selectNoMatches}' />" data-select-load-more="<c:out value='${selectLoadMore}' />" data-search-unavailable="<c:out value='${searchUnavailable}' />" class="aws-console min-h-screen font-sans text-sacco-ink antialiased" data-shell-results="<c:out value='${shellControlresults}' />" data-shell-refresh="<c:out value='${shellControlrefresh}' />" data-shell-loading="<c:out value='${shellControlloading}' />" data-shell-select="<c:out value='${shellControlselect}' />" data-shell-no-options="<c:out value='${shellControlnoOptions}' />">
 <a class="aws-skip-link" href="#main-content"><spring:message code="common.skipToContent" text="Skip to main content" /></a>
 <script>
     try {
