@@ -29,8 +29,8 @@
         <form method="get" action="<c:url value='${listBase}' />" class="erp-table-toolbar coa-filters">
             <label class="erp-table-toolbar__search"><spring:message code="coa.search" /><input class="aws-control" name="search" value="<c:out value='${search}' />" maxlength="100" /></label>
             <c:if test="${not isActivity}"><label class="erp-table-toolbar__control"><spring:message code="library.activity" /><select class="aws-control" name="activityId"><option value=""><spring:message code="coa.all" /></option>
-                <c:if test="${not empty activity}"><option value="${activity.id}" selected><c:out value="${activity.code}" /> · <c:out value="${activity.name}" /></option></c:if>
-                <c:forEach items="${activityFilters.rows}" var="choice"><c:if test="${choice.id ne activity.id}"><option value="${choice.id}"><c:out value="${choice.code}" /> · <c:out value="${choice.name}" /></option></c:if></c:forEach>
+                <c:if test="${not empty activity}"><option value="${activity.id}" selected><c:out value="${activity.name}" /></option></c:if>
+                <c:forEach items="${activityFilters.rows}" var="choice"><c:if test="${choice.id ne activity.id}"><option value="${choice.id}"><c:out value="${choice.name}" /></option></c:if></c:forEach>
             </select></label></c:if>
             <label class="erp-table-toolbar__control"><spring:message code="coa.status" /><select class="aws-control" name="state"><option value=""><spring:message code="coa.all" /></option><option value="ACTIVE" ${state=='ACTIVE'?'selected':''}><spring:message code="accounting.active.true" /></option><option value="INACTIVE" ${state=='INACTIVE'?'selected':''}><spring:message code="accounting.active.false" /></option></select></label>
             <div class="erp-table-toolbar__actions"><button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button><a class="app-btn btn-neutral" href="<c:url value='${listBase}' />"><spring:message code="coa.clear" /></a></div>

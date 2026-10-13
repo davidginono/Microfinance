@@ -15,13 +15,13 @@
         </div>
     <form method="get" action="<c:url value='/finance/library/templates' />" class="erp-table-toolbar coa-filters library-template-filters">
         <label class="erp-table-toolbar__control"><spring:message code="library.activity" /><select class="aws-control" name="activityId"><option value=""><spring:message code="coa.all" /></option>
-            <c:if test="${not empty activity}"><option value="${activity.id}" selected><c:out value="${activity.code}" /> · <c:out value="${activity.name}" /></option></c:if>
-            <c:forEach items="${activityFilters.rows}" var="choice"><c:if test="${choice.id ne activity.id}"><option value="${choice.id}"><c:out value="${choice.code}" /> · <c:out value="${choice.name}" /></option></c:if></c:forEach>
+            <c:if test="${not empty activity}"><option value="${activity.id}" selected><c:out value="${activity.name}" /></option></c:if>
+            <c:forEach items="${activityFilters.rows}" var="choice"><c:if test="${choice.id ne activity.id}"><option value="${choice.id}"><c:out value="${choice.name}" /></option></c:if></c:forEach>
         </select></label>
         <label class="erp-table-toolbar__control"><spring:message code="library.transaction" /><select class="aws-control" name="transactionId">
             <c:if test="${empty transaction}"><option value=""><spring:message code="library.noMatchingTransactions" /></option></c:if>
-            <c:if test="${not empty transaction}"><option value="${transaction.id}" selected><c:out value="${transaction.code}" /> · <c:out value="${transaction.name}" /></option></c:if>
-            <c:forEach items="${transactionChoices.rows}" var="choice"><c:if test="${choice.id ne transaction.id}"><option value="${choice.id}"><c:out value="${choice.code}" /> · <c:out value="${choice.name}" /></option></c:if></c:forEach>
+            <c:if test="${not empty transaction}"><option value="${transaction.id}" selected><c:out value="${transaction.name}" /></option></c:if>
+            <c:forEach items="${transactionChoices.rows}" var="choice"><c:if test="${choice.id ne transaction.id}"><option value="${choice.id}"><c:out value="${choice.name}" /></option></c:if></c:forEach>
         </select></label>
         <label class="erp-table-toolbar__control"><spring:message code="library.sourceEvent" /><select class="aws-control" name="sourceEvent"><option value=""><spring:message code="coa.all" /></option><c:forEach items="${sourceEvents}" var="event"><option value="${event}" ${sourceEvent==event?'selected':''}><spring:message code="accounting.policy.event.${event}" /></option></c:forEach></select></label>
         <label class="erp-table-toolbar__control"><spring:message code="coa.status" /><select class="aws-control" name="state"><option value=""><spring:message code="coa.all" /></option><option value="ACTIVE" ${state=='ACTIVE'?'selected':''}><spring:message code="accounting.active.true" /></option><option value="INACTIVE" ${state=='INACTIVE'?'selected':''}><spring:message code="accounting.active.false" /></option></select></label>

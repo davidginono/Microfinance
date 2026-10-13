@@ -36,6 +36,7 @@ The current interface is a compact operational ERP, not a lending marketing site
 - Primary action buttons use the shared console orange (`--aws-orange`, `#ec7211`) with the shared darker hover/focus state. Use this default across pages, tables and dialogs; do not introduce blue primary buttons.
 - Use the available Lucide integration for new tool icons. Give icon-only controls an accessible name and a tooltip when their purpose is not obvious; retain short verb labels for financial commands.
 - Use selects for option sets, segmented controls for modes, checkboxes/toggles for binary choices, and suitable numeric inputs for amounts and rates. Keep currency, rate basis, and repayment frequency adjacent to their values.
+- Resource filters show names/labels only in selected values and dropdown options, without code prefixes. Preserve the submitted IDs/codes and localized names; apply this at the option source so native and enhanced selects agree.
 - Group fields by identity, business/employment, cash flow, guarantors, collateral, and documents when relevant. Preserve field values and inline errors across failed submissions.
 - Arrange related controls with wrapping flex or responsive grid tracks and `min-width: 0`. Keep command buttons compact, allowing labels to wrap when necessary without clipping.
 
