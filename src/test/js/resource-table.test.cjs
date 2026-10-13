@@ -4,7 +4,7 @@ const {readFileSync} = require('node:fs');
 const {JSDOM} = require('jsdom');
 const source = readFileSync('src/main/resources/static/js/resource-table.js', 'utf8');
 const voucherSource = readFileSync('src/main/resources/static/js/accounting-vouchers.js', 'utf8');
-const labels = `<template id="resource-table-labels" data-records="Records" data-page-size="Page size" data-striped="Striped rows" data-sticky="Sticky first columns" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-reorder="Move column" data-details="Details" data-show-details="Show details" data-panel-position="Panel position" data-bottom="Bottom" data-side="Side" data-resize="Resize details panel" data-select-record="Select a record" data-search-page="Search this page" data-no-matches="No matching records." data-refresh="Refresh" data-pagination="Pagination" data-page="Page" data-previous="Previous page" data-next="Next page" data-preferences="Preferences" data-columns="Visible columns" data-compact="Compact rows" data-wrap="Wrap lines" data-select="Select" data-select-first="Select first row" data-clear-selection="Clear row selection" data-view="View" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
+const labels = `<template id="resource-table-labels" data-records="Records" data-actions="Actions" data-page-size="Page size" data-striped="Striped rows" data-sticky="Sticky first columns" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-reorder="Move column" data-details="Details" data-show-details="Show details" data-panel-position="Panel position" data-bottom="Bottom" data-side="Side" data-resize="Resize details panel" data-select-record="Select a record" data-search-page="Search this page" data-no-matches="No matching records." data-refresh="Refresh" data-pagination="Pagination" data-page="Page" data-previous="Previous page" data-next="Next page" data-preferences="Preferences" data-columns="Visible columns" data-compact="Compact rows" data-wrap="Wrap lines" data-select="Select" data-select-first="Select first row" data-clear-selection="Clear row selection" data-view="View" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
 const table = (key, body, extra = '') => `<section class="erp-table-wrap" data-resource-table="${key}" ${extra}><div class="app-table-titlebar"><h2>Records</h2><div class="accounting-actions"><a class="app-btn btn-primary" href="/create">Create</a></div></div><form method="get"><input name="search"></form><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th>Reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 const row = '<tr><td>V001</td><td>100.00</td><td>Posted</td></tr>';
 async function setup(html, integration = '') {
@@ -275,4 +275,32 @@ test('side divider follows horizontal dragging and falls back to vertical resizi
     pointer(handle,'pointerdown',300,400);pointer(w,'pointermove',300,450);pointer(w,'pointerup',300,450);
     assert.equal(handle.getAttribute('aria-valuenow'),'370');
     dom.window.close();
+});
+
+
+test('Actions menu preserves live forms and follows selection, keyboard and reset states', async () => {
+    const markup=table('commands',row).replace('<a class="app-btn btn-primary"', '<form data-table-command method="post" id="status"><input type="hidden" name="_csrf" value="token"><button class="app-btn btn-neutral" id="deactivate" disabled>Deactivate</button></form><button data-table-command class="app-btn btn-neutral" id="print" disabled>Print</button><a class="app-btn btn-primary"');
+    const {dom,window:w,document:d}=await setup(markup);
+    const trigger=d.querySelector('.resource-table-action-menu>button'),menu=d.querySelector('[role=menu]'),command=d.querySelector('#deactivate');
+    assert.equal(trigger.disabled,true);assert.equal(menu.hidden,true);
+    assert.equal(menu.querySelector('[name=_csrf]').value,'token');
+    let submissions=0;d.querySelector('#status').addEventListener('submit',event=>{event.preventDefault();submissions++;});
+    command.disabled=false;d.querySelector('#print').disabled=false;await new Promise(resolve=>w.setTimeout(resolve,0));
+    assert.equal(trigger.disabled,false);trigger.click();assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(d.activeElement,command);
+    command.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(d.activeElement,d.querySelector('#print'));
+    d.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.hidden,true);assert.equal(d.activeElement,trigger);
+    trigger.click();command.click();await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(submissions,1);assert.equal(menu.hidden,true);
+    trigger.click();d.querySelector('[data-resource-table]').dispatchEvent(new w.CustomEvent('resource-table:reset'));assert.equal(menu.hidden,true);
+    command.disabled=true;d.querySelector('#print').disabled=true;await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(trigger.disabled,true);
+    assert.equal(d.querySelector('.resource-table-menu .btn-primary'),null);dom.window.close();
+});
+
+test('sort links preserve server queries, expose direction and clear selected rows', async () => {
+    const markup=table('sorting','<tr><td><input type="checkbox" checked></td><td>Alice</td><td>Active</td></tr>','data-table-selection="single"').replace('<th>Amount</th>','<th aria-sort="descending"><a data-table-sort href="?search=Alice&state=ACTIVE&activityId=parent&size=50&sort=name&direction=asc">Name</a></th>');
+    const {dom,document:d}=await setup(markup);const link=d.querySelector('.resource-table-sort');
+    assert.equal(link.href,'http://localhost/finance/test?search=Alice&state=ACTIVE&activityId=parent&size=50&sort=name&direction=asc');
+    assert.equal(link.closest('th').getAttribute('aria-sort'),'descending');assert.equal(link.querySelector('svg').getAttribute('viewBox'),'0 0 16 16');
+    d.querySelector('tbody input').checked=true;
+    link.addEventListener('click',event=>event.preventDefault());link.click();assert.equal(d.querySelector('tbody input').checked,false);
+    assert.equal(d.querySelectorAll('.resource-table-sort').length,1);dom.window.close();
 });

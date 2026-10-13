@@ -37,6 +37,16 @@ class AccountingCodeLibraryMvcTest {
         lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
     }
+    @Test void sortingPreservesActivityScopeAndPageSize() throws Exception {
+        mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId",activity.toString())
+            .param("search","Office").param("state","ACTIVE").param("page","2").param("size","50").param("sort","name").param("direction","desc"))
+            .andExpect(status().isOk()).andExpect(model().attribute("sort","name")).andExpect(model().attribute("direction","desc"));
+        verify(library).transactionRegister(actor,activity,"Office","ACTIVE",2,50,"name","desc");
+    }
+    @Test void defaultSortIsCodeAscending() throws Exception {
+        mvc.perform(get("/finance/library").with(user(actor))).andExpect(status().isOk());
+        verify(library).activities(actor,"","",0,30,"code","asc");
+    }
     @Test void filtersReachTheScopedList() throws Exception {
         when(library.activities(any(),eq("Office"),eq("ACTIVE"),eq(2))).thenReturn(new Page<>(List.of(),2,false));
         mvc.perform(get("/finance/library").with(user(actor)).param("search","Office").param("state","ACTIVE").param("page","2"))
@@ -61,7 +71,7 @@ class AccountingCodeLibraryMvcTest {
             .andExpect(status().isOk()).andExpect(model().attribute("isTransactions",true))
             .andExpect(model().attribute("activity",new Activity(activity,"OPS","Operations","Shughuli","",true)))
             .andExpect(model().attributeExists("activityFilters"));
-        verify(library).transactionRegister(actor,activity,"cash","ACTIVE",1,30);
+        verify(library).transactionRegister(actor,activity,"cash","ACTIVE",1,30,"code","asc");
     }
     @Test void activityTransactionsLinkRedirectsToTheFilteredRegisterWithItsSearchContext() throws Exception {
         mvc.perform(get("/finance/library/activities/"+activity).with(user(actor)).param("search","cash").param("state","ACTIVE").param("page","1"))
@@ -71,7 +81,7 @@ class AccountingCodeLibraryMvcTest {
     @Test void allActivitiesFilterRemovesActivityScopeWithoutDroppingSearchOrStatus() throws Exception {
         mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId","").param("search","cash").param("state","ACTIVE"))
             .andExpect(status().isOk()).andExpect(model().attribute("isTransactions",true));
-        verify(library).transactionRegister(actor,null,"cash","ACTIVE",0,30);verify(library,never()).activity(any(),any());
+        verify(library).transactionRegister(actor,null,"cash","ACTIVE",0,30,"code","asc");verify(library,never()).activity(any(),any());
     }
     @Test void activityRedirectRejectsForeignRecordsBeforeBuildingALocation() throws Exception {
         UUID foreign=UUID.randomUUID();when(library.activity(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));

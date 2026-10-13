@@ -30,14 +30,16 @@ public class AccountingCodeLibraryController {
     }
     @GetMapping
     String activities(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,
-            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="false") boolean create,@RequestParam(defaultValue="30") int size,Model model) {
-        model.addAttribute("modalOpen",create);return register(actor,false,null,search,state,page,size,model);
+            @RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="false") boolean create,@RequestParam(defaultValue="30") int size,
+            @RequestParam(defaultValue="code") String sort,@RequestParam(defaultValue="asc") String direction,Model model) {
+        model.addAttribute("modalOpen",create);return register(actor,false,null,search,state,page,size,sort,direction,model);
     }
     @GetMapping("/transactions")
     String transactions(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID activityId,
             @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,
-            @RequestParam(defaultValue="false") boolean create,@RequestParam(defaultValue="30") int size,Model model) {
-        model.addAttribute("modalOpen",create);return register(actor,true,activityId,search,state,page,size,model);
+            @RequestParam(defaultValue="false") boolean create,@RequestParam(defaultValue="30") int size,
+            @RequestParam(defaultValue="code") String sort,@RequestParam(defaultValue="asc") String direction,Model model) {
+        model.addAttribute("modalOpen",create);return register(actor,true,activityId,search,state,page,size,sort,direction,model);
     }
     @GetMapping("/activities/{id}")
     String activity(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="") String search,
@@ -144,15 +146,16 @@ public class AccountingCodeLibraryController {
         model.addAttribute("activity",activity);model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());return "accounting/library-code-form";
     }
     private String register(AppUserPrincipal actor,boolean transactions,UUID activityId,String search,String state,int page,Model model) {
-        return register(actor,transactions,activityId,search,state,page,30,model);
+        return register(actor,transactions,activityId,search,state,page,30,"code","asc",model);
     }
-    private String register(AppUserPrincipal actor,boolean transactions,UUID activityId,String search,String state,int page,int size,Model model) {
+    private String register(AppUserPrincipal actor,boolean transactions,UUID activityId,String search,String state,int page,int size,String sort,String direction,Model model) {
         model.addAttribute("tablePageSize",size);
+        model.addAttribute("sort",sort);model.addAttribute("direction",direction);
         model.addAttribute("isTransactions",transactions);filters(model,search,state);
         if(transactions) {
             Activity parent=activityId==null?null:library.activity(actor,activityId);model.addAttribute("activity",parent);
             model.addAttribute("activityFilters",library.activities(actor,"","",0));
-            model.addAttribute("records",library.transactionRegister(actor,activityId,search,state,page,size));
+            model.addAttribute("records",library.transactionRegister(actor,activityId,search,state,page,size,sort,direction));
             if(!model.containsAttribute("transactionForm")) {var form=new TransactionForm();if(parent!=null)form.setActivityCode(parent.code());model.addAttribute("transactionForm",form);}
             var form=(TransactionForm)model.getAttribute("transactionForm");
             if(form.getTemplate().getRules()==null)form.getTemplate().setRules(new java.util.ArrayList<>());
@@ -160,7 +163,7 @@ public class AccountingCodeLibraryController {
             model.addAttribute("activityChoices",library.activities(actor,"","ACTIVE",0));model.addAttribute("accountChoices",library.accounts(actor,"",0));
             model.addAttribute("components",AccountingCodeLibraryService.COMPONENTS);model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());
         } else {
-            model.addAttribute("records",library.activities(actor,search,state,page,size));
+            model.addAttribute("records",library.activities(actor,search,state,page,size,sort,direction));
             if(!model.containsAttribute("codeForm"))model.addAttribute("codeForm",new CodeForm());
         }
         return "accounting/library";

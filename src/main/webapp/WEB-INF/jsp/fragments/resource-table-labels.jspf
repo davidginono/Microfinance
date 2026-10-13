@@ -1,5 +1,6 @@
 <%@ page pageEncoding="UTF-8" %>
 <template id="resource-table-labels"
+    data-actions="<spring:message code='common.actions' />"
     data-records="<spring:message code='table.records' />"
     data-search-page="<spring:message code='table.searchPage' />"
     data-no-matches="<spring:message code='table.noMatches' />"

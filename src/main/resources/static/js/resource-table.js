@@ -10,7 +10,7 @@
     };
     const icon = name => {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        const consoleArrow = ['previous','next','refresh'].includes(name);
+        const consoleArrow = ['previous','next','refresh','sort','caret'].includes(name);
         svg.setAttribute('viewBox', consoleArrow ? '0 0 16 16' : '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
         svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', consoleArrow ? '2' : '1.8');
         if (consoleArrow) svg.setAttribute('stroke-linejoin','round');
@@ -20,9 +20,11 @@
         const paths = {
             previous: ['M11 2L5 8L11 14'], next: ['M5 2L11 8L5 14'], close: ['m6 6 12 12M6 18 18 6'],
             refresh: ['M15 0V5L10 4.95999', 'M15 8C15 11.87 11.87 15 8 15C4.13 15 1 11.87 1 8C1 4.13 4.13 1 8 1C10.79 1 13.2 2.63 14.33 5'],
+            sort: ['M8 11L12 5H4L8 11Z'], caret: ['M8 11L12 5H4L8 11Z'],
             settings: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8', 'M9.5 2h5l.5 2.5 2 1.2 2.5-.8L22 9l-2 1.8v2.4l2 1.8-2.5 4.1-2.5-.8-2 1.2-.5 2.5h-5L9 19.5l-2-1.2-2.5.8L2 15l2-1.8v-2.4L2 9l2.5-4.1 2.5.8 2-1.2Z']
         };
         paths[name].forEach(d => { const path = document.createElementNS(svg.namespaceURI, 'path'); path.setAttribute('d', d); svg.append(path); });
+        if (name === 'caret') svg.setAttribute('fill','currentColor');
         return svg;
     };
     const iconButton = (name, label) => {
@@ -166,6 +168,43 @@
         navigation.addEventListener('click', clearSelection); window.addEventListener('pageshow', clearSelection);
 
         const headers = [...head.cells];
+        headers.forEach(header => {
+            header.scope = 'col';
+            const link = header.querySelector('a[data-table-sort]');
+            if (!link) return;
+            link.classList.add('resource-table-sort');
+            const label = node('span'); label.append(...link.childNodes); link.append(label,icon('sort'));
+            link.addEventListener('click', clearSelection);
+        });
+        // Opt in actual commands, preserving their forms, CSRF tokens and page controller listeners.
+        const menuCommands = [...actions.querySelectorAll(':scope > [data-table-command]')];
+        if (menuCommands.length) {
+            const group = node('div','resource-table-action-menu'), trigger = node('button','app-btn btn-neutral',l.actions);
+            trigger.type='button'; trigger.setAttribute('aria-haspopup','menu'); trigger.setAttribute('aria-expanded','false');
+            const menu = node('div','resource-table-menu'); menu.id=region.dataset.resourceTable+'-actions'; menu.hidden=true; menu.setAttribute('role','menu');
+            trigger.setAttribute('aria-controls',menu.id); trigger.append(icon('caret')); menu.append(...menuCommands); group.append(trigger,menu); actions.append(group);
+            const items = () => [...menu.querySelectorAll('button,a[href]')].filter(item=>!item.disabled && item.getAttribute('aria-disabled')!=='true');
+            menu.querySelectorAll('button,a[href]').forEach(item=>item.setAttribute('role','menuitem'));
+            const close = restore => {menu.hidden=true;trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();};
+            const sync = () => {trigger.disabled=!items().length;if(trigger.disabled)close(false);};
+            const open = last => {if(trigger.disabled)return;menu.hidden=false;trigger.setAttribute('aria-expanded','true');(last?items().at(-1):items()[0])?.focus();};
+            trigger.addEventListener('click',()=>menu.hidden?open(false):close(false));
+            trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
+            menu.addEventListener('keydown',event=>{
+                if(event.key==='Escape'){event.preventDefault();close(true);}
+                else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+                    event.preventDefault();const choices=items(),index=choices.indexOf(document.activeElement);
+                    const next=event.key==='Home'?0:event.key==='End'?choices.length-1:(index+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length;
+                    choices[next]?.focus();
+                }
+            });
+            // Let the native click/submit complete before restoring focus.
+            menu.addEventListener('click',event=>{if(event.target.closest('[role=menuitem]:not(:disabled)'))queueMicrotask(()=>close(true));});
+            document.addEventListener('click',event=>{if(!group.contains(event.target))close(false);});
+            group.addEventListener('focusout',()=>queueMicrotask(()=>{if(!group.contains(document.activeElement))close(false);}));
+            new MutationObserver(sync).observe(menu,{subtree:true,attributes:true,attributeFilter:['disabled','aria-disabled']});
+            region.addEventListener('resource-table:reset',()=>{close(false);sync();}); sync();
+        }
         // This fallback searches only the bounded rows on this page; server filters remain authoritative.
         const searchVisibility = new WeakMap();
         let noMatches;

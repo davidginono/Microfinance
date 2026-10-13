@@ -34,7 +34,7 @@ The current interface is a compact operational ERP, not a lending marketing site
 
 - Reuse `app-btn`, `btn-primary`, `btn-neutral`, and `erp-icon-btn` rather than creating page-specific button systems.
 - Primary action buttons use the shared console orange (`--aws-orange`, `#ec7211`) with the shared darker hover/focus state. Use this default across pages, tables and dialogs; do not introduce blue primary buttons.
-- Use the available Lucide integration for new tool icons. Give icon-only controls an accessible name and a tooltip when their purpose is not obvious; retain short verb labels for financial commands.
+- Resource table refresh, pagination, sort and Actions carets use the shared Cloudscape SVG geometry and the [AWS header/command contract](../microfinance-table-standard/SKILL.md#aws-reference-and-split-details). Keep hollow inactive sort carets distinct from filled active/menu carets. Use the available Lucide integration for other new tool icons. Give icon-only controls an accessible name and a tooltip when their purpose is not obvious; retain short verb labels for financial commands.
 - Use selects for option sets, segmented controls for modes, checkboxes/toggles for binary choices, and suitable numeric inputs for amounts and rates. Keep currency, rate basis, and repayment frequency adjacent to their values.
 - Resource filters show names/labels only in selected values and dropdown options, without code prefixes. Preserve the submitted IDs/codes and localized names; apply this at the option source so native and enhanced selects agree.
 - Group fields by identity, business/employment, cash flow, guarantors, collateral, and documents when relevant. Preserve field values and inline errors across failed submissions.
