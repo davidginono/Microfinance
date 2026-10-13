@@ -6,7 +6,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="staff.analytics.breadcrumb" text="Staff Workspace / Staff Reports and Analytics" /></p>
-    <h1 class="erp-page-title">${staffAnalyticsTitle}</h1>
+    <h1 class="erp-page-title" id="staff-analytics-title">${staffAnalyticsTitle}</h1>
 </div>
 
 <section class="erp-panel staff-analytics-command-panel" aria-labelledby="staffAnalyticsControlsTitle">
@@ -48,7 +48,7 @@
             </a>
         </div>
     </div>
-    <form action="/staff/analytics" method="get" class="staff-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true" data-view-position-key="staff-analytics-filters">
+    <form action="/staff/analytics" method="get" class="staff-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true" data-view-position-key="staff-analytics-filters" data-table-filter-for="staff-analytics-1">
         <label class="staff-analytics-control is-date fcms-label">
             <spring:message code="reports.startDate" text="Start Date" />
             <input name="fromDate" type="date" autocomplete="off" value="${fromDateInput}" class="fcms-control" />
@@ -166,8 +166,8 @@
 
 <section class="staff-analytics-layout">
     <section class="erp-panel staff-portfolio-panel">
-            <div class="erp-panel-header">
-                <h2 class="erp-panel-title">
+            <div class="erp-panel-header" data-resource-header-source>
+                <h2 class="erp-panel-title" data-table-heading-for="staff-analytics-1">
                     <c:choose>
                         <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:when>
                         <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationPortfolioSummary" text="Branch Portfolio Summary" /></c:when>
@@ -226,7 +226,7 @@
                         </div>
                     </div>
                     <c:if test="${empty loanType}">
-                        <div class="erp-table-wrap staff-financial-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Loan product financial breakdown">
+                        <div class="erp-table-wrap staff-financial-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Loan product financial breakdown" data-resource-table="staff-analytics-1">
                             <div class="erp-table-scroll" data-view-position-key="staff-analytics-financial-breakdown">
                             <table class="erp-table staff-financial-table">
                                 <thead>

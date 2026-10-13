@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="loanOfficer.reports.breadcrumb" text="Loan Officer Panel / Loan Reports" /></p>
-    <h1 class="erp-page-title"><spring:message code="loanOfficer.reports.title" text="Loan Officer Review Reports" /></h1>
+    <h1 class="erp-page-title" id="loan-officer-reports-title"><spring:message code="loanOfficer.reports.title" text="Loan Officer Review Reports" /></h1>
 </div>
 
 <form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
@@ -39,7 +39,7 @@
     </div>
 </form>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="loan-officer-reports-1" data-resource-split data-table-title-id="loan-officer-reports-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -52,7 +52,7 @@
             <th><spring:message code="review.loanOfficerDecision" text="Loan Officer Decision" /></th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
-            <th></th>
+            <th data-table-actions-header></th>
         </tr>
         </thead>
         <tbody>

@@ -6,7 +6,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users &amp; Roles" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users &amp; Roles" /></h1>
+    <h1 class="erp-page-title" id="admin-users-title"><spring:message code="admin.users.title" text="Users &amp; Roles" /></h1>
 </div>
 
 <c:if test="${not empty createdStaffUserId}">
@@ -23,7 +23,7 @@
 <c:set var="userSliceStart" value="${userTotal == 0 ? 0 : (usersPage.number * usersPage.size) + 1}" />
 <c:set var="userSliceEndRaw" value="${(usersPage.number * usersPage.size) + users.size()}" />
 <c:set var="userSliceEnd" value="${userTotal == 0 ? 0 : userSliceEndRaw}" />
-<section class="erp-table-wrap admin-register-shell admin-users-register" aria-label="Users and roles results">
+<section class="erp-table-wrap admin-register-shell admin-users-register" aria-label="Users and roles results" data-resource-table="admin-users-1" data-resource-split data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2>Users &amp; Roles results</h2>
@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <form method="get" action="/admin/users" class="admin-filter-form aws-filter-toolbar admin-users-filter-form" data-aws-filter-toolbar>
+    <form method="get" action="/admin/users" class="admin-filter-form aws-filter-toolbar admin-users-filter-form" data-aws-filter-toolbar data-table-filter-for="admin-users-1">
         <label class="admin-users-filter-field admin-users-filter-field--type">
             <span class="sr-only">Search By</span>
             <select name="searchBy" class="fcms-control w-full" aria-label="Search by">
@@ -53,7 +53,7 @@
                    title="Enter selected User ID or name" />
         </label>
 
-        <label class="admin-users-filter-field admin-users-filter-field--rows">
+        <label class="admin-users-filter-field admin-users-filter-field--rows" data-table-page-size-control>
             <span class="sr-only">Rows Per Page</span>
             <select name="size" class="fcms-control w-full" aria-label="Rows per page">
                 <option value="25" ${selectedPageSize == 25 ? 'selected' : ''}>25 rows</option>
@@ -80,7 +80,7 @@
             <th class="px-3 py-2 text-left whitespace-nowrap">Current Roles</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Membership</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Current Status</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Update</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-actions-header>Update</th>
         </tr>
         </thead>
         <tbody>
@@ -143,12 +143,12 @@
     </div>
 </section>
 
-<div class="erp-toolbar">
+<div class="erp-toolbar" data-table-pagination-shell>
     <div class="text-sm text-slate-500">
-        Server-paged list.
+
     </div>
     <c:if test="${usersPage.totalPages > 1}">
-        <div class="flex flex-wrap items-center justify-end gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2" data-table-pagination data-table-for="admin-users-1" data-page="${usersPage.number}">
             <c:set var="userPrevPage" value="${usersPage.number - 1}" />
             <c:set var="userNextPage" value="${usersPage.number + 1}" />
             <c:choose>
@@ -156,7 +156,7 @@
                     <span class="app-btn btn-neutral pointer-events-none opacity-50">Previous</span>
                 </c:when>
                 <c:otherwise>
-                    <a href="/admin/users?page=${userPrevPage}${usersPaginationQuery}" class="app-btn btn-neutral">Previous</a>
+                    <a href="/admin/users?page=${userPrevPage}${usersPaginationQuery}" class="app-btn btn-neutral" data-page-direction="previous">Previous</a>
                 </c:otherwise>
             </c:choose>
 
@@ -169,7 +169,7 @@
                     <span class="app-btn btn-neutral pointer-events-none opacity-50">Next</span>
                 </c:when>
                 <c:otherwise>
-                    <a href="/admin/users?page=${userNextPage}${usersPaginationQuery}" class="app-btn btn-neutral">Next</a>
+                    <a href="/admin/users?page=${userNextPage}${usersPaginationQuery}" class="app-btn btn-neutral" data-page-direction="next">Next</a>
                 </c:otherwise>
             </c:choose>
         </div>

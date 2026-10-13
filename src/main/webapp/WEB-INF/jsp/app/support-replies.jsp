@@ -6,19 +6,19 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="support.replies.breadcrumb" text="Borrower Workspace / Support / Replies" /></p>
-    <h1 class="erp-page-title"><spring:message code="support.replies.title" text="Support Replies" /></h1>
+    <h1 class="erp-page-title" id="app-support-replies-title"><spring:message code="support.replies.title" text="Support Replies" /></h1>
 </div>
 
 <section class="erp-panel">
-    <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3">
-        <p class="erp-panel-title"><spring:message code="support.replies.fromStationAdmin" text="Replies From Branch Admin" /></p>
-        <form action="/app/support/replies/mark-all-read" method="post">
+    <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3" data-resource-header-source>
+        <h2 class="erp-panel-title" data-table-heading-for="app-support-replies-1"><spring:message code="support.replies.fromStationAdmin" text="Replies From Branch Admin" /></h2>
+        <form action="/app/support/replies/mark-all-read" method="post" data-table-toolbar-for="app-support-replies-1">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <button type="submit" class="app-btn btn-neutral"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
         </form>
     </div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-support-replies-1">
             <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
@@ -51,9 +51,9 @@
 </section>
 
 <section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="support.broadcasts.title" text="Branch Admin Broadcasts" /></p></div>
+    <div class="erp-panel-header" data-resource-header-source><h2 class="erp-panel-title" data-table-heading-for="app-support-replies-2"><spring:message code="support.broadcasts.title" text="Branch Admin Broadcasts" /></h2></div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-support-replies-2">
             <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>

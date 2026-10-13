@@ -6,11 +6,11 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.support.archiveBreadcrumb" text="Admin Tools / Support / Sent Archive" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.support.archiveTitle" text="Sent Support Archive" /></h1>
+    <h1 class="erp-page-title" id="admin-support-archive-title"><spring:message code="admin.support.archiveTitle" text="Sent Support Archive" /></h1>
 </div>
 
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
-    <form method="get" action="/admin/support/archive" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar>
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-support-archive-1" data-table-title-id="admin-support-archive-title">
+    <form method="get" action="/admin/support/archive" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-support-archive-1">
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="common.fromDate" text="From Date" />
             <input type="date" name="fromDate" value="${fromDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
@@ -48,11 +48,11 @@
     </table>
 </div>
     <c:if test="${archivePage.totalPages gt 1}">
-        <nav class="aws-table-pagination-footer" aria-label="Support archive pages">
+        <nav class="aws-table-pagination-footer" aria-label="Support archive pages" data-table-pagination-shell>
             <span>Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
-            <div class="flex gap-2">
-                <c:if test="${not archivePage.first}"><c:url var="supportPreviousUrl" value="/admin/support/archive"><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /><c:param name="page" value="${archivePage.number - 1}" /></c:url><a class="app-btn btn-neutral" href="${supportPreviousUrl}"><spring:message code="common.previous" text="Previous" /></a></c:if>
-                <c:if test="${not archivePage.last}"><c:url var="supportNextUrl" value="/admin/support/archive"><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /><c:param name="page" value="${archivePage.number + 1}" /></c:url><a class="app-btn btn-primary" href="${supportNextUrl}"><spring:message code="common.next" text="Next" /></a></c:if>
+            <div class="flex gap-2" data-table-pagination data-table-for="admin-support-archive-1" data-page="${archivePage.number}">
+                <c:if test="${not archivePage.first}"><c:url var="supportPreviousUrl" value="/admin/support/archive"><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /><c:param name="page" value="${archivePage.number - 1}" /></c:url><a class="app-btn btn-neutral" href="${supportPreviousUrl}" data-page-direction="previous"><spring:message code="common.previous" text="Previous" /></a></c:if>
+                <c:if test="${not archivePage.last}"><c:url var="supportNextUrl" value="/admin/support/archive"><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /><c:param name="page" value="${archivePage.number + 1}" /></c:url><a class="app-btn btn-primary" href="${supportNextUrl}" data-page-direction="next"><spring:message code="common.next" text="Next" /></a></c:if>
             </div>
         </nav>
     </c:if>

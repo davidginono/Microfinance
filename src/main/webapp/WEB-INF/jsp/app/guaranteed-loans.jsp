@@ -8,11 +8,11 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Borrower Workspace / Guarantees" /></p>
-    <h1 class="erp-page-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
+    <h1 class="erp-page-title" id="app-guaranteed-loans-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
 </div>
 
 <section class="erp-table-wrap guaranteed-loans-table" aria-labelledby="guaranteedLoansTableTitle"
-         data-aws-table-region data-aws-client-table data-loading-label="Loading results...">
+         data-aws-table-region data-aws-client-table data-loading-label="Loading results..." data-resource-table="app-guaranteed-loans-1">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2 id="guaranteedLoansTableTitle"><spring:message code="guaranteedLoans.activePosition" text="Active Guarantee Position" /></h2>

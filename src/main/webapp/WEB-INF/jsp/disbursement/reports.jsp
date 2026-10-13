@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.reports.breadcrumb" text="Disbursement Panel / Reports" /></p>
-    <h1 class="erp-page-title"><spring:message code="disbursement.reports.title" text="Disbursement Reports" /></h1>
+    <h1 class="erp-page-title" id="disbursement-reports-title"><spring:message code="disbursement.reports.title" text="Disbursement Reports" /></h1>
 </div>
 
 <form method="get" action="/documents/reports/disbursement-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
@@ -31,7 +31,7 @@
     </div>
 </form>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="disbursement-reports-1" data-resource-split data-table-title-id="disbursement-reports-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -43,7 +43,7 @@
             <th><spring:message code="common.amount" text="Amount" /></th>
             <th><spring:message code="review.disbursedAt" text="Disbursed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
-            <th></th>
+            <th data-table-actions-header></th>
         </tr>
         </thead>
         <tbody>

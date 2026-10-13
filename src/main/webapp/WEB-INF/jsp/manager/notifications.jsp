@@ -7,15 +7,15 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.notifications.breadcrumb" text="Manager Panel / Notifications" /></p>
-    <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
+    <h1 class="erp-page-title" id="manager-notifications-title"><spring:message code="notifications.title" text="Notifications" /></h1>
 </div>
 <div class="mb-3 flex items-center justify-end">
-    <form action="/manager/notifications/mark-all-read" method="post" class="m-0">
+    <form action="/manager/notifications/mark-all-read" method="post" class="m-0" data-table-toolbar-for="manager-notifications-1">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <button type="submit" class="app-btn btn-primary"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
     </form>
 </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-notifications-1" data-table-title-id="manager-notifications-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

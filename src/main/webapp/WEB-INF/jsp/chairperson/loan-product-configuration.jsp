@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="chairperson.configurations" text="Institution Configurations" /> / <spring:message code="reports.loanProduct" text="Loan Product" /></p>
-    <h1 class="erp-page-title"><c:out value="${product.name}" /></h1>
+    <h1 class="erp-page-title" id="chairperson-loan-product-configuration-title"><c:out value="${product.name}" /></h1>
 </div>
 
 <section class="erp-panel chairperson-product-summary" data-aws-table-region>
@@ -117,8 +117,8 @@
     </section>
 </div>
 
-<section class="erp-panel mt-4 overflow-hidden">
-    <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold"><spring:message code="admin.settings.approvalFlow" text="Approval Flow" /></h2></div>
+<section class="erp-panel mt-4 overflow-hidden" data-resource-table="chairperson-loan-product-configuration-1">
+    <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold" data-table-heading-for="chairperson-loan-product-configuration-1"><spring:message code="admin.settings.approvalFlow" text="Approval Flow" /></h2></div>
     <div class="erp-table-scroll erp-table-scroll-fit">
         <table class="erp-table erp-table--left-headings chairperson-approval-table">
             <colgroup><col class="chairperson-table-order-column" /><col /></colgroup>
@@ -132,8 +132,8 @@
 </section>
 
 <div class="chairperson-product-tables-grid">
-    <section class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold"><spring:message code="loan.attachments" text="Required Attachments" /></h2></div>
+    <section class="erp-panel overflow-hidden" data-resource-table="chairperson-loan-product-configuration-2">
+        <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold" data-table-heading-for="chairperson-loan-product-configuration-2"><spring:message code="loan.attachments" text="Required Attachments" /></h2></div>
         <div class="erp-table-scroll erp-table-scroll-fit">
             <table class="erp-table erp-table--left-headings chairperson-attachments-table">
                 <colgroup><col /><col class="chairperson-table-size-column" /></colgroup>
@@ -146,8 +146,8 @@
         </div>
     </section>
 
-    <section class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold"><spring:message code="chairperson.assignedReviewers" text="Assigned Reviewers" /></h2></div>
+    <section class="erp-panel overflow-hidden" data-resource-table="chairperson-loan-product-configuration-3">
+        <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold" data-table-heading-for="chairperson-loan-product-configuration-3"><spring:message code="chairperson.assignedReviewers" text="Assigned Reviewers" /></h2></div>
         <div class="erp-table-scroll erp-table-scroll-md">
             <table class="erp-table erp-table--left-headings chairperson-reviewers-table">
                 <colgroup><col class="chairperson-table-stage-column" /><col /><col class="chairperson-table-staff-column" /></colgroup>

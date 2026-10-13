@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / SMS Usage</p>
-    <h1 class="erp-page-title">SMS Usage</h1>
+    <h1 class="erp-page-title" id="admin-sms-usage-title">SMS Usage</h1>
 </div>
 
 <c:url var="smsRefreshUrl" value="/admin/sms-usage">
@@ -84,19 +84,21 @@
         <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
     </c:url>
 
-    <section class="erp-table-wrap mt-3" aria-label="Branch SMS balances">
+    <section class="erp-table-wrap mt-3" aria-label="Branch SMS balances" data-resource-table="admin-sms-usage-1">
         <div class="app-table-titlebar">
             <div class="app-table-heading"><h2>Branch SMS Balances</h2><span>Showing ${accountStart}-${accountEnd} of ${accountTotal}</span></div>
             <div class="app-table-toolbar">
                 <a class="app-icon-button" href="${smsRefreshUrl}" aria-label="Refresh Branch SMS balances">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg>
                 </a>
-                <span class="admin-register-count">Page ${accounts.number + 1} of ${accounts.totalPages gt 0 ? accounts.totalPages : 1}</span>
-                <c:choose><c:when test="${accounts.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${accountPreviousUrl}" aria-label="Previous Branch SMS balances page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
-                <c:choose><c:when test="${accounts.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${accountNextUrl}" aria-label="Next Branch SMS balances page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>
+                <div data-table-pagination data-table-for="admin-sms-usage-1" data-page="${accounts.number}">
+<span class="admin-register-count">Page ${accounts.number + 1} of ${accounts.totalPages gt 0 ? accounts.totalPages : 1}</span>
+                <c:choose><c:when test="${accounts.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" data-page-direction="previous" href="${accountPreviousUrl}" aria-label="Previous Branch SMS balances page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
+                <c:choose><c:when test="${accounts.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" data-page-direction="next" href="${accountNextUrl}" aria-label="Next Branch SMS balances page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>
+</div>
             </div>
         </div>
-        <form method="get" action="/admin/sms-usage" class="aws-filter-toolbar" data-aws-filter-toolbar>
+        <form method="get" action="/admin/sms-usage" class="aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-sms-usage-1">
             <label class="min-w-[12rem] flex-[1_1_14rem]"><span class="sr-only">Filter by Institution</span><select id="smsBalanceSacco" name="saccoId" class="fcms-control w-full"><option value="">All Institutions</option><c:forEach items="${registeredSaccos}" var="Sacco"><option value="${Sacco.saccoId}" ${selectedSaccoId eq Sacco.saccoId ? 'selected' : ''}>${Sacco.saccoName}</option></c:forEach></select></label>
             <label class="min-w-[10rem] flex-[1_1_12rem]"><span class="sr-only">Filter by Branch</span><select id="smsBalanceStation" name="stationId" data-selected-station="${selectedStationId}" class="fcms-control w-full"><option value="">Select an institution first</option></select></label>
             <label class="min-w-[10rem] flex-[0_1_12rem]"><span class="sr-only">Filter by status</span><select name="status" class="fcms-control w-full"><option value="">All statuses</option><c:forEach items="${smsStatuses}" var="item"><option value="${item}" ${selectedSmsStatus eq item.toString() ? 'selected' : ''}>${item}</option></c:forEach></select></label>
@@ -163,7 +165,7 @@
     <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
-<section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage">
+<section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage" data-resource-table="admin-sms-usage-2">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2>Loan Application SMS Usage</h2>
@@ -172,12 +174,14 @@
         <div class="app-table-toolbar">
             <a class="app-icon-button" href="${smsRefreshUrl}" aria-label="Refresh loan application SMS usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg></a>
             <a class="app-btn btn-neutral" href="${loanUsagePdfUrl}" data-download-action="true">PDF</a>
-            <span class="admin-register-count">Page ${loanSmsUsage.number + 1} of ${loanSmsUsage.totalPages gt 0 ? loanSmsUsage.totalPages : 1}</span>
-            <c:choose><c:when test="${loanSmsUsage.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${loanUsagePreviousUrl}" aria-label="Previous loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
-            <c:choose><c:when test="${loanSmsUsage.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" href="${loanUsageNextUrl}" aria-label="Next loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>
+            <div data-table-pagination data-table-for="admin-sms-usage-2" data-page="${loanSmsUsage.number}">
+<span class="admin-register-count">Page ${loanSmsUsage.number + 1} of ${loanSmsUsage.totalPages gt 0 ? loanSmsUsage.totalPages : 1}</span>
+            <c:choose><c:when test="${loanSmsUsage.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" data-page-direction="previous" href="${loanUsagePreviousUrl}" aria-label="Previous loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>
+            <c:choose><c:when test="${loanSmsUsage.last}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" data-page-direction="next" href="${loanUsageNextUrl}" aria-label="Next loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></c:otherwise></c:choose>
+</div>
         </div>
     </div>
-    <form method="get" action="/admin/sms-usage" class="aws-filter-toolbar sms-usage-filter-toolbar" data-aws-filter-toolbar data-sms-applicant-filter>
+    <form method="get" action="/admin/sms-usage" class="aws-filter-toolbar sms-usage-filter-toolbar" data-aws-filter-toolbar data-sms-applicant-filter data-table-filter-for="admin-sms-usage-2">
         <input type="hidden" name="saccoId" value="${selectedSaccoId}" data-sms-filter-sacco />
         <input type="hidden" name="stationId" value="${selectedStationId}" data-sms-filter-station />
         <input type="hidden" name="status" value="${selectedSmsStatus}" />

@@ -8,21 +8,19 @@
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="archives.breadcrumb" text="Borrower Workspace / Archives" /></p>
-    <h1 class="erp-page-title"><spring:message code="archives.title" text="Archives" /></h1>
+    <h1 class="erp-page-title" id="app-archives-title"><spring:message code="archives.title" text="Archives" /></h1>
 </div>
 
 <c:choose>
     <c:when test="${archiveSection eq 'guarantors'}">
         <section id="guarantor-archive-section" class="erp-panel overflow-hidden">
-            <div class="border-b border-slate-200 px-4 py-4">
+            <div class="border-b border-slate-200 px-4 py-4" data-resource-header-source>
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="archives.guarantee.title" text="Guarantee Archive" /></p>
-                        <p class="mt-2 text-sm text-slate-600"><spring:message code="archives.guarantee.subtitle" text="Search by loan ID and filter archived guarantor decisions." /></p>
+                        <h2 data-table-heading-for="app-archives-1"><spring:message code="archives.guarantee.title" text="Guarantee Archive" /> <span class="app-table-count">(${fn:length(guarantorArchives)})</span></h2>
                     </div>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(guarantorArchives)} <spring:message code="common.shown" text="shown" /></span>
                 </div>
-<form action="/app/archives" method="get" class="erp-filter-form mt-4 aws-filter-toolbar" data-aws-filter-toolbar>
+<form action="/app/archives" method="get" class="erp-filter-form mt-4 aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="app-archives-1">
                     <input type="hidden" name="section" value="guarantors" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="archives.loanIdSearch" text="Loan ID Search" /></span>
@@ -55,7 +53,7 @@
                     </div>
                 </form>
             </div>
-<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-archives-1" data-table-title-id="app-archives-title">
                 <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
@@ -101,15 +99,13 @@
     </c:when>
     <c:otherwise>
         <section id="loan-archive-section" class="erp-panel overflow-hidden">
-            <div class="border-b border-slate-200 px-4 py-4">
+            <div class="border-b border-slate-200 px-4 py-4" data-resource-header-source>
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="archives.loan.title" text="Loan Archive" /></p>
-                        <p class="mt-2 text-sm text-slate-600"><spring:message code="archives.loan.subtitle" text="Search by loan ID and filter archived loan outcomes." /></p>
+                        <h2 data-table-heading-for="app-archives-2"><spring:message code="archives.loan.title" text="Loan Archive" /> <span class="app-table-count">(${fn:length(archives)})</span></h2>
                 </div>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(archives)} <spring:message code="common.shown" text="shown" /></span>
                     </div>
-<form action="/app/archives" method="get" class="erp-filter-form mt-4 aws-filter-toolbar" data-aws-filter-toolbar>
+<form action="/app/archives" method="get" class="erp-filter-form mt-4 aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="app-archives-2">
                     <input type="hidden" name="section" value="loans" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="archives.loanIdSearch" text="Loan ID Search" /></span>
@@ -143,7 +139,7 @@
             </div>
                 </form>
             </div>
-<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-archives-2" data-resource-split data-table-title-id="app-archives-title">
                 <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
@@ -154,7 +150,7 @@
                         <th><spring:message code="common.amount" text="Amount" /></th>
                         <th><spring:message code="common.status" text="Status" /></th>
                         <th><spring:message code="loan.date" text="Date" /></th>
-                        <th scope="col" class="erp-table-action-column"><spring:message code="common.actions" text="Actions" /></th>
+                        <th scope="col" class="erp-table-action-column" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -198,7 +194,7 @@
 </c:choose>
 
 <c:if test="${archivePage.totalPages gt 1}">
-    <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Archive pages">
+    <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Archive pages" data-table-pagination data-table-for="app-archives-1 app-archives-2" data-page="${archivePage.number}">
         <c:choose>
             <c:when test="${not archivePage.first}">
                 <c:url var="archivePreviousUrl" value="/app/archives">
@@ -211,7 +207,7 @@
                     <c:param name="fromDate" value="${fromDate}" />
                     <c:param name="toDate" value="${toDate}" />
                 </c:url>
-                <a class="app-btn btn-neutral" href="${archivePreviousUrl}">Previous</a>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}" data-page-direction="previous">Previous</a>
             </c:when>
             <c:otherwise><span></span></c:otherwise>
         </c:choose>
@@ -227,7 +223,7 @@
                 <c:param name="fromDate" value="${fromDate}" />
                 <c:param name="toDate" value="${toDate}" />
             </c:url>
-            <a class="app-btn btn-neutral" href="${archiveNextUrl}">Next</a>
+            <a class="app-btn btn-neutral" href="${archiveNextUrl}" data-page-direction="next">Next</a>
         </c:if>
     </nav>
 </c:if>

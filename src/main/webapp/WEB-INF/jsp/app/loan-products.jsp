@@ -8,7 +8,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="products.breadcrumb" /></p>
-    <h1 class="erp-page-title"><spring:message code="products.title" /></h1>
+    <h1 class="erp-page-title" id="app-loan-products-title"><spring:message code="products.title" /></h1>
 </div>
 
 <section class="erp-form-wrap mb-4 space-y-4">
@@ -164,7 +164,7 @@
                         <p class="mt-1 text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
                     </div>
                 </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-products-1" data-table-title-id="app-loan-products-title">
                     <div class="erp-table-scroll erp-table-scroll-sm">
                     <table class="erp-table">
                         <thead>
@@ -217,7 +217,7 @@
                     </div>
 </c:if>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-products-2" data-table-title-id="app-loan-products-title" data-resource-split>
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -228,7 +228,7 @@
                 <th><spring:message code="products.table.annualInterest" /></th>
                 <th><spring:message code="products.table.repaymentMethod" text="Repayment Method" /></th>
                 <th><spring:message code="products.table.tenure" /></th>
-                <th><spring:message code="products.table.action" /></th>
+                <th data-table-actions-header><spring:message code="products.table.action" /></th>
             </tr>
         </thead>
         <tbody>
@@ -580,9 +580,11 @@
 
         function renderFinancialSections(sections) {
             card.innerHTML = "";
-            Object.entries(sections || {}).forEach(function (section) {
+            Object.entries(sections || {}).forEach(function (section, sectionIndex) {
                 const wrapper = document.createElement("div");
                 wrapper.className = "erp-table-wrap loan-calculator-detail-card";
+                wrapper.dataset.resourceTable = "member-product-calculation-" + sectionIndex;
+                wrapper.dataset.awsNoRefresh = "true";
                 wrapper.innerHTML = ""
                     +"<div class='app-table-titlebar'>"
                     +"<div class='app-table-heading'><h3></h3></div>"
@@ -604,6 +606,7 @@
                     tableBody.appendChild(row);
                 });
                 card.appendChild(wrapper);
+                window.ResourceTable.init(card);
             });
             card.classList.toggle("hidden", card.children.length === 0);
         }

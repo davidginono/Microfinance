@@ -5,15 +5,15 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Reports</p>
-    <h1 class="erp-page-title">Reporting & Export Architecture</h1>
+    <h1 class="erp-page-title" id="admin-reports-title">Reporting & Export Architecture</h1>
 </div>
 
 <section class="erp-panel overflow-hidden">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4" data-resource-header-source>
         <p class="erp-widget-title">25.1 Report Categories</p>
-        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Report Categories</h2>
+        <h2 class="mt-1 text-xl font-bold text-sacco-ink" data-table-heading-for="admin-reports-1">Report Categories</h2>
     </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-reports-1">
         <div class="erp-table-scroll">
         <table class="erp-table">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -84,9 +84,9 @@
     </div>
         </div>
     <div class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4" data-resource-header-source>
             <p class="erp-widget-title">25.3 Reconciliation Report</p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Reconciliation Report</h2>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink" data-table-heading-for="admin-reports-2">Reconciliation Report</h2>
             </div>
         <div class="erp-panel-body space-y-5">
             <div>
@@ -95,7 +95,7 @@
                     Identify approved applications not yet completed with Loan ID and disbursement details.
                 </p>
             </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-reports-2">
                 <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">

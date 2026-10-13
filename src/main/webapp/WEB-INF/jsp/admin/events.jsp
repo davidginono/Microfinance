@@ -7,16 +7,16 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.events.breadcrumb" text="Admin Tools / Event Log" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.events.title" text="Event Log" /></h1>
+    <h1 class="erp-page-title" id="admin-events-title"><spring:message code="admin.events.title" text="Event Log" /></h1>
 </div>
-<section class="erp-table-wrap admin-register-shell" aria-label="Event log results">
+<section class="erp-table-wrap admin-register-shell" aria-label="Event log results" data-resource-table="admin-events-1" data-resource-split data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
     <div class="app-table-titlebar">
         <div class="app-table-heading"><h2>Event Log results</h2></div>
         <div class="app-table-toolbar">
             <a href="/admin/events" class="app-icon-button" aria-label="Refresh event log" title="Refresh event log">&#8635;</a>
         </div>
     </div>
-    <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
+    <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-events-1">
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 Institution
@@ -62,7 +62,7 @@
             Actor / User ID
             <input type="text" name="actorId" value="${selectedActorId}" placeholder="Search actor UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" />
         </label>
-        <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700">
+        <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700" data-table-page-size-control>
             <span class="admin-filter-field--rows-label">Rows Per Page</span>
             <select name="size" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none">
                 <option value="25" ${selectedPageSize eq 25 ? 'selected' : ''}>25 rows</option>
@@ -129,15 +129,15 @@
     </div>
 </section>
 <c:if test="${entriesPage.totalPages gt 1}">
-    <div class="mt-4 flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mt-4 flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-table-pagination-shell>
         <p class="text-sm text-slate-600">Page <span class="font-semibold text-slate-800">${entriesPage.number + 1}</span> of <span class="font-semibold text-slate-800">${entriesPage.totalPages}</span></p>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2" data-table-pagination data-table-for="admin-events-1" data-page="${entriesPage.number}">
             <c:choose>
                 <c:when test="${entriesPage.first}">
                     <span class="app-btn btn-neutral opacity-50">Previous</span>
                 </c:when>
                 <c:otherwise>
-                    <a href="/admin/events?page=${entriesPage.number - 1}${eventsPaginationQuery}" class="app-btn btn-neutral">Previous</a>
+                    <a href="/admin/events?page=${entriesPage.number - 1}${eventsPaginationQuery}" class="app-btn btn-neutral" data-page-direction="previous">Previous</a>
                 </c:otherwise>
             </c:choose>
             <c:choose>
@@ -145,7 +145,7 @@
                     <span class="app-btn btn-neutral opacity-50">Next</span>
                 </c:when>
                 <c:otherwise>
-                    <a href="/admin/events?page=${entriesPage.number + 1}${eventsPaginationQuery}" class="app-btn btn-primary">Next</a>
+                    <a href="/admin/events?page=${entriesPage.number + 1}${eventsPaginationQuery}" class="app-btn btn-primary" data-page-direction="next">Next</a>
                 </c:otherwise>
             </c:choose>
         </div>

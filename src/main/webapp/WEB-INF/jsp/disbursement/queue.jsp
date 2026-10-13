@@ -9,7 +9,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.queue.breadcrumb" text="Disbursement Panel / Queue" /></p>
-    <h1 class="erp-page-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h1>
+    <h1 class="erp-page-title" id="disbursement-queue-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h1>
 </div>
 <section class="aws-current-filter-toolbar" aria-labelledby="disbursementQueueCurrentFilterLabel">
     <div class="aws-current-filter-summary">
@@ -18,7 +18,7 @@
             <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
         </div>
     </div>
-    <form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+    <form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="disbursement-queue-1">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${queueSearchLabel}
@@ -37,7 +37,7 @@
             </div>
         </form>
 </section>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="disbursement-queue-1" data-resource-split data-table-title-id="disbursement-queue-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -48,7 +48,7 @@
             <th><spring:message code="common.amount" text="Amount" /></th>
             <th><spring:message code="common.status" text="Status" /></th>
             <th><spring:message code="loan.date" text="Date" /></th>
-            <th><spring:message code="common.action" text="Action" /></th>
+            <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>

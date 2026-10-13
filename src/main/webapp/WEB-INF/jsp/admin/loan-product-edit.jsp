@@ -8,7 +8,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Settings & Controls / Loan Products</p>
-    <h1 class="erp-page-title">Configure <c:out value="${product.displayName}" /></h1>
+    <h1 class="erp-page-title" id="admin-loan-product-edit-title">Configure <c:out value="${product.displayName}" /></h1>
 </div>
 
 <div class="product-config-page-actions">
@@ -30,9 +30,9 @@
      data-product-config-stage="Step 2 of 2 &middot; focused product"
      data-product-config-storage-key="loan-product-config-${product.id}">
     <section class="product-config-workspace-nav" aria-label="Loan product configuration sections">
-        <div class="product-config-workspace-summary">
+        <div class="product-config-workspace-summary" data-resource-header-source>
             <p class="erp-widget-title">Selected product</p>
-            <h2><c:out value="${product.displayName}" /></h2>
+            <h2 data-table-heading-for="admin-loan-product-edit-1"><c:out value="${product.displayName}" /></h2>
             <div class="product-config-workspace-meta">
                 <span class="product-config-status
                     ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
@@ -195,7 +195,7 @@
                         <details class="workflow-subsection product-config-subsection">
                             <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></summary>
                             <div class="product-config-subsection-body">
-                            <div class="erp-table-wrap" data-aws-no-titlebar="true">
+                            <div class="erp-table-wrap" data-aws-no-titlebar="true" data-resource-table="admin-loan-product-edit-1">
                                 <div class="erp-table-scroll erp-table-scroll-sm" data-aws-table-region data-loading-label="Loading workflow stages...">
                                     <table class="erp-table">
                                         <thead>
@@ -259,7 +259,7 @@
                         <details class="workflow-subsection product-config-subsection">
                             <summary class="workflow-subsection-title"><spring:message code="role.boardMember" text="Committee Member" /></summary>
                             <div class="product-config-subsection-body">
-                            <div class="erp-table-wrap" data-board-reviewer-list data-aws-no-titlebar="true">
+                            <div class="erp-table-wrap" data-board-reviewer-list data-aws-no-titlebar="true" data-resource-table="admin-loan-product-edit-2" data-table-title-id="admin-loan-product-edit-title">
                                 <div class="aws-filter-toolbar">
                                     <label class="min-w-[14rem] flex-[1_1_20rem]">
                                         <span class="sr-only">Search Committee Members</span>
@@ -290,7 +290,7 @@
                         <details class="workflow-subsection product-config-subsection">
                             <summary class="workflow-subsection-title"><spring:message code="role.committee" text="Credit Committee" /></summary>
                             <div class="product-config-subsection-body">
-                            <div class="erp-table-wrap" data-credit-committee-reviewer-list data-aws-no-titlebar="true">
+                            <div class="erp-table-wrap" data-credit-committee-reviewer-list data-aws-no-titlebar="true" data-resource-table="admin-loan-product-edit-3" data-table-title-id="admin-loan-product-edit-title">
                                 <div class="aws-filter-toolbar">
                                     <label class="min-w-[14rem] flex-[1_1_20rem]">
                                         <span class="sr-only">Search credit committee Members</span>
@@ -337,7 +337,7 @@
                                     <button type="button" class="app-btn btn-neutral" data-required-attachment-add>Add Name of Required Attachment</button>
                                 </div>
                                 <div class="hidden border border-slate-200 bg-slate-50 p-3" data-required-attachment-form>
-                                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end">
+                                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end" data-table-toolbar-for="admin-loan-product-edit-4" data-resource-header-source>
                                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             Attachment Name
                                             <input form="requiredAttachmentCreateForm" name="attachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. Salary slip" />
@@ -350,14 +350,14 @@
                                         <button type="button" class="app-btn btn-neutral" data-required-attachment-cancel>Cancel</button>
                                     </div>
                                 </div>
-                                <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading clients...">
+                                <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading clients..." data-resource-table="admin-loan-product-edit-4" data-resource-split data-table-title-id="admin-loan-product-edit-title">
                                     <div class="erp-table-scroll erp-table-scroll-sm">
                                     <table class="erp-table min-w-[620px]">
                                         <thead>
                                         <tr>
                                             <th class="px-3 py-2 text-left">Name</th>
                                             <th class="px-3 py-2 text-left">Max MB</th>
-                                            <th class="px-3 py-2 text-left">Action</th>
+                                            <th class="px-3 py-2 text-left" data-table-actions-header>Action</th>
                                         </tr>
                                         </thead>
                                         <tbody>

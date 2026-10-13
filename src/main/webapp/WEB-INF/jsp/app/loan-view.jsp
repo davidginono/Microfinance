@@ -24,7 +24,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Borrower Workspace / Application Detail" /></p>
-    <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
+    <h1 class="erp-page-title" id="app-loan-view-title"><spring:message code="loan.detail" /></h1>
 </div>
 <div class="loan-application-detail-page">
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your institution'}" />
@@ -179,8 +179,8 @@
 <c:choose>
     <c:when test="${not empty financialFieldSections}">
         <div class="grid gap-3 md:grid-cols-2">
-            <c:forEach items="${financialFieldSections}" var="section">
-<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-loading-label="Loading results...">
+            <c:forEach items="${financialFieldSections}" var="section" varStatus="financialSectionLoop">
+<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-loading-label="Loading results..." data-resource-table="app-loan-view-1-${financialSectionLoop.index}" data-table-title-id="app-loan-view-title">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -207,7 +207,7 @@
             </div>
     </c:when>
     <c:otherwise>
-        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-2">
             <div class="app-table-titlebar">
                 <div class="app-table-heading"><h2><spring:message code="loan.details" text="Loan Details" /></h2></div>
         </div>
@@ -239,7 +239,7 @@
 </c:choose>
 
 <c:if test="${not empty calculatedRepaymentRows}">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-3">
         <div class="app-table-titlebar">
             <div class="app-table-heading">
                 <h2>
@@ -291,8 +291,8 @@
          data-repayment-schedule-url="${pageContext.request.contextPath}${repaymentSchedulePath}"
          data-repayment-summary-card-class="loan-repayment-card">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.title" text="Repayment Plan" /></h5>
+            <div data-resource-header-source>
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="app-loan-view-4"><spring:message code="loan.repayment.title" text="Repayment Plan" /></h2>
                 <p class="mt-1 text-sm text-slate-500">
                     <c:choose>
                         <c:when test="${app.status eq 'PAID'}"><spring:message code="loan.repayment.paidHelp" text="This loan was disbursed and fully cleared. The schedule below shows the agreed repayment trail." /></c:when>
@@ -448,7 +448,7 @@
                     <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
                 </span>
             </summary>
-            <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true">
+            <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true" data-resource-table="app-loan-view-4">
                 <div class="erp-table-scroll">
                 <table class="erp-table loan-repayment-schedule-table">
                     <thead>
@@ -494,7 +494,7 @@
 </c:if>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-5" data-resource-split>
         <div class="app-table-titlebar">
             <div class="app-table-heading"><h2><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></h2></div>
 </div>
@@ -505,7 +505,7 @@
                     <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.size" text="Size" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.uploaded" text="Uploaded" /></th>
-                    <th class="px-3 py-2 text-left"></th>
+                    <th class="px-3 py-2 text-left" data-table-actions-header></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -533,7 +533,7 @@
                                 </div>
 </c:if>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-6" data-resource-split>
     <div class="app-table-titlebar">
         <div class="app-table-heading"><h2><spring:message code="loan.attachments.applicationAttachments" text="Application Attachments" /></h2></div>
 </div>
@@ -544,7 +544,7 @@
                 <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.size" text="Size" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.uploaded" text="Uploaded" /></th>
-                <th class="px-3 py-2 text-left"></th>
+                <th class="px-3 py-2 text-left" data-table-actions-header></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -567,7 +567,7 @@
                 </div>
             </div>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-7" data-resource-split>
     <div class="app-table-titlebar">
         <div class="app-table-heading"><h2><spring:message code="loan.guarantors" /></h2></div>
             </div>
@@ -579,7 +579,7 @@
                 <th class="w-[12%] px-3 py-2 text-left"><spring:message code="member.memberNo" text="Client No" /></th>
                 <th class="w-[14%] px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
                 <th class="w-[14%] px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-                <th class="w-[42%] px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
+                <th class="w-[42%] px-3 py-2 text-left" data-table-actions-header><spring:message code="loan.removalRequest" text="Removal Request" /></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">

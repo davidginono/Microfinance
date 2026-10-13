@@ -7,7 +7,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Client Workspace / Application Progress" /></p>
-    <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
+    <h1 class="erp-page-title" id="app-loan-applications-title"><spring:message code="apps.title" /></h1>
 </div>
 <c:set var="hasAwaitingGuarantors" value="false" />
 <c:forEach items="${apps}" var="a">
@@ -23,7 +23,7 @@
         setTimeout(function () { window.location.reload(); }, 3600000);
     </script>
 </c:if>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-applications-1" data-resource-split data-table-title-id="app-loan-applications-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -40,7 +40,7 @@
                 </th>
                 <th class="px-3 py-2 text-left"><spring:message code="common.reason" text="Reason" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-                <th scope="col" class="erp-table-action-column"><spring:message code="common.actions" text="Actions" /></th>
+                <th scope="col" class="erp-table-action-column" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr>
         </thead>
         <tbody>

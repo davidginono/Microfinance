@@ -24,7 +24,7 @@
                         name="saccoId"
                         class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
                     <c:forEach items="${scopeSelection.options}" var="option">
-                        <option value="${option.saccoId}" ${scopeSelection.saccoId eq option.saccoId ? 'selected' : ''}>${option.saccoId} - ${option.saccoName}</option>
+                        <option value="${option.saccoId}" ${scopeSelection.saccoId eq option.saccoId ? 'selected' : ''}><c:out value="${option.saccoName}" /></option>
                     </c:forEach>
                 </select>
             </label>

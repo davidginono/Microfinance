@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="chairperson.office" text="Chairperson Office" /> / <spring:message code="chairperson.configurations" text="Institution Configurations" /></p>
-    <h1 class="erp-page-title"><spring:message code="chairperson.configurations" text="Institution Configurations" /></h1>
+    <h1 class="erp-page-title" id="chairperson-configurations-title"><spring:message code="chairperson.configurations" text="Institution Configurations" /></h1>
 </div>
 
 <div class="chairperson-config-grid">
@@ -84,11 +84,11 @@
     </section>
 </div>
 
-<section class="erp-panel mt-4 overflow-hidden" data-aws-table-region>
-    <div class="border-b border-slate-200 px-5 py-4">
-        <h2 class="font-semibold text-slate-900"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></h2>
+<section class="erp-panel mt-4 overflow-hidden" data-aws-table-region data-resource-table="chairperson-configurations-1" data-resource-split>
+    <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source>
+        <h2 class="font-semibold text-slate-900" data-table-heading-for="chairperson-configurations-1"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></h2>
     </div>
-    <form method="get" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar>
+    <form method="get" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="chairperson-configurations-1">
         <label class="min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="common.search" text="Search" />
             <input type="search" name="search" value="${fn:escapeXml(configuration.search)}" placeholder="<spring:message code='chairperson.products.searchPlaceholder' text='Product code or name' />" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm" />
         </label>
@@ -105,7 +105,7 @@
                 <th scope="col"><spring:message code="common.status" text="Status" /></th>
                 <th scope="col"><spring:message code="chairperson.amountRange" text="Amount Range" /></th>
                 <th scope="col"><spring:message code="admin.settings.approvalFlow" text="Approval Flow" /></th>
-                <th scope="col" class="erp-table-action-column"><spring:message code="common.actions" text="Actions" /></th>
+                <th scope="col" class="erp-table-action-column" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr></thead>
             <tbody>
                 <c:forEach items="${configuration.products}" var="row">
@@ -130,11 +130,11 @@
 </section>
 
 <c:if test="${configuration.totalPages gt 1}">
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3" data-table-pagination-shell>
         <span class="text-sm text-slate-500"><spring:message code="common.page" text="Page" /> ${configuration.page + 1} / ${configuration.totalPages}</span>
-        <div class="flex gap-2">
-            <c:if test="${not configuration.first}"><c:url var="prevUrl" value="/chairperson/configurations"><c:param name="search" value="${configuration.search}"/><c:param name="page" value="${configuration.page - 1}"/></c:url><a class="app-btn btn-neutral" href="${prevUrl}"><spring:message code="common.previous" text="Previous" /></a></c:if>
-            <c:if test="${not configuration.last}"><c:url var="nextUrl" value="/chairperson/configurations"><c:param name="search" value="${configuration.search}"/><c:param name="page" value="${configuration.page + 1}"/></c:url><a class="app-btn btn-primary" href="${nextUrl}"><spring:message code="common.next" text="Next" /></a></c:if>
+        <div class="flex gap-2" data-table-pagination data-table-for="chairperson-configurations-1" data-page="${configuration.page}">
+            <c:if test="${not configuration.first}"><c:url var="prevUrl" value="/chairperson/configurations"><c:param name="search" value="${configuration.search}"/><c:param name="page" value="${configuration.page - 1}"/></c:url><a class="app-btn btn-neutral" href="${prevUrl}" data-page-direction="previous"><spring:message code="common.previous" text="Previous" /></a></c:if>
+            <c:if test="${not configuration.last}"><c:url var="nextUrl" value="/chairperson/configurations"><c:param name="search" value="${configuration.search}"/><c:param name="page" value="${configuration.page + 1}"/></c:url><a class="app-btn btn-primary" href="${nextUrl}" data-page-direction="next"><spring:message code="common.next" text="Next" /></a></c:if>
         </div>
     </div>
 </c:if>

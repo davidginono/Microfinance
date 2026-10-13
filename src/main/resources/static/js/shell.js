@@ -429,7 +429,7 @@
     };
     const enhanceConsoleTables = function () {
         const regions = Array.from(document.querySelectorAll('.erp-table-wrap')).filter(function (region) {
-            return region.querySelector('table');
+            return region.querySelector('table') && !region.hasAttribute('data-resource-table');
         });
         regions.forEach(function (region, index) {
             ensureConsoleTableScroller(region, index);
@@ -502,6 +502,7 @@
 
         const tableActions = Array.from(document.querySelectorAll('a.app-btn, button.app-btn')).filter(function (control) {
             if (control.closest('table')
+                || control.closest('[data-resource-table], [data-table-toolbar-for], [data-table-pagination]')
                 || control.closest('.app-table-titlebar')
                 || control.closest('.erp-page-header')
                 || control.closest('.aws-filter-toolbar')
@@ -535,6 +536,7 @@
         });
 
         document.querySelectorAll('[data-aws-client-table]').forEach(function (region) {
+            if (region.hasAttribute('data-resource-table')) return;
             const input = region.querySelector('[data-aws-table-search]');
             const table = region.querySelector('.erp-table');
             const body = table?.tBodies?.[0];

@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${boardReportsBreadcrumb}</p>
-    <h1 class="erp-page-title">${boardReportsTitle}</h1>
+    <h1 class="erp-page-title" id="board-reports-title">${boardReportsTitle}</h1>
 </div>
 
 <form method="get" action="/documents/reports/board-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
@@ -39,7 +39,7 @@
     </div>
 </form>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-reports-1" data-resource-split data-table-title-id="board-reports-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -52,7 +52,7 @@
             <th>${boardReportsDecisionLabel}</th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
-            <th></th>
+            <th data-table-actions-header></th>
         </tr>
         </thead>
         <tbody>

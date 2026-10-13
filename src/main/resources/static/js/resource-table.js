@@ -2,6 +2,7 @@
 (() => {
     'use strict';
     const labels = () => document.getElementById('resource-table-labels')?.dataset || {};
+    const lifetimes = new Map();
     const node = (tag, className, text) => {
         const element = document.createElement(tag);
         if (className) element.className = className;
@@ -32,10 +33,42 @@
         button.type = 'button'; button.title = label; button.setAttribute('aria-label', label); button.append(icon(name));
         return button;
     };
+    function actionMenu(container, initial, key, region, l) {
+        const signal = lifetimes.get(region).controller.signal;
+        const group = node('div','resource-table-action-menu'), trigger = node('button','app-btn btn-neutral',l.actions);
+        trigger.type='button'; trigger.setAttribute('aria-haspopup','menu'); trigger.setAttribute('aria-expanded','false');
+        const menu = node('div','resource-table-menu'); menu.id=key+'-actions'; menu.hidden=true; menu.setAttribute('role','menu');
+        trigger.setAttribute('aria-controls',menu.id); trigger.append(icon('caret')); menu.append(...initial); group.append(trigger,menu); container.append(group);
+        const items = () => [...menu.querySelectorAll('button,a[href]')].filter(item=>!item.disabled && item.getAttribute('aria-disabled')!=='true');
+        menu.querySelectorAll('button,a[href]').forEach(item=>item.setAttribute('role','menuitem'));
+        const close = restore => {menu.hidden=true;trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();};
+        const sync = () => {trigger.disabled=!items().length;if(trigger.disabled)close(false);};
+        const open = last => {if(trigger.disabled)return;menu.hidden=false;trigger.setAttribute('aria-expanded','true');(last?items().at(-1):items()[0])?.focus();};
+        trigger.addEventListener('click',()=>menu.hidden?open(false):close(false));
+        trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
+        menu.addEventListener('keydown',event=>{
+            if(event.key==='Escape'){event.preventDefault();close(true);}
+            else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+                event.preventDefault();const choices=items(),index=choices.indexOf(document.activeElement);
+                const next=event.key==='Home'?0:event.key==='End'?choices.length-1:(index+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length;
+                choices[next]?.focus();
+            }
+        });
+        // Let the native click/submit complete before restoring focus.
+        menu.addEventListener('click',event=>{if(event.target.closest('[role=menuitem]:not(:disabled)'))queueMicrotask(()=>{if(region.isConnected)close(group.contains(document.activeElement));});});
+        document.addEventListener('click',event=>{if(!group.contains(event.target))close(false);},{signal});
+        group.addEventListener('focusout',()=>queueMicrotask(()=>{if(region.isConnected && !group.contains(document.activeElement))close(false);}));
+        const observer = new MutationObserver(sync); observer.observe(menu,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','aria-disabled']});
+        lifetimes.get(region).observers.push(observer);
+        region.addEventListener('resource-table:reset',()=>{close(false);sync();}); sync();
+        return {menu,trigger,sync,close};
+    }
     function init(region) {
         if (region.dataset.resourceTableReady) return;
         const table = region.querySelector('table'), head = table?.tHead?.rows[0];
         if (!head) return;
+        const lifetime = {controller:new AbortController(),observers:[]}; lifetimes.set(region,lifetime);
+        const signal = lifetime.controller.signal;
         region.dataset.resourceTableReady = 'true';
         const l = labels();
         let scroller = table.closest('.erp-table-scroll');
@@ -46,8 +79,9 @@
         let titlebar = region.querySelector(':scope > .app-table-titlebar');
         if (!titlebar) {
             titlebar = node('div', 'app-table-titlebar');
-            const heading = region.querySelector(':scope > h2, :scope > h3');
-            titlebar.append(heading || node('h2', '', table.caption?.textContent || l.records)); region.prepend(titlebar);
+            const heading = region.querySelector(':scope > h2, :scope > h3') || [...document.querySelectorAll('[data-table-heading-for]')].find(candidate => candidate.dataset.tableHeadingFor === region.dataset.resourceTable);
+            const title = region.getAttribute('aria-label') || document.getElementById(region.dataset.tableTitleId)?.textContent;
+            titlebar.append(heading || node('h2', '', table.caption?.textContent || title || l.records)); region.prepend(titlebar);
         }
         const duplicateHeading = region.querySelector(':scope > h2, :scope > h3');
         if (duplicateHeading && duplicateHeading.textContent.trim() === titlebar.querySelector('h2,h3')?.textContent.trim()) duplicateHeading.remove();
@@ -56,6 +90,12 @@
         let actions = titlebar.querySelector('.accounting-actions, .app-table-toolbar, .business-actions, .reconciliation-actions');
         if (!actions) { actions = node('div', 'app-table-toolbar'); titlebar.append(actions); }
         actions.classList.add('resource-table-actions');
+        document.querySelectorAll('[data-table-toolbar-for]').forEach(group => {
+            if (group.dataset.tableToolbarFor === region.dataset.resourceTable) {
+                if (group.tagName === 'FORM') actions.append(group);
+                else actions.append(...group.childNodes);
+            }
+        });
         titlebar.querySelectorAll(':scope > a.app-btn, :scope > button.app-btn').forEach(control => actions.append(control));
         const refresh = actions.querySelector('[data-aws-table-refresh], .app-icon-button');
         if (refresh) { refresh.replaceChildren(icon('refresh')); refresh.classList.add('resource-table-icon'); refresh.setAttribute('aria-label', l.refresh); refresh.title = l.refresh; }
@@ -63,8 +103,8 @@
             const button = iconButton('refresh', l.refresh); actions.prepend(button); button.addEventListener('click', () => location.reload());
         }
         const tools = node('div', 'resource-table-tools'); titlebar.after(tools);
-        let filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar');
-        let search;
+        let filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar') || [...document.querySelectorAll('[data-table-filter-for]')].find(candidate => candidate.dataset.tableFilterFor === region.dataset.resourceTable);
+        let search = filters?.querySelector('[data-aws-table-search]');
         if (!filters || !filters.querySelector('input:not([type="hidden"]),select,textarea')) {
             filters ||= node('div');
             filters.classList.add('resource-table-search');
@@ -77,7 +117,7 @@
         if (filters) {
             filters.classList.add('resource-table-filters');
             if (region.dataset.tablePageSize && filters.tagName === 'FORM') {
-                let size = filters.querySelector('input[name="size"]');
+                let size = filters.querySelector('[name="size"]');
                 if (!size) { size=node('input');size.type='hidden';size.name='size';filters.append(size); }
                 size.value=region.dataset.tablePageSize;
             }
@@ -107,39 +147,67 @@
         // Existing row-selection controllers keep their business-specific command rules.
         const rowInputs = () => selectable ? [...table.querySelectorAll('tbody input[type="checkbox"]')].filter(input => input.closest('td')?.cellIndex === 0 && !input.closest('tr').hidden && !input.disabled) : [];
         let selectable = region.dataset.tableSelection === 'single';
-        const actionHeader = head.querySelector('[data-table-actions-header]');
-        if (actionHeader) {
+        const actionHeaders = [...head.querySelectorAll('[data-table-actions-header]')];
+        if (actionHeaders.length) {
             selectable = true;
-            const actionIndex = actionHeader.cellIndex, columnCount = head.cells.length;
-            actionHeader.remove(); head.prepend(node('th'));
+            const actionIndexes = actionHeaders.map(header => header.cellIndex), columnCount = head.cells.length;
+            actionHeaders.forEach(header => header.remove()); head.prepend(node('th'));
             const commands = node('div', 'resource-table-record-actions'); actions.prepend(commands);
-            const records = [], commandLabels = new Set();
-            let active;
+            const records = new Map(), commandLabels = new Map();
+            const secondary = actionMenu(commands,[],region.dataset.resourceTable+'-record',region,l);
+            const context = node('div','resource-table-command-context'); context.hidden = true; region.append(context);
+            let active, placements = [];
             const announcement = node('span', 'sr-only'); announcement.setAttribute('role', 'status'); region.append(announcement);
+            const kind = control => control.tagName === 'A' && !control.hasAttribute('download') && !control.hasAttribute('data-download-action') && !/\.pdf(?:$|[?#])/.test(control.getAttribute('href') || '') ? 'navigation' : 'command';
             const resetCommands = () => {
-                if (active) { active.content.append(...commands.childNodes); active = null; }
+                placements.forEach(({control,parent,next}) => parent.insertBefore(control,next?.parentNode === parent ? next : null)); placements=[];
+                if (active) { active.content.append(...context.childNodes); active = null; }
                 records.forEach(record => { record.input.checked = false; record.row.classList.remove('resource-table-selected'); });
-                commands.replaceChildren();
-                (commandLabels.size ? [...commandLabels] : [l.view]).forEach(label => { const button = node('button', 'app-btn btn-neutral', label); button.type = 'button'; button.disabled = true; commands.append(button); });
-                announcement.textContent = '';
-            };
-            [...table.tBodies].flatMap(body => [...body.rows]).forEach(row => {
-                if (row.cells.length !== columnCount || row.cells[0].colSpan > 1) return;
-                const content = document.createDocumentFragment(), cell = row.cells[actionIndex];
-                cell.querySelectorAll('a.app-btn, button').forEach(control => commandLabels.add(control.textContent.trim()));
-                content.append(...cell.childNodes); cell.remove();
-                const selectCell = node('td', 'resource-table-selection'), input = node('input'); input.type = 'checkbox';
-                input.disabled = !content.querySelector('a[href],button:not(:disabled)');
-                input.setAttribute('aria-label', l.select + ' ' + row.cells[0].textContent.trim()); selectCell.append(input); row.prepend(selectCell);
-                const record = {row, input, content}; records.push(record);
-                input.addEventListener('change', () => {
-                    const selected = input.checked; resetCommands();
-                    if (selected) { active = record; input.checked = true; row.classList.add('resource-table-selected'); commands.replaceChildren(content); announcement.textContent = input.getAttribute('aria-label'); }
+                commands.querySelectorAll(':scope > button, :scope > a').forEach(control => control.remove()); secondary.menu.replaceChildren();
+                (commandLabels.size ? [...commandLabels] : [[l.view,'navigation']]).forEach(([label,type]) => {
+                    const button = node('button','app-btn btn-neutral',label); button.type='button'; button.disabled=true;
+                    (type === 'navigation' ? commands : secondary.menu).append(button);
                 });
-                row.addEventListener('click', event => { if (!event.target.closest('input,button,a,select,textarea,label,summary')) input.click(); });
-            });
-            resetCommands(); region.addEventListener('resource-table:reset', resetCommands);
+                secondary.trigger.hidden = !secondary.menu.children.length; secondary.close(false); secondary.sync(); context.hidden=true; announcement.textContent = '';
+            };
+            const adaptRows = () => {
+                [...table.tBodies].flatMap(body => [...body.rows]).forEach(row => {
+                    if (row.cells.length === 1 && row.cells[0].colSpan === columnCount) row.cells[0].colSpan = columnCount - actionHeaders.length + 1;
+                    if (records.has(row) || row.cells.length !== columnCount || row.cells[0].colSpan > 1 || row.querySelector('.resource-table-selection')) return;
+                    const content = document.createDocumentFragment(), commandCells = actionIndexes.map(index => row.cells[index]);
+                    commandCells.forEach(cell => {
+                        cell.querySelectorAll('a.app-btn,button').forEach(control => commandLabels.set(control.textContent.trim(),kind(control)));
+                        content.append(...cell.childNodes); cell.remove();
+                    });
+                    const selectCell = node('td','resource-table-selection'), input = node('input'); input.type='checkbox';
+                    input.setAttribute('aria-label',l.select+' '+row.cells[0].textContent.trim()); selectCell.append(input); row.prepend(selectCell);
+                    const record = {row,input,content}; records.set(row,record);
+                    input.addEventListener('change', () => {
+                        const selected=input.checked; resetCommands();
+                        if (selected) {
+                            active=record; input.checked=true; row.classList.add('resource-table-selected'); context.append(content);
+                            const controls=[...context.querySelectorAll('a.app-btn,button')];
+                            controls.forEach(control => {
+                                const moved=control.closest('form') || control;
+                                if (placements.some(item=>item.control===moved)) return;
+                                placements.push({control:moved,parent:moved.parentNode,next:moved.nextSibling});
+                                control.classList.add('app-btn');
+                                if (kind(control)==='navigation') commands.append(moved);
+                                else {control.setAttribute('role','menuitem');secondary.menu.append(moved);}
+                            });
+                            secondary.trigger.hidden=!secondary.menu.children.length; secondary.sync();
+                            context.hidden=!context.textContent.trim() || context.textContent.trim()==='-'; announcement.textContent=input.getAttribute('aria-label');
+                        }
+                    });
+                    row.addEventListener('click',event=>{if(!event.target.closest('input,button,a,select,textarea,label,summary'))input.click();});
+                });
+                for (const [row] of records) if (!table.contains(row)) {if(active?.row===row)resetCommands();records.delete(row);}
+            };
+            adaptRows(); resetCommands(); region.addEventListener('resource-table:reset',resetCommands);
+            const adapterObserver = new MutationObserver(() => {if(region.isConnected){adaptRows();if(!active)resetCommands();}});
+            adapterObserver.observe(table,{childList:true,subtree:true}); lifetime.observers.push(adapterObserver);
         }
+
         let selectHeader;
         const syncSelection = () => {
             if (!selectHeader) return;
@@ -165,7 +233,7 @@
             syncSelection();
         }
         filters?.addEventListener('input', clearSelection); filters?.addEventListener('change', clearSelection);
-        navigation.addEventListener('click', clearSelection); window.addEventListener('pageshow', clearSelection);
+        navigation.addEventListener('click', clearSelection); window.addEventListener('pageshow', clearSelection,{signal});
 
         const headers = [...head.cells];
         headers.forEach(header => {
@@ -176,35 +244,9 @@
             const label = node('span'); label.append(...link.childNodes); link.append(label,icon('sort'));
             link.addEventListener('click', clearSelection);
         });
-        // Opt in actual commands, preserving their forms, CSRF tokens and page controller listeners.
+        // Original forms and listeners remain attached when commands move into the menu.
         const menuCommands = [...actions.querySelectorAll(':scope > [data-table-command]')];
-        if (menuCommands.length) {
-            const group = node('div','resource-table-action-menu'), trigger = node('button','app-btn btn-neutral',l.actions);
-            trigger.type='button'; trigger.setAttribute('aria-haspopup','menu'); trigger.setAttribute('aria-expanded','false');
-            const menu = node('div','resource-table-menu'); menu.id=region.dataset.resourceTable+'-actions'; menu.hidden=true; menu.setAttribute('role','menu');
-            trigger.setAttribute('aria-controls',menu.id); trigger.append(icon('caret')); menu.append(...menuCommands); group.append(trigger,menu); actions.append(group);
-            const items = () => [...menu.querySelectorAll('button,a[href]')].filter(item=>!item.disabled && item.getAttribute('aria-disabled')!=='true');
-            menu.querySelectorAll('button,a[href]').forEach(item=>item.setAttribute('role','menuitem'));
-            const close = restore => {menu.hidden=true;trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();};
-            const sync = () => {trigger.disabled=!items().length;if(trigger.disabled)close(false);};
-            const open = last => {if(trigger.disabled)return;menu.hidden=false;trigger.setAttribute('aria-expanded','true');(last?items().at(-1):items()[0])?.focus();};
-            trigger.addEventListener('click',()=>menu.hidden?open(false):close(false));
-            trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
-            menu.addEventListener('keydown',event=>{
-                if(event.key==='Escape'){event.preventDefault();close(true);}
-                else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
-                    event.preventDefault();const choices=items(),index=choices.indexOf(document.activeElement);
-                    const next=event.key==='Home'?0:event.key==='End'?choices.length-1:(index+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length;
-                    choices[next]?.focus();
-                }
-            });
-            // Let the native click/submit complete before restoring focus.
-            menu.addEventListener('click',event=>{if(event.target.closest('[role=menuitem]:not(:disabled)'))queueMicrotask(()=>close(true));});
-            document.addEventListener('click',event=>{if(!group.contains(event.target))close(false);});
-            group.addEventListener('focusout',()=>queueMicrotask(()=>{if(!group.contains(document.activeElement))close(false);}));
-            new MutationObserver(sync).observe(menu,{subtree:true,attributes:true,attributeFilter:['disabled','aria-disabled']});
-            region.addEventListener('resource-table:reset',()=>{close(false);sync();}); sync();
-        }
+        if (menuCommands.length) actionMenu(actions,menuCommands,region.dataset.resourceTable,region,l);
         // This fallback searches only the bounded rows on this page; server filters remain authoritative.
         const searchVisibility = new WeakMap();
         let noMatches;
@@ -235,7 +277,7 @@
         const lockedColumns = () => {
             const rows=[...table.rows].filter(row=>row!==head);
             const hasGroupedCells=rows.some(row=>row.cells.length>1 && [...row.cells].some(cell=>cell.colSpan>1 || cell.rowSpan>1));
-            return new Set(headers.flatMap((header, index) => hasGroupedCells || index <= (selectable ? 1 : 0) || rows.some(row => originalCells(row)[index]?.querySelector('input,select,textarea')) ? [index] : []));
+            return new Set(headers.flatMap((header, index) => hasGroupedCells || header.hasAttribute('data-table-identifier') || index <= (selectable ? 1 : 0) || rows.some(row => originalCells(row)[index]?.querySelector('input,select,textarea')) ? [index] : []));
         };
         const key = 'resource-table:v1:' + (region.dataset.resourceTable || scroller.dataset.viewPositionKey || location.pathname + ':' + [...document.querySelectorAll('[data-resource-table]')].indexOf(region));
         const defaultOrder = headers.map((_, index) => index);
@@ -280,10 +322,11 @@
             stickyOffsets();
         };
         apply();
-        if (window.ResizeObserver) new ResizeObserver(stickyOffsets).observe(scroller);
-        window.addEventListener('resize', stickyOffsets);
-        const observer = new MutationObserver(() => { apply(); applySearch(); syncSelection(); });
+        if (window.ResizeObserver) {const resizeObserver=new ResizeObserver(stickyOffsets);resizeObserver.observe(scroller);lifetime.observers.push(resizeObserver);}
+        window.addEventListener('resize', stickyOffsets,{signal});
+        const observer = new MutationObserver(() => { if(region.isConnected){apply(); applySearch(); syncSelection();} });
         [...table.tBodies].forEach(body => observer.observe(body, {childList:true, subtree:true}));
+        lifetime.observers.push(observer);
         preferences.addEventListener('click', () => {
             const dialog = node('dialog', 'resource-table-preferences app-modal-panel');
             const title = node('h2', '', l.preferences); title.id = 'resource-table-preferences-title'; dialog.setAttribute('aria-labelledby', title.id);
@@ -300,7 +343,8 @@
                     label.append(input, document.createTextNode(text)); group.append(label); return input;
                 });
             };
-            const pageSize = region.dataset.tablePageSize ? radioGroup(l.pageSize, [10,30,50].map(size => [size, size + ' ' + l.records.toLocaleLowerCase()]), Number(region.dataset.tablePageSize), 'pageSize') : [];
+            const sizes = region.dataset.tablePageSizeOptions ? region.dataset.tablePageSizeOptions.split(' ').map(Number) : [10,30,50];
+            const pageSize = region.dataset.tablePageSize ? radioGroup(l.pageSize, sizes.map(size => [size, size + ' ' + l.records.toLocaleLowerCase()]), Number(region.dataset.tablePageSize), 'pageSize') : [];
             const wrap = check(display, l.wrap, settings.wrap), striped = check(display, l.striped, settings.striped), compact = check(display, l.compact, settings.compact);
             const sticky = radioGroup(l.sticky, [[0,l.none],[1,l.firstColumn],[2,l.firstTwoColumns]], settings.sticky, 'sticky');
             const columns = node('fieldset', 'resource-table-column-options'); columns.append(node('legend', '', l.columns)); body.append(columns);
@@ -362,8 +406,25 @@
         window.ResourceSplitView?.init(region, {headers, originalCells, selectable, labels:l});
     }
     window.ResourceTable = {init: root => {
+        for (const [region,lifetime] of lifetimes) if (!region.isConnected) {
+            lifetime.controller.abort(); lifetime.observers.forEach(observer=>observer.disconnect()); lifetimes.delete(region);
+        }
         (root || document).querySelectorAll('[data-resource-table]').forEach(init);
         document.querySelectorAll('[data-table-pagination-used]').forEach(pager => pager.remove());
+        document.querySelectorAll('[data-table-pagination-shell]').forEach(shell => {
+            if (!shell.querySelector('[data-table-pagination]')) shell.remove();
+        });
+        document.querySelectorAll('[data-resource-header-source], .erp-panel-header').forEach(source => {
+            if (!source.textContent.trim() && !source.querySelector('input,select,button,a,img')) source.hidden=true;
+        });
+        document.querySelectorAll('.erp-panel').forEach(panel => {
+            const body=panel.querySelector(':scope > .erp-panel-body');
+            if (!body) return;
+            const visible=[...panel.children].filter(child=>!child.hidden && child!==body);
+            if (!visible.length && body.children.length && [...body.children].every(child=>child.hasAttribute('data-resource-table'))) {
+                panel.classList.add('resource-table-surface'); body.classList.add('resource-table-surface-body');
+            }
+        });
     }};
     window.addEventListener('load', () => window.ResourceTable.init());
 })();

@@ -7,7 +7,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/loan-repayments.css' />" />
 <div class="repayment-workspace">
-    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="loan.loanId" /> <c:out value="${ledger.loanId}" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="loan.loanId" /> <c:out value="${ledger.loanId}" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
     <c:if test="${not empty repaymentError}"><div class="repayment-error" role="alert"><spring:message code="${repaymentError}" /></div></c:if>
     <dl class="repayment-facts">
         <div><dt><spring:message code="repayment.principalOutstanding" /></dt><dd>TZS <fmt:formatNumber value="${ledger.outstandingPrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
@@ -33,10 +33,10 @@
             </section>
         </c:if>
     </sec:authorize>
-    <section class="erp-table-wrap" data-aws-table-region>
+    <section class="erp-table-wrap" data-aws-table-region data-resource-table="repayments-loan-1" data-resource-split>
         <div class="app-table-titlebar"><h2><spring:message code="repayment.history" /></h2></div>
         <div class="erp-table-scroll" data-view-position-key="repayment-history-${ledger.id}">
-            <table class="erp-table"><thead><tr><th><spring:message code="repayment.receipt" /></th><th><spring:message code="repayment.paymentDate" /></th><th><spring:message code="common.status" /></th><th class="money"><spring:message code="common.amount" /> (TZS)</th><th class="money"><spring:message code="repayment.principal" /> (TZS)</th><th class="money"><spring:message code="repayment.interest" /> (TZS)</th><th><spring:message code="common.actions" /></th></tr></thead><tbody>
+            <table class="erp-table"><thead><tr><th><spring:message code="repayment.receipt" /></th><th><spring:message code="repayment.paymentDate" /></th><th><spring:message code="common.status" /></th><th class="money"><spring:message code="common.amount" /> (TZS)</th><th class="money"><spring:message code="repayment.principal" /> (TZS)</th><th class="money"><spring:message code="repayment.interest" /> (TZS)</th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead><tbody>
                 <c:forEach items="${ledger.history.content}" var="row"><tr>
                     <c:if test="${row.id eq ledger.latestPaymentId}"><c:set var="latestReceipt" value="${row}" /></c:if>
                     <td class="repayment-reference"><c:out value="${row.reference}" /></td><td><c:out value="${row.paymentDate}" /></td>
@@ -47,10 +47,10 @@
                 <c:if test="${empty ledger.history.content}"><tr><td colspan="7" class="erp-table-empty"><spring:message code="repayment.noPayments" /></td></tr></c:if>
             </tbody></table>
         </div>
-        <div class="repayment-pagination">
-            <c:if test="${ledger.history.hasPrevious()}"><c:url var="previous" value="/repayments/loans/${ledger.id}"><c:param name="page" value="${ledger.history.number - 1}" /><c:param name="schedulePage" value="${ledger.installments.number}" /></c:url><a class="app-btn btn-neutral" href="${previous}"><spring:message code="common.previous" /></a></c:if>
+        <div class="repayment-pagination" data-table-pagination data-table-for="repayments-loan-1" data-page="${ledger.history.number}">
+            <c:if test="${ledger.history.hasPrevious()}"><c:url var="previous" value="/repayments/loans/${ledger.id}"><c:param name="page" value="${ledger.history.number - 1}" /><c:param name="schedulePage" value="${ledger.installments.number}" /></c:url><a class="app-btn btn-neutral" href="${previous}" data-page-direction="previous"><spring:message code="common.previous" /></a></c:if>
             <span><spring:message code="repayment.page" /> <c:out value="${ledger.history.number + 1}" /></span>
-            <c:if test="${ledger.history.hasNext()}"><c:url var="next" value="/repayments/loans/${ledger.id}"><c:param name="page" value="${ledger.history.number + 1}" /><c:param name="schedulePage" value="${ledger.installments.number}" /></c:url><a class="app-btn btn-neutral" href="${next}"><spring:message code="common.next" /></a></c:if>
+            <c:if test="${ledger.history.hasNext()}"><c:url var="next" value="/repayments/loans/${ledger.id}"><c:param name="page" value="${ledger.history.number + 1}" /><c:param name="schedulePage" value="${ledger.installments.number}" /></c:url><a class="app-btn btn-neutral" href="${next}" data-page-direction="next"><spring:message code="common.next" /></a></c:if>
         </div>
     </section>
     <sec:authorize access="@access.has(principal, 'LOAN_REPAYMENTS_REVERSE')">
@@ -64,18 +64,18 @@
             </form>
         </section></c:if>
     </sec:authorize>
-    <section class="erp-table-wrap" data-aws-table-region>
+    <section class="erp-table-wrap" data-aws-table-region data-resource-table="repayments-loan-2">
         <div class="app-table-titlebar"><h2><spring:message code="repayment.schedule" /></h2></div>
         <div class="erp-table-scroll" data-view-position-key="repayment-installments-${ledger.id}"><table class="erp-table"><thead><tr><th>#</th><th><spring:message code="repayment.dueDate" /></th><th class="money"><spring:message code="repayment.principal" /> (TZS)</th><th class="money"><spring:message code="repayment.interest" /> (TZS)</th><th class="money"><spring:message code="repayment.principalPaid" /> (TZS)</th><th class="money"><spring:message code="repayment.interestPaid" /> (TZS)</th></tr></thead><tbody>
             <c:forEach items="${ledger.installments.content}" var="row"><tr><td><c:out value="${row.number}" /></td><td><c:out value="${row.dueDate}" /></td><td class="money"><fmt:formatNumber value="${row.principal}" minFractionDigits="2" maxFractionDigits="2" /></td><td class="money"><fmt:formatNumber value="${row.interest}" minFractionDigits="2" maxFractionDigits="2" /></td><td class="money"><fmt:formatNumber value="${row.principalPaid}" minFractionDigits="2" maxFractionDigits="2" /></td><td class="money"><fmt:formatNumber value="${row.interestPaid}" minFractionDigits="2" maxFractionDigits="2" /></td></tr></c:forEach>
         </tbody></table></div>
-        <div class="repayment-pagination">
-            <c:if test="${ledger.installments.hasPrevious()}"><c:url var="previousSchedule" value="/repayments/loans/${ledger.id}"><c:param name="schedulePage" value="${ledger.installments.number - 1}" /><c:param name="page" value="${ledger.history.number}" /></c:url><a class="app-btn btn-neutral" href="${previousSchedule}"><spring:message code="common.previous" /></a></c:if>
+        <div class="repayment-pagination" data-table-pagination data-table-for="repayments-loan-2" data-page="${ledger.installments.number}">
+            <c:if test="${ledger.installments.hasPrevious()}"><c:url var="previousSchedule" value="/repayments/loans/${ledger.id}"><c:param name="schedulePage" value="${ledger.installments.number - 1}" /><c:param name="page" value="${ledger.history.number}" /></c:url><a class="app-btn btn-neutral" href="${previousSchedule}" data-page-direction="previous"><spring:message code="common.previous" /></a></c:if>
             <span><spring:message code="repayment.page" /> <c:out value="${ledger.installments.number + 1}" /></span>
-            <c:if test="${ledger.installments.hasNext()}"><c:url var="nextSchedule" value="/repayments/loans/${ledger.id}"><c:param name="schedulePage" value="${ledger.installments.number + 1}" /><c:param name="page" value="${ledger.history.number}" /></c:url><a class="app-btn btn-neutral" href="${nextSchedule}"><spring:message code="common.next" /></a></c:if>
+            <c:if test="${ledger.installments.hasNext()}"><c:url var="nextSchedule" value="/repayments/loans/${ledger.id}"><c:param name="schedulePage" value="${ledger.installments.number + 1}" /><c:param name="page" value="${ledger.history.number}" /></c:url><a class="app-btn btn-neutral" href="${nextSchedule}" data-page-direction="next"><spring:message code="common.next" /></a></c:if>
         </div>
     </section>
-    <c:if test="${not empty ledger.journal}"><section class="erp-table-wrap" data-aws-table-region>
+    <c:if test="${not empty ledger.journal}"><section class="erp-table-wrap" data-aws-table-region data-resource-table="repayments-loan-3">
         <div class="app-table-titlebar"><h2><spring:message code="repayment.journal" /></h2></div>
         <div class="erp-table-scroll erp-table-scroll-sm"><table class="erp-table"><thead><tr><th><spring:message code="repayment.paymentDate" /></th><th><spring:message code="repayment.account" /></th><th class="money"><spring:message code="repayment.debit" /> (TZS)</th><th class="money"><spring:message code="repayment.credit" /> (TZS)</th></tr></thead><tbody>
             <c:forEach items="${ledger.journal}" var="line"><tr><td><c:out value="${line.date}" /></td><td><spring:message code="repayment.account.${line.account}" /></td><td class="money"><fmt:formatNumber value="${line.debit}" minFractionDigits="2" maxFractionDigits="2" /></td><td class="money"><fmt:formatNumber value="${line.credit}" minFractionDigits="2" maxFractionDigits="2" /></td></tr></c:forEach>

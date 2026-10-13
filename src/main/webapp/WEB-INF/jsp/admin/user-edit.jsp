@@ -10,7 +10,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Users &amp; Roles / Edit User</p>
-    <h1 class="erp-page-title">Edit User Access</h1>
+    <h1 class="erp-page-title" id="admin-user-edit-title">Edit User Access</h1>
 </div>
 
 <div class="admin-user-edit-context-bar">
@@ -103,8 +103,8 @@
 
     <section class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header admin-user-section-header--actions">
-            <div>
-                <h2><spring:message code="access.matrix.title" /></h2>
+            <div data-resource-header-source>
+                <h2 data-table-heading-for="admin-user-edit-1"><spring:message code="access.matrix.title" /></h2>
                 <p><spring:message code="access.matrix.unsupported" /></p>
             </div>
             <div class="admin-user-section-actions">
@@ -115,7 +115,8 @@
         </div>
         <div class="admin-user-section-body">
             <spring:message code="access.matrix.loading" var="accessMatrixLoading" />
-            <div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="${accessMatrixLoading}">
+            <div class="erp-table-wrap" data-resource-table="admin-user-edit-1">
+<div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="${accessMatrixLoading}">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -178,6 +179,7 @@
                     </tbody>
                 </table>
             </div>
+</div>
         </div>
     </section>
 

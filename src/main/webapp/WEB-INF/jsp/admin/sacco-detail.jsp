@@ -7,14 +7,14 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Institutions / Detail</p>
-    <h1 class="erp-page-title">${saccoDetail.summary.saccoName}</h1>
+    <h1 class="erp-page-title" id="admin-sacco-detail-title">${saccoDetail.summary.saccoName}</h1>
 </div>
 
 <section class="erp-panel mb-4 overflow-hidden">
     <div class="erp-panel-header">
         <p class="erp-panel-title">Branch Scope</p>
     </div>
-<form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end aws-filter-toolbar" data-aws-filter-toolbar>
+<form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-sacco-detail-1">
         <input type="hidden" name="section" value="${selectedSection}" />
         <label class="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Branch
@@ -172,7 +172,7 @@
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalDisbursedPrincipalFullLabel}</p>
                     </div>
                 </div>
-                <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-1">
                     <div class="app-table-titlebar">
                         <div class="app-table-heading"><h2>Loan Applications by Status</h2></div>
                     </div>
@@ -203,8 +203,8 @@
     </c:when>
     <c:when test="${selectedSection eq 'members'}">
         <section class="erp-panel mt-4">
-            <div class="erp-panel-header">
-                <p class="erp-panel-title">Client Summary</p>
+            <div class="erp-panel-header" data-resource-header-source>
+                <h2 class="erp-panel-title" data-table-heading-for="admin-sacco-detail-2">Client Summary</h2>
                     </div>
             <div class="erp-panel-body space-y-4">
                 <div class="grid gap-3 sm:grid-cols-3">
@@ -236,7 +236,7 @@
                             <span>Showing <span class="font-semibold text-slate-800">${MembersliceStart}-${MembersliceEnd}</span> of <span class="font-semibold text-slate-800">${MemberTotal}</span> accounts</span>
                     </div>
                         </div>
-<form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3 aws-filter-toolbar" data-aws-filter-toolbar>
+<form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3 aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-sacco-detail-2">
                         <input type="hidden" name="section" value="members" />
                         <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
                         <label class="block min-w-[16rem] flex-[1_1_22rem]">
@@ -262,7 +262,7 @@
                 </div>
                     </form>
                 </div>
-                <div class="erp-table-wrap">
+                <div class="erp-table-wrap" data-resource-table="admin-sacco-detail-2">
                     <div class="erp-table-scroll">
                     <table class="erp-table min-w-[1120px]">
                         <thead>
@@ -316,16 +316,16 @@
                     </table>
                         </div>
                 </div>
-                <div class="flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-table-pagination-shell>
                     <p class="text-sm text-slate-600">The table is server-paged to keep large Client Lists manageable.</p>
                     <c:if test="${saccoMembersPage.totalPages gt 1}">
-                        <div class="flex flex-wrap items-center justify-end gap-2">
+                        <div class="flex flex-wrap items-center justify-end gap-2" data-table-pagination data-table-for="admin-sacco-detail-2" data-page="${saccoMembersPage.number}">
                             <c:choose>
                                 <c:when test="${saccoMembersPage.first}">
                                     <span class="app-btn btn-neutral pointer-events-none opacity-50">Previous</span>
                                 </c:when>
                                 <c:otherwise>
-                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number - 1}${saccoMembersPaginationQuery}" class="app-btn btn-neutral">Previous</a>
+                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number - 1}${saccoMembersPaginationQuery}" class="app-btn btn-neutral" data-page-direction="previous">Previous</a>
                                 </c:otherwise>
                             </c:choose>
                             <span class="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
@@ -336,7 +336,7 @@
                                     <span class="app-btn btn-neutral pointer-events-none opacity-50">Next</span>
                                 </c:when>
                                 <c:otherwise>
-                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number + 1}${saccoMembersPaginationQuery}" class="app-btn btn-primary">Next</a>
+                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number + 1}${saccoMembersPaginationQuery}" class="app-btn btn-primary" data-page-direction="next">Next</a>
                                 </c:otherwise>
                             </c:choose>
             </div>
@@ -408,7 +408,7 @@
                             </div>
                 </section>
 
-                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results...">
+                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-3">
                     <div class="app-table-titlebar">
                         <div class="app-table-heading"><h2>Recent SMS Usage</h2></div>
                     </div>
@@ -442,15 +442,15 @@
                         </table>
                         </div>
                         <c:if test="${smsHistory.totalPages gt 1}">
-                        <div class="erp-table-footer flex justify-end gap-2">
-                                <c:if test="${not smsHistory.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number - 1}">Previous</a></c:if>
-                                <c:if test="${not smsHistory.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number + 1}">Next</a></c:if>
+                        <div class="erp-table-footer flex justify-end gap-2" data-table-pagination data-table-for="admin-sacco-detail-3" data-page="${smsHistory.number}">
+                                <c:if test="${not smsHistory.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number - 1}" data-page-direction="previous">Previous</a></c:if>
+                                <c:if test="${not smsHistory.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number + 1}" data-page-direction="next">Next</a></c:if>
                     </div>
                         </c:if>
                 </section>
             </c:when>
             <c:otherwise>
-                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results...">
+                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-4" data-resource-split>
                     <div class="app-table-titlebar">
                         <div class="app-table-heading"><h2>Branch SMS Balances</h2></div>
                         <div class="app-table-toolbar">
@@ -466,7 +466,7 @@
                                 <th>Alert Reserve</th>
                                 <th>Warning Baseline</th>
                                 <th>Status</th>
-                                <th></th>
+                                <th data-table-actions-header></th>
                             </tr>
                             </thead>
                             <tbody>
@@ -487,9 +487,9 @@
                         </table>
             </div>
                         <c:if test="${smsAccounts.totalPages gt 1}">
-                        <div class="erp-table-footer flex justify-end gap-2">
-                                <c:if test="${not smsAccounts.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number - 1}">Previous</a></c:if>
-                                <c:if test="${not smsAccounts.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number + 1}">Next</a></c:if>
+                        <div class="erp-table-footer flex justify-end gap-2" data-table-pagination data-table-for="admin-sacco-detail-4" data-page="${smsAccounts.number}">
+                                <c:if test="${not smsAccounts.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number - 1}" data-page-direction="previous">Previous</a></c:if>
+                                <c:if test="${not smsAccounts.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number + 1}" data-page-direction="next">Next</a></c:if>
                                 </div>
                         </c:if>
                 </section>

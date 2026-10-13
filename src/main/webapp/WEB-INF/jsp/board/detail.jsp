@@ -79,7 +79,7 @@
             <div class="applicant-info-value" data-staff-active-loans-total>${activeApplicantLoanTotalAmount}</div>
         </div>
     </div>
-    <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading active loans...">
+    <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading active loans..." data-resource-table="board-detail-1" data-resource-split>
         <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
@@ -91,7 +91,7 @@
                     <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.installmentAmount" text="Installment" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="analytics.disbursed" text="Disbursed" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.finalDueDate" text="Final Due" /></th>
-                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.schedule" text="Schedule" /></th>
+                    <th class="px-3 py-2 text-left" data-table-actions-header><spring:message code="loan.repayment.schedule" text="Schedule" /></th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100" data-staff-active-loans-body>
@@ -157,7 +157,7 @@
         <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewAssessorTitle}</p>
         <p class="mt-2 text-base text-slate-600">${reviewAssessorDescription}</p>
     </div>
-<div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-2">
         <div class="erp-table-scroll">
         <table class="erp-table">
             <thead>
@@ -217,8 +217,8 @@
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
-        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h5>
+    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-3" data-resource-split data-resource-header-source>
+        <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-3"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h2>
         <div class="erp-table-scroll">
         <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50">
@@ -226,7 +226,7 @@
                 <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="common.size" text="Size" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="common.uploaded" text="Uploaded" /></th>
-                <th class="px-3 py-2 text-left"></th>
+                <th class="px-3 py-2 text-left" data-table-actions-header></th>
             </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -252,8 +252,8 @@
                         </div>
 </c:if>
 
-<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h5>
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-4" data-resource-split data-resource-header-source>
+    <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-4"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h2>
     <div class="erp-table-scroll">
     <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -261,7 +261,7 @@
             <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="common.size" text="Size" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="common.uploaded" text="Uploaded" /></th>
-            <th class="px-3 py-2 text-left"></th>
+            <th class="px-3 py-2 text-left" data-table-actions-header></th>
         </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -281,8 +281,8 @@
                     </div>
 </div>
 
-<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-5" data-resource-header-source data-resource-split>
+    <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-5"><spring:message code="loan.guarantors" text="Guarantors" /></h2>
     <div class="erp-table-scroll">
     <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -291,7 +291,7 @@
             <th class="px-3 py-2 text-left"><spring:message code="Member.memberNo" text="Client No" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="common.status" text="Status" /></th>
             <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="financial.status" text="Financial Status" /></th>
+            <th class="px-3 py-2 text-left" data-table-actions-header><spring:message code="financial.status" text="Financial Status" /></th>
         </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">

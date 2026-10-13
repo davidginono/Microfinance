@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/resource-table.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/workspace-resources.css' />" />
     <script src="<c:url value='/js/vendor/lucide-repayments.js' />" defer></script>
 <%@ include file="select-enhancer.jspf" %>
 </head>

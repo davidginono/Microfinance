@@ -9,7 +9,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${boardListBreadcrumb}</p>
-    <h1 class="erp-page-title">${boardListTitle}</h1>
+    <h1 class="erp-page-title" id="board-assigned-title">${boardListTitle}</h1>
 </div>
 
 <c:if test="${archiveView}">
@@ -42,7 +42,7 @@
 </c:if>
 
 <div class="erp-panel overflow-hidden">
-<form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+<form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="board-assigned-1">
         <c:if test="${archiveView}">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
         </c:if>
@@ -78,7 +78,7 @@
             </button>
         </div>
     </form>
-<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-assigned-1" data-resource-split data-table-title-id="board-assigned-title">
         <div class="erp-table-scroll">
         <table class="erp-table">
             <thead>
@@ -93,7 +93,7 @@
                     <th><spring:message code="review.reason" text="Reason" /></th>
                 </c:if>
                 <th><spring:message code="loan.date" text="Date" /></th>
-                <th></th>
+                <th data-table-actions-header></th>
             </tr>
             </thead>
             <tbody>
@@ -152,9 +152,9 @@
         </div>
 
 <c:if test="${archiveView and archivePage.totalPages gt 1}">
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3" data-table-pagination-shell>
         <span class="text-sm text-slate-500">Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2" data-table-pagination data-table-for="board-assigned-1" data-page="${archivePage.number}">
             <c:if test="${not archivePage.first}">
                 <c:url var="archivePreviousUrl" value="${boardListRoute}">
                     <c:param name="filter" value="${currentFilterKey}" />
@@ -163,7 +163,7 @@
                     <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number - 1}" />
                 </c:url>
-                <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}" data-page-direction="previous"><spring:message code="common.previous" text="Previous" /></a>
             </c:if>
             <c:if test="${not archivePage.last}">
                 <c:url var="archiveNextUrl" value="${boardListRoute}">
@@ -173,7 +173,7 @@
                     <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number + 1}" />
                 </c:url>
-                <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
+                <a class="app-btn btn-primary" href="${archiveNextUrl}" data-page-direction="next"><spring:message code="common.next" text="Next" /></a>
             </c:if>
     </div>
     </div>

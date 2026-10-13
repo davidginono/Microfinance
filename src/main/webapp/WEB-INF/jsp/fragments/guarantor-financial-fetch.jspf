@@ -103,6 +103,7 @@
     }
 
     function guarantorNameFor(btn) {
+        if (btn.dataset.guarantorName) return btn.dataset.guarantorName;
         var row = btn.closest('tr');
         if (!row) return msgGuarantor;
         var firstCell = row.querySelector('td');
@@ -122,6 +123,7 @@
     });
 
     triggers.forEach(function (btn) {
+        btn.dataset.guarantorName = guarantorNameFor(btn);
         // Keep the inline credit profile cards in sync with the modal.
         var legacy = btn.parentElement ? btn.parentElement.querySelector('.guarantor-financial-result') : null;
         var label = btn.querySelector('[data-financial-label]');

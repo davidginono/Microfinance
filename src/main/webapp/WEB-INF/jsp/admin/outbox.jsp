@@ -8,9 +8,9 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.outbox.breadcrumb" text="Admin Tools / Outbox Monitor" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h1>
+    <h1 class="erp-page-title" id="admin-outbox-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h1>
 </div>
-<section class="erp-table-wrap admin-register-shell" aria-label="Outbox monitor results">
+<section class="erp-table-wrap admin-register-shell" aria-label="Outbox monitor results" data-resource-table="admin-outbox-1" data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
     <div class="app-table-titlebar">
         <div class="app-table-heading"><h2>Outbox Monitor results</h2></div>
         <div class="app-table-toolbar">
@@ -21,7 +21,7 @@
             <a href="/admin/outbox" class="app-icon-button" aria-label="Refresh outbox monitor" title="Refresh outbox monitor">&#8635;</a>
         </div>
     </div>
-    <form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
+    <form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-outbox-1">
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 Institution
@@ -60,7 +60,7 @@
             Loan Application ID
             <input type="text" name="loanApplicationId" value="${selectedLoanApplicationId}" placeholder="Search application UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" />
         </label>
-        <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700">
+        <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700" data-table-page-size-control>
             <span class="admin-filter-field--rows-label">Rows Per Page</span>
             <select name="size" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none">
                 <option value="25" ${selectedPageSize eq 25 ? 'selected' : ''}>25 rows</option>
@@ -109,15 +109,15 @@
     </div>
 </section>
 <c:if test="${eventsPage.totalPages gt 1}">
-    <div class="mt-4 flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mt-4 flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-table-pagination-shell>
         <p class="text-sm text-slate-600">Page <span class="font-semibold text-slate-800">${eventsPage.number + 1}</span> of <span class="font-semibold text-slate-800">${eventsPage.totalPages}</span></p>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2" data-table-pagination data-table-for="admin-outbox-1" data-page="${eventsPage.number}">
             <c:choose>
                 <c:when test="${eventsPage.first}">
                     <span class="app-btn btn-neutral opacity-50">Previous</span>
                 </c:when>
                 <c:otherwise>
-                    <a href="/admin/outbox?page=${eventsPage.number - 1}${outboxPaginationQuery}" class="app-btn btn-neutral">Previous</a>
+                    <a href="/admin/outbox?page=${eventsPage.number - 1}${outboxPaginationQuery}" class="app-btn btn-neutral" data-page-direction="previous">Previous</a>
                 </c:otherwise>
             </c:choose>
             <c:choose>
@@ -125,7 +125,7 @@
                     <span class="app-btn btn-neutral opacity-50">Next</span>
                 </c:when>
                 <c:otherwise>
-                    <a href="/admin/outbox?page=${eventsPage.number + 1}${outboxPaginationQuery}" class="app-btn btn-primary">Next</a>
+                    <a href="/admin/outbox?page=${eventsPage.number + 1}${outboxPaginationQuery}" class="app-btn btn-primary" data-page-direction="next">Next</a>
                 </c:otherwise>
             </c:choose>
         </div>

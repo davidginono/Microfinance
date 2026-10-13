@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Exercise Jasper and all shared JSP includes without booting the application or connecting to a database. */
 class ChartOfAccountsJspCompilationTest {
     @TempDir Path temporary;
-    @Test void bothOnboardingViewsCompileWithTheSharedShell() throws Exception {
+    @Test void resourceViewsCompileWithTheSharedShell() throws Exception {
         var tomcat=new Tomcat();tomcat.setBaseDir(temporary.toString());tomcat.setPort(0);
         var context=tomcat.addContext("",Path.of("src/main/webapp").toAbsolutePath().toString());
         context.setParentClassLoader(getClass().getClassLoader());
@@ -27,16 +27,20 @@ class ChartOfAccountsJspCompilationTest {
             var expanded=new java.util.LinkedHashSet<>(java.util.List.of(pages));
             expanded.add("vouchers/loan-details.jsp");
             // Compile every accountant resource view changed by the shared table rollout.
-            for (String folder : new String[]{"accounting", "accountant", "reporting", "reports"}) {
+            String[] folders = {"accounting", "accountant", "reporting", "reports", "app", "admin", "manager", "board", "chairperson", "disbursement", "loan-officer", "staff", "repayments", "account"};
+            if (Boolean.getBoolean("microfinance.workspace.jsp-only")) expanded.clear();
+            for (String folder : folders) {
                 try (var files=java.nio.file.Files.walk(Path.of("src/main/webapp/WEB-INF/jsp",folder))) {
                     for (var file:files.filter(path -> path.toString().endsWith(".jsp")).toList()) {
-                        if (java.nio.file.Files.readString(file).contains("data-resource-table="))
+                        if (Boolean.getBoolean("microfinance.workspace.jsp-only") || java.nio.file.Files.readString(file).contains("data-resource-table="))
                             expanded.add("../"+Path.of("src/main/webapp/WEB-INF/jsp").relativize(file).toString().replace('\\','/'));
                     }
                 }
             }
             pages=expanded.toArray(String[]::new);
         }
+        String selectedPages=System.getProperty("microfinance.jsp.pages");
+        if(selectedPages!=null)pages=selectedPages.split(",");
         for(int n=0;n<pages.length;n++) {
             var servlet=Tomcat.addServlet(context,"coa-"+n,new JspServlet());
             servlet.setLoadOnStartup(1);

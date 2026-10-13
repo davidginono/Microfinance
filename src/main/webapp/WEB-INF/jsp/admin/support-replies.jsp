@@ -6,19 +6,19 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.support.repliesBreadcrumb" text="Admin Tools / Support / Replies" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.support.repliesTitle" text="Support Replies" /></h1>
+    <h1 class="erp-page-title" id="admin-support-replies-title"><spring:message code="admin.support.repliesTitle" text="Support Replies" /></h1>
 </div>
 
 <section class="erp-panel">
-    <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3">
-        <p class="erp-panel-title"><spring:message code="support.repliesFromSuperAdmin" text="Replies From Super Admin" /></p>
-        <form action="/admin/support/replies/mark-all-read" method="post">
+    <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3" data-resource-header-source>
+        <h2 class="erp-panel-title" data-table-heading-for="admin-support-replies-1"><spring:message code="support.repliesFromSuperAdmin" text="Replies From Super Admin" /></h2>
+        <form action="/admin/support/replies/mark-all-read" method="post" data-table-toolbar-for="admin-support-replies-1">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <button type="submit" class="app-btn btn-neutral">Mark All Read</button>
         </form>
     </div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-support-replies-1">
             <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
@@ -51,9 +51,9 @@
 </section>
 
 <section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title">Super Admin Broadcasts</p></div>
+    <div class="erp-panel-header" data-resource-header-source><h2 class="erp-panel-title" data-table-heading-for="admin-support-replies-2">Super Admin Broadcasts</h2></div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-support-replies-2">
             <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>

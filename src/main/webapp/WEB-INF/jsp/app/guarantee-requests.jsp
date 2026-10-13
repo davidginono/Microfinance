@@ -8,13 +8,13 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guaranteeRequests.breadcrumb" text="Borrower Workspace / Guarantee Requests" /></p>
-    <h1 class="erp-page-title"><spring:message code="menu.grequests" /></h1>
+    <h1 class="erp-page-title" id="app-guarantee-requests-title"><spring:message code="menu.grequests" /></h1>
 </div>
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-guarantee-requests-1" data-resource-split data-table-title-id="app-guarantee-requests-title">
 <div class="erp-table-scroll">
 <table class="erp-table">
-    <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="reports.loanProduct" text="Loan Product" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th><spring:message code="common.actions" text="Actions" /></th></tr></thead>
+    <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="reports.loanProduct" text="Loan Product" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th data-table-actions-header><spring:message code="common.actions" text="Actions" /></th></tr></thead>
     <tbody>
     <c:forEach items="${requests}" var="req">
         <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />

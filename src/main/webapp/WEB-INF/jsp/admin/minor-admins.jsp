@@ -7,7 +7,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / Institution Registry / Institution Admins Registration" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.minorAdmins.title" text="Institution Admins Registration" /></h1>
+    <h1 class="erp-page-title" id="admin-minor-admins-title"><spring:message code="admin.minorAdmins.title" text="Institution Admins Registration" /></h1>
 </div>
 
 <c:if test="${not empty createdMinorAdminStaffNumber}">
@@ -81,7 +81,7 @@
                     </label>
                 </div>
 
-                <div class="minor-admin-create-actions" data-aws-action-pin="true">
+                <div class="minor-admin-create-actions" data-aws-action-pin="true" data-table-toolbar-for="admin-minor-admins-1" data-resource-header-source>
                     <button type="submit"
                             formaction="/admin/saccos/minor-admins/change"
                             class="app-btn btn-primary"
@@ -98,15 +98,15 @@
 <div class="erp-panel overflow-hidden minor-admin-list-panel">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <p class="erp-panel-title"><spring:message code="admin.minorAdmins.registered" text="Registered Institution Admins" /></p>
+            <div data-resource-header-source>
+                <h2 class="erp-panel-title" data-table-heading-for="admin-minor-admins-1"><spring:message code="admin.minorAdmins.registered" text="Registered Institution Admins" /></h2>
                 <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.minorAdmins.manageHelp" text="Use Users &amp; Roles for status changes or broader role updates." /></p>
             </div>
             <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="admin.minorAdmins.manageUsers" text="Manage In Users &amp; Roles" /></a>
         </div>
     </div>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-minor-admins-1" data-resource-split>
         <div class="erp-table-scroll">
         <table class="erp-table min-w-[1120px]">
             <thead>
@@ -117,7 +117,7 @@
                 <th><spring:message code="common.sacco" text="Institution" /></th>
                 <th><spring:message code="admin.saccoRegistry.station" text="Branch" /></th>
                 <th><spring:message code="admin.minorAdmins.activation" text="Activation" /></th>
-                <th class="text-right"><spring:message code="common.actions" text="Actions" /></th>
+                <th class="text-right" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr>
             </thead>
             <tbody>

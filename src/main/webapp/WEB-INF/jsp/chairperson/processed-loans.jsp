@@ -8,11 +8,11 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="chairperson.office" text="Chairperson Office" /> / <spring:message code="chairperson.processedLoans" text="Processed Loans" /></p>
-    <h1 class="erp-page-title"><spring:message code="chairperson.processedLoans" text="Processed Loans" /></h1>
+    <h1 class="erp-page-title" id="chairperson-processed-loans-title"><spring:message code="chairperson.processedLoans" text="Processed Loans" /></h1>
 </div>
 
 <section class="erp-panel overflow-hidden">
-    <form method="get" action="${pageContext.request.contextPath}/chairperson/processed-loans" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar>
+    <form method="get" action="${pageContext.request.contextPath}/chairperson/processed-loans" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="chairperson-processed-loans-1">
         <label class="erp-table-toolbar__search text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="common.search" text="Search" />
             <input type="search" name="search" value="${fn:escapeXml(processedLoans.search)}"
@@ -45,7 +45,7 @@
             </c:if>
         </div>
     </form>
-    <div class="erp-table-wrap border-0 shadow-none" data-aws-table-region>
+    <div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-resource-table="chairperson-processed-loans-1" data-resource-split data-table-title-id="chairperson-processed-loans-title">
         <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead><tr>
@@ -57,7 +57,7 @@
                     <th><spring:message code="common.status" text="Status" /></th>
                     <th><spring:message code="chairperson.latestDecision" text="Latest Staff Decision" /></th>
                     <th><spring:message code="chairperson.decisionCount" text="Decisions" /></th>
-                    <th></th>
+                    <th data-table-actions-header></th>
                 </tr></thead>
                 <tbody>
                 <c:forEach items="${processedLoans.rows}" var="row">
@@ -87,11 +87,11 @@
 </section>
 
 <c:if test="${processedLoans.totalPages gt 1}">
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3" data-table-pagination-shell>
         <span class="text-sm text-slate-500"><spring:message code="common.page" text="Page" /> ${processedLoans.page + 1} / ${processedLoans.totalPages}</span>
-        <div class="flex gap-2">
-            <c:if test="${not processedLoans.first}"><c:url var="prevUrl" value="/chairperson/processed-loans"><c:param name="search" value="${processedLoans.search}"/><c:param name="fromDate" value="${processedLoans.fromDate}"/><c:param name="toDate" value="${processedLoans.toDate}"/><c:param name="status" value="${processedLoans.status}"/><c:param name="page" value="${processedLoans.page - 1}"/></c:url><a class="app-btn btn-neutral" href="${prevUrl}"><spring:message code="common.previous" text="Previous" /></a></c:if>
-            <c:if test="${not processedLoans.last}"><c:url var="nextUrl" value="/chairperson/processed-loans"><c:param name="search" value="${processedLoans.search}"/><c:param name="fromDate" value="${processedLoans.fromDate}"/><c:param name="toDate" value="${processedLoans.toDate}"/><c:param name="status" value="${processedLoans.status}"/><c:param name="page" value="${processedLoans.page + 1}"/></c:url><a class="app-btn btn-primary" href="${nextUrl}"><spring:message code="common.next" text="Next" /></a></c:if>
+        <div class="flex gap-2" data-table-pagination data-table-for="chairperson-processed-loans-1" data-page="${processedLoans.page}">
+            <c:if test="${not processedLoans.first}"><c:url var="prevUrl" value="/chairperson/processed-loans"><c:param name="search" value="${processedLoans.search}"/><c:param name="fromDate" value="${processedLoans.fromDate}"/><c:param name="toDate" value="${processedLoans.toDate}"/><c:param name="status" value="${processedLoans.status}"/><c:param name="page" value="${processedLoans.page - 1}"/></c:url><a class="app-btn btn-neutral" href="${prevUrl}" data-page-direction="previous"><spring:message code="common.previous" text="Previous" /></a></c:if>
+            <c:if test="${not processedLoans.last}"><c:url var="nextUrl" value="/chairperson/processed-loans"><c:param name="search" value="${processedLoans.search}"/><c:param name="fromDate" value="${processedLoans.fromDate}"/><c:param name="toDate" value="${processedLoans.toDate}"/><c:param name="status" value="${processedLoans.status}"/><c:param name="page" value="${processedLoans.page + 1}"/></c:url><a class="app-btn btn-primary" href="${nextUrl}" data-page-direction="next"><spring:message code="common.next" text="Next" /></a></c:if>
         </div>
     </div>
 </c:if>

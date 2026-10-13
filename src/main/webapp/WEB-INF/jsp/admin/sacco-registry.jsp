@@ -18,37 +18,37 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.tools" text="Admin Tools" /> / ${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</p>
-    <h1 class="erp-page-title">${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</h1>
+    <h1 class="erp-page-title" id="admin-sacco-registry-title">${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</h1>
 </div>
 
 <div class="erp-panel">
     <div class="erp-panel-header">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <p class="erp-panel-title">${superAdmin ? SaccoRegistrationLabel : currentSaccoStationsLabel}</p>
+            <div data-resource-header-source>
+                <h2 class="erp-panel-title" data-table-heading-for="admin-sacco-registry-1">${superAdmin ? SaccoRegistrationLabel : currentSaccoStationsLabel}</h2>
             </div>
             <c:if test="${superAdmin}">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2" data-table-toolbar-for="admin-sacco-registry-1" data-resource-header-source>
                     <button type="button" class="app-btn btn-launch" data-sacco-modal-open="create-Sacco"><spring:message code="admin.saccoRegistry.addSacco" text="Add Institution" /></button>
                 </div>
             </c:if>
         </div>
     </div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-registry-1" data-resource-split>
             <div class="erp-table-scroll">
             <table class="erp-table min-w-[680px]">
                 <thead>
                 <tr>
                     <th><spring:message code="admin.saccoRegistry.logo" text="Logo" /></th>
-                    <th>Institution ID</th>
+                    <th data-table-identifier>Institution ID</th>
                     <th><spring:message code="admin.saccoRegistry.saccoName" text="Institution Name" /></th>
                     <th><spring:message code="admin.saccoRegistry.access" text="Access" /></th>
                     <th><spring:message code="admin.saccoRegistry.stations" text="Branches" /></th>
                     <c:if test="${superAdmin}">
-                        <th><spring:message code="admin.saccoRegistry.details" text="Details" /></th>
+                        <th data-table-actions-header><spring:message code="admin.saccoRegistry.details" text="Details" /></th>
                     </c:if>
-                    <th><spring:message code="common.action" text="Action" /></th>
+                    <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
                 </tr>
                 </thead>
                 <tbody>

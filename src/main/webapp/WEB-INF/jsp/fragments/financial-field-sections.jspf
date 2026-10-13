@@ -8,9 +8,10 @@
                  aria-label="${fn:escapeXml(section.key)}"
                  data-aws-table-region
                  data-aws-no-titlebar="true"
+                 data-resource-table="review-financial-section-${sectionLoop.index}"
                  data-aws-no-refresh="true">
-            <div class="loan-financial-section__header">
-                <h5><c:out value="${section.key}" /></h5>
+            <div class="app-table-titlebar">
+                <h2><c:out value="${section.key}" /></h2>
             </div>
             <div class="erp-table-scroll erp-table-scroll-sm"
                  data-view-position-key="loan-financial-section-${sectionLoop.index}">

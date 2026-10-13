@@ -7,6 +7,65 @@ const voucherSource = readFileSync('src/main/resources/static/js/accounting-vouc
 const labels = `<template id="resource-table-labels" data-records="Records" data-actions="Actions" data-page-size="Page size" data-striped="Striped rows" data-sticky="Sticky first columns" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-reorder="Move column" data-details="Details" data-show-details="Show details" data-panel-position="Panel position" data-bottom="Bottom" data-side="Side" data-resize="Resize details panel" data-select-record="Select a record" data-search-page="Search this page" data-no-matches="No matching records." data-refresh="Refresh" data-pagination="Pagination" data-page="Page" data-previous="Previous page" data-next="Next page" data-preferences="Preferences" data-columns="Visible columns" data-compact="Compact rows" data-wrap="Wrap lines" data-select="Select" data-select-first="Select first row" data-clear-selection="Clear row selection" data-view="View" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
 const table = (key, body, extra = '') => `<section class="erp-table-wrap" data-resource-table="${key}" ${extra}><div class="app-table-titlebar"><h2>Records</h2><div class="accounting-actions"><a class="app-btn btn-primary" href="/create">Create</a></div></div><form method="get"><input name="search"></form><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th>Reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 const row = '<tr><td>V001</td><td>100.00</td><td>Posted</td></tr>';
+
+test('workspace command columns retain native forms, permissions and record targets in Actions', async () => {
+    const html=`<section data-resource-table="workspace"><table class="erp-table"><thead><tr><th>Name</th><th data-table-actions-header>Details</th><th data-table-actions-header>Actions</th></tr></thead><tbody><tr><td>First</td><td><a class="app-btn" href="/first">Open</a></td><td><form id="native-command" method="post" action="/first/decision"><input type="hidden" name="_csrf" value="original"><button type="button" id="approve">Approve</button></form><button disabled>Restricted</button><p>Policy restriction</p></td></tr><tr><td>Second</td><td><a class="app-btn" href="/second">Open</a></td><td><button disabled>Restricted</button></td></tr></tbody></table></section>`;
+    const {dom,window:w,document:d}=await setup(html);
+    assert.equal(d.querySelectorAll('thead th').length,2);assert.equal(d.querySelector('thead [data-table-actions-header]'),null);
+    d.querySelector('tbody input').click();
+    const form=d.querySelector('#native-command'),button=d.querySelector('#approve');let commands=0;button.addEventListener('click',()=>commands++);
+    assert.equal(form.closest('[role=menu]')!==null,true);assert.equal(form.action,'http://localhost/first/decision');assert.equal(form.querySelector('input').value,'original');
+    assert.equal(d.querySelector('.resource-table-command-context').hidden,false);
+    d.querySelector('.resource-table-action-menu > button').click();button.click();assert.equal(commands,1);
+    d.querySelectorAll('tbody input')[1].click();assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/second');assert.equal(d.querySelector('.resource-table-action-menu > button').disabled,true);
+    d.querySelector('tbody input').click();assert.equal(d.querySelector('#native-command'),form);assert.equal(d.querySelector('#approve'),button);
+    d.querySelector('.resource-table-search input').dispatchEvent(new w.Event('input'));assert.equal(d.querySelector('tbody input').checked,false);dom.window.close();
+});
+
+test('late hydrated rows receive selection and replacement clears old record commands', async () => {
+    const html=`<section data-resource-table="hydrated"><table><thead><tr><th>Reference</th><th>Amount</th><th data-table-actions-header>Commands</th></tr></thead><tbody><tr><td colspan="3">Loading</td></tr></tbody></table></section>`;
+    const {dom,window:w,document:d}=await setup(html);const body=d.querySelector('tbody');
+    body.innerHTML='<tr><td>L001</td><td>100</td><td><button type="button" id="schedule">Schedule</button></td></tr>';
+    await new Promise(resolve=>w.setTimeout(resolve,0));d.querySelector('tbody input').click();
+    assert.equal(d.querySelector('.resource-table-menu #schedule')!==null,true);
+    body.innerHTML='<tr><td>L002</td><td>200</td><td><a class="app-btn" href="/second">Open</a></td></tr>';
+    await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(d.querySelector('#schedule'),null);assert.equal(d.querySelector('tbody input').checked,false);
+    d.querySelector('tbody input').click();assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/second');dom.window.close();
+});
+
+test('explicit workspace headings, GET filters and independent POST commands move with their envelopes', async () => {
+    const html=`<h2 data-table-heading-for="external">Review queue</h2><form method="get" action="/queue" data-table-filter-for="external"><input name="searchId" value="L001"><input type="hidden" name="filter" value="pending"></form><form id="mark-read" method="post" action="/notifications/mark-all-read" data-table-toolbar-for="external"><input type="hidden" name="_csrf" value="token"><button>Mark read</button></form>${table('external',row).replace('<div class="app-table-titlebar"><h2>Records</h2><div class="accounting-actions"><a class="app-btn btn-primary" href="/create">Create</a></div></div>','').replace('<form method="get"><input name="search"></form>','')}`;
+    const {dom,document:d}=await setup(html);
+    assert.equal(d.querySelector('.app-table-titlebar h2').textContent,'Review queue');assert.equal(d.querySelector('.resource-table-tools [name=searchId]').value,'L001');assert.equal(d.querySelector('.resource-table-tools [name=filter]').value,'pending');
+    assert.equal(d.querySelector('.resource-table-actions #mark-read').action,'http://localhost/notifications/mark-all-read');assert.equal(d.querySelector('#mark-read input').value,'token');assert.equal(d.querySelector('.erp-table-scroll form'),null);dom.window.close();
+});
+
+test('existing bounded client search remains functional under the shared table component', async () => {
+    const html=table('bounded',row+'<tr><td>V002</td><td>200</td><td>Reversed</td></tr>').replace('<form method="get"><input name="search"></form>','<div class="aws-filter-toolbar"><input type="search" data-aws-table-search></div>');
+    const {dom,window:w,document:d}=await setup(html);const search=d.querySelector('[data-aws-table-search]');search.value='reversed';search.dispatchEvent(new w.Event('input'));
+    assert.equal(d.querySelector('tbody tr').hidden,true);assert.equal(d.querySelector('tbody tr:nth-child(2)').hidden,false);dom.window.close();
+});
+
+test('preferences use the staff register server sizes without duplicate size fields', async () => {
+    const html=table('staff-sizes',row,'data-table-page-size="25" data-table-page-size-options="25 50 100"').replace('<input name="search">','<input name="search"><select name="size"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select>');
+    const {dom,document:d}=await setup(html);assert.equal(d.querySelectorAll('.resource-table-tools [name=size]').length,1);d.querySelector('[aria-label="Preferences"]').click();
+    assert.deepEqual([...d.querySelectorAll('input[name=pageSize]')].map(input=>input.value),['25','50','100']);assert.equal(d.querySelector('input[name=pageSize]:checked').value,'25');d.querySelector('dialog button[title=Close]').click();dom.window.close();
+});
+
+test('replaced calculator sections release old observers and initialize exactly one set of tools', async () => {
+    const {dom,window:w,document:d}=await setup('<div id="calculator">'+table('calculation',row)+'</div>');
+    const container=d.querySelector('#calculator'),old=container.querySelector('[data-resource-table]'),body=old.querySelector('tbody');
+    container.innerHTML=table('calculation',row);w.ResourceTable.init(container);w.ResourceTable.init(container);
+    assert.equal(container.querySelectorAll('.resource-table-tools').length,1);assert.equal(container.querySelectorAll('.resource-table-preferences-button').length,1);
+    body.insertAdjacentHTML('beforeend',row);await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(body.lastChild.cells[0].style.getPropertyValue('--sticky-left'),'');dom.window.close();
+});
+
+test('opening an existing record modal from Actions keeps focus in the modal', async () => {
+    const html=table('modal-command','<tr><td>R001</td><td>100</td><td><button type="button" id="open-modal">Review</button></td></tr>').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>')+'<div id="modal" hidden><input aria-label="Review reason"></div>';
+    const {dom,window:w,document:d}=await setup(html);d.querySelector('tbody input').click();
+    const input=d.querySelector('#modal input');d.querySelector('#open-modal').addEventListener('click',()=>{d.querySelector('#modal').hidden=false;input.focus();});
+    d.querySelector('.resource-table-action-menu > button').click();d.querySelector('#open-modal').click();await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(d.activeElement,input);dom.window.close();
+});
 async function setup(html, integration = '') {
     const dom = new JSDOM(labels + html, {url:'http://localhost/finance/test', runScripts:'outside-only', pretendToBeVisual:true});
     const {window} = dom;

@@ -9,7 +9,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="newloan.breadcrumb" /></p>
-    <h1 class="erp-page-title"><spring:message code="newloan.title" />: <c:out value="${loanProductName}" /></h1>
+    <h1 class="erp-page-title" id="app-loan-new-title"><spring:message code="newloan.title" />: <c:out value="${loanProductName}" /></h1>
 </div>
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your institution'}" />
 <div class="mb-4 erp-section-muted">
@@ -206,8 +206,8 @@
             </div>
         </div>
         <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotSections}'>hidden </c:if>mt-4 grid gap-3 md:grid-cols-2">
-            <c:forEach items="${financialSnapshotSections}" var="section">
-<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
+            <c:forEach items="${financialSnapshotSections}" var="section" varStatus="financialSectionLoop">
+<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results..." data-resource-table="app-loan-new-1-${financialSectionLoop.index}" data-table-title-id="app-loan-new-title">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -240,7 +240,7 @@
                 <h5 class="erp-panel-title"><spring:message code="repayment.scheduler" text="Repayment Scheduler" /></h5>
         </div>
         </div>
-<div class="erp-table-wrap" aria-label="<spring:message code='repayment.scheduler' text='Repayment Scheduler' />" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
+<div class="erp-table-wrap" aria-label="<spring:message code='repayment.scheduler' text='Repayment Scheduler' />" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results..." data-resource-table="app-loan-new-2" data-table-title-id="app-loan-new-title">
             <div class="erp-table-scroll erp-table-scroll-sm">
             <table class="erp-table">
                 <thead>
@@ -437,7 +437,7 @@
             </span>
                             </div>
         <c:if test="${not empty existingApplicationAttachments}">
-            <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading attachments...">
+            <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading attachments..." data-resource-table="app-loan-new-3" data-resource-split>
                 <div class="app-table-titlebar">
                     <div class="app-table-heading"><h2><spring:message code="loan.attachments.existing" text="Existing Attachments" /></h2></div>
                 </div>
@@ -448,7 +448,7 @@
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.size" text="Size" /></th>
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.uploaded" text="Uploaded" /></th>
-                            <th class="px-3 py-2 text-left"><spring:message code="common.actions" text="Actions" /></th>
+                            <th class="px-3 py-2 text-left" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -1122,9 +1122,11 @@
 
         function renderFinancialSections(sections) {
             financialCard.innerHTML = "";
-            Object.entries(sections || {}).forEach(function (section) {
+            Object.entries(sections || {}).forEach(function (section, sectionIndex) {
                 const wrapper = document.createElement("div");
                 wrapper.className ="erp-table-wrap loan-summary-table";
+                wrapper.dataset.resourceTable = "member-application-calculation-" + sectionIndex;
+                wrapper.dataset.awsNoRefresh = "true";
                 wrapper.setAttribute("data-aws-table-region", "");
                 wrapper.setAttribute("data-aws-no-titlebar", "true");
                 wrapper.setAttribute("data-aws-no-refresh", "true");
@@ -1149,6 +1151,7 @@
                     body.appendChild(row);
                 });
                 financialCard.appendChild(wrapper);
+                window.ResourceTable.init(financialCard);
             });
             financialCard.classList.toggle("hidden", financialCard.children.length === 0);
         }

@@ -9,7 +9,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.archive.breadcrumb" text="Manager Panel / Archive" /></p>
-    <h1 class="erp-page-title"><spring:message code="manager.archive.title" text="Manager Archive" /></h1>
+    <h1 class="erp-page-title" id="manager-archive-title"><spring:message code="manager.archive.title" text="Manager Archive" /></h1>
 </div>
 
 <c:url var="managerArchiveAllUrl" value="/manager/archive"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
@@ -34,7 +34,7 @@
         <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
     </a>
 </div>
-<form action="/manager/archive" method="get" class="erp-filter-form manager-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+<form action="/manager/archive" method="get" class="erp-filter-form manager-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="manager-archive-1">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${archiveSearchLabel}
@@ -61,7 +61,7 @@
             </div>
         </form>
 
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Manager Archive results">
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Manager Archive results" data-resource-table="manager-archive-1" data-resource-split data-table-title-id="manager-archive-title">
     <div class="erp-table-scroll" data-view-position-key="manager-archive-table">
         <table class="erp-table">
         <thead>
@@ -75,7 +75,7 @@
             <th><spring:message code="review.reason" text="Reason" /></th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
-            <th><spring:message code="common.action" text="Action" /></th>
+            <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
@@ -106,9 +106,9 @@
 </section>
 
 <c:if test="${archivePage.totalPages gt 1}">
-    <div class="mt-4 flex items-center justify-between gap-3">
+    <div class="mt-4 flex items-center justify-between gap-3" data-table-pagination-shell>
         <span class="text-sm text-slate-500">Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
-        <div class="flex gap-2">
+        <div class="flex gap-2" data-table-pagination data-table-for="manager-archive-1" data-page="${archivePage.number}">
             <c:if test="${not archivePage.first}">
                 <c:url var="archivePreviousUrl" value="/manager/archive">
                     <c:param name="filter" value="${currentFilterKey}" />
@@ -117,7 +117,7 @@
                     <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number - 1}" />
                 </c:url>
-                <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}" data-page-direction="previous"><spring:message code="common.previous" text="Previous" /></a>
             </c:if>
             <c:if test="${not archivePage.last}">
                 <c:url var="archiveNextUrl" value="/manager/archive">
@@ -127,7 +127,7 @@
                     <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number + 1}" />
                 </c:url>
-                <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
+                <a class="app-btn btn-primary" href="${archiveNextUrl}" data-page-direction="next"><spring:message code="common.next" text="Next" /></a>
             </c:if>
         </div>
     </div>

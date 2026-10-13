@@ -5,9 +5,9 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Audit Log</p>
-    <h1 class="erp-page-title">Audit Log</h1>
+    <h1 class="erp-page-title" id="admin-audit-title">Audit Log</h1>
 </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-audit-1" data-resource-split data-table-title-id="admin-audit-title">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

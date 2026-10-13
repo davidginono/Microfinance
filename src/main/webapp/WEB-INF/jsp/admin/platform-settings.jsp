@@ -8,7 +8,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Platform Settings</p>
-    <h1 class="erp-page-title">Platform Settings</h1>
+    <h1 class="erp-page-title" id="admin-platform-settings-title">Platform Settings</h1>
 </div>
 
 <section class="erp-panel aws-settings-panel overflow-hidden">
@@ -284,13 +284,13 @@
 </section>
 
 <section class="erp-panel aws-settings-panel overflow-hidden">
-    <div class="aws-settings-header">
+    <div class="aws-settings-header" data-resource-header-source>
         <p class="aws-settings-kicker">Institution Features</p>
-        <h2 class="aws-settings-title">Loan Top-Up Access</h2>
+        <h2 class="aws-settings-title" data-table-heading-for="admin-platform-settings-1">Loan Top-Up Access</h2>
         <p class="aws-settings-description">Allow or block loan top-up requests for each institution.</p>
     </div>
     <div class="erp-panel-body">
-        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading institution feature settings...">
+        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading institution feature settings..." data-resource-table="admin-platform-settings-1">
             <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>

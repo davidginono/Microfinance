@@ -11,12 +11,12 @@
 <div class="erp-page-header" data-aws-page-header>
     <div>
         <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Borrower Workspace / Reports & Analytics" /></p>
-        <h1 class="erp-page-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
+        <h1 class="erp-page-title" id="app-reports-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
     </div>
 </div>
 
 <section class="erp-panel loan-analytics-command-panel overflow-hidden">
-<form action="/app/reports" method="get" class="erp-panel-body loan-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true">
+<form action="/app/reports" method="get" class="erp-panel-body loan-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true" data-table-filter-for="app-reports-1">
         <label class="loan-analytics-filter-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="reports.startDate" text="Start Date" />
             <input name="fromDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" value="${fromDate}" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
@@ -146,11 +146,11 @@
 </section>
 
 <section class="erp-panel overflow-hidden">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4" data-resource-header-source>
         <p class="erp-widget-title"><spring:message code="reports.activeLoanDetails" text="Active Loan Details" /></p>
-        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="reports.activeLoanDetailsSummary" text="Active Loans and Interest Summary" /></h2>
+        <h2 class="mt-1 text-xl font-bold text-sacco-ink" data-table-heading-for="app-reports-1"><spring:message code="reports.activeLoanDetailsSummary" text="Active Loans and Interest Summary" /></h2>
     </div>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-reports-1">
         <div class="erp-table-scroll">
         <table class="erp-table loan-active-detail-table">
             <thead>
