@@ -29,7 +29,7 @@
   <sec:authorize access="hasAuthority('STATEMENT_DESIGN')"><a class="app-btn btn-neutral" href="<c:url value='/reports/statements/mappings/new?kind=${kind}' />"><spring:message code="statements.configure" /></a><c:if test="${not empty selected}"><a class="app-btn btn-neutral" href="<c:url value='/reports/statements/mappings?version=${selected.id}' />"><spring:message code="statements.editMapping" /></a></c:if></sec:authorize>
  </section>
  <section data-resource-table="reports-financial-statements-1" class="erp-table-wrap" data-aws-table-region>
-  <div class="app-table-titlebar statement-toolbar"><h2 class="erp-panel-title"><spring:message code="statements.finalized" /></h2><div class="statement-actions">
+  <div class="app-table-titlebar statement-toolbar"><h2 class="erp-panel-title"><spring:message code="statements.finalized" /></h2><div class="app-table-toolbar">
    <button type="button" class="app-btn btn-neutral" data-statement-view disabled><spring:message code="common.view" /></button>
    <sec:authorize access="hasAuthority('STATEMENT_EXPORT')"><button type="submit" form="statement-export" class="app-btn btn-neutral" data-statement-export disabled><spring:message code="voucher.pdf" /></button><button type="submit" form="statement-export" name="inline" value="true" class="app-btn btn-neutral" data-statement-export disabled><spring:message code="voucher.print" /></button></sec:authorize>
   </div></div>
