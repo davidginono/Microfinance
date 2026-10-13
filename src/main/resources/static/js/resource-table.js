@@ -10,11 +10,16 @@
     };
     const icon = name => {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
-        svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '1.8');
+        const consoleArrow = ['previous','next','refresh'].includes(name);
+        svg.setAttribute('viewBox', consoleArrow ? '0 0 16 16' : '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', consoleArrow ? '2' : '1.8');
+        if (consoleArrow) svg.setAttribute('stroke-linejoin','round');
+        // Arrow geometry: Cloudscape Design System (Amazon), Apache-2.0.
+        // https://github.com/cloudscape-design/components/tree/main/src/icon/icons
+        // See vendor/cloudscape-icons.LICENSE and vendor/cloudscape-icons.NOTICE.
         const paths = {
-            previous: ['m15 18-6-6 6-6'], next: ['m9 18 6-6-6-6'], close: ['m6 6 12 12M6 18 18 6'],
-            refresh: ['M20 4v7h-7', 'M20 11a8 8 0 1 0-2.4 6'],
+            previous: ['M11 2L5 8L11 14'], next: ['M5 2L11 8L5 14'], close: ['m6 6 12 12M6 18 18 6'],
+            refresh: ['M15 0V5L10 4.95999', 'M15 8C15 11.87 11.87 15 8 15C4.13 15 1 11.87 1 8C1 4.13 4.13 1 8 1C10.79 1 13.2 2.63 14.33 5'],
             settings: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8', 'M9.5 2h5l.5 2.5 2 1.2 2.5-.8L22 9l-2 1.8v2.4l2 1.8-2.5 4.1-2.5-.8-2 1.2-.5 2.5h-5L9 19.5l-2-1.2-2.5.8L2 15l2-1.8v-2.4L2 9l2.5-4.1 2.5.8 2-1.2Z']
         };
         paths[name].forEach(d => { const path = document.createElementNS(svg.namespaceURI, 'path'); path.setAttribute('d', d); svg.append(path); });
