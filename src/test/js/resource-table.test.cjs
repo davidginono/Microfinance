@@ -207,7 +207,7 @@ test('split details follow selection, stay dismissed, clear stale data and suppo
     d.querySelector('tbody input').click();d.querySelector('tbody input').click();
     await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.hidden,true);
     d.querySelector('[aria-label="Show details"]').click();assert.equal(panel.hidden,false);
-    const resize=panel.querySelector('[role=separator]');resize.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));assert.equal(resize.getAttribute('aria-valuenow'),'640');
+    const resize=panel.querySelector('[role=separator]');resize.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));assert.equal(resize.getAttribute('aria-valuenow'),resize.getAttribute('aria-valuemax'));
     const pos=panel.querySelector('select');pos.value='side';pos.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('.resource-split-layout').classList.contains('resource-split-side'),true);
     d.querySelector('.resource-table-filters input').dispatchEvent(new w.Event('input',{bubbles:true}));
     await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.querySelectorAll('dd').length,0);assert.equal(panel.querySelector('.resource-split-content').textContent,'Select a record');
@@ -231,5 +231,48 @@ test('preferences preserve editable cells and never clear form checkbox values',
     assert.equal(amountChoice.disabled,true);
     d.querySelector('dialog form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
     assert.equal(d.querySelector('[name="include"]').checked,true);
+    dom.window.close();
+});
+
+test('dragging the bottom divider exchanges table space and stops at pointer release or cancellation', async () => {
+    const markup=table('drag','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
+    const {dom,window:w,document:d}=await setup(markup);
+    d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
+    const layout=d.querySelector('.resource-split-layout'), scroller=layout.querySelector('.erp-table-scroll'), handle=d.querySelector('[role=separator]');
+    const pointer=(target,type,y,id=1)=>{const event=new w.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{button:0,pointerId:id,clientY:y,clientX:500});target.dispatchEvent(event);};
+    const initialHeight=parseFloat(w.getComputedStyle(scroller).height), total=initialHeight+320;
+    pointer(handle,'pointerdown',400);pointer(w,'pointermove',320);
+    assert.equal(Number(handle.getAttribute('aria-valuenow')),400);
+    assert.ok(Math.abs(parseFloat(w.getComputedStyle(scroller).height)-(initialHeight-80))<.01);
+    assert.ok(Math.abs(parseFloat(scroller.style.height)+Number(handle.getAttribute('aria-valuenow'))-total)<.01);
+    pointer(w,'pointerup',320);pointer(w,'pointermove',250);
+    assert.equal(Number(handle.getAttribute('aria-valuenow')),400);
+    assert.equal(layout.classList.contains('resource-split-dragging'),false);
+    assert.equal(JSON.parse(w.localStorage.getItem('resource-split:v1:drag')).size,400);
+    pointer(handle,'pointerdown',320);pointer(w,'pointermove',370);
+    assert.equal(Number(handle.getAttribute('aria-valuenow')),350);
+    pointer(w,'pointercancel',370);pointer(w,'pointermove',420);
+    assert.equal(Number(handle.getAttribute('aria-valuenow')),350);
+    d.querySelector('.resource-split-panel [aria-label="Close"]').click();
+    assert.equal(scroller.style.height,'');
+    dom.window.close();
+});
+
+test('side divider follows horizontal dragging and falls back to vertical resizing on mobile', async () => {
+    const markup=table('side-drag','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
+    const {dom,window:w,document:d}=await setup(markup,'window.innerWidth=1366;window.matchMedia=()=>({get matches(){return window.innerWidth>=1100;},addEventListener(){}});');
+    d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
+    const handle=d.querySelector('[role=separator]'), position=d.querySelector('.resource-split-panel select'), scroller=d.querySelector('.erp-table-scroll');
+    position.value='side';position.dispatchEvent(new w.Event('change'));
+    const pointer=(target,type,x,y,id=1)=>{const event=new w.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{button:0,pointerId:id,clientX:x,clientY:y});target.dispatchEvent(event);};
+    pointer(handle,'pointerdown',900,400);pointer(w,'pointermove',800,100);
+    assert.equal(handle.getAttribute('aria-orientation'),'vertical');
+    assert.equal(handle.getAttribute('aria-valuenow'),'420');assert.equal(scroller.style.height,'');
+    pointer(w,'pointermove',700,100,2);assert.equal(handle.getAttribute('aria-valuenow'),'420');
+    pointer(w,'pointerup',800,100);
+    w.innerWidth=360;w.dispatchEvent(new w.Event('resize'));
+    assert.equal(handle.getAttribute('aria-orientation'),'horizontal');assert.notEqual(scroller.style.height,'');
+    pointer(handle,'pointerdown',300,400);pointer(w,'pointermove',300,450);pointer(w,'pointerup',300,450);
+    assert.equal(handle.getAttribute('aria-valuenow'),'370');
     dom.window.close();
 });

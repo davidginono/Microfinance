@@ -29,15 +29,22 @@
         let state={position:'bottom',size:320}, dismissed=false;
         const wide=window.matchMedia?.('(min-width:1100px)');
         const side=()=>state.position==='side' && wide?.matches;
+        const bottomTotal=()=>Math.max(160,Math.min(window.innerHeight*.38,360))+320;
+        const limits=()=>side()
+            ? {min:280,max:Math.max(280,Math.min(640,(layout.clientWidth || window.innerWidth)-240))}
+            : {min:200,max:Math.min(640,bottomTotal()-96)};
         try { const saved=JSON.parse(localStorage.getItem(key)); if(saved && ['bottom','side'].includes(saved.position)) state={position:saved.position,size:Number(saved.size)||320}; } catch { /* Optional display storage. */ }
         const save=()=>{try{localStorage.setItem(key,JSON.stringify(state));}catch{/* Optional. */}};
         const apply=()=>{
-            state.size=Math.min(640,Math.max(200,state.size));
+            const {min,max}=limits();
+            state.size=Math.min(max,Math.max(min,state.size));
             layout.classList.toggle('resource-split-side',state.position==='side'); position.value=state.position;
             layout.style.setProperty('--split-size',state.size+'px');
+            // Move the divider by exchanging space with the table, keeping the total height stable.
+            if (!panel.hidden && !side()) scroller.style.height=(bottomTotal()-state.size)+'px';
+            else scroller.style.removeProperty('height');
             resize.setAttribute('aria-orientation',side()?'vertical':'horizontal');
-            resize.setAttribute('aria-valuemin','200');resize.setAttribute('aria-valuemax','640');resize.setAttribute('aria-valuenow',String(state.size));
-            window.dispatchEvent(new Event('resize'));
+            resize.setAttribute('aria-valuemin',String(min));resize.setAttribute('aria-valuemax',String(max));resize.setAttribute('aria-valuenow',String(state.size));
         };
         const selected=()=>[...table.querySelectorAll('tbody input[type=checkbox]')].find(input=>input.checked && input.closest('td').cellIndex===0 && !input.closest('tr').hidden)?.closest('tr');
         const render=()=>{
@@ -59,23 +66,35 @@
         const open=()=>{panel.hidden=false;layout.classList.add('resource-split-open');show.setAttribute('aria-expanded','true');render();apply();};
         const sync=()=>{if(selected() && !dismissed)open();else render();};
         show.addEventListener('click',()=>{dismissed=false;open();close.focus();});
-        close.addEventListener('click',()=>{dismissed=true;panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');show.focus();});
+        close.addEventListener('click',()=>{dismissed=true;panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');apply();show.focus();});
         gear.setAttribute('aria-expanded','false'); gear.addEventListener('click',()=>{positions.hidden=!positions.hidden;gear.setAttribute('aria-expanded',String(!positions.hidden));if(!positions.hidden)position.focus();});
         position.addEventListener('change',()=>{state.position=position.value;apply();save();});
         resize.addEventListener('keydown',event=>{
             if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-            event.preventDefault();state.size=event.key==='Home'?200:event.key==='End'?640:state.size+(['ArrowUp','ArrowLeft'].includes(event.key)?20:-20);apply();save();
+            const {min,max}=limits();
+            event.preventDefault();state.size=event.key==='Home'?min:event.key==='End'?max:state.size+(['ArrowUp','ArrowLeft'].includes(event.key)?20:-20);apply();save();
         });
+        let dragging=false;
         resize.addEventListener('pointerdown',event=>{
-            if(event.button!==0)return; event.preventDefault();resize.setPointerCapture(event.pointerId);
-            const start=side()?event.clientX:event.clientY, size=state.size;
-            const move=e=>{state.size=size+start-(side()?e.clientX:e.clientY);apply();};
-            const end=()=>{resize.removeEventListener('pointermove',move);resize.removeEventListener('pointerup',end);resize.removeEventListener('pointercancel',end);save();};
-            resize.addEventListener('pointermove',move);resize.addEventListener('pointerup',end);resize.addEventListener('pointercancel',end);
+            if(event.button!==0 || event.isPrimary===false || dragging)return;
+            event.preventDefault();resize.focus({preventScroll:true});resize.setPointerCapture?.(event.pointerId);
+            dragging=true;layout.classList.add('resource-split-dragging');
+            const horizontal=side(), pointerId=event.pointerId;
+            const start=horizontal?event.clientX:event.clientY, size=state.size;
+            const move=e=>{if(e.pointerId!==pointerId)return;state.size=size+start-(horizontal?e.clientX:e.clientY);apply();};
+            const end=e=>{
+                if(e.pointerId!==pointerId)return;
+                window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);resize.removeEventListener('lostpointercapture',end);
+                dragging=false;layout.classList.remove('resource-split-dragging');
+                if(resize.hasPointerCapture?.(pointerId))resize.releasePointerCapture(pointerId);
+                save();
+            };
+            window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);resize.addEventListener('lostpointercapture',end);
         });
         table.addEventListener('click',()=>queueMicrotask(sync));table.addEventListener('change',()=>queueMicrotask(sync));
         region.addEventListener('resource-table:reset',()=>queueMicrotask(sync));
         wide?.addEventListener('change',apply);
+        window.addEventListener('resize',apply);
         apply();
     }};
 })();
