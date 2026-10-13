@@ -56,7 +56,17 @@
             const button = iconButton('refresh', l.refresh); actions.prepend(button); button.addEventListener('click', () => location.reload());
         }
         const tools = node('div', 'resource-table-tools'); titlebar.after(tools);
-        const filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar');
+        let filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar');
+        let search;
+        if (!filters || !filters.querySelector('input:not([type="hidden"]),select,textarea')) {
+            filters ||= node('div');
+            filters.classList.add('resource-table-search');
+            const label = node('label'); label.append(node('span', 'sr-only', l.searchPage));
+            search = node('input', 'aws-control'); search.type = 'search'; search.placeholder = l.searchPage;
+            label.append(search); filters.append(label);
+            if (filters.tagName === 'FORM') filters.addEventListener('submit', event => event.preventDefault());
+            search.addEventListener('keydown', event => { if (event.key === 'Enter') event.preventDefault(); });
+        }
         if (filters) {
             filters.classList.add('resource-table-filters');
             const filterCommands = [...filters.querySelectorAll(':scope > button, :scope > a.app-btn')];
@@ -142,6 +152,28 @@
         navigation.addEventListener('click', clearSelection); window.addEventListener('pageshow', clearSelection);
 
         const headers = [...head.cells];
+        // This fallback searches only the bounded rows on this page; server filters remain authoritative.
+        const searchVisibility = new WeakMap();
+        let noMatches;
+        const applySearch = () => {
+            if (!search) return;
+            const query = search.value.trim().toLocaleLowerCase();
+            const rows = [...table.tBodies].flatMap(body => [...body.rows]).filter(row => row !== noMatches && row.cells.length === headers.length && ![...row.cells].some(cell => cell.colSpan > 1));
+            let visible = 0;
+            rows.forEach(row => {
+                if (!searchVisibility.has(row)) searchVisibility.set(row, row.hidden);
+                const values = [...row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]),select,textarea')].map(control => control.tagName === 'SELECT' ? [...control.selectedOptions].map(option => option.textContent).join(' ') : control.value);
+                row.hidden = searchVisibility.get(row) || ![row.textContent, ...values].join(' ').toLocaleLowerCase().includes(query);
+                if (!row.hidden) visible++;
+            });
+            if (query && rows.length && !visible && !noMatches) {
+                noMatches = node('tr', 'resource-table-no-matches');
+                const cell = node('td', '', l.noMatches); cell.colSpan = headers.length; cell.setAttribute('role', 'status'); noMatches.append(cell); table.tBodies[0].append(noMatches);
+            }
+            if (noMatches) noMatches.hidden = !query || !rows.length || visible > 0;
+            syncSelection();
+        };
+        search?.addEventListener('input', () => { clearSelection(); applySearch(); });
         const lockedColumns = () => new Set(headers.flatMap((header, index) => index <= (selectable ? 1 : 0) || [...table.tBodies].some(body => [...body.rows].some(row => row.cells[index]?.querySelector('input,select,textarea'))) ? [index] : []));
         const key = 'resource-table:v1:' + (region.dataset.resourceTable || scroller.dataset.viewPositionKey || location.pathname + ':' + [...document.querySelectorAll('[data-resource-table]')].indexOf(region));
         let settings = {hidden: [], compact: true, wrap: false};
@@ -156,7 +188,7 @@
             });
         };
         apply();
-        const observer = new MutationObserver(() => { apply(); syncSelection(); });
+        const observer = new MutationObserver(() => { apply(); applySearch(); syncSelection(); });
         [...table.tBodies].forEach(body => observer.observe(body, {childList:true, subtree:true}));
         preferences.addEventListener('click', () => {
             const dialog = node('dialog', 'resource-table-preferences app-modal-panel');
