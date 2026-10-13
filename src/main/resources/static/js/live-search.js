@@ -43,7 +43,7 @@
             if (!input || form.querySelector('[name="format"], [data-download-action], [data-print-action]')) return;
             const finder = form.closest('.coa-parent-picker')?.querySelector('.erp-table-wrap');
             let controller, version = 0, submitting = false;
-            const invalidate = () => { version++; controller?.abort(); finder?.removeAttribute('aria-busy'); };
+            const invalidate = () => { version++; controller?.abort();window.AppLoading?.end(finder?.querySelector('.erp-table-wrap')); finder?.removeAttribute('aria-busy'); };
             const search = async (pageUrl) => {
                 form.querySelectorAll('[name="page"], [name="parentPage"], [name="accountPage"]').forEach(field => field.value = '0');
                 const url = new URL(pageUrl || form.action, location.href);
@@ -61,6 +61,7 @@
                 }
                 const current = ++version;
                 controller = new AbortController(); finder.setAttribute('aria-busy', 'true');
+                window.AppLoading?.begin(finder.querySelector('.erp-table-wrap'));
                 try {
                     const response = await fetch(url, {signal:controller.signal, credentials:'same-origin', cache:'no-store'});
                     if (!response.ok || response.redirected) throw new Error('Search unavailable');
@@ -81,7 +82,7 @@
                         status.textContent = document.body.dataset.searchUnavailable;
                         binding.cancel();
                     }
-                } finally { if (current === version) finder.removeAttribute('aria-busy'); }
+                } finally { if (current === version) {window.AppLoading?.end(finder.querySelector('.erp-table-wrap'));finder.removeAttribute('aria-busy');} }
             };
             const binding = bind(input, () => void search(), invalidate);
             form.addEventListener('submit', event => {

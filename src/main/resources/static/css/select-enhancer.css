@@ -8,7 +8,9 @@
 .aws-console .neo-select-search input {box-sizing:border-box;width:100%;min-width:0;height:32px;margin:0;border:1px solid #aab7b8;border-radius:2px;background:#fff;padding:4px 32px;font:400 14px/20px "Open Sans",Helvetica,Arial,sans-serif;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='%23687078' stroke-width='2'%3E%3Ccircle cx='10' cy='10' r='7'/%3E%3Cpath d='m15 15 6 6'/%3E%3C/svg%3E");background-position:8px center;background-repeat:no-repeat;}
 .neo-select-search input::placeholder {font-style:italic;color:#879596;}
 .neo-select-search input:focus {outline:2px solid #0073bb;outline-offset:-2px;}
-.neo-select-options {min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+.neo-select-options {flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+.aws-console .neo-select-options .neo-select-option {flex:none;height:auto!important;white-space:normal!important;overflow-wrap:anywhere;}
+.neo-select-option-label {flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:left;}
 .aws-console .neo-select-options .neo-select-option {box-sizing:border-box;display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;min-height:36px!important;padding:8px 12px!important;border:0;border-radius:0;background:#fff;color:#16191f;text-align:left;font-size:14px!important;line-height:20px!important;font-weight:400!important;box-shadow:none;}
 .aws-console .neo-select-options .neo-select-option:is(:hover,:focus-visible) {background:#f1faff;outline:2px solid #0073bb;outline-offset:-2px;}
 .aws-console .neo-select-options .neo-select-option.is-selected {background:#f1faff;box-shadow:inset 3px 0 #0073bb;color:#0073bb;}

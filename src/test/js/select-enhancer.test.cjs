@@ -23,6 +23,18 @@ const loan = `<form method="post"><div data-loan-choice data-category="clients">
 const response = choices => ({ok:true,redirected:false,json:async()=>choices});
 const labels = d => [...d.querySelectorAll('.neo-select-option')].map(item=>item.firstChild.textContent);
 
+test('searching to a single option reserves a full row below the fixed search, irrespective of old popup height',async()=>{
+    const {dom,w,d}=await setup(local);const menu=d.querySelector('.neo-select-menu');
+    Object.defineProperty(menu,'scrollHeight',{value:54});d.querySelector('.neo-select-button').getBoundingClientRect=()=>({top:100,bottom:132,left:30,width:400});
+    d.querySelector('.neo-select-button').click();const search=d.querySelector('.neo-select-search input');search.value='Two';search.dispatchEvent(new w.Event('input'));
+    assert.ok(parseFloat(menu.style.height)>=86);assert.equal(labels(d)[0],'Client Two');assert.equal(d.querySelector('.neo-select-option-label').textContent,'Client Two');dom.window.close();
+});
+test('remote option requests show an inline spinner while retaining authorized matches and native selection',async()=>{
+    const {dom,d}=await setup(local);const select=d.querySelector('select'),picker=dom.window.NeoSelect.search(select);
+    picker.setLoading(true);assert.equal(d.querySelector('.neo-select-options').getAttribute('aria-busy'),'true');assert.equal(d.querySelectorAll('.neo-select-loading .app-loading-spinner').length,1);
+    assert.equal(select.value,'C1');assert.equal(labels(d).length,3);picker.setLoading(false);assert.equal(d.querySelector('.neo-select-loading'),null);assert.equal(select.value,'C1');dom.window.close();
+});
+
 test('searchable options filter immediately without altering native values or submitting forms',async()=>{
     const {dom,w,d}=await setup(local);let submits=0;d.querySelector('form').addEventListener('submit',event=>{event.preventDefault();submits++;});
     d.querySelector('.neo-select-button').click();const search=d.querySelector('.neo-select-search input');assert.equal(d.activeElement,search);

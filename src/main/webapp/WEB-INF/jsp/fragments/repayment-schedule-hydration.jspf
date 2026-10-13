@@ -113,12 +113,14 @@
             var originalLabel = button ? button.getAttribute("aria-label") : "";
             section.setAttribute("data-repayment-schedule-loading", "true");
             section.removeAttribute("data-repayment-schedule-ready");
+            var loadingRegion=section.querySelector('.erp-table-wrap');
+            window.AppLoading?.begin(loadingRegion);
             if (button) {
                 button.disabled = true;
                 button.setAttribute("aria-busy", "true");
                 button.setAttribute("aria-label", button.getAttribute("data-loading-label") || "Refreshing repayment schedule");
             }
-            if (force) {
+            if (force && !window.AppLoading) {
                 var body = section.querySelector("[data-repayment-schedule-body]");
                 if (body) {
                     body.innerHTML = emptyRowHtml("Refreshing repayment schedule...");
@@ -151,6 +153,7 @@
                     }
                 })
                 .finally(function () {
+                    window.AppLoading?.end(loadingRegion);
                     section.removeAttribute("data-repayment-schedule-loading");
                     if (button) {
                         button.disabled = false;
@@ -236,6 +239,8 @@
             }
             modal.classList.remove("hidden");
             modal.classList.add("is-open");
+            var loadingRegion=modal.querySelector('.erp-table-wrap');
+            window.AppLoading?.begin(loadingRegion);
             fetch(url, {
                 credentials: "same-origin",
                 headers: {
@@ -262,7 +267,7 @@
                     if (body) {
                         body.innerHTML = emptyRowHtml("Repayment schedule is unavailable right now. Please retry again later.");
                     }
-                });
+                }).finally(function () {window.AppLoading?.end(loadingRegion);});
         }
 
         function init() {

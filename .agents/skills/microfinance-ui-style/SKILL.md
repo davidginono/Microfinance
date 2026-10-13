@@ -43,6 +43,8 @@ The current interface is a compact operational ERP, not a lending marketing site
 
 ## AWS searchable selectors
 
+- Result menus reserve the fixed search row plus the measured height of up to six full option rows, loading status and Load more. Never size a new result set from a previously constrained popup `scrollHeight`; this clips single-result queries. Option label spans wrap fully, with a non-shrinking checkmark. Clamp/flip the popup at viewport edges and scroll only its results.
+
 Use `fragments/select-enhancer.jspf`, `select-enhancer.js` and `select-enhancer.css` for single-value dropdowns, following the [Cloudscape select](https://cloudscape.design/components/select/) reference. The 2026-10-13 correction replaces centered selected values, blank unlabelled search fields, bold gray option rows and an intervening previous/next bar.
 
 - Keep selected labels left aligned, with the shared filled 16px caret at the trailing edge. The popup matches the control width, uses a white surface, thin gray border, 2px corners, 14px Open Sans options and a blue checkmark for selection. Search belongs at the top with a magnifier, localized accessible name and italic placeholder. Options scroll beneath this fixed search row; remote Load more belongs below the list, without a separate arrow toolbar or Search/Apply button.
@@ -72,6 +74,12 @@ Reuse the [table skill split-view contract](../microfinance-table-standard/SKILL
 - Provide a dialog name, sensible initial focus, focus containment, and focus restoration. Support Escape where cancellation is safe; do not dismiss an in-flight financial command as if it had not been submitted.
 - Keep success, failure, and pending feedback concise. Never imply a payment succeeded before the server confirms posting.
 - Use the shared discard dialog for changed forms, with focus containment and restoration for both the form and confirmation. Preserve the existing success/X behavior where the workflow requires it. UI submission locks must not re-enable buttons disabled by a business rule when restoring a cached page.
+
+## Component loading and refreshing
+
+Use shared `ui-loading.js` / `ui-loading.css` (`AppLoading.begin(region, options)` / `end(region)`) for actual pending requests, following [Cloudscape loading and refreshing](https://cloudscape.design/patterns/general/loading-and-refreshing/). The user's classic AWS reference selects contained spinners rather than skeletons. Tables keep headings/tools stationary and show the spinner in a centered spanning body row. Retain sharp loaded data on refresh; hide only an initial empty placeholder while its request is pending. No blur, translucent whole-card mask or page-wide interaction lock. Match explicit busy states to real requests; clear on success, failure, cancellation and cached-page restoration. Show ready server-rendered content immediately without fake loading delays.
+
+Dashboard progressive cards, schedule hydration, lookup results, notifications and sidebar route navigation use the same contained spinner. Local option filtering stays immediate; remote choices retain debouncing, cancellation and scoped pagination. Preserve form values, disabled financial controls and native submission protections. Newly created asynchronous components may declare `data-ui-loading-region` and drive `aria-busy`, or call the shared API directly. Never refetch permission navigation or convert posting commands into AJAX solely for an animation.
 
 ## Responsive And Accessible Checks
 

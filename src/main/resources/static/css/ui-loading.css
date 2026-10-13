@@ -1,0 +1,16 @@
+/* Keep ready content sharp; pending indicators occupy only their own component. */
+.app-loading-status {display:flex;align-items:center;justify-content:center;min-height:64px;gap:8px;color:#545b64;}
+.app-loading-spinner {display:inline-block;flex:none;width:20px;height:20px;box-sizing:border-box;border:2px solid #d5dbdb;border-top-color:#545b64;border-radius:50%;animation:aws-console-spin .7s linear infinite;}
+.aws-console .erp-table tbody tr.app-loading-row > td {padding:24px!important;text-align:center!important;vertical-align:middle;height:96px;}
+.aws-console .erp-table tbody tr:not(.app-loading-row) > td[colspan]:only-child {text-align:center!important;vertical-align:middle;white-space:normal;}
+.aws-console .erp-table-wrap.is-loading {overflow:visible!important;}
+.aws-console .erp-table-wrap.is-loading .erp-table tbody {opacity:1!important;filter:none!important;}
+.aws-console .erp-table-wrap.is-loading > :not(.aws-table-loader) {pointer-events:auto;}
+.aws-console .erp-table-wrap.is-loading .aws-table-loader {display:none!important;}
+.erp-stat-value .app-loading-status {min-height:32px;justify-content:flex-start;}
+#appSidebar .app-loading-status {min-height:28px;display:inline-flex;padding:0 8px;}
+#appSidebar .app-loading-spinner {width:14px;height:14px;border-color:#aab7b8;border-top-color:#fff;}
+.neo-select-loading {display:flex;justify-content:center;align-items:center;min-height:40px;flex:none;border-top:1px solid #eaeded;}
+.neo-select-loading .app-loading-status {min-height:40px;}
+@media(prefers-reduced-motion:reduce){.app-loading-spinner{animation-duration:1.8s;}}
+@media print{.app-loading-status,.app-loading-row,.neo-select-loading{display:none!important;}}

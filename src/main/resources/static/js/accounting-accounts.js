@@ -71,6 +71,9 @@
         if (!anchor) {
             anchor = branchMessage(parent, register.dataset.loading, false); parent.after(anchor);
         } else anchor.querySelector('button').disabled = true;
+        const pendingCell=anchor.cells[0];
+        const branchSpinner=window.AppLoading?.status(register.dataset.loading);
+        if(branchSpinner){branchSpinner.classList.add('coa-branch-loading');pendingCell.prepend(branchSpinner);}
         refreshBranches();
         const url = new URL(register.dataset.childrenUrl, location.href);
         url.searchParams.set('parentId', parent.dataset.id); url.searchParams.set('page', page);
@@ -109,6 +112,7 @@
             const error = branchMessage(parent, register.dataset.error, true); error.dataset.coaPage = page;
             anchor.replaceWith(error);
         } finally {
+            branchSpinner?.remove();
             clearTimeout(timeout); delete parent.dataset.loading; parent.removeAttribute('aria-busy'); refreshBranches();
         }
     };

@@ -268,36 +268,36 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.applications.label" /></p>
-                            <p class="erp-stat-value">...</p>
+                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
                         </div>
-                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+
                     </div>
                 </div>
                 <div class="erp-stat-card erp-stat-green">
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
-                            <p class="erp-stat-value">...</p>
+                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
                         </div>
-                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+
                     </div>
                 </div>
                 <div class="erp-stat-card erp-stat-amber">
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.guarantorRequests.label" /></p>
-                            <p class="erp-stat-value">...</p>
+                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
                         </div>
-                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+
                     </div>
                 </div>
                 <div class="erp-stat-card erp-stat-red">
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.archivedRejections.label" /></p>
-                            <p class="erp-stat-value">...</p>
+                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
                         </div>
-                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+
                     </div>
                 </div>
             </div>
@@ -327,7 +327,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
                     </div>
                     <div class="erp-panel-body">
-                        <div class="erp-section text-center text-sm text-slate-500">Loading application status...</div>
+                        <div class="erp-section text-center text-sm text-slate-500"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></div>
                     </div>
                 </section>
                 <section class="erp-panel min-w-0 xl:self-start">
@@ -335,7 +335,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <p class="erp-panel-title"><spring:message code="dashboard.activeLoans.title" text="Active Loans" /></p>
                     </div>
                     <div class="erp-panel-body">
-                        <div class="erp-section text-center text-sm text-slate-500">Loading active loans...</div>
+                        <div class="erp-section text-center text-sm text-slate-500"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></div>
                     </div>
                 </section>
             </div>
@@ -759,21 +759,14 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             if (label) {
                 region.setAttribute('data-loading-label', label);
             }
-            var loader = document.createElement('div');
-            loader.className = 'aws-table-loader';
-            loader.setAttribute('role', 'status');
-            loader.setAttribute('aria-label', region.getAttribute('data-loading-label') || 'Loading results...');
-            var spinner = document.createElement('span');
-            spinner.className = 'aws-table-loader__spinner';
-            spinner.setAttribute('aria-hidden', 'true');
-            loader.appendChild(spinner);
-            region.appendChild(loader);
+            window.AppLoading?.begin(region, {label:label});
         }
 
         function hideActiveLoansTableLoading(region) {
             if (!region) {
                 return;
             }
+            window.AppLoading?.end(region);
             region.classList.remove('is-loading');
             region.setAttribute('aria-busy', 'false');
             region.removeAttribute('data-aws-async-table-loading');
@@ -1041,6 +1034,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     }
                 })
                 .catch(function () {
+                    shell.querySelectorAll('.app-loading-status').forEach(indicator => indicator.remove());
+                    shell.querySelectorAll('[aria-busy]').forEach(region => region.setAttribute('aria-busy','false'));
                     var errorBox = shell.querySelector('[data-dashboard-progressive-error]');
                     if (errorBox) {
                         errorBox.hidden = false;

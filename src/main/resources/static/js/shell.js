@@ -608,6 +608,7 @@
             });
         });
     };
+    const navigationLoadingRegions = new Set();
     const clearConsoleTableLoading = function (options) {
         const force = options && options.force === true;
         document.querySelectorAll('.erp-table-wrap.is-loading').forEach(function (region) {
@@ -617,6 +618,7 @@
             region.classList.remove('is-loading');
             region.setAttribute('aria-busy', 'false');
             region.removeAttribute('data-aws-async-table-loading');
+            window.AppLoading?.end(region);
             region.querySelectorAll('.aws-table-loader').forEach(function (loader) {
                 loader.remove();
             });
@@ -632,6 +634,7 @@
         if (!nearbyRegion || nearbyRegion.classList.contains('is-loading')) {
             return;
         }
+        if(window.AppLoading) {hidePageSubmitPreloader();window.AppLoading.begin(nearbyRegion);return;}
         nearbyRegion.classList.add('is-loading');
         nearbyRegion.setAttribute('aria-busy', 'true');
         hidePageSubmitPreloader();
@@ -678,7 +681,7 @@
         clearConsoleTableLoading();
         document.querySelectorAll('.erp-table-wrap').forEach(function (region) {
             // Async hydration also uses these regions, independently of form navigation.
-            observeLoadingInteraction(region, region, 'is-loading', '.aws-table-loader');
+            if(!window.AppLoading)observeLoadingInteraction(region, region, 'is-loading', '.aws-table-loader');
         });
         if (pageSubmitPreloader) {
             observeLoadingInteraction(document.body, pageSubmitPreloader, 'is-active', '#pageSubmitPreloader');
@@ -692,16 +695,16 @@
                     clearConsoleTableLoading();
                     return;
                 }
-                showConsoleTableLoading(form);
+                window.setTimeout(function () {if(!event.defaultPrevented)showConsoleTableLoading(form);},0);
             });
         });
         document.querySelectorAll('.erp-table-wrap a[href], .erp-table-toolbar a[href], .aws-pagination-chevron[href]').forEach(function (link) {
-            link.addEventListener('click', function () {
+            link.addEventListener('click', function (event) {
                 if (isConsoleDownloadAction(link)) {
                     clearConsoleTableLoading();
                     return;
                 }
-                showConsoleTableLoading(link);
+                window.setTimeout(function () {if(!event.defaultPrevented)showConsoleTableLoading(link);},0);
             });
         });
         window.addEventListener('pagehide', function () {
@@ -1023,6 +1026,7 @@
     };
 
     const hidePageSubmitPreloader = function () {
+        navigationLoadingRegions.forEach(region=>window.AppLoading?.end(region));navigationLoadingRegions.clear();
         pageSubmitPreloaderActive = false;
         document.documentElement.classList.remove('page-submit-preloader-active');
         document.body.removeAttribute('aria-busy');
@@ -1046,17 +1050,20 @@
         if (!pagePreloaderRequested && (regionalLoaderActive || regionalForm)) {
             return;
         }
+        if (form) {
+            form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (control) {
+                control.disabled = true;control.setAttribute('aria-disabled','true');control.classList.add('opacity-60','cursor-not-allowed');
+            });
+        }
+        if(window.AppLoading) {
+            const region=form?.closest('.erp-form-wrap,.erp-panel,.loan-flow-panel') || form || document.querySelector('main');
+            if(region){pageSubmitPreloaderActive=true;navigationLoadingRegions.add(region);window.AppLoading.begin(region,{table:false});}
+            return;
+        }
         pageSubmitPreloaderActive = true;
         document.body.setAttribute('aria-busy', 'true');
         pageSubmitPreloader.classList.add('is-active');
         pageSubmitPreloader.setAttribute('aria-hidden', 'false');
-        if (form) {
-            form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (control) {
-                control.disabled = true;
-                control.setAttribute('aria-disabled', 'true');
-                control.classList.add('opacity-60', 'cursor-not-allowed');
-            });
-        }
     };
 
     const resolveDownloadFilename = function (response, target) {
@@ -1775,6 +1782,7 @@
         reMemberscrollForReload();
         window.setTimeout(function () {
             if (!event.defaultPrevented) {
+                if(link.closest('#appSidebar') && window.AppLoading){navigationLoadingRegions.add(link);window.AppLoading.begin(link,{table:false});}
                 showPageSubmitPreloader(null);
             }
         }, 0);
@@ -2413,6 +2421,7 @@
             return;
         }
         notificationsLoading = true;
+        window.AppLoading?.begin(notificationPanelBody,{table:false});
         fetch('/header/notifications', {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin'
@@ -2429,6 +2438,7 @@
                 appendNotificationText(notificationPanelBody, 'div', 'erp-notification-empty', 'Notifications are temporarily unavailable.');
             })
             .finally(function () {
+                window.AppLoading?.end(notificationPanelBody);
                 notificationsLoading = false;
             });
     }

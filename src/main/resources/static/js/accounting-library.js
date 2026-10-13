@@ -85,11 +85,14 @@
         if (!input.matches('[data-library-lookup]') || bound.has(input)) return;
         bound.add(input);
         const key = input.getAttribute('list');
+        const loadingHost=input.parentElement;
         const invalidate = () => {
             lookups.get(key)?.abort(); lookups.delete(key);
+            window.AppLoading?.end(loadingHost);
         };
         const binding = window.AppSearch.bind(input, async () => {
             const controller = new AbortController(); lookups.set(key, controller);
+            window.AppLoading?.begin(loadingHost,{table:false});
             const status = input.closest('form')?.querySelector('.library-lookup-status');
             try {
                 const url = new URL(input.dataset.libraryLookup, location.href); url.searchParams.set('search', input.value);
@@ -101,7 +104,7 @@
                 if (status) status.textContent = '';
             } catch (error) {
                 if (lookups.get(key) === controller && error.name !== 'AbortError') {if (status) status.textContent = status.dataset.lookupFailure; binding.cancel();}
-            }
+            } finally {if(lookups.get(key)===controller)window.AppLoading?.end(loadingHost);}
         }, invalidate);
     }
     document.querySelectorAll('[data-library-lookup]').forEach(bindLookup);

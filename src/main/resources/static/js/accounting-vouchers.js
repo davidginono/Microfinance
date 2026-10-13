@@ -48,13 +48,13 @@ form.querySelector('[data-add-row]').addEventListener('click',()=>{
 const picker=document.getElementById('voucher-picker');document.body.append(picker);
 let opener=null,mode=null,target=null,page=0,version=0,controller,previousOverflow,previousRootOverflow;
 const searchForm=picker.querySelector('[data-picker-search]'),results=picker.querySelector('[data-picker-results]'),ps=picker.querySelector('[data-picker-status]');
-function close(){searchBinding.cancel();version++;controller?.abort();picker.hidden=true;picker.classList.remove('is-open');document.body.style.overflow=previousOverflow;document.documentElement.style.overflow=previousRootOverflow;opener?.focus();}
+function close(){searchBinding.cancel();version++;controller?.abort();window.AppLoading?.end(results);picker.hidden=true;picker.classList.remove('is-open');document.body.style.overflow=previousOverflow;document.documentElement.style.overflow=previousRootOverflow;opener?.focus();}
 picker.querySelector('[data-picker-close]').addEventListener('click',close);
 picker.addEventListener('click',e=>{if(e.target===picker)close();});
 picker.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();close();}if(e.key==='Tab'){const focus=[...picker.querySelectorAll('button:not(:disabled),input,a[href]')].filter(x=>!x.hidden);const first=focus[0],last=focus.at(-1);if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}}});
 async function load(){
  controller?.abort();controller=new AbortController();
- const token=++version;ps.textContent=ps.dataset.loading;results.replaceChildren();picker.querySelector('[data-picker-prev]').disabled=true;picker.querySelector('[data-picker-next]').disabled=true;
+ const token=++version;ps.textContent=ps.dataset.loading;window.AppLoading?.end(results);results.replaceChildren();window.AppLoading?.begin(results,{table:false});picker.querySelector('[data-picker-prev]').disabled=true;picker.querySelector('[data-picker-next]').disabled=true;
  try{
   const url=new URL(form.dataset.base+'/'+(mode.startsWith('loan-')?'loan-choices/'+mode.slice(5):mode==='mapping'?'transactions':'accounts'),location.origin);url.searchParams.set('search',searchForm.elements.search.value);url.searchParams.set('page',page);if(mode==='loan-loans')url.searchParams.set('clientId',form.elements.clientId.value);
   const response=await fetch(url,{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},credentials:'same-origin',cache:'no-store',signal:controller.signal});if(!response.ok)throw Error();const data=await response.json();if(token!==version)return;
@@ -68,7 +68,7 @@ async function load(){
     update();form.dispatchEvent(new Event('input',{bubbles:true}));close();
    });results.append(b);
   });picker.querySelector('[data-picker-prev]').disabled=page===0;picker.querySelector('[data-picker-next]').disabled=data.length<=25;
- }catch(e){if(token===version){ps.textContent=ps.dataset.error;searchBinding.cancel();}}
+ }catch(e){if(token===version){ps.textContent=ps.dataset.error;searchBinding.cancel();}}finally{if(token===version)window.AppLoading?.end(results);}
 }
 const searchBinding=window.AppSearch.bind(searchForm.elements.search,()=>{if(!picker.hidden){page=0;load();}},()=>{version++;controller?.abort();results.replaceChildren();picker.querySelector('[data-picker-prev]').disabled=true;picker.querySelector('[data-picker-next]').disabled=true;});
 searchForm.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();searchBinding.run();});

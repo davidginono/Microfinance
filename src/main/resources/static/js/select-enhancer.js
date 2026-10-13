@@ -118,9 +118,16 @@
             state.buttonText.textContent = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
             state.button.title = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
             state.list.replaceChildren();
+            state.menu.querySelector('.neo-select-loading')?.remove();
+            if(state.loading) {
+                const loading=document.createElement('div');loading.className='neo-select-loading';loading.setAttribute('role','status');
+                loading.setAttribute('aria-label',document.body.dataset.shellLoading);
+                const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.setAttribute('aria-hidden','true');loading.append(spinner);
+                state.list.after(loading);
+            }
             select.dispatchEvent(new CustomEvent('neo-select:render', { detail: { menu: state.menu } }));
 
-            if (!visibleOptions.length) {
+            if (!visibleOptions.length && !state.loading) {
                 const emptyState = document.createElement('div');
                 emptyState.className = 'neo-select-empty';
                 emptyState.setAttribute('role','status');
@@ -139,7 +146,7 @@
                 item.className = 'neo-select-option';
                 item.setAttribute('role', 'option');
                 item.setAttribute('data-option-index', String(index));
-                item.appendChild(document.createTextNode(option.textContent.trim()));
+                const label=document.createElement('span');label.className='neo-select-option-label';label.textContent=option.textContent.trim();item.append(label);
                 const check = document.createElement('span'); check.className = 'neo-select-check'; check.setAttribute('aria-hidden','true');
                 check.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M1 9L5 13L15 2"/></svg>'; item.appendChild(check);
                 item.disabled = option.disabled || !!option.parentElement.disabled;
@@ -206,8 +213,8 @@
             const controls = state.menu.querySelector('[data-neo-select-controls]');
             const optionCount = state.list.children.length;
             const visibleRows = Math.max(1, Math.min(maxVisibleRows, optionCount || 1));
-            const contentHeight = visibleRows * compactRowHeight + (controls ? controls.offsetHeight || 48 : 0) + (state.footer?.hidden === false ? 36 : 0) + 2;
-            const desiredHeight = Math.min(state.menu.scrollHeight || contentHeight, contentHeight);
+            const rowsHeight=[...state.list.children].slice(0,visibleRows).reduce((height,item)=>height+Math.max(compactRowHeight,item.getBoundingClientRect().height),0);
+            const desiredHeight = rowsHeight + (controls ? controls.offsetHeight || 48 : 0) + (state.loading ? 40 : 0) + (state.footer?.hidden === false ? 36 : 0) + 2;
             const availableAbove = Math.max(0, rect.top - viewportTop - viewportPadding);
             const upward = availableBelow < Math.min(desiredHeight,150) && availableAbove > availableBelow;
             const menuHeight = Math.min(desiredHeight, upward ? availableAbove : availableBelow);
@@ -215,6 +222,7 @@
             state.menu.style.width = Math.min(rect.width, window.innerWidth - 16) + 'px';
             state.menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)) + 'px';
             state.menu.style.top = (upward ? rect.top - menuHeight : rect.bottom) + 'px';
+            state.menu.style.height = menuHeight + 'px';
             state.menu.style.maxHeight = menuHeight + 'px';
         }
 

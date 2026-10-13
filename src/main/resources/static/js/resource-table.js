@@ -100,7 +100,7 @@
         const refresh = actions.querySelector('[data-aws-table-refresh], .app-icon-button');
         if (refresh) { refresh.replaceChildren(icon('refresh')); refresh.classList.add('resource-table-icon'); refresh.setAttribute('aria-label', l.refresh); refresh.title = l.refresh; }
         else if (region.dataset.awsNoRefresh !== 'true') {
-            const button = iconButton('refresh', l.refresh); actions.prepend(button); button.addEventListener('click', () => location.reload());
+            const button = iconButton('refresh', l.refresh); actions.prepend(button); button.addEventListener('click', () => {window.AppLoading?.begin(region,{label:l.refresh});location.reload();});
         }
         const tools = node('div', 'resource-table-tools'); titlebar.after(tools);
         let filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar') || [...document.querySelectorAll('[data-table-filter-for]')].find(candidate => candidate.dataset.tableFilterFor === region.dataset.resourceTable);
@@ -253,7 +253,7 @@
         const applySearch = () => {
             if (!search) return;
             const query = search.value.trim().toLocaleLowerCase();
-            const rows = [...table.tBodies].flatMap(body => [...body.rows]).filter(row => row !== noMatches && row.cells.length === headers.length && ![...row.cells].some(cell => cell.colSpan > 1));
+            const rows = [...table.tBodies].flatMap(body => [...body.rows]).filter(row => row !== noMatches && !row.classList.contains('app-loading-row') && row.cells.length === headers.length && ![...row.cells].some(cell => cell.colSpan > 1));
             let visible = 0;
             rows.forEach(row => {
                 if (!searchVisibility.has(row)) searchVisibility.set(row, row.hidden);
@@ -261,11 +261,12 @@
                 row.hidden = searchVisibility.get(row) || ![row.textContent, ...values].join(' ').toLocaleLowerCase().includes(query);
                 if (!row.hidden) visible++;
             });
-            if (query && rows.length && !visible && !noMatches) {
+            const loading=!!table.querySelector('.app-loading-row');
+            if (query && rows.length && !visible && !noMatches && !loading) {
                 noMatches = node('tr', 'resource-table-no-matches');
                 const cell = node('td', '', l.noMatches); cell.colSpan = headers.length; cell.setAttribute('role', 'status'); noMatches.append(cell); table.tBodies[0].append(noMatches);
             }
-            if (noMatches) noMatches.hidden = !query || !rows.length || visible > 0;
+            if (noMatches) noMatches.hidden = loading || !query || !rows.length || visible > 0;
             syncSelection();
         };
         search?.addEventListener('input', () => { clearSelection(); applySearch(); });
