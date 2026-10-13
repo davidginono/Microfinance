@@ -10,6 +10,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 import java.math.*;
@@ -34,6 +35,31 @@ public class LoanRecordingService {
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
+    public List<Choice> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page){
+        authorize(a,"VIEW");authorize(a,"POST");check(client!=null && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
+        return records.repaymentLoans(a,client,search,page,clock.today()).stream().map(l->new Choice(l.id(),l.number()+" - "+l.client(),l.status())).toList();
+    }
+    @Transactional(readOnly=true) public LoanRow receiptLoan(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.loan(a,id,clock.today());}
+    @Transactional(readOnly=true) public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.receiptForPosting(a,id);}
+    @Transactional(readOnly=true) public Choice receiptClient(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.ledgerClient(a,id).orElseThrow(()->new AccessDeniedException("Client unavailable"));}
+    @Transactional(readOnly=true) public Choice receiptInterestAccount(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.account(a,id,"INTEREST",false);}
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void lockReceiptLoans(AppUserPrincipal a,List<UUID> ids,UUID client){authorize(a,"VIEW");check(ids!=null && !ids.isEmpty() && ids.size()<=50 && new HashSet<>(ids).size()==ids.size(),"request");check(records.lockReceiptLoans(a,ids,client).size()==ids.size(),"client");}
+    @Transactional(readOnly=true)
+    public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){authorize(a,"VIEW");check(ids!=null && ids.size()<=50 && date!=null,"request");if(ids.isEmpty())return List.of();var found=records.receiptLoans(a,ids,date);if(found.size()!=new HashSet<>(ids).size())throw new AccessDeniedException("Loan unavailable");return found;}
+    @Transactional(readOnly=true)
+    public List<AllocationPreview> receiptPreview(AppUserPrincipal a,com.sacco.mvp.accounting.dto.VoucherDtos.Form f){
+        authorize(a,"POST");var contexts=receiptLoans(a,f.getRows().stream().map(r->r.getLoanId()).toList(),f.getEffectiveDate());
+        records.account(a,f.getMoneyAccountId(),"MONEY",false);var result=new ArrayList<AllocationPreview>();
+        for(var row:f.getRows()){var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();
+            check(loan.clientId().equals(f.getClientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
+            check(loan.disbursed()!=null && !f.getEffectiveDate().isBefore(loan.disbursed()) && (loan.lastPayment()==null || !f.getEffectiveDate().isBefore(loan.lastPayment())),"date");
+            check(row.getAmount().compareTo(loan.duePrincipal().add(loan.dueInterest()))<=0,"advance");result.add(allocation(row.getAmount(),loan.dueInterest(),loan.outstandingPrincipal()));
+        }
+        if(result.stream().anyMatch(p->p.interest().signum()>0))records.account(a,f.getInterestAccountId(),"INTEREST",false);return result;
+    }
+    private static AllocationPreview allocation(BigDecimal amount,BigDecimal dueInterest,BigDecimal outstanding){var interest=amount.min(dueInterest);var principal=amount.subtract(interest);return new AllocationPreview(principal,interest,outstanding.subtract(principal));}
+    @Transactional(readOnly=true)
     public Page<LoanRow> list(AppUserPrincipal a,Filter f){authorize(a,"VIEW");filter(f,false);var rows=records.loans(a,f,clock.today(),26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
     @Transactional(readOnly=true)
     public Page<Posting> register(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);var rows=records.posts(a,kind,f,26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
@@ -57,9 +83,9 @@ public class LoanRecordingService {
         check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
         check(f.getAmount().compareTo(balance.duePrincipal().add(balance.dueInterest()))<=0,"advance");
-        var interest=f.getAmount().min(balance.dueInterest());var principal=f.getAmount().subtract(interest);
+        var interest=f.getAmount().min(balance.dueInterest());
         if(interest.signum()>0)records.account(a,f.getInterestAccountId(),"INTEREST",false);
-        return new AllocationPreview(principal,interest,balance.outstandingPrincipal().subtract(principal));
+        return allocation(f.getAmount(),balance.dueInterest(),balance.outstandingPrincipal());
     }
     @Transactional(readOnly=true)
     public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");validateRecord(f);check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);
@@ -124,6 +150,15 @@ public class LoanRecordingService {
     }
     @Transactional
     public Posting reverse(AppUserPrincipal a,UUID originalId,UUID key,LocalDate date,String reason){
+        check(records.receiptForPosting(a,originalId).isEmpty(),"receiptCorrection");
+        return reverseInternal(a,originalId,key,date,reason);
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Posting reverseReceiptRow(AppUserPrincipal a,UUID receiptId,UUID originalId,UUID key,LocalDate date,String reason){
+        check(records.receiptForPosting(a,originalId).filter(receiptId::equals).isPresent(),"receiptCorrection");
+        return reverseInternal(a,originalId,key,date,reason);
+    }
+    private Posting reverseInternal(AppUserPrincipal a,UUID originalId,UUID key,LocalDate date,String reason){
         authorize(a,"REVERSE");check(key!=null,"request");text(reason,500,true);var original=records.posting(a,originalId);check("PAYMENT".equals(original.kind()),"reversal");check(!original.actorId().equals(a.getMemberId()),"independentCorrection");
         var f=new PostForm();f.setRequestKey(key);f.setLoanId(original.loanId());f.setEffectiveDate(date);f.setAmount(original.amount());f.setReference(original.reference());f.setEvidence(original.evidence());f.setNotes(reason.strip());
         validatePost(f);String hash=hash(Map.of("original",originalId,"form",f));records.lockRequest(a,key);var prior=records.postRequest(a,key,hash);if(prior.isPresent())return prior.get();

@@ -34,7 +34,7 @@ Use the existing JSP table contract rather than introducing a React/Cloudscape a
 ## Loan And Financial Columns
 
 - Use short concrete headers and client-facing identifiers: Loan ID, Client Number, Branch, Due Date, Payment Date, Reference, Principal, Interest, Fees, Amount, and Status as relevant.
-- Right-align monetary columns with consistent precision and tabular numerals. State `TZS` in a visible column heading or shared context; distinguish zero from unavailable data.
+- Workspace table headings and values share the left leading edge, including Debit, Credit and monetary columns, so values do not drift to the far edge of wide columns. Use consistent precision and tabular numerals. Explicit centered selection/utility columns may remain centered in both header and body. Standalone PDF/print stationery retains its financial layout. State `TZS` in a visible column heading or shared context; distinguish zero from unavailable data.
 - In repayment tables, distinguish actual received payments, allocation components, unapplied amounts, reversals, and projected instalments. Do not mix a repayment schedule into transaction history without clear separation.
 - Collections tables distinguish days past due, overdue amount, and outstanding principal; PAR is not the same as the sum of missed instalments.
 - Keep identifying information and financial consequences visible on mobile. Let the inner viewport scroll horizontally instead of hiding essential amounts, statuses, or receipt actions.

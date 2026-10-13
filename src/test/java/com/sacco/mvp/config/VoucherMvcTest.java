@@ -25,10 +25,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 @SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class,VoucherMvcTest.Config.class})
 class VoucherMvcTest {
- @Autowired WebApplicationContext context;@Autowired VoucherService service;@Autowired VoucherPdfService pdf;
+ @Autowired WebApplicationContext context;@Autowired VoucherService service;@Autowired VoucherPdfService pdf;@Autowired LoanReceiptService receipts;@Autowired LoanReceiptPdfService loanPdf;
  MockMvc mvc;AppUserPrincipal actor;UUID id=UUID.randomUUID();
  @BeforeEach void setup(){
-  reset(service,pdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  reset(service,pdf,receipts,loanPdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   var m=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class),true);
   lenient().when(service.selectedAccounts(any(),any(),any())).thenReturn(Map.of());
  }
@@ -61,12 +61,29 @@ class VoucherMvcTest {
   mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(status().isOk()).andExpect(content().contentType("application/pdf")).andExpect(header().string("Content-Disposition","inline; filename=RV-2026-00000001.pdf")).andExpect(header().string("Cache-Control","no-store"));verify(service,times(2)).export(actor,Type.RECEIPT,id);verify(pdf,times(2)).render(eq(v),any(),isNull());
  }
  Voucher voucher(){return new Voucher(id,"RV-2026-00000001",Type.RECEIPT,LocalDate.of(2026,10,8),"Payer","REF","","",UUID.randomUUID(),new BigDecimal("3.03"),2,UUID.randomUUID(),actor.getMemberId(),"Accountant",OffsetDateTime.now(),null,null,"Institution","Branch",List.of());}
+ @Test void loanReceiptUsesRepaymentUseCaseAndNotGenericJournalPosting()throws Exception{
+  var receipt=new LoanReceipt(voucher(),"C100",List.of());when(receipts.post(eq(actor),any())).thenReturn(receipt);when(receipts.selected(eq(actor),any())).thenReturn(Map.of());
+  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("clientId",UUID.randomUUID().toString()).param("rows[0].loanId",UUID.randomUUID().toString()).param("rows[0].amount","120.00").param("rows[0].description","Repayment")).andExpect(redirectedUrl("/finance/vouchers/receipts/"+id));
+  verify(receipts).post(eq(actor),argThat(f->f.getClientId()!=null && f.getRows().getFirst().getLoanId()!=null));verify(service,never()).post(any(),any(),any());
+ }
+ @Test void loanPreviewAndErrorsPreserveTheConditionalForm()throws Exception{
+  when(receipts.preview(eq(actor),any())).thenThrow(new IllegalArgumentException("repayment.error.advance"));when(receipts.selected(eq(actor),any())).thenReturn(Map.of());
+  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("action","preview").param("rows[0].amount","9999.00")).andExpect(view().name("accounting/vouchers/form")).andExpect(model().attributeHasErrors("voucherForm"));
+  verify(receipts,never()).post(any(),any());verify(service,never()).preview(any(),any(),any());
+ }
+ @Test void loanPdfAndPrintUseProtectedCombinedDocument()throws Exception{
+  var receipt=new LoanReceipt(voucher(),"C100",List.of());when(receipts.find(actor,id)).thenReturn(Optional.of(receipt));when(receipts.export(actor,id)).thenReturn(receipt);when(loanPdf.render(eq(receipt),any(),isNull())).thenReturn(new byte[]{1,2,3});
+  mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(content().contentType("application/pdf")).andExpect(header().string("Content-Disposition","inline; filename=RV-2026-00000001.pdf"));verify(receipts).export(actor,id);verifyNoInteractions(pdf);
+  when(receipts.export(actor,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Export revoked"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/pdf").with(user(actor))).andExpect(status().isForbidden());
+ }
  @Test void printCannotBypassResourceExportAuthorization()throws Exception {when(service.export(actor,Type.RECEIPT,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Outside branch"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(pdf);}
  @Configuration @EnableWebMvc static class Config {
   @Bean("access") @Primary com.sacco.mvp.service.AccessControlService access(){return new com.sacco.mvp.service.AccessControlService();}
   @Bean VoucherService service(){return mock(VoucherService.class);}
   @Bean VoucherPdfService pdf(){return mock(VoucherPdfService.class);}
   @Bean ApplicationClock voucherClock(){var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(LocalDate.of(2026,10,8));return clock;}
-  @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class));}
+  @Bean LoanReceiptService receipts(){return mock(LoanReceiptService.class);}
+  @Bean LoanReceiptPdfService loanPdf(){return mock(LoanReceiptPdfService.class);}
+  @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock,LoanReceiptService receipts,LoanReceiptPdfService loanPdf){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),receipts,loanPdf);}
  }
 }

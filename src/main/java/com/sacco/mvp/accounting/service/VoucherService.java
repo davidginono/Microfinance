@@ -28,6 +28,7 @@ public class VoucherService {
     public void authorize(AppUserPrincipal actor,Type type,String action){
         ledger.requireActor(actor,(type==Type.JOURNAL?"ACCOUNTING_JOURNALS_":"ACCOUNTING_BUSINESS_")+action);
     }
+    public void requireExport(AppUserPrincipal actor){ledger.requireActor(actor,"FINANCIAL_REPORTS_EXPORT");}
     @Transactional(readOnly=true)
     public Page list(AppUserPrincipal actor,Type type,Filter filter){
         authorize(actor,type,"VIEW");validateFilter(filter);
@@ -57,6 +58,7 @@ public class VoucherService {
     public Voucher post(AppUserPrincipal actor,Type type,Form form){
         authorize(actor,type,"CREATE");validate(form,type,clock.today());
         String hash=hash(type,form);vouchers.lockRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
+        require(!vouchers.loanRequestExists(actor.getSaccoId(),actor.getStationId(),form.getRequestKey()),"","retry");
         var prior=vouchers.byRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
         if(prior.isPresent()){
             require(prior.get().type()==type && vouchers.sameRequest(prior.get().id(),hash,actor.getMemberId()),"","retry");return details(prior.get());
@@ -116,6 +118,8 @@ public class VoucherService {
         require(total.precision()<=18,"","amount");return new Preview(List.copyOf(result),total);
     }
     static void validate(Form f,Type type,LocalDate today){
+        require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getClientId()==null && f.getInterestAccountId()==null,"","request");
+        require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getLoanId()==null),"","request");
         require(f!=null && f.getRequestKey()!=null,"","request");require(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(today),"effectiveDate","date");
         text(f.getParty(),160,true,"party");text(f.getReference(),160,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
         require(type!=Type.JOURNAL || f.getMoneyAccountId()==null,"moneyAccountId","moneyAccount");require(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");
@@ -127,9 +131,15 @@ public class VoucherService {
     }
     private Voucher scoped(AppUserPrincipal actor,Type type,UUID id,boolean lock){return vouchers.find(actor.getSaccoId(),actor.getStationId(),type,id,lock).orElseThrow(()->new AccessDeniedException("Voucher outside your workspace"));}
     private Voucher details(Voucher v){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),vouchers.transactions(v.id()));}
-    private String hash(Type type,Form f){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((type.name()+json.writeValueAsString(f)).getBytes(StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
+    private String hash(Type type,Form f){try{
+        // Keep ordinary-voucher retry hashes compatible with the pre-unification form.
+        var payload=(tools.jackson.databind.node.ObjectNode)json.valueToTree(f);
+        payload.remove("receiptPurpose");payload.remove("clientId");payload.remove("interestAccountId");
+        for(var row:payload.path("rows"))((tools.jackson.databind.node.ObjectNode)row).remove("loanId");
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((type.name()+json.writeValueAsString(payload)).getBytes(StandardCharsets.UTF_8)));
+    }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
     private static void text(String s,int max,boolean required,String field){boolean multiline=field.equals("description")||field.endsWith(".description");require(s!=null && (!required || !s.isBlank()) && s.length()<=max && s.chars().noneMatch(c->c<32 && !(multiline && (c=='\n'||c=='\r'||c=='\t'))),field,"text");}
     private static void query(String search,int page){require(search!=null && search.length()<=100 && page>=0 && page<=1000,"","filter");}
-    private static void validateFilter(Filter f){require(f!=null,"","filter");query(f.search(),f.page());require(Set.of("","POSTED","REVERSED","REVERSAL").contains(f.status()) && Set.of("newest","oldest","amount").contains(f.sort()) && (f.from()==null || f.through()==null || !f.through().isBefore(f.from())),"","filter");}
+    static void validateFilter(Filter f){require(f!=null,"","filter");query(f.search(),f.page());require(Set.of("","POSTED","REVERSED","REVERSAL").contains(f.status()) && Set.of("newest","oldest","amount").contains(f.sort()) && (f.from()==null || f.through()==null || !f.through().isBefore(f.from())),"","filter");}
     private static void require(boolean ok,String field,String code){if(!ok)throw new Invalid(field,code);}
 }

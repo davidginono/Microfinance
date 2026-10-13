@@ -42,6 +42,65 @@ class LoanRecordingPostgresTest {
     static final LocalDate TODAY=LocalDate.of(2026,10,8);
     AnnotationConfigApplicationContext context;JdbcTemplate jdbc;LoanRecordingService service;LoanRepaymentLedgerService ledger;
     String institution;AppUserPrincipal actor;UUID client,product,cash,principal,interest;
+    com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
+    com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
+    UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
+    @Test void unifiedReceiptPostsAllLoansOnceAndRetainsHistoricalReceipts(){
+        var first=disbursed("D-GROUP-1");var second=disbursed("D-GROUP-2");var f=receiptForm(first,second);
+        var preview=receiptService().preview(actor,f);assertThat(preview).hasSize(2);assertThat(preview.getFirst().principal()).isEqualByComparingTo("100.00");
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=?",Integer.class,institution)).isZero();
+        var saved=receiptService().post(actor,f);assertThat(saved.header().total()).isEqualByComparingTo("240.00");assertThat(saved.rows()).hasSize(2);
+        assertThat(receiptService().post(actor,f).header().id()).isEqualTo(saved.header().id());
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isEqualTo(4);
+        assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
+        assertThat(service.detail(actor,first).loan().outstandingPrincipal()).isEqualByComparingTo("900.00");
+        f.getRows().getFirst().setAmount(new BigDecimal("121.00"));assertThatThrownBy(()->receiptService().post(actor,f)).hasMessage("voucher.error.retry");
+        var historical=post(first,"10.00","HISTORICAL");historical.setInterestAccountId(interest);var old=service.repay(actor,historical);
+        assertThat(receiptService().find(actor,old.id()).orElseThrow().rows()).hasSize(1);
+        assertThat(receiptService().list(actor,new com.sacco.mvp.accounting.dto.VoucherDtos.Filter("",null,null,"","newest",0)).rows()).hasSize(2);
+        assertThat(service.receiptForPosting(actor,saved.rows().getFirst().postingId())).contains(saved.header().id());
+    }
+    @Test void unifiedReceiptRollsBackEveryLoanWhenAnyRowFailsAndRejectsForeignClients(){
+        var first=disbursed("D-ROLLBACK-1");var second=disbursed("D-ROLLBACK-2");var f=receiptForm(first,second);f.getRows().get(1).setAmount(new BigDecimal("9999.00"));
+        assertThatThrownBy(()->receiptService().post(actor,f)).hasMessage("repayment.error.advance");
+        assertThat(service.detail(actor,first).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=?",Integer.class,institution)).isZero();
+        var repeated=receiptForm(first,first);assertThatThrownBy(()->receiptService().post(actor,repeated)).hasMessage("voucher.error.loanRow");
+        var foreign=receiptForm(first);foreign.setClientId(UUID.randomUUID());assertThatThrownBy(()->receiptService().post(actor,foreign)).hasMessage("recording.error.client");
+        assertThat(receiptService().choices(operator("B2"),"loans",client,"",0)).isEmpty();
+    }
+    @Test void unifiedReceiptRequiresCompleteIndependentCorrectionAndPreservesAllocations(){
+        var first=disbursed("D-REVERSE-1");var second=disbursed("D-REVERSE-2");var saved=receiptService().post(actor,receiptForm(first,second));
+        assertThatThrownBy(()->receiptService().reverse(actor,saved.header().id(),UUID.randomUUID(),TODAY,"Correction")).hasMessage("voucher.error.independentCorrection");
+        var corrector=operator("B1");assertThatThrownBy(()->service.reverse(corrector,saved.rows().getFirst().postingId(),UUID.randomUUID(),TODAY,"Partial correction")).hasMessage("recording.error.receiptCorrection");
+        var key=UUID.randomUUID();var reversed=receiptService().reverse(corrector,saved.header().id(),key,TODAY,"Correction");assertThat(reversed.header().reversesId()).isEqualTo(saved.header().id());assertThat(reversed.rows()).hasSize(2);
+        assertThat(receiptService().reverse(corrector,saved.header().id(),key,TODAY,"Correction").header().id()).isEqualTo(reversed.header().id());
+        assertThat(service.detail(actor,first).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(service.detail(actor,second).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(receiptService().find(actor,saved.header().id()).orElseThrow().header().status()).isEqualTo("REVERSED");
+    }
+    @Test void unifiedReceiptConcurrentRetriesAndAuditFailureAreAtomic()throws Exception{
+        var id=disbursed("D-CONCURRENT");var f=receiptForm(id);var pool=Executors.newFixedThreadPool(2);
+        try{var a=pool.submit(()->receiptService().post(actor,f));var b=pool.submit(()->receiptService().post(actor,f));assertThat(a.get(60,TimeUnit.SECONDS).header().id()).isEqualTo(b.get(60,TimeUnit.SECONDS).header().id());}finally{pool.shutdownNow();}
+        var failed=receiptForm(id);failed.setReference("AUDIT-FAIL");doThrow(new IllegalStateException("Synthetic audit failure")).when(context.getBean(AuditService.class)).logEvent(eq("ACCOUNTING"),any(),eq("LOAN_RECEIPT_POSTED"),any(),any(),any(),any(),any(),any(),any(),any());
+        assertThatThrownBy(()->receiptService().post(actor,failed)).hasMessage("Synthetic audit failure");assertThat(service.detail(actor,id).loan().outstandingPrincipal()).isEqualByComparingTo("900.00");
+        assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+    }
+    @Test void unifiedReceiptScopeRevocationClosedPeriodsAndDuplicateReferencesFailClosed(){
+        var id=disbursed("D-SECURITY");var f=receiptForm(id);var saved=receiptService().post(actor,f);
+        assertThat(receiptService().find(operator("B2"),saved.header().id())).isEmpty();
+        var duplicate=receiptForm(id);duplicate.setReference(f.getReference());
+        assertThatThrownBy(()->receiptService().post(actor,duplicate)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(service.detail(actor,id).loan().outstandingPrincipal()).isEqualByComparingTo("900.00");
+        var closedDate=LocalDate.of(2026,9,15);
+        jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'CLOSED',?,now())",UUID.randomUUID(),institution,closedDate,closedDate,actor.getMemberId());
+        var closedForm=receiptForm(id);closedForm.setEffectiveDate(closedDate);
+        assertThatThrownBy(()->receiptService().post(actor,closedForm)).hasMessage("voucher.error.period");
+        when(context.getBean(UserClaimService.class).effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());
+        assertThatThrownBy(()->receiptService().find(actor,saved.header().id())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->receiptService().export(actor,saved.header().id())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->receiptService().post(actor,receiptForm(id))).isInstanceOf(AccessDeniedException.class);
+    }
     @BeforeAll void start(){context=new AnnotationConfigApplicationContext(Config.class);jdbc=context.getBean(JdbcTemplate.class);service=context.getBean(LoanRecordingService.class);ledger=context.getBean(LoanRepaymentLedgerService.class);}
     @AfterAll void stop(){if(context!=null)context.close();}
     @BeforeEach void fixture(){
@@ -201,5 +260,7 @@ class LoanRecordingPostgresTest {
         @Bean BusinessAccountingGuard guard(JdbcTemplate j,ObjectMapper mapper){return new BusinessAccountingGuard(new BusinessAccountingRepository(j,mapper));}
         @Bean LoanRepaymentLedgerService repayments(LoanLedgerRepository ledgers,LoanLedgerInstallmentRepository installments,LoanRepaymentTransactionRepository transactions,LoanRepaymentAllocationRepository allocations,LoanJournalEntryRepository journal,LoanApplicationRepository loans,ObjectMapper mapper,ApplicationClock clock,AuditService audit,BusinessAccountingGuard guard){return new LoanRepaymentLedgerService(ledgers,installments,transactions,allocations,journal,loans,mapper,clock,new AccessControlService(),audit,guard);}
         @Bean LoanRecordingService recording(JdbcTemplate j,LoanApplicationRepository loans,LoanProductSettingRepository products,LoanRepaymentLedgerService repayments,GeneralLedgerService accounting,ObjectMapper mapper,ApplicationClock clock,AuditService audit){var numbers=mock(ApplicationNumberService.class);var next=new AtomicLong(1000000000);when(numbers.nextFor(anyString())).thenAnswer(i->next.incrementAndGet());return new LoanRecordingService(new LoanRecordingRepository(j),loans,products,numbers,new RepaymentScheduleService(mapper,products),repayments,accounting,new VoucherRepository(j),mapper,clock,audit);}
+        @Bean com.sacco.mvp.accounting.service.VoucherService vouchers(JdbcTemplate j,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit,ObjectMapper json){return new com.sacco.mvp.accounting.service.VoucherService(new VoucherRepository(j),accounting,clock,audit,(JsonMapper)json);}
+        @Bean com.sacco.mvp.accounting.service.LoanReceiptService receipts(JdbcTemplate j,com.sacco.mvp.accounting.service.VoucherService ordinary,LoanRecordingService loans,ApplicationClock clock,AuditService audit,ObjectMapper json){return new com.sacco.mvp.accounting.service.LoanReceiptService(new LoanReceiptRepository(j),new VoucherRepository(j),ordinary,loans,clock,audit,json);}
     }
 }

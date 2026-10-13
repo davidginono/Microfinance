@@ -19,7 +19,7 @@ class ErpTableAlignmentContractTest {
     );
 
     @Test
-    void sharedTableStylesAlignHeadersWithBodyCellsAndPreserveExplicitAlignment() throws Exception {
+    void sharedTableStylesAlignValuesWithHeadingsIncludingLegacyNumericClasses() throws Exception {
         String shellCss = normalizedCss();
 
         assertThat(shellCss)
@@ -27,6 +27,8 @@ class ErpTableAlignmentContractTest {
             .contains(".erp-table th.text-left,")
             .contains(".erp-table th.text-center,")
             .contains(".erp-table th.text-right,")
+            .containsPattern("(?s)body\\.aws-console table\\.erp-table :is\\(th, td\\) \\{\\s*text-align: left !important;")
+            .containsPattern("(?s)body\\.aws-console table\\.erp-table :is\\(th, td\\)\\.text-center \\{\\s*text-align: center !important;")
             .contains("font-variant-numeric: tabular-nums;");
     }
 

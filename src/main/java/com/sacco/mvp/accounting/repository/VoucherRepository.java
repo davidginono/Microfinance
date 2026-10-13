@@ -20,6 +20,7 @@ public class VoucherRepository {
     public void lockRequest(String institution,String branch,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","CORE/"+institution+"/"+branch+"/"+key);}
     public Optional<Voucher> byRequest(String institution,String branch,UUID key){return jdbc.query(HEAD+" where v.sacco_id=? and v.station_id=? and v.request_key=?",this::voucher,institution,branch,key).stream().findFirst();}
     public boolean sameRequest(UUID id,String hash,UUID actor){return Boolean.TRUE.equals(jdbc.queryForObject("select payload_hash=? and posted_by=? from accounting_voucher where id=?",Boolean.class,hash,actor,id));}
+    public boolean loanRequestExists(String institution,String branch,UUID key){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_receipt where sacco_id=? and station_id=? and request_key=?)",Boolean.class,institution,branch,key));}
     public Optional<Voucher> find(String institution,String branch,Type type,UUID id,boolean lock){return jdbc.query(HEAD+" where v.sacco_id=? and v.station_id=? and v.type=? and v.id=?"+(lock?" for update of v":""),this::voucher,institution,branch,type.name(),id).stream().findFirst();}
     public List<Voucher> list(String institution,String branch,Type type,Filter f){
         String order=switch(f.sort()){case "oldest"->"v.effective_date,v.id";case "amount"->"v.total desc,v.id desc";default->"v.effective_date desc,v.id desc";};

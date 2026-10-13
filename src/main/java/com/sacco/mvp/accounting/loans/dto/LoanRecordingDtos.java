@@ -42,6 +42,7 @@ public final class LoanRecordingDtos {
         private String notes = "";
     }
     public record Choice(UUID id, String label, String purpose) {}
+    public record ReceiptLoan(UUID id,UUID clientId,String number,String client,String clientNumber,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal outstandingPrincipal,LocalDate disbursed,LocalDate lastPayment,String status) {}
     public record Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId, UUID productId) {
         public Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId) {
             this(search, from, through, status, sort, page, clientId, null);

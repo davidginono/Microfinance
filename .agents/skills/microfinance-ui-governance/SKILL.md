@@ -53,6 +53,8 @@ For COA or activity/transaction configuration, read [the accounting architecture
 
 ## Financial Information
 
+- Loan repayments for directly recorded loans are entered through Receipt vouchers using the explicit Loan repayment purpose, scoped client choice and per-row Loan ID choices. Keep the specialized repayment engine underneath; activity names or account numbers alone never authorize loan posting. Hide incompatible ordinary account mappings, preview principal/interest and the resulting principal balance, and use one receipt detail/PDF/print document for the complete collection. Corrections reverse the entire receipt through a different authorized accountant; retain historical records and legacy lending safeguards. See `docs/unified-receipt-vouchers.md`.
+
 - Separate requested principal, approved principal, net disbursement, paid principal, due interest, fees, arrears, and outstanding debt. Label projected schedules as schedules, not payment history.
 - Show the currency and rate basis. A monthly rate must not look like an annual rate; an instalment amount must include its repayment frequency.
 - Do not call future scheduled interest a current settlement balance. Use server-calculated, dated values and disclose stale or unavailable balances.

@@ -17,7 +17,7 @@ Accounts are active, institution-scoped ordinary `POSTING` accounts, not heading
 
 An existing open accounting period is shared-locked while posting. When no period covers the date, core accounting creates a one-day open period under the existing setup advisory lock; it cannot post in a closed period or open a date before a later close. Direct journals have a distinct `direct_post`/`CORE_*` identity and no invented policy/checker records. Historical policy-backed journals keep their existing constraints.
 
-Generic vouchers do **not** post loan repayments/disbursements, calculate fees, reconcile bank channels, establish historical opening balances, or certify financial statements. Loan controls and loan subledgers must use their owning services. These features do not finish the larger accounting/report-builder checklist. Branch display uses the existing branch location, with branch ID fallback because the current branch entity has no dedicated display-name field.
+Ordinary vouchers do **not** post loan repayments/disbursements, calculate fees, reconcile bank channels, establish historical opening balances, or certify financial statements. The receipt form now has an explicit Loan repayment purpose for directly recorded loans: it delegates to the owning loan services and creates an immutable document envelope, not another GL journal. These receipts require loan permissions and complete independent corrections, unlike ordinary voucher reversals. See [unified receipts](unified-receipt-vouchers.md). These features do not finish the larger accounting/report-builder checklist. Branch display uses the existing branch location, with branch ID fallback because the current branch entity has no dedicated display-name field.
 
 ## Permissions and output policy
 

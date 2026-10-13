@@ -1,6 +1,6 @@
 # Accountant loan recording
 
-The accountant workspace has separate **Loan records**, **Loan disbursements**, **Loan repayments**, and **Client ledgers** destinations. This path records an existing loan agreement and actual movements directly. It does not create approval, verification, maker/checker, or release evidence. Existing borrower applications and historical specialized accounting retain their own workflows.
+The accountant workspace has **Loan records**, **Loan disbursements**, **Receipt vouchers**, and **Client ledgers** destinations. Directly recorded loan repayments are entered and documented through Receipt vouchers; the old repayment-create URL redirects there and stale posting forms cannot submit. Historical repayment records remain retained and readable. See [unified receipts](unified-receipt-vouchers.md). This path records an existing loan agreement and actual movements directly. It does not create approval, verification, maker/checker, or release evidence. Existing borrower applications and historical specialized accounting retain their own workflows.
 
 ## Recording and posting
 

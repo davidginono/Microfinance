@@ -8977,7 +8977,7 @@ html.session-timeout-active,
 .loan-application-detail-page .loan-repayment-schedule-table th:nth-child(n + 3),
 .loan-application-detail-page .loan-repayment-schedule-table td:nth-child(n + 3) {
     width: 15.8%;
-    text-align: right !important;
+    text-align: left !important;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }

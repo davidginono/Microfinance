@@ -2793,8 +2793,19 @@ body.aws-console {
 
 .erp-table th.text-right,
 .erp-table td.text-right {
-    text-align: right !important;
+    text-align: left !important;
     font-variant-numeric: tabular-nums;
+}
+
+/* Workspace columns share one leading edge, including legacy numeric classes.
+   Standalone PDF/print stationery keeps its independent financial layout. */
+body.aws-console table.erp-table :is(th, td) {
+    text-align: left !important;
+    font-variant-numeric: tabular-nums;
+}
+
+body.aws-console table.erp-table :is(th, td).text-center {
+    text-align: center !important;
 }
 
 .erp-table tbody tr:hover td {

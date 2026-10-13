@@ -15,9 +15,6 @@
                     <a href="<c:url value='/finance/loan-disbursements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-disbursements') ? 'shell-nav-active' : ''}"><spring:message code="recording.register.DISBURSEMENT" /></a>
                 </sec:authorize>
                 <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
-                    <a href="<c:url value='/finance/loan-repayments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-repayments') ? 'shell-nav-active' : ''}"><spring:message code="recording.register.PAYMENT" /></a>
-                </sec:authorize>
-                <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
                     <a href="<c:url value='/finance/client-ledgers' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/client-ledgers') ? 'shell-nav-active' : ''}"><spring:message code="recording.clientLedgers" /></a>
                 </sec:authorize>
             </div>

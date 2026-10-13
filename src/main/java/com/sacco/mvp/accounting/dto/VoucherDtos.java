@@ -14,10 +14,13 @@ public final class VoucherDtos {
         private LocalDate effectiveDate;
         private String party="",reference="",description="",evidence="";
         private UUID moneyAccountId;
+        private String receiptPurpose="OTHER";
+        private UUID clientId,interestAccountId;
         private List<RowForm> rows=new ArrayList<>(List.of(new RowForm()));
     }
     @Data public static class RowForm {
         private UUID transactionId,templateKey,debitAccountId,creditAccountId;
+        private UUID loanId;
         private String component="TOTAL",description="";
         private BigDecimal amount;
     }
@@ -34,6 +37,10 @@ public final class VoucherDtos {
     public record Filter(String search,LocalDate from,LocalDate through,String status,String sort,int page) {}
     public record Page(List<Voucher> rows,int page,boolean hasNext) {}
     public record Preview(List<Transaction> rows,BigDecimal total) {}
+    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows) {}
+    public record LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,
+                                 BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,
+                                 String moneyAccount,String principalAccount,String interestAccount,String reference) {}
     public static class Invalid extends IllegalArgumentException {
         private final String field;
         public Invalid(String field,String code){super("voucher.error."+code);this.field=field;}

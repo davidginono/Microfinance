@@ -34,6 +34,26 @@ public class LoanRecordingRepository {
         (select x.id from accountant_loan_post x where x.reverses_id=p.id) reversed_by
         """+POST_FROM;
     public void lockRequest(AppUserPrincipal a,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_RECORD/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);}
+    public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){return jdbc.query("select receipt_id from accountant_loan_receipt_row where posting_id=? and sacco_id=? and station_id=?",(r,n)->r.getObject(1,UUID.class),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
+    public List<LoanRow> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page,LocalDate today){
+        return jdbc.query(LOANS+" where r.sacco_id=? and r.station_id=? and m.id=? and a.status in ('DISBURSED','PAR','DEFAULTED') and l.loan_application_id is not null and strpos(lower(a.loan_id),?)>0 order by a.loan_id,a.id limit 26 offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>)this::loan,today,today,today,a.getSaccoId(),a.getStationId(),client,search.toLowerCase(Locale.ROOT),page*25);
+    }
+    public List<UUID> lockReceiptLoans(AppUserPrincipal a,List<UUID> ids,UUID client){
+        var args=new ArrayList<Object>();args.add(a.getSaccoId());args.add(a.getStationId());args.add(client);args.add(client);args.addAll(ids);
+        return jdbc.query("select r.loan_id from accountant_loan_record r join loan_applications l on l.id=r.loan_id where r.sacco_id=? and r.station_id=? and (?::uuid is null or l.applicant_member_id=?::uuid) and r.loan_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by r.loan_id for update of r",(r,n)->r.getObject(1,UUID.class),args.toArray());
+    }
+    public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){
+        var args=new ArrayList<Object>();args.add(date);args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(ids);
+        return jdbc.query("""
+            select l.id,l.applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,b.last_payment_date,
+            b.principal-b.principal_paid outstanding,coalesce(d.principal,0) due_principal,coalesce(d.interest,0) due_interest
+            from accountant_loan_record r join loan_applications l on l.id=r.loan_id join members m on m.id=l.applicant_member_id
+            left join loan_ledgers b on b.loan_application_id=l.id
+            left join lateral(select sum(principal-principal_paid) principal,sum(interest-interest_paid) interest
+              from loan_ledger_installments where loan_application_id=l.id and due_date<=?) d on true
+            where r.sacco_id=? and r.station_id=? and l.id in (
+            """+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by l.id",(r,n)->new ReceiptLoan(r.getObject("id",UUID.class),r.getObject("applicant_member_id",UUID.class),r.getString("loan_id"),r.getString("full_name"),r.getString("member_no"),r.getBigDecimal("due_principal"),r.getBigDecimal("due_interest"),r.getBigDecimal("outstanding"),r.getObject("disbursement_date",LocalDate.class),r.getObject("last_payment_date",LocalDate.class),r.getString("status")),args.toArray());
+    }
     public Optional<UUID> recordRequest(AppUserPrincipal a,UUID key,String hash){
         var rows=jdbc.queryForList("select loan_id,payload_hash,actor_id from accountant_loan_record where sacco_id=? and station_id=? and request_key=?",a.getSaccoId(),a.getStationId(),key);
         if(rows.isEmpty())return Optional.empty();var row=rows.getFirst();
