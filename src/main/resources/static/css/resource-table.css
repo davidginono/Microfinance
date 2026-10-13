@@ -47,5 +47,13 @@
 .resource-table-dialog-body fieldset { margin-top:12px; border-top:1px solid #d5dbdb; padding-top:12px; }
 .resource-table-dialog-body legend { font-weight:700; padding-right:8px; }
 .resource-table-dialog-actions { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #d5dbdb; }
+@media (min-width:1024px) {
+    .aws-console .resource-table-tools { flex-wrap:nowrap; }
+    .aws-console .resource-table-tools > .resource-table-filters { flex-flow:row nowrap !important; align-items:flex-end; flex:1 1 0; }
+    .aws-console .resource-table-filters > :is(label,.erp-table-toolbar__control,.admin-filter-field,.staff-analytics-control,.loan-analytics-filter-field,.form-field) { flex:1 1 0 !important; width:auto !important; min-width:0 !important; }
+    .aws-console .resource-table-filters :is(.neo-select,.neo-select-button) { width:100%; min-width:0; max-width:100%; }
+    .aws-console .resource-table-filters > :is(.resource-table-filter-actions,[class*="actions"]) { flex:0 0 auto !important; flex-wrap:nowrap; align-self:flex-end; }
+    .aws-console .resource-table-filters .app-btn { flex:0 0 auto; white-space:nowrap; }
+}
 @media (max-width:767px) { .aws-console [data-resource-table] .resource-table-actions { width:auto; flex:1 1 auto; } .aws-console .resource-table-tools > .resource-table-filters { flex-basis:100%; } .aws-console [data-resource-table] .resource-table-actions .app-btn { max-width:100%; white-space:normal; } }
 @media print { .resource-table-tools,.resource-table-actions,.resource-table-preferences { display:none !important; } [data-resource-table] > .erp-table-scroll { overflow:visible !important; max-height:none !important; } }
