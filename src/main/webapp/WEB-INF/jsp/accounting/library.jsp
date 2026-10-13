@@ -15,7 +15,7 @@
 <div class="accounting-workspace accounting-resource-workspace">
     <c:if test="${not empty libraryError}"><p class="coa-error" role="alert"><spring:message code="${libraryError}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
-    <section data-resource-table="accounting-library-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region id="library-register">
+    <section data-resource-table="accounting-library-1" data-table-selection="single" data-resource-split data-table-page-size="${tablePageSize}" class="erp-table-wrap" data-aws-table-region id="library-register">
         <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="${isActivity?'library.activityRegister':'library.transactionRegister'}" /></h2>
             <div class="accounting-actions">
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" id="library-status-form" data-url="<c:url value='/finance/library/${isActivity?"activities":"transactions"}/' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button type="submit" class="app-btn btn-neutral" id="library-status" disabled data-deactivate="<spring:message code='accounting.deactivate' />" data-reactivate="<spring:message code='coa.reactivate' />"><spring:message code="accounting.deactivate" /></button></form></sec:authorize>

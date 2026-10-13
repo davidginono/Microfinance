@@ -14,9 +14,10 @@ public class AccountingCodeLibraryRepository {
     private final JdbcTemplate jdbc;
     private static final String ACTIVITY="select id,code,name,name_sw,description,active from gl_activity";
     private static final String TRANSACTION="select t.id,t.activity_id,a.code activity_code,a.name activity_name,a.name_sw activity_name_sw,t.code,t.name,t.name_sw,t.description,t.source_event,t.active,exists(select 1 from gl_transaction_template p where p.transaction_id=t.id and p.sacco_id=t.sacco_id) has_template from gl_transaction_code t join gl_activity a on a.id=t.activity_id and a.sacco_id=t.sacco_id";
-    public List<Activity> activities(String institution,String search,String state,int offset) {
-        return jdbc.query(ACTIVITY+" where sacco_id=? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) and (?='' or active=(?='ACTIVE')) order by code,id limit 26 offset ?",
-            this::activity,institution,search,search,search,state,state,offset);
+    public List<Activity> activities(String institution,String search,String state,int offset) {return activities(institution,search,state,offset,26);}
+    public List<Activity> activities(String institution,String search,String state,int offset,int limit) {
+        return jdbc.query(ACTIVITY+" where sacco_id=? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) and (?='' or active=(?='ACTIVE')) order by code,id limit ? offset ?",
+            this::activity,institution,search,search,search,state,state,limit,offset);
     }
     public Optional<Activity> activity(String institution,UUID id,boolean lock) {
         return jdbc.query(ACTIVITY+" where sacco_id=? and id=?"+(lock?" for update":""),this::activity,institution,id).stream().findFirst();
@@ -24,11 +25,12 @@ public class AccountingCodeLibraryRepository {
     public Optional<Activity> activityByCode(String institution,String code) {
         return jdbc.query(ACTIVITY+" where sacco_id=? and code=?",this::activity,institution,code).stream().findFirst();
     }
-    public List<TransactionCode> transactionRegister(String institution,UUID activity,String search,String state,String sourceEvent,int offset) {
+    public List<TransactionCode> transactionRegister(String institution,UUID activity,String search,String state,String sourceEvent,int offset) {return transactionRegister(institution,activity,search,state,sourceEvent,offset,26);}
+    public List<TransactionCode> transactionRegister(String institution,UUID activity,String search,String state,String sourceEvent,int offset,int limit) {
         String parent=activity==null?"":" and t.activity_id=?";
         var args=new ArrayList<Object>();args.add(institution);if(activity!=null)args.add(activity);
-        Collections.addAll(args,search,search,search,state,state,sourceEvent,sourceEvent,offset);
-        return jdbc.query(TRANSACTION+" where t.sacco_id=?"+parent+" and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) and (?='' or t.source_event=?) order by t.code,t.id limit 26 offset ?",this::transaction,args.toArray());
+        Collections.addAll(args,search,search,search,state,state,sourceEvent,sourceEvent,limit,offset);
+        return jdbc.query(TRANSACTION+" where t.sacco_id=?"+parent+" and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) and (?='' or t.source_event=?) order by t.code,t.id limit ? offset ?",this::transaction,args.toArray());
     }
     public UUID createActivity(String institution,CodeForm form,UUID actor,OffsetDateTime now) {
         UUID id=UUID.randomUUID();

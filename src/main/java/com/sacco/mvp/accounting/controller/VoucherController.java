@@ -41,8 +41,8 @@ public class VoucherController {
     public String list(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
                        @RequestParam(defaultValue="") String search,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
                        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(defaultValue="") String state,
-                       @RequestParam(defaultValue="newest") String sort,@RequestParam(defaultValue="0") int page,Model model){
-        var filter=new Filter(search,from,through,state,sort,page);context(kind,model);model.addAttribute("filter",filter);
+                       @RequestParam(defaultValue="newest") String sort,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="30") int size,Model model){
+        var filter=new Filter(search,from,through,state,sort,page,size);context(kind,model);model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
         model.addAttribute("vouchers",type(kind)==Type.RECEIPT?loanReceipts.list(actor,filter):vouchers.list(actor,type(kind),filter));return "accounting/vouchers/register";
     }
     @GetMapping("/new")

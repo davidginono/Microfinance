@@ -14,7 +14,7 @@
         svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '1.8');
         const paths = {
             previous: ['m15 18-6-6 6-6'], next: ['m9 18 6-6-6-6'], close: ['m6 6 12 12M6 18 18 6'],
-            refresh: ['M20 7v5h-5M4 17v-5h5', 'M6.1 7a7 7 0 0 1 11.5-2L20 8M4 16l2.4 3A7 7 0 0 0 18 17'],
+            refresh: ['M20 4v7h-7', 'M20 11a8 8 0 1 0-2.4 6'],
             settings: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8', 'M9.5 2h5l.5 2.5 2 1.2 2.5-.8L22 9l-2 1.8v2.4l2 1.8-2.5 4.1-2.5-.8-2 1.2-.5 2.5h-5L9 19.5l-2-1.2-2.5.8L2 15l2-1.8v-2.4L2 9l2.5-4.1 2.5.8 2-1.2Z']
         };
         paths[name].forEach(d => { const path = document.createElementNS(svg.namespaceURI, 'path'); path.setAttribute('d', d); svg.append(path); });
@@ -69,6 +69,11 @@
         }
         if (filters) {
             filters.classList.add('resource-table-filters');
+            if (region.dataset.tablePageSize && filters.tagName === 'FORM') {
+                let size = filters.querySelector('input[name="size"]');
+                if (!size) { size=node('input');size.type='hidden';size.name='size';filters.append(size); }
+                size.value=region.dataset.tablePageSize;
+            }
             const filterCommands = [...filters.querySelectorAll(':scope > button, :scope > a.app-btn')];
             if (filterCommands.length) { const group = node('div', 'resource-table-filter-actions'); group.append(...filterCommands); filters.append(group); }
             tools.append(filters);
@@ -82,6 +87,9 @@
             if (control) control = control.cloneNode(true);
             if (!control) { control = iconButton(direction, l[direction]); control.disabled = true; }
             control.className = 'resource-table-page'; control.setAttribute('aria-label', l[direction]); control.title = l[direction]; control.replaceChildren(icon(direction));
+            if (region.dataset.tablePageSize && control.hasAttribute('href')) {
+                const url = new URL(control.href, location.href);url.searchParams.set('size',region.dataset.tablePageSize);control.href=url.href;
+            }
             if (direction === 'next') { const current = node('span', 'resource-table-page-number', String(page)); current.setAttribute('aria-current', 'page'); current.setAttribute('aria-label', l.page + ' ' + page); navigation.append(current); }
             navigation.append(control);
         });
@@ -129,6 +137,7 @@
         const syncSelection = () => {
             if (!selectHeader) return;
             const inputs = rowInputs(), checked = inputs.some(input => input.checked);
+            inputs.forEach(input=>input.closest('td').classList.add('resource-table-selection'));
             selectHeader.disabled = !inputs.length; selectHeader.checked = checked; selectHeader.indeterminate = checked && inputs.length > 1;
             selectHeader.setAttribute('aria-label', checked ? l.clearSelection : l.selectFirst);
         };
@@ -174,20 +183,61 @@
             syncSelection();
         };
         search?.addEventListener('input', () => { clearSelection(); applySearch(); });
-        const lockedColumns = () => new Set(headers.flatMap((header, index) => index <= (selectable ? 1 : 0) || [...table.tBodies].some(body => [...body.rows].some(row => row.cells[index]?.querySelector('input,select,textarea'))) ? [index] : []));
+        const cells = new WeakMap();
+        const originalCells = row => {
+            if (!cells.has(row)) cells.set(row, [...row.cells]);
+            return cells.get(row);
+        };
+        const lockedColumns = () => {
+            const rows=[...table.rows].filter(row=>row!==head);
+            const hasGroupedCells=rows.some(row=>row.cells.length>1 && [...row.cells].some(cell=>cell.colSpan>1 || cell.rowSpan>1));
+            return new Set(headers.flatMap((header, index) => hasGroupedCells || index <= (selectable ? 1 : 0) || rows.some(row => originalCells(row)[index]?.querySelector('input,select,textarea')) ? [index] : []));
+        };
         const key = 'resource-table:v1:' + (region.dataset.resourceTable || scroller.dataset.viewPositionKey || location.pathname + ':' + [...document.querySelectorAll('[data-resource-table]')].indexOf(region));
-        let settings = {hidden: [], compact: true, wrap: false};
-        try { const stored = JSON.parse(localStorage.getItem(key)); if (stored && Array.isArray(stored.hidden)) settings = {hidden: stored.hidden.filter(n => Number.isInteger(n) && n > (selectable ? 1 : 0) && n < headers.length), compact: stored.compact !== false, wrap: stored.wrap === true}; } catch { /* Storage may be disabled. */ }
+        const defaultOrder = headers.map((_, index) => index);
+        let settings = {hidden: [], compact: false, wrap: false, striped: false, sticky: 0, order: defaultOrder};
+        try {
+            const stored = JSON.parse(localStorage.getItem(key));
+            if (stored && Array.isArray(stored.hidden)) settings = {...settings, ...stored,
+                hidden: stored.hidden.filter(n => Number.isInteger(n) && n >= 0 && n < headers.length),
+                sticky: [0,1,2].includes(stored.sticky) ? stored.sticky : 0,
+                order: Array.isArray(stored.order) && stored.order.length === headers.length && new Set(stored.order).size === headers.length && stored.order.every(n => defaultOrder.includes(n)) ? stored.order : defaultOrder};
+        } catch { /* Storage may be disabled. */ }
+        const stickyOffsets = () => {
+            let left=0, count=0;
+            const offsets=[...head.cells].map(cell=>{
+                const sticky=!cell.hidden && count < settings.sticky + (settings.sticky && selectable ? 1 : 0);
+                const offset=left;
+                if(!cell.hidden){left+=cell.getBoundingClientRect().width;count++;}
+                return {sticky,left:offset};
+            });
+            [...table.rows].forEach(row => {
+                [...row.cells].forEach((cell,index) => {
+                    const {sticky,left}=row.cells.length===headers.length && cell.colSpan===1 ? offsets[index] : {sticky:false,left:0};
+                    cell.classList.toggle('resource-table-sticky', sticky);
+                    cell.style.setProperty('--sticky-left', left + 'px');
+                });
+            });
+        };
         const apply = () => {
             const locked = lockedColumns();
             settings.hidden = settings.hidden.filter(index => !locked.has(index));
+            // Keep identifiers and editable columns in their original positions for page controllers.
+            const movable = settings.order.filter(index => !locked.has(index));
+            settings.order = defaultOrder.map(index => locked.has(index) ? index : movable.shift());
             region.classList.toggle('resource-table-compact', settings.compact); region.classList.toggle('resource-table-wrap-lines', settings.wrap);
+            region.classList.toggle('resource-table-striped', settings.striped);
             [...table.rows].forEach(row => {
                 if (row.cells.length !== headers.length || [...row.cells].some(cell => cell.colSpan > 1)) return;
-                [...row.cells].forEach((cell, index) => { cell.hidden = settings.hidden.includes(index); });
+                const originals = originalCells(row), ordered = settings.order.map(index => originals[index]);
+                originals.forEach((cell, index) => { cell.hidden = settings.hidden.includes(index); });
+                if (ordered.some((cell, index) => row.cells[index] !== cell)) row.append(...ordered);
             });
+            stickyOffsets();
         };
         apply();
+        if (window.ResizeObserver) new ResizeObserver(stickyOffsets).observe(scroller);
+        window.addEventListener('resize', stickyOffsets);
         const observer = new MutationObserver(() => { apply(); applySearch(); syncSelection(); });
         [...table.tBodies].forEach(body => observer.observe(body, {childList:true, subtree:true}));
         preferences.addEventListener('click', () => {
@@ -197,19 +247,75 @@
             const form = node('form'); form.method = 'dialog';
             const body = node('div', 'resource-table-dialog-body'); form.append(body);
             const check = (parent, text, checked, disabled = false) => { const label = node('label', 'resource-table-option'); const input = node('input'); input.type = 'checkbox'; input.checked = checked; input.disabled = disabled; label.append(input, document.createTextNode(text)); parent.append(label); return input; };
-            const compact = check(body, l.compact, settings.compact), wrap = check(body, l.wrap, settings.wrap);
-            const columns = node('fieldset'); columns.append(node('legend', '', l.columns)); body.append(columns);
+            const display = node('div', 'resource-table-display-options'); body.append(display);
+            const radioGroup = (title, options, current, name) => {
+                const group = node('fieldset'); group.append(node('legend', '', title)); display.append(group);
+                return options.map(([value, text]) => {
+                    const label = node('label', 'resource-table-option'), input = node('input');
+                    input.type = 'radio'; input.name = name; input.value = value; input.checked = value === current;
+                    label.append(input, document.createTextNode(text)); group.append(label); return input;
+                });
+            };
+            const pageSize = region.dataset.tablePageSize ? radioGroup(l.pageSize, [10,30,50].map(size => [size, size + ' ' + l.records.toLocaleLowerCase()]), Number(region.dataset.tablePageSize), 'pageSize') : [];
+            const wrap = check(display, l.wrap, settings.wrap), striped = check(display, l.striped, settings.striped), compact = check(display, l.compact, settings.compact);
+            const sticky = radioGroup(l.sticky, [[0,l.none],[1,l.firstColumn],[2,l.firstTwoColumns]], settings.sticky, 'sticky');
+            const columns = node('fieldset', 'resource-table-column-options'); columns.append(node('legend', '', l.columns)); body.append(columns);
             const locked = lockedColumns();
-            const choices = headers.map((header, index) => selectable && index === 0 ? null : check(columns, header.textContent.trim(), locked.has(index) || !settings.hidden.includes(index), locked.has(index)));
+            const choices = [], order = [...settings.order];
+            let dragged;
+            const reorder = (source, target) => {
+                if (locked.has(source) || locked.has(target) || source === target) return;
+                const movable=order.filter(index=>!locked.has(index));
+                const from=movable.indexOf(source), to=movable.indexOf(target);
+                if(from<0 || to<0)return;
+                movable.splice(to,0,...movable.splice(from,1));
+                order.forEach((index,position)=>{if(!locked.has(index))order[position]=movable.shift();});
+            };
+            const renderColumns = () => {
+                columns.querySelectorAll('.resource-table-column-option').forEach(item => item.remove());
+                order.forEach(index => {
+                    if (selectable && index === 0) return;
+                    const item = node('div', 'resource-table-column-option'), handle = node('button', 'resource-table-drag', '⠿');
+                    handle.type = 'button'; handle.disabled = locked.has(index); handle.draggable = !handle.disabled;
+                    handle.setAttribute('aria-label', l.reorder + ' ' + headers[index].textContent.trim());
+                    handle.title = l.reorder;
+                    const move = target => {
+                        if (locked.has(index) || locked.has(target) || index === target) return;
+                        reorder(index,target); renderColumns();
+                        columns.querySelector('[data-column="' + index + '"] button')?.focus();
+                    };
+                    handle.addEventListener('keydown', event => {
+                        if (!['ArrowUp','ArrowDown'].includes(event.key)) return;
+                        event.preventDefault(); const movable = order.filter(n => !locked.has(n));
+                        const target = movable[movable.indexOf(index) + (event.key === 'ArrowUp' ? -1 : 1)];
+                        if (target !== undefined) move(target);
+                    });
+                    handle.addEventListener('dragstart', event => { dragged = index; event.dataTransfer?.setData('text/plain', String(index)); });
+                    item.addEventListener('dragover', event => { if (!locked.has(index)) event.preventDefault(); });
+                    item.addEventListener('drop', event => { event.preventDefault(); if (dragged !== undefined) { reorder(dragged,index); renderColumns(); } dragged=undefined; });
+                    item.dataset.column = index; item.append(handle); columns.append(item);
+                    const checked = choices[index]?.checked ?? (locked.has(index) || !settings.hidden.includes(index));
+                    choices[index] = check(item, headers[index].textContent.trim(), checked, locked.has(index));
+                    choices[index].setAttribute('role','switch');
+                });
+            };
+            renderColumns();
             const footer = node('div', 'app-modal-actions resource-table-dialog-actions'); const cancel = node('button', 'app-btn btn-neutral', l.cancel); cancel.type = 'button'; const confirm = node('button', 'app-btn btn-primary', l.confirm); confirm.type = 'submit'; footer.append(cancel, confirm); form.append(footer); dialog.append(form);
             document.body.append(dialog);
             const oldBodyOverflow = document.body.style.overflow, oldRootOverflow = document.documentElement.style.overflow;
             document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden';
             dialog.addEventListener('close', () => { document.body.style.overflow = oldBodyOverflow; document.documentElement.style.overflow = oldRootOverflow; dialog.remove(); preferences.focus(); });
             close.addEventListener('click', () => dialog.close()); cancel.addEventListener('click', () => dialog.close());
-            form.addEventListener('submit', event => { event.preventDefault(); settings = {compact:compact.checked, wrap:wrap.checked, hidden:choices.flatMap((choice,index) => choice && !choice.checked ? [index] : [])}; clearSelection(); apply(); try { localStorage.setItem(key, JSON.stringify(settings)); } catch { /* Preferences still apply for this view. */ } dialog.close(); });
+            form.addEventListener('submit', event => {
+                event.preventDefault(); settings = {compact:compact.checked, wrap:wrap.checked, striped:striped.checked, sticky:Number(sticky.find(input => input.checked).value), order, hidden:choices.flatMap((choice,index) => choice && !choice.checked ? [index] : [])};
+                clearSelection(); apply(); try { localStorage.setItem(key, JSON.stringify(settings)); } catch { /* Preferences still apply for this view. */ }
+                dialog.close();
+                const size = pageSize.find(input => input.checked)?.value;
+                if (size && size !== region.dataset.tablePageSize) { const url = new URL(location.href); url.searchParams.set('size',size); url.searchParams.set('page','0'); location.assign(url); }
+            });
             dialog.showModal(); close.focus();
         });
+        window.ResourceSplitView?.init(region, {headers, originalCells, selectable, labels:l});
     }
     window.ResourceTable = {init: root => {
         (root || document).querySelectorAll('[data-resource-table]').forEach(init);

@@ -24,7 +24,7 @@ The current interface is a compact operational ERP, not a lending marketing site
 
 - Reuse shared tokens and ERP classes for workspace canvas, neutral surfaces, borders, text, and status colors. Keep navigation and institution identity distinct from the data workspace.
 - Prefer unframed page sections and a restrained white surface for genuinely framed forms, tables, or dialogs. Do not nest cards or turn every section into a floating card.
-- Use modest corners, normally at most 8px, compact headings, ordinary letter spacing, and the existing local font. Do not introduce oversized headings, viewport-scaled type, decorative gradients, or visual effects behind financial data.
+- Use square resource cards/table containers and 2px control corners for the supplied classic AWS reference; use modest corners elsewhere, compact headings, ordinary letter spacing, and the existing local font. Do not introduce oversized headings, viewport-scaled type, decorative gradients, or visual effects behind financial data.
 - Use semantic status colors with readable labels or icons; color alone must not communicate approval, delinquency, or reversal.
 - Institution logos and names belong in the shared shell. Do not add SACCO/cooperative branding or decorative stock imagery to operational loan screens.
 
@@ -42,12 +42,16 @@ The current interface is a compact operational ERP, not a lending marketing site
 
 ## Creation Layout, Breadcrumbs, And Validation
 
-- Adapt Cloudscape resource layouts with the existing JSP classes. For focused creation pages, use a bounded workspace (the accounting implementation uses 960px), white section surfaces with compact headings, and a responsive two-column field grid that becomes one column on mobile. Registers and detail tables can use the available workspace width.
+- Adapt Cloudscape resource layouts with the existing JSP classes. For focused creation pages, use a bounded workspace (the accounting implementation uses 960px), square white section surfaces with shaded `#fafafa` headings, thin `#d5dbdb` borders and a subtle bottom shadow. Stack primary configuration fields in a readable column up to 728px wide; keep genuinely related repeated transaction controls together, stacking on mobile. Registers and detail tables can use the available workspace width.
 - Reuse `erp-page-path` and shared sticky shell styling for breadcrumbs below the top bar and above the page title. Match the current label to the title, mark it `aria-current="page"`, and link ancestors to real authorized pages. Derive the sticky offset from the shared top bar rather than a page-specific constant.
 - Use compact key/value summaries for read-only parent context, fieldsets/legends for related settings, and expandable optional sections. Keep Cancel/Create actions right aligned; avoid full-width toolbar buttons and redundant nested cards.
 - Put error summaries in focusable alert regions. Associate field errors with controls using `aria-invalid` and `aria-describedby`; open any collapsed section containing an error. When cloning repeatable rows, remove stale error associations and preserve unique field IDs/bindings.
 - Use `min-width:0` on grid/flex children and enhanced select wrappers; ensure the select fits its parent at every breakpoint. Group amount component, debit account, credit account and row removal coherently on desktop, then stack them on mobile.
 - Reuse the accounting reference implementation in `src/main/resources/static/css/accounting-ledger.css`, `src/main/resources/static/js/accounting-form-ux.js`, and `src/main/webapp/WEB-INF/jsp/accounting/accounting-form-support.jspf` when extending those pages. Promote patterns to shared styles only when another workspace needs them; do not spread accounting-specific selectors globally.
+
+## Read-only resource preview
+
+Reuse the [table skill split-view contract](../microfinance-table-standard/SKILL.md#aws-reference-and-split-details) for switching between records without losing the register. Use `data-resource-split` on a table that already has single-record selection. Keep full details available and financial commands in the existing toolbar. Avoid instructional paragraphs in headers, filters, preferences and preview panes; retain field labels, errors and required financial disclosures.
 
 ## Shared Modal Contract
 

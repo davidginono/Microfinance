@@ -4,7 +4,7 @@ const {readFileSync} = require('node:fs');
 const {JSDOM} = require('jsdom');
 const source = readFileSync('src/main/resources/static/js/resource-table.js', 'utf8');
 const voucherSource = readFileSync('src/main/resources/static/js/accounting-vouchers.js', 'utf8');
-const labels = `<template id="resource-table-labels" data-records="Records" data-search-page="Search this page" data-no-matches="No matching records." data-refresh="Refresh" data-pagination="Pagination" data-page="Page" data-previous="Previous page" data-next="Next page" data-preferences="Preferences" data-columns="Visible columns" data-compact="Compact rows" data-wrap="Wrap lines" data-select="Select" data-select-first="Select first row" data-clear-selection="Clear row selection" data-view="View" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
+const labels = `<template id="resource-table-labels" data-records="Records" data-page-size="Page size" data-striped="Striped rows" data-sticky="Sticky first columns" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-reorder="Move column" data-details="Details" data-show-details="Show details" data-panel-position="Panel position" data-bottom="Bottom" data-side="Side" data-resize="Resize details panel" data-select-record="Select a record" data-search-page="Search this page" data-no-matches="No matching records." data-refresh="Refresh" data-pagination="Pagination" data-page="Page" data-previous="Previous page" data-next="Next page" data-preferences="Preferences" data-columns="Visible columns" data-compact="Compact rows" data-wrap="Wrap lines" data-select="Select" data-select-first="Select first row" data-clear-selection="Clear row selection" data-view="View" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
 const table = (key, body, extra = '') => `<section class="erp-table-wrap" data-resource-table="${key}" ${extra}><div class="app-table-titlebar"><h2>Records</h2><div class="accounting-actions"><a class="app-btn btn-primary" href="/create">Create</a></div></div><form method="get"><input name="search"></form><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th>Reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 const row = '<tr><td>V001</td><td>100.00</td><td>Posted</td></tr>';
 async function setup(html, integration = '') {
@@ -13,6 +13,7 @@ async function setup(html, integration = '') {
     window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
     if (integration) window.eval(integration);
+    window.eval(readFileSync('src/main/resources/static/js/resource-split-view.js', 'utf8'));
     window.eval(source);
     if (window.document.readyState !== 'complete') await new Promise(resolve => window.addEventListener('load', resolve, {once:true}));
     return {dom, window, document:window.document};
@@ -131,14 +132,14 @@ test('preferences cancel does not change columns; confirm persists display setti
     const gear=d.querySelector('[aria-label="Preferences"]'); gear.click();
     assert.equal(d.querySelector('dialog').parentElement,d.body);
     assert.equal(d.documentElement.style.overflow,'hidden');
-    d.querySelectorAll('dialog fieldset input')[1].click();
+    d.querySelectorAll('dialog .resource-table-column-options input')[1].click();
     [...d.querySelectorAll('dialog button')].find(x=>x.textContent==='Cancel').click();
     assert.equal(d.querySelector('thead th:nth-child(2)').hidden,false);
     assert.equal(d.documentElement.style.overflow,'');
     assert.equal(d.activeElement,gear);
     gear.click();
-    assert.equal(d.querySelector('dialog fieldset input').disabled,true);
-    d.querySelectorAll('dialog fieldset input')[1].click();
+    assert.equal(d.querySelector('dialog .resource-table-column-options input').disabled,true);
+    d.querySelectorAll('dialog .resource-table-column-options input')[1].click();
     d.querySelector('dialog form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
     assert.equal(d.querySelector('thead th:nth-child(2)').hidden,true);
     assert.equal(d.querySelector('tbody td:nth-child(2)').hidden,true);
@@ -154,10 +155,69 @@ test('unmarked tables are untouched', async () => {
     dom.window.close();
 });
 
+test('preferences reorder stable columns, stripe rows, pin columns and preserve late rows', async () => {
+    const {dom, window:w, document:d}=await setup(table('ordering',row));
+    d.querySelector('[aria-label="Preferences"]').click();
+    const amount=d.querySelector('[data-column="1"] button');
+    amount.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+    const option=text=>[...d.querySelectorAll('.resource-table-display-options label')].find(n=>n.textContent===text).querySelector('input');
+    option('Striped rows').click();option('First two columns').click();option('Wrap lines').click();
+    d.querySelector('dialog form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+    assert.deepEqual([...d.querySelectorAll('thead th')].map(n=>n.textContent),['Reference','Status','Amount']);
+    assert.deepEqual([...d.querySelectorAll('tbody td')].map(n=>n.textContent),['V001','Posted','100.00']);
+    assert.equal(d.querySelectorAll('thead .resource-table-sticky').length,2);
+    assert.equal(d.querySelector('[data-resource-table]').classList.contains('resource-table-striped'),true);
+    assert.equal(d.querySelector('[data-resource-table]').classList.contains('resource-table-wrap-lines'),true);
+    d.querySelector('tbody').insertAdjacentHTML('beforeend',row);
+    await new Promise(resolve=>w.setTimeout(resolve,0));
+    assert.deepEqual([...d.querySelector('tbody tr:last-child').cells].map(n=>n.textContent),['V001','Posted','100.00']);
+    assert.deepEqual(JSON.parse(w.localStorage.getItem('resource-table:v1:ordering')).order,[0,2,1]);
+    dom.window.close();
+});
+
+test('server page size is available only on supported tables and survives filters and paging', async () => {
+    const {dom,document:d}=await setup(table('sized',row,'data-table-page-size="30"')+'<div data-table-pagination data-page="0" data-table-for="sized"><a data-page-direction="next" href="?page=1&search=test">Next</a></div>');
+    assert.equal(d.querySelector('.resource-table-filters input[name=size]').value,'30');
+    const url=new URL(d.querySelector('[aria-label="Next page"]').href);
+    assert.equal(url.searchParams.get('size'),'30');assert.equal(url.searchParams.get('search'),'test');
+    d.querySelector('[aria-label="Preferences"]').click();
+    assert.deepEqual([...d.querySelectorAll('input[name=pageSize]')].map(n=>n.value),['10','30','50']);
+    assert.equal(d.querySelector('input[name=pageSize]:checked').value,'30');
+    dom.window.close();
+});
+
+test('grouped financial totals retain their columns and heading order', async () => {
+    const {dom,document:d}=await setup(table('totals',row+'<tr><td colspan="2">Total</td><td>100.00</td></tr>'));
+    d.querySelector('[aria-label="Preferences"]').click();
+    assert.equal([...d.querySelectorAll('.resource-table-column-options input')].every(input=>input.disabled),true);
+    assert.equal([...d.querySelectorAll('.resource-table-drag')].every(button=>button.disabled),true);
+    assert.equal(d.querySelectorAll('input[name=pageSize]').length,0);
+    dom.window.close();
+});
+
+test('split details follow selection, stay dismissed, clear stale data and support resizing', async () => {
+    const markup=table('split','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
+    const {dom,window:w,document:d}=await setup(markup);
+    const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,true);
+    d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
+    assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'A001');
+    assert.equal(panel.querySelectorAll('dd').length,2);assert.equal(panel.querySelector('.resource-split-content a'),null);
+    assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/record/1');
+    panel.querySelector('[aria-label="Close"]').click();
+    d.querySelector('tbody input').click();d.querySelector('tbody input').click();
+    await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.hidden,true);
+    d.querySelector('[aria-label="Show details"]').click();assert.equal(panel.hidden,false);
+    const resize=panel.querySelector('[role=separator]');resize.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));assert.equal(resize.getAttribute('aria-valuenow'),'640');
+    const pos=panel.querySelector('select');pos.value='side';pos.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('.resource-split-layout').classList.contains('resource-split-side'),true);
+    d.querySelector('.resource-table-filters input').dispatchEvent(new w.Event('input',{bubbles:true}));
+    await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.querySelectorAll('dd').length,0);assert.equal(panel.querySelector('.resource-split-content').textContent,'Select a record');
+    dom.window.close();
+});
+
 test('preferences preserve editable cells and never clear form checkbox values', async () => {
     const {dom, window:w, document:d} = await setup(table('editor',row));
     d.querySelector('[aria-label="Preferences"]').click();
-    d.querySelectorAll('dialog fieldset input')[1].click();
+    d.querySelectorAll('dialog .resource-table-column-options input')[1].click();
     d.querySelector('dialog form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
     assert.equal(d.querySelector('tbody td:nth-child(2)').hidden,true);
     d.querySelector('tbody').innerHTML='<tr><td><input type="checkbox" name="include" checked></td><td><input name="amount" value="100"></td><td>Draft</td></tr>';
@@ -166,7 +226,7 @@ test('preferences preserve editable cells and never clear form checkbox values',
     d.querySelector('.resource-table-filters input').dispatchEvent(new w.Event('input',{bubbles:true}));
     assert.equal(d.querySelector('[name="include"]').checked,true);
     d.querySelector('[aria-label="Preferences"]').click();
-    const amountChoice=d.querySelectorAll('dialog fieldset input')[1];
+    const amountChoice=d.querySelectorAll('dialog .resource-table-column-options input')[1];
     assert.equal(amountChoice.checked,true);
     assert.equal(amountChoice.disabled,true);
     d.querySelector('dialog form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));

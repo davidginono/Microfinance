@@ -57,10 +57,15 @@ public class GeneralLedgerService {
     }
     @Transactional(readOnly=true)
     public Page<AccountRow> chart(AppUserPrincipal actor,AccountFilter filter,int page) {
+        return chart(actor,filter,page,25);
+    }
+    @Transactional(readOnly=true)
+    public Page<AccountRow> chart(AppUserPrincipal actor,AccountFilter filter,int page,int size) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");int n=page(page);validateFilter(filter);
+        require(java.util.Set.of(10,25,30,50).contains(size),"filter");
         if(filter.parentId()!=null) require(books.account(actor.getSaccoId(),filter.parentId()).map(a->"HEADING".equals(a.kind())).orElse(false),"parent");
-        var rows=books.chart(actor.getSaccoId(),filter,n*25,26);
-        return new Page<>(rows.stream().limit(25).toList(),n,rows.size()>25);
+        var rows=books.chart(actor.getSaccoId(),filter,n*size,size+1);
+        return new Page<>(rows.stream().limit(size).toList(),n,rows.size()>size);
     }
     @Transactional(readOnly=true)
     public List<Account> chartPath(AppUserPrincipal actor,UUID id) {

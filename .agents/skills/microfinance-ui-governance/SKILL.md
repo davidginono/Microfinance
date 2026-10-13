@@ -26,6 +26,10 @@ Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/c
 - Distinguish declared values from verified values and identify missing or stale evidence. A missing record is not a zero balance, a positive credit result, or verified identity.
 - Guarantor views must explain the specific liability and approval state without exposing unrelated client finances or full credit records.
 
+## Selection preview
+
+Use the shared [split-view contract](../microfinance-table-standard/SKILL.md#aws-reference-and-split-details) for suitable record-switching tasks. The panel shows authorized selected-row facts, supports bottom/side placement and resizing, and clears on selection reset. It supplements existing record details and never duplicates or relaxes financial command rules.
+
 ## Resource Creation And Details
 
 Use Cloudscape's [create](https://cloudscape.design/patterns/resource-management/create/), [details](https://cloudscape.design/patterns/resource-management/details/), and [sub-resource create](https://cloudscape.design/patterns/resource-management/create/sub-resource-create/) guidance as UX references, adapted to the existing JSP shell. These references do not authorize installing React components or replacing a user-requested workflow.

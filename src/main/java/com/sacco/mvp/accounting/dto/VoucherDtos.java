@@ -34,7 +34,9 @@ public final class VoucherDtos {
                           String branchName,List<Transaction> transactions) {
         public String status(){return reversesId!=null?"REVERSAL":reversedBy!=null?"REVERSED":"POSTED";}
     }
-    public record Filter(String search,LocalDate from,LocalDate through,String status,String sort,int page) {}
+    public record Filter(String search,LocalDate from,LocalDate through,String status,String sort,int page,int size) {
+        public Filter(String search,LocalDate from,LocalDate through,String status,String sort,int page) {this(search,from,through,status,sort,page,25);}
+    }
     public record Page(List<Voucher> rows,int page,boolean hasNext) {}
     public record Preview(List<Transaction> rows,BigDecimal total) {}
     public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows) {}

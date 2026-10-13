@@ -302,4 +302,5 @@
 <script src="<c:url value='/js/live-search.js' />"></script>
 <script src="<c:url value='/js/shell.js' />" defer></script>
 <%@ include file="resource-table-labels.jspf" %>
+<script src="<c:url value='/js/resource-split-view.js' />" defer></script>
 <script src="<c:url value='/js/resource-table.js' />" defer></script>

@@ -41,10 +41,16 @@ class ChartOfAccountsMvcTest {
         lenient().when(ledger.chartParent(any(),eq(parent),anyBoolean())).thenReturn(new Account(parent,"121000","Equipment","ASSET","DEBIT","HEADING","OTHER",UUID.randomUUID(),true));
     }
     @Test void chartPreservesSearchAndFilters() throws Exception {
-        when(ledger.chart(any(),any(),eq(1))).thenReturn(new Page<>(List.of(),1,false));
+        when(ledger.chart(any(),any(),eq(1),eq(30))).thenReturn(new Page<>(List.of(),1,false));
         mvc.perform(get("/finance/accounts").param("search","Land").param("type","ASSET").param("kind","POSTING").param("state","ACTIVE").param("page","1").with(user(accountant)))
             .andExpect(status().isOk()).andExpect(view().name("accounting/accounts"))
             .andExpect(model().attribute("filter",new AccountFilter("Land","ASSET","POSTING","ACTIVE")));
+    }
+    @Test void chartPassesRequestedPageSizeWithoutDroppingFilters() throws Exception {
+        when(ledger.chart(any(),any(),eq(2),eq(50))).thenReturn(new Page<>(List.of(),2,false));
+        mvc.perform(get("/finance/accounts").param("search","cash").param("state","ACTIVE").param("page","2").param("size","50").with(user(accountant)))
+            .andExpect(status().isOk()).andExpect(model().attribute("tablePageSize",50));
+        verify(ledger).chart(eq(accountant),eq(new AccountFilter("cash","","","ACTIVE")),eq(2),eq(50));
     }
     @Test void childFragmentPreservesParentFiltersAndBoundedPageWithoutRenderingTheShell() throws Exception {
         when(ledger.chart(any(),any(),eq(2))).thenReturn(new Page<>(List.of(),2,true));
@@ -104,14 +110,14 @@ class ChartOfAccountsMvcTest {
     @Test void childRegisterRetainsParentSearchAndPageAndAllowsReadOnlyViewing() throws Exception {
         var root=new Account(parent,"100000","Assets","ASSET","DEBIT","HEADING","OTHER",null,true);
         when(ledger.chartPath(any(),eq(parent))).thenReturn(List.of(root));
-        when(ledger.chart(any(),any(),eq(1))).thenReturn(new Page<>(List.of(),1,false));
+        when(ledger.chart(any(),any(),eq(1),eq(30))).thenReturn(new Page<>(List.of(),1,false));
         var reader=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).memberNo("READER").saccoId("I1").stationId("B1")
             .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
         mvc.perform(get("/finance/accounts").param("parentId",parent.toString()).param("search","assets").param("state","ACTIVE").param("page","1").with(user(reader)))
             .andExpect(status().isOk()).andExpect(view().name("accounting/accounts"))
             .andExpect(model().attribute("selectedGroup",root)).andExpect(model().attribute("groupPath",List.of(root)))
             .andExpect(model().attribute("filter",new AccountFilter("assets","","","ACTIVE",parent)));
-        verify(ledger).chart(eq(reader),eq(new AccountFilter("assets","","","ACTIVE",parent)),eq(1));
+        verify(ledger).chart(eq(reader),eq(new AccountFilter("assets","","","ACTIVE",parent)),eq(1),eq(30));
     }
     @Test void foreignGroupAndInvalidParentCannotLoadChildRows() throws Exception {
         when(ledger.chartPath(any(),eq(parent))).thenThrow(new IllegalArgumentException("accounting.error.parent"));

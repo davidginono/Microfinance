@@ -29,7 +29,7 @@ public class VoucherRepository {
             and (?='' or strpos(lower(v.number||' '||v.party||' '||v.reference),?)>0)
             and (?::date is null or v.effective_date>=?::date) and (?::date is null or v.effective_date<=?::date)
             and (?='' or (case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher r where r.reverses_id=v.id) then 'REVERSED' else 'POSTED' end)=?)
-            """+" order by "+order+" limit 26 offset ?",this::voucher,institution,branch,type.name(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.page()*25);
+            """+" order by "+order+" limit ? offset ?",this::voucher,institution,branch,type.name(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
     public List<Account> accounts(String institution,String search,int offset){return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING' and (strpos(lower(code||' '||name),?)>0) order by code,id limit 26 offset ?",this::account,institution,search.toLowerCase(Locale.ROOT),offset);}
     public List<Account> lockAccounts(String institution,List<UUID> ids){

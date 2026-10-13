@@ -1,6 +1,6 @@
-/* Compact console table: only the data canvas owns horizontal scrolling. */
+/* Console table: only the data canvas owns horizontal scrolling. */
 .aws-console [data-resource-table] { min-width:0; max-width:100%; overflow:visible; }
-.aws-console [data-resource-table] > .app-table-titlebar { flex-wrap:wrap; background:#fff !important; gap:8px 16px; border-bottom:0 !important; }
+.aws-console [data-resource-table] > .app-table-titlebar { flex-wrap:wrap; background:#fafafa !important; gap:8px 16px; padding:16px 20px 12px; border-bottom:0 !important; }
 .aws-console [data-resource-table] > .app-table-titlebar h2 { margin:0; font-size:16px; font-weight:700; line-height:1.4; text-transform:none !important; letter-spacing:normal; }
 .aws-console [data-resource-table] .resource-table-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:6px; margin-left:auto; min-width:0; padding:0 !important; }
 .aws-console [data-resource-table] .resource-table-actions form { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0; }
@@ -9,7 +9,7 @@
 .aws-console [data-resource-table] .resource-table-actions .btn-neutral { background:#fff; border:1px solid #aab7b8; color:#414d5c; }
 .aws-console [data-resource-table] .resource-table-actions :disabled { background:#fff !important; border-color:#d5dbdb !important; color:#879596 !important; opacity:1; cursor:default; }
 .aws-console [data-resource-table] .resource-table-actions .btn-primary { order:10; }
-.aws-console .resource-table-tools { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; padding:0 10px 8px; min-width:0; border-bottom:1px solid var(--aws-line); }
+.aws-console .resource-table-tools { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; padding:0 20px 16px; min-width:0; background:#fafafa; border-bottom:1px solid #eaeded; }
 .aws-console .resource-table-tools > .resource-table-filters { flex:1 1 380px; display:flex !important; flex-flow:row wrap !important; min-width:0 !important; width:auto; gap:8px !important; padding:0 !important; margin:0; overflow:visible; border:0 !important; }
 .aws-console .resource-table-filters > label { flex:1 1 140px; min-width:0 !important; max-width:100%; }
 .aws-console .resource-table-filter-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; flex:0 0 auto; }
@@ -27,7 +27,7 @@
 .aws-console .resource-table-preferences-button { border:0 !important; border-left:1px solid #d5dbdb !important; border-radius:0 !important; background:transparent !important; padding:5px 8px 5px 12px; min-width:32px; min-height:28px; }
 .aws-console [data-resource-table] > .erp-table-scroll { width:100%; min-width:0; max-width:100%; overflow:auto; }
 .aws-console [data-resource-table] .erp-table { width:100%; }
-.aws-console [data-resource-table] .erp-table th { background:#f2f3f3; color:#414d5c; font-size:12px; text-transform:none; letter-spacing:normal; }
+.aws-console [data-resource-table] .erp-table th { background:#fafafa; color:#545b64; font-size:14px; font-weight:700; text-transform:none; letter-spacing:normal; }
 .aws-console [data-resource-table].resource-table-compact .erp-table :is(th,td) { padding-top:6px !important; padding-bottom:6px !important; }
 .aws-console [data-resource-table]:not(.resource-table-compact) .erp-table :is(th,td) { padding-top:12px !important; padding-bottom:12px !important; }
 .aws-console [data-resource-table].resource-table-wrap-lines .erp-table :is(th,td) { white-space:normal; overflow-wrap:anywhere; }
@@ -38,16 +38,16 @@
 .aws-console [data-resource-table] .resource-table-selected > td { background:#e6f3fa; }
 .aws-console .resource-table-record-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .aws-console [data-resource-table] :focus-visible { outline:2px solid #0073bb; outline-offset:2px; }
-.aws-console dialog.resource-table-preferences { position:fixed; inset:0; margin:auto; width:min(480px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #aab7b8; border-radius:4px; color:#16191f; background:white; box-shadow:0 8px 24px #0003; }
+.aws-console dialog.resource-table-preferences { position:fixed; inset:0; margin:auto; width:min(800px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #aab7b8; border-radius:2px; color:#16191f; background:white; box-shadow:0 8px 24px #0003; }
 .aws-console dialog.resource-table-preferences::backdrop { background:#0006; }
 .resource-table-dialog-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #d5dbdb; }
 .resource-table-dialog-header h2 { margin:0; font-size:18px; font-weight:700; }
 .resource-table-dialog-header button { min-width:28px; border:0; padding:4px; }
-.resource-table-dialog-body { padding:16px; overflow:auto; max-height:calc(100dvh - 190px); }
+.resource-table-dialog-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); padding:16px; gap:24px; overflow:auto; max-height:calc(100dvh - 190px); }
 .resource-table-option { display:flex; gap:10px; align-items:center; padding:7px 0; font-size:14px; }
 .resource-table-option input { width:16px; height:16px; accent-color:#0073bb; }
-.resource-table-dialog-body fieldset { margin-top:12px; border-top:1px solid #d5dbdb; padding-top:12px; }
-.resource-table-dialog-body legend { font-weight:700; padding-right:8px; }
+.resource-table-dialog-body fieldset { margin:0 0 20px; border:0; padding:0; min-width:0; }
+.resource-table-dialog-body legend { font-weight:700; padding-right:8px; margin-bottom:8px; }
 .resource-table-dialog-actions { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #d5dbdb; }
 @media (min-width:1024px) {
     .aws-console .resource-table-tools { flex-wrap:nowrap; }
@@ -59,3 +59,64 @@
 }
 @media (max-width:767px) { .aws-console [data-resource-table] .resource-table-actions { width:auto; flex:1 1 auto; } .aws-console .resource-table-tools > .resource-table-filters { flex-basis:100%; } .aws-console [data-resource-table] .resource-table-actions .app-btn { max-width:100%; white-space:normal; } }
 @media print { .resource-table-tools,.resource-table-actions,.resource-table-preferences { display:none !important; } [data-resource-table] > .erp-table-scroll { overflow:visible !important; max-height:none !important; } }
+
+/* AWS console reference surfaces and controls. */
+.resource-split-layout {min-width:0;max-width:100%;}
+.resource-split-layout>.erp-table-scroll {min-width:0;width:100%;overflow:auto;}
+.resource-split-panel {min-width:0;background:#f2f3f3;border-top:1px solid #879596;position:relative;}
+.resource-split-panel[hidden],.resource-split-positions[hidden] {display:none!important;}
+.resource-split-open>.erp-table-scroll {height:min(38vh,360px);min-height:160px;max-height:45vh;background:#f2f3f3;}
+.resource-split-resize {height:12px;cursor:row-resize;touch-action:none;display:flex;justify-content:center;align-items:center;}
+.resource-split-resize::after {content:"";width:20px;height:4px;border-top:1px solid #687078;border-bottom:1px solid #687078;}
+.resource-split-header {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 20px 16px;}
+.resource-split-header h2 {margin:0;font-size:16px;font-weight:700;overflow-wrap:anywhere;}
+.resource-split-commands {display:flex;align-items:center;gap:10px;flex:none;}
+.resource-split-commands button,.resource-table-utilities>button:not(.resource-table-preferences-button) {background:transparent;border:0;padding:5px;color:#545b64;}
+.resource-split-commands svg {width:16px;height:16px;}
+.resource-split-tabs {display:flex;margin:0 20px;border-bottom:1px solid #aab7b8;}
+.resource-split-tabs>span {display:block;padding:10px 20px;color:#ec7211;font-weight:700;border-bottom:2px solid #16191f;}
+.resource-split-content {height:var(--split-size,320px);max-height:60dvh;overflow:auto;padding:20px;}
+.resource-split-values {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;background:#fff;border:1px solid #eaeded;padding:16px 0;gap:20px 0;}
+.resource-split-values>div {padding:0 20px;border-right:1px solid #eaeded;min-width:0;}
+.resource-split-values dt {color:#545b64;font-size:12px;margin-bottom:6px;}
+.resource-split-values dd {margin:0;overflow-wrap:anywhere;font-size:14px;}
+.resource-split-empty {margin:0;color:#545b64;}
+@media(min-width:1100px){.resource-split-side.resource-split-open{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,var(--split-size,320px));align-items:start}.resource-split-side .resource-split-panel{border-top:0;border-left:1px solid #879596}.resource-split-side .resource-split-resize{position:absolute;left:-6px;width:12px;height:100%;cursor:col-resize}.resource-split-side .resource-split-resize::after{width:4px;height:20px;border:0;border-left:1px solid #687078;border-right:1px solid #687078}.resource-split-side .resource-split-values{grid-template-columns:1fr}.resource-split-side .resource-split-content{height:55vh}.resource-split-side>.erp-table-scroll{max-height:70vh}}
+@media(max-width:767px){.resource-split-values{grid-template-columns:1fr}.resource-split-header{padding:8px 12px}.resource-split-content{padding:12px}.resource-split-tabs{margin:0 12px}.resource-split-positions{position:absolute;right:12px;top:48px;background:white;border:1px solid #aab7b8;padding:8px;z-index:3}}
+@media print{.resource-split-panel{display:none!important}.resource-split-layout{display:block!important}}
+.aws-console [data-resource-table] {border:1px solid #d5dbdb;border-radius:0;background:#fff;box-shadow:0 1px 1px #879596;padding:0;}
+.aws-console [data-resource-table] .erp-table {border-collapse:separate;border-spacing:0;margin:0;font-size:14px;line-height:20px;}
+.aws-console [data-resource-table] .erp-table :is(th,td) {border:0;border-bottom:1px solid #eaeded;padding-left:20px;padding-right:20px;text-align:left!important;}
+.aws-console [data-resource-table] .erp-table th {position:sticky;top:0;z-index:2;}
+.aws-console [data-resource-table] .erp-table th:not(:last-child)::after {content:"";position:absolute;right:0;top:25%;height:50%;border-right:1px solid #eaeded;}
+.aws-console [data-resource-table] .erp-table td {background:#fff;color:#16191f;font-size:14px;}
+.aws-console [data-resource-table] .erp-table td a {color:#0073bb;}
+.aws-console [data-resource-table]:not(.resource-table-wrap-lines) .erp-table :is(th,td) {white-space:nowrap;}
+.aws-console [data-resource-table] .resource-table-no-matches td {white-space:normal;}
+.aws-console [data-resource-table] .neo-select-chevron {width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #545b64;}
+.aws-console [data-resource-table] .neo-select-chevron>* {display:none;}
+.aws-console [data-resource-table].resource-table-striped .erp-table tbody tr:nth-child(even)>td {background:#fafafa;}
+.aws-console [data-resource-table] .erp-table tr:is(.resource-table-selected,.coa-row-selected,.voucher-row-selected,.is-selected,[aria-selected=true])>td {background:#f1faff;box-shadow:inset 0 1px #00a1c9,inset 0 -1px #00a1c9;}
+.aws-console [data-resource-table] .erp-table tr:is(.resource-table-selected,.coa-row-selected,.voucher-row-selected,.is-selected,[aria-selected=true])>td:first-child {border-left:1px solid #00a1c9;}
+.aws-console [data-resource-table] .erp-table .resource-table-sticky {position:sticky;left:var(--sticky-left);z-index:1;box-shadow:1px 0 #d5dbdb;}
+.aws-console [data-resource-table] .erp-table th.resource-table-sticky {z-index:3;}
+.aws-console [data-resource-table] .erp-table .resource-table-selection {padding-left:12px;padding-right:12px;text-align:center!important;}
+.aws-console [data-resource-table] input[type=checkbox] {width:16px!important;height:16px!important;}
+.aws-console .resource-table-filters :is(input,select,.neo-select-button) {border:1px solid #aab7b8;border-radius:2px!important;background-color:white;min-height:32px;box-shadow:none;}
+.aws-console .resource-table-filters input:is([type=search],[name=search]) {padding-left:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23687278' stroke-width='2'%3E%3Ccircle cx='10' cy='10' r='7'/%3E%3Cpath d='m15 15 7 7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:9px center;}
+.aws-console .resource-table-filters input::placeholder {color:#879596;font-style:italic;}
+.aws-console .resource-table-page-number {font-size:14px;}
+.aws-console .resource-table-page svg,.aws-console .resource-table-preferences-button svg {width:18px;height:18px;}
+.resource-table-dialog-body .resource-table-column-options {border-left:1px solid #d5dbdb;padding-left:20px;}
+.resource-table-column-option {display:flex;align-items:center;gap:8px;border-bottom:1px solid #eaeded;min-height:37px;}
+.resource-table-column-option .resource-table-option {flex:1;justify-content:space-between;flex-direction:row-reverse;}
+.resource-table-column-option input[role=switch] {appearance:none;position:relative;width:24px;height:16px;border:0;border-radius:10px;background:#545b64;flex:none;cursor:pointer;}
+.resource-table-column-option input[role=switch]::after {content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:white;}
+.resource-table-column-option input[role=switch]:checked {background:#0073bb;}
+.resource-table-column-option input[role=switch]:checked::after {left:10px;}
+.resource-table-column-option input[role=switch]:disabled {opacity:.35;cursor:default;}
+.resource-table-drag {background:none;border:0;font-size:20px;color:#545b64;padding:0;cursor:grab;}
+.resource-table-drag:disabled {visibility:hidden;}
+.resource-table-display-options>.resource-table-option {margin:10px 0;}
+.resource-table-display-options>fieldset:last-child {margin-top:20px;}
+@media(max-width:600px){.resource-table-dialog-body{grid-template-columns:minmax(0,1fr);gap:12px}.resource-table-dialog-body .resource-table-column-options{border-left:0;border-top:1px solid #d5dbdb;padding:16px 0 0}.aws-console [data-resource-table]>.app-table-titlebar{padding:12px}.aws-console .resource-table-tools{padding:0 12px 12px}}

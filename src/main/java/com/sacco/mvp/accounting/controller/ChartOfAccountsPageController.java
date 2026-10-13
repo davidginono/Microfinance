@@ -30,13 +30,13 @@ public class ChartOfAccountsPageController {
     String chart(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String type,
             @RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="") String state,
-            @RequestParam(required=false) UUID parentId,Model model) {
+            @RequestParam(required=false) UUID parentId,@RequestParam(defaultValue="30") int size,Model model) {
         var filter=new AccountFilter(search.strip(),type,kind,state,parentId);
         if(parentId!=null) {
             var path=ledger.chartPath(actor,parentId);
             model.addAttribute("groupPath",path);model.addAttribute("selectedGroup",path.getLast());
         }
-        model.addAttribute("accounts",ledger.chart(actor,filter,page));model.addAttribute("filter",filter);
+        model.addAttribute("accounts",ledger.chart(actor,filter,page,size));model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
         model.addAttribute("accountTypes",List.of("ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"));
         model.addAttribute("accountKinds",List.of("HEADING","POSTING","CONTROL"));
         return "accounting/accounts";

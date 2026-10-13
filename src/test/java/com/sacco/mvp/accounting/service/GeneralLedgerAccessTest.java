@@ -24,6 +24,15 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class GeneralLedgerAccessTest {
+    @Test void chartPageSizeIsBoundedBeforeQueryAndRetainsInstitutionScope() {
+        var filter=new com.sacco.mvp.accounting.dto.GeneralLedgerDtos.AccountFilter("cash","ASSET","POSTING","ACTIVE");
+        when(books.chart("I1",filter,100,51)).thenReturn(java.util.List.of());
+        service.chart(actor,filter,2,50);
+        verify(books).chart("I1",filter,100,51);
+        clearInvocations(books);
+        for(int size:new int[]{0,-1,51,1000})assertThatThrownBy(()->service.chart(actor,filter,0,size)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(books);
+    }
     @Mock GeneralLedgerRepository books;
     @Mock AccountingPolicyService policies;
     @Mock AuditService audit;

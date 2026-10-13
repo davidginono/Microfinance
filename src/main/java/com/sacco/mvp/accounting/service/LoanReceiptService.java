@@ -35,7 +35,7 @@ public class LoanReceiptService {
     @Transactional(readOnly=true)
     public void prefill(AppUserPrincipal a,Form f,UUID loanId){authorize(a,"POST");var loan=loans.receiptLoan(a,loanId);f.setClientId(loan.clientId());f.getRows().getFirst().setLoanId(loanId);}
     @Transactional(readOnly=true)
-    public Page list(AppUserPrincipal a,Filter f){ordinary.authorize(a,Type.RECEIPT,"VIEW");VoucherService.validateFilter(f);var rows=receipts.list(a,f,available(a,"VIEW"));return new Page(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
+    public Page list(AppUserPrincipal a,Filter f){ordinary.authorize(a,Type.RECEIPT,"VIEW");VoucherService.validateFilter(f);var rows=receipts.list(a,f,available(a,"VIEW"));return new Page(rows.stream().limit(f.size()).toList(),f.page(),rows.size()>f.size());}
     @Transactional(readOnly=true)
     public Optional<LoanReceipt> find(AppUserPrincipal a,UUID id){ordinary.authorize(a,Type.RECEIPT,"VIEW");var source=receipts.find(a,id,false);if(source.isEmpty()){var legacy=receipts.legacy(a,id);if(legacy.isPresent())loans.authorize(a,"VIEW");return legacy;}loans.authorize(a,"VIEW");var r=source.get();return Optional.of(new LoanReceipt(r.header(),r.clientNumber(),receipts.rows(a,id)));}
     @Transactional(readOnly=true)

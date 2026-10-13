@@ -13,7 +13,7 @@
     <p><spring:message code="coa.intro" /></p>
     <c:if test="${not empty accountingError}"><p class="coa-error" role="alert"><spring:message code="${accountingError}" /></p></c:if>
     <c:if test="${not empty accountingSuccess}"><p class="coa-success" role="status"><spring:message code="${accountingSuccess}" /></p></c:if>
-    <section data-resource-table="accounting-accounts-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region id="coa-register" data-children-url="<c:url value='/finance/accounts/children' />" data-expand="<spring:message code='coa.expand' />" data-collapse="<spring:message code='coa.collapse' />" data-loading="<spring:message code='coa.loadingChildren' />" data-error="<spring:message code='coa.childrenError' />" data-empty-children="<spring:message code='coa.emptyChildren' />" data-retry="<spring:message code='coa.retryChildren' />">
+    <section data-resource-table="accounting-accounts-1" data-table-selection="single" data-resource-split data-table-page-size="${tablePageSize}" class="erp-table-wrap" data-aws-table-region id="coa-register" data-children-url="<c:url value='/finance/accounts/children' />" data-expand="<spring:message code='coa.expand' />" data-collapse="<spring:message code='coa.collapse' />" data-loading="<spring:message code='coa.loadingChildren' />" data-error="<spring:message code='coa.childrenError' />" data-empty-children="<spring:message code='coa.emptyChildren' />" data-retry="<spring:message code='coa.retryChildren' />">
         <div class="app-table-titlebar coa-titlebar">
             <h2><spring:message code="${empty selectedGroup?'coa.registry':'coa.children'}" /></h2>
                 <div class="accounting-actions">

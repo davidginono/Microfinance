@@ -28,6 +28,18 @@ public class AccountingCodeLibraryService {
         authorize(actor,"VIEW");validateQuery(search,state,page);return slice(library.activities(actor.getSaccoId(),term(search),state,page*25),page);
     }
     @Transactional(readOnly=true)
+    public Page<Activity> activities(AppUserPrincipal actor,String search,String state,int page,int size) {
+        authorize(actor,"VIEW");validateQuery(search,state,page);require(Set.of(10,25,30,50).contains(size),"validation");
+        var rows=library.activities(actor.getSaccoId(),term(search),state,page*size,size+1);
+        return new Page<>(rows.stream().limit(size).toList(),page,rows.size()>size);
+    }
+    @Transactional(readOnly=true)
+    public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,int page,int size) {
+        authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);require(Set.of(10,25,30,50).contains(size),"validation");
+        var rows=library.transactionRegister(actor.getSaccoId(),activity,term(search),state,"",page*size,size+1);
+        return new Page<>(rows.stream().limit(size).toList(),page,rows.size()>size);
+    }
+    @Transactional(readOnly=true)
     public Activity activity(AppUserPrincipal actor,UUID id) {authorize(actor,"VIEW");return activity(actor,id,false);}
     private Activity activity(AppUserPrincipal actor,UUID id,boolean lock) {
         return library.activity(actor.getSaccoId(),id,lock).orElseThrow(()->new AccessDeniedException("Library record unavailable"));
