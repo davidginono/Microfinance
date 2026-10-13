@@ -45,6 +45,18 @@ class LedgerReportServiceTest {
         when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of());
         denied();
     }
+    @Test void portfolioSetupRequiresCurrentLoanReportClaimAndDoesNotReadReportData() {
+        var sources=mock(LoanPortfolioReportRepository.class);
+        var portfolio=new LoanPortfolioReportService(service,repository,sources);
+        assertThatThrownBy(()->portfolio.configurationScope(actor,false)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean()))
+            .thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.LOAN_REPORTS_VIEW));
+        assertThat(portfolio.configurationScope(actor,false)).isEqualTo(new LedgerReportService.Scope("I1","B1",false));
+        assertThatThrownBy(()->portfolio.configurationScope(actor,true)).isInstanceOf(AccessDeniedException.class);
+        current.setStationId("B2");
+        assertThatThrownBy(()->portfolio.configurationScope(actor,false)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(repository,sources,policies);
+    }
     @Test void changedBranchRejectsStaleSession() { current.setStationId("B2");denied(); }
     @Test void inactiveInstitutionRejectsRead() {when(institutions.findActiveSacco("I1")).thenReturn(Optional.empty());denied();}
     @Test void suspendedBranchRejectsRead() {

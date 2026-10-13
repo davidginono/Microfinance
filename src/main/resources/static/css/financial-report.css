@@ -1,4 +1,4 @@
-.financial-report .financial-number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.financial-report .financial-number { text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .financial-report .financial-context { display: flex; flex-wrap: wrap; gap: .35rem 1rem; margin-block: .65rem; }
 .financial-report .financial-evidence { overflow-wrap: anywhere; max-width: 26rem; }
 .financial-report .accounting-grid label { min-width: 0; }
@@ -11,3 +11,52 @@
 }
 
 .financial-report .financial-definition { overflow-wrap: anywhere; }
+
+/* Loan portfolio setup and details use the shared ERP resource surfaces. */
+.portfolio-workspace { min-width: 0; gap: 1rem; }
+.portfolio-configure { max-width: 960px; }
+.portfolio-setup-form { display: grid; gap: 1rem; min-width: 0; }
+.portfolio-setup-form .accounting-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1rem; }
+.portfolio-setup-form label { display: grid; gap: .4rem; min-width: 0; }
+.portfolio-setup-form .aws-control, .portfolio-setup-form .neo-select { width: 100%; min-width: 0; max-width: 100%; }
+.portfolio-setup-form small, .portfolio-field-help { color: #52606d; font-size: .85rem; }
+.portfolio-field-help { margin: 0; }
+.portfolio-readonly { margin: 0; }
+.portfolio-readonly dt { font-weight: 600; margin-bottom: .4rem; }
+.portfolio-readonly dd { margin: 0; }
+.portfolio-context-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; }
+.portfolio-context { border-bottom: 0; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1.3fr) minmax(0, .4fr); }
+.portfolio-context small { display: block; margin-top: .2rem; color: #52606d; }
+.portfolio-draft { display: inline-flex; border: 1px solid #8b96a3; border-radius: 4px; padding: .15rem .5rem; font-size: .8rem; }
+.portfolio-notice { min-width: 0; padding: .85rem 1rem; border: 1px solid #7b9dbb; border-left-width: 4px; border-radius: 4px; background: #f4f8fc; }
+.portfolio-notice-warning { border-color: #b78315; background: #fffaf0; }
+.portfolio-notice h2 { margin: 0 0 .35rem; font-size: 1rem; font-weight: 700; }
+.portfolio-notice p { margin: .35rem 0; }
+.portfolio-notice summary, .portfolio-methodology summary { cursor: pointer; font-weight: 600; }
+.portfolio-coverage-details { display: grid; gap: .5rem; margin: .75rem 0 0; }
+.portfolio-coverage-details > div { display: flex; flex-wrap: wrap; gap: .25rem .75rem; }
+.portfolio-coverage-details dd { margin: 0; font-weight: 600; }
+.portfolio-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid #b6bec9; gap: 0 .5rem; }
+.portfolio-tabs a { display: block; padding: .75rem 1rem; color: #52606d; border-bottom: 3px solid transparent; text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+.portfolio-tabs a[aria-selected="true"] { color: #0073bb; border-bottom-color: #0073bb; }
+.portfolio-tabs a:focus-visible, .portfolio-section:focus-visible { outline: 2px solid #0073bb; outline-offset: 2px; }
+.portfolio-section { display: grid; gap: 1rem; min-width: 0; }
+.portfolio-section[hidden] { display: none; }
+.portfolio-section .erp-table-wrap { margin: 0; }
+.portfolio-section .erp-table-scroll { min-height: 0; }
+.portfolio-methodology { padding: .75rem 0; min-width: 0; }
+.portfolio-methodology > p, .portfolio-methodology > .erp-table-wrap { margin-top: .75rem; }
+.portfolio-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; padding: .75rem 1rem; border-top: 1px solid #d7dde3; }
+.portfolio-pagination .accounting-actions { padding: 0; }
+.portfolio-pagination button:disabled { opacity: .5; cursor: not-allowed; }
+.portfolio-workspace .accounting-error-summary h2 { margin: 0; font-size: 1rem; }
+@media (max-width: 767px) {
+  .portfolio-setup-form .accounting-grid, .portfolio-context { grid-template-columns: minmax(0, 1fr); }
+  .portfolio-tabs a { padding: .65rem .5rem; }
+}
+@media print {
+  .financial-report .financial-number { text-align: right; }
+  [data-portfolio-report-header] .accounting-actions, .portfolio-tabs, .portfolio-pagination { display: none; }
+  .portfolio-section[hidden] { display: grid; }
+  .portfolio-section .erp-table-scroll { overflow: visible; max-height: none; }
+}

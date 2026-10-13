@@ -73,7 +73,7 @@ class FinancialReportRoutesTest {
         Set<String> routes=new HashSet<>();
         context.getBean(RequestMappingHandlerMapping.class).getHandlerMethods().keySet()
             .forEach(mapping->routes.addAll(mapping.getPatternValues()));
-        assertThat(routes).contains("/reports/financial/portfolio","/reports/statements/mappings",
+        assertThat(routes).contains("/reports/financial/portfolio","/reports/financial/portfolio/configure","/reports/statements/mappings",
             "/reports/statements/versions/{id}/preview","/reports/statements/versions/{id}/finalize",
             "/reports/statements/versions/{id}/pdf","/reports/statements/results/{id}/pdf");
     }

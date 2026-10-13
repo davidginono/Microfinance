@@ -19,6 +19,9 @@ public class LoanPortfolioReportService {
     public record Report(Scope scope,Parameters parameters,Summary summary,Ratios ratios,Coverage bookCoverage,
             List<SourceRow> rows,List<Bucket> ageing,List<Bucket> classificationReference,List<BranchPerformance> branches,
             boolean hasNext,String definitionsVersion,String regulatoryReference) { }
+    public Scope configurationScope(AppUserPrincipal actor,boolean institutionWide) {
+        return access.authorizeManagement(actor,institutionWide);
+    }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
     public Report report(AppUserPrincipal actor,Parameters p,boolean institutionWide) {
         var scope=access.authorizeManagement(actor,institutionWide);access.validateDates(p);
