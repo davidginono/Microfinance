@@ -14,7 +14,7 @@
     <c:if test="${not empty parentError}"><p class="coa-error" role="alert"><spring:message code="${parentError}" /></p></c:if>
     <details class="coa-parent-picker" ${empty selectedParent?'open':''}>
         <summary><spring:message code="coa.chooseParent" /></summary>
-        <section class="erp-table-wrap" data-aws-table-region>
+        <section data-resource-table="accounting-account-form-1" class="erp-table-wrap" data-aws-table-region>
             <form method="get" action="<c:url value='${formBase}/new' />" class="erp-table-toolbar coa-filters">
                 <label class="erp-table-toolbar__search"><spring:message code="coa.searchGroups" /><input class="aws-control" name="parentSearch" value="<c:out value='${parentSearch}' />" maxlength="100" /></label>
                 <button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button>
@@ -23,10 +23,10 @@
                 <thead><tr><th><spring:message code="accounting.code" /></th><th><spring:message code="accounting.name" /></th><th><spring:message code="common.actions" /></th></tr></thead>
                 <tbody><c:forEach items="${parents.rows}" var="p"><tr><td><c:out value="${p.code}" /></td><td><c:out value="${pageContext.response.locale.language=='sw' and not empty p.nameSw?p.nameSw:p.name}" /></td><td><c:url value="${formBase}/new" var="selectParent"><c:param name="parentId" value="${p.id}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${selectParent}' />"><spring:message code="coa.select" /></a></td></tr></c:forEach><c:if test="${empty parents.rows}"><tr><td colspan="3"><spring:message code="${groupMode?'coa.noGroupParents':'coa.noAccountParents'}" /></td></tr></c:if></tbody>
             </table></div>
-            <div class="erp-table-footer accounting-actions">
-                <c:if test="${parents.page>0}"><c:url value="${formBase}/new" var="previous"><c:param name="parentPage" value="${parents.page-1}" /><c:param name="parentSearch" value="${parentSearch}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${previous}' />"><spring:message code="common.previous" /></a></c:if>
+            <div data-table-pagination data-page="${parents.page}" data-table-for="accounting-account-form-1" class="erp-table-footer accounting-actions">
+                <c:if test="${parents.page>0}"><c:url value="${formBase}/new" var="previous"><c:param name="parentPage" value="${parents.page-1}" /><c:param name="parentSearch" value="${parentSearch}" /></c:url><a data-page-direction="previous" class="app-btn btn-neutral" href="<c:out value='${previous}' />"><spring:message code="common.previous" /></a></c:if>
                 <span><spring:message code="coa.page" arguments="${parents.page+1}" /></span>
-                <c:if test="${parents.hasNext}"><c:url value="${formBase}/new" var="next"><c:param name="parentPage" value="${parents.page+1}" /><c:param name="parentSearch" value="${parentSearch}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${next}' />"><spring:message code="common.next" /></a></c:if>
+                <c:if test="${parents.hasNext}"><c:url value="${formBase}/new" var="next"><c:param name="parentPage" value="${parents.page+1}" /><c:param name="parentSearch" value="${parentSearch}" /></c:url><a data-page-direction="next" class="app-btn btn-neutral" href="<c:out value='${next}' />"><spring:message code="common.next" /></a></c:if>
             </div>
         </section>
     </details>

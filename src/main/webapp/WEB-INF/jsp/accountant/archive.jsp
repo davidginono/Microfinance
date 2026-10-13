@@ -64,7 +64,7 @@
         </form>
 </section>
 
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
+<section data-resource-table="accountant-archive-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
     <div class="erp-table-scroll" data-view-position-key="accountant-archive-table">
         <table class="erp-table">
         <thead>
@@ -76,7 +76,7 @@
             <th><spring:message code="review.decision" text="Decision" /></th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
-            <th><spring:message code="common.action" text="Action" /></th>
+            <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
@@ -125,7 +125,7 @@
 </section>
 
 <c:if test="${archivePage.totalPages gt 1}">
-    <div class="mt-4 flex items-center justify-between gap-3">
+    <div data-table-pagination data-page="${archivePage.number}" data-table-for="accountant-archive-1" class="mt-4 flex items-center justify-between gap-3">
         <span class="text-sm text-slate-500">Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
         <div class="flex gap-2">
             <c:if test="${not archivePage.first}">
@@ -136,7 +136,7 @@
                     <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number - 1}" />
                 </c:url>
-                <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
+                <a data-page-direction="previous" class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
             </c:if>
             <c:if test="${not archivePage.last}">
                 <c:url var="archiveNextUrl" value="/accountant/archive">
@@ -146,7 +146,7 @@
                     <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number + 1}" />
                 </c:url>
-                <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
+                <a data-page-direction="next" class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
             </c:if>
         </div>
     </div>

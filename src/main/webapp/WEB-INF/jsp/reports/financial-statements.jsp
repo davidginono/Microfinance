@@ -28,7 +28,7 @@
   <c:if test="${moreMappings}"><p><spring:message code="statements.moreMappings" /></p></c:if>
   <sec:authorize access="hasAuthority('STATEMENT_DESIGN')"><a class="app-btn btn-neutral" href="<c:url value='/reports/statements/mappings/new?kind=${kind}' />"><spring:message code="statements.configure" /></a><c:if test="${not empty selected}"><a class="app-btn btn-neutral" href="<c:url value='/reports/statements/mappings?version=${selected.id}' />"><spring:message code="statements.editMapping" /></a></c:if></sec:authorize>
  </section>
- <section class="erp-table-wrap" data-aws-table-region>
+ <section data-resource-table="reports-financial-statements-1" class="erp-table-wrap" data-aws-table-region>
   <div class="app-table-titlebar statement-toolbar"><h2 class="erp-panel-title"><spring:message code="statements.finalized" /></h2><div class="statement-actions">
    <button type="button" class="app-btn btn-neutral" data-statement-view disabled><spring:message code="common.view" /></button>
    <sec:authorize access="hasAuthority('STATEMENT_EXPORT')"><button type="submit" form="statement-export" class="app-btn btn-neutral" data-statement-export disabled><spring:message code="voucher.pdf" /></button><button type="submit" form="statement-export" name="inline" value="true" class="app-btn btn-neutral" data-statement-export disabled><spring:message code="voucher.print" /></button></sec:authorize>
@@ -39,7 +39,7 @@
    <c:forEach items="${results}" var="record"><tr data-statement-id="${record.id}"><td><input type="checkbox" aria-label="<spring:message code='voucher.select' /> ${record.from} / ${record.through}" /></td><td><c:out value="${record.from}" /></td><td><c:out value="${record.through}" /></td><td>${record.mappingVersion}</td><td><c:out value="${record.generatedAt}" /></td></tr></c:forEach>
    <c:if test="${empty results}"><tr><td colspan="5"><spring:message code="statements.empty" /></td></tr></c:if>
   </tbody></table></div>
-  <div class="statement-actions"><c:if test="${page gt 0}"><a class="app-btn btn-neutral" href="<c:url value='/reports/statements?kind=${kind}&page=${page-1}' />"><spring:message code="common.previous" /></a></c:if><c:if test="${hasNext}"><a class="app-btn btn-neutral" href="<c:url value='/reports/statements?kind=${kind}&page=${page+1}' />"><spring:message code="common.next" /></a></c:if></div>
+  <div data-table-pagination data-page="${page}" data-table-for="reports-financial-statements-1" class="statement-actions"><c:if test="${page gt 0}"><a data-page-direction="previous" class="app-btn btn-neutral" href="<c:url value='/reports/statements?kind=${kind}&page=${page-1}' />"><spring:message code="common.previous" /></a></c:if><c:if test="${hasNext}"><a data-page-direction="next" class="app-btn btn-neutral" href="<c:url value='/reports/statements?kind=${kind}&page=${page+1}' />"><spring:message code="common.next" /></a></c:if></div>
  </section>
 </div><script src="<c:url value='/js/financial-statements.js' />" defer></script>
 <%@ include file="../fragments/footer.jspf" %>

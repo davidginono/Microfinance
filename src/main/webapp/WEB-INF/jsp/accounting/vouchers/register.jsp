@@ -10,7 +10,7 @@
 
 <div class="accounting-workspace voucher-register" data-voucher-register data-base="<c:url value='${base}' />">
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="voucher.register.${voucherType}" /></h1></div>
-<section class="erp-table-wrap" data-aws-table-region>
+<section data-resource-table="accounting-vouchers-register-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region>
 <div class="app-table-titlebar voucher-toolbar" data-aws-action-pin="true"><h2 class="erp-panel-title"><spring:message code="voucher.records" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-aws-table-refresh><spring:message code="common.refresh" /></button>
 <button type="button" class="app-btn btn-neutral" data-selection-action="details" disabled><spring:message code="common.view" /></button>
@@ -30,11 +30,11 @@
 <c:forEach items="${vouchers.rows}" var="v"><tr data-voucher-id="${v.id}"><td><input type="checkbox" class="voucher-select" aria-label="<spring:message code='voucher.select' /> <c:out value='${v.number}' />" /></td><td><a href="<c:url value='${base}/${v.id}' />"><c:out value="${v.number}" /></a></td><td><c:out value="${v.effectiveDate}" /></td><td><c:out value="${v.party}" /></td><td><c:out value="${v.reference}" /></td><td><c:out value="${v.transactionCount}" /></td><td class="voucher-numeric"><fmt:formatNumber value="${v.total}" minFractionDigits="2" maxFractionDigits="2" /></td><td><span class="voucher-status"><spring:message code="voucher.status.${v.status()}" /></span></td></tr></c:forEach>
 <c:if test="${empty vouchers.rows}"><tr><td colspan="8" class="voucher-empty"><spring:message code="${empty filter.search and empty filter.from and empty filter.through and empty filter.status?'voucher.empty':'voucher.noMatches'}" /></td></tr></c:if>
 </tbody></table></div>
-<div class="voucher-pagination"><spring:message code="voucher.page" /> ${vouchers.page+1}<div class="accounting-actions">
+<div data-table-pagination data-page="${vouchers.page}" data-table-for="accounting-vouchers-register-1" class="voucher-pagination"><spring:message code="voucher.page" /> ${vouchers.page+1}<div class="accounting-actions">
 <c:url value="${base}" var="prev"><c:param name="page" value="${vouchers.page-1}" /><c:param name="search" value="${filter.search}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="state" value="${filter.status}" /><c:param name="sort" value="${filter.sort}" /></c:url>
 <c:url value="${base}" var="next"><c:param name="page" value="${vouchers.page+1}" /><c:param name="search" value="${filter.search}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="state" value="${filter.status}" /><c:param name="sort" value="${filter.sort}" /></c:url>
-<c:choose><c:when test="${vouchers.page>0}"><a class="app-btn btn-neutral" href="<c:out value='${prev}' />"><spring:message code="common.previous" /></a></c:when><c:otherwise><button class="app-btn btn-neutral" disabled><spring:message code="common.previous" /></button></c:otherwise></c:choose>
-<c:choose><c:when test="${vouchers.hasNext}"><a class="app-btn btn-neutral" href="<c:out value='${next}' />"><spring:message code="common.next" /></a></c:when><c:otherwise><button class="app-btn btn-neutral" disabled><spring:message code="common.next" /></button></c:otherwise></c:choose>
+<c:choose><c:when test="${vouchers.page>0}"><a data-page-direction="previous" class="app-btn btn-neutral" href="<c:out value='${prev}' />"><spring:message code="common.previous" /></a></c:when><c:otherwise><button data-page-direction="previous" class="app-btn btn-neutral" disabled><spring:message code="common.previous" /></button></c:otherwise></c:choose>
+<c:choose><c:when test="${vouchers.hasNext}"><a data-page-direction="next" class="app-btn btn-neutral" href="<c:out value='${next}' />"><spring:message code="common.next" /></a></c:when><c:otherwise><button data-page-direction="next" class="app-btn btn-neutral" disabled><spring:message code="common.next" /></button></c:otherwise></c:choose>
 </div></div></section></div>
 <script src="<c:url value='/js/accounting-vouchers.js' />" defer></script>
 <%@ include file="../../fragments/footer.jspf" %>

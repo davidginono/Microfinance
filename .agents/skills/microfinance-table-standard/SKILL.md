@@ -9,19 +9,38 @@ description: Create, edit, or review Microfinance JSP registries, accounting con
 
 Apply Cloudscape [table view](https://cloudscape.design/patterns/resource-management/view/table-view/) with [create](https://cloudscape.design/patterns/resource-management/create/) and [details](https://cloudscape.design/patterns/resource-management/details/) navigation. Receipt, payment and journal registers are separate full-width scoped resources. Use single-row checkbox selection, keyboard access, a live selected-record announcement, disabled View/PDF/Print until selection, and an always-independent Create action. Never add a row Actions column. Clear selection on filters, sorting, pagination and restored navigation; provide explicit empty/no-match states and pagination even on one page. Outputs are PDF/print, never CSV/Excel. Creation supports multiple transactions and direct accountant posting, not approval queues.
 
+## Reusable console table component
+
+Use `resource-table.js`, `resource-table.css` and the localized `fragments/resource-table-labels.jspf`, loaded by the shared header. This is the maintained JSP implementation of the [Cloudscape table view](https://cloudscape.design/patterns/resource-management/view/table-view/) and the compact AWS console reference supplied on 2026-10-13. Read these component files before changing table behavior; extend them instead of copying controls into each page.
+
+- Opt a resource wrapper in with a stable `data-resource-table="workspace-resource"` key. The key also scopes local display preferences; never put client names, financial data or selection in storage.
+- Title/count and compact actions occupy the first row. Use neutral secondary buttons, a refresh icon at the start, a single independent primary action at the end, 28px desktop control height, 2px corners and 6px action gaps. Wrap groups on mobile without stretching individual buttons.
+- Filters occupy the left of the second row; borderless previous/current-page/next controls and a separated gear icon occupy the right. Always show pagination, including one-page and empty results. Only the inner table canvas scrolls horizontally; title, actions, filters, paginator and gear remain stationary.
+- Add `data-table-pagination data-page="${records.page}" data-table-for="workspace-resource"` to the server-rendered pager. Page is zero-based. Mark controls `data-page-direction="previous"` or `"next"`; preserve their scoped server URLs and filter/sort parameters. Omitted controls become disabled chevrons. A shared server pager can name several table keys separated by spaces. Do not infer paging from translated labels or paginate only the loaded page in JavaScript.
+- The gear opens a body-mounted, keyboard-accessible Preferences dialog with Confirm/Cancel. Display settings are compact rows, line wrapping and visible columns. Keep the identifying column and editable form columns available. Page-size choices are appropriate only when the server endpoint accepts and caps that size; do not add a cosmetic client-only page-size setting.
+- For existing single-record controllers, add `data-table-selection="single"`. The leading header checkbox selects the first visible selectable row when empty and clears the selection when selected; its accessible label states that behavior. It never enables a bulk financial command. Use a mixed state when one of several rows is selected. Clear selection on filters, paging, confirmed preferences and restored navigation. Row selection itself remains owned by the page's existing permission-aware controller.
+- For a legacy resource table with a final command column, mark its header `data-table-actions-header`. The component replaces that column with leading selection and moves the selected row's actual links/forms into the toolbar, retaining CSRF, targets, values and permission conditions. Unselected commands are disabled. Use this adapter for native commands; custom delegated handlers that depend on row ancestry require an explicit page controller. Do not apply it to an inline editor or account picker where cell controls are the task itself.
+- Do not add selectors to financial summary tables that have no record commands. Do not apply interactive tools to PDF/print stationery. Keep helper explanations out of the toolbar; labels, empty/error states and required financial context remain.
+
+The accountant rollout includes accounting registers/configuration, loan recording/client ledgers, reconciliation, the legacy accountant queues/archives and financial/report tables. Other workspaces adopt this component as they are migrated; shared assets alone do not opt them in.
+
 ## Shared Structure
 
 Use the existing JSP table contract rather than introducing a React/Cloudscape adapter:
 
 ```jsp
-<div class="erp-table-wrap">
+<div class="erp-table-wrap" data-resource-table="loan-repayments">
     <%-- Title, record actions, and filters stay outside the scroll viewport. --%>
     <div class="erp-table-scroll" data-view-position-key="loan-repayments-table">
         <table class="erp-table">
             <!-- Table header and rows -->
         </table>
     </div>
-    <%-- Pagination stays outside the scroll viewport. --%>
+    <%-- Server pager is promoted beside filters; it stays outside the scroll viewport. --%>
+    <div data-table-pagination data-page="${records.page}" data-table-for="loan-repayments">
+        <c:if test="${records.page > 0}"><a data-page-direction="previous" href="<c:out value='${previousUrl}' />"><spring:message code="common.previous" /></a></c:if>
+        <c:if test="${records.hasNext}"><a data-page-direction="next" href="<c:out value='${nextUrl}' />"><spring:message code="common.next" /></a></c:if>
+    </div>
 </div>
 ```
 
@@ -46,7 +65,7 @@ Use the existing JSP table contract rather than introducing a React/Cloudscape a
 - Disable record commands until the required selection is present. For a single-record workflow, use one selected row with a leading, accessibly named checkbox: selecting another replaces selection, and clicking the selected checkbox or row body again clears it. Support native Tab/Space, a visible row highlight/focus indicator and a screen-reader-only selection announcement. Do not add a visible selection summary or Clear selection button.
 - Bind navigation and lifecycle commands to the selected record, derive labels such as Deactivate/Reactivate from its state, and retain service-backed permission and eligibility restrictions. Keep CSRF on POST commands; UI selection is not authorization.
 - Clear selection on filter changes, pagination and cached-page restoration so commands cannot target a stale record. Row-body selection must ignore links, buttons and form controls. Keep independent Create/Add New commands available without selection.
-- Reuse the accounting register behavior in `src/main/resources/static/js/accounting-accounts.js` and `accounting-library.js` and the scoped selection styles in `accounting-ledger.css` for these workspaces.
+- Reuse existing accounting controllers in `accounting-accounts.js`, `accounting-library.js` and `accounting-vouchers.js`; the shared resource-table component supplies their header selector and preference/filter reset contract.
 
 ## Data And Interaction
 

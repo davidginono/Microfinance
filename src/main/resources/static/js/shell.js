@@ -357,6 +357,7 @@
     };
     const enhanceConsolePagination = function () {
         document.querySelectorAll('a.app-btn, button.app-btn, span.app-btn').forEach(function (control) {
+            if (control.closest('[data-resource-table], [data-table-pagination]')) return;
             const label = (control.textContent || '').trim().toLocaleLowerCase();
             const isPrevious = label === 'previous';
             const isNext = label === 'next';
@@ -488,6 +489,7 @@
         });
 
         document.querySelectorAll('.aws-pagination-chevron').forEach(function (control) {
+            if (control.closest('[data-resource-table], [data-table-pagination]')) return;
             const precedingRegions = regions.filter(function (region) {
                 return Boolean(region.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING);
             });

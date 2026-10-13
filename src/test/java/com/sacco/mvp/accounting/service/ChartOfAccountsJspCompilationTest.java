@@ -23,7 +23,20 @@ class ChartOfAccountsJspCompilationTest {
         context.addServletContainerInitializer(new JasperInitializer(),null);
         String[] pages={"accounts.jsp","account-form.jsp","library.jsp","library-code-form.jsp","library-transaction.jsp","library-template-form.jsp","vouchers/register.jsp","vouchers/form.jsp","vouchers/details.jsp","loans/record-form.jsp","loans/post-form.jsp","loans/register.jsp","loans/details.jsp","loans/posting.jsp","loans/statement.jsp","loans/statement-print.jsp","journal.jsp","business/openings/view.jsp","policies/view.jsp","reconciliation/review.jsp","reconciliation/statement.jsp","../reporting/loan-portfolio.jsp","../reports/accounting-release.jsp","../reports/statement-result.jsp","../reports/financial-statements.jsp","../reports/statement-mappings.jsp","../app/loan-new.jsp","../app/guarantor-selection.jsp","../admin/sms-usage.jsp"};
         if(Boolean.getBoolean("microfinance.receipt.jsp-only"))pages=new String[]{"vouchers/form.jsp","vouchers/loan-details.jsp"};
-        else {var expanded=new java.util.ArrayList<>(java.util.List.of(pages));expanded.add("vouchers/loan-details.jsp");pages=expanded.toArray(String[]::new);}
+        else {
+            var expanded=new java.util.LinkedHashSet<>(java.util.List.of(pages));
+            expanded.add("vouchers/loan-details.jsp");
+            // Compile every accountant resource view changed by the shared table rollout.
+            for (String folder : new String[]{"accounting", "accountant", "reporting", "reports"}) {
+                try (var files=java.nio.file.Files.walk(Path.of("src/main/webapp/WEB-INF/jsp",folder))) {
+                    for (var file:files.filter(path -> path.toString().endsWith(".jsp")).toList()) {
+                        if (java.nio.file.Files.readString(file).contains("data-resource-table="))
+                            expanded.add("../"+Path.of("src/main/webapp/WEB-INF/jsp").relativize(file).toString().replace('\\','/'));
+                    }
+                }
+            }
+            pages=expanded.toArray(String[]::new);
+        }
         for(int n=0;n<pages.length;n++) {
             var servlet=Tomcat.addServlet(context,"coa-"+n,new JspServlet());
             servlet.setLoadOnStartup(1);

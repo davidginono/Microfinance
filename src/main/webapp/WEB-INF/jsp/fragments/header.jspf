@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/resource-table.css' />" />
     <script src="<c:url value='/js/vendor/lucide-repayments.js' />" defer></script>
 <%@ include file="select-enhancer.jspf" %>
 </head>
@@ -300,3 +301,5 @@
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
 <script src="<c:url value='/js/live-search.js' />"></script>
 <script src="<c:url value='/js/shell.js' />" defer></script>
+<%@ include file="resource-table-labels.jspf" %>
+<script src="<c:url value='/js/resource-table.js' />" defer></script>

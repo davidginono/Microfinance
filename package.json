@@ -2,10 +2,12 @@
   "name": "sacco-loan-mvp",
   "private": true,
   "scripts": {
+    "test:tables": "node --test src/test/js/resource-table.test.cjs",
     "tailwind:build": "tailwindcss -c tailwind.config.js -i ./src/main/resources/tailwind/app.css -o ./src/main/resources/static/css/tailwind.css --minify",
     "tailwind:watch": "tailwindcss -c tailwind.config.js -i ./src/main/resources/tailwind/app.css -o ./src/main/resources/static/css/tailwind.css --watch"
   },
   "devDependencies": {
+    "jsdom": "^29.1.1",
     "tailwindcss": "3.4.17"
   }
 }

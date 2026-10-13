@@ -43,7 +43,7 @@
             </div>
         </form>
 </section>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div data-resource-table="accountant-queue-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
@@ -54,7 +54,7 @@
             <th><spring:message code="common.amount" text="Amount" /></th>
             <th><spring:message code="common.status" text="Status" /></th>
             <th><spring:message code="loan.date" text="Date" /></th>
-            <th><spring:message code="common.action" text="Action" /></th>
+            <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
