@@ -25,7 +25,7 @@
                             <%@ include file="library-rule-fields.jspf" %>
                         </fieldset>
                         <p class="library-lookup-status" role="status" data-lookup-failure="<spring:message code='library.lookupUnavailable' />"></p>
-                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-primary"><spring:message code="library.createTransaction" /></button></div>
+                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-launch" data-aws-action-pin="true"><spring:message code="library.createTransaction" /></button></div>
                     </form:form>
                 </c:otherwise></c:choose>
             </div>

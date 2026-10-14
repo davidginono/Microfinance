@@ -186,7 +186,7 @@
             <div class="loan-calculator-footer-actions">
                 <button type="button" class="app-btn btn-neutral" data-calculator-edit>Change figures</button>
                 <c:if test="${empty applicationLockApp and applicantPolicyEligible ne false}">
-                    <a id="productsCalculatorApplyLink" class="app-btn btn-launch hidden" href="#">Continue to application</a>
+                    <a id="productsCalculatorApplyLink" class="app-btn btn-neutral hidden" href="#">Continue to application</a>
                 </c:if>
             </div>
         </div>

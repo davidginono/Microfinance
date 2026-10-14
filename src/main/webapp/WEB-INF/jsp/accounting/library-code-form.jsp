@@ -21,7 +21,7 @@
 
             </div>
             <details class="accounting-additional" ${not empty codeForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>
-            <div class="accounting-actions accounting-form-actions"><c:url value="${empty activity?'/finance/library':'/finance/library/activities/'}${empty activity?'':activity.id}" var="cancelUrl" /><a class="app-btn btn-neutral" href="<c:out value='${cancelUrl}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-primary" ${not empty activity and not activity.active?'disabled':''}><spring:message code="${empty activity?'library.createActivity':'library.createTransaction'}" /></button></div>
+            <div class="accounting-actions accounting-form-actions"><c:url value="${empty activity?'/finance/library':'/finance/library/activities/'}${empty activity?'':activity.id}" var="cancelUrl" /><a class="app-btn btn-neutral" href="<c:out value='${cancelUrl}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" data-aws-action-pin="true" ${not empty activity and not activity.active?'disabled':''}><spring:message code="${empty activity?'library.createActivity':'library.createTransaction'}" /></button></div>
         </form:form>
     </section>
 </div>

@@ -1166,12 +1166,40 @@
 
         document.querySelectorAll('form').forEach(syncRequiredAttachmentPanel);
 
+        let productModalScrollState = null;
+        let productModalOpener = null;
         function closeAllProductModals() {
             document.querySelectorAll('[data-product-modal]').forEach((modal) => {
                 modal.classList.add('hidden');
                 modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
             });
-            body.classList.remove('overflow-hidden');
+            if (productModalScrollState) {
+                body.style.overflow = productModalScrollState.body;
+                document.documentElement.style.overflow = productModalScrollState.root;
+                body.classList.toggle('overflow-hidden', productModalScrollState.locked);
+                productModalScrollState = null;
+                productModalOpener?.focus({preventScroll: true});
+            } else if (!document.querySelector('.app-modal-overlay.is-open')) {
+                // The shared navigation restorer can reopen a dialog without its opener.
+                body.classList.remove('overflow-hidden');
+            }
+        }
+
+        function openProductModal(modal, opener) {
+            productModalOpener = opener || document.activeElement;
+            productModalScrollState = {body: body.style.overflow, root: document.documentElement.style.overflow, locked: body.classList.contains('overflow-hidden')};
+            modal.classList.remove('hidden');
+            modal.classList.add('is-open');
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-hidden', 'false');
+            const title = modal.querySelector('.app-modal-header h2');
+            if (title) { title.id ||= 'product-modal-title-' + modal.dataset.productModal; modal.setAttribute('aria-labelledby', title.id); }
+            body.classList.add('overflow-hidden');
+            body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+            modal.querySelector('input:not([type=hidden]),select,button')?.focus({preventScroll: true});
         }
 
         document.querySelectorAll('[data-product-modal-open]').forEach((button) => {
@@ -1180,9 +1208,7 @@
                 closeAllProductModals();
                 const modal = document.querySelector('[data-product-modal="' + key + '"]');
                 if (modal) {
-                    modal.classList.remove('hidden');
-                    modal.classList.add('is-open');
-                    body.classList.add('overflow-hidden');
+                    openProductModal(modal, button);
                     modal.querySelectorAll('[data-product-workflow-builder="true"]').forEach((form) => {
                         form.dispatchEvent(new Event('workflow:refresh'));
                     });
@@ -1200,9 +1226,7 @@
             const modal = key ? document.querySelector('[data-product-modal="' + key + '"]') : null;
             if (modal) {
                 closeAllProductModals();
-                modal.classList.remove('hidden');
-                modal.classList.add('is-open');
-                body.classList.add('overflow-hidden');
+                openProductModal(modal);
                 const modalScroll = modal.querySelector('.app-modal-scroll');
                 const firstServerError = modal.querySelector('.field-error-input');
                 if (firstServerError) {
@@ -1212,6 +1236,20 @@
                 }
             }
         }
+
+        document.querySelectorAll('[data-product-modal]').forEach(modal => {
+            modal.addEventListener('keydown', event => {
+                if (event.defaultPrevented || !modal.classList.contains('is-open')) return;
+                if (event.key === 'Escape') { event.preventDefault(); modal.querySelector('[data-product-modal-close]')?.click(); }
+                if (event.key !== 'Tab') return;
+                const controls = [...modal.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex="0"]')]
+                    .filter(control => !control.disabled && !control.closest('[hidden],.hidden') && control.getClientRects().length);
+                if (!controls.length) return;
+                const first = controls[0], last = controls.at(-1);
+                if (event.shiftKey && document.activeElement === first) {event.preventDefault();last.focus();}
+                else if (!event.shiftKey && document.activeElement === last) {event.preventDefault();first.focus();}
+            });
+        });
 
         const createdLoanProductTarget = document.querySelector('[data-created-loan-product-target="true"]');
         if (createdLoanProductTarget) {

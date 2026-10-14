@@ -21,8 +21,8 @@
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" data-table-command id="library-status-form" data-url="<c:url value='/finance/library/${isActivity?"activities":"transactions"}/' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button type="submit" class="app-btn btn-neutral" id="library-status" disabled data-deactivate="<spring:message code='accounting.deactivate' />" data-reactivate="<spring:message code='coa.reactivate' />"><spring:message code="accounting.deactivate" /></button></form></sec:authorize>
             <button type="button" class="app-btn btn-neutral" id="library-view" disabled><spring:message code="${isActivity?'library.transactions':'library.open'}" /></button>
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')">
-                <c:if test="${isActivity}"><button type="button" class="app-btn btn-primary" data-library-open><spring:message code="library.addActivity" /></button></c:if>
-                <c:if test="${not isActivity}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><button type="button" class="app-btn btn-primary" data-library-open><spring:message code="library.addTransaction" /></button></sec:authorize></c:if>
+                <c:if test="${isActivity}"><button type="button" class="app-btn btn-launch" data-library-open><spring:message code="library.addActivity" /></button></c:if>
+                <c:if test="${not isActivity}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><button type="button" class="app-btn btn-launch" data-library-open><spring:message code="library.addTransaction" /></button></sec:authorize></c:if>
             </sec:authorize>
             </div>
         </div>

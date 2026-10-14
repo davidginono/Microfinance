@@ -14,10 +14,15 @@ test('workspace command columns retain native forms, permissions and record targ
     assert.equal(d.querySelectorAll('thead th').length,2);assert.equal(d.querySelector('thead [data-table-actions-header]'),null);
     d.querySelector('tbody input').click();
     const form=d.querySelector('#native-command'),button=d.querySelector('#approve');let commands=0;button.addEventListener('click',()=>commands++);
+    assert.equal(d.querySelectorAll('.resource-table-record-actions > button,.resource-table-record-actions > a').length,1);
+    assert.equal(d.querySelector('.resource-table-record-actions > a').textContent,'Open');
+    assert.equal(d.querySelectorAll('.resource-table-menu #approve').length,1);
+    assert.equal([...d.querySelectorAll('.resource-table-menu button')].filter(control=>control.textContent==='Approve').length,1);
     assert.equal(form.closest('[role=menu]')!==null,true);assert.equal(form.action,'http://localhost/first/decision');assert.equal(form.querySelector('input').value,'original');
     assert.equal(d.querySelector('.resource-table-command-context').hidden,false);
     d.querySelector('.resource-table-action-menu > button').click();button.click();assert.equal(commands,1);
     d.querySelectorAll('tbody input')[1].click();assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/second');assert.equal(d.querySelector('.resource-table-action-menu > button').disabled,true);
+    assert.equal(d.querySelectorAll('.resource-table-record-actions > button,.resource-table-record-actions > a').length,1);
     d.querySelector('tbody input').click();assert.equal(d.querySelector('#native-command'),form);assert.equal(d.querySelector('#approve'),button);
     d.querySelector('.resource-table-search input').dispatchEvent(new w.Event('input'));assert.equal(d.querySelector('tbody input').checked,false);dom.window.close();
 });
@@ -86,6 +91,18 @@ test('pager keeps scoped URLs and tools outside the horizontal viewport', async 
     assert.equal(d.querySelector('[data-table-pagination]'), null);
     assert.equal(d.querySelector('.resource-table-search'), null);
     dom.window.close();
+});
+
+test('compact density is the default while an explicit saved comfortable preference survives', async () => {
+    const fresh=await setup(table('fresh-density',row));
+    assert.equal(fresh.document.querySelector('section').classList.contains('resource-table-compact'),true);
+    fresh.dom.window.close();
+    const saved=await setup(table('saved-density',row), `localStorage.setItem('resource-table:v1:saved-density',JSON.stringify({hidden:[],compact:false}));`);
+    assert.equal(saved.document.querySelector('section').classList.contains('resource-table-compact'),false);
+    saved.document.querySelector('[aria-label="Preferences"]').click();
+    const compact=[...saved.document.querySelectorAll('.resource-table-option')].find(option=>option.textContent==='Compact rows');
+    assert.equal(compact.querySelector('input').checked,false);
+    saved.dom.window.close();
 });
 
 test('tables without filters get bounded search, no-match recovery and dynamic-row filtering', async () => {

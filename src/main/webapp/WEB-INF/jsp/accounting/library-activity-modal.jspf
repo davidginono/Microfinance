@@ -14,7 +14,7 @@
 
                         </div></fieldset>
                         <details class="accounting-additional" ${not empty codeForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>
-                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-primary"><spring:message code="library.createActivity" /></button></div>
+                        <div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-library-close><spring:message code="common.cancel" /></button><button class="app-btn btn-launch" data-aws-action-pin="true"><spring:message code="library.createActivity" /></button></div>
                     </form:form>
                 </c:otherwise></c:choose>
             </div>

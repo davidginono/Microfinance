@@ -185,6 +185,8 @@
                     input.addEventListener('change', () => {
                         const selected=input.checked; resetCommands();
                         if (selected) {
+                            commands.querySelectorAll(':scope > button, :scope > a').forEach(control => control.remove());
+                            secondary.menu.replaceChildren();
                             active=record; input.checked=true; row.classList.add('resource-table-selected'); context.append(content);
                             const controls=[...context.querySelectorAll('a.app-btn,button')];
                             controls.forEach(control => {
@@ -300,7 +302,7 @@
         };
         const key = 'resource-table:v1:' + (region.dataset.resourceTable || scroller.dataset.viewPositionKey || location.pathname + ':' + [...document.querySelectorAll('[data-resource-table]')].indexOf(region));
         const defaultOrder = headers.map((_, index) => index);
-        let settings = {hidden: [], compact: false, wrap: false, striped: false, sticky: 0, order: defaultOrder};
+        let settings = {hidden: [], compact: true, wrap: false, striped: false, sticky: 0, order: defaultOrder};
         try {
             const stored = JSON.parse(localStorage.getItem(key));
             if (stored && Array.isArray(stored.hidden)) settings = {...settings, ...stored,
@@ -407,7 +409,7 @@
                 });
             };
             renderColumns();
-            const footer = node('div', 'app-modal-actions resource-table-dialog-actions'); const cancel = node('button', 'app-btn btn-neutral', l.cancel); cancel.type = 'button'; const confirm = node('button', 'app-btn btn-primary', l.confirm); confirm.type = 'submit'; footer.append(cancel, confirm); form.append(footer); dialog.append(form);
+            const footer = node('div', 'app-modal-actions resource-table-dialog-actions'); const cancel = node('button', 'app-btn btn-neutral', l.cancel); cancel.type = 'button'; const confirm = node('button', 'app-btn btn-neutral', l.confirm); confirm.type = 'submit'; footer.append(cancel, confirm); form.append(footer); dialog.append(form);
             document.body.append(dialog);
             const oldBodyOverflow = document.body.style.overflow, oldRootOverflow = document.documentElement.style.overflow;
             document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden';

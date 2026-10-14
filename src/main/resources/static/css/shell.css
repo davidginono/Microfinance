@@ -2497,25 +2497,25 @@ body.aws-console {
     font-weight: 700 !important;
 }
 
-.btn-neutral {
+.btn-neutral,
+.btn-primary {
     border-color: var(--aws-line-dark) !important;
     background: #ffffff !important;
     color: var(--aws-ink) !important;
 }
 
-.btn-neutral:hover {
+.btn-neutral:hover,
+.btn-primary:hover,
+.btn-primary:focus-visible {
     background: #f2f3f3 !important;
 }
 
-.btn-primary,
 .btn-launch {
     border-color: #b65b0a !important;
     background: var(--aws-orange) !important;
     color: #ffffff !important;
 }
 
-.btn-primary:hover,
-.btn-primary:focus-visible,
 .btn-launch:hover,
 .btn-launch:focus-visible {
     border-color: #8f4808 !important;

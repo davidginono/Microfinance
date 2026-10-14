@@ -63,12 +63,12 @@
         </label>
 
         <div class="admin-users-filter-actions">
-            <button type="submit" class="app-btn btn-primary">Search</button>
+            <button type="submit" class="app-btn btn-neutral">Search</button>
             <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
         </div>
     </form>
     <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
-    <table class="erp-table min-w-[1420px]">
+    <table class="erp-table min-w-[1100px]">
         <thead>
         <tr>
             <th class="px-3 py-2 text-left whitespace-nowrap">User ID</th>
@@ -127,7 +127,7 @@
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <c:choose>
                                 <c:when test="${canEditUsers}">
-                                    <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-primary">Edit</a>
+                                    <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-neutral">Edit</a>
                                 </c:when>
                                 <c:otherwise>
                                     <span class="app-btn btn-neutral pointer-events-none opacity-50">View Only</span>
