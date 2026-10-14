@@ -91,12 +91,23 @@ public class LoanRecordingController {
     }
     @GetMapping({"/client-ledgers/{id}/pdf","/client-ledgers/{id}/print"}) public Object statementExport(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
         var document=statementDocument(service.exportStatement(a,id),locale);
-        if(request.getRequestURI().endsWith("/print")){model.addAttribute("document",document);return "accounting/loans/statement-print";}
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=client-statement.pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=client-statement.pdf")
             .header("X-Content-Type-Options","nosniff").body(pdf.renderStatement(document));
     }
-    private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale){
+    @GetMapping("/client-ledgers/{client}/loans/{loan}/statement") public String loanStatement(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID client,@PathVariable UUID loan,@RequestParam(defaultValue="0") int page,Locale locale,Model model){
+        var source=service.loanStatement(actor,client,loan,page,false);
+        model.addAttribute("document",statementDocument(source.source(),locale,source.opening()));model.addAttribute("statementPage",source);
+        model.addAttribute("statementBase","/finance/client-ledgers/"+client+"/loans/"+loan+"/statement");return "accounting/loans/loan-statement";
+    }
+    @GetMapping({"/client-ledgers/{client}/loans/{loan}/statement/pdf","/client-ledgers/{client}/loans/{loan}/statement/print"}) public ResponseEntity<byte[]> loanStatementPdf(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID client,@PathVariable UUID loan,jakarta.servlet.http.HttpServletRequest request,Locale locale){
+        var source=service.loanStatement(actor,client,loan,0,true);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=loan-statement.pdf")
+            .header("X-Content-Type-Options","nosniff").body(pdf.renderStatement(statementDocument(source.source(),locale,source.opening())));
+    }
+    private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale){return statementDocument(source,locale,null);}
+    private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale,Posting opening){
         String unavailable=label("recording.unavailable",locale);String[] client=source.client().split(" - ",2);
         var identity=List.of(new StatementField(label("recording.statement.clientNumber",locale),client[0]),
             new StatementField(label("recording.statement.name",locale),client.length>1?client[1]:source.client()),
@@ -109,7 +120,7 @@ public class LoanRecordingController {
         var sections=new ArrayList<StatementSection>();
         for(var loan:source.loans()){
             var term=terms.get(loan.id());var movements=posts.getOrDefault(loan.id(),List.of());
-            var disbursement=movements.stream().filter(p->"DISBURSEMENT".equals(p.kind())).findFirst().orElse(null);
+            var disbursement=opening!=null?opening:movements.stream().filter(p->"DISBURSEMENT".equals(p.kind())).findFirst().orElse(null);
             var fields=new ArrayList<StatementField>();
             statementField(fields,"loan",loan.number(),locale);statementField(fields,"product",loan.product(),locale);
             statementField(fields,"disbursementDate",disbursement==null?unavailable:statementDate(disbursement.date(),locale),locale);

@@ -222,6 +222,17 @@ class LoanRecordingPostgresTest {
         current.setPosition(Position.MANAGER);
         assertThatThrownBy(()->service.save(actor,form())).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void individualLoanStatementKeepsOpeningOnLaterPagesAndChecksOwnership(){
+        var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));
+        var page=service.loanStatement(actor,client,id,1,false);
+        assertThat(page.source().loans()).extracting(LoanRow::id).containsExactly(id);
+        assertThat(page.source().terms()).extracting(StatementTerms::loanId).containsExactly(id);
+        assertThat(page.source().movements()).isEmpty();assertThat(page.hasNext()).isFalse();
+        assertThat(page.opening().principalBalance()).isEqualByComparingTo("1000.00");
+        assertThat(service.loanStatement(actor,client,id,1,true).source().movements()).hasSize(1);
+        assertThatThrownBy(()->service.loanStatement(operator("B2"),client,id,0,false)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.loanStatement(actor,UUID.randomUUID(),id,0,false)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void historicalBranchRetainsItsLedgerWhenClientMoves(){
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));
         jdbc.update("update members set station_id='B2',status='INACTIVE' where id=?",client);

@@ -87,6 +87,27 @@ class StatementDesignerPostgresTest {
     private StatementDefinition definition(boolean visible){return new StatementDefinition(1,1,Kind.BALANCE_SHEET,"Synthetic financial position","Hali ya fedha ya majaribio",List.of(new Row("ASSETS_ROW","Bank assets","Mali za benki",RowKind.ACCOUNT_GROUP,Section.ASSETS,Unit.TZS,List.of(bank),Sign.DEBIT_POSITIVE,null,null,null,visible,true,false,null),new Row("EQUITY_ROW","Capital","Mtaji",RowKind.ACCOUNT_GROUP,Section.EQUITY,Unit.TZS,List.of(capital),Sign.CREDIT_POSITIVE,null,null,null,visible,false,false,null)),List.of(),false);}
     private UUID approvedVersion(boolean visible){UUID id=service.save(maker,null,definition(visible),"Synthetic mapping evidence");service.approve(checker,id,"Independent mapping and exclusions review");return id;}
 
+    @Test void lineTrialUsesOnlyMappedAccountsAndRejectsForeignBranchesAndHiddenLines(){
+        UUID version=approvedVersion(true),review=reviewedClose("1000.01"),id=service.finalize(maker,version,review,null);
+        var detail=service.lineTrial(maker,"results",id,"ASSETS_ROW",null,null,null,null,null,0,false);
+        assertThat(detail.trial().accounts()).singleElement().satisfies(a->{assertThat(a.id()).isEqualTo(bank);assertThat(a.opening()).isEqualByComparingTo("1000.01");assertThat(a.closing()).isEqualByComparingTo("1001.02");});
+        assertThat(detail.trial().totals().closingDebit()).isEqualByComparingTo("1001.02");
+        assertThat(service.lineTrial(maker,"results",id,"ASSETS_ROW",null,null,null,null,null,1,false).trial().accounts()).isEmpty();
+        assertThat(service.lineTrial(maker,"results",id,"ASSETS_ROW",null,null,null,null,null,1,true).trial().accounts()).hasSize(1);
+        assertThatThrownBy(()->service.lineTrial(maker,"results",id,"INVENTED",null,null,null,null,null,0,false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var foreign=operator("B2");assertThatThrownBy(()->service.lineTrial(foreign,"results",id,"ASSETS_ROW",null,null,null,null,null,0,false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.of(UserClaim.STATEMENT_VIEW));
+        assertThatThrownBy(()->service.lineTrial(maker,"results",id,"ASSETS_ROW",null,null,null,null,null,0,false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void draftLineTrialKeepsUnknownBalancesAndCutoff(){
+        UUID version=approvedVersion(true);OffsetDateTime cutoff=now;
+        var detail=service.lineTrial(maker,"versions",version,"ASSETS_ROW",DAY,END,null,null,cutoff,0,false);
+        assertThat(detail.trial().parameters().recordedCutoff()).isEqualTo(cutoff);
+        assertThat(detail.trial().accounts()).singleElement().satisfies(a->{assertThat(a.id()).isEqualTo(bank);assertThat(a.opening()).isNull();assertThat(a.closing()).isNull();});
+        assertThat(detail.trial().totals().openingDebit()).isNull();
+        assertThatThrownBy(()->service.lineTrial(maker,"versions",version,"ASSETS_ROW",DAY,END,null,null,now.plusDays(1),0,false)).hasMessage("statement.error.dates");
+    }
+
     @Test void institutionTwoBranchSourceIsExactMinimalImmutableAndFreshlyAuthorized(){
         UUID version=approvedVersion(false);var b1Maker=maker;var b1Checker=checker;
         jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at,access_status) values(?,?,'B2',true,now(),now(),'ACTIVE')",UUID.randomUUID(),institution);var b2Maker=operator("B2");var b2Checker=operator("B2");

@@ -1,0 +1,52 @@
+/* Document surfaces follow the supplied financial stationery; shell controls stay shared. */
+.reference-report { font: 14px/1.2 Arial, Helvetica, sans-serif; color: #000; background: #fff; padding: 20px; min-width: 0; max-width: 100%; }
+.reference-report .reference-title { font: 20px/1.2 Arial, Helvetica, sans-serif; text-transform: uppercase; text-align: center; margin: 0 0 10px; color: #000; }
+.reference-generated { text-align: right; margin: 4px 0 20px; font-size: 12px; }
+.reference-period { margin: 0 0 16px; text-transform: uppercase; }
+.reference-period span { margin-left: 24px; }
+.reference-scroll { max-width: 100%; overflow-x: auto; }
+.reference-table { border-collapse: collapse; border: 0; table-layout: auto; width: 100%; min-width: 640px; font: inherit; }
+.reference-table th, .reference-table td { border: 0; padding: 2px 8px; vertical-align: top; text-align: left; background: transparent; font: inherit; }
+.reference-table th:first-child, .reference-table td:first-child { padding-left: 0; }
+.reference-table thead th { text-transform: uppercase; padding-bottom: 9px; }
+.reference-table .reference-description { width: 52%; }
+.reference-table .reference-amount { min-width: 130px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reference-table .statement-number { text-align: right; }
+.reference-table .reference-heading td { padding-top: 22px; text-transform: uppercase; }
+.reference-table .reference-total td { font-weight: bold; padding-bottom: 7px; }
+.reference-total .reference-amount, .reference-total .statement-number { text-decoration: underline; text-underline-offset: 3px; }
+.reference-detail-button { display: inline-block; font: 16px/1 "Courier New", Courier, monospace; color: #000; background: #eee; border: 1px solid #777; border-radius: 0; padding: 1px 3px; text-decoration: underline; white-space: nowrap; }
+.reference-detail-button:hover { background: #ddd; }
+.reference-detail-button:focus-visible, .reference-scroll:focus-visible { outline: 2px solid #0073bb; outline-offset: 2px; }
+.reference-notes { margin-top: 24px; font-size: 12px; overflow-wrap: anywhere; }
+.reference-notes h3 { font: bold 14px Arial, sans-serif; }
+.reference-notes ol { padding-left: 22px; list-style: decimal; }
+.reference-notes li { margin: 6px 0; white-space: pre-line; }
+.reference-CHANGES_IN_EQUITY { font-family: "Courier New", Courier, monospace; }
+.reference-trial { font-family: "Times New Roman", Times, serif; }
+.reference-trial .reference-period { font-family: "Courier New", Courier, monospace; }
+.reference-CHANGES_IN_EQUITY .reference-title { color: #f00; font-weight: bold; }
+.reference-CHANGES_IN_EQUITY .equity-matrix { margin: 44px 0 30px; min-width: 900px; }
+.reference-CHANGES_IN_EQUITY .equity-matrix th { min-width: 140px; font-weight: bold; text-transform: none; padding-bottom: 32px; }
+.reference-CHANGES_IN_EQUITY .equity-matrix td { white-space: nowrap; }
+.reference-trial .reference-title { font-family: "Times New Roman", Times, serif; text-decoration: underline; }
+.reference-trial .reference-table { min-width: 1000px; font-size: 13px; }
+.reference-trial .reference-table thead { font-family: "Times New Roman", Times, serif; }
+.reference-trial .reference-table th { font-weight: bold; text-decoration: underline; }
+.reference-account .reference-title { font-weight: bold; text-decoration: underline; }
+.reference-account .reference-table thead th { background: #d9d9d9; padding: 5px; text-transform: none; }
+.reference-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px 32px; margin: 20px 0 12px; }
+.reference-facts > div { display: flex; gap: 20px; min-width: 0; }
+.reference-facts dt { font-weight: bold; }
+.reference-facts dd { margin: 0; overflow-wrap: anywhere; }
+.reference-pagination { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; align-items: center; margin: 16px 0; }
+@media (max-width: 640px) { .reference-report { padding: 12px; } .reference-facts { grid-template-columns: minmax(0,1fr); } }
+@media print {
+  .reference-details, .reference-pagination, .statement-actions { display: none !important; }
+  .reference-report { padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .reference-scroll { overflow: visible; }
+  .reference-table { min-width: 0 !important; font-size: 9pt; }
+  .reference-table thead { display: table-header-group; }
+  .reference-table tr { break-inside: avoid; }
+  .reference-table .reference-amount, .reference-table .statement-number { text-align: right; }
+}

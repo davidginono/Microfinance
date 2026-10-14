@@ -39,7 +39,9 @@ public class LedgerReportService {
             List<AccountBalance> accounts, Totals totals, Coverage coverage, boolean hasNext) {}
     public record Activity(UUID journalId, LocalDate effectiveDate, OffsetDateTime recordedAt,
             OffsetDateTime postedAt, String sourceType, String sourceReference, String evidenceReference,
-            UUID reversalOf, BigDecimal debit, BigDecimal credit) {}
+            UUID reversalOf, BigDecimal debit, BigDecimal credit, BigDecimal cumulativeMovement) {
+        public Activity(UUID journalId,LocalDate effectiveDate,OffsetDateTime recordedAt,OffsetDateTime postedAt,String sourceType,String sourceReference,String evidenceReference,UUID reversalOf,BigDecimal debit,BigDecimal credit){this(journalId,effectiveDate,recordedAt,postedAt,sourceType,sourceReference,evidenceReference,reversalOf,debit,credit,null);}
+    }
     public record AccountActivity(Scope scope, Parameters parameters, UUID accountId, String code,
             String name, BigDecimal opening, List<Activity> movements, BigDecimal closing,
             Coverage coverage, boolean hasNext) {}

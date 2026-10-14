@@ -37,14 +37,14 @@ class ClientLoanStatementDocumentTest {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
         var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));var controller=new LoanRecordingController(service,renderer,clock,messages,mock(com.sacco.mvp.service.SaccoLogoStorageService.class));
         var model=new ExtendedModelMap();var request=new MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/print");
-        assertThat(controller.statementExport(actor,client,request,Locale.ENGLISH,model)).isEqualTo("accounting/loans/statement-print");
-        var document=(StatementDocument)model.get("document");var section=document.sections().getFirst();
-        assertThat(section.fields()).contains(new StatementField("Last instalment date","16-SEP-2027"),
-            new StatementField("Opening principal balance (TZS)","1,000.00"),new StatementField("Interest rate (% per year)","24.00"));
-        assertThat(section.rows().get(1).subList(6,10)).containsExactly("","100.00","10.00","900.00");
-        assertThat(section.rows().get(2).subList(6,10)).containsExactly("100.00","","-10.00","1,000.00");
+        var print=(ResponseEntity<?>)controller.statementExport(actor,client,request,Locale.ENGLISH,model);
+        assertThat(print.getHeaders().getFirst("Content-Disposition")).startsWith("inline");
+        try(var printed=Loader.loadPDF((byte[])print.getBody())){
+            assertThat(new PDFTextStripper().getText(printed).replaceAll("\\s+"," ")).contains("16-SEP-2027","1,000.00","24.00","900.00","-10.00");
+        }
         request.setRequestURI("/finance/client-ledgers/"+client+"/pdf");
         var response=(ResponseEntity<?>)controller.statementExport(actor,client,request,Locale.ENGLISH,new ExtendedModelMap());
+        java.nio.file.Files.write(java.nio.file.Path.of("target/loan-statement-reference.pdf"),(byte[])response.getBody());
         try(var pdf=Loader.loadPDF((byte[])response.getBody())){
             assertThat(pdf.getPage(0).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(0).getMediaBox().getHeight());
             assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("CLIENT LOAN STATEMENT","James Mafumba","D001","P001","R001","Principal balance","24.00");

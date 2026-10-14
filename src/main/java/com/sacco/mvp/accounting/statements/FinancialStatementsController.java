@@ -58,7 +58,7 @@ public class FinancialStatementsController {
         var artifact=outputs.artifacts(actor,output).stream().filter(a->a.format()==Format.PDF).findFirst().orElseThrow();
         return pdf(outputs.download(actor,output,artifact.id()).bytes(),inline,"financial-statement.pdf");
     }
-    private static Layout layout(Kind kind,Locale locale){return new Layout(3,locale.getLanguage().equals("sw")?"sw":"en",kind==Kind.CHANGES_IN_EQUITY,false);}
+    private static Layout layout(Kind kind,Locale locale){return new Layout(4,locale.getLanguage().equals("sw")?"sw":"en",kind==Kind.CHANGES_IN_EQUITY,false);}
     private static ResponseEntity<byte[]> pdf(byte[] bytes,boolean inline,String filename){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF).header(HttpHeaders.CONTENT_DISPOSITION,(inline?"inline":"attachment")+"; filename="+filename).header("X-Content-Type-Options","nosniff").body(bytes);}
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     String invalid(IllegalArgumentException failure,Model model){String key=failure.getMessage();model.addAttribute("statementError",key!=null&&(key.startsWith("statement.error.")||key.startsWith("accounting.release.error.")||key.startsWith("accounting.policy.error."))?key:"statement.error.validation");return "reports/statement-error";}

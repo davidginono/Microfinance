@@ -39,3 +39,17 @@
 .statement-transactions col:nth-child(8) { width: 7.6%; }
 .statement-transactions col:nth-child(9) { width: 7.3%; }
 .statement-transactions col:nth-child(10) { width: 7.9%; }
+
+.client-statement-workspace .client-loan-statement { max-width: none; font-family: "Times New Roman", Times, serif; }
+.client-statement-workspace .client-loan-statement .reference-title { font-family: "Times New Roman", Times, serif; font-weight: bold; text-decoration: underline; }
+.client-statement-workspace .client-loan-statement .reference-table tbody { font-family: "Courier New", Courier, monospace; }
+.client-statement-workspace .client-loan-statement .reference-table { min-width: 1100px; font-size: 13px; }
+.client-statement-workspace .reference-pagination { font-family: Arial, sans-serif; }
+
+.reference-report.client-loan-statement { max-width: none; font-family: "Times New Roman", Times, serif; }
+.reference-report.client-loan-statement h1 { font-weight: bold; }
+.reference-report.client-loan-statement .statement-facts { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px 24px; }
+.reference-report.client-loan-statement .statement-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.reference-report.client-loan-statement .statement-facts dd { font-weight: bold; font-style: italic; }
+.reference-report.client-loan-statement .statement-transactions td { font-family: "Courier New", Courier, monospace; }
+@media (max-width: 767px) { .reference-report.client-loan-statement .statement-facts { grid-template-columns: minmax(0,1fr); } }

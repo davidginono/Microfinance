@@ -39,7 +39,7 @@ public class StatementTypedExporter {
  }
  /** Draft files remain explicitly marked drafts and never enter the retained final-output workflow. */
  public byte[] exportDraft(Result result,Layout layout){
-  layout.validate();if(layout.version()!=3||!"DRAFT".equals(result.status())||result.id()!=null||result.rows().size()>10_000||result.disclosures().size()>2500)throw new IllegalArgumentException("accounting.release.error.source");
+  layout.validate();if((layout.version()!=3&&layout.version()!=4)||!"DRAFT".equals(result.status())||result.id()!=null||result.rows().size()>10_000||result.disclosures().size()>2500)throw new IllegalArgumentException("accounting.release.error.source");
   try{return pdf(result,layout,null);}catch(IOException|ArithmeticException|IllegalArgumentException ex){throw new IllegalArgumentException("accounting.release.error.export",ex);}
  }
  private String message(String key,Layout layout){return messages.getMessage(key,null,key,Locale.forLanguageTag(layout.language()));}
@@ -68,15 +68,16 @@ public class StatementTypedExporter {
    PDFont pdfFont=PDType0Font.load(document,in);boolean comparative=r.definition().comparison();
    String period=r.definition().kind()==com.sacco.mvp.accounting.statements.StatementDefinition.Kind.BALANCE_SHEET?message("financial.print.asAt",l)+": "+r.through():message("report.period",l)+": "+r.from()+" / "+r.through();
    var summary=List.of(message("report.scope",l)+": "+r.institution()+" / "+r.branch(),period+"  |  TZS  |  "+r.status(),message("statement.export.generated",l)+": "+r.generatedAt());
-   String title=l.language().equals("sw")?r.definition().titleSw():r.definition().titleEn();
+   String title=l.language().equals("sw")?r.definition().titleSw():r.definition().titleEn();if(l.version()>=4)title=title.toUpperCase(Locale.forLanguageTag(l.language()));
    var image=logo==null?null:PDImageXObject.createFromByteArray(document,logo.logo(),"institution-logo");
-   try(var page=new AccountingPdfDocument(document,pdfFont,l.landscape()||l.version()==3&&r.definition().kind()==com.sacco.mvp.accounting.statements.StatementDefinition.Kind.CHANGES_IN_EQUITY,title,summary,image)){
-    boolean matrix=l.version()==3&&!r.getEquityRows().isEmpty();if(matrix)equityMatrix(page,r,l);
+   try(var page=new AccountingPdfDocument(document,pdfFont,l.landscape()||l.version()>=3&&r.definition().kind()==com.sacco.mvp.accounting.statements.StatementDefinition.Kind.CHANGES_IN_EQUITY,title,summary,image,l.version()<4?AccountingPdfDocument.Style.ORIGINAL:r.definition().kind()==com.sacco.mvp.accounting.statements.StatementDefinition.Kind.CHANGES_IN_EQUITY?AccountingPdfDocument.Style.EQUITY:AccountingPdfDocument.Style.STATEMENT)){
+    boolean matrix=l.version()>=3&&!r.getEquityRows().isEmpty();if(matrix)equityMatrix(page,r,l);
     var headings=new ArrayList<>(List.of(message("statement.export.line",l),message("financial.print.notes",l),message("statement.export.current",l)));
     if(comparative)headings.add(message("statement.export.comparison",l));
-    if(!matrix||comparative||r.getStatementRows().stream().anyMatch(row->row.kind()==RowKind.SUBTOTAL||row.kind()==RowKind.RATIO))page.columns(headings,comparative?new float[]{.46f,.06f,.24f,.24f}:new float[]{.64f,.08f,.28f},comparative?new boolean[]{false,false,true,true}:new boolean[]{false,false,true});
+    if(!matrix||comparative||r.getStatementRows().stream().anyMatch(row->(row.kind()==RowKind.SUBTOTAL||row.kind()==RowKind.RATIO)&&(l.version()<4||!row.mandatory())))page.columns(headings,comparative?new float[]{.46f,.06f,.24f,.24f}:new float[]{.64f,.08f,.28f},comparative?new boolean[]{false,false,true,true}:new boolean[]{false,false,true});
     var notes=new ArrayList<String>();
-    for(var row:l.version()==3?r.getStatementRows():r.getVisibleRows()){
+    for(var row:l.version()>=3?r.getStatementRows():r.getVisibleRows()){
+     if(l.version()>=4&&matrix&&!comparative&&row.mandatory()&&row.id().startsWith("REQUIRED_"))continue;
      String note=l.language().equals("sw")?row.noteSw():row.noteEn();boolean hasNote=note!=null&&!note.isBlank();
      if(row.kind()==RowKind.HEADING){page.section(label(row,l));if(hasNote)notes.add(note);continue;}
      // Required source evidence is appendix text, not a financial amount or an invented account code.
@@ -84,12 +85,12 @@ public class StatementTypedExporter {
      String noteNumber="";if(hasNote){notes.add(note);noteNumber=Integer.toString(notes.size());}
      var values=new ArrayList<>(List.of(label(row,l)+(row.unit()==Unit.RATIO?" ("+unit(row.unit(),l)+")":""),noteNumber,printed(row.current(),row.unit(),row.status(),l)));
      if(comparative)values.add(printed(row.comparison(),row.unit(),row.comparisonStatus(),l));
-     if(l.version()!=3||r.getEquityRows().isEmpty()||comparative||row.kind()!=RowKind.ACCOUNT_GROUP)page.row(values,row.kind()==RowKind.SUBTOTAL || row.mandatory());
+     if(l.version()<3||r.getEquityRows().isEmpty()||comparative||row.kind()!=RowKind.ACCOUNT_GROUP)page.row(values,row.kind()==RowKind.SUBTOTAL || row.mandatory());
     }
     page.endTable();
     if(!notes.isEmpty()){page.section(message("financial.print.notes",l));for(int n=0;n<notes.size();n++)page.text((n+1)+". "+notes.get(n));}
-    page.section(message("financial.print.reportContext",l));for(String line:context(r,l).subList(1,context(r,l).size()))page.text(line);
-    if(l.version()==3)for(var row:r.getSupportingRows())page.text(label(row,l)+": "+printed(row.current(),row.unit(),row.status(),l)+(comparative?" / "+printed(row.comparison(),row.unit(),row.comparisonStatus(),l):""));
+    if(l.version()>=4)page.appendix(message("financial.print.reportContext",l));else page.section(message("financial.print.reportContext",l));for(String line:context(r,l).subList(1,context(r,l).size()))page.text(line);
+    if(l.version()>=3)for(var row:r.getSupportingRows())page.text(label(row,l)+": "+printed(row.current(),row.unit(),row.status(),l)+(comparative?" / "+printed(row.comparison(),row.unit(),row.comparisonStatus(),l):""));
     for(var text:r.disclosures())page.text(disclosure(text,l));
    }
    document.save(out);return out.toByteArray();

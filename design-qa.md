@@ -153,3 +153,32 @@ final result: passed
 - [x] Existing login and registration flows reused
 
 final result: passed
+
+
+---
+
+# Financial statement reference designs — 2026-10-14
+
+## Comparison target and evidence
+
+The seven user-supplied report images are the visual references: trial balance, balance sheet, cash flow, changes in equity, client loan statement and two account statement examples. They specify presentation, not account mappings, transactions, cooperative products or accounting policy. The shared application shell remains unchanged.
+
+Synthetic PDF samples were rendered with Poppler and inspected at up to 1250 pixels: `target/trial-balance-format.pdf`, `target/balance_sheet-reference-format.pdf`, `target/profit_and_loss-reference-format.pdf`, `target/cash-flow-reference.pdf`, `target/equity-reference-format.pdf`, `target/account-statement-reference.pdf` and `target/loan-statement-reference.pdf`. These local ignored artifacts contain synthetic test data and are not institution reports.
+
+## Findings and changes
+
+- Document surfaces use serif trial/loan headings, sans-serif financial/account statements, a red equity heading with monospaced matrix, compact borderless rows, gray transaction headers, underlined totals and parenthesized financial amounts. The PDF renderer uses Times, Helvetica and Courier with the existing embedded fallback where required. Browser CSS selects corresponding local font families. Exact raster font identity cannot be established from the screenshots alone.
+- The first loan PDF review found transaction text too small. Increased the Courier body and adjusted column widths; the regenerated PDF remains readable with complete transaction content. Long unavailable values can wrap in narrow metadata/document columns.
+- Moved detailed source evidence to appendix pages so the financial layout stays compact. Institution, branch, period, currency and draft/final status remain visible. Real mappings, available ledger data and localized domain wording determine report content; screenshot balances and cooperative reserve percentages are not copied.
+- On-screen Details links resolve a statement line's saved accounts into a paginated trial balance, then a scoped account statement. PDF/Print omits Details. Client loan statements link from the client ledger and share their data model with PDF output.
+- Responsive CSS contains wide reports in horizontal scroll areas, wraps toolbar controls and stacks metadata on small screens. This is implementation evidence, not a rendered mobile acceptance result.
+
+## Verification
+
+- Focused acceptance: 86 tests passed, zero failures/errors/skips, including PostgreSQL mapping/snapshot scope, trial drilldowns, running balances across pages, loan ownership/opening values, output authorization, PDF-only routes and Jasper compilation of all six affected JSP pages.
+- After enlarging loan transaction typography: 6 loan document/PDF tests passed.
+- Final PDF checks: 21 tests passed, including layout-version compatibility, embedded fallback, the equity Courier/bold fonts and red title, PDF amount rendering and export limits.
+- Rendered and inspected the synthetic PDF designs, including cash flow. Retained source artifacts are unchanged; new financial statement outputs use layout version 4.
+- The browser tool timed out on both tab creation and surface inventory. Live page interactions, browser console state, and desktop/mobile screenshot comparison could not be verified. No full-suite, load-test or institution-policy approval claim is made.
+
+final result: blocked — live browser and mobile visual acceptance remains unverified; implementation, focused checks and PDF visual inspection completed.

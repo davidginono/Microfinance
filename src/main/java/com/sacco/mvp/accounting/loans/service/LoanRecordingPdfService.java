@@ -6,6 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import java.awt.Color;
@@ -28,33 +31,34 @@ public class LoanRecordingPdfService {
     });}
     public byte[] renderStatement(StatementDocument source){return limiter.run(()->{
         try(var doc=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
-            var font=PDType0Font.load(doc,fontStream);
+            PDFont fallback=PDType0Font.load(doc,fontStream);PDFont font=new PDType1Font(FontName.COURIER);
+            PDFont titleFont=readable(new PDType1Font(FontName.TIMES_BOLD),fallback,source.title());
             var sections=source.sections().isEmpty()?List.of(new StatementSection(List.of(),List.of(),List.of())):source.sections();
             for(var section:sections){
                 PDPageContentStream stream=null;float y=0;
                 try{
                     var rows=section.rows().isEmpty()?List.of(List.of(source.empty())):section.rows();
                     for(var row:rows){
-                        float[] widths={68,78,70,72,68,196,60,60,58,62};
-                        var cells=new ArrayList<List<String>>();int lineCount=1;
-                        for(int c=0;c<row.size();c++){var lines=wrap(font,row.get(c),7,row.size()==1?792:widths[c]-8);cells.add(lines);lineCount=Math.max(lineCount,lines.size());}
-                        float height=lineCount*10+8;
+                        float[] widths={70,80,55,76,58,173,70,70,70,70};
+                        var cells=new ArrayList<List<String>>();var faces=new ArrayList<PDFont>();var points=new ArrayList<Float>();int lineCount=1;
+                        for(int c=0;c<row.size();c++){PDFont face=readable(font,fallback,row.get(c));float point=9;if(c>=6&&!row.get(c).isBlank())point=Math.min(point,(widths[c]-8)*1000/face.getStringWidth(row.get(c)));faces.add(face);points.add(point);var lines=wrap(face,row.get(c),point,row.size()==1?792:widths[c]-8);cells.add(lines);lineCount=Math.max(lineCount,lines.size());}
+                        float height=lineCount*11+5;
                         if(stream==null || y-height<45){
                             if(stream!=null)stream.close();
                             var page=new PDPage(new PDRectangle(PDRectangle.A4.getHeight(),PDRectangle.A4.getWidth()));doc.addPage(page);stream=new PDPageContentStream(doc,page);
-                            float titleWidth=font.getStringWidth(source.title())*12/1000;
-                            draw(stream,font,(842-titleWidth)/2,570,12,Color.BLACK,source.title());
+                            float titleWidth=titleFont.getStringWidth(source.title())*12/1000;
+                            draw(stream,titleFont,(842-titleWidth)/2,570,12,Color.BLACK,source.title());
                             stream.setStrokingColor(Color.BLACK);stream.moveTo((842-titleWidth)/2,567);stream.lineTo((842+titleWidth)/2,567);stream.stroke();
                             y=548;
-                            y=statementFields(stream,font,source.client(),y);
-                            y=statementFields(stream,font,section.fields(),y)-6;
+                            y=statementFields(stream,fallback,source.client(),y);
+                            y=statementFields(stream,fallback,section.fields(),y)-6;
                             if(!section.columns().isEmpty()){
                                 stream.setNonStrokingColor(new Color(222,222,222));stream.addRect(24,y-32,792,32);stream.fill();float x=24;
-                                for(int c=0;c<section.columns().size();c++){float lineY=y-10;for(var line:wrap(font,section.columns().get(c),7,widths[c]-8)){draw(stream,font,x+4,lineY,7,Color.BLACK,line);lineY-=9;}x+=widths[c];}y-=32;
+                                for(int c=0;c<section.columns().size();c++){PDFont face=readable(new PDType1Font(FontName.TIMES_BOLD),fallback,section.columns().get(c));float lineY=y-10;for(var line:wrap(face,section.columns().get(c),8,widths[c]-8)){draw(stream,face,x+4,lineY,8,Color.BLACK,line);lineY-=10;}x+=widths[c];}y-=32;
                             }
                         }
                         float x=24;
-                        for(int c=0;c<cells.size();c++){float lineY=y-12;for(var line:cells.get(c)){float textX=x+4;if(row.size()>1 && c>=6)textX=x+widths[c]-4-font.getStringWidth(line)*7/1000;draw(stream,font,textX,lineY,7,Color.BLACK,line);lineY-=10;}x+=row.size()==1?792:widths[c];}
+                        for(int c=0;c<cells.size();c++){float lineY=y-12;PDFont face=faces.get(c);float point=points.get(c);for(var line:cells.get(c)){float textX=x+4;if(row.size()>1 && c>=6)textX=x+widths[c]-4-face.getStringWidth(line)*point/1000;draw(stream,face,textX,lineY,point,Color.BLACK,line);lineY-=11;}x+=row.size()==1?792:widths[c];}
                         y-=height;
                     }
                 }finally{if(stream!=null)stream.close();}
@@ -66,14 +70,17 @@ public class LoanRecordingPdfService {
             doc.getDocumentInformation().setTitle(source.title());doc.save(out);return out.toByteArray();
         }catch(IOException e){throw new IllegalStateException("Client statement generation failed",e);}
     });}
-    private static float statementFields(PDPageContentStream stream,PDType0Font font,List<StatementField> fields,float y)throws IOException{
-        for(int i=0;i<fields.size();i+=4){int height=2;
-            for(int c=i;c<Math.min(i+4,fields.size());c++){
-                float x=24+(c-i)*198,lineY=y;
-                var labels=wrap(font,fields.get(c).label(),7,190);var values=wrap(font,fields.get(c).value(),8,190);height=Math.max(height,labels.size()+values.size());
-                for(var line:labels){draw(stream,font,x,lineY,7,Color.BLACK,line);lineY-=10;}
-                for(var line:values){draw(stream,font,x,lineY,8,Color.BLACK,line);lineY-=10;}
-            }y-=height*10+5;
+    private static float statementFields(PDPageContentStream stream,PDFont font,List<StatementField> fields,float y)throws IOException{
+        PDFont labelFont=new PDType1Font(FontName.TIMES_BOLD),valueFont=new PDType1Font(FontName.TIMES_BOLD_ITALIC);
+        for(int i=0;i<fields.size();i+=3){int height=1;
+            for(int c=i;c<Math.min(i+3,fields.size());c++){
+                float x=24+(c-i)*264,lineY=y;
+                PDFont labelFace=readable(labelFont,font,fields.get(c).label()),valueFace=readable(valueFont,font,fields.get(c).value());
+                var labels=wrap(labelFace,fields.get(c).label().toUpperCase(Locale.ROOT),8,148);
+                var values=wrap(valueFace,fields.get(c).value(),9,104);height=Math.max(height,Math.max(labels.size(),values.size()));
+                for(var line:labels){draw(stream,labelFace,x,lineY,8,Color.BLACK,line);lineY-=11;}
+                lineY=y;for(var line:values){draw(stream,valueFace,x+152,lineY,9,Color.BLACK,line);lineY-=11;}
+            }y-=height*11+5;
         }return y;
     }
     public byte[] render(Document source){return limiter.run(()->{
@@ -96,7 +103,8 @@ public class LoanRecordingPdfService {
             doc.getDocumentInformation().setTitle(source.title());doc.save(out);return out.toByteArray();
         }catch(IOException e){throw new IllegalStateException("Loan document generation failed",e);}
     });}
-    private static List<String> wrap(PDType0Font font,String value,float size,float width)throws IOException{
+    private static PDFont readable(PDFont preferred,PDFont fallback,String value)throws IOException{try{preferred.encode(value);return preferred;}catch(IllegalArgumentException unsupported){return fallback;}}
+    private static List<String> wrap(PDFont font,String value,float size,float width)throws IOException{
         var rows=new ArrayList<String>();var line=new StringBuilder();
         for(int point:Objects.toString(value,"").codePoints().toArray()){
             if(point=='\n'){rows.add(line.toString());line.setLength(0);continue;}
@@ -108,5 +116,5 @@ public class LoanRecordingPdfService {
             }line.append(ch);
         }rows.add(line.toString());return rows;
     }
-    private static void draw(PDPageContentStream stream,PDType0Font font,float x,float y,float size,Color color,String text)throws IOException{stream.beginText();stream.setNonStrokingColor(color);stream.setFont(font,size);stream.newLineAtOffset(x,y);stream.showText(text);stream.endText();}
+    private static void draw(PDPageContentStream stream,PDFont font,float x,float y,float size,Color color,String text)throws IOException{stream.beginText();stream.setNonStrokingColor(color);stream.setFont(font,size);stream.newLineAtOffset(x,y);stream.showText(text);stream.endText();}
 }

@@ -2,6 +2,7 @@ package com.sacco.mvp.accounting.statements;
 
 import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
+import com.sacco.mvp.accounting.reports.LedgerReportService;
 import com.sacco.mvp.accounting.reconciliation.ReconciliationService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -67,6 +68,51 @@ public class StatementDesignerService {
     private record Source(LocalDate from,LocalDate through,OffsetDateTime cutoff,UUID closeId,String checksum,
             UUID policyId,int policyVersion,List<Balance> balances,List<Map<String,Object>> cashMovements,Map<String,Object> cashTransfers,List<String> disclosures,String reportingFramework,Map<String,Object> frozen) { }
     public record MappingApproval(UUID id,UUID templateId,int version,UUID reviewer,String evidence,String state,String definitionChecksum) { }
+
+    public record LineTrial(Result result, Row row, LedgerReportService.TrialBalance trial) { }
+
+    /** Resolve the account set on the server from the displayed mapping, never from URL account lists. */
+    @Transactional(isolation=Isolation.REPEATABLE_READ,timeout=20)
+    public LineTrial lineTrial(AppUserPrincipal actor,String source,UUID id,String line,LocalDate from,LocalDate through,
+            LocalDate comparisonFrom,LocalDate comparisonThrough,OffsetDateTime cutoff,int page,boolean export) {
+        authorize(actor,UserClaim.FINANCIAL_REPORTS_VIEW);
+        if(export){authorizeExport(actor);authorize(actor,UserClaim.FINANCIAL_REPORTS_EXPORT);}
+        page(page);require(Set.of("versions","results").contains(source),"source");
+        Result result=source.equals("results")?verifiedResult(actor,id):preview(actor,id,from,through,comparisonFrom,comparisonThrough,cutoff);
+        Row row=result.definition().rows().stream().filter(r->r.id().equals(line) && r.visible() && r.kind()==RowKind.ACCOUNT_GROUP).findFirst()
+            .orElseThrow(()->new AccessDeniedException("Statement line unavailable"));
+        List<Balance> balances;
+        if(result.id()==null)balances=repository.balances(result.institution(),result.branch(),result.from(),result.through(),result.recordedCutoff());
+        else if(result.dimension()==RegulatoryFormatCatalog.Scope.INSTITUTION){
+            String json=repository.institutionSource(result.institution(),result.institutionPeriodId(),result.institutionSourceChecksum());
+            require(sha(json.getBytes(StandardCharsets.UTF_8)).equals(result.institutionSourceChecksum()),"checksum");
+            balances=snapshotBalances(json);
+        }else{
+            Source closed=closed(actor,result.closeReviewId());require(closed.checksum().equals(result.closeChecksum()),"checksum");balances=closed.balances();
+        }
+        require(balances.size()<=1000,"size");
+        boolean known=result.id()!=null || "REVIEWED_COVERAGE".equals(result.coverage());
+        Set<UUID> ids=Set.copyOf(row.accounts());
+        // Older close snapshots retain codes but not names. Labels may follow today's chart; amounts never do.
+        Map<UUID,String> names=result.id()==null?Map.of():catalog(actor).stream().collect(java.util.stream.Collectors.toMap(Account::id,Account::name));
+        var accounts=balances.stream().filter(b->ids.contains(b.account().id())).sorted(Comparator.comparing(b->b.account().code()))
+            .map(b->new LedgerReportService.AccountBalance(b.account().id(),b.account().code(),names.getOrDefault(b.account().id(),b.account().name()),b.account().type(),b.account().purpose(),known?b.opening():null,b.debit(),b.credit(),known?b.closing():null)).toList();
+        require(accounts.size()==ids.size(),"source");
+        BigDecimal openingDebit=BigDecimal.ZERO,openingCredit=BigDecimal.ZERO,debit=BigDecimal.ZERO,credit=BigDecimal.ZERO,closingDebit=BigDecimal.ZERO,closingCredit=BigDecimal.ZERO;
+        for(var a:accounts){debit=debit.add(a.debit());credit=credit.add(a.credit());if(known){openingDebit=openingDebit.add(a.opening().max(BigDecimal.ZERO));openingCredit=openingCredit.add(a.opening().negate().max(BigDecimal.ZERO));closingDebit=closingDebit.add(a.closing().max(BigDecimal.ZERO));closingCredit=closingCredit.add(a.closing().negate().max(BigDecimal.ZERO));}}
+        var totals=new LedgerReportService.Totals(known?openingDebit:null,known?openingCredit:null,debit,credit,known?closingDebit:null,known?closingCredit:null);
+        int start=Math.min(accounts.size(),Math.multiplyExact(page,25)),end=Math.min(accounts.size(),start+25);
+        var trial=new LedgerReportService.TrialBalance(new LedgerReportService.Scope(result.institution(),result.branch(),result.dimension()==RegulatoryFormatCatalog.Scope.INSTITUTION),
+            new LedgerReportService.Parameters(result.from(),result.through(),result.recordedCutoff(),page),result.policyId(),result.policyVersion(),export?accounts:accounts.subList(start,end),totals,
+            new LedgerReportService.Coverage(known?0:1,0,0),!export && end<accounts.size());
+        return new LineTrial(result,row,trial);
+    }
+
+    @SuppressWarnings("unchecked") private List<Balance> snapshotBalances(String json){
+        Map<String,Object> snapshot=mapper.readerFor(Map.class).with(tools.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readValue(json);
+        var rows=(List<Map<String,Object>>)snapshot.get("accounts");require(rows!=null && rows.size()<=1000,"source");
+        return rows.stream().map(a->new Balance(new Account(UUID.fromString(a.get("id").toString()),a.get("code").toString(),Objects.toString(a.get("name"),a.get("code").toString()),a.get("type").toString(),a.get("purpose").toString()),decimal(a.get("opening")),decimal(a.get("period_debit")),decimal(a.get("period_credit")),decimal(a.get("closing")))).toList();
+    }
 
     @Transactional public UUID save(AppUserPrincipal actor,UUID template,StatementDefinition definition,String evidence){
         actor=authorize(actor,UserClaim.STATEMENT_DESIGN);text(evidence,1000);require(definition.kind()!=Kind.CASH_FLOW || definition.calculationVersion()==2,"cashVersion");definition.validateMappings(catalog(actor));

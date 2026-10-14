@@ -87,6 +87,16 @@ class LedgerReportPostgresTest {
     private Journal post(String reference,String amount) {
         var j=service.draftManual(maker,command(reference,amount));service.approve(checker,j.id(),"Synthetic independent review");return service.post(checker,j.id(),false);
     }
+    @Test void accountRunningMovementIsCalculatedBeforePageLimitAndRespectsCutoff(){
+        opening();for(int n=0;n<28;n++)post("PAGED-"+n,"1.01");
+        var cutoff=OffsetDateTime.now();post("AFTER-CUTOFF","99.00");
+        var second=new LedgerReportService.Parameters(DAY,DAY.plusDays(1),cutoff,1);
+        var rows=reports.activity(scope(false),second,cash);
+        assertThat(rows).hasSize(3);
+        assertThat(rows.getFirst().cumulativeMovement()).isEqualByComparingTo("26.26");
+        assertThat(rows.getLast().cumulativeMovement()).isEqualByComparingTo("28.28");
+        assertThat(rows).noneMatch(a->"AFTER-CUTOFF".equals(a.sourceReference()));
+    }
     @Test void unknownOpeningIsUnknownAndInactiveHistoricalBranchStillNeedsCoverage() {
         var params=p(OffsetDateTime.now());var coverage=reports.coverage(scope(false),params);
         assertThat(coverage.missingOpenings()).isEqualTo(1);

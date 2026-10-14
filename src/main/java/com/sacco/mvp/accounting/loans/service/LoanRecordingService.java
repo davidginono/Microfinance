@@ -178,6 +178,16 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public Posting posting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.posting(a,id);}
     @Transactional(readOnly=true) public Page<Posting> history(AppUserPrincipal a,UUID id,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");records.record(a,id,false);var rows=records.loanPosts(a,id,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional(readOnly=true) public Page<Posting> movements(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");check(records.ledgerClient(a,client).isPresent(),"client");var rows=records.clientPosts(a,client,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
+    public record LoanStatementView(StatementExport source,Posting opening,int page,boolean hasNext) {}
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public LoanStatementView loanStatement(AppUserPrincipal a,UUID client,UUID loan,int page,boolean export){
+        authorize(a,export?"EXPORT":"VIEW");check(page>=0 && page<=10000,"filter");
+        var owner=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
+        var record=records.loan(a,loan,clock.today());
+        if(!record.clientId().equals(client))throw new org.springframework.security.access.AccessDeniedException("Loan outside client statement");
+        var rows=records.loanPosts(a,loan,export?501:26,export?0:page*25);if(export)check(rows.size()<=500,"reportLimit");
+        return new LoanStatementView(new StatementExport(owner.label(),List.of(record),export?rows:rows.stream().limit(25).toList(),records.statementTerms(a,client,loan)),records.loanOpening(a,loan).orElse(null),page,!export && rows.size()>25);
+    }
     public record StatementExport(String client,List<LoanRow> loans,List<Posting> movements,List<StatementTerms> terms) {}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public StatementExport exportStatement(AppUserPrincipal a,UUID client){

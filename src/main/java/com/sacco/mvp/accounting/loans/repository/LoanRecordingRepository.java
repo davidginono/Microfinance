@@ -95,7 +95,8 @@ public class LoanRecordingRepository {
     public Optional<Choice> client(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no||' - '||full_name label from members where id=? and sacco_id=? and station_id=? and status='ACTIVE' and is_member",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Choice> ledgerClients(AppUserPrincipal a,String search,int page){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.sacco_id=? and ((m.station_id=? and m.is_member) or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?)) and strpos(lower(m.member_no||' '||m.full_name),?)>0 order by m.member_no,m.id limit 26 offset ?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
     public Optional<Choice> ledgerClient(AppUserPrincipal a,UUID id){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.id=? and m.sacco_id=? and (m.station_id=? or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?))",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId()).stream().findFirst();}
-    public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client){return jdbc.query("""
+    public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client){return statementTerms(a,client,null);}
+    public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client,UUID loan){return jdbc.query("""
         select a.id,a.tenor_months,r.first_payment_date,
         (a.financial_snapshot::jsonb->>'interestRate')::numeric rate,
         a.financial_snapshot::jsonb->>'repaymentFrequency' frequency,
@@ -105,11 +106,11 @@ public class LoanRecordingRepository {
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id
         join registered_saccos i on i.sacco_id=r.sacco_id
         join sacco_stations s on s.sacco_id=r.sacco_id and s.station_id=r.station_id
-        where a.applicant_member_id=? and r.sacco_id=? and r.station_id=?
+        where a.applicant_member_id=? and r.sacco_id=? and r.station_id=? and (?::uuid is null or a.id=?)
         order by r.application_date,a.id limit 501
         """,(r,n)->new StatementTerms(r.getObject("id",UUID.class),r.getBigDecimal("rate"),r.getString("frequency"),
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
-            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name")),client,a.getSaccoId(),a.getStationId());}
+            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name")),client,a.getSaccoId(),a.getStationId(),loan,loan);}
     public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and active
         and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
@@ -154,6 +155,7 @@ public class LoanRecordingRepository {
     }
     public void finish(UUID id,UUID transaction,BigDecimal principal,BigDecimal interest,BigDecimal balance){jdbc.update("update accountant_loan_post set transaction_id=?,principal_amount=?,interest_amount=?,principal_balance=?,state='POSTED' where id=? and state='POSTING'",transaction,principal,interest,balance,id);}
     public Posting posting(AppUserPrincipal a,UUID id){return jdbc.query(POSTS+" where p.id=? and p.sacco_id=? and p.station_id=?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Posting unavailable"));}
+    public Optional<Posting> loanOpening(AppUserPrincipal a,UUID loan){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='DISBURSEMENT' order by p.recorded_at,p.id limit 1",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Posting> loanPosts(AppUserPrincipal a,UUID loan,int limit,int offset){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? order by p.recorded_at,p.id limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId(),limit,offset);}
     public List<Posting> clientPosts(AppUserPrincipal a,UUID client,int limit,int offset){return jdbc.query(POSTS+" where a.applicant_member_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by p.recorded_at,p.id limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,client,a.getSaccoId(),a.getStationId(),limit,offset);}
     private String postWhere(){return """

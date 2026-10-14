@@ -78,14 +78,15 @@ public class LedgerReportRepository {
     private List<Activity> activity(Scope scope,Parameters p,UUID account,int limit,int offset) {
         return jdbc.query("""
             SELECT j.id,j.effective_date,j.recorded_at,j.posted_at,j.source_type,j.source_reference,j.evidence_reference,j.reverses_id,
-              SUM(l.debit) debit,SUM(l.credit) credit
+              SUM(l.debit) debit,SUM(l.credit) credit,
+              SUM(SUM(l.debit-l.credit)) OVER (ORDER BY j.effective_date,j.posted_at,j.id ROWS UNBOUNDED PRECEDING) cumulative_movement
             FROM gl_journal j JOIN gl_journal_line l ON (l.journal_id,l.sacco_id,l.station_id)=(j.id,j.sacco_id,j.station_id)
             WHERE j.sacco_id=:institution AND (:wide OR j.station_id=:branch) AND l.account_id=:account AND j.state='POSTED'
               AND j.source_type<>'OPENING' AND j.effective_date BETWEEN :from AND :through AND j.posted_at<=:cutoff AND j.recorded_at<=:cutoff
             GROUP BY j.id ORDER BY j.effective_date,j.posted_at,j.id LIMIT :rowLimit OFFSET :offset
             """,parameters(scope,p).addValue("account",account).addValue("rowLimit",limit).addValue("offset",offset),(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),
                 r.getObject("recorded_at",OffsetDateTime.class),r.getObject("posted_at",OffsetDateTime.class),r.getString("source_type"),r.getString("source_reference"),
-                r.getString("evidence_reference"),r.getObject("reverses_id",UUID.class),r.getBigDecimal("debit"),r.getBigDecimal("credit")));
+                r.getString("evidence_reference"),r.getObject("reverses_id",UUID.class),r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("cumulative_movement")));
     }
     public Coverage coverage(Scope scope,Parameters p) {
         return jdbc.queryForObject("""
