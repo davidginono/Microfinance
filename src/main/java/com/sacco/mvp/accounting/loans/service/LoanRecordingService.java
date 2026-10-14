@@ -34,6 +34,10 @@ public class LoanRecordingService {
     private final AuditService audit;
     private final LoanAttachmentService attachments;
     private final LoanDisbursementNumberService disbursementNumbers;
+    private final LoanProductWorkflowService workflows;
+    private final WorkflowRoutingService routing;
+    private final LoanProductBoardReviewerRepository productReviewers;
+    private final ManagerReviewRepository reviews;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -115,16 +119,19 @@ public class LoanRecordingService {
         snapshot.put("interestRate",product.getInterestRate());snapshot.put("interestMethod",product.getInterestMethod().name());snapshot.put("repaymentFrequency",product.getResolvedRepaymentFrequency().name());
         tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
+        var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
+        var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
         long number=numbers.nextFor(a.getSaccoId());
         var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
             .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(f))
-            .policySnapshot(write(Map.of("source","ACCOUNTANT_DIRECT","product",product.getDisplayName(),"guarantorsRequired",product.getGuarantorsRequired())))
+            .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
             .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,null));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
-        event(a,id,"LOAN_RECORDED",Map.of("principal",f.getPrincipal()));return id;
+        routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);
+        event(a,id,"LOAN_APPLICATION_RECORDED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
     }
     @Transactional(readOnly=true)
     public Detail detail(AppUserPrincipal a,UUID id){
@@ -139,8 +146,11 @@ public class LoanRecordingService {
     @Transactional
     public Posting disburse(AppUserPrincipal a,PostForm f,List<org.springframework.web.multipart.MultipartFile> files){
         validateFiles(files);
-        authorize(a,"DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
-        var record=records.record(a,f.getLoanId(),true);var loan=loans.findById(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.RECORDED,"state");
+        accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
+        var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
+        check(allowedTeller(loan,a.getMemberId()),"customTeller");
+        var policy=schedules.parseSummary(loan.getPolicySnapshot());
+        if(Boolean.TRUE.equals(policy.get("disbursementProofRequired")))check(files.stream().anyMatch(file->!file.isEmpty()),"attachments");
         check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");LocalDate first=f.getFirstPaymentDate()!=null?f.getFirstPaymentDate():loan.getFirstRepaymentDate();
         check(first!=null,"date");
         check(!f.getEffectiveDate().isBefore(((java.sql.Date)record.get("application_date")).toLocalDate()) && first.isAfter(f.getEffectiveDate()),"date");
@@ -155,7 +165,10 @@ public class LoanRecordingService {
         disbursementNumbers.assign(loan,a.getMemberId(),f.getEffectiveDate());
         loan.setRepaymentScheduleJson(schedule.scheduleJson());loan.setFinalDueDate(schedule.finalDueDate());loan.setUpdatedAt(now);loans.saveAndFlush(loan);repayments.openAtDisbursement(loan);
         records.lines(a,journal,List.of(new Object[]{principal.id(),f.getAmount(),ZERO},new Object[]{money.id(),ZERO,f.getAmount()}));
-        records.finish(id,null,f.getAmount(),ZERO,f.getAmount());records.postJournal(a,journal,now);event(a,id,"LOAN_DISBURSEMENT_POSTED",Map.of("loan",loan.getId(),"amount",f.getAmount()));return records.posting(a,id);
+        records.finish(id,null,f.getAmount(),ZERO,f.getAmount());records.postJournal(a,journal,now);
+        reviews.save(ManagerReview.builder().id(UUID.randomUUID()).loanApplicationId(loan.getId()).managerMemberId(a.getMemberId()).reviewStage(ApprovalWorkflowStage.DISBURSEMENT_OFFICER).decision(ManagerDecision.ACCEPT).reasons(f.getNotes()).createdAt(now).build());
+        routing.announceRecordedDisbursement(loan,a.getMemberId());
+        event(a,id,"LOAN_DISBURSEMENT_POSTED",Map.of("loan",loan.getId(),"amount",f.getAmount()));return records.posting(a,id);
     }
     @Transactional
     public Posting repay(AppUserPrincipal a,PostForm f){
@@ -225,11 +238,13 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public Totals totals(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);return records.totals(a,kind,f);}
     private LoanProductSetting product(AppUserPrincipal a,RecordForm f){
         if ("CUSTOM".equals(f.getLoanMode())) {
+            var configured=products.findBySaccoIdAndCustomRecordingConfigurationTrue(a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration"));
+            check(configured.getStatus()==LoanProductStatus.ACTIVE,"customConfiguration");
             check(Set.of("PERCENTAGE","AMOUNT").contains(f.getInterestEntry()) && Set.of("WHOLE_LOAN","ANNUAL").contains(f.getInterestBasis()) && f.getCustomFrequency()!=null,"terms");
             BigDecimal rate=BigDecimal.ZERO;
             if("AMOUNT".equals(f.getInterestEntry()))nonnegativeMoney(f.getInterestAmount());
             else {check(f.getInterestPercent()!=null && f.getInterestPercent().signum()>=0 && f.getInterestPercent().compareTo(new BigDecimal("10000"))<=0 && f.getInterestPercent().scale()<=4,"terms");rate=f.getInterestPercent().movePointLeft(2);}
-            return LoanProductSetting.builder().loanType(LoanType.CUSTOMIZED_LOAN).productName("Customised loan").interestRate(rate).interestMethod(InterestMethod.FLAT_RATE).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).build();
+            return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(InterestMethod.FLAT_RATE).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).build();
         }
         var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
         check((p.getMinimumAmount()==null || f.getPrincipal().compareTo(p.getMinimumAmount())>=0) && (p.getMaximumAmount()==null || f.getPrincipal().compareTo(p.getMaximumAmount())<=0),"productLimits");
@@ -265,4 +280,58 @@ public class LoanRecordingService {
     private String hash(Object value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(write(value).getBytes(StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
     private OffsetDateTime time(Object value){return value instanceof OffsetDateTime t?t:((java.sql.Timestamp)value).toInstant().atOffset(clock.now().getOffset());}
     private void event(AppUserPrincipal a,UUID id,String action,Map<String,Object> detail){audit.logEvent("LOAN_RECORDING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"LOAN",id.toString(),a.getSaccoId(),a.getStationId(),detail);}
+
+    @Transactional(readOnly=true)
+    public boolean recordedForStaff(AppUserPrincipal actor,UUID loan) {
+        accounting.requireActor(actor,actor.getClaims().contains("DISBURSEMENT_QUEUE_DISBURSE")?"DISBURSEMENT_QUEUE_DISBURSE":"DISBURSEMENT_QUEUE_VIEW");
+        return records.recorded(actor,loan);
+    }
+    @Transactional(readOnly=true)
+    public boolean allowedTeller(LoanApplication loan,UUID actor) {
+        var policy=schedules.parseSummary(loan.getPolicySnapshot());
+        var ids=policy.get("disbursementOfficerIds");
+        if("CUSTOM".equals(schedules.parseSummary(loan.getFinancialSnapshot()).get("loanMode")))return ids instanceof List<?> assigned && !assigned.isEmpty() && assigned.contains(actor.toString());
+        return !(ids instanceof List<?> assigned) || assigned.contains(actor.toString());
+    }
+    public boolean disbursementProofRequired(LoanApplication loan) {
+        return Boolean.TRUE.equals(schedules.parseSummary(loan.getPolicySnapshot()).get("disbursementProofRequired"));
+    }
+    @Transactional(readOnly=true)
+    public List<Choice> postingAccounts(AppUserPrincipal actor,UUID loan,String category,String search,int page) {
+        accounting.requireActor(actor,"DISBURSEMENT_QUEUE_DISBURSE");records.record(actor,loan,false);
+        check(allowedTeller(loans.findById(loan).orElseThrow(),actor.getMemberId()),"customTeller");
+        check(Set.of("money","principal").contains(category) && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
+        return records.accounts(actor,category.toUpperCase(Locale.ROOT),search,page);
+    }
+    @Transactional(readOnly=true)
+    public Choice postingAccount(AppUserPrincipal actor,UUID loan,UUID id,String category) {
+        accounting.requireActor(actor,"DISBURSEMENT_QUEUE_DISBURSE");records.record(actor,loan,false);
+        check(allowedTeller(loans.findById(loan).orElseThrow(),actor.getMemberId()),"customTeller");
+        check(Set.of("MONEY","PRINCIPAL").contains(category),"filter");
+        return records.account(actor,id,category,false);
+    }
+
+    private Map<String,Object> recordedPolicy(AppUserPrincipal a,LoanProductSetting selectedProduct,String label,Integer guarantors) {
+        var policy=new LinkedHashMap<String,Object>(workflows.snapshotData(workflows.resolveForProduct(a.getSaccoId(),selectedProduct)));
+        policy.put("source","ACCOUNTANT_DIRECT");policy.put("product",label);policy.put("guarantorsRequired",guarantors);policy.put("disbursementProofRequired",selectedProduct.isDisbursementProofRequired());policy.put("recordingWorkflowVersion","STAFF_REVIEW_V1");
+        if(selectedProduct.isCustomRecordingConfiguration()) {
+            var tellers=productReviewers.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(selectedProduct.getId(),ApprovalWorkflowStage.DISBURSEMENT_OFFICER).stream().map(LoanProductBoardReviewer::getBoardMemberId).toList();
+            check(!tellers.isEmpty() && records.availableTeller(a,tellers),"customTellers");policy.put("disbursementOfficerIds",tellers.stream().map(UUID::toString).toList());
+        }
+        for(var stage:List.of(ApprovalWorkflowStage.CHAIRPERSON,ApprovalWorkflowStage.BOARD,ApprovalWorkflowStage.CREDIT_COMMITTEE))
+            policy.put("recordingReviewers_"+stage.name(),productReviewers.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(selectedProduct.getId(),stage).stream().map(r->r.getBoardMemberId().toString()).toList());
+        return policy;
+    }
+    @Transactional
+    public void submitRecordedApplication(AppUserPrincipal actor,UUID id) {
+        authorize(actor,"CREATE");var record=records.record(actor,id,true);var application=loans.findForDisbursement(id).orElseThrow();
+        if(application.getStatus()!=LoanStatus.RECORDED){check("STAFF_REVIEW_V1".equals(schedules.parseSummary(application.getPolicySnapshot()).get("recordingWorkflowVersion")),"state");return;}
+        var form=read(record.get("metadata").toString(),RecordForm.class);
+        var product="CUSTOM".equals(form.getLoanMode())?products.findBySaccoIdAndCustomRecordingConfigurationTrue(actor.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration")):
+            products.findByIdAndSaccoId(application.getLoanProductSettingId(),actor.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));
+        check(product.getStatus()==LoanProductStatus.ACTIVE,"product");
+        application.setLoanProductSettingId(product.getId());application.setPolicySnapshot(write(recordedPolicy(actor,product,record.get("product_name").toString(),application.getRequiredGuarantors())));
+        routing.moveToFirstReviewStage(application,actor.getMemberId());loans.saveAndFlush(application);
+        event(actor,id,"RECORDED_APPLICATION_SUBMITTED",Map.of("status",application.getStatus().name()));
+    }
 }

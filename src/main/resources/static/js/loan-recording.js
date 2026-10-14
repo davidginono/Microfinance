@@ -12,7 +12,7 @@
       const version = ++request, query = search.value, normalized = query.trim().toLocaleLowerCase();
       loading = true; picker.setLoading(true); more.disabled = true;
       try {
-        const response = await fetch(root + '/finance/loan-recording/choices/' + box.dataset.category + '?' + new URLSearchParams({search: query, page: targetPage}), {headers: {Accept: 'application/json'}, signal:controller.signal, cache:'no-store', credentials:'same-origin'});
+        const response = await fetch((box.dataset.choiceUrl || root + '/finance/loan-recording/choices/' + box.dataset.category) + '?' + new URLSearchParams({search: query, page: targetPage}), {headers: {Accept: 'application/json'}, signal:controller.signal, cache:'no-store', credentials:'same-origin'});
         if (!response.ok || response.redirected) throw new Error('Lookup failed');
         const choices = await response.json(); if (version !== request || controller.signal.aborted || !select.isConnected) return;
         const value = select.value, selected = select.selectedOptions[0]?.cloneNode(true);
@@ -85,6 +85,7 @@
     const initiallyDisabled = new Set(submitButtons.filter(button => button.disabled));
     let submitting = false;
     form.addEventListener('submit', event => {
+      if (event.defaultPrevented) return;
       if (submitting) {event.preventDefault(); return;}
       if (event.submitter?.name === 'action') {
         let action = form.querySelector('input[name="action"]');

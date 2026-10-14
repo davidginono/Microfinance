@@ -3,6 +3,30 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 
+test('OTP validation can cancel a submission without locking the later verified submission',()=>{
+  const dom=new JSDOM('<form data-loan-form><button type="submit">Disburse</button></form>',{runScripts:'outside-only'});
+  const w=dom.window,form=w.document.querySelector('form');let verified=false;
+  form.addEventListener('submit',event=>{if(!verified)event.preventDefault();});
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  assert.equal(form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),false);
+  verified=true;
+  assert.equal(form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),true);
+  assert.equal(form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),false);
+  dom.window.close();
+});
+
+test('staff posting lookups use the scoped review endpoint and preserve the chosen account',async()=>{
+  const dom=new JSDOM(`<form data-loan-form><div data-loan-choice data-category="money" data-choice-url="/disbursement/loan-applications/scoped-loan/posting-accounts/money"><select data-choice-select><option value="">Choose</option><option value="account" selected>Cash account</option></select><span data-choice-error data-search-label="Search accounts" data-error="Lookup failed"></span></div></form>`,{runScripts:'outside-only',url:'http://localhost/disbursement/loan-applications/scoped-loan'});
+  const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button');let requested;
+  w.NeoSelect={search:()=>({input,more,setLoading:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
+  w.fetch=async url=>{requested=url;return {ok:true,redirected:false,json:async()=>[{id:'account',label:'101 - Teller cash'}]};};
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requested,'/disbursement/loan-applications/scoped-loan/posting-accounts/money?search=&page=0');
+  assert.equal(w.document.querySelector('select').value,'account');assert.equal(w.document.querySelector('select').selectedOptions[0].textContent,'101 - Teller cash');
+  dom.window.close();
+});
+
 function fixture() {
   const dom = new JSDOM(`<html lang="en"><form data-loan-form>
     <input name="_csrf" value="token"><select id="loanMode" name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>

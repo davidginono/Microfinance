@@ -16,7 +16,8 @@ class LoanInterestQuoteTest {
     private final GeneralLedgerService guard=mock(GeneralLedgerService.class);
     private final LoanProductSettingRepository products=mock(LoanProductSettingRepository.class);
     private final AppUserPrincipal actor=mock(AppUserPrincipal.class);
-    private final LoanRecordingService service=new LoanRecordingService(null,null,products,null,null,null,guard,null,null,null,null,null,null);
+    private final LoanRecordingService service=new LoanRecordingService(null,null,products,null,null,null,guard,null,null,null,null,null,null,null,null,null,null);
+    @org.junit.jupiter.api.BeforeEach void configuredCustomWorkflow(){when(products.findBySaccoIdAndCustomRecordingConfigurationTrue(any())).thenReturn(Optional.of(LoanProductSetting.builder().id(UUID.randomUUID()).saccoId("I1").productName("Customised loan").customRecordingConfiguration(true).active(true).productStatus(LoanProductStatus.ACTIVE).build()));}
     private RecordForm custom(){var f=new RecordForm();f.setLoanMode("CUSTOM");f.setPrincipal(new BigDecimal("1000.00"));f.setInterestPercent(new BigDecimal("12"));f.setTenureValue(6);return f;}
     @Test void recorderCanChooseWholeLoanAnnualOrAmountInterest(){
         var f=custom();assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("120.00");
@@ -24,6 +25,15 @@ class LoanInterestQuoteTest {
         f.setInterestEntry("AMOUNT");f.setInterestAmount(new BigDecimal("17.03"));assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("17.03");
         f.setInterestAmount(new BigDecimal("-1"));assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.amount");
         verify(guard,times(4)).requireActor(actor,"LOAN_RECORDING_CREATE");
+    }
+    @Test void customPricingRequiresInstitutionWorkflowAndCannotMasqueradeAsConfiguredProduct(){
+        when(actor.getSaccoId()).thenReturn("I1");
+        when(products.findBySaccoIdAndCustomRecordingConfigurationTrue("I1")).thenReturn(Optional.empty());
+        assertThatThrownBy(()->service.interestQuote(actor,custom())).hasMessage("recording.error.customConfiguration");
+        var configuration=LoanProductSetting.builder().id(UUID.randomUUID()).customRecordingConfiguration(true).active(true).productStatus(LoanProductStatus.ACTIVE).build();
+        when(products.findByIdAndSaccoId(configuration.getId(),"I1")).thenReturn(Optional.of(configuration));
+        var f=custom();f.setLoanMode("CONFIGURED");f.setProductId(configuration.getId());
+        assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.product");
     }
     @Test void missingTenureIsAValidationErrorBeforeAnyRecordIsWritten(){
         var f=custom();f.setClientId(UUID.randomUUID());f.setTenureValue(null);f.setMonths(null);

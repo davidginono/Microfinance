@@ -463,11 +463,13 @@
           method="post"
           enctype="multipart/form-data"
           class="erp-form-wrap mt-5 space-y-3"
+          data-loan-form="true"
           data-confirm-title="<spring:message code='loan.disbursement.action' text='Disburse Loan' />"
           data-confirm-message="<spring:message code='loan.disbursement.confirmMessage' text='Disburse this loan now? There will be no reversal of this action.' />"
           data-confirm-proceed="<spring:message code='loan.disbursement.action' text='Disburse Loan' />">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <input type="hidden" name="decision" value="FINAL_APPROVE" />
+        <c:if test="${recordedLoanApplication}"><input type="hidden" name="requestKey" value="${disbursementRequestKey}" /></c:if>
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <label class="block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.formTitle" text="Loan Disbursement" /></label>
@@ -483,20 +485,20 @@
         <div class="grid gap-4 md:grid-cols-2">
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.disbursementDate" text="Disbursement Date" /></label>
-                <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
+                <input type="date" name="disbursementDate" value="${postingDisbursementDate ne null ? postingDisbursementDate : app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
                             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.disbursementAmount" text="Disbursement Amount" /> <span class="text-rose-600">*</span></label>
                 <input type="text"
                        id="depositAmountInput"
-                       name="depositAmount"
+                       name="depositAmount" ${recordedLoanApplication ? 'readonly' : ''}
                        value="${app.depositAmount ne null ? app.depositAmount : disbursementBaseAmount}"
                        inputmode="decimal"
                        autocomplete="off"
                        required
                        class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        placeholder="100,000" />
-                <div class="mt-2 flex flex-wrap items-center gap-2">
+                <c:if test="${not recordedLoanApplication}"><div class="mt-2 flex flex-wrap items-center gap-2">
                     <button type="button"
                             class="app-btn btn-neutral ${empty deductibleFeeRows ? 'opacity-60 cursor-not-allowed' : ''}"
                             data-deduct-fees
@@ -554,7 +556,7 @@
                         </div>
                     </c:if>
                     <p class="w-full text-xs text-slate-500"><spring:message code="loan.disbursement.disbursementAmountHelp" text="This is the amount the applicant will receive, while the loan to be repaid remains the approved amount." /></p>
-                        </div>
+                        </div></c:if>
                     </div>
             <div class="md:col-span-2">
                 <div class="border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
@@ -574,7 +576,8 @@
                 </div>
             </div>
         </div>
-            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${firstRepaymentDateDefault}" required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
+            <c:if test="${recordedLoanApplication}"><%@ include file="../fragments/staff-disbursement-posting-fields.jspf" %></c:if>
+            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${postingFirstPaymentDate ne null ? postingFirstPaymentDate : firstRepaymentDateDefault}" required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
             <div><span class="text-sm font-medium text-slate-700"><spring:message code="loan.loanId" /></span><p><spring:message code="recording.numberAssigned" /></p></div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>
@@ -622,7 +625,7 @@
                 </div>
         <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
-            <textarea name="disbursementNotes" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="<spring:message code='loan.disbursement.notesPlaceholder' text='Optional disbursement or repayment instructions' />">${app.disbursementNotes}</textarea>
+            <textarea name="disbursementNotes" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="<spring:message code='loan.disbursement.notesPlaceholder' text='Optional disbursement or repayment instructions' />">${fn:escapeXml(postingDisbursementNotes ne null ? postingDisbursementNotes : app.disbursementNotes)}</textarea>
             </div>
         <div class="border border-slate-200 bg-slate-50 px-4 py-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1171,4 +1174,5 @@
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
 <%@ include file="../fragments/loan-export-modal.jspf" %>
 
+<c:if test="${recordedLoanApplication}"><link rel="stylesheet" href="<c:url value='/css/loan-recording.css' />" /><script src="<c:url value='/js/loan-recording.js' />" defer></script></c:if>
 <%@ include file="../fragments/footer.jspf" %>

@@ -25,6 +25,13 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LoanProductWorkflowServiceTest {
+    @Test void recordedApplicationsRetainNamedReviewersAndFailClosedWhenSnapshotIsIncomplete(){
+        var service=new LoanProductWorkflowService(new ObjectMapper(),loanProductSettingRepository,saccoSettingsRepository);
+        var id=UUID.randomUUID();var loan=LoanApplication.builder().policySnapshot("{\"recordingWorkflowVersion\":\"STAFF_REVIEW_V1\",\"recordingReviewers_BOARD\":[\""+id+"\"]}").build();
+        assertThat(service.recordedReviewerIds(loan,ApprovalWorkflowStage.BOARD)).contains(List.of(id));
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.recordedReviewerIds(loan,ApprovalWorkflowStage.CREDIT_COMMITTEE)).isInstanceOf(IllegalStateException.class);
+        loan.setPolicySnapshot("{}");assertThat(service.recordedReviewerIds(loan,ApprovalWorkflowStage.BOARD)).isEmpty();
+    }
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private SaccoSettingsRepository saccoSettingsRepository;
 

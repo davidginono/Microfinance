@@ -115,7 +115,7 @@ public class LoanRecordingRepository {
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
             r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name"),r.getString("rate_basis"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("final_due_date",LocalDate.class)),client,a.getSaccoId(),a.getStationId(),loan,loan);}
     public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
-        select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and active
+        select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and active and not custom_recording_configuration
         and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
         order by coalesce(display_order,2147483647),id limit 26 offset ?
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),search.toLowerCase(Locale.ROOT),page*25);}
@@ -187,4 +187,11 @@ public class LoanRecordingRepository {
     public UUID principalAccount(UUID loan){return jdbc.queryForObject("select principal_account_id from accountant_loan_post where loan_id=? and kind='DISBURSEMENT'",UUID.class,loan);}
     private LoanRow loan(ResultSet r,int n)throws SQLException{return new LoanRow(r.getObject("id",UUID.class),r.getString("loan_id"),r.getObject("client_id",UUID.class),r.getString("full_name"),r.getString("member_no"),r.getString("product_name"),r.getObject("application_date",LocalDate.class),r.getBigDecimal("requested_principal"),r.getBigDecimal("amount"),r.getString("status"),r.getBigDecimal("outstanding"),r.getBigDecimal("due_interest"),r.getBigDecimal("arrears"),r.getBigDecimal("future_interest"),r.getBigDecimal("principal_paid"),r.getBigDecimal("interest_paid"));}
     private Posting posting(ResultSet r,int n)throws SQLException{return new Posting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("full_name"),r.getString("member_no"),r.getString("kind"),r.getObject("effective_date",LocalDate.class),r.getString("reference"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("evidence"),r.getString("notes"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("journal_id",UUID.class),r.getObject("transaction_id",UUID.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getBigDecimal("principal_balance"),r.getString("product_name"));}
+
+    public boolean recorded(AppUserPrincipal actor,UUID loan) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_record where loan_id=? and sacco_id=? and station_id=?)",Boolean.class,loan,actor.getSaccoId(),actor.getStationId()));
+    }
+    public boolean availableTeller(AppUserPrincipal actor,List<UUID> ids) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from members where id=any(string_to_array(?,',')::uuid[]) and sacco_id=? and station_id=? and status='ACTIVE' and coalesce(staff_access_status,'ACTIVE')='ACTIVE')",Boolean.class,ids.stream().map(UUID::toString).collect(java.util.stream.Collectors.joining(",")),actor.getSaccoId(),actor.getStationId()));
+    }
 }

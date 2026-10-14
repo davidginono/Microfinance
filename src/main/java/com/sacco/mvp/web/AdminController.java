@@ -1004,7 +1004,8 @@ public class AdminController {
         model.addAttribute("products", products);
         model.addAttribute("requiredAttachmentsByProductId", requiredAttachmentService.activeByProduct(
             products.stream().map(LoanProductSetting::getId).toList()));
-        model.addAttribute("customizedProductExists", false);
+        model.addAttribute("customisedLoanConfiguration", adminService.customisedLoanConfiguration(saccoId).orElse(null));
+        model.addAttribute("products", products.stream().filter(p -> !p.isCustomRecordingConfiguration()).toList());
         var settings = adminService.settings(saccoId);
         var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
         model.addAttribute("settings", settings);
@@ -2640,5 +2641,36 @@ public class AdminController {
         } catch (IllegalArgumentException ignored) {
             return "/admin/dashboard";
         }
+    }
+
+    @org.springframework.web.bind.annotation.InitBinder("customisedWorkflowForm")
+    public void customWorkflowBinder(org.springframework.web.bind.WebDataBinder binder) {
+        binder.setAllowedFields("managerReviewRequired","managerPriority","loanOfficerReviewRequired","loanOfficerPriority","chairpersonReviewRequired","chairpersonPriority","boardReviewRequired","boardPriority","boardReviewerIds","committeeReviewRequired","committeePriority","creditCommitteeReviewerIds","accountantReviewRequired","accountantPriority","disbursementOfficerIds","disbursementProofRequired");
+    }
+    @GetMapping("/settings-controls/customised-loan")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.hasAny(principal, 'LOAN_PRODUCTS_VIEW','LOAN_PRODUCTS_CREATE','LOAN_PRODUCTS_UPDATE')")
+    public String customisedLoanWorkflow(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
+        String saccoId=adminScopeService.currentSaccoId(principal);
+        model.addAttribute("customisedWorkflowForm",adminService.customisedLoanWorkflowForm(saccoId));
+        customWorkflowOptions(saccoId,model);return "admin/customised-loan-workflow";
+    }
+    @PostMapping("/settings-controls/customised-loan")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_UPDATE')")
+    public String saveCustomisedLoanWorkflow(@AuthenticationPrincipal AppUserPrincipal principal,
+        @org.springframework.web.bind.annotation.ModelAttribute("customisedWorkflowForm") com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm form,
+        org.springframework.validation.BindingResult errors,Model model,RedirectAttributes flash) {
+        String saccoId=adminScopeService.currentSaccoId(principal);
+        if(!errors.hasErrors())try {
+            adminService.configureCustomisedLoanWorkflow(saccoId,principal.getMemberId(),form);
+            flash.addFlashAttribute("customisedWorkflowSaved",true);
+            return "redirect:/admin/settings-controls?section=loan";
+        } catch(IllegalArgumentException|IllegalStateException ex){model.addAttribute("customisedWorkflowError",ex.getMessage());}
+        catch(org.springframework.dao.DataIntegrityViolationException ex){errors.reject("recording.error.duplicate");}
+        customWorkflowOptions(saccoId,model);return "admin/customised-loan-workflow";
+    }
+    private void customWorkflowOptions(String saccoId,Model model) {
+        model.addAttribute("boardReviewerOptions",adminService.activeBoardReviewerOptions(saccoId));
+        model.addAttribute("creditCommitteeReviewerOptions",adminService.activeCreditCommitteeReviewerOptions(saccoId));
+        model.addAttribute("disbursementReviewerOptions",adminService.activeDisbursementReviewerOptions(saccoId));
     }
 }

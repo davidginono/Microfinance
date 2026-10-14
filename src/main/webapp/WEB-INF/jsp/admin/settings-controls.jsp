@@ -275,6 +275,12 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">
+    <section class="erp-panel mb-4"><div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="customised.workflow.title" /></h2></div>
+        <div class="erp-panel-body"><p class="text-sm"><spring:message code="customised.workflow.help" /></p>
+            <c:if test="${customisedWorkflowSaved}"><p role="status"><spring:message code="customised.workflow.saved" /></p></c:if>
+            <a class="app-btn btn-neutral mt-3" href="<c:url value='/admin/settings-controls/customised-loan' />"><spring:message code="common.configure" text="Configure" /></a>
+        </div></section>
+
     <section class="product-catalog" aria-labelledby="loan-product-catalog-title">
         <div class="product-catalog-toolbar">
             <div class="product-catalog-heading">

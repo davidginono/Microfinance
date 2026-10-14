@@ -14,9 +14,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface LoanProductSettingRepository extends JpaRepository<LoanProductSetting, UUID> {
-    Optional<LoanProductSetting> findBySaccoIdAndLoanTypeAndActiveTrue(String saccoId, LoanType loanType);
+    Optional<LoanProductSetting> findBySaccoIdAndCustomRecordingConfigurationTrue(String saccoId);
+    @Query("select p from LoanProductSetting p where p.saccoId=:saccoId and p.loanType=:loanType and p.active=true and p.customRecordingConfiguration=false")
+    Optional<LoanProductSetting> findBySaccoIdAndLoanTypeAndActiveTrue(@Param("saccoId") String saccoId, @Param("loanType") LoanType loanType);
 
-    Optional<LoanProductSetting> findBySaccoIdAndLoanType(String saccoId, LoanType loanType);
+    @Query("select p from LoanProductSetting p where p.saccoId=:saccoId and p.loanType=:loanType and p.customRecordingConfiguration=false")
+    Optional<LoanProductSetting> findBySaccoIdAndLoanType(@Param("saccoId") String saccoId, @Param("loanType") LoanType loanType);
 
     Optional<LoanProductSetting> findByIdAndSaccoId(UUID id, String saccoId);
 
@@ -25,6 +28,7 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
     @Query("""
         select p from LoanProductSetting p
         where p.saccoId = :saccoId
+          and p.customRecordingConfiguration = false
           and (p.productStatus is null or p.productStatus not in :excludedStatuses)
           and (:search = ''
             or lower(coalesce(p.productCode, '')) like concat(:search, '%')
@@ -38,11 +42,14 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
 
     Optional<LoanProductSetting> findByIdAndSaccoIdAndActiveTrue(UUID id, String saccoId);
 
-    List<LoanProductSetting> findBySaccoIdAndActiveTrue(String saccoId);
+    @Query("select p from LoanProductSetting p where p.saccoId=:saccoId and p.active=true and p.customRecordingConfiguration=false")
+    List<LoanProductSetting> findBySaccoIdAndActiveTrue(@Param("saccoId") String saccoId);
 
-    List<LoanProductSetting> findBySaccoIdOrderByLoanTypeAsc(String saccoId);
+    @Query("select p from LoanProductSetting p where p.saccoId=:saccoId and p.customRecordingConfiguration=false order by p.loanType")
+    List<LoanProductSetting> findBySaccoIdOrderByLoanTypeAsc(@Param("saccoId") String saccoId);
 
-    List<LoanProductSetting> findBySaccoIdAndProductStatusNot(String saccoId, com.sacco.mvp.domain.LoanProductStatus productStatus);
+    @Query("select p from LoanProductSetting p where p.saccoId=:saccoId and p.productStatus<>:productStatus and p.customRecordingConfiguration=false")
+    List<LoanProductSetting> findBySaccoIdAndProductStatusNot(@Param("saccoId") String saccoId, @Param("productStatus") com.sacco.mvp.domain.LoanProductStatus productStatus);
 
     boolean existsBySaccoId(String saccoId);
 

@@ -75,6 +75,23 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
+    @Test void customisedWorkflowRequiresAnEligibleInstitutionTeller(){
+        var form=new com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm();
+        assertThatThrownBy(()->adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form)).hasMessage("recording.error.customTellers");
+        form.setDisbursementOfficerIds(List.of(UUID.randomUUID()));
+        assertThatThrownBy(()->adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form)).isInstanceOf(IllegalArgumentException.class);
+        verify(loanProductSettingRepository,never()).save(any());
+    }
+    @Test void customisedWorkflowStoresReviewStagesAndNamedTellersSeparatelyFromPricedProducts(){
+        var teller=Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").stationId("B1").fullName("Teller").position(Position.DISBURSEMENT_OFFICER).staffRoles(new LinkedHashSet<>(List.of(Position.DISBURSEMENT_OFFICER))).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        var reviewer=Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").stationId("B1").fullName("Accountant").position(Position.ACCOUNTANT).staffRoles(new LinkedHashSet<>(List.of(Position.ACCOUNTANT))).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+        stubActiveRoleDirectory("SACCO-01",List.of(teller,reviewer));
+        when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(i->i.getArgument(0));
+        var form=new com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm();form.setDisbursementOfficerIds(List.of(teller.getId()));
+        adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form);
+        verify(loanProductSettingRepository).saveAndFlush(argThat(p->p.isCustomRecordingConfiguration() && p.isAccountantReviewRequired() && !p.isAvailableForApplications()));
+        verify(loanProductBoardReviewerRepository).save(argThat(r->r.getReviewStage()==ApprovalWorkflowStage.DISBURSEMENT_OFFICER && teller.getId().equals(r.getBoardMemberId()) && "SACCO-01".equals(r.getSaccoId())));
+    }
 
     @Mock private MemberRepository memberRepository;
     @Mock private SavingsAccountRepository savingsAccountRepository;

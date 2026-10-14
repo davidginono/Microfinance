@@ -52,6 +52,17 @@ class LoanRecordingMvcTest {
         var id=UUID.randomUUID();when(service.attachment(eq(actor),eq(id),eq("proof"))).thenReturn(new LoanAttachmentService.AttachmentResource("%PDF synthetic".getBytes(),"proof.pdf","application/pdf"));
         mvc.perform(get("/finance/loan-records/"+id+"/attachments/proof").with(user(actor))).andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(content().contentType("application/pdf"));
     }
+    @Test void obsoleteDisbursementEntryRedirectsToReviewAndCannotPost() throws Exception {
+        mvc.perform(get("/finance/loan-disbursements/new").with(user(actor))).andExpect(redirectedUrl("/disbursement/loan-applications"));
+        mvc.perform(post("/finance/loan-disbursements").with(user(actor)).with(csrf())).andExpect(status().isGone());
+        verify(service).authorize(actor,"VIEW");verify(service,never()).disburse(any(),any(),any());
+    }
+    @Test void historicalRecordedApplicationsRequireCsrfAndSubmitThroughScopedService() throws Exception {
+        var id=UUID.randomUUID();
+        mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor))).andExpect(status().isForbidden());
+        mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf())).andExpect(redirectedUrl("/finance/loan-records/"+id));
+        verify(service).submitRecordedApplication(actor,id);
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}
         @Bean LoanRecordingService service(){return mock(LoanRecordingService.class);}

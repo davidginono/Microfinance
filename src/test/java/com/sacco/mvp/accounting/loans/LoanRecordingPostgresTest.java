@@ -109,6 +109,10 @@ class LoanRecordingPostgresTest {
         for(String branch:List.of("B1","B2"))jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,access_status,created_at,updated_at) values(?,?,?,true,'ACTIVE',now(),now())",UUID.randomUUID(),institution,branch);
         actor=operator("B1");client=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,is_member,password_hash,created_at) values(?,?, 'B1',?,'Synthetic client','ACTIVE','MEMBER',true,'test-only',now())",client,institution,client.toString());
         product=UUID.randomUUID();jdbc.update("insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at) values(?,?,'DEVELOPMENT_LOAN',true,'ACTIVE','BUSINESS','Synthetic business loan','{}',0,0.2400,'FLAT_RATE','MONTHLY',1,24,now(),now())",product,institution);
+        jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",product);
+        UUID customConfiguration=UUID.randomUUID();jdbc.update("insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,manager_review_required,loan_officer_review_required,chairperson_review_required,board_review_required,committee_review_required,accountant_review_required,disbursement_officer_required,disbursement_proof_required,custom_recording_configuration,created_at,updated_at) values(?,?,'CUSTOMIZED_LOAN',true,'ACTIVE','CUSTOM','Customised loan','{}',0,0,'FLAT_RATE','MONTHLY',1,600,false,false,false,false,false,false,true,false,true,now(),now())",customConfiguration,institution);
+        jdbc.update("insert into loan_product_board_reviewers(id,loan_product_setting_id,sacco_id,review_stage,board_member_id,created_at) values(?,?,?,'DISBURSEMENT_OFFICER',?,now())",UUID.randomUUID(),customConfiguration,institution,actor.getMemberId());
+
         cash=account("CASH","ASSET","DEBIT","POSTING","CASH");principal=account("LOANS","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");interest=account("INTEREST","LIABILITY","CREDIT","POSTING","CLEARING");
         var institutions=context.getBean(SaccoRegistryService.class);when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().active(true).accessStatus(SaccoAccessStatus.ACTIVE).saccoId(institution).stationId(i.getArgument(1)).build()));
         when(context.getBean(UserClaimService.class).effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
@@ -121,6 +125,60 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->jdbc.update("update loan_applications set amount=1 where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(jdbc.queryForMap("select direct_post,checker_id,policy_id,state from gl_journal where id=?",disbursement.journalId())).containsEntry("direct_post",true).containsEntry("checker_id",null).containsEntry("policy_id",null).containsEntry("state","POSTED");
     }
+    @Test void applicationsFollowFrozenReviewOrderBeforeTellerPosts(){
+        jdbc.update("update loan_product_settings set manager_review_required=true,manager_priority=1,accountant_review_required=true,accountant_priority=6 where id=?",product);
+        var f=form();f.setFirstPaymentDate(null);var id=service.save(actor,f);
+        assertThat(status(id)).isEqualTo("READY_FOR_MANAGER");
+        assertThatThrownBy(()->service.disburse(actor,post(id,"1000.00","EARLY"))).hasMessage("recording.error.state");
+        assertThatThrownBy(()->jdbc.update("update loan_applications set status='READY_FOR_DISBURSEMENT' where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update("update loan_product_settings set manager_review_required=false,accountant_review_required=false,interest_rate=0.9 where id=?",product);
+        advance(id,ApprovalWorkflowStage.MANAGER);assertThat(status(id)).isEqualTo("AWAITING_ACCOUNTANT");
+        advance(id,ApprovalWorkflowStage.ACCOUNTANT);assertThat(status(id)).isEqualTo("READY_FOR_DISBURSEMENT");
+        var p=post(id,"1000.00","REVIEWED");p.setFirstPaymentDate(TODAY.plusMonths(1));var saved=service.disburse(actor,p);
+        assertThat(status(id)).isEqualTo("DISBURSED");assertThat(service.disburse(actor,p).id()).isEqualTo(saved.id());
+        assertThat(service.detail(actor,id).contractualInterest()).isEqualByComparingTo("20.00");
+        assertThat(jdbc.queryForObject("select count(*) from manager_reviews where loan_application_id=? and review_stage='DISBURSEMENT_OFFICER' and decision='ACCEPT'",Integer.class,id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+    }
+    @Test void customisedApplicationsFreezeAssignedTellersAndKeepBranchIsolation(){
+        var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setInterestPercent(new BigDecimal("12"));
+        var id=service.save(actor,f);var other=operator("B1");
+        var config=context.getBean(LoanProductSettingRepository.class).findBySaccoIdAndCustomRecordingConfigurationTrue(institution).orElseThrow();
+        jdbc.update("update loan_product_board_reviewers set board_member_id=? where loan_product_setting_id=? and review_stage='DISBURSEMENT_OFFICER'",other.getMemberId(),config.getId());
+        assertThatThrownBy(()->service.disburse(other,post(id,"1000.00","WRONG-TELLER"))).hasMessage("recording.error.customTeller");
+        assertThatThrownBy(()->service.postingAccounts(other,id,"money","",0)).hasMessage("recording.error.customTeller");
+        assertThatThrownBy(()->service.disburse(operator("B2"),post(id,"1000.00","WRONG-BRANCH"))).isInstanceOf(AccessDeniedException.class);
+        service.disburse(actor,post(id,"1000.00","D-ASSIGNED-TELLER"));assertThat(status(id)).isEqualTo("DISBURSED");
+    }
+    @Test void databaseRejectsFundingWithoutPostedAccountingAndSnapshotTampering(){
+        var f=form();f.setFirstPaymentDate(null);var id=service.save(actor,f);
+        assertThatThrownBy(()->jdbc.update("update loan_applications set status='DISBURSED',disbursement_date=?,first_repayment_date=? where id=?",TODAY,TODAY.plusMonths(1),id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(status(id)).isEqualTo("READY_FOR_DISBURSEMENT");
+        assertThatThrownBy(()->jdbc.update("update loan_applications set policy_snapshot='{}' where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(service.detail(actor,id).loan().outstandingPrincipal()).isZero();
+    }
+    @Test void historicalRecordedApplicationCanEnterReviewWithoutRepricing(){
+        var original=service.save(actor,form());var legacy=UUID.randomUUID();
+        jdbc.update("""
+            insert into loan_applications(id,application_number,sacco_id,station_id,applicant_member_id,loan_type,loan_product_setting_id,amount,tenor_months,status,required_guarantors,form_data,policy_snapshot,financial_snapshot,repayment_frequency,first_repayment_date,installment_amount,created_at,updated_at,version)
+            select ?,application_number+5000,sacco_id,station_id,applicant_member_id,loan_type,loan_product_setting_id,amount,tenor_months,'RECORDED',required_guarantors,form_data,'{}',financial_snapshot,repayment_frequency,first_repayment_date,installment_amount,now(),now(),0 from loan_applications where id=?
+            """,legacy,original);
+        jdbc.update("""
+            insert into accountant_loan_record(loan_id,sacco_id,station_id,request_key,payload_hash,actor_id,recorded_at,application_date,requested_principal,first_payment_date,product_name,metadata)
+            select ?,sacco_id,station_id,?,payload_hash,actor_id,now(),application_date,requested_principal,first_payment_date,product_name,metadata from accountant_loan_record where loan_id=?
+            """,legacy,UUID.randomUUID(),original);
+        jdbc.update("update loan_product_settings set accountant_review_required=true,accountant_priority=6,interest_rate=0.9 where id=?",product);
+        service.submitRecordedApplication(actor,legacy);service.submitRecordedApplication(actor,legacy);
+        assertThat(status(legacy)).isEqualTo("AWAITING_ACCOUNTANT");assertThat(service.detail(actor,legacy).contractualInterest()).isEqualByComparingTo("20.00");
+        assertThatThrownBy(()->service.submitRecordedApplication(operator("B2"),legacy)).isInstanceOf(AccessDeniedException.class);
+    }
+    private String status(UUID id){return jdbc.queryForObject("select status from loan_applications where id=?",String.class,id);}
+    private void advance(UUID id,ApprovalWorkflowStage stage){
+        new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class)).executeWithoutResult(tx->{
+            var repository=context.getBean(LoanApplicationRepository.class);var application=repository.findForDisbursement(id).orElseThrow();
+            context.getBean(WorkflowRoutingService.class).advanceAfterApproval(application,stage,actor.getMemberId());repository.saveAndFlush(application);
+        });
+    }
     @Test void productFiltersUseCreatedProductIdentityAcrossLoansPostingsReportsAndTotals(){
         var other=UUID.randomUUID();
         jdbc.update("""
@@ -130,6 +188,7 @@ class LoanRecordingPostgresTest {
             guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,now(),now()
             from loan_product_settings where id=?
             """,other,product);
+        jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",other);
         var first=service.save(actor,form());var secondForm=form();secondForm.setProductId(other);var second=service.save(actor,secondForm);
         service.disburse(actor,post(first,"1000.00","D-PRODUCT-1"));service.disburse(actor,post(second,"1000.00","D-PRODUCT-2"));
         var payment=post(first,"120.00","PRODUCT-R1");payment.setInterestAccountId(interest);service.repay(actor,payment);
@@ -302,7 +361,9 @@ class LoanRecordingPostgresTest {
         @Bean GeneralLedgerService accounting(JdbcTemplate j,AuditService audit,ApplicationClock clock,UserClaimService claims,MemberDirectoryService directory,SaccoRegistryService institutions){return new GeneralLedgerService(new GeneralLedgerRepository(j),mock(AccountingPolicyService.class),new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class));}
         @Bean BusinessAccountingGuard guard(JdbcTemplate j,ObjectMapper mapper){return new BusinessAccountingGuard(new BusinessAccountingRepository(j,mapper));}
         @Bean LoanRepaymentLedgerService repayments(LoanLedgerRepository ledgers,LoanLedgerInstallmentRepository installments,LoanRepaymentTransactionRepository transactions,LoanRepaymentAllocationRepository allocations,LoanJournalEntryRepository journal,LoanApplicationRepository loans,ObjectMapper mapper,ApplicationClock clock,AuditService audit,BusinessAccountingGuard guard){return new LoanRepaymentLedgerService(ledgers,installments,transactions,allocations,journal,loans,mapper,clock,new AccessControlService(),audit,guard);}
-        @Bean LoanRecordingService recording(JdbcTemplate j,LoanApplicationRepository loans,LoanProductSettingRepository products,LoanRepaymentLedgerService repayments,GeneralLedgerService accounting,ObjectMapper mapper,ApplicationClock clock,AuditService audit,com.sacco.mvp.repository.StoredUploadRepository uploadRepository){var storage=new StoredUploadStorageService(uploadRepository);org.springframework.test.util.ReflectionTestUtils.setField(storage,"uploadsRoot","target/request-upload-fixture");var numbers=mock(ApplicationNumberService.class);var next=new AtomicLong(1000000000);when(numbers.nextFor(anyString())).thenAnswer(i->next.incrementAndGet());return new LoanRecordingService(new LoanRecordingRepository(j),loans,products,numbers,new RepaymentScheduleService(mapper,products),repayments,accounting,new VoucherRepository(j),mapper,clock,audit,new LoanAttachmentService(mapper,mock(AdminAlertService.class),storage),new com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService(new com.sacco.mvp.accounting.loans.repository.LoanNumberRepository(j),new VoucherRepository(j),clock));}
+        LoanProductWorkflowService contextWorkflows(ObjectMapper mapper,LoanProductSettingRepository products){return new LoanProductWorkflowService(mapper,products,mock(com.sacco.mvp.repository.SaccoSettingsRepository.class));}
+        @Bean WorkflowRoutingService routing(ObjectMapper mapper,LoanProductSettingRepository products,com.sacco.mvp.repository.SaccoSettingsRepository settings,com.sacco.mvp.repository.BoardReviewRepository board,com.sacco.mvp.repository.LoanProductBoardReviewerRepository assigned){return new WorkflowRoutingService(settings,new ApprovalFlowService(),board,assigned,products,mock(RoleDirectoryService.class),contextWorkflows(mapper,products),mock(OutboxService.class));}
+        @Bean LoanRecordingService recording(JdbcTemplate j,LoanApplicationRepository loans,LoanProductSettingRepository products,LoanRepaymentLedgerService repayments,GeneralLedgerService accounting,ObjectMapper mapper,ApplicationClock clock,AuditService audit,com.sacco.mvp.repository.StoredUploadRepository uploadRepository,WorkflowRoutingService routing,com.sacco.mvp.repository.LoanProductBoardReviewerRepository contextReviewers,com.sacco.mvp.repository.ManagerReviewRepository contextReviews){var storage=new StoredUploadStorageService(uploadRepository);org.springframework.test.util.ReflectionTestUtils.setField(storage,"uploadsRoot","target/request-upload-fixture");var numbers=mock(ApplicationNumberService.class);var next=new AtomicLong(1000000000);when(numbers.nextFor(anyString())).thenAnswer(i->next.incrementAndGet());return new LoanRecordingService(new LoanRecordingRepository(j),loans,products,numbers,new RepaymentScheduleService(mapper,products),repayments,accounting,new VoucherRepository(j),mapper,clock,audit,new LoanAttachmentService(mapper,mock(AdminAlertService.class),storage),new com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService(new com.sacco.mvp.accounting.loans.repository.LoanNumberRepository(j),new VoucherRepository(j),clock),contextWorkflows(mapper,products),routing,contextReviewers,contextReviews);}
         @Bean com.sacco.mvp.accounting.service.VoucherService vouchers(JdbcTemplate j,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit,ObjectMapper json){return new com.sacco.mvp.accounting.service.VoucherService(new VoucherRepository(j),accounting,clock,audit,(JsonMapper)json);}
         @Bean com.sacco.mvp.accounting.service.LoanReceiptService receipts(JdbcTemplate j,com.sacco.mvp.accounting.service.VoucherService ordinary,LoanRecordingService loans,ApplicationClock clock,AuditService audit,ObjectMapper json){return new com.sacco.mvp.accounting.service.LoanReceiptService(new LoanReceiptRepository(j),new VoucherRepository(j),ordinary,loans,clock,audit,json);}
     }

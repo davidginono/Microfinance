@@ -3491,6 +3491,7 @@ public class AdminService {
             case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_APPROVE;
             case BOARD -> UserClaim.BOARD_QUEUE_APPROVE;
             case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE;
+            case DISBURSEMENT_OFFICER -> UserClaim.DISBURSEMENT_QUEUE_DISBURSE;
             default -> throw new IllegalArgumentException("Unsupported reviewer access role.");
         };
     }
@@ -3646,6 +3647,8 @@ public class AdminService {
         data.put("accountantPriority", product.getAccountantPriority());
         data.put("disbursementOfficerRequired", !Boolean.FALSE.equals(product.getDisbursementOfficerRequired()));
         data.put("disbursementProofRequired", !Boolean.FALSE.equals(product.getDisbursementProofRequired()));
+        data.put("customRecordingConfiguration", product.isCustomRecordingConfiguration());
+        data.put("disbursementOfficerIds", reviewerIds(product.getId(), ApprovalWorkflowStage.DISBURSEMENT_OFFICER));
         data.put("applicantAttachmentRequired", Boolean.TRUE.equals(product.getApplicantAttachmentRequired()));
         data.put("guarantorMinSavingsCheckRequired", Boolean.TRUE.equals(product.getGuarantorMinSavingsCheckRequired()));
         data.put("guarantorMinimumSavings", product.getGuarantorMinimumSavings());
@@ -4148,5 +4151,31 @@ public class AdminService {
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         loanProductSettingRepository.save(product);
         return product;
+    }
+
+    public java.util.Optional<LoanProductSetting> customisedLoanConfiguration(String saccoId) {
+        return loanProductSettingRepository.findBySaccoIdAndCustomRecordingConfigurationTrue(saccoId);
+    }
+    public List<BoardReviewerOption> activeDisbursementReviewerOptions(String saccoId) {
+        return activeReviewerOptions(saccoId, Position.DISBURSEMENT_OFFICER);
+    }
+    public com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm customisedLoanWorkflowForm(String saccoId) {
+        var product=customisedLoanConfiguration(saccoId).orElse(null);
+        var form=com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm.from(product);
+        if(product!=null){form.setBoardReviewerIds(reviewerIds(product.getId(),ApprovalWorkflowStage.BOARD));form.setCreditCommitteeReviewerIds(reviewerIds(product.getId(),ApprovalWorkflowStage.CREDIT_COMMITTEE));form.setDisbursementOfficerIds(reviewerIds(product.getId(),ApprovalWorkflowStage.DISBURSEMENT_OFFICER));}
+        return form;
+    }
+    @Transactional
+    public void configureCustomisedLoanWorkflow(String saccoId, UUID adminId, com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm f) {
+        var tellers=normalizeReviewerIds(saccoId,f.getDisbursementOfficerIds(),Position.DISBURSEMENT_OFFICER);
+        if(tellers.isEmpty())throw new IllegalArgumentException("recording.error.customTellers");
+        var product=customisedLoanConfiguration(saccoId).orElse(null);
+        var before=product==null?Map.<String,Object>of():snapshotProduct(product);
+        if(product==null)product=createLoanProduct(saccoId,adminId,(product==null?"CUSTOM-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(java.util.Locale.ROOT):product.getDisplayCode()),"Customised loan","Workflow for staff-recorded customised loan applications.",999,BigDecimal.ZERO,new BigDecimal("9999999999999999.99"),0,new BigDecimal("0.4"),false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,600,true,false,f.isManagerReviewRequired(),f.isLoanOfficerReviewRequired(),ApprovalWorkflowStage.MANAGER,f.getManagerPriority(),f.getLoanOfficerPriority(),f.isChairpersonReviewRequired(),f.getChairpersonPriority(),List.of(),f.isBoardReviewRequired(),f.getBoardPriority(),f.getBoardReviewerIds(),f.isCommitteeReviewRequired(),f.getCommitteePriority(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds(),f.isAccountantReviewRequired(),f.getAccountantPriority(),true,f.isDisbursementProofRequired(),false,false,BigDecimal.ZERO,LoanProductStatus.ACTIVE,null);
+        else updateLoanProduct(saccoId,adminId,product.getId(),(product==null?"CUSTOM-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(java.util.Locale.ROOT):product.getDisplayCode()),"Customised loan","Workflow for staff-recorded customised loan applications.",999,BigDecimal.ZERO,new BigDecimal("9999999999999999.99"),0,new BigDecimal("0.4"),false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,600,true,false,f.isManagerReviewRequired(),f.isLoanOfficerReviewRequired(),ApprovalWorkflowStage.MANAGER,f.getManagerPriority(),f.getLoanOfficerPriority(),f.isChairpersonReviewRequired(),f.getChairpersonPriority(),List.of(),f.isBoardReviewRequired(),f.getBoardPriority(),f.getBoardReviewerIds(),f.isCommitteeReviewRequired(),f.getCommitteePriority(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds(),f.isAccountantReviewRequired(),f.getAccountantPriority(),true,f.isDisbursementProofRequired(),false,false,BigDecimal.ZERO,LoanProductStatus.ACTIVE,null);
+        product.setCustomRecordingConfiguration(true);
+        loanProductSettingRepository.saveAndFlush(product);
+        replaceLoanProductReviewers(product,ApprovalWorkflowStage.DISBURSEMENT_OFFICER,tellers);
+        auditService.log("LOAN_PRODUCT",product.getId(),"CUSTOMISED_LOAN_WORKFLOW_CONFIGURED",adminId,before,snapshotProduct(product));
     }
 }

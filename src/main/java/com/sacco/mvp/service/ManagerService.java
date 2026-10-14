@@ -392,6 +392,7 @@ public class ManagerService {
                              String disbursementNotes,
                              MultipartFile disbursementProofFile) {
         LoanApplication app = getDisbursementApplication(applicationId, disbursementOfficerId);
+        if(accountingGuard.recordedLoan(app.getId()))throw new IllegalArgumentException("recording.error.reviewPosting");
         if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
             throw new IllegalStateException("Application is not ready for disbursement");
         }

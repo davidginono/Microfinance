@@ -35,7 +35,6 @@ public class LoanRecordingController {
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalidRequest(IllegalArgumentException exception,Model model){model.addAttribute("recordingError",error(exception));return "accounting/loans/error";}
     @InitBinder("recordForm") public void recordBinder(WebDataBinder b){b.setAllowedFields("requestKey","clientId","productId","applicationDate","principal","months","tenureUnit","tenureValue","loanMode","interestEntry","interestBasis","interestPercent","interestAmount","customFrequency","purpose","business","income","expenses","otherDebt","informationSource","guarantors","collateral","evidence","notes");}
-    @InitBinder("postForm") public void postBinder(WebDataBinder b){b.setAllowedFields("requestKey","loanId","firstPaymentDate","effectiveDate","amount","moneyAccountId","principalAccountId","interestAccountId","reference","evidence","notes");}
     @GetMapping({"/loan-records","/loan-disbursements","/loan-repayments"})
     public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
@@ -63,21 +62,13 @@ public class LoanRecordingController {
     @GetMapping("/loan-records/{id}/attachments/{attachmentId}")
     public ResponseEntity<byte[]> attachment(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable String attachmentId){var file=service.attachment(a,id,attachmentId);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType(file.getContentType())).header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.getOriginalName(),java.nio.charset.StandardCharsets.UTF_8).build().toString()).header("X-Content-Type-Options","nosniff").body(file.getContent());}
     @GetMapping("/loan-records/{id}") public String detail(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int historyPage,@RequestParam(defaultValue="0") int schedulePage,Model model){if(schedulePage<0 || schedulePage>24)throw new IllegalArgumentException("recording.error.filter");var d=service.detail(a,id);model.addAttribute("detail",d);model.addAttribute("attachments",service.attachments(a,id));model.addAttribute("history",service.history(a,id,historyPage));model.addAttribute("schedulePage",schedulePage);model.addAttribute("scheduleRows",d.schedule().stream().skip(schedulePage*25L).limit(25).toList());model.addAttribute("scheduleHasNext",d.schedule().size()>(schedulePage+1)*25);return "accounting/loans/details";}
-    @GetMapping({"/loan-disbursements/new","/loan-repayments/new"}) public String postingForm(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID loanId,jakarta.servlet.http.HttpServletRequest request,Model model){
-        if(kind(request).equals("PAYMENT")){service.authorize(a,"POST");if(loanId!=null)service.receiptLoan(a,loanId);return "redirect:/finance/vouchers/receipts/new?purpose=LOAN_REPAYMENT"+(loanId==null?"":"&loanId="+loanId);}
-        String kind=kind(request);service.authorize(a,kind.equals("DISBURSEMENT")?"DISBURSE":"POST");var f=new PostForm();f.setEffectiveDate(clock.today());f.setLoanId(loanId);
-        if(loanId!=null){var detail=service.detail(a,loanId);model.addAttribute("detail",detail);if(kind.equals("DISBURSEMENT")){f.setAmount(detail.loan().principal());f.setFirstPaymentDate(defaultFirstDate(detail,f.getEffectiveDate()));}}
-        context(kind,model);model.addAttribute("postForm",f);return "accounting/loans/post-form";
+    @GetMapping({"/loan-disbursements/new","/loan-repayments/new"}) public String postingForm(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID loanId,jakarta.servlet.http.HttpServletRequest request,Model model) {
+        if(kind(request).equals("PAYMENT")){service.authorize(actor,"POST");if(loanId!=null)service.receiptLoan(actor,loanId);return "redirect:/finance/vouchers/receipts/new?purpose=LOAN_REPAYMENT"+(loanId==null?"":"&loanId="+loanId);}
+        service.authorize(actor,"VIEW");if(loanId!=null)service.detail(actor,loanId);
+        return "redirect:/disbursement/loan-applications"+(loanId==null?"":"/"+loanId);
     }
-    private LocalDate defaultFirstDate(Detail detail,LocalDate date){if(detail.firstPaymentDate()!=null)return detail.firstPaymentDate();var term=new com.sacco.mvp.service.LoanTenure(detail.tenureUnit(),detail.tenureValue());var frequency=com.sacco.mvp.domain.RepaymentFrequency.valueOf(detail.frequency());return term.firstDate(date,frequency);}
-    @GetMapping("/loan-recording/loans/{id}") @ResponseBody
-    public ResponseEntity<?> disbursementContext(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id){service.authorize(a,"DISBURSE");var detail=service.detail(a,id);if(!"RECORDED".equals(detail.loan().status()))return ResponseEntity.badRequest().build();return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("amount",detail.loan().principal().toPlainString(),"firstPaymentDate",defaultFirstDate(detail,clock.today()),"client",detail.loan().client()));}
-    @PostMapping({"/loan-disbursements","/loan-repayments"}) public String post(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute PostForm postForm,BindingResult errors,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,@RequestParam(defaultValue="post") String action,jakarta.servlet.http.HttpServletRequest request,Model model,RedirectAttributes flash){
-        if(kind(request).equals("PAYMENT"))throw new org.springframework.web.server.ResponseStatusException(HttpStatus.GONE,"Use the receipt voucher form");
-        String kind=kind(request);service.authorize(a,kind.equals("DISBURSEMENT")?"DISBURSE":"POST");if(!errors.hasErrors())try{
-            if(action.equals("preview")){model.addAttribute("allocationPreview",service.postingPreview(a,postForm,kind));context(kind,model);model.addAttribute("detail",service.detail(a,postForm.getLoanId()));return "accounting/loans/post-form";}if(!action.equals("post"))throw new IllegalArgumentException("recording.error.request");var saved=kind.equals("DISBURSEMENT")?service.disburse(a,postForm,attachments==null?List.of():attachments):service.repay(a,postForm);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-postings/"+saved.id();
-        }catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
-        context(kind,model);if(postForm.getLoanId()!=null)model.addAttribute("detail",service.detail(a,postForm.getLoanId()));return "accounting/loans/post-form";
+    @PostMapping({"/loan-disbursements","/loan-repayments"}) public String post(jakarta.servlet.http.HttpServletRequest request) {
+        throw new org.springframework.web.server.ResponseStatusException(HttpStatus.GONE,"Use the staff disbursement review or receipt voucher form");
     }
     @GetMapping({"/loan-postings/{id}","/loan-disbursements/{id}","/loan-repayments/{id}"}) public String posting(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model model){var receipt=service.receiptForPosting(a,id);if(receipt.isPresent())return "redirect:/finance/vouchers/receipts/"+receipt.get();postingModel(a,id,model);return "accounting/loans/posting";}
     private void postingModel(AppUserPrincipal a,UUID id,Model model){var p=service.posting(a,id);model.addAttribute("posting",p);model.addAttribute("detail",service.detail(a,p.loanId()));model.addAttribute("canReverse",!p.actorId().equals(a.getMemberId()));model.addAttribute("reverseKey",UUID.randomUUID());model.addAttribute("today",clock.today());}
@@ -219,4 +210,9 @@ public class LoanRecordingController {
     private String kind(jakarta.servlet.http.HttpServletRequest r){return r.getRequestURI().contains("loan-disbursements")?"DISBURSEMENT":r.getRequestURI().contains("loan-repayments")?"PAYMENT":"LOAN";}
     private void context(String kind,Model model){model.addAttribute("kind",kind);model.addAttribute("createClaim",kind.equals("LOAN")?"LOAN_RECORDING_CREATE":kind.equals("DISBURSEMENT")?"LOAN_RECORDING_DISBURSE":"LOAN_RECORDING_POST");model.addAttribute("base",kind.equals("LOAN")?"/finance/loan-records":kind.equals("DISBURSEMENT")?"/finance/loan-disbursements":"/finance/loan-repayments");}
     private String error(IllegalArgumentException e){return e.getMessage()!=null && (e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error."))?e.getMessage():"recording.error.terms";}
+
+    @PostMapping("/loan-records/{id}/submit-for-review")
+    public String submitForReview(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash) {
+        service.submitRecordedApplication(actor,id);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
+    }
 }

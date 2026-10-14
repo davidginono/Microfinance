@@ -1,0 +1,13 @@
+<%@ page pageEncoding="UTF-8" %>
+<spring:message code="common.choose" text="Choose" var="chooseLabel" />
+<div data-loan-choice data-category="money" data-choice-url="${pageContext.request.contextPath}/disbursement/loan-applications/${app.id}/posting-accounts/money">
+    <label><spring:message code="recording.moneyAccount" /><select name="moneyAccountId" class="aws-control" data-choice-select="true" required><option value="">${chooseLabel}</option><c:if test="${not empty postingMoneyAccount}"><option value="${postingMoneyAccount.id}" selected><c:out value="${postingMoneyAccount.label}" /></option></c:if></select></label>
+    <%@ include file="../accounting/loans/choice-search.jspf" %>
+</div>
+<div data-loan-choice data-category="principal" data-choice-url="${pageContext.request.contextPath}/disbursement/loan-applications/${app.id}/posting-accounts/principal">
+    <label><spring:message code="recording.principalAccount" /><select name="principalAccountId" class="aws-control" data-choice-select="true" required><option value="">${chooseLabel}</option><c:if test="${not empty postingPrincipalAccount}"><option value="${postingPrincipalAccount.id}" selected><c:out value="${postingPrincipalAccount.label}" /></option></c:if></select></label>
+    <%@ include file="../accounting/loans/choice-search.jspf" %>
+</div>
+<div class="md:col-span-2"><label><spring:message code="recording.attachments" />
+    <span class="attachment-dropzone" data-attachment-dropzone><input type="file" name="attachments" multiple accept=".pdf,.png,.jpg,.jpeg" class="attachment-dropzone-input" data-attachment-input /><span class="attachment-dropzone-main"><span class="attachment-dropzone-copy"><span class="attachment-dropzone-title"><spring:message code="recording.attachments.drop" /></span><span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" /></span></span><span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.chooseOne" text="Choose files" /></span></span></span>
+</label></div>

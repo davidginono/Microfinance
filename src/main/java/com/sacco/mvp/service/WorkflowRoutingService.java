@@ -37,6 +37,13 @@ public class WorkflowRoutingService {
             .orElseThrow(() -> new IllegalArgumentException("Settings missing"));
     }
 
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void announceRecordedDisbursement(LoanApplication loan,UUID actor) {
+        if(loan.getStatus()!=LoanStatus.DISBURSED)throw new IllegalStateException("Disbursement has not been posted");
+        outboxService.enqueue("LOAN",loan.getId(),"DISBURSED",loan.getApplicantMemberId(),actor,loan.getSaccoId(),loan.getStationId(),
+            Map.of("loanId",loan.getLoanId(),"disbursementDate",String.valueOf(loan.getDisbursementDate()),"disbursementAmount",loan.getAmount()));
+    }
+
     @Transactional
     public LoanStatus moveToFirstReviewStage(LoanApplication app, UUID actorMemberId) {
         if (app == null) {
@@ -118,6 +125,8 @@ public class WorkflowRoutingService {
 
     private java.util.List<UUID> productReviewerIds(LoanApplication app, ApprovalWorkflowStage stage) {
         UserClaim requiredClaim = reviewerClaimFor(stage);
+        var frozen=loanProductWorkflowService.recordedReviewerIds(app,stage);
+        if(frozen.isPresent())return frozen.get().stream().filter(id->roleDirectoryService.hasActiveClaimInSacco(id,app.getSaccoId(),requiredClaim)).toList();
         java.util.Optional<com.sacco.mvp.domain.LoanProductSetting> selectedProduct = app.getLoanProductSettingId() == null
             ? loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
             : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId());

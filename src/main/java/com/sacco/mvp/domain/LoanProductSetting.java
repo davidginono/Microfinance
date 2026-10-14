@@ -26,6 +26,9 @@ public class LoanProductSetting {
     @Column(name = "sacco_id", nullable = false)
     private String saccoId;
 
+    @Column(name = "custom_recording_configuration", nullable = false)
+    private boolean customRecordingConfiguration;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "loan_type", nullable = false)
     private LoanType loanType;
@@ -370,7 +373,7 @@ public class LoanProductSetting {
     }
 
     public boolean isAvailableForApplications() {
-        return getStatus() == LoanProductStatus.ACTIVE;
+        return !customRecordingConfiguration && getStatus() == LoanProductStatus.ACTIVE;
     }
 }
 

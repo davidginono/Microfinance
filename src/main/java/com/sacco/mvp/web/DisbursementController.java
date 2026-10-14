@@ -64,6 +64,7 @@ import java.util.stream.Collectors;
 public class DisbursementController {
     private final com.sacco.mvp.service.ArchivedLoanDeletionService archivedLoanDeletionService;
     private final ManagerService managerService;
+    private final com.sacco.mvp.accounting.loans.service.LoanRecordingService loanRecordingService;
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
@@ -376,12 +377,23 @@ public class DisbursementController {
         model.addAttribute("rejectActionLabel", "Reject");
         model.addAttribute("showReviewDecisionForm", false);
         model.addAttribute("showManagerReversalRequests", false);
-        boolean canDisburseLoan = access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE");
+        boolean recordedApplication=loanRecordingService.recordedForStaff(principal,app.getId());
+        model.addAttribute("recordedLoanApplication",recordedApplication);
+        if(!model.containsAttribute("disbursementRequestKey"))model.addAttribute("disbursementRequestKey",UUID.randomUUID());
+        boolean canDisburseLoan = access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE") && (!recordedApplication || loanRecordingService.allowedTeller(app,principal.getMemberId()));
+        if(recordedApplication && canDisburseLoan) {
+            for(var accountType:List.of("Money","Principal")) {
+                var retained=model.getAttribute("posting"+accountType+"AccountId");
+                if(retained instanceof UUID accountId)try {
+                    model.addAttribute("posting"+accountType+"Account",loanRecordingService.postingAccount(principal,app.getId(),accountId,accountType.toUpperCase(Locale.ROOT)));
+                } catch(IllegalArgumentException ex){model.asMap().remove("posting"+accountType+"AccountId");}
+            }
+        }
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
-        model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
+        model.addAttribute("disbursementProofRequired", recordedApplication ? loanRecordingService.disbursementProofRequired(app) : managerService.isDisbursementProofRequired(app));
         model.addAttribute("allowPaymentSync", true);
         model.addAttribute("allowDefaultedPaymentRecheck", canDisburseLoan);
         addReviewDisplayAttributes(model, app);
@@ -434,10 +446,24 @@ public class DisbursementController {
                            @RequestParam(required = false) String disbursementNotes,
                            @RequestParam(required = false) String disbursementOtpCode,
                            @RequestParam(required = false) MultipartFile disbursementProofFile,
+                           @RequestParam(required = false) UUID requestKey,
+                           @RequestParam(required = false) UUID moneyAccountId,
+                           @RequestParam(required = false) UUID principalAccountId,
+                           @RequestParam(required = false) List<MultipartFile> attachments,
                            RedirectAttributes ra) {
         try {
             UUID otpTokenId = validateDisbursementOtp(principal.getMemberId(), disbursementOtpCode);
-            managerService.disburseLoan(
+            LoanApplication application=requireVisibleApplication(id,principal.getSaccoId(),principal.getStationId());
+            if(loanRecordingService.recordedForStaff(principal,id)) {
+                var form=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm();
+                form.setRequestKey(requestKey);form.setLoanId(id);form.setEffectiveDate(disbursementDate);form.setFirstPaymentDate(firstRepaymentDate);
+                form.setAmount(application.getAmount());form.setMoneyAccountId(moneyAccountId);form.setPrincipalAccountId(principalAccountId);
+                form.setReference(disbursementReference==null?"":disbursementReference);form.setNotes(disbursementNotes==null?"":disbursementNotes);
+                if(depositAmount!=null && depositAmount.compareTo(application.getAmount())!=0)throw new IllegalArgumentException("recording.error.disbursementAmount");
+                var documents=new java.util.ArrayList<MultipartFile>();if(disbursementProofFile!=null && !disbursementProofFile.isEmpty())documents.add(disbursementProofFile);
+                if(attachments!=null)documents.addAll(attachments);
+                loanRecordingService.disburse(principal,form,documents);
+            } else managerService.disburseLoan(
                 id,
                 principal.getMemberId(),
                 disbursementDate,
@@ -454,8 +480,11 @@ public class DisbursementController {
             ra.addFlashAttribute("message", message("recording.disbursedSuccess"));
             return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
+            ra.addFlashAttribute("error", ex.getMessage()!=null && ex.getMessage().startsWith("recording.error.")?message(ex.getMessage()):ex.getMessage());
+            ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);
+            ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
+            ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);
+        } catch(org.springframework.dao.DataIntegrityViolationException ex){ra.addFlashAttribute("error",message("recording.error.duplicate"));}
         return "redirect:/disbursement/loan-applications/" + id;
     }
 
@@ -712,4 +741,13 @@ public class DisbursementController {
     }
 
     private record ArchiveEntry(ManagerReview review, LoanApplication loan) {}
+
+    @GetMapping("/loan-applications/{id}/posting-accounts/{category}")
+    @PreAuthorize("@access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")
+    @ResponseBody
+    public Object postingAccounts(@PathVariable UUID id,@PathVariable String category,@AuthenticationPrincipal AppUserPrincipal principal,
+        @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {
+        requireVisibleApplication(id,principal.getSaccoId(),principal.getStationId());
+        return loanRecordingService.postingAccounts(principal,id,category,search,page);
+    }
 }

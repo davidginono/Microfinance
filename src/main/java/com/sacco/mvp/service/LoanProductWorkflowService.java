@@ -444,4 +444,14 @@ public class LoanProductWorkflowService {
         }
 
     }
+
+    public java.util.Optional<java.util.List<java.util.UUID>> recordedReviewerIds(LoanApplication loan,ApprovalWorkflowStage stage) {
+        if(loan.getPolicySnapshot()==null || loan.getPolicySnapshot().isBlank())return java.util.Optional.empty();
+        try {
+            Map<String,Object> data=objectMapper.readValue(loan.getPolicySnapshot(),new TypeReference<>(){});
+            if(!"STAFF_REVIEW_V1".equals(data.get("recordingWorkflowVersion")))return java.util.Optional.empty();
+            if(!(data.get("recordingReviewers_"+stage.name()) instanceof List<?> ids))throw new IllegalStateException("Application reviewer assignments are unavailable");
+            return java.util.Optional.of(ids.stream().map(id->java.util.UUID.fromString(id.toString())).toList());
+        } catch(Exception ex){throw new IllegalStateException("The application workflow snapshot could not be read",ex);}
+    }
 }
