@@ -30,7 +30,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ManagerService {
     private static final int MAX_QUEUE_ROWS = 100;
-    private static final java.util.regex.Pattern LOAN_ID_PATTERN = java.util.regex.Pattern.compile("^[0-9]{4,20}$");
     private final LoanApplicationRepository loanApplicationRepository;
     private final ManagerReviewRepository managerReviewRepository;
     private final BoardReviewRepository boardReviewRepository;
@@ -47,6 +46,7 @@ public class ManagerService {
     private final RepaymentScheduleService repaymentScheduleService;
     private final LoanRepaymentLedgerService loanRepaymentLedgerService;
     private final com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
+    private final com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService disbursementNumbers;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -401,27 +401,15 @@ public class ManagerService {
         if (isDisbursementProofRequired(app) && !hasUploadedProof && !hasDisbursementProofAttachment(app)) {
             throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
         }
-        String normalisedLoanId = blankToNull(loanId);
-        if (normalisedLoanId == null) {
-            throw new IllegalArgumentException("Loan ID is required to disburse this loan");
-        }
-        if (!LOAN_ID_PATTERN.matcher(normalisedLoanId).matches()) {
-            throw new IllegalArgumentException("Loan ID must be 4-20 digits (numbers only)");
-        }
-        if (!normalisedLoanId.equals(app.getLoanId())
-            && loanApplicationRepository.existsBySaccoIdAndLoanId(app.getSaccoId(), normalisedLoanId)) {
-            throw new IllegalArgumentException("Loan ID is already used in this SACCO");
-        }
         app.setDepositAmount(effectiveDepositAmount);
         app.setDisbursementDate(disbursementDate);
-        app.setLoanId(normalisedLoanId);
         app.setDisbursementReference(blankToNull(disbursementReference));
         app.setDisbursementNotes(blankToNull(disbursementNotes));
         RepaymentFrequency effectiveFrequency = repaymentFrequency == null
             ? resolveProduct(app).getResolvedRepaymentFrequency()
             : repaymentFrequency;
         LocalDate effectiveFirstRepaymentDate = firstRepaymentDate == null
-            ? defaultFirstRepaymentDate(disbursementDate, effectiveFrequency)
+            ? LoanTenure.fromSnapshot(repaymentScheduleService.parseSummary(app.getFinancialSnapshot()),app.getTenorMonths()).firstDate(disbursementDate,effectiveFrequency)
             : firstRepaymentDate;
         RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
             app,
@@ -458,6 +446,7 @@ public class ManagerService {
             .createdAt(now)
             .build());
         app.setStatus(LoanStatus.DISBURSED);
+        disbursementNumbers.assign(app,disbursementOfficerId,disbursementDate);
         app.setUpdatedAt(now);
         loanApplicationRepository.save(app);
         try {
@@ -583,12 +572,6 @@ public class ManagerService {
         return product.orElseThrow(() -> new IllegalArgumentException("Loan product is not available for this application"));
     }
 
-    private LocalDate defaultFirstRepaymentDate(LocalDate disbursementDate, RepaymentFrequency frequency) {
-        if (frequency == RepaymentFrequency.WEEKLY) {
-            return disbursementDate.plusWeeks(1);
-        }
-        return disbursementDate.plusMonths(1);
-    }
 
     private boolean hasDisbursementProofAttachment(LoanApplication app) {
         List<Map<String, Object>> attachments = loanAttachmentService.parse(app.getAttachmentsJson());
@@ -626,7 +609,7 @@ public class ManagerService {
     }
 
     private LoanApplication getDisbursementApplication(UUID loanId, UUID disbursementActorId) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
+        LoanApplication app = loanApplicationRepository.findForDisbursement(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member actor = memberRepository.findById(disbursementActorId)
             .orElseThrow(() -> new IllegalArgumentException("Forbidden"));

@@ -43,16 +43,17 @@ public class RepaymentScheduleService {
         if (decimalQuote && !frequency.name().equals(snapshot.get("repaymentFrequency"))) {
             throw new IllegalArgumentException("Repayment frequency differs from the assessed terms. Return the application for reassessment.");
         }
-        int installments = decimalQuote ? LoanAmortizationCalculator.numberOfPayments(app.getTenorMonths(), frequency)
+        LoanTenure tenure = LoanTenure.fromSnapshot(snapshot, app.getTenorMonths());
+        int installments = decimalQuote ? tenure.payments(frequency)
             : frequency == RepaymentFrequency.WEEKLY ? app.getTenorMonths() * 4 : app.getTenorMonths();
         LoanProductSetting product = app.getLoanProductSettingId() == null
             ? loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType()).orElse(null)
             : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId()).orElse(null);
         BigDecimal configuredRate = resolveAnnualInterestRate(app, product);
         InterestMethod interestMethod = resolveInterestMethod(app, product);
-        LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.calculate(
-            app.getAmount(), installments, configuredRate, interestMethod, frequency, installmentOverride,
-            resolveFlatInterestAmount(app, configuredRate));
+        LoanAmortizationCalculator.Result calculation = decimalQuote
+            ? tenure.calculate(app.getAmount(), configuredRate, interestMethod, frequency, installmentOverride, resolveFlatInterestAmount(app, configuredRate))
+            : LoanAmortizationCalculator.calculate(app.getAmount(), installments, configuredRate, interestMethod, frequency, installmentOverride, resolveFlatInterestAmount(app, configuredRate));
         BigDecimal baseInstallment = calculation.installment();
         if (decimalQuote && (readBigDecimal(snapshot.get("tenorMonths")) == null
             || BigDecimal.valueOf(app.getTenorMonths()).compareTo(readBigDecimal(snapshot.get("tenorMonths"))) != 0
@@ -70,9 +71,7 @@ public class RepaymentScheduleService {
         }
         List<Map<String, Object>> rows = new ArrayList<>();
         for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
-            LocalDate dueDate = frequency == RepaymentFrequency.WEEKLY
-                ? firstRepaymentDate.plusWeeks(installment.number() - 1L)
-                : firstRepaymentDate.plusMonths(installment.number() - 1L);
+            LocalDate dueDate = tenure.dueDate(disbursementDate, firstRepaymentDate, frequency, installment.number(), installments);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("installmentNumber", installment.number());
             row.put("dueDate", dueDate.toString());

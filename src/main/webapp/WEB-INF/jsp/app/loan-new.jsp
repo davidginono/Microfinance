@@ -95,17 +95,19 @@
         <div>
             <label id="tenorDisplayLabel" for="tenorDisplayInput" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.tenor.label" /></label>
             <input id="tenorInput" type="hidden" name="tenorMonths" value="${formValues['tenorMonths']}" />
+            <input id="tenureUnitInput" type="hidden" name="tenureUnit" value="${empty formValues['tenureUnit'] ? product.resolvedTenureUnit : formValues['tenureUnit']}" />
             <div class="tenure-unit-toggle-group mb-2 text-sm" role="group" aria-label="<spring:message code='newloan.tenureUnit' text='Tenure unit' />">
+                <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-tenure-unit="DAYS" aria-pressed="false"><spring:message code="recording.tenure.DAYS" /></button>
                 <button type="button" class="tenure-unit-toggle is-active px-3 py-2 transition" data-tenure-unit="MONTHS" aria-pressed="true"><spring:message code="common.months.label" text="Months" /></button>
                 <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-tenure-unit="YEARS" aria-pressed="false"><spring:message code="common.years.label" text="Years" /></button>
             </div>
             <div>
-                <input id="tenorDisplayInput" type="number"
+                <input id="tenorDisplayInput" name="tenureValue" type="number"
                        min="${product.minimumRepaymentMonths}"
                        max="${product.maxRepaymentMonths}"
-                       value="${formValues['tenorMonths']}"
+                       value="${empty formValues['tenureValue'] ? formValues['tenorMonths'] : formValues['tenureValue']}"
                        placeholder="12"
-                       data-min-months="${product.minimumRepaymentMonths}"
+                       data-min-months="${product.minimumRepaymentMonths}" data-product-unit="${product.resolvedTenureUnit}" data-min-tenure="${product.resolvedMinimumTenure}" data-max-tenure="${product.resolvedMaximumTenure}"
                        data-max-months="${product.maxRepaymentMonths}"
                        class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        required />
@@ -114,7 +116,7 @@
                data-prefix="<spring:message code='newloan.allowedTenureRange' />"
                data-to-label="<spring:message code='common.to' text='to' />"
                data-month-label="<spring:message code='common.months' text='month(s)' />"
-               data-year-label="<spring:message code='common.years' text='year(s)' />"></p>
+               data-day-label="<spring:message code='recording.tenure.DAYS' />" data-label="<spring:message code='recording.tenureValue' />" data-error="<spring:message code='recording.error.productLimits' />" data-year-label="<spring:message code='common.years' text='year(s)' />"></p>
         </div>
     </div>
 
@@ -935,145 +937,31 @@
             }
         }
 
-        let tenureUnit = "MONTHS";
-
-        function minTenorMonths() {
-            return Number(tenorDisplayInput?.dataset.minMonths || 1);
-        }
-
-        function maxTenorMonths() {
-            return Number(tenorDisplayInput?.dataset.maxMonths || 0);
-        }
-
-        function yearsFromMonths(months, rounder) {
-            if (!Number.isFinite(months) || months <= 0) {
-                return 0;
-            }
-            return rounder(months / 12);
-        }
-
-        function visibleTenorBounds() {
-            const minMonths = minTenorMonths();
-            const maxMonths = maxTenorMonths();
-            if (tenureUnit === "YEARS") {
-                return {
-                    min: Math.max(1, yearsFromMonths(minMonths, Math.ceil)),
-                    max: maxMonths > 0 ? yearsFromMonths(maxMonths, Math.floor) : 0
-                };
-            }
-            return {
-                min: minMonths,
-                max: maxMonths
-            };
-        }
-
-        function hasWholeYearTenureOption() {
-            const maxMonths = maxTenorMonths();
-            return tenureUnit !== "YEARS" || maxMonths <= 0 || yearsFromMonths(maxMonths, Math.floor) >= Math.max(1, yearsFromMonths(minTenorMonths(), Math.ceil));
-        }
-
-        function renderTenureCopy() {
-            if (tenorDisplayLabel) {
-                tenorDisplayLabel.textContent = tenureUnit === "YEARS" ? "Total Years to Repay" : "Total Months to Repay";
-            }
-            if (tenorRangeHelp) {
-                if (!hasWholeYearTenureOption()) {
-                    tenorRangeHelp.textContent = "Allowed range: no full-year tenure for this product. Choose Months.";
-                    return;
-                }
-                const bounds = visibleTenorBounds();
-                const prefix = tenorRangeHelp.dataset.prefix || "Allowed range:";
-                const toLabel = tenorRangeHelp.dataset.toLabel || "to";
-                const unitLabel = tenureUnit === "YEARS"
-                    ? (tenorRangeHelp.dataset.yearLabel || "year(s)")
-                    : (tenorRangeHelp.dataset.monthLabel || "month(s)");
-                tenorRangeHelp.textContent = maxTenorMonths() > 0
-                    ? prefix + " " + bounds.min + " " + toLabel + " " + bounds.max + " " + unitLabel
-                    : prefix + " " + bounds.min + "+ " + unitLabel;
-            }
-        }
-
+        const tenureUnitInput = document.getElementById("tenureUnitInput");
+        let tenureUnit = tenureUnitInput.value || "MONTHS";
+        const monthFactor = unit => unit === "DAYS" ? 12 / 365 : unit === "YEARS" ? 12 : 1;
         function monthsFromVisibleTenor() {
-            const rawValue = Number(tenorDisplayInput ? tenorDisplayInput.value : tenorInput.value);
-            if (!Number.isFinite(rawValue) || rawValue <= 0) {
-                return "";
-            }
-            return tenureUnit === "YEARS" ? Math.round(rawValue) * 12 : Math.round(rawValue);
+            const value = Number(tenorDisplayInput.value);return Number.isInteger(value) && value > 0 ? Math.ceil(value * monthFactor(tenureUnit)) : "";
         }
-
-        function refreshTenureConstraints() {
-            if (!tenorDisplayInput) {
-                return;
-            }
-            if (tenureUnit === "YEARS") {
-                const bounds = visibleTenorBounds();
-                tenorDisplayInput.min = bounds.min;
-                if (bounds.max >= bounds.min) {
-                    tenorDisplayInput.max = bounds.max;
-                } else {
-                    tenorDisplayInput.removeAttribute("max");
-                }
-                tenorDisplayInput.step = "1";
-                tenorDisplayInput.placeholder = "1";
-            } else {
-                tenorDisplayInput.min = minTenorMonths();
-                const maxMonths = maxTenorMonths();
-                if (maxMonths > 0) {
-                    tenorDisplayInput.max = maxMonths;
-                } else {
-                    tenorDisplayInput.removeAttribute("max");
-                }
-                tenorDisplayInput.step = "1";
-                tenorDisplayInput.placeholder = "12";
-            }
-            renderTenureCopy();
+        function visibleTenorBounds() {
+            const factor = monthFactor(tenorDisplayInput.dataset.productUnit) / monthFactor(tenureUnit);
+            return {min:Math.max(1,Math.ceil(Number(tenorDisplayInput.dataset.minTenure) * factor - 1e-9)),max:Math.floor(Number(tenorDisplayInput.dataset.maxTenure) * factor + 1e-9)};
         }
-
         function syncTenorInput() {
-            if (!tenorDisplayInput || !tenorInput) {
-                return true;
-            }
-            const months = monthsFromVisibleTenor();
-            tenorInput.value = months;
-            tenorDisplayInput.setCustomValidity("");
-            if (!months) {
-                return false;
-            }
-            if (tenureUnit === "YEARS" && !/^\d+$/.test(String(tenorDisplayInput.value || "").trim())) {
-                tenorDisplayInput.setCustomValidity("Enter whole years only.");
-                return false;
-            }
-            const minMonths = minTenorMonths();
-            const maxMonths = maxTenorMonths();
-            if (!hasWholeYearTenureOption()) {
-                tenorDisplayInput.setCustomValidity("This product does not allow a whole-year tenure. Choose Months.");
-                return false;
-            }
-            if (months < minMonths || (maxMonths > 0 && months > maxMonths)) {
-                const bounds = visibleTenorBounds();
-                const unitLabel = tenureUnit === "YEARS" ? "years" : "months";
-                const rangeLabel = maxMonths > 0 ? "between " + bounds.min + " and " + bounds.max : "of at least " + bounds.min;
-                tenorDisplayInput.setCustomValidity("Choose a tenure " + rangeLabel + " " + unitLabel + ".");
-                return false;
-            }
-            return true;
+            tenorInput.value = monthsFromVisibleTenor();tenureUnitInput.value = tenureUnit;
+            const bounds = visibleTenorBounds(), value = Number(tenorDisplayInput.value);
+            const valid = Number.isInteger(value) && value >= bounds.min && value <= bounds.max;
+            tenorDisplayInput.setCustomValidity(valid || !tenorDisplayInput.value ? "" : tenorRangeHelp.dataset.error);
+            return valid;
         }
-
-        function setTenureUnit(unit) {
-            const currentMonths = Number(tenorInput.value || monthsFromVisibleTenor());
-            tenureUnit = unit === "YEARS" ? "YEARS" : "MONTHS";
-            tenureUnitButtons.forEach(function (button) {
-                const active = button.dataset.tenureUnit === tenureUnit;
-                button.setAttribute("aria-pressed", active ? "true" : "false");
-                button.classList.toggle("is-active", active);
-            });
-            refreshTenureConstraints();
-            if (Number.isFinite(currentMonths) && currentMonths > 0) {
-                tenorDisplayInput.value = tenureUnit === "YEARS"
-                    ? String(Math.max(1, Math.round(currentMonths / 12)))
-                    : String(Math.round(currentMonths));
-            }
-            renderTenureCopy();
+        function setTenureUnit(unit, initial) {
+            tenureUnit = unit;tenureUnitInput.value = unit;
+            tenureUnitButtons.forEach(button => {const active=button.dataset.tenureUnit === unit;button.setAttribute("aria-pressed",String(active));button.classList.toggle("is-active",active);});
+            if(!initial)tenorDisplayInput.value = "";
+            const bounds = visibleTenorBounds();tenorDisplayInput.min=bounds.min;tenorDisplayInput.max=bounds.max;tenorDisplayInput.step="1";
+            tenorDisplayLabel.textContent=tenorRangeHelp.dataset.label;
+            const label = unit === "DAYS" ? tenorRangeHelp.dataset.dayLabel : unit === "YEARS" ? tenorRangeHelp.dataset.yearLabel : tenorRangeHelp.dataset.monthLabel;
+            tenorRangeHelp.textContent=tenorRangeHelp.dataset.prefix+" "+bounds.min+" "+tenorRangeHelp.dataset.toLabel+" "+bounds.max+" "+label;
             syncTenorInput();
         }
 
@@ -1390,7 +1278,7 @@
             });
         });
         syncAmountInput(false, true);
-        setTenureUnit("MONTHS");
+        setTenureUnit(tenureUnit,true);
         form.querySelectorAll('[name="monthlyIncome"], [name="monthlyExpenses"], [name="otherDebtRepayments"], [name="collateralDescription"], [name="collateralEstimatedValue"]').forEach(function (input) {
             input.addEventListener("change", resetFinancialPreview);
         });
@@ -1436,7 +1324,7 @@
                 previewParams.set("loanProductId", "${loanProductId}");
                 previewParams.set("loanType", "${loanType}");
                 previewParams.set("amount", amountInput.value);
-                previewParams.set("tenorMonths", tenorInput.value);
+                previewParams.set("tenorMonths", tenorInput.value);previewParams.set("tenureUnit",tenureUnit);previewParams.set("tenureValue",tenorDisplayInput.value);
                 previewParams.set("applicationId", "${formValues['applicationId']}");
                 previewParams.set("topUpLoanId", topUpLoanIdInput ? topUpLoanIdInput.value : "");
                 const response = await fetch("/app/loan-applications/financial-preview", {

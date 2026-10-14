@@ -143,15 +143,7 @@
                             <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank if there is no maximum amount" />' />
                         </label>
 
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                            <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumRepaymentMonths}" />
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                            <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
-                        </label>
+                        <c:set var="tenureProduct" value="${product}" /><%@ include file="../fragments/loan-tenure-fields.jspf" %>
 
                         <c:set var="eligibilityProduct" value="${product}" />
                         <%@ include file="../fragments/loan-product-eligibility-fields.jspf" %>
@@ -528,4 +520,4 @@
 
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
-<%@ include file="../fragments/footer.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>

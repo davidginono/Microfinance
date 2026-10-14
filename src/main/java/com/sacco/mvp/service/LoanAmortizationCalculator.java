@@ -29,7 +29,7 @@ public final class LoanAmortizationCalculator {
         BigDecimal flat = decimal(snapshot.get("interestAmount"), flatInterest(principal, rate, months));
         BigDecimal legacyPayment = !current && method == InterestMethod.REDUCING_BALANCE
             ? decimal(snapshot.get("monthlyRepaymentAmount"), null) : null;
-        return calculate(principal, numberOfPayments(months, frequency), rate, method, frequency, legacyPayment, flat);
+        return LoanTenure.fromSnapshot(snapshot, months).calculate(principal, rate, method, frequency, legacyPayment, flat);
     }
 
     private static BigDecimal decimal(Object value, BigDecimal fallback) {
@@ -59,6 +59,14 @@ public final class LoanAmortizationCalculator {
     public static BigDecimal flatInterest(BigDecimal principal, BigDecimal annualRate, int months) {
         return principal.multiply(annualRate).multiply(BigDecimal.valueOf(months))
             .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+    }
+
+    public static BigDecimal monthlyEquivalent(BigDecimal maximumPayment, int payments, BigDecimal tenureMonths) {
+        validatePayments(payments);
+        if (maximumPayment == null || maximumPayment.signum() <= 0 || tenureMonths == null || tenureMonths.signum() <= 0) {
+            throw new IllegalArgumentException("Valid payment amounts and tenure are required for affordability.");
+        }
+        return maximumPayment.multiply(BigDecimal.valueOf(payments)).divide(tenureMonths, 2, RoundingMode.UP);
     }
 
     public static BigDecimal annuity(BigDecimal principal, BigDecimal periodicRate, int payments) {

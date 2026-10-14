@@ -17,6 +17,10 @@ import java.util.UUID;
 import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from LoanApplication l where l.id=:id")
+    Optional<LoanApplication> findForDisbursement(@Param("id") UUID id);
+
     interface StatusCountProjection {
         LoanStatus getStatus();
         long getTotal();

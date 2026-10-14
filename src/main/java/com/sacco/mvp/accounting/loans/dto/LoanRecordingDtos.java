@@ -17,6 +17,14 @@ public final class LoanRecordingDtos {
         private BigDecimal requestedPrincipal;
         private BigDecimal principal;
         private Integer months;
+        private String loanMode = "CONFIGURED";
+        private String tenureUnit = "MONTHS";
+        private Integer tenureValue;
+        private String interestEntry = "PERCENTAGE";
+        private String interestBasis = "WHOLE_LOAN";
+        private BigDecimal interestPercent;
+        private BigDecimal interestAmount;
+        private RepaymentFrequency customFrequency = RepaymentFrequency.MONTHLY;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate firstPaymentDate;
         private String purpose = "";
         private String business = "";
@@ -32,6 +40,7 @@ public final class LoanRecordingDtos {
     @Data public static class PostForm {
         private UUID requestKey = UUID.randomUUID();
         private UUID loanId;
+        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate firstPaymentDate;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate effectiveDate;
         private BigDecimal amount;
         private UUID moneyAccountId;
@@ -62,14 +71,19 @@ public final class LoanRecordingDtos {
         String purpose, String business, BigDecimal income, BigDecimal expenses, BigDecimal otherDebt,
         String informationSource, String guarantors, String collateral, String evidence, String notes,
         BigDecimal rate, String method, String frequency, int months, LocalDate firstPaymentDate,
-        BigDecimal installment, BigDecimal contractualInterest, List<ScheduleRow> schedule) {}
+        BigDecimal installment, BigDecimal contractualInterest, List<ScheduleRow> schedule,
+        String tenureUnit,int tenureValue,String interestBasis,String loanMode,String interestEntry) {
+        public Detail(LoanRow loan,String institution,String branch,String recordedBy,OffsetDateTime recordedAt,String purpose,String business,BigDecimal income,BigDecimal expenses,BigDecimal otherDebt,String informationSource,String guarantors,String collateral,String evidence,String notes,BigDecimal rate,String method,String frequency,int months,LocalDate firstPaymentDate,BigDecimal installment,BigDecimal contractualInterest,List<ScheduleRow> schedule){this(loan,institution,branch,recordedBy,recordedAt,purpose,business,income,expenses,otherDebt,informationSource,guarantors,collateral,evidence,notes,rate,method,frequency,months,firstPaymentDate,installment,contractualInterest,schedule,"MONTHS",months,"ANNUAL","CONFIGURED","PERCENTAGE");}
+    }
     public record ScheduleRow(int number, LocalDate date, BigDecimal principal, BigDecimal interest, BigDecimal amount) {}
     public record Statement(String client, String clientNumber, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
         BigDecimal futureInterest, long loans, Page<LoanRow> page) {}
     public record Totals(long count, BigDecimal amount, BigDecimal principal, BigDecimal interest) {}
     public record StatementTerms(UUID loanId, BigDecimal rate, String frequency, int months, int installments,
-        LocalDate firstPaymentDate, BigDecimal installment, String institution, String branch) {
+        LocalDate firstPaymentDate, BigDecimal installment, String institution, String branch, String rateBasis, String tenureUnit, int tenureValue, LocalDate maturityDate) {
+        public StatementTerms(UUID loanId,BigDecimal rate,String frequency,int months,int installments,LocalDate firstPaymentDate,BigDecimal installment,String institution,String branch){this(loanId,rate,frequency,months,installments,firstPaymentDate,installment,institution,branch,"ANNUAL","MONTHS",months,null);}
         public LocalDate lastPaymentDate() {
+            if(maturityDate!=null)return maturityDate;
             if (firstPaymentDate == null || installments < 1 || !("WEEKLY".equals(frequency) || "MONTHLY".equals(frequency))) return null;
             return "WEEKLY".equals(frequency) ? firstPaymentDate.plusWeeks(installments - 1L)
                 : firstPaymentDate.plusMonths(installments - 1L);

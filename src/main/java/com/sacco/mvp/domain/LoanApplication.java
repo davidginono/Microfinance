@@ -27,6 +27,9 @@ public class LoanApplication {
     @Column(name = "loan_id", length = 20)
     private String loanId;
 
+    @Column(name = "loan_accounting_period_id")
+    private UUID loanAccountingPeriodId;
+
     @Column(name = "sacco_id", nullable = false)
     private String saccoId;
 

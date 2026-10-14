@@ -305,6 +305,10 @@ public class DisbursementController {
             app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
 
         model.addAttribute("app", app);
+        var tenureData=app.getFinancialSnapshot()==null?Map.<String,Object>of():objectMapper.readValue(app.getFinancialSnapshot(),new TypeReference<Map<String,Object>>(){});
+        var loanTenure=com.sacco.mvp.service.LoanTenure.fromSnapshot(tenureData,app.getTenorMonths());
+        model.addAttribute("loanTenure",loanTenure);
+        model.addAttribute("firstRepaymentDateDefault",loanTenure.firstDate(applicationClock.today(),app.getRepaymentFrequency()==null?com.sacco.mvp.domain.RepaymentFrequency.MONTHLY:app.getRepaymentFrequency()));
         model.addAttribute("applicant", applicant);
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
@@ -447,7 +451,8 @@ public class DisbursementController {
                 disbursementProofFile
             );
             emailOtpService.consumeOtpById(otpTokenId);
-            ra.addFlashAttribute("message", "Loan disbursed successfully. Repayment schedule created.");
+            ra.addFlashAttribute("message", message("recording.disbursedSuccess"));
+            return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

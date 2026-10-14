@@ -1061,6 +1061,7 @@ public class AdminController {
                                     @RequestParam BigDecimal processingFeePercent,
                                     @RequestParam BigDecimal annualInterestPercent,
                                     @RequestParam(defaultValue = "FLAT_RATE") InterestMethod interestMethod,
+                                    @RequestParam(defaultValue = "MONTHS") String tenureUnit,
                                     @RequestParam Integer minRepaymentMonths,
                                     @RequestParam Integer maxRepaymentMonths,
                                     @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
@@ -1106,7 +1107,7 @@ public class AdminController {
                 managerPriority,
                 loanOfficerPriority
             );
-            adminService.updateLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
+            adminService.updateLoanProductTenure(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
                 maxLoanSavingsRatio, savingsLimitCheckRequired, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
@@ -1114,7 +1115,7 @@ public class AdminController {
                 boardReviewRequired, boardPriority, boardReviewerIds,
                 committeeReviewRequired, committeePriority, committeeMinimumVotes,
                 committeeApprovalThreshold, creditCommitteeReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
-                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans);
+                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -1209,7 +1210,8 @@ public class AdminController {
                                               @RequestParam BigDecimal processingFeePercent,
                                               @RequestParam BigDecimal annualInterestPercent,
                                               @RequestParam(defaultValue = "FLAT_RATE") InterestMethod interestMethod,
-                                              @RequestParam Integer minRepaymentMonths,
+                                              @RequestParam(defaultValue = "MONTHS") String tenureUnit,
+                                    @RequestParam Integer minRepaymentMonths,
                                               @RequestParam Integer maxRepaymentMonths,
                                               @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
                                               @RequestParam(required = false) Integer maximumActiveLoans,
@@ -1252,7 +1254,7 @@ public class AdminController {
                 managerPriority,
                 loanOfficerPriority
             );
-            LoanProductSetting product = adminService.createLoanProduct(
+            LoanProductSetting product = adminService.createLoanProductTenure(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
                 productCode,
@@ -1297,7 +1299,7 @@ public class AdminController {
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus,
-                maximumActiveLoans
+                maximumActiveLoans, tenureUnit
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Loan product created successfully.");

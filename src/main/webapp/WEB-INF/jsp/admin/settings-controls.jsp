@@ -375,7 +375,7 @@
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.tenureRules" text="Tenure Rules" /></p>
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.tenureRulesHelp" text="Minimum and maximum repayment duration allowed for this product." /></p>
                         </div>
-                        <p class="text-base font-semibold text-slate-900">${product.minimumRepaymentMonths} - ${product.maxRepaymentMonths} <spring:message code="common.months" text="month(s)" /></p>
+                        <p class="text-base font-semibold text-slate-900">${product.resolvedMinimumTenure} - ${product.resolvedMaximumTenure} <spring:message code="recording.tenure.${product.resolvedTenureUnit}" /></p>
                     </div>
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -694,15 +694,7 @@
 
                             <c:set var="eligibilityProduct" value="${null}" />
                             <%@ include file="../fragments/loan-product-eligibility-fields.jspf" %>
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                                <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                                <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="12" />
-                            </label>
+                            <c:set var="tenureProduct" value="${null}" /><%@ include file="../fragments/loan-tenure-fields.jspf" %>
                         </div>
                     </section>
 
@@ -1114,15 +1106,7 @@
 
                         <c:set var="eligibilityProduct" value="${product}" />
                         <%@ include file="../fragments/loan-product-eligibility-fields.jspf" %>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                            <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumRepaymentMonths}" />
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                            <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
-                        </label>
+                        <c:set var="tenureProduct" value="${product}" /><%@ include file="../fragments/loan-tenure-fields.jspf" %>
                     </div>
                 </section>
 
@@ -1510,4 +1494,4 @@
 <spring:message code="admin.settings.validation.processingFeePercent" text="Loan processing fee percentage cannot be negative." var="validationProcessingFeePercent" />
 <%@ include file="../fragments/loan-product-workflow-script.jspf" %>
 
-<%@ include file="../fragments/footer.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>

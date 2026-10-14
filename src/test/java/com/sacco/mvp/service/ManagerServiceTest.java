@@ -61,11 +61,15 @@ class ManagerServiceTest {
     @Mock private RepaymentScheduleService repaymentScheduleService;
     @Mock private LoanRepaymentLedgerService loanRepaymentLedgerService;
     @Mock private com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
+    @Mock private com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService disbursementNumbers;
     @Spy private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @InjectMocks
     private ManagerService managerService;
 
+    @org.junit.jupiter.api.BeforeEach void automaticLoanNumber(){
+        org.mockito.Mockito.lenient().doAnswer(call->{LoanApplication loan=call.getArgument(0);loan.setLoanId("1");loan.setLoanAccountingPeriodId(UUID.randomUUID());return null;}).when(disbursementNumbers).assign(any(),any(),any());
+    }
     @Test
     void decideRejectsManagerFromAnotherSacco() {
         UUID loanId = UUID.randomUUID();
@@ -169,13 +173,12 @@ class ManagerServiceTest {
             "proof".getBytes()
         );
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findForDisbursement(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
         when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
             .thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(true).build()));
-        when(loanApplicationRepository.existsBySaccoIdAndLoanId("SACCO-A", "12345")).thenReturn(false);
         when(loanAttachmentService.store(eq(loanId), any(), eq(null), eq(LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF)))
             .thenReturn("[]");
         stubRepaymentSchedule(LocalDate.of(2026, 12, 3), new BigDecimal("25000.00"));
@@ -244,7 +247,7 @@ class ManagerServiceTest {
             .build();
         Member officer = activeOfficer(officerId);
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findForDisbursement(loanId)).thenReturn(Optional.of(app));
         when(loanApplicationRepository.findById(sourceLoanId)).thenReturn(Optional.of(sourceLoan));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
         when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
@@ -306,7 +309,7 @@ class ManagerServiceTest {
             .build();
         Member officer = activeOfficer(officerId);
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findForDisbursement(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
         when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
             .thenReturn(true);
@@ -337,7 +340,7 @@ class ManagerServiceTest {
         LoanApplication app = readyDisbursementApplication(loanId);
         Member officer = activeOfficer(officerId);
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findForDisbursement(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
         when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
             .thenReturn(true);
@@ -371,7 +374,7 @@ class ManagerServiceTest {
         LoanApplication app = readyDisbursementApplication(loanId);
         Member officer = activeOfficer(officerId);
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findForDisbursement(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
         when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
             .thenReturn(true);

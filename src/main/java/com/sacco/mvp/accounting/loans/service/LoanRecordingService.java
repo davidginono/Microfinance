@@ -32,6 +32,8 @@ public class LoanRecordingService {
     private final ObjectMapper json;
     private final ApplicationClock clock;
     private final AuditService audit;
+    private final LoanAttachmentService attachments;
+    private final LoanDisbursementNumberService disbursementNumbers;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -68,11 +70,12 @@ public class LoanRecordingService {
         case "clients"->records.clients(a,search,page);case "ledger-clients"->records.ledgerClients(a,search,page);case "products"->records.products(a,search,page);
         case "filter-products"->records.filterProducts(a,search,page);
         case "money"->records.accounts(a,"MONEY",search,page);case "principal"->records.accounts(a,"PRINCIPAL",search,page);case "interest"->records.accounts(a,"INTEREST",search,page);
+        case "disbursement-clients"->records.loans(a,new Filter(search,null,null,"RECORDED","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.clientNumber()+" - "+l.client()+" ("+l.number()+")",l.status())).toList();
         case "loans"->records.loans(a,new Filter(search,null,null,"","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.number()+" - "+l.client(),l.status())).toList();
         default->throw new IllegalArgumentException("recording.error.filter");};}
     @Transactional(readOnly=true)
     public Choice filterProduct(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.filter"));}
-    public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule) {}
+    public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule,String tenureUnit,int tenureValue) {}
     public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance) {}
     @Transactional(readOnly=true)
     public AllocationPreview postingPreview(AppUserPrincipal a,PostForm f,String kind){
@@ -88,23 +91,38 @@ public class LoanRecordingService {
         return allocation(f.getAmount(),balance.dueInterest(),balance.outstandingPrincipal());
     }
     @Transactional(readOnly=true)
+    public Quote interestQuote(AppUserPrincipal a,RecordForm f){
+        authorize(a,"CREATE");money(f.getPrincipal());check(Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"terms");
+        if("CONFIGURED".equals(f.getLoanMode()) && f.getTenureValue()==null){
+            check(f.getProductId()!=null,"product");var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));
+            f.setTenureUnit(p.getResolvedTenureUnit());f.setTenureValue(p.getResolvedMinimumTenure());
+        }
+        if(f.getTenureValue()==null){check(!"ANNUAL".equals(f.getInterestBasis()) || "AMOUNT".equals(f.getInterestEntry()),"terms");f.setTenureUnit("MONTHS");f.setTenureValue(1);}
+        f.setMonths(tenure(f).compatibilityMonths());var p=product(a,f);var result=calculate(f,p);
+        return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),List.of(),tenure(f).unit(),tenure(f).value());
+    }
+    @Transactional(readOnly=true)
     public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");validateRecord(f);check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);
-        return new Quote(product.getDisplayName(),product.getInterestRate(),product.getInterestMethod().name(),product.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),schedule(result,f.getFirstPaymentDate(),product.getResolvedRepaymentFrequency()));}
+        return new Quote(product.getDisplayName(),product.getInterestRate(),product.getInterestMethod().name(),product.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),List.of(),tenure(f).unit(),tenure(f).value());}
     @Transactional
-    public UUID save(AppUserPrincipal a,RecordForm f){
-        authorize(a,"CREATE");validateRecord(f);String hash=hash(f);records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+    public UUID save(AppUserPrincipal a,RecordForm f){return save(a,f,List.of());}
+    @Transactional
+    public UUID save(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files){
+        validateFiles(files);
+        authorize(a,"CREATE");validateRecord(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
         check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);var now=clock.now();
         var snapshot=new LinkedHashMap<String,Object>();snapshot.put("calculationVersion",LoanAmortizationCalculator.VERSION);snapshot.put("principalAmount",f.getPrincipal());
         snapshot.put("interestRate",product.getInterestRate());snapshot.put("interestMethod",product.getInterestMethod().name());snapshot.put("repaymentFrequency",product.getResolvedRepaymentFrequency().name());
-        snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
+        tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         long number=numbers.nextFor(a.getSaccoId());
-        var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).loanId(Long.toString(number)).saccoId(a.getSaccoId()).stationId(a.getStationId())
+        var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
             .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(f))
             .policySnapshot(write(Map.of("source","ACCOUNTANT_DIRECT","product",product.getDisplayName(),"guarantorsRequired",product.getGuarantorsRequired())))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
             .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();
+        loan.setAttachmentsJson(attachments.store(loan.getId(),files,null));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
         event(a,id,"LOAN_RECORDED",Map.of("principal",f.getPrincipal()));return id;
     }
@@ -114,20 +132,27 @@ public class LoanRecordingService {
         var snapshot=schedules.parseSummary(loan.getFinancialSnapshot());var calc=LoanAmortizationCalculator.estimate(loan.getAmount(),loan.getTenorMonths(),snapshot);
         return new Detail(records.loan(a,id,clock.today()),record.get("sacco_name").toString(),record.get("branch_name").toString(),record.get("actor_name").toString(),time(record.get("recorded_at")),
             f.getPurpose(),f.getBusiness(),f.getIncome(),f.getExpenses(),f.getOtherDebt(),f.getInformationSource(),f.getGuarantors(),f.getCollateral(),f.getEvidence(),f.getNotes(),
-            new BigDecimal(snapshot.get("interestRate").toString()),snapshot.get("interestMethod").toString(),snapshot.get("repaymentFrequency").toString(),loan.getTenorMonths(),f.getFirstPaymentDate(),calc.installment(),calc.totalInterest(),schedule(calc,f.getFirstPaymentDate(),loan.getRepaymentFrequency()));
+            new BigDecimal(snapshot.get("interestRate").toString()),snapshot.get("interestMethod").toString(),snapshot.get("repaymentFrequency").toString(),loan.getTenorMonths(),loan.getFirstRepaymentDate(),calc.installment(),calc.totalInterest(),loan.getFirstRepaymentDate()==null?List.of():datedSchedule(calc,loan),tenure(f).unit(),tenure(f).value(),f.getInterestBasis(),f.getLoanMode(),f.getInterestEntry());
     }
     @Transactional
-    public Posting disburse(AppUserPrincipal a,PostForm f){
-        authorize(a,"DISBURSE");validatePost(f);String hash=hash(f);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
+    public Posting disburse(AppUserPrincipal a,PostForm f){return disburse(a,f,List.of());}
+    @Transactional
+    public Posting disburse(AppUserPrincipal a,PostForm f,List<org.springframework.web.multipart.MultipartFile> files){
+        validateFiles(files);
+        authorize(a,"DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findById(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.RECORDED,"state");
-        check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");LocalDate first=((java.sql.Date)record.get("first_payment_date")).toLocalDate();
+        check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");LocalDate first=f.getFirstPaymentDate()!=null?f.getFirstPaymentDate():loan.getFirstRepaymentDate();
+        check(first!=null,"date");
         check(!f.getEffectiveDate().isBefore(((java.sql.Date)record.get("application_date")).toLocalDate()) && first.isAfter(f.getEffectiveDate()),"date");
         UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
         var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,f.getPrincipalAccountId(),"PRINCIPAL");
         check(f.getInterestAccountId()==null,"account");UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
         records.journal(a,journal,id,f,hash,period,"DISBURSEMENT",null,now);records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
         var schedule=schedules.buildSchedule(loan,f.getEffectiveDate(),first,loan.getRepaymentFrequency(),null,f.getReference(),f.getNotes());
+        loan.setFirstRepaymentDate(first);
         loan.setStatus(LoanStatus.DISBURSED);loan.setDisbursementDate(f.getEffectiveDate());loan.setDisbursementReference(f.getReference().strip());loan.setDisbursementNotes(f.getNotes().strip());
+        loan.setAttachmentsJson(attachments.store(loan.getId(),files,loan.getAttachmentsJson(),LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF));
+        disbursementNumbers.assign(loan,a.getMemberId(),f.getEffectiveDate());
         loan.setRepaymentScheduleJson(schedule.scheduleJson());loan.setFinalDueDate(schedule.finalDueDate());loan.setUpdatedAt(now);loans.saveAndFlush(loan);repayments.openAtDisbursement(loan);
         records.lines(a,journal,List.of(new Object[]{principal.id(),f.getAmount(),ZERO},new Object[]{money.id(),ZERO,f.getAmount()}));
         records.finish(id,null,f.getAmount(),ZERO,f.getAmount());records.postJournal(a,journal,now);event(a,id,"LOAN_DISBURSEMENT_POSTED",Map.of("loan",loan.getId(),"amount",f.getAmount()));return records.posting(a,id);
@@ -198,14 +223,32 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public Statement statement(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));var f=new Filter("",null,null,"","newest",page,client);filter(f,false);var t=records.clientTotals(a,f,clock.today());var rows=records.loans(a,f,clock.today(),26,page*25);return new Statement(c.label(),c.label().split(" - ",2)[0],(BigDecimal)t.get("principal"),(BigDecimal)t.get("interest"),(BigDecimal)t.get("arrears"),(BigDecimal)t.get("future_interest"),((Number)t.get("loans")).longValue(),new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25));}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public List<Posting> report(AppUserPrincipal a,String kind,Filter f){authorize(a,"EXPORT");filter(f,true);kind(kind);var total=records.totals(a,kind,f);check(total.count()<=500,"reportLimit");return records.posts(a,kind,f,500,0);}
     @Transactional(readOnly=true) public Totals totals(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);return records.totals(a,kind,f);}
-    private LoanProductSetting product(AppUserPrincipal a,RecordForm f){var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
+    private LoanProductSetting product(AppUserPrincipal a,RecordForm f){
+        if ("CUSTOM".equals(f.getLoanMode())) {
+            check(Set.of("PERCENTAGE","AMOUNT").contains(f.getInterestEntry()) && Set.of("WHOLE_LOAN","ANNUAL").contains(f.getInterestBasis()) && f.getCustomFrequency()!=null,"terms");
+            BigDecimal rate=BigDecimal.ZERO;
+            if("AMOUNT".equals(f.getInterestEntry()))nonnegativeMoney(f.getInterestAmount());
+            else {check(f.getInterestPercent()!=null && f.getInterestPercent().signum()>=0 && f.getInterestPercent().compareTo(new BigDecimal("10000"))<=0 && f.getInterestPercent().scale()<=4,"terms");rate=f.getInterestPercent().movePointLeft(2);}
+            return LoanProductSetting.builder().loanType(LoanType.CUSTOMIZED_LOAN).productName("Customised loan").interestRate(rate).interestMethod(InterestMethod.FLAT_RATE).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).build();
+        }
+        var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
         check((p.getMinimumAmount()==null || f.getPrincipal().compareTo(p.getMinimumAmount())>=0) && (p.getMaximumAmount()==null || f.getPrincipal().compareTo(p.getMaximumAmount())<=0),"productLimits");
-        check(f.getMonths()>=p.getMinimumRepaymentMonths() && (p.getMaxRepaymentMonths()==null || f.getMonths()<=p.getMaxRepaymentMonths()),"productLimits");
+        tenure(f).validate(p);
         check((p.getApplicationFee()==null || p.getApplicationFee().signum()==0) && (p.getProcessingFeeRate()==null || p.getProcessingFeeRate().signum()==0) && (p.getInsuranceRate()==null || p.getInsuranceRate().signum()==0),"productFees");return p;}
-    private LoanAmortizationCalculator.Result calculate(RecordForm f,LoanProductSetting p){return LoanAmortizationCalculator.calculate(f.getPrincipal(),LoanAmortizationCalculator.numberOfPayments(f.getMonths(),p.getResolvedRepaymentFrequency()),p.getInterestRate(),p.getInterestMethod(),p.getResolvedRepaymentFrequency(),null,LoanAmortizationCalculator.flatInterest(f.getPrincipal(),p.getInterestRate(),f.getMonths()));}
-    private List<ScheduleRow> schedule(LoanAmortizationCalculator.Result c,LocalDate first,RepaymentFrequency frequency){return c.rows().stream().map(r->new ScheduleRow(r.number(),frequency==RepaymentFrequency.WEEKLY?first.plusWeeks(r.number()-1L):first.plusMonths(r.number()-1L),r.principal(),r.interest(),r.amount())).toList();}
-    private void validateRecord(RecordForm f){check(f!=null && f.getRequestKey()!=null && f.getClientId()!=null && f.getProductId()!=null,"request");money(f.getRequestedPrincipal());money(f.getPrincipal());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
-        check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()) && f.getFirstPaymentDate()!=null && f.getFirstPaymentDate().isAfter(f.getApplicationDate()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
+    private LoanTenure tenure(RecordForm f){Integer value=f.getTenureValue()==null?f.getMonths():f.getTenureValue();check(value!=null,"terms");return new LoanTenure(f.getTenureUnit(),value);}
+    private LoanAmortizationCalculator.Result calculate(RecordForm f,LoanProductSetting p){
+        var term=tenure(f);BigDecimal flat=term.flatInterest(f.getPrincipal(),p.getInterestRate());
+        if("CUSTOM".equals(f.getLoanMode()))flat="AMOUNT".equals(f.getInterestEntry())?f.getInterestAmount():"WHOLE_LOAN".equals(f.getInterestBasis())?f.getPrincipal().multiply(p.getInterestRate()).setScale(2,RoundingMode.HALF_UP):flat;
+        return term.calculate(f.getPrincipal(),p.getInterestRate(),p.getInterestMethod(),p.getResolvedRepaymentFrequency(),null,flat);
+    }
+    private List<ScheduleRow> datedSchedule(LoanAmortizationCalculator.Result c,LoanApplication loan){var t=LoanTenure.fromSnapshot(schedules.parseSummary(loan.getFinancialSnapshot()),loan.getTenorMonths());return c.rows().stream().map(r->new ScheduleRow(r.number(),t.dueDate(loan.getDisbursementDate(),loan.getFirstRepaymentDate(),loan.getRepaymentFrequency(),r.number(),c.rows().size()),r.principal(),r.interest(),r.amount())).toList();}
+    private static void nonnegativeMoney(BigDecimal amount){check(amount!=null && amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
+    private static void validateFiles(List<org.springframework.web.multipart.MultipartFile> files){check(files!=null && files.size()<=10 && files.stream().allMatch(f->f.getSize()<=25L*1024*1024),"attachments");}
+    @Transactional(readOnly=true) public List<Map<String,Object>> attachments(AppUserPrincipal a,UUID id){authorize(a,"VIEW");records.record(a,id,false);return attachments.parse(loans.findById(id).orElseThrow().getAttachmentsJson());}
+    @Transactional(readOnly=true) public LoanAttachmentService.AttachmentResource attachment(AppUserPrincipal a,UUID id,String attachmentId){authorize(a,"VIEW");records.record(a,id,false);return attachments.load(id,attachmentId,loans.findById(id).orElseThrow().getAttachmentsJson());}
+    private void validateRecord(RecordForm f){check(f!=null && f.getRequestKey()!=null && f.getClientId()!=null && ("CUSTOM".equals(f.getLoanMode()) || f.getProductId()!=null) && Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"request");money(f.getPrincipal());f.setRequestedPrincipal(f.getPrincipal());f.setMonths(tenure(f).compatibilityMonths());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
+        if("CONFIGURED".equals(f.getLoanMode())){f.setInterestEntry("PERCENTAGE");f.setInterestBasis("ANNUAL");f.setInterestPercent(null);f.setInterestAmount(null);}
+        check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
         check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getExpenses(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private void validatePost(PostForm f){check(f!=null && f.getRequestKey()!=null && f.getLoanId()!=null,"request");money(f.getAmount());check(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(clock.today()),"date");text(f.getReference(),100,true);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);}
     static void filter(Filter f,boolean posting){check(f!=null && f.search()!=null && f.search().length()<=100 && f.page()>=0 && f.page()<=10000 && Set.of("newest","oldest","amount").contains(f.sort()),"filter");check(f.from()==null || f.through()==null || !f.from().isAfter(f.through()),"date");check((posting?Set.of("","POSTED","REVERSED","REVERSAL"):Set.of("","RECORDED","DISBURSED","PAR","DEFAULTED","PAID")).contains(f.status()),"filter");}
@@ -215,6 +258,10 @@ public class LoanRecordingService {
     private static void check(boolean value,String key){if(!value)throw new IllegalArgumentException("recording.error."+key);}
     private String write(Object value){return json.writeValueAsString(value);}
     private <T>T read(String value,Class<T> type){return json.readValue(value,type);}
+    private String uploadHash(Object form,List<org.springframework.web.multipart.MultipartFile> files){
+        try {var evidence=new ArrayList<String>();for(var file:files)if(!file.isEmpty())evidence.add(Objects.toString(file.getOriginalFilename(),"")+":"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file.getBytes())));return hash(Map.of("form",form,"attachments",evidence));}
+        catch(java.io.IOException|java.security.NoSuchAlgorithmException ex){throw new IllegalArgumentException("recording.error.attachments",ex);}
+    }
     private String hash(Object value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(write(value).getBytes(StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
     private OffsetDateTime time(Object value){return value instanceof OffsetDateTime t?t:((java.sql.Timestamp)value).toInstant().atOffset(clock.now().getOffset());}
     private void event(AppUserPrincipal a,UUID id,String action,Map<String,Object> detail){audit.logEvent("LOAN_RECORDING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"LOAN",id.toString(),a.getSaccoId(),a.getStationId(),detail);}

@@ -1121,6 +1121,8 @@ public class AppController {
         BigDecimal formAmount = app.getTopUpSourceLoanId() == null ? app.getAmount() : loanPresentationService.topUpRequestedAmount(app);
         formValues.put("amount", formAmount == null ? "" : formAmount.toPlainString());
         formValues.put("tenorMonths", app.getTenorMonths() == null ? "" : String.valueOf(app.getTenorMonths()));
+        var tenure=com.sacco.mvp.service.LoanTenure.fromSnapshot(objectMapper.readValue(app.getFinancialSnapshot()==null?"{}":app.getFinancialSnapshot(),new tools.jackson.core.type.TypeReference<Map<String,Object>>(){}),app.getTenorMonths());
+        formValues.put("tenureUnit",tenure.unit());formValues.put("tenureValue",Integer.toString(tenure.value()));
         formValues.put("financialSnapshotJson", app.getFinancialSnapshot());
         if (app.getTopUpSourceLoanId() != null) {
             formValues.put("topUpLoanId", app.getTopUpSourceLoanId().toString());
@@ -1756,8 +1758,8 @@ public class AppController {
         try {
             loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId, applicationId);
             LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
-            Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
-                principal.getSaccoId(), principal.getMemberId(), product, amount, tenorMonths, topUpLoanId);
+            Map<String, Object> snapshot = requestParams.containsKey("tenureUnit") ? financialDetailsService.generateSnapshot(
+                principal.getSaccoId(), principal.getMemberId(), product, amount, tenorMonths, topUpLoanId,com.sacco.mvp.service.LoanTenure.from(requestParams,tenorMonths)) : financialDetailsService.generateSnapshot(principal.getSaccoId(),principal.getMemberId(),product,amount,tenorMonths,topUpLoanId);
             BigDecimal effectiveAmount = Optional.ofNullable(readBigDecimal(snapshot.get("principalAmount")))
                 .orElse(amount);
             Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());

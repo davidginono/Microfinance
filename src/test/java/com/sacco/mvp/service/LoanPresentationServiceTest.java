@@ -106,6 +106,20 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void customInterestPreservesWholeLoanBasisAndOmitsRateForAmountEntry() {
+        var whole = loanPresentationService.parseFinancialFieldSections("""
+            {"loanMode":"CUSTOM","interestEntry":"PERCENTAGE","interestBasis":"WHOLE_LOAN",
+             "interestRate":0.12,"interestAmount":120}
+            """).get("Loan Calculations");
+        assertThat(whole).containsEntry("For the whole loan", "12.00%")
+            .doesNotContainKey("Annual Interest Rate");
+        var amount = loanPresentationService.parseFinancialFieldSections("""
+            {"loanMode":"CUSTOM","interestEntry":"AMOUNT","interestRate":0,"interestAmount":17.03}
+            """).get("Loan Calculations");
+        assertThat(amount).doesNotContainKey("Annual Interest Rate");
+    }
+
+    @Test
     void previousApprovedReviewsShowsOnlyApprovedEarlierStages() {
         UUID loanId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();

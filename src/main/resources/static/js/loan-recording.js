@@ -34,6 +34,51 @@
     window.addEventListener('pagehide', () => {binding.cancel(); ++request; controller?.abort();});
     load();
   });
+  const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');
+  if(disbursementSelect){let sequence=0, controller;disbursementSelect.addEventListener('change',async()=>{
+    controller?.abort();controller=new AbortController();const version=++sequence,form=disbursementSelect.form;
+    form.elements.amount.value='';form.elements.firstPaymentDate.value='';if(!disbursementSelect.value)return;
+    try{const response=await fetch(root+'/finance/loan-recording/loans/'+encodeURIComponent(disbursementSelect.value),{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store',signal:controller.signal});if(!response.ok || response.redirected)return;const data=await response.json();if(version!==sequence)return;form.elements.amount.value=data.amount;form.elements.firstPaymentDate.value=data.firstPaymentDate;}catch(error){if(error.name!=='AbortError')form.querySelector('[data-choice-error]').textContent=form.querySelector('[data-choice-error]').dataset.error;}
+  });}
+  const recordForm = document.querySelector('form:has(#loanMode)');
+  if (recordForm) {
+    const mode = recordForm.querySelector('#loanMode'), entry = recordForm.querySelector('#interestEntry'), unit = recordForm.querySelector('#tenureUnit');
+    const region = recordForm.querySelector('[data-interest-preview]'), spinner = region.querySelector('.loan-interest-spinner'), output = region.querySelector('[data-interest-value]'), description = region.querySelector('[data-interest-description]');
+    let timer, controller, version = 0;
+    const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
+    function refresh() {
+      const custom = mode.value === 'CUSTOM', amount = entry.value === 'AMOUNT';
+      show(recordForm.querySelector('[data-configured-product]'), !custom);
+      const productNote=recordForm.querySelector('[data-configured-terms-note]');if(productNote)productNote.hidden=custom;
+      show(recordForm.querySelector('[data-custom-terms]'), custom);
+      recordForm.querySelectorAll('[data-custom-percentage]').forEach(box => show(box, custom && !amount));
+      show(recordForm.querySelector('[data-custom-amount]'), custom && amount);
+      show(recordForm.querySelector('[data-tenure-number]'), !!unit.value);
+      recordForm.querySelector('#tenureValue').max = unit.value === 'DAYS' ? '18250' : unit.value === 'YEARS' ? '50' : '600';
+      clearTimeout(timer); controller?.abort(); ++version;
+      spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
+      if (!recordForm.querySelector('#principal').value || (!custom && !recordForm.querySelector('#productId').value)) return;
+      const current = version;
+      timer = setTimeout(async () => {
+        controller = new AbortController(); spinner.hidden = false; region.setAttribute('aria-busy','true');
+        const data = new URLSearchParams();new FormData(recordForm).forEach((value,key) => {if(typeof value === 'string')data.append(key,value);});
+        try {
+          const response = await fetch(root + '/finance/loan-recording/quote', {method:'POST',body:data,headers:{Accept:'application/json'},signal:controller.signal,credentials:'same-origin',cache:'no-store'});
+          if(response.redirected)throw new Error(region.dataset.error);
+          const quote = await response.json();if(current !== version)return;
+          if(!response.ok)throw new Error(quote.error || region.dataset.error);
+          output.textContent = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits:2,maximumFractionDigits:2}).format(quote.interest);
+          description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
+        } catch(error) {if(current === version && error.name !== 'AbortError')description.textContent = error.message || region.dataset.error;}
+        finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');}}
+      }, 150);
+    }
+    const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency']);
+    const changed = event => {if(pricing.has(event.target.name))refresh();};
+    recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
+    window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;});
+    window.addEventListener('pageshow', refresh);refresh();
+  }
   document.querySelectorAll('[data-loan-form]').forEach(form => {
     const summary = form.querySelector('.loan-error-summary'); if (summary) {form.querySelectorAll('details').forEach(d => d.open = true); summary.focus();}
     const submitButtons = [...form.querySelectorAll('button[type="submit"],button:not([type])')];

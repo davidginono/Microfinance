@@ -574,19 +574,12 @@
                 </div>
             </div>
         </div>
-            <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.loanId" text="Loan ID" /> <span class="text-rose-600">*</span></label>
-                <input type="text" name="loanId" value="${app.loanId}"
-                       pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
-                       title="<spring:message code='loan.disbursement.loanIdTitle' text='Enter the institution loan-book number (4-20 digits)' />"
-                       class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                       placeholder="<spring:message code='loan.disbursement.loanIdPlaceholder' text='Institution loan-book number (digits only)' />" />
-                <p class="mt-1 text-xs text-slate-500"><spring:message code="loan.disbursement.loanIdHelp" text="Entered at disbursement. 4-20 digits, unique within this institution." /></p>
-        </div>
+            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${firstRepaymentDateDefault}" required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
+            <div><span class="text-sm font-medium text-slate-700"><spring:message code="loan.loanId" /></span><p><spring:message code="recording.numberAssigned" /></p></div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>
                 <div class="erp-section-muted text-sm text-slate-600">
-                    <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The local repayment schedule is created at disbursement." />
+                    <c:choose><c:when test="${not empty loanTenure}">${loanTenure.value()} <spring:message code="recording.tenure.${loanTenure.unit()}" /></c:when><c:otherwise>${app.tenorMonths} <spring:message code="recording.tenure.MONTHS" /></c:otherwise></c:choose>
         </div>
                 </div>
             </div>

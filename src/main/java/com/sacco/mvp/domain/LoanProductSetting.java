@@ -73,6 +73,17 @@ public class LoanProductSetting {
     @Column(name = "interest_method", length = 32)
     private InterestMethod interestMethod;
 
+    @Column(name = "tenure_unit", length = 8)
+    private String tenureUnit;
+    @Column(name = "min_tenure")
+    private Integer minTenure;
+    @Column(name = "max_tenure")
+    private Integer maxTenure;
+
+    public String getResolvedTenureUnit() { return tenureUnit == null ? "MONTHS" : tenureUnit; }
+    public int getResolvedMinimumTenure() { return minTenure == null ? getMinimumRepaymentMonths() : minTenure; }
+    public int getResolvedMaximumTenure() { return maxTenure == null ? (maxRepaymentMonths == null ? 600 : maxRepaymentMonths) : maxTenure; }
+
     @Column(name = "min_repayment_months")
     private Integer minRepaymentMonths;
 

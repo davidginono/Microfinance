@@ -1,0 +1,1 @@
+.loan-tenure-config{min-width:0;grid-column:1/-1}.loan-tenure-config label{display:flex;flex-direction:column;gap:5px}.loan-tenure-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:12px}.loan-tenure-values[hidden]{display:none}@media(max-width:640px){.loan-tenure-values{grid-template-columns:minmax(0,1fr)}}

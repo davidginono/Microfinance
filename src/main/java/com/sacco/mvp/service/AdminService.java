@@ -4037,4 +4037,116 @@ public class AdminService {
             return percent;
         }
     }
+
+    @Transactional
+    public void updateLoanProductTenure(String saccoId,
+                                  UUID adminId,
+                                  UUID productId,
+                                  String productCode,
+                                  String productName,
+                                  String productDescription,
+                                  Integer displayOrder,
+                                  BigDecimal minimumAmount,
+                                  BigDecimal maximumAmount,
+                                  Integer guarantorsRequired,
+                                  BigDecimal ratio,
+                                  boolean savingsLimitCheckRequired,
+                                  BigDecimal applicationFee,
+                                  BigDecimal insuranceRate,
+                                  BigDecimal processingFeeRate,
+                                  BigDecimal annualRate,
+                                  InterestMethod interestMethod,
+                                  Integer minRepaymentMonths,
+                                  Integer maxRepaymentMonths,
+                                  boolean allowApplicationWithActiveLoan,
+                                  boolean freshFinancialDataRequired,
+                                  boolean managerReviewRequired,
+                                  boolean loanOfficerReviewRequired,
+                                  ApprovalWorkflowStage workflowStartStage,
+                                  Integer managerPriority,
+                                  Integer loanOfficerPriority,
+                                  boolean chairpersonReviewRequired,
+                                  Integer chairpersonPriority,
+                                  List<UUID> chairpersonReviewerIds,
+                                  boolean boardReviewRequired,
+                                  Integer boardPriority,
+                                  List<UUID> boardReviewerIds,
+                                  boolean committeeReviewRequired,
+                                  Integer committeePriority,
+                                  Integer committeeMinimumVotes,
+                                  Integer committeeApprovalThreshold,
+                                  List<UUID> creditCommitteeReviewerIds,
+                                  boolean accountantReviewRequired,
+                                  Integer accountantPriority,
+                                  boolean disbursementOfficerRequired,
+                                  boolean disbursementProofRequired,
+                                  boolean applicantAttachmentRequired,
+                                  boolean guarantorMinSavingsCheckRequired,
+                                  BigDecimal guarantorMinimumSavings,
+                                  LoanProductStatus productStatus,
+                                  Integer maximumActiveLoans, String tenureUnit) {
+        var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
+        var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
+        if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
+        updateLoanProduct(saccoId,adminId,productId,productCode,productName,productDescription,displayOrder,minimumAmount,maximumAmount,guarantorsRequired,ratio,savingsLimitCheckRequired,applicationFee,insuranceRate,processingFeeRate,annualRate,interestMethod,minimum.compatibilityMonths(),maximum.compatibilityMonths(),allowApplicationWithActiveLoan,freshFinancialDataRequired,managerReviewRequired,loanOfficerReviewRequired,workflowStartStage,managerPriority,loanOfficerPriority,chairpersonReviewRequired,chairpersonPriority,chairpersonReviewerIds,boardReviewRequired,boardPriority,boardReviewerIds,committeeReviewRequired,committeePriority,committeeMinimumVotes,committeeApprovalThreshold,creditCommitteeReviewerIds,accountantReviewRequired,accountantPriority,disbursementOfficerRequired,disbursementProofRequired,applicantAttachmentRequired,guarantorMinSavingsCheckRequired,guarantorMinimumSavings,productStatus,maximumActiveLoans);
+        LoanProductSetting product = loanProductSettingRepository.findByIdAndSaccoId(productId,saccoId).orElseThrow();
+        product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
+        loanProductSettingRepository.save(product);
+
+    }
+
+    @Transactional
+    public LoanProductSetting createLoanProductTenure(String saccoId,
+                                                UUID adminId,
+                                                String productCode,
+                                                String productName,
+                                                String productDescription,
+                                                Integer displayOrder,
+                                                BigDecimal minimumAmount,
+                                                BigDecimal maximumAmount,
+                                                Integer guarantorsRequired,
+                                                BigDecimal ratio,
+                                                boolean savingsLimitCheckRequired,
+                                                BigDecimal applicationFee,
+                                                BigDecimal insuranceRate,
+                                                BigDecimal processingFeeRate,
+                                                BigDecimal annualRate,
+                                                InterestMethod interestMethod,
+                                                Integer minRepaymentMonths,
+                                                Integer maxRepaymentMonths,
+                                                boolean allowApplicationWithActiveLoan,
+                                                boolean freshFinancialDataRequired,
+                                                boolean managerReviewRequired,
+                                                boolean loanOfficerReviewRequired,
+                                                ApprovalWorkflowStage workflowStartStage,
+                                                Integer managerPriority,
+                                                Integer loanOfficerPriority,
+                                                boolean chairpersonReviewRequired,
+                                                Integer chairpersonPriority,
+                                                List<UUID> chairpersonReviewerIds,
+                                                boolean boardReviewRequired,
+                                                Integer boardPriority,
+                                                List<UUID> boardReviewerIds,
+                                                boolean committeeReviewRequired,
+                                                Integer committeePriority,
+                                                Integer committeeMinimumVotes,
+                                                Integer committeeApprovalThreshold,
+                                                List<UUID> creditCommitteeReviewerIds,
+                                                boolean accountantReviewRequired,
+                                                Integer accountantPriority,
+                                                boolean disbursementOfficerRequired,
+                                                boolean disbursementProofRequired,
+                                                boolean applicantAttachmentRequired,
+                                                boolean guarantorMinSavingsCheckRequired,
+                                                BigDecimal guarantorMinimumSavings,
+                                                LoanProductStatus productStatus,
+                                                Integer maximumActiveLoans, String tenureUnit) {
+        var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
+        var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
+        if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
+        LoanProductSetting product = createLoanProduct(saccoId,adminId,productCode,productName,productDescription,displayOrder,minimumAmount,maximumAmount,guarantorsRequired,ratio,savingsLimitCheckRequired,applicationFee,insuranceRate,processingFeeRate,annualRate,interestMethod,minimum.compatibilityMonths(),maximum.compatibilityMonths(),allowApplicationWithActiveLoan,freshFinancialDataRequired,managerReviewRequired,loanOfficerReviewRequired,workflowStartStage,managerPriority,loanOfficerPriority,chairpersonReviewRequired,chairpersonPriority,chairpersonReviewerIds,boardReviewRequired,boardPriority,boardReviewerIds,committeeReviewRequired,committeePriority,committeeMinimumVotes,committeeApprovalThreshold,creditCommitteeReviewerIds,accountantReviewRequired,accountantPriority,disbursementOfficerRequired,disbursementProofRequired,applicantAttachmentRequired,guarantorMinSavingsCheckRequired,guarantorMinimumSavings,productStatus,maximumActiveLoans);
+        product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
+        loanProductSettingRepository.save(product);
+        return product;
+    }
 }

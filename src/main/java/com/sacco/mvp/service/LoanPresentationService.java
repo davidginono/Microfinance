@@ -242,7 +242,7 @@ public class LoanPresentationService {
             } else {
                 putMoney(calculations, "Loan Amount (TZS)", principalAmount);
             }
-            putValue(calculations, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putSnapshotInterestRate(calculations, raw);
             putValue(calculations, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
             addFinancialRow(calculations, "Interest (TZS)", raw.get("interestAmount"));
             Integer tenorMonths = readInteger(raw.get("tenorMonths"));
@@ -252,7 +252,8 @@ public class LoanPresentationService {
             if (tenorMonths == null) {
                 tenorMonths = fallbackTenorMonths;
             }
-            putValue(calculations, "Loan Period in Years", formatYears(tenorMonths));
+            if(raw.containsKey("tenureUnit"))putValue(calculations,financialMessage("tenure","Loan tenure"),tenureText(raw,tenorMonths));
+            else putValue(calculations, "Loan Period in Years", formatYears(tenorMonths));
             putValue(calculations, "Number of Payments", firstNonNull(raw.get("numberOfPayments"), tenorMonths));
             putValue(calculations, financialMessage("frequency", "Repayment Frequency"), repaymentFrequencyLabel(raw.get("repaymentFrequency")));
             BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
@@ -536,10 +537,10 @@ public class LoanPresentationService {
             Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
             Map<String, Object> display = new LinkedHashMap<>();
             putMoney(display, "Loan Amount", app.getAmount());
-            putValue(display, "Repayment Period", app.getTenorMonths() == null ? null : app.getTenorMonths() + " month(s)");
+            putValue(display, financialMessage("tenure","Loan tenure"), tenureText(raw,app.getTenorMonths()));
             putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
-            putValue(display, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
-            putValue(display, "Loan Period in Years", formatYears(app.getTenorMonths()));
+            putSnapshotInterestRate(display, raw);
+            if(!raw.containsKey("tenureUnit"))putValue(display, "Loan Period in Years", formatYears(app.getTenorMonths()));
             putValue(display, "Number of Payments", firstNonNull(raw.get("numberOfPayments"), app.getTenorMonths()));
             putValue(display, financialMessage("frequency", "Repayment Frequency"), repaymentFrequencyLabel(raw.get("repaymentFrequency")));
             putMoney(display, "Estimated Installment", firstNonNull(raw.get("periodicRepaymentAmount"), raw.get("monthlyRepaymentAmount")));
@@ -754,6 +755,19 @@ public class LoanPresentationService {
         return messageSource.getMessage("newloan.calculation." + code, null, fallback, LocaleContextHolder.getLocale());
     }
 
+    private void putSnapshotInterestRate(Map<String, Object> display, Map<String, Object> snapshot) {
+        if ("CUSTOM".equals(snapshot.get("loanMode"))) {
+            if ("AMOUNT".equals(snapshot.get("interestEntry"))) return;
+            if ("WHOLE_LOAN".equals(snapshot.get("interestBasis"))) {
+                String label = messageSource.getMessage("recording.basis.WHOLE_LOAN", null,
+                    "For the whole loan", LocaleContextHolder.getLocale());
+                putValue(display, label, formatPercentValue(snapshot.get("interestRate")));
+                return;
+            }
+        }
+        putValue(display, "Annual Interest Rate", formatPercentValue(snapshot.get("interestRate")));
+    }
+
     private int indexOfLabel(List<String> labels, String target) {
         int index = labels.indexOf(target);
         return index >= 0 ? index : Math.max(labels.size() - 1, 0);
@@ -876,6 +890,7 @@ public class LoanPresentationService {
         return label + " (" + percent + "%)";
     }
 
+    private String tenureText(Map<String,Object> snapshot,Integer fallback){if(fallback==null)return null;var tenure=LoanTenure.fromSnapshot(snapshot,fallback);return tenure.value()+" "+messageSource.getMessage("recording.tenure."+tenure.unit(),null,tenure.unit(),LocaleContextHolder.getLocale());}
     private String formatYears(Integer tenorMonths) {
         if (tenorMonths == null || tenorMonths <= 0) {
             return null;

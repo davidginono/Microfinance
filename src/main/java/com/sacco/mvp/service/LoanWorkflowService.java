@@ -412,9 +412,11 @@ public class LoanWorkflowService {
             : formSchemaService.getSchema(saccoId, loanProductId, loanType);
         LoanType resolvedLoanType = product.getLoanType();
         assertCanApplyForProduct(saccoId, applicantId, product, existingDraft == null ? null : existingDraft.getId());
-        validateRepaymentPeriod(product, tenorMonths);
-        Map<String, Object> generatedTopUpSnapshot = financialDetailsService.generateSnapshot(
-            saccoId, applicantId, product, amount, tenorMonths, topUpSourceLoan == null ? null : topUpSourceLoan.getId());
+        if(tenorMonths==null)throw new IllegalArgumentException("Select a valid repayment period.");
+        LoanTenure tenure=LoanTenure.from(requestParams,tenorMonths);
+        tenure.validate(product);tenorMonths=tenure.compatibilityMonths();
+        Map<String, Object> generatedTopUpSnapshot = requestParams.containsKey("tenureUnit") ? financialDetailsService.generateSnapshot(
+            saccoId, applicantId, product, amount, tenorMonths, topUpSourceLoan == null ? null : topUpSourceLoan.getId(),tenure) : financialDetailsService.generateSnapshot(saccoId,applicantId,product,amount,tenorMonths,topUpSourceLoan==null?null:topUpSourceLoan.getId());
         BigDecimal applicationAmount = topUpSourceLoan == null
             ? amount
             : requireFinancialSnapshotAmount(generatedTopUpSnapshot, "principalAmount");
@@ -2271,21 +2273,6 @@ public class LoanWorkflowService {
         return amount == null ? "0.00" : amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
     }
 
-    private void validateRepaymentPeriod(LoanProductSetting product, Integer tenorMonths) {
-        if (tenorMonths == null || tenorMonths <= 0) {
-            throw new IllegalArgumentException("Repayment period must be at least 1 month");
-        }
-        int minimumMonths = product.getMinimumRepaymentMonths();
-        if (tenorMonths < minimumMonths) {
-            throw new IllegalArgumentException("Repayment period cannot be below " + minimumMonths + " month(s) for this loan product");
-        }
-        if (product.getMaxRepaymentMonths() != null
-            && product.getMaxRepaymentMonths() > 0
-            && tenorMonths > product.getMaxRepaymentMonths()) {
-            throw new IllegalArgumentException("Repayment period cannot exceed " + product.getMaxRepaymentMonths() + " month(s) for this loan product");
-        }
-    }
-
     private void requireLoadedFinancialDataForDraft(LoanProductSetting product, String financialSnapshotJson) {
         if (product == null || !product.isFreshFinancialDataRequired()) {
             return;
@@ -2321,13 +2308,8 @@ public class LoanWorkflowService {
             return;
         }
         BigDecimal requestedAmount = topUpRequestedAmount(app);
-        Map<String, Object> generatedSnapshot = app.getLoanProductSettingId() == null
-            ? financialDetailsService.generateSnapshot(
-                app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), requestedAmount,
-                app.getTenorMonths(), app.getTopUpSourceLoanId())
-            : financialDetailsService.generateSnapshot(
-                app.getSaccoId(), app.getApplicantMemberId(), resolveWorkflowProduct(app), requestedAmount,
-                app.getTenorMonths(), app.getTopUpSourceLoanId());
+        LoanTenure tenure=LoanTenure.fromSnapshot(parseFinancialSnapshot(app.getFinancialSnapshot()),app.getTenorMonths());
+        Map<String,Object> generatedSnapshot=parseFinancialSnapshot(app.getFinancialSnapshot()).containsKey("tenureUnit") ? financialDetailsService.generateSnapshot(app.getSaccoId(),app.getApplicantMemberId(),resolveWorkflowProduct(app),requestedAmount,app.getTenorMonths(),app.getTopUpSourceLoanId(),tenure) : app.getLoanProductSettingId()==null ? financialDetailsService.generateSnapshot(app.getSaccoId(),app.getApplicantMemberId(),app.getLoanType(),requestedAmount,app.getTenorMonths(),app.getTopUpSourceLoanId()) : financialDetailsService.generateSnapshot(app.getSaccoId(),app.getApplicantMemberId(),resolveWorkflowProduct(app),requestedAmount,app.getTenorMonths(),app.getTopUpSourceLoanId());
         if (app.getTopUpSourceLoanId() != null) {
             app.setAmount(requireFinancialSnapshotAmount(generatedSnapshot, "principalAmount"));
         }

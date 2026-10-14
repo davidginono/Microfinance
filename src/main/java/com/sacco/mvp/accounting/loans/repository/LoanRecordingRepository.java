@@ -14,7 +14,7 @@ import java.util.*;
 public class LoanRecordingRepository {
     private final JdbcTemplate jdbc;
     private static final String LOANS="""
-        select a.id,a.loan_id,m.id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
+        select a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
         a.amount,a.status,coalesce(l.principal-l.principal_paid,0) outstanding,coalesce(l.principal_paid,0) principal_paid,
         coalesce(l.interest_paid,0) interest_paid,coalesce(d.interest,0) due_interest,coalesce(d.arrears,0) arrears,coalesce(d.future,0) future_interest
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id join members m on m.id=a.applicant_member_id
@@ -77,7 +77,7 @@ public class LoanRecordingRepository {
     }
     public LoanRow loan(AppUserPrincipal a,UUID id,LocalDate today){return jdbc.query(LOANS+" where a.id=? and r.sacco_id=? and r.station_id=?",(org.springframework.jdbc.core.RowMapper<LoanRow>) this::loan,today,today,today,id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Loan unavailable"));}
     private String loanWhere(){return """
-        where r.sacco_id=? and r.station_id=? and (?='' or strpos(lower(a.loan_id||' '||m.full_name||' '||m.member_no),?)>0)
+        where r.sacco_id=? and r.station_id=? and (?='' or strpos(lower(coalesce(a.loan_id,a.application_number::text)||' '||m.full_name||' '||m.member_no),?)>0)
         and (?::date is null or r.application_date>=?::date) and (?::date is null or r.application_date<=?::date)
         and (?='' or a.status=?) and (?::uuid is null or m.id=?::uuid)
         and (?::uuid is null or a.loan_product_setting_id=?::uuid)
@@ -97,7 +97,10 @@ public class LoanRecordingRepository {
     public Optional<Choice> ledgerClient(AppUserPrincipal a,UUID id){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.id=? and m.sacco_id=? and (m.station_id=? or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?))",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client){return statementTerms(a,client,null);}
     public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client,UUID loan){return jdbc.query("""
-        select a.id,a.tenor_months,r.first_payment_date,
+        select a.id,a.tenor_months,coalesce(a.first_repayment_date,r.first_payment_date) first_payment_date,a.final_due_date,
+        coalesce(a.financial_snapshot->>'tenureUnit','MONTHS') tenure_unit,
+        coalesce((a.financial_snapshot->>'tenureValue')::integer,a.tenor_months) tenure_value,
+        case when a.financial_snapshot->>'loanMode'='CUSTOM' then case when a.financial_snapshot->>'interestEntry'='AMOUNT' then 'AMOUNT' else coalesce(a.financial_snapshot->>'interestBasis','WHOLE_LOAN') end else 'ANNUAL' end rate_basis,
         (a.financial_snapshot::jsonb->>'interestRate')::numeric rate,
         a.financial_snapshot::jsonb->>'repaymentFrequency' frequency,
         (a.financial_snapshot::jsonb->>'numberOfPayments')::integer installments,
@@ -110,7 +113,7 @@ public class LoanRecordingRepository {
         order by r.application_date,a.id limit 501
         """,(r,n)->new StatementTerms(r.getObject("id",UUID.class),r.getBigDecimal("rate"),r.getString("frequency"),
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
-            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name")),client,a.getSaccoId(),a.getStationId(),loan,loan);}
+            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name"),r.getString("rate_basis"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("final_due_date",LocalDate.class)),client,a.getSaccoId(),a.getStationId(),loan,loan);}
     public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and active
         and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
@@ -160,7 +163,7 @@ public class LoanRecordingRepository {
     public List<Posting> clientPosts(AppUserPrincipal a,UUID client,int limit,int offset){return jdbc.query(POSTS+" where a.applicant_member_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by p.recorded_at,p.id limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,client,a.getSaccoId(),a.getStationId(),limit,offset);}
     private String postWhere(){return """
         where p.sacco_id=? and p.station_id=? and (p.kind=? or (?='PAYMENT' and p.kind='REVERSAL')) and p.state='POSTED'
-        and (?='' or strpos(lower(a.loan_id||' '||m.full_name||' '||m.member_no||' '||p.reference),?)>0)
+        and (?='' or strpos(lower(coalesce(a.loan_id,a.application_number::text)||' '||m.full_name||' '||m.member_no||' '||p.reference),?)>0)
         and (?::date is null or p.effective_date>=?::date) and (?::date is null or p.effective_date<=?::date)
         and (?='' or (case when p.reverses_id is not null then 'REVERSAL' when exists(select 1 from accountant_loan_post x where x.reverses_id=p.id) then 'REVERSED' else 'POSTED' end)=?)
         and (?::uuid is null or a.loan_product_setting_id=?::uuid)

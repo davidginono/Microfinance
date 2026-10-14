@@ -47,6 +47,24 @@ class FinancialDetailsServiceTest {
     }
 
     @Test
+    void dayTenureCannotUseAFullMonthOfDeclaredCashFlowForOnePayment() {
+        var client=UUID.randomUUID();
+        var product=LoanProductSetting.builder().saccoId("S1").loanType(LoanType.DEVELOPMENT_LOAN).minimumAmount(BigDecimal.ZERO).maximumAmount(new BigDecimal("1000000"))
+            .applicationFee(BigDecimal.ZERO).insuranceRate(BigDecimal.ZERO).processingFeeRate(BigDecimal.ZERO).interestRate(BigDecimal.ZERO).interestMethod(InterestMethod.REDUCING_BALANCE)
+            .repaymentFrequency(RepaymentFrequency.MONTHLY).tenureUnit("DAYS").minTenure(1).maxTenure(365).minRepaymentMonths(1).maxRepaymentMonths(12).affordabilityCheckRequired(true).active(true).build();
+        var amount=new BigDecimal("1000.00");
+        var shortTerm=financialDetailsService.generateSnapshot("S1",client,product,amount,1,null,new LoanTenure("DAYS",10));
+        assertThat((BigDecimal)shortTerm.get("periodicRepaymentAmount")).isEqualByComparingTo("1000.00");
+        assertThat((BigDecimal)shortTerm.get("monthlyRepaymentAmount")).isEqualByComparingTo("3041.67");
+        var analytics=org.mockito.Mockito.mock(LoanAnalyticsService.class);when(analytics.activeLoanAmount(client,"S1",null)).thenReturn(BigDecimal.ZERO);
+        var eligibility=new EligibilityService(loanProductSettingRepository,analytics,JsonMapper.builder().findAndAddModules().build());
+        var declared=java.util.Map.of("monthlyIncome",new BigDecimal("2500.00"),"monthlyExpenses",BigDecimal.ZERO,"otherDebtRepayments",BigDecimal.ZERO);
+        assertThat(eligibility.check("S1",client,product,amount,declared,shortTerm).eligible()).isFalse();
+        var monthly=financialDetailsService.generateSnapshot("S1",client,product,amount,1,null,new LoanTenure("MONTHS",1));
+        assertThat(eligibility.check("S1",client,product,amount,declared,monthly).eligible()).isTrue();
+    }
+
+    @Test
     void generateSnapshotUsesConfiguredApplicationFee() {
         String saccoId = "SACCO-1";
         UUID memberId = UUID.randomUUID();

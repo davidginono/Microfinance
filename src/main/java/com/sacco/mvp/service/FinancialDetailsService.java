@@ -43,6 +43,10 @@ public class FinancialDetailsService {
 
     public Map<String, Object> generateSnapshot(String saccoId, UUID memberId, LoanProductSetting product, BigDecimal amount,
                                                 Integer tenorMonths, UUID topUpSourceLoanId) {
+        if(tenorMonths==null || tenorMonths<=0)throw new IllegalArgumentException("Select a valid repayment period.");
+        return generateSnapshot(saccoId,memberId,product,amount,tenorMonths,topUpSourceLoanId,new LoanTenure("MONTHS",tenorMonths));
+    }
+    public Map<String,Object> generateSnapshot(String saccoId,UUID memberId,LoanProductSetting product,BigDecimal amount,Integer tenorMonths,UUID topUpSourceLoanId,LoanTenure tenure) {
         if (product == null) {
             throw new IllegalArgumentException("Loan product settings not found");
         }
@@ -55,9 +59,9 @@ public class FinancialDetailsService {
         if (tenorMonths == null || tenorMonths <= 0) {
             throw new IllegalArgumentException("Select a valid repayment period.");
         }
-        int safeTenor = tenorMonths;
+        int safeTenor = tenure.compatibilityMonths();
         validatePositiveAmount(safeAmount);
-        validateRepaymentPeriod(product, safeTenor);
+        tenure.validate(product);
 
         BigDecimal insuranceRate = product.getInsuranceRate() == null ? DEFAULT_INSURANCE_RATE : product.getInsuranceRate();
         BigDecimal fallbackApplicationFee = saccoSettingsRepository.findById(saccoId)
@@ -82,10 +86,8 @@ public class FinancialDetailsService {
 
         InterestMethod method = product.getInterestMethod() == null ? InterestMethod.REDUCING_BALANCE : product.getInterestMethod();
         RepaymentFrequency frequency = product.getResolvedRepaymentFrequency();
-        int payments = LoanAmortizationCalculator.numberOfPayments(safeTenor, frequency);
-        LoanAmortizationCalculator.Result amortization = LoanAmortizationCalculator.calculate(
-            principalAmount, payments, interestRate, method, frequency, null,
-            LoanAmortizationCalculator.flatInterest(principalAmount, interestRate, safeTenor));
+        int payments = tenure.payments(frequency);
+        LoanAmortizationCalculator.Result amortization = tenure.calculate(principalAmount, interestRate, method, frequency, null, tenure.flatInterest(principalAmount, interestRate));
         BigDecimal interestAmount = amortization.totalInterest();
         BigDecimal principalPlusInterest = amortization.totalRepayment()
             .setScale(2, RoundingMode.HALF_UP);
@@ -103,7 +105,9 @@ public class FinancialDetailsService {
         snapshot.put("principalPlusInterest", principalPlusInterest);
         snapshot.put("loanPlusInterest", principalPlusInterest);
         snapshot.put("interestAmount", interestAmount);
-        snapshot.put("monthlyRepaymentAmount", LoanAmortizationCalculator.monthlyEquivalent(amortization.maximumInstallment(), frequency));
+        snapshot.put("monthlyRepaymentAmount", tenure.unit().equals("DAYS")
+            ? LoanAmortizationCalculator.monthlyEquivalent(amortization.maximumInstallment(),payments,tenure.months())
+            : LoanAmortizationCalculator.monthlyEquivalent(amortization.maximumInstallment(), frequency));
         snapshot.put("periodicRepaymentAmount", periodicRepaymentAmount);
         snapshot.put("maximumInstallmentAmount", amortization.maximumInstallment());
         snapshot.put("repaymentFrequency", frequency.name());
@@ -112,6 +116,7 @@ public class FinancialDetailsService {
         snapshot.put("insuranceRate", insuranceRate);
         snapshot.put("processingFeeRate", processingFeeRate);
         snapshot.put("interestRate", interestRate);
+        tenure.snapshot(snapshot);
         snapshot.put("tenorMonths", safeTenor);
         snapshot.put("numberOfPayments", payments);
         snapshot.put("interestMethod", method.name());
@@ -224,20 +229,5 @@ public class FinancialDetailsService {
         }
     }
 
-    private void validateRepaymentPeriod(LoanProductSetting product, int tenorMonths) {
-        int minimumMonths = product.getMinimumRepaymentMonths();
-        if (tenorMonths < minimumMonths) {
-            throw new IllegalArgumentException(
-                "Total months to repay cannot be below " + minimumMonths + " month(s) configured for this loan product."
-            );
-        }
-        if (product.getMaxRepaymentMonths() != null
-            && product.getMaxRepaymentMonths() > 0
-            && tenorMonths > product.getMaxRepaymentMonths()) {
-            throw new IllegalArgumentException(
-                "Total months to repay cannot exceed " + product.getMaxRepaymentMonths() + " month(s) configured for this loan product."
-            );
-        }
-    }
 
 }
