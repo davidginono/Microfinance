@@ -839,7 +839,7 @@ public class ManagerController {
         }
     }
 
-    private record ArchiveEntry(ManagerReview review,
+    public record ArchiveEntry(ManagerReview review,
                                 com.sacco.mvp.domain.LoanApplication loan,
                                 String currentStatusLabel) {}
 }

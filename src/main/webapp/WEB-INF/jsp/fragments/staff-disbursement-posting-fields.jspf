@@ -1,5 +1,8 @@
 <%@ page pageEncoding="UTF-8" %>
 <spring:message code="common.choose" text="Choose" var="chooseLabel" />
+<div class="md:col-span-2"><label><spring:message code="recording.paymentReference" />
+    <input name="disbursementReference" class="aws-control" required maxlength="100" value="${fn:escapeXml(postingDisbursementReference)}" />
+</label></div>
 <div data-loan-choice data-category="money" data-choice-url="${pageContext.request.contextPath}/disbursement/loan-applications/${app.id}/posting-accounts/money">
     <label><spring:message code="recording.moneyAccount" /><select name="moneyAccountId" class="aws-control" data-choice-select="true" required><option value="">${chooseLabel}</option><c:if test="${not empty postingMoneyAccount}"><option value="${postingMoneyAccount.id}" selected><c:out value="${postingMoneyAccount.label}" /></option></c:if></select></label>
     <%@ include file="../accounting/loans/choice-search.jspf" %>

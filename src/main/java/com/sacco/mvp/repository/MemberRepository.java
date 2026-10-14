@@ -38,6 +38,9 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     boolean existsByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
     Optional<Member> findByStaffNo(String staffNo);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from Member m where m.id = :id")
+    Optional<Member> findForSignatureRegistration(@Param("id") UUID id);
     boolean existsByStaffNoIgnoreCase(String staffNo);
 
     @Query(value = "select nextval('public.staff_number_seq')", nativeQuery = true)

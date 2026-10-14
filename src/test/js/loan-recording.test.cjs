@@ -3,6 +3,18 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 
+test('shared confirmation does not lock the accepted teller submission',()=>{
+  const dom=new JSDOM('<form data-loan-form><button type="submit">Disburse</button></form>',{runScripts:'outside-only'});
+  const w=dom.window,form=w.document.querySelector('form');let confirmed=false;
+  w.document.addEventListener('submit',event=>{if(!confirmed)event.preventDefault();});
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  assert.equal(form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),false);
+  confirmed=true;
+  assert.equal(form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),true);
+  assert.equal(form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})),false);
+  dom.window.close();
+});
+
 test('OTP validation can cancel a submission without locking the later verified submission',()=>{
   const dom=new JSDOM('<form data-loan-form><button type="submit">Disburse</button></form>',{runScripts:'outside-only'});
   const w=dom.window,form=w.document.querySelector('form');let verified=false;

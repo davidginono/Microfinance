@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.InterestMethod;
+import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -182,6 +183,11 @@ public class SaccoConfigurationService {
             .processingFeeRate(processingFeeRate == null ? DEFAULT_PROCESSING_FEE_RATE : processingFeeRate)
             .interestRate(interestRate)
             .interestMethod(interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod)
+            .repaymentFrequency(RepaymentFrequency.MONTHLY)
+            .affordabilityCheckRequired(true)
+            .maxRepaymentToDisposableIncomeRatio(new BigDecimal("0.4000"))
+            .collateralRequired(false)
+            .minCollateralCoverageRatio(BigDecimal.ZERO)
             .minRepaymentMonths(minRepaymentMonths == null ? DEFAULT_MIN_REPAYMENT_MONTHS : minRepaymentMonths)
             .maxRepaymentMonths(maxRepaymentMonths)
             .allowApplicationWithActiveLoan(allowApplicationWithActiveLoan)

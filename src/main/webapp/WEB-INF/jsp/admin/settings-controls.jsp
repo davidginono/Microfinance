@@ -49,21 +49,21 @@
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="grid gap-3 lg:grid-cols-3">
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${StationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
+                    <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${stationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.email" text="Email" /></span>
                         <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.emailHelp" text="Always send OTP codes to the account email." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${StationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
+                    <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsOnly" text="SMS only" /></span>
                         <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsOnlyHelp" text="Use normal Branch SMS units. OTP requests stop when units are depleted." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${StationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
+                    <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsFallback" text="SMS with email fallback" /></span>
                         <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsFallbackHelp" text="Try SMS first, then use email when SMS cannot be sent." /></span>
@@ -77,7 +77,7 @@
                     <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                         <input name="otpSelectionPolicy" type="radio" value="AT_LEAST_ONE" class="mt-1"
                                data-clearable-otp-policy
-                               ${StationOtpSelectionPolicy eq 'AT_LEAST_ONE' ? 'checked' : ''} />
+                               ${stationOtpSelectionPolicy eq 'AT_LEAST_ONE' ? 'checked' : ''} />
                         <span>
                             <span class="block font-semibold text-slate-900">At least one</span>
                             <span class="mt-1 block text-xs text-slate-500">Users select login OTP, approval OTP, or both.</span>
@@ -86,7 +86,7 @@
                     <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                         <input name="otpSelectionPolicy" type="radio" value="BOTH" class="mt-1"
                                data-clearable-otp-policy
-                               ${StationOtpSelectionPolicy eq 'BOTH' ? 'checked' : ''} />
+                               ${stationOtpSelectionPolicy eq 'BOTH' ? 'checked' : ''} />
                         <span>
                             <span class="block font-semibold text-slate-900">Both required</span>
                             <span class="mt-1 block text-xs text-slate-500">All users must use OTP for login and approvals.</span>
@@ -275,11 +275,7 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">
-    <section class="erp-panel mb-4"><div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="customised.workflow.title" /></h2></div>
-        <div class="erp-panel-body"><p class="text-sm"><spring:message code="customised.workflow.help" /></p>
-            <c:if test="${customisedWorkflowSaved}"><p role="status"><spring:message code="customised.workflow.saved" /></p></c:if>
-            <a class="app-btn btn-neutral mt-3" href="<c:url value='/admin/settings-controls/customised-loan' />"><spring:message code="common.configure" text="Configure" /></a>
-        </div></section>
+    <c:if test="${customisedWorkflowSaved}"><p role="status"><spring:message code="customised.workflow.saved" /></p></c:if>
 
     <section class="product-catalog" aria-labelledby="loan-product-catalog-title">
         <div class="product-catalog-toolbar">

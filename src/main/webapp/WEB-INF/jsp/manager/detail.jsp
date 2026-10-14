@@ -405,7 +405,8 @@
             </c:when>
             <c:otherwise>
                 <div class="border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                    <spring:message code="otp.approvalDisabledHelp" text="OTP confirmation is disabled for this approval." />
+                    <spring:message code="${reviewBasePath eq '/accountant' ? 'role.accountant' : 'role.manager'}" var="approvalRoleLabel" />
+                    <spring:message code="otp.approvalDisabledHelp" arguments="${approvalRoleLabel}" text="OTP confirmation is disabled for this approval." />
     </div>
             </c:otherwise>
         </c:choose>
@@ -627,7 +628,7 @@
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
             <textarea name="disbursementNotes" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="<spring:message code='loan.disbursement.notesPlaceholder' text='Optional disbursement or repayment instructions' />">${fn:escapeXml(postingDisbursementNotes ne null ? postingDisbursementNotes : app.disbursementNotes)}</textarea>
             </div>
-        <div class="border border-slate-200 bg-slate-50 px-4 py-4">
+        <c:if test="${disbursementOtpEnabled}"><div class="border border-slate-200 bg-slate-50 px-4 py-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
@@ -663,7 +664,7 @@
                 </div>
             </div>
         </div>
-        <button type="submit" class="app-btn btn-approve">${disbursementActionLabel}</button>
+        </c:if><button type="submit" class="app-btn btn-approve">${disbursementActionLabel}</button>
     </form>
 </c:if>
 

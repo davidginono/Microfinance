@@ -18,7 +18,7 @@ public class LoanDisbursementNumberService {
     @Transactional(propagation=Propagation.MANDATORY)
     public void assign(LoanApplication loan, UUID actor, LocalDate date) {
         UUID period = periods.period(loan.getSaccoId(), date, actor, clock.now());
-        loan.setLoanId(Long.toString(numbers.next(loan.getSaccoId(), period)));
+        loan.setLoanId(Long.toString(numbers.next()));
         loan.setLoanAccountingPeriodId(period);
     }
 }

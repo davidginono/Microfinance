@@ -24,6 +24,7 @@ class RecordedApplicationDisbursementTest {
     @Mock LoanRecordingService recording;
     @Mock MemberDirectoryService members;
     @Mock EmailOtpService otp;
+    @Mock StationOtpSettingsService otpSettings;
     @Mock MessageSource messages;
     @InjectMocks DisbursementController controller;
     AppUserPrincipal actor;UUID id=UUID.randomUUID(),token=UUID.randomUUID(),key=UUID.randomUUID(),money=UUID.randomUUID(),principal=UUID.randomUUID();
@@ -31,6 +32,7 @@ class RecordedApplicationDisbursementTest {
     @BeforeEach void fixture(){
         var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").email("synthetic@example.invalid").position(Position.DISBURSEMENT_OFFICER).build();
         actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);
+        when(otpSettings.requiresApprovalOtp(actor.getMemberId(),"I1","B1")).thenReturn(true);
         when(members.find(member.getId())).thenReturn(Optional.of(member));
         when(otp.validateOtp(member.getEmail(),EmailOtpPurpose.BOARD_SIGNATURE,"123456")).thenReturn(token);
         when(manager.get(id,"I1","B1")).thenReturn(LoanApplication.builder().id(id).amount(new BigDecimal("1000.00")).status(LoanStatus.READY_FOR_DISBURSEMENT).build());
@@ -55,5 +57,13 @@ class RecordedApplicationDisbursementTest {
         assertThat(flash.getFlashAttributes().get("postingMoneyAccountId")).isEqualTo(money);
         assertThat(flash.getFlashAttributes().get("postingPrincipalAccountId")).isEqualTo(principal);
         assertThat(flash.getFlashAttributes().get("postingFirstPaymentDate")).isEqualTo(due);
+    }
+    @Test void disabledApprovalOtpDoesNotRequireOrConsumeAnOtpDuringTellerPosting(){
+        reset(otp,members);
+        when(otpSettings.requiresApprovalOtp(actor.getMemberId(),"I1","B1")).thenReturn(false);
+        var flash=new RedirectAttributesModelMap();
+        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("1000"),null,"D-NO-OTP","Synthetic test",null,null,key,money,principal,List.of(),flash)).isEqualTo("redirect:/disbursement/archive?filter=DISBURSED");
+        verify(recording).disburse(eq(actor),any(),eq(List.of()));
+        verifyNoInteractions(otp);
     }
 }

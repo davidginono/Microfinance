@@ -84,8 +84,10 @@
     const submitButtons = [...form.querySelectorAll('button[type="submit"],button:not([type])')];
     const initiallyDisabled = new Set(submitButtons.filter(button => button.disabled));
     let submitting = false;
-    form.addEventListener('submit', event => {
-      if (event.defaultPrevented) return;
+    // Shared confirmation runs on document before this deferred script binds.
+    // Lock only the accepted submission, not the first confirmation request.
+    document.addEventListener('submit', event => {
+      if (event.target !== form || event.defaultPrevented) return;
       if (submitting) {event.preventDefault(); return;}
       if (event.submitter?.name === 'action') {
         let action = form.querySelector('input[name="action"]');

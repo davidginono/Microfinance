@@ -1191,11 +1191,12 @@
             productModalScrollState = {body: body.style.overflow, root: document.documentElement.style.overflow, locked: body.classList.contains('overflow-hidden')};
             modal.classList.remove('hidden');
             modal.classList.add('is-open');
-            modal.setAttribute('role', 'dialog');
-            modal.setAttribute('aria-modal', 'true');
             modal.setAttribute('aria-hidden', 'false');
+            const panel = modal.querySelector('.app-modal-panel');
+            panel.setAttribute('role', 'dialog');
+            panel.setAttribute('aria-modal', 'true');
             const title = modal.querySelector('.app-modal-header h2');
-            if (title) { title.id ||= 'product-modal-title-' + modal.dataset.productModal; modal.setAttribute('aria-labelledby', title.id); }
+            if (title) { title.id ||= 'product-modal-title-' + modal.dataset.productModal; panel.setAttribute('aria-labelledby', title.id); }
             body.classList.add('overflow-hidden');
             body.style.overflow = 'hidden';
             document.documentElement.style.overflow = 'hidden';

@@ -8,7 +8,8 @@
     const disabledOnSubmit = new Set();
     const values = () => JSON.stringify(Array.from(form.elements).filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action').map(el => [el.name, el.value, el.checked]));
     let initial = values();
-    const errors = form.querySelector('.accounting-error-summary .coa-error');
+    const errorSummary = form.querySelector('.accounting-error-summary, .loan-error-summary');
+    const errors = form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary');
     let restoredErrors = Boolean(errors);
     const dirty = () => restoredErrors || values() !== initial;
     const close = () => {
@@ -71,5 +72,5 @@
         control.setAttribute('aria-describedby', error.id);
         const details = label.closest('details'); if (details) details.open = true;
     });
-    if (errors && !form.closest('.library-modal')) form.querySelector('.accounting-error-summary').focus();
+    if (errors && !form.closest('.library-modal')) errorSummary.focus();
 })();

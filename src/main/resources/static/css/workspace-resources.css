@@ -46,8 +46,7 @@
 .aws-console .admin-users-register .erp-table td .inline-flex {padding:2px 6px;}
 .aws-console [data-product-modal] .app-modal-panel {display:flex;flex-direction:column;}
 .aws-console [data-product-modal] .app-modal-scroll {flex:1 1 auto;min-height:0;overscroll-behavior:contain;}
-.aws-console [data-product-modal] .app-modal-actions {position:sticky;bottom:-1.7rem;z-index:7;margin-bottom:-1.7rem;padding:12px 0;background:#fff;border-top:1px solid #d5dbdb;}
-@media(max-width:640px){.aws-console [data-product-modal] .app-modal-actions {bottom:-1.1rem;margin-bottom:-1.1rem;}}
+.aws-console [data-product-modal] .app-modal-actions {position:sticky;bottom:0;z-index:7;margin-bottom:0;padding:12px 0;background:#fff;border-top:1px solid #d5dbdb;}
 .aws-console .erp-panel.resource-table-surface {background:transparent;border:0;box-shadow:none;}
 .aws-console .resource-table-surface-body {padding:0!important;}
 @media(min-width:1024px) {

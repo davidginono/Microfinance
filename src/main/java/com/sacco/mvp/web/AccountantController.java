@@ -196,7 +196,7 @@ public class AccountantController {
 
         model.addAttribute("archiveEntries", entries);
         model.addAttribute("applicantNames", applicantNames);
-        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
+        model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), entries.stream().map(ArchiveEntry::loan).toList()));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
@@ -694,5 +694,5 @@ public class AccountantController {
         }
     }
 
-    private record ArchiveEntry(ManagerReview review, LoanApplication loan) {}
+    public record ArchiveEntry(ManagerReview review, LoanApplication loan) {}
 }

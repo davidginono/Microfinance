@@ -5736,6 +5736,12 @@ body.aws-console,
     overflow-y: visible !important;
 }
 
+/* Active dialogs keep the document locked while their own body remains scrollable. */
+html:has(body.aws-console):has(.app-modal-overlay.is-open:not([hidden]), dialog[open]),
+body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
+    overflow: hidden !important;
+}
+
 .shell-main,
 .shell-content-frame {
     overflow-y: visible !important;

@@ -9,7 +9,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.queue.breadcrumb" text="Accountant Panel / Queue" /></p>
-    <h1 class="erp-page-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
+    <h1 class="erp-page-title" id="accountant-queue-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
 </div>
 <section class="aws-current-filter-toolbar" aria-labelledby="accountantQueueCurrentFilterLabel">
         <div class="aws-current-filter-summary">
@@ -24,7 +24,7 @@
                 <spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" />
             </a>
         </div>
-        <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+        <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-queue-1">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="loan.applicationId" text="Loan Application ID" />
@@ -43,7 +43,7 @@
             </div>
         </form>
 </section>
-<div data-resource-table="accountant-queue-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div data-resource-table="accountant-queue-1" data-table-title-id="accountant-queue-title" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

@@ -216,6 +216,13 @@ class LoanRecordingPostgresTest {
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));var f=post(id,"120.00","R1");f.setPrincipalAccountId(null);f.setInterestAccountId(interest);
         var paid=service.repay(actor,f);assertThat(paid.principal()).isEqualByComparingTo("100.00");assertThat(paid.interest()).isEqualByComparingTo("20.00");assertThat(paid.principalBalance()).isEqualByComparingTo("900.00");
         assertThat(service.repay(actor,f).id()).isEqualTo(paid.id());assertThat(service.statement(actor,client,0).principal()).isEqualByComparingTo("900.00");
+        var postedFilter=new Filter("R1",TODAY,TODAY,"POSTED","newest",0,null);
+        var postedTotals=service.totals(actor,"PAYMENT",postedFilter);
+        assertThat(postedTotals.count()).isEqualTo(1);assertThat(postedTotals.amount()).isEqualByComparingTo("120.00");
+        assertThat(postedTotals.principal()).isEqualByComparingTo("100.00");assertThat(postedTotals.interest()).isEqualByComparingTo("20.00");
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,cash)).isEqualByComparingTo("-880.00");
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,principal)).isEqualByComparingTo("900.00");
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,interest)).isEqualByComparingTo("-20.00");
         assertThatThrownBy(()->service.reverse(actor,paid.id(),UUID.randomUUID(),TODAY,"Wrong collection")).hasMessage("recording.error.independentCorrection");
         assertThatThrownBy(()->jdbc.update("""
             insert into accountant_loan_post(id,loan_id,sacco_id,station_id,kind,state,request_key,payload_hash,
@@ -234,6 +241,8 @@ class LoanRecordingPostgresTest {
         assertThat(totals.count()).isEqualTo(2);assertThat(totals.amount()).isZero();assertThat(totals.principal()).isZero();assertThat(totals.interest()).isZero();
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=?",BigDecimal.class,institution)).isZero();
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,principal)).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,cash)).isEqualByComparingTo("-1000.00");
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,interest)).isZero();
         var owner=new AppUserPrincipal(Member.builder().id(client).saccoId(institution).stationId("B1").memberAccount(true).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.MEMBER_LOANS_VIEW),false);
         assertThat(ledger.view(id,owner,0,0).outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(ledger.view(id,owner,0,0).journal()).isEmpty();
     }
@@ -309,12 +318,14 @@ class LoanRecordingPostgresTest {
         assertThat(posted.principal()).isEqualByComparingTo("1000.01");assertThat(posted.interest()).isEqualByComparingTo("60.00");
         assertThat(posted.principalBalance()).isZero();assertThat(service.detail(actor,id).loan().status()).isEqualTo("PAID");
     }
-    @Test void newRecordingDefersFirstDateAndAssignsPeriodNumbersOnAtomicDisbursement(){
+    @Test void newRecordingDefersFirstDateAndAssignsUniqueNumbersOnAtomicDisbursement(){
         var f=form();f.setFirstPaymentDate(null);f.setRequestedPrincipal(null);f.setTenureUnit("YEARS");f.setTenureValue(1);f.setMonths(null);
         var id=service.save(actor,f);assertThat(service.detail(actor,id).firstPaymentDate()).isNull();assertThat(service.detail(actor,id).tenureUnit()).isEqualTo("YEARS");
         var post=post(id,"1000.00","D-NEW-1");post.setFirstPaymentDate(LocalDate.of(2026,10,1));var saved=service.disburse(actor,post);
-        assertThat(saved.loanNumber()).isEqualTo("1");assertThat(service.disburse(actor,post).id()).isEqualTo(saved.id());
-        var second=disbursed("D-NEW-2");assertThat(service.detail(actor,second).loan().number()).isEqualTo("2");
+        long firstNumber=Long.parseLong(saved.loanNumber());assertThat(firstNumber).isPositive();assertThat(service.disburse(actor,post).id()).isEqualTo(saved.id());
+        var second=disbursed("D-NEW-2");assertThat(Long.parseLong(service.detail(actor,second).loan().number())).isGreaterThan(firstNumber);
+        var pending=service.save(actor,form());
+        assertThatThrownBy(()->jdbc.update("update loan_applications set loan_id=? where id=?",saved.loanNumber(),pending)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThatThrownBy(()->jdbc.update("update loan_applications set loan_id='99' where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThatThrownBy(()->jdbc.update("update loan_applications set first_repayment_date=first_repayment_date+1 where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
@@ -334,12 +345,31 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->service.attachment(operator("B2"),id,attachment)).isInstanceOf(AccessDeniedException.class);
         var invalid=new org.springframework.mock.web.MockMultipartFile("attachments","evidence.pdf","application/pdf","not a PDF".getBytes());assertThatThrownBy(()->service.save(actor,form(),List.of(invalid))).isInstanceOf(IllegalArgumentException.class);
     }
-    @Test void periodCountersRestartAndConcurrentAssignmentsAreUnique() throws Exception {
+    @Test void globalNumbersDoNotRestartAcrossPeriodsAndConcurrentAssignmentsNeverReuseValues() throws Exception {
         var repo=new com.sacco.mvp.accounting.loans.repository.LoanNumberRepository(jdbc);var transactions=new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         UUID first=UUID.randomUUID(),second=UUID.randomUUID();for(var period:List.of(first,second))jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'OPEN',?,now())",period,institution,period.equals(first)?LocalDate.of(2030,1,1):LocalDate.of(2031,1,1),period.equals(first)?LocalDate.of(2030,12,31):LocalDate.of(2031,12,31),actor.getMemberId());
-        try(var pool=Executors.newFixedThreadPool(4)){var work=new ArrayList<Callable<Long>>();for(int i=0;i<8;i++)work.add(()->transactions.execute(t->repo.next(institution,first)));var results=pool.invokeAll(work);var values=new ArrayList<Long>();for(var result:results)values.add(result.get());assertThat(values).containsExactlyInAnyOrder(1L,2L,3L,4L,5L,6L,7L,8L);}
-        assertThat(transactions.<Long>execute(t->repo.next(institution,second))).isEqualTo(1L);
-        transactions.executeWithoutResult(t->{repo.next(institution,second);t.setRollbackOnly();});assertThat(transactions.<Long>execute(t->repo.next(institution,second))).isEqualTo(2L);
+        var numbering=new com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService(repo,new VoucherRepository(jdbc),context.getBean(ApplicationClock.class));
+        var firstLoan=LoanApplication.builder().saccoId(institution).build();var secondLoan=LoanApplication.builder().saccoId(institution).build();
+        transactions.executeWithoutResult(t->numbering.assign(firstLoan,actor.getMemberId(),LocalDate.of(2030,6,1)));
+        transactions.executeWithoutResult(t->numbering.assign(secondLoan,actor.getMemberId(),LocalDate.of(2031,6,1)));
+        assertThat(firstLoan.getLoanAccountingPeriodId()).isEqualTo(first);assertThat(secondLoan.getLoanAccountingPeriodId()).isEqualTo(second);
+        assertThat(Long.parseLong(secondLoan.getLoanId())).isGreaterThan(Long.parseLong(firstLoan.getLoanId()));
+        try(var pool=Executors.newFixedThreadPool(4)){var work=new ArrayList<Callable<Long>>();for(int i=0;i<8;i++)work.add(()->transactions.execute(t->repo.next()));var results=pool.invokeAll(work);var values=new ArrayList<Long>();for(var result:results)values.add(result.get());assertThat(values).hasSize(8).doesNotHaveDuplicates().allMatch(value->value>Long.parseLong(secondLoan.getLoanId()));}
+        Long rolledBack=transactions.execute(t->{long value=repo.next();t.setRollbackOnly();return value;});assertThat(transactions.<Long>execute(t->repo.next())).isGreaterThan(rolledBack);
+    }
+    @Test void concurrentStaffSignatureRegistrationKeepsTheFirstSignatureAndOneAudit() throws Exception {
+        var password="synthetic-signature-password";
+        jdbc.update("update members set password_hash=? where id=?",new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(password),actor.getMemberId());
+        var signatures=context.getBean(StaffSignatureService.class);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var work=List.<Callable<Void>>of(()->{signatures.register(actor,"Test Accountant",password,true);return null;},()->{signatures.register(actor,"Test Accountant",password,true);return null;});
+            for(var result:pool.invokeAll(work))result.get();
+        }
+        var saved=context.getBean(MemberRepository.class).findById(actor.getMemberId()).orElseThrow();
+        assertThat(saved.getSignatureText()).isEqualTo("Test A");assertThat(saved.getSignatureRegisteredAt()).isNotNull();
+        signatures.register(actor,"Different Name",password,true);
+        assertThat(context.getBean(MemberRepository.class).findById(actor.getMemberId()).orElseThrow().getSignatureText()).isEqualTo("Test A");
+        verify(context.getBean(AuditService.class),times(1)).log(eq("STAFF_USER"),eq(actor.getMemberId()),eq("STAFF_REGISTER_OWN_SIGNATURE"),eq(actor.getMemberId()),any(),any());
     }
     RecordForm form(){var f=new RecordForm();f.setClientId(client);f.setProductId(product);f.setApplicationDate(LocalDate.of(2026,9,1));f.setFirstPaymentDate(LocalDate.of(2026,10,1));f.setMonths(1);f.setRequestedPrincipal(new BigDecimal("1000.00"));f.setPrincipal(new BigDecimal("1000.00"));f.setPurpose("Business stock");return f;}
     PostForm post(UUID loan,String amount,String reference){var f=new PostForm();f.setLoanId(loan);f.setAmount(new BigDecimal(amount));f.setEffectiveDate(reference.startsWith("D")?LocalDate.of(2026,9,1):TODAY);f.setMoneyAccountId(cash);f.setPrincipalAccountId(principal);f.setReference(reference);return f;}
@@ -355,6 +385,7 @@ class LoanRecordingPostgresTest {
         @Bean ObjectMapper json(){return JsonMapper.builder().findAndAddModules().build();}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(TODAY);when(c.now()).thenReturn(OffsetDateTime.parse("2026-10-08T12:00:00+03:00"));return c;}
         @Bean AuditService audit(){return mock(AuditService.class);}
+        @Bean StaffSignatureService signatures(MemberRepository members,AuditService audit){return new StaffSignatureService(members,new NameSignatureService(),new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(),audit);}
         @Bean MemberDirectoryService directory(){return mock(MemberDirectoryService.class);}
         @Bean UserClaimService claims(){return mock(UserClaimService.class);}
         @Bean SaccoRegistryService institutions(){return mock(SaccoRegistryService.class);}

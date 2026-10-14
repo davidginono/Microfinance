@@ -5,6 +5,9 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberProfileImageService;
 import com.sacco.mvp.service.PlatformAdminProfileService;
+import com.sacco.mvp.service.StaffSignatureService;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +29,8 @@ public class ProfileController {
     private final MemberDirectoryService memberDirectoryService;
     private final MemberProfileImageService memberProfileImageService;
     private final PlatformAdminProfileService platformAdminProfileService;
+    private final StaffSignatureService staffSignatureService;
+    private final MessageSource messageSource;
 
     @GetMapping("/profile")
     public String profile(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -33,7 +38,25 @@ public class ProfileController {
             .orElseThrow(() -> new IllegalArgumentException("Member account not found"));
         model.addAttribute("profileMember", member);
         model.addAttribute("hasProfileImage", memberProfileImageService.hasImage(principal.getMemberId()));
+        model.addAttribute("staffSignatureAvailable", staffSignatureService.canRegister(principal, member));
+        if (!model.containsAttribute("signatureFullName")) model.addAttribute("signatureFullName", member.getFullName());
         return "profile";
+    }
+
+    @PostMapping("/profile/signature")
+    public String registerStaffSignature(@AuthenticationPrincipal AppUserPrincipal principal,
+                                         @RequestParam String fullName,
+                                         @RequestParam String currentPassword,
+                                         @RequestParam(defaultValue = "false") boolean confirmed,
+                                         RedirectAttributes redirectAttributes) {
+        try {
+            staffSignatureService.register(principal, fullName, currentPassword, confirmed);
+            redirectAttributes.addFlashAttribute("message", messageSource.getMessage("profile.signature.saved", null, LocaleContextHolder.getLocale()));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("signatureFullName", fullName);
+            redirectAttributes.addFlashAttribute("signatureError", messageSource.getMessage(ex.getMessage(), null, LocaleContextHolder.getLocale()));
+        }
+        return "redirect:/profile";
     }
 
     @PostMapping("/profile/image")

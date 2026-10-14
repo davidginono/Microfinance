@@ -9,7 +9,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.archive.breadcrumb" text="Accountant Panel / Archive" /></p>
-    <h1 class="erp-page-title"><spring:message code="accountant.archive.title" text="Accountant Archive" /></h1>
+    <h1 class="erp-page-title" id="accountant-archive-title"><spring:message code="accountant.archive.title" text="Accountant Archive" /></h1>
 </div>
 
 <section class="aws-current-filter-toolbar" aria-labelledby="accountantArchiveCurrentFilterLabel">
@@ -36,7 +36,7 @@
                 <spring:message code="review.rejected" text="Rejected" />
             </a>
         </div>
-        <form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+        <form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-archive-1">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${archiveSearchLabel}
@@ -64,7 +64,7 @@
         </form>
 </section>
 
-<section data-resource-table="accountant-archive-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
+<section data-resource-table="accountant-archive-1" data-table-title-id="accountant-archive-title" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
     <div class="erp-table-scroll" data-view-position-key="accountant-archive-table">
         <table class="erp-table">
         <thead>
@@ -89,10 +89,7 @@
                     </c:choose>
                 </td>
                 <td>
-                    <c:choose>
-                        <c:when test="${not empty loanProductNames[entry.loan.loanType]}"><c:out value="${loanProductNames[entry.loan.loanType]}" /></c:when>
-                        <c:otherwise><spring:message code="loan.type.${entry.loan.loanType}" text="${entry.loan.loanType}" /></c:otherwise>
-                    </c:choose>
+                    <c:out value="${applicationProductNames[entry.loan.id]}" />
                 </td>
                 <td>
                     <c:choose>

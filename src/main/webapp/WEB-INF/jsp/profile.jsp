@@ -64,6 +64,35 @@
     </section>
 </c:if>
 
+<c:if test="${staffSignatureAvailable}">
+    <section class="erp-panel aws-settings-panel" aria-labelledby="staffSignatureTitle">
+        <div class="aws-settings-header">
+            <h2 id="staffSignatureTitle" class="aws-settings-title"><spring:message code="profile.signature.title" /></h2>
+            <p class="aws-settings-description"><spring:message code="profile.signature.help" /></p>
+        </div>
+        <c:choose>
+            <c:when test="${not empty profileMember.signatureText}">
+                <div class="erp-panel-body"><p class="aws-signature-text"><c:out value="${profileMember.signatureText}" /></p><p><spring:message code="profile.signature.registered" /></p></div>
+            </c:when>
+            <c:otherwise>
+                <form action="<c:url value='/profile/signature' />" method="post" class="aws-settings-form accounting-create-form">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <c:if test="${not empty signatureError}"><p class="loan-error-summary" role="alert" tabindex="-1"><c:out value="${signatureError}" /></p></c:if>
+                    <label class="aws-settings-field" for="signatureFullName"><spring:message code="profile.signature.fullName" />
+                        <input id="signatureFullName" name="fullName" class="aws-control" required maxlength="120" autocomplete="name" value="<c:out value='${signatureFullName}' />" />
+                    </label>
+                    <label class="aws-settings-field mt-3" for="signatureCurrentPassword"><spring:message code="profile.signature.currentPassword" />
+                        <input id="signatureCurrentPassword" name="currentPassword" type="password" class="aws-control" required maxlength="128" autocomplete="current-password" />
+                    </label>
+                    <label class="flex items-center gap-2 mt-3"><input type="checkbox" name="confirmed" value="true" required /><span><spring:message code="profile.signature.confirm" /></span></label>
+                    <div class="aws-settings-footer"><button type="submit" class="app-btn btn-neutral"><spring:message code="profile.signature.save" /></button></div>
+                </form>
+                <%@ include file="accounting/accounting-form-support.jspf" %>
+            </c:otherwise>
+        </c:choose>
+    </section>
+</c:if>
+
 <section class="erp-panel profile-page-panel">
     <div class="profile-page-panel-header">
         <h2><spring:message code="profile.photo.title" text="Passport Photo" /></h2>
@@ -114,7 +143,7 @@
                     </span>
                 </label>
                 <div class="profile-identity-panel">
-                    <h3>${profileMember.fullName}</h3>
+                    <h3><c:out value="${profileMember.fullName}" /></h3>
                     <dl>
                     <div>
                         <dt><spring:message code="profile.memberNo" text="Client Number" /></dt>

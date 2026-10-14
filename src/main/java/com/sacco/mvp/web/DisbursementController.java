@@ -16,6 +16,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.LoanRepaymentScheduleDisplayService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
@@ -74,6 +75,7 @@ public class DisbursementController {
     private final NotificationInboxService notificationInboxService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
+    private final StationOtpSettingsService stationOtpSettingsService;
     private final PaymentDetailsService paymentDetailsService;
     private final LoanRepaymentScheduleDisplayService repaymentScheduleDisplayService;
     private final MessageSource messageSource;
@@ -204,7 +206,7 @@ public class DisbursementController {
                 row.put("loanProductName", loanProductDisplayService.displayName(entry.loan(), loanProductNames));
                 row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
-                row.put("disbursedAt", entry.review().getCreatedAt() == null ? "-" : entry.review().getCreatedAt().toLocalDate().toString());
+                row.put("disbursedAt", entry.loan().getDisbursementDate() == null ? "-" : entry.loan().getDisbursementDate().toString());
                 row.put("currentStatusLabel", workflowStatusPresentationService.dashboardStatusLabel(entry.loan().getStatus()));
                 row.put("disbursed", String.valueOf(entry.loan().getStatus() == LoanStatus.DISBURSED));
                 return row;
@@ -281,7 +283,7 @@ public class DisbursementController {
                 row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
                 row.put("loanTypeLabel", entry.loan().getLoanType() == null ? "-" : entry.loan().getLoanType().getDisplayLabel());
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
-                row.put("disbursedAt", entry.review().getCreatedAt() == null ? "-" : entry.review().getCreatedAt().toLocalDate().toString());
+                row.put("disbursedAt", entry.loan().getDisbursementDate() == null ? "-" : entry.loan().getDisbursementDate().toString());
                 row.put("currentStatusLabel", workflowStatusPresentationService.dashboardStatusLabel(entry.loan().getStatus()));
                 return row;
             })
@@ -390,6 +392,8 @@ public class DisbursementController {
             }
         }
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
+        model.addAttribute("disbursementOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
         model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
@@ -452,8 +456,10 @@ public class DisbursementController {
                            @RequestParam(required = false) List<MultipartFile> attachments,
                            RedirectAttributes ra) {
         try {
-            UUID otpTokenId = validateDisbursementOtp(principal.getMemberId(), disbursementOtpCode);
             LoanApplication application=requireVisibleApplication(id,principal.getSaccoId(),principal.getStationId());
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(
+                principal.getMemberId(), principal.getSaccoId(), principal.getStationId())
+                ? validateDisbursementOtp(principal.getMemberId(), disbursementOtpCode) : null;
             if(loanRecordingService.recordedForStaff(principal,id)) {
                 var form=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm();
                 form.setRequestKey(requestKey);form.setLoanId(id);form.setEffectiveDate(disbursementDate);form.setFirstPaymentDate(firstRepaymentDate);
@@ -476,7 +482,7 @@ public class DisbursementController {
                 disbursementNotes,
                 disbursementProofFile
             );
-            emailOtpService.consumeOtpById(otpTokenId);
+            if (otpTokenId != null) emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", message("recording.disbursedSuccess"));
             return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -497,6 +503,9 @@ public class DisbursementController {
             LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
             if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
                 throw new IllegalStateException("This loan is no longer ready for disbursement.");
+            }
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions on your account.");
             }
             Member officer = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a disbursement OTP.");
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueLoanOtpWithMetadata(
@@ -530,6 +539,9 @@ public class DisbursementController {
             LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
             if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
                 throw new IllegalStateException("This loan is no longer ready for disbursement.");
+            }
+            if (!stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
+                return ResponseEntity.ok(Map.of("valid", true, "message", "OTP verification is disabled for approval actions on your account."));
             }
             validateDisbursementOtp(principal.getMemberId(), otpCode);
             return ResponseEntity.ok(Map.of(
@@ -740,7 +752,7 @@ public class DisbursementController {
         }
     }
 
-    private record ArchiveEntry(ManagerReview review, LoanApplication loan) {}
+    public record ArchiveEntry(ManagerReview review, LoanApplication loan) {}
 
     @GetMapping("/loan-applications/{id}/posting-accounts/{category}")
     @PreAuthorize("@access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")

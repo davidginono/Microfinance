@@ -36,6 +36,17 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JspRecordAccessorCompatibilityTest {
+    @Test
+    void jakartaElResolvesPopulatedStaffArchiveRows() {
+        var loan = com.sacco.mvp.domain.LoanApplication.builder().id(UUID.randomUUID()).build();
+        var review = com.sacco.mvp.domain.ManagerReview.builder().id(UUID.randomUUID()).build();
+        for (Object row : List.of(new AccountantController.ArchiveEntry(review, loan),
+                new DisbursementController.ArchiveEntry(review, loan),
+                new ManagerController.ArchiveEntry(review, loan, "Ready for Disbursement"))) {
+            assertElProperty("entry", row, "loan", loan);
+            assertElProperty("entry", row, "review", review);
+        }
+    }
     private static final Pattern JSP_PROPERTY = Pattern.compile("\\.([A-Za-z_][A-Za-z0-9_]*)");
     private static final Pattern RECORD_DECLARATION = Pattern.compile(
         "\\brecord\\s+([A-Za-z0-9_]+)\\s*\\((.*?)\\)\\s*\\{",

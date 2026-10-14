@@ -89,7 +89,12 @@ class AdminServiceTest {
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(i->i.getArgument(0));
         var form=new com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm();form.setDisbursementOfficerIds(List.of(teller.getId()));
         adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form);
-        verify(loanProductSettingRepository).saveAndFlush(argThat(p->p.isCustomRecordingConfiguration() && p.isAccountantReviewRequired() && !p.isAvailableForApplications()));
+        verify(loanProductSettingRepository).saveAndFlush(argThat(p->p.isCustomRecordingConfiguration() && p.isAccountantReviewRequired() && !p.isAvailableForApplications()
+            && p.getRepaymentFrequency()==com.sacco.mvp.domain.RepaymentFrequency.MONTHLY
+            && Boolean.TRUE.equals(p.getAffordabilityCheckRequired())
+            && p.getMaxRepaymentToDisposableIncomeRatio().compareTo(new BigDecimal("0.4000"))==0
+            && Boolean.FALSE.equals(p.getCollateralRequired())
+            && p.getMinCollateralCoverageRatio().compareTo(BigDecimal.ZERO)==0));
         verify(loanProductBoardReviewerRepository).save(argThat(r->r.getReviewStage()==ApprovalWorkflowStage.DISBURSEMENT_OFFICER && teller.getId().equals(r.getBoardMemberId()) && "SACCO-01".equals(r.getSaccoId())));
     }
 
