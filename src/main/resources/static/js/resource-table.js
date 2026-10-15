@@ -57,7 +57,7 @@
         // Let the native click/submit complete before restoring focus.
         menu.addEventListener('click',event=>{if(event.target.closest('[role=menuitem]:not(:disabled)'))queueMicrotask(()=>{if(region.isConnected)close(group.contains(document.activeElement));});});
         document.addEventListener('click',event=>{if(!group.contains(event.target))close(false);},{signal});
-        group.addEventListener('focusout',()=>queueMicrotask(()=>{if(region.isConnected && !group.contains(document.activeElement))close(false);}));
+        group.addEventListener('focusout',event=>{if(!group.contains(event.relatedTarget))close(false);});
         const observer = new MutationObserver(sync); observer.observe(menu,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','aria-disabled']});
         lifetimes.get(region).observers.push(observer);
         region.addEventListener('resource-table:reset',()=>{close(false);sync();}); sync();

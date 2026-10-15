@@ -435,6 +435,22 @@ test('Actions menu preserves live forms and follows selection, keyboard and rese
     assert.equal(d.querySelector('.resource-table-menu .btn-primary'),null);dom.window.close();
 });
 
+test('Actions toggles closed when pointer focus returns from a menu item to its trigger', async () => {
+    const markup=table('toggle',row).replace('<a class="app-btn btn-primary"','<button type="button" data-table-command>Deactivate</button><a class="app-btn btn-primary"');
+    const {dom,window:w,document:d}=await setup(markup);
+    const trigger=d.querySelector('.resource-table-action-menu>button'),menu=d.querySelector('[role=menu]');
+    trigger.click();assert.equal(menu.hidden,false);assert.equal(d.activeElement,menu.querySelector('button'));
+    // Native focus events can run a microtask checkpoint before the new target gains focus.
+    const queue=w.queueMicrotask;w.queueMicrotask=callback=>callback();
+    trigger.focus();w.queueMicrotask=queue;
+    trigger.click();await settle();
+    assert.equal(menu.hidden,true);assert.equal(trigger.getAttribute('aria-expanded'),'false');
+    trigger.click();assert.equal(menu.hidden,false);
+    d.querySelector('.resource-table-filters input').focus();await settle();
+    assert.equal(menu.hidden,true);assert.equal(trigger.getAttribute('aria-expanded'),'false');
+    dom.window.close();
+});
+
 test('sort links preserve server queries, expose direction and clear selected rows', async () => {
     const markup=table('sorting','<tr><td><input type="checkbox" checked></td><td>Alice</td><td>Active</td></tr>','data-table-selection="single"').replace('<th>Amount</th>','<th aria-sort="descending"><a data-table-sort href="?search=Alice&state=ACTIVE&activityId=parent&size=50&sort=name&direction=asc">Name</a></th>');
     const {dom,document:d}=await setup(markup);const link=d.querySelector('.resource-table-sort');
