@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="<c:url value='/css/statement-reference.css' />" />
 <div class="accounting-workspace">
  <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="financial.report.trial" /></h1>
- <sec:authorize access="hasAuthority('STATEMENT_EXPORT') and hasAuthority('FINANCIAL_REPORTS_EXPORT')"><div class="accounting-actions">
+ <sec:authorize access="@access.has(principal, 'STATEMENT_EXPORT') and @access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><div class="accounting-actions">
  <a class="app-btn btn-neutral" href="<c:url value='${detailBase}/trial-balance/pdf${detailQuery}' />"><spring:message code="voucher.pdf" /></a>
  <a class="app-btn btn-neutral" target="_blank" href="<c:url value='${detailBase}/trial-balance/pdf${detailQuery}&inline=true' />"><spring:message code="voucher.print" /></a>
  </div></sec:authorize></div>

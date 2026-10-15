@@ -7,7 +7,7 @@
 <div class="accounting-workspace">
  <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="statement.reference.accountTitle" /></h1><div class="accounting-actions">
  <a class="app-btn btn-neutral" href="<c:url value='${detailBase}/trial-balance${detailQuery}' />"><spring:message code="financial.report.trial" /></a>
- <sec:authorize access="hasAuthority('STATEMENT_EXPORT') and hasAuthority('FINANCIAL_REPORTS_EXPORT')">
+ <sec:authorize access="@access.has(principal, 'STATEMENT_EXPORT') and @access.has(principal, 'FINANCIAL_REPORTS_EXPORT')">
  <a class="app-btn btn-neutral" href="<c:url value='${detailBase}/accounts/${activity.accountId}/pdf${detailQuery}' />"><spring:message code="voucher.pdf" /></a>
  <a class="app-btn btn-neutral" target="_blank" href="<c:url value='${detailBase}/accounts/${activity.accountId}/pdf${detailQuery}&inline=true' />"><spring:message code="voucher.print" /></a>
  </sec:authorize></div></div>

@@ -11,7 +11,7 @@
  <section class="erp-detail-card"><p><span class="statement-status"><spring:message code="statement.status.${result.status}" /></span> · TZS · <c:out value="${result.from}" /> — <c:out value="${result.through}" /></p>
  <p><spring:message code="statement.dimension.${result.dimension}" /> · <spring:message code="${result.dimension eq 'INSTITUTION' ? 'statement.latestBranchCutoff' : 'statement.cutoff'}" />: <c:out value="${result.recordedCutoff}" /> · <spring:message code="statement.mappingVersion" />: <c:out value="${result.mappingVersion}" /></p>
  <c:if test="${result.definition.comparison}"><p><spring:message code="statement.comparison" />: <c:out value="${result.comparisonFrom}" /> — <c:out value="${result.comparisonThrough}" /> · <spring:message code="statement.cutoff" />: <c:out value="${result.comparisonCutoff}" /></p></c:if><c:if test="${not empty statementSuccess}"><p role="status"><spring:message code="${statementSuccess}" /></p></c:if>
- <sec:authorize access="hasAuthority('STATEMENT_EXPORT')">
+ <sec:authorize access="@access.has(principal, 'STATEMENT_EXPORT')">
  <form method="post" target="_blank" action="<c:url value='${empty result.id ? "/reports/statements/versions/" : "/reports/statements/results/"}${empty result.id ? result.versionId : result.id}/pdf' />" class="statement-actions">
   <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
   <c:if test="${empty result.id}"><input type="hidden" name="from" value="${result.from}" /><input type="hidden" name="through" value="${result.through}" /><input type="hidden" name="cutoff" value="${result.recordedCutoff}" /><c:if test="${result.definition.comparison}"><input type="hidden" name="comparisonFrom" value="${result.comparisonFrom}" /><input type="hidden" name="comparisonThrough" value="${result.comparisonThrough}" /></c:if></c:if>
@@ -28,7 +28,7 @@
  <c:forEach items="${['opening','movement','closing']}" var="measure"><tr class="${measure eq 'closing'?'reference-total':''}"><th scope="row"><spring:message code="statements.equity.${measure}" /></th><c:forEach items="${result.getEquityRows()}" var="component"><c:set var="amount" value="${measure eq 'opening'?component.opening:measure eq 'closing'?component.closing:component.current}" /><td class="statement-number"><c:choose><c:when test="${amount ne null}"><fmt:formatNumber value="${amount}" pattern="#,##0.00;(#,##0.00)" /></c:when><c:otherwise><spring:message code="statement.value.UNAVAILABLE" /></c:otherwise></c:choose></td></c:forEach><c:set var="total" value="${result.reconciliations[measure eq 'opening'?'OPENING_EQUITY':measure eq 'closing'?'EQUITY':'EQUITY_MOVEMENT']}" /><td class="statement-number"><c:choose><c:when test="${total ne null}"><fmt:formatNumber value="${total}" pattern="#,##0.00;(#,##0.00)" /></c:when><c:otherwise><spring:message code="statement.value.UNAVAILABLE" /></c:otherwise></c:choose></td></tr></c:forEach>
  </tbody></table></div></div>
  </c:if>
- <sec:authorize access="hasAuthority('FINANCIAL_REPORTS_VIEW')" var="canDrill" />
+ <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')" var="canDrill" />
  <c:set var="showLineTable" value="${empty result.getEquityRows() or result.definition.comparison}" />
  <c:forEach items="${result.getStatementRows()}" var="line"><c:if test="${not line.mandatory and (line.kind eq 'SUBTOTAL' or line.kind eq 'RATIO')}"><c:set var="showLineTable" value="${true}" /></c:if></c:forEach>
  <div class="reference-scroll" role="region" aria-label="<spring:message code='statement.line' />" tabindex="0">
