@@ -42,19 +42,26 @@
   });}
   const recordForm = document.querySelector('form:has(#loanMode)');
   if (recordForm) {
-    const mode = recordForm.querySelector('#loanMode'), entry = recordForm.querySelector('#interestEntry'), unit = recordForm.querySelector('#tenureUnit');
+    const mode = recordForm.querySelector('#loanMode'), entry = recordForm.querySelector('#interestEntry'), unit = recordForm.querySelector('#tenureUnit'), method = recordForm.querySelector('#customMethod'), basis = recordForm.querySelector('#interestBasis');
     const region = recordForm.querySelector('[data-interest-preview]'), spinner = region.querySelector('.loan-interest-spinner'), output = region.querySelector('[data-interest-value]'), description = region.querySelector('[data-interest-description]');
     const schedule = recordForm.querySelector('[data-schedule-preview]'), rows = schedule?.querySelector('[data-schedule-rows]'), summary = schedule?.querySelector('[data-schedule-summary]');
     const money = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits:2,maximumFractionDigits:2}).format(value);
     let timer, controller, version = 0;
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
-      const custom = mode.value === 'CUSTOM', amount = entry.value === 'AMOUNT';
+      const custom = mode.value === 'CUSTOM', reducing = custom && method.value === 'REDUCING_BALANCE';
+      if(reducing){entry.value = 'PERCENTAGE';basis.value = 'ANNUAL';}
+      entry.querySelector('option[value="AMOUNT"]').disabled = reducing;
+      basis.querySelector('option[value="WHOLE_LOAN"]').disabled = reducing;
+      const amount = entry.value === 'AMOUNT';
       show(recordForm.querySelector('[data-configured-product]'), !custom);
+      show(recordForm.querySelector('[data-configured-method]'), !custom);
+      const productMethod = recordForm.querySelector('[data-product-method]');productMethod.value = '\u2014';
       const productNote=recordForm.querySelector('[data-configured-terms-note]');if(productNote)productNote.hidden=custom;
       show(recordForm.querySelector('[data-custom-terms]'), custom);
       recordForm.querySelectorAll('[data-custom-percentage]').forEach(box => show(box, custom && !amount));
       show(recordForm.querySelector('[data-custom-amount]'), custom && amount);
+      window.refreshEnhancedSelects?.(recordForm.querySelector('[data-custom-terms]'));
       show(recordForm.querySelector('[data-tenure-number]'), !!unit.value);
       recordForm.querySelector('#tenureValue').max = unit.value === 'DAYS' ? '18250' : unit.value === 'YEARS' ? '50' : '600';
       clearTimeout(timer); controller?.abort(); ++version;
@@ -73,6 +80,7 @@
           const quote = await response.json();if(current !== version)return;
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
           output.textContent = money(quote.interest);
+          productMethod.value = [...method.options].find(option => option.value === quote.method)?.textContent || '\u2014';
           description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
           if(schedule && quote.schedule?.length){
             rows.replaceChildren(...quote.schedule.map(payment => {
@@ -89,7 +97,7 @@
         finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');}}
       }, 150);
     }
-    const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency']);
+    const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod']);
     const changed = event => {if(pricing.has(event.target.name))refresh();};
     recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
     window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;});

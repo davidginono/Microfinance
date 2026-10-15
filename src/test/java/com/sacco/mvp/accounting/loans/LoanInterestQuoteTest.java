@@ -36,6 +36,17 @@ class LoanInterestQuoteTest {
             assertThat(quote.schedule()).allSatisfy(row->assertThat(row.amount()).isEqualByComparingTo(row.principal().add(row.interest())));
         }
     }
+    @Test void reducingBalanceUsesAnnualRatesAndRejectsConflictingPricingModes(){
+        var f=custom();f.setCustomMethod(InterestMethod.REDUCING_BALANCE);f.setInterestBasis("ANNUAL");
+        var quote=service.interestQuote(actor,f);
+        assertThat(quote.method()).isEqualTo("REDUCING_BALANCE");
+        assertThat(quote.interest()).isLessThan(new BigDecimal("60.00"));
+        assertThat(quote.schedule().getFirst().interest()).isEqualByComparingTo("10.00");
+        assertThat(quote.schedule().getLast().interest()).isLessThan(quote.schedule().getFirst().interest());
+        assertThat(quote.schedule().stream().map(row->row.principal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("1000.00");
+        f.setInterestBasis("WHOLE_LOAN");assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+        f.setInterestBasis("ANNUAL");f.setInterestEntry("AMOUNT");f.setInterestAmount(new BigDecimal("17.03"));assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+    }
     @Test void customPricingRequiresInstitutionWorkflowAndCannotMasqueradeAsConfiguredProduct(){
         when(actor.getSaccoId()).thenReturn("I1");
         when(products.findBySaccoIdAndCustomRecordingConfigurationTrue("I1")).thenReturn(Optional.empty());

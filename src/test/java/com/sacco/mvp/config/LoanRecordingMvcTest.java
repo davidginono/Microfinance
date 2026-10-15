@@ -32,9 +32,9 @@ class LoanRecordingMvcTest {
     @Test void quoteRequiresCsrfAndDoesNotAcceptAFirstDueDateOrRequestedPrincipal() throws Exception {
         when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",new BigDecimal("0.12"),"FLAT_RATE","MONTHLY",new BigDecimal("176.67"),new BigDecimal("60.00"),List.of(),"MONTHS",6));
         mvc.perform(post("/finance/loan-recording/quote").with(user(actor))).andExpect(status().isForbidden());
-        mvc.perform(post("/finance/loan-recording/quote").with(user(actor)).with(csrf()).param("loanMode","CUSTOM").param("principal","1000.00").param("tenureUnit","MONTHS").param("tenureValue","6").param("interestBasis","ANNUAL").param("interestPercent","12").param("requestedPrincipal","9999").param("firstPaymentDate","2026-12-01"))
+        mvc.perform(post("/finance/loan-recording/quote").with(user(actor)).with(csrf()).param("loanMode","CUSTOM").param("principal","1000.00").param("tenureUnit","MONTHS").param("tenureValue","6").param("interestBasis","ANNUAL").param("interestPercent","12").param("customMethod","REDUCING_BALANCE").param("requestedPrincipal","9999").param("firstPaymentDate","2026-12-01"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.interest").value("60.00"));
-        verify(service).interestQuote(eq(actor),argThat(f->f.getRequestedPrincipal()==null && f.getFirstPaymentDate()==null && Integer.valueOf(6).equals(f.getTenureValue()) && "ANNUAL".equals(f.getInterestBasis())));
+        verify(service).interestQuote(eq(actor),argThat(f->f.getRequestedPrincipal()==null && f.getFirstPaymentDate()==null && Integer.valueOf(6).equals(f.getTenureValue()) && "ANNUAL".equals(f.getInterestBasis()) && f.getCustomMethod()==InterestMethod.REDUCING_BALANCE));
     }
     @Test void interestResponsePreservesCentsBeyondTheJavascriptIntegerRange() throws Exception {
         var payment=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(1,null,new BigDecimal("1.00"),new BigDecimal("9007199254740991.01"),new BigDecimal("9007199254740992.01"));

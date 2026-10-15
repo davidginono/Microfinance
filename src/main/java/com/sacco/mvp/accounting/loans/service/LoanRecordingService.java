@@ -243,11 +243,12 @@ public class LoanRecordingService {
         if ("CUSTOM".equals(f.getLoanMode())) {
             var configured=products.findBySaccoIdAndCustomRecordingConfigurationTrue(a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration"));
             check(configured.getStatus()==LoanProductStatus.ACTIVE,"customConfiguration");
-            check(Set.of("PERCENTAGE","AMOUNT").contains(f.getInterestEntry()) && Set.of("WHOLE_LOAN","ANNUAL").contains(f.getInterestBasis()) && f.getCustomFrequency()!=null,"terms");
+            check(Set.of("PERCENTAGE","AMOUNT").contains(f.getInterestEntry()) && Set.of("WHOLE_LOAN","ANNUAL").contains(f.getInterestBasis()) && f.getCustomFrequency()!=null && f.getCustomMethod()!=null,"terms");
+            check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE || ("PERCENTAGE".equals(f.getInterestEntry()) && "ANNUAL".equals(f.getInterestBasis())),"terms");
             BigDecimal rate=BigDecimal.ZERO;
             if("AMOUNT".equals(f.getInterestEntry()))nonnegativeMoney(f.getInterestAmount());
             else {check(f.getInterestPercent()!=null && f.getInterestPercent().signum()>=0 && f.getInterestPercent().compareTo(new BigDecimal("10000"))<=0 && f.getInterestPercent().scale()<=4,"terms");rate=f.getInterestPercent().movePointLeft(2);}
-            return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(InterestMethod.FLAT_RATE).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).build();
+            return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(f.getCustomMethod()).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).build();
         }
         var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
         check((p.getMinimumAmount()==null || f.getPrincipal().compareTo(p.getMinimumAmount())>=0) && (p.getMaximumAmount()==null || f.getPrincipal().compareTo(p.getMaximumAmount())<=0),"productLimits");

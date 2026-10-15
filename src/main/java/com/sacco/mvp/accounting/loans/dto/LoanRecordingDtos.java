@@ -25,6 +25,7 @@ public final class LoanRecordingDtos {
         private BigDecimal interestPercent;
         private BigDecimal interestAmount;
         private RepaymentFrequency customFrequency = RepaymentFrequency.MONTHLY;
+        private InterestMethod customMethod = InterestMethod.FLAT_RATE;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate firstPaymentDate;
         private String purpose = "";
         private String business = "";

@@ -43,9 +43,10 @@ function fixture() {
   const dom = new JSDOM(`<html lang="en"><form data-loan-form>
     <input name="_csrf" value="token"><select id="loanMode" name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>
     <div data-configured-product><select id="productId" name="productId"><option value="product">Business loan</option></select></div>
+    <label data-configured-method><input data-product-method readonly></label>
     <input id="principal" name="principal"><select id="tenureUnit" name="tenureUnit"><option value=""></option><option>DAYS</option><option>MONTHS</option><option>YEARS</option></select>
     <label data-tenure-number><input id="tenureValue" name="tenureValue"></label>
-    <div data-custom-terms><select id="interestEntry" name="interestEntry"><option>PERCENTAGE</option><option>AMOUNT</option></select>
+    <div data-custom-terms><select id="customMethod" name="customMethod"><option value="FLAT_RATE">Flat rate</option><option value="REDUCING_BALANCE">Reducing balance</option></select><select id="interestEntry" name="interestEntry"><option value="PERCENTAGE">PERCENTAGE</option><option value="AMOUNT">AMOUNT</option></select>
     <label data-custom-percentage><input id="interestPercent" name="interestPercent"></label>
     <label data-custom-percentage><select id="interestBasis" name="interestBasis"><option value="WHOLE_LOAN">For the whole loan</option><option value="ANNUAL">Annual rate</option></select></label>
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
@@ -59,7 +60,7 @@ function fixture() {
   w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
   const set=(id,value)=>{w.document.getElementById(id).value=value;w.document.getElementById(id).dispatchEvent(new w.Event('change',{bubbles:true}));};
   const run=()=>{const fn=[...timers.values()].at(-1);timers.clear();return fn();};
-  const respond=(index,interest,ok=true,schedule=[])=>requests[index].resolve({ok,redirected:false,json:async()=>ok?{interest,product:'Business loan',tenureUnit:'MONTHS',tenureValue:6,frequency:'MONTHLY',schedule}:{error:'Invalid loan terms'}});
+  const respond=(index,interest,ok=true,schedule=[],method='FLAT_RATE')=>requests[index].resolve({ok,redirected:false,json:async()=>ok?{interest,method,product:'Business loan',tenureUnit:'MONTHS',tenureValue:6,frequency:'MONTHLY',schedule}:{error:'Invalid loan terms'}});
   return {w,set,run,respond,requests,dom};
 }
 
@@ -106,4 +107,15 @@ test('incomplete configuration does not request a misleading default schedule',(
   const {set,requests,dom}=fixture();set('principal','1000');set('loanMode','CUSTOM');
   assert.equal(requests.length,0);assert.equal(dom.window.document.querySelector('[data-schedule-preview]').hidden,true);
   dom.window.close();
+});
+
+test('reducing balance selects annual percentage terms and configured loans retain their product method',async()=>{
+  const {w,set,run,respond,requests,dom}=fixture();const d=w.document;
+  set('loanMode','CUSTOM');set('tenureUnit','MONTHS');set('tenureValue','6');set('interestPercent','12');set('principal','1000');set('customMethod','REDUCING_BALANCE');
+  assert.equal(d.getElementById('interestBasis').value,'ANNUAL');assert.equal(d.getElementById('interestEntry').value,'PERCENTAGE');
+  assert.equal(d.querySelector('#interestEntry option[value="AMOUNT"]').disabled,true);
+  const reducing=run();assert.equal(requests[0].options.body.get('customMethod'),'REDUCING_BALANCE');respond(0,'35.29',true,[],'REDUCING_BALANCE');await reducing;
+  set('customMethod','FLAT_RATE');assert.equal(d.querySelector('#interestEntry option[value="AMOUNT"]').disabled,false);
+  set('loanMode','CONFIGURED');const configured=run();assert.equal(requests[1].options.body.get('customMethod'),null);respond(1,'50.00');await configured;
+  assert.equal(d.querySelector('[data-product-method]').value,'Flat rate');dom.window.close();
 });
