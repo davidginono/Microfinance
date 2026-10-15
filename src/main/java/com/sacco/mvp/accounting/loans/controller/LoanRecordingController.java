@@ -56,7 +56,7 @@ public class LoanRecordingController {
     @PostMapping("/loan-recording/quote") @ResponseBody
     public ResponseEntity<?> quote(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute RecordForm recordForm,BindingResult errors,Locale locale){
         service.authorize(a,"CREATE");if(errors.hasErrors())return ResponseEntity.badRequest().body(Map.of("error",label("recording.error.terms",locale)));
-        try{var q=service.interestQuote(a,recordForm);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("product",q.product(),"rate",q.rate().toPlainString(),"method",q.method(),"frequency",q.frequency(),"installment",q.installment().toPlainString(),"interest",q.interest().toPlainString(),"tenureUnit",q.tenureUnit(),"tenureValue",q.tenureValue()));}
+        try{var q=service.interestQuote(a,recordForm);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("product",q.product(),"rate",q.rate().toPlainString(),"method",q.method(),"frequency",q.frequency(),"installment",q.installment().toPlainString(),"interest",q.interest().toPlainString(),"tenureUnit",q.tenureUnit(),"tenureValue",q.tenureValue(),"schedule",q.schedule().stream().map(r->Map.of("number",r.number(),"principal",r.principal().toPlainString(),"interest",r.interest().toPlainString(),"amount",r.amount().toPlainString())).toList()));}
         catch(IllegalArgumentException ex){return ResponseEntity.badRequest().body(Map.of("error",label(error(ex),locale)));}
     }
     @GetMapping("/loan-records/{id}/attachments/{attachmentId}")

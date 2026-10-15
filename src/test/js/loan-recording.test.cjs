@@ -50,6 +50,7 @@ function fixture() {
     <label data-custom-percentage><select id="interestBasis" name="interestBasis"><option value="WHOLE_LOAN">For the whole loan</option><option value="ANNUAL">Annual rate</option></select></label>
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
     <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span class="loan-interest-spinner" hidden></span><output data-interest-value></output><p data-interest-description></p></div>
+    <section data-schedule-preview hidden><span data-schedule-summary data-monthly="Monthly" data-weekly="Weekly"></span><table><tbody data-schedule-rows></tbody></table></section>
     <button name="action" value="save">Save</button><button disabled>Restricted</button>
   </form></html>`, {runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
   const w=dom.window, timers=new Map(), requests=[];let next=0;
@@ -58,14 +59,14 @@ function fixture() {
   w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
   const set=(id,value)=>{w.document.getElementById(id).value=value;w.document.getElementById(id).dispatchEvent(new w.Event('change',{bubbles:true}));};
   const run=()=>{const fn=[...timers.values()].at(-1);timers.clear();return fn();};
-  const respond=(index,interest,ok=true)=>requests[index].resolve({ok,redirected:false,json:async()=>ok?{interest,product:'Business loan',tenureUnit:'MONTHS',tenureValue:6}:{error:'Invalid loan terms'}});
+  const respond=(index,interest,ok=true,schedule=[])=>requests[index].resolve({ok,redirected:false,json:async()=>ok?{interest,product:'Business loan',tenureUnit:'MONTHS',tenureValue:6,frequency:'MONTHLY',schedule}:{error:'Invalid loan terms'}});
   return {w,set,run,respond,requests,dom};
 }
 
 test('progressive tenure, custom modes and percentage basis send only active fields',async()=>{
   const {w,set,run,respond,requests,dom}=fixture();const d=w.document;
   assert.equal(d.querySelector('[data-tenure-number]').hidden,true);
-  set('tenureUnit','DAYS');assert.equal(d.getElementById('tenureValue').disabled,false);assert.equal(d.getElementById('tenureValue').max,'18250');
+  set('tenureUnit','DAYS');set('tenureValue','14');assert.equal(d.getElementById('tenureValue').disabled,false);assert.equal(d.getElementById('tenureValue').max,'18250');
   set('loanMode','CUSTOM');set('interestBasis','ANNUAL');set('interestPercent','12');set('principal','1000');
   const calculation=run();assert.equal(d.querySelector('.loan-interest-spinner').hidden,false);assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
   assert.equal(requests[0].options.body.get('productId'),null);assert.equal(requests[0].options.body.get('_csrf'),'token');assert.equal(requests[0].options.body.get('interestBasis'),'ANNUAL');
@@ -75,7 +76,7 @@ test('progressive tenure, custom modes and percentage basis send only active fie
 });
 
 test('stale quotes cannot overwrite the latest amount and failures end the spinner',async()=>{
-  const {w,set,run,respond,requests,dom}=fixture();set('principal','1000');const first=run();set('principal','2000');const second=run();
+  const {w,set,run,respond,requests,dom}=fixture();set('tenureUnit','MONTHS');set('tenureValue','6');set('principal','1000');const first=run();set('principal','2000');const second=run();
   assert.equal(requests[0].options.signal.aborted,true);respond(0,'100.00');await first;assert.equal(w.document.querySelector('.loan-interest-spinner').hidden,false);
   respond(1,'200.00');await second;assert.equal(w.document.querySelector('[data-interest-value]').textContent,'200.00');
   set('principal','3000');const failed=run();respond(2,null,false);await failed;
@@ -84,6 +85,25 @@ test('stale quotes cannot overwrite the latest amount and failures end the spinn
 });
 
 test('decimal interest strings retain exact cents when displayed',async()=>{
-  const {w,set,run,respond,dom}=fixture();set('principal','1000');const pending=run();respond(0,'9007199254740991.01');await pending;
+  const {w,set,run,respond,dom}=fixture();set('tenureUnit','MONTHS');set('tenureValue','6');set('principal','1000');const pending=run();respond(0,'9007199254740991.01');await pending;
   assert.equal(w.document.querySelector('[data-interest-value]').textContent,'9,007,199,254,740,991.01');dom.window.close();
+});
+
+test('schedule uses server rows, preserves cents, and clears stale estimates on changes and errors',async()=>{
+  const {w,set,run,respond,dom}=fixture();const d=w.document,preview=d.querySelector('[data-schedule-preview]');
+  set('tenureUnit','MONTHS');set('tenureValue','6');set('principal','1000');const pending=run();
+  assert.equal(preview.hidden,true);
+  respond(0,'17.03',true,[{number:1,principal:'9007199254740991.01',interest:'17.03',amount:'9007199254741008.04'}]);await pending;
+  assert.equal(preview.hidden,false);
+  assert.equal(d.querySelector('[data-schedule-summary]').textContent,'Monthly · 6 Months');
+  assert.deepEqual([...d.querySelectorAll('[data-schedule-rows] td')].map(cell=>cell.textContent),['1','—','9,007,199,254,740,991.01','17.03','9,007,199,254,741,008.04']);
+  set('tenureValue','12');assert.equal(preview.hidden,true);assert.equal(d.querySelector('[data-schedule-rows]').children.length,0);
+  const failed=run();respond(1,null,false);await failed;assert.equal(preview.hidden,true);
+  dom.window.close();
+});
+
+test('incomplete configuration does not request a misleading default schedule',()=>{
+  const {set,requests,dom}=fixture();set('principal','1000');set('loanMode','CUSTOM');
+  assert.equal(requests.length,0);assert.equal(dom.window.document.querySelector('[data-schedule-preview]').hidden,true);
+  dom.window.close();
 });

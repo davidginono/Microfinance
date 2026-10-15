@@ -26,6 +26,16 @@ class LoanInterestQuoteTest {
         f.setInterestAmount(new BigDecimal("-1"));assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.amount");
         verify(guard,times(4)).requireActor(actor,"LOAN_RECORDING_CREATE");
     }
+    @Test void previewScheduleReconcilesForDaysMonthsAndYearsWithoutInventingDueDates(){
+        for(var unit:List.of("DAYS","MONTHS","YEARS")){
+            var f=custom();f.setTenureUnit(unit);f.setTenureValue(unit.equals("DAYS")?14:unit.equals("MONTHS")?6:1);
+            var quote=service.interestQuote(actor,f);
+            assertThat(quote.schedule()).isNotEmpty().allSatisfy(row->assertThat(row.date()).isNull());
+            assertThat(quote.schedule().stream().map(row->row.principal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(f.getPrincipal());
+            assertThat(quote.schedule().stream().map(row->row.interest()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.interest());
+            assertThat(quote.schedule()).allSatisfy(row->assertThat(row.amount()).isEqualByComparingTo(row.principal().add(row.interest())));
+        }
+    }
     @Test void customPricingRequiresInstitutionWorkflowAndCannotMasqueradeAsConfiguredProduct(){
         when(actor.getSaccoId()).thenReturn("I1");
         when(products.findBySaccoIdAndCustomRecordingConfigurationTrue("I1")).thenReturn(Optional.empty());

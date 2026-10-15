@@ -37,9 +37,12 @@ class LoanRecordingMvcTest {
         verify(service).interestQuote(eq(actor),argThat(f->f.getRequestedPrincipal()==null && f.getFirstPaymentDate()==null && Integer.valueOf(6).equals(f.getTenureValue()) && "ANNUAL".equals(f.getInterestBasis())));
     }
     @Test void interestResponsePreservesCentsBeyondTheJavascriptIntegerRange() throws Exception {
-        when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",BigDecimal.ZERO,"FLAT_RATE","MONTHLY",new BigDecimal("9007199254740991.01"),new BigDecimal("9007199254740991.01"),List.of(),"MONTHS",1));
+        var payment=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(1,null,new BigDecimal("1.00"),new BigDecimal("9007199254740991.01"),new BigDecimal("9007199254740992.01"));
+        when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",BigDecimal.ZERO,"FLAT_RATE","MONTHLY",payment.amount(),payment.interest(),List.of(payment),"MONTHS",1));
         mvc.perform(post("/finance/loan-recording/quote").with(user(actor)).with(csrf()).param("principal","1000.00"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.interest").value("9007199254740991.01"));
+            .andExpect(status().isOk()).andExpect(jsonPath("$.interest").value("9007199254740991.01"))
+            .andExpect(jsonPath("$.schedule[0].number").value(1)).andExpect(jsonPath("$.schedule[0].interest").value("9007199254740991.01"))
+            .andExpect(jsonPath("$.schedule[0].amount").value("9007199254740992.01"));
     }
     @Test void multipartRecordingPassesDocumentsAndRetainsValuesOnInvalidInput() throws Exception {
         var id=UUID.randomUUID();when(service.save(any(),any(),any())).thenReturn(id);var file=new MockMultipartFile("attachments","proof.pdf","application/pdf","%PDF synthetic".getBytes());

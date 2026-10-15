@@ -103,7 +103,7 @@ public class LoanRecordingService {
         }
         if(f.getTenureValue()==null){check(!"ANNUAL".equals(f.getInterestBasis()) || "AMOUNT".equals(f.getInterestEntry()),"terms");f.setTenureUnit("MONTHS");f.setTenureValue(1);}
         f.setMonths(tenure(f).compatibilityMonths());var p=product(a,f);var result=calculate(f,p);
-        return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),List.of(),tenure(f).unit(),tenure(f).value());
+        return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),result.rows().stream().map(r->new ScheduleRow(r.number(),null,r.principal(),r.interest(),r.amount())).toList(),tenure(f).unit(),tenure(f).value());
     }
     @Transactional(readOnly=true)
     public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");validateRecord(f);check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);

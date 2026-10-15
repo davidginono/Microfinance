@@ -44,6 +44,8 @@
   if (recordForm) {
     const mode = recordForm.querySelector('#loanMode'), entry = recordForm.querySelector('#interestEntry'), unit = recordForm.querySelector('#tenureUnit');
     const region = recordForm.querySelector('[data-interest-preview]'), spinner = region.querySelector('.loan-interest-spinner'), output = region.querySelector('[data-interest-value]'), description = region.querySelector('[data-interest-description]');
+    const schedule = recordForm.querySelector('[data-schedule-preview]'), rows = schedule?.querySelector('[data-schedule-rows]'), summary = schedule?.querySelector('[data-schedule-summary]');
+    const money = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits:2,maximumFractionDigits:2}).format(value);
     let timer, controller, version = 0;
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
@@ -57,7 +59,10 @@
       recordForm.querySelector('#tenureValue').max = unit.value === 'DAYS' ? '18250' : unit.value === 'YEARS' ? '50' : '600';
       clearTimeout(timer); controller?.abort(); ++version;
       spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
-      if (!recordForm.querySelector('#principal').value || (!custom && !recordForm.querySelector('#productId').value)) return;
+      if(schedule){schedule.hidden = true;rows.replaceChildren();summary.textContent = '';}
+      if (!recordForm.querySelector('#principal').value || !unit.value || !recordForm.querySelector('#tenureValue').value
+        || (!custom && !recordForm.querySelector('#productId').value)
+        || (custom && !recordForm.querySelector(amount ? '#interestAmount' : '#interestPercent').value)) return;
       const current = version;
       timer = setTimeout(async () => {
         controller = new AbortController(); spinner.hidden = false; region.setAttribute('aria-busy','true');
@@ -67,8 +72,19 @@
           if(response.redirected)throw new Error(region.dataset.error);
           const quote = await response.json();if(current !== version)return;
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
-          output.textContent = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits:2,maximumFractionDigits:2}).format(quote.interest);
+          output.textContent = money(quote.interest);
           description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
+          if(schedule && quote.schedule?.length){
+            rows.replaceChildren(...quote.schedule.map(payment => {
+              const row = document.createElement('tr');
+              [payment.number,'\u2014',money(payment.principal),money(payment.interest),money(payment.amount)].forEach(value => {
+                const cell = document.createElement('td');cell.textContent = value;row.append(cell);
+              });
+              return row;
+            }));
+            summary.textContent = summary.dataset[quote.frequency.toLowerCase()] + ' \u00b7 ' + quote.tenureValue + ' ' + region.dataset[quote.tenureUnit.toLowerCase()];
+            schedule.hidden = false;
+          }
         } catch(error) {if(current === version && error.name !== 'AbortError')description.textContent = error.message || region.dataset.error;}
         finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');}}
       }, 150);
