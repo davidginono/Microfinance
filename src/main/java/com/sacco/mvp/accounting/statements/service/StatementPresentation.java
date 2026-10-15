@@ -15,7 +15,11 @@ public class StatementPresentation {
     public record Column(String label,boolean numeric,float weight) {}
     public record Cell(String text,BigDecimal amount) {}
     public record DisplayRow(List<Cell> cells,boolean total,boolean heading,String details) {}
-    public record Document(String title,String style,List<Column> columns,List<DisplayRow> rows,int detailsBefore) {}
+    public record Document(String title,String style,List<Column> columns,List<DisplayRow> rows,int detailsBefore,boolean asAt) {}
+    private String title(Snapshot snapshot,Kind kind,Locale locale){
+        String title=label("fs.title."+kind,locale);
+        return kind==Kind.POSITION||kind==Kind.TRIAL?title+" "+snapshot.parameters().through().format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy",locale)):title;
+    }
     public String label(String text,Locale locale){return text!=null&&text.startsWith("fs.")?messages.getMessage(text,null,text,locale):text;}
     public Document document(Snapshot s,Kind kind,List<Balance> selected,Locale locale){
         var rows=new ArrayList<DisplayRow>();var columns=new ArrayList<Column>();String base="/reports/financial/statements/"+s.id();
@@ -24,13 +28,13 @@ public class StatementPresentation {
             BigDecimal opening=BigDecimal.ZERO,debit=BigDecimal.ZERO,credit=BigDecimal.ZERO,closing=BigDecimal.ZERO;
             for(var b:selected){rows.add(row(false,false,s.parameters().institutionWide()?null:base+"/ledger/"+b.id(),b.code(),b.name(),b.opening(),b.debit(),b.credit(),b.movement(),b.closing()));opening=opening.add(b.opening());debit=debit.add(b.debit());credit=credit.add(b.credit());closing=closing.add(b.closing());}
             rows.add(row(true,false,null,label("fs.total",locale),"",opening,debit,credit,debit.subtract(credit),closing));
-            return new Document(label("fs.title.TRIAL",locale),"trial",columns,rows,2);
+            return new Document(title(s,kind,locale),"trial",columns,rows,2,true);
         }
         if(kind==Kind.EQUITY){
             columns.add(new Column(label("fs.description",locale),false,.28f));float width=.72f/(s.equityColumns().size()+1);
             for(String c:s.equityColumns())columns.add(new Column(c.startsWith("account:")?c.substring(8):label(c,locale),true,width));columns.add(new Column(label("fs.equityTotal",locale),true,width));
             for(var r:s.equity()){var cells=new ArrayList<Cell>();cells.add(cell(label(r.label(),locale)));for(String c:s.equityColumns())cells.add(cell(r.values().get(c)));cells.add(cell(r.total()));rows.add(new DisplayRow(cells,r.summary(),false,null));}
-            return new Document(label("fs.title.EQUITY",locale),"equity",columns,rows,-1);
+            return new Document(title(s,kind,locale),"equity",columns,rows,-1,false);
         }
         for(var c:List.of(new Column(label("fs.account",locale),false,.12f),new Column(label("fs.description",locale),false,.40f),new Column(label("fs.notes",locale),false,.08f),new Column(label("fs.current",locale),true,.20f),new Column(label("fs.previous",locale),true,.20f)))columns.add(c);
         if(kind==Kind.NOTES){
@@ -58,7 +62,7 @@ public class StatementPresentation {
                 if(!Set.of("TOTAL","UNCLASSIFIED").contains(section))rows.add(row(true,false,null,"",label("fs.total",locale),"",current,previous));
             }
         }
-        return new Document(label("fs.title."+kind,locale),"statement",columns,rows,3);
+        return new Document(title(s,kind,locale),"statement",columns,rows,3,kind==Kind.POSITION);
     }
     public DisplayRow row(boolean total,boolean heading,String details,Object... values){return new DisplayRow(Arrays.stream(values).map(this::cell).toList(),total,heading,details);}
     public Document ledger(Snapshot s,Balance b,List<Activity> activity,Locale locale){
@@ -66,7 +70,7 @@ public class StatementPresentation {
         var rows=new ArrayList<DisplayRow>();rows.add(row(true,false,null,"","",label("fs.opening",locale),"","",b.opening()));
         for(var a:activity)rows.add(row(false,false,a.sourceUrl(),a.date(),a.reference(),a.description(),a.debit(),a.credit(),b.opening().add(a.running())));
         rows.add(row(true,false,null,"","",label("fs.periodTotal",locale),b.debit(),b.credit(),b.closing()));
-        return new Document(label("fs.title.LEDGER",locale)+" — "+b.code()+" "+b.name(),"trial",columns,rows,-1);
+        return new Document(label("fs.title.LEDGER",locale)+" — "+b.code()+" "+b.name(),"trial",columns,rows,-1,false);
     }
     private Cell cell(Object value){if(value instanceof BigDecimal amount){var f=new DecimalFormat("#,##0.00;(#,##0.00)",DecimalFormatSymbols.getInstance(Locale.UK));return new Cell(f.format(amount),amount);}return new Cell(value==null?"":value.toString(),null);}
 }

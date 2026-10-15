@@ -37,6 +37,8 @@
    applyViewSettings(next);
    next.querySelector('.fs-view-settings').open=current.querySelector('.fs-view-settings').open;
    current.replaceWith(next);
+   const actions=parsed.querySelector('[data-fs-preview-actions]');
+   if(actions)document.querySelector('[data-fs-preview-actions]')?.replaceWith(actions);
    window.refreshEnhancedSelects?.(next);
    if(push)history.pushState({statementPreview:true},'',url);
    next.querySelector('.fs-tabs [aria-current="page"]')?.focus({preventScroll:true});

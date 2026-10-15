@@ -16,6 +16,8 @@ The report paper uses Arial/Helvetica for ordinary statements, Times for trial/l
 
 Statement tabs fetch the authorized server-rendered preview and replace only the statement workspace. They preserve the shell, update the URL, support Back/Forward and keep selected-report export/print context synchronized. Pending requests are cancelled when another tab is selected; failures retain the visible report with a localized retry message. No financial report data is cached in browser storage. Ordinary links remain available without JavaScript and for opening another tab.
 
+The shared shell owns one stable breadcrumb and page header outside the replaced workspace. Tab responses refresh its report actions without inserting another heading. Screen messages use plain-language draft status and a collapsed Items to review list; internal snapshot IDs and repeated source-coverage explanations are not displayed. Trial-balance and financial-position titles include the selected reporting date in every output language and format.
+
 ## Source and calculation boundaries
 
 Every generation runs inside one bounded PostgreSQL repeatable-read transaction. It freezes account/mapping/identity/balance data and exact journal membership for current/comparison activity. Opening balances are aggregated over the same visible posted-ledger snapshot; old journal histories are not loaded into application memory. Subsequent backdated postings, mapping changes and account-name changes cannot alter the saved figures or drill-down membership. Request keys bind retries to actor, scope and dates.
@@ -33,6 +35,8 @@ The user's latest instruction explicitly enables Excel for this workspace, its t
 Preview, PDF, print and XLSX consume the same typed frozen data. Details controls and source links are omitted from all outputs. Print uses a standalone internal document view with explicit A4 portrait/landscape page rules, repeated table headings and wrapping cells. This avoids browser PDF iframe printing that cropped wide reports onto portrait sheets; downloaded PDFs remain complete and unchanged. Print requires current export permission and uses the full bounded ledger-export query, never just the visible activity page. Excel uses real numeric money cells, accounting number formats, repeated headings, frozen panes and A4 fit-to-width print areas. Amounts exceeding Excel's 15-digit numeric precision are retained as text instead of silently losing digits. User text is written as text, never executable formulas. Statement packages contain all statements, notes and the trial balance.
 
 Full-statement PDF/Excel artifacts are retained with checksums and language. Scope/claims and checksums are rechecked on downloads. Filtered trial and ledger documents are reproducible from the immutable snapshot and journal membership. Database triggers prohibit changing/deleting captured figures, changing journal membership or replacing retained artifacts. Archived financial history is untouched.
+
+The simplified output layout contains only one short draft notice after the figures. Technical checks and snapshot reference IDs remain in retained report evidence rather than visible PDF, print or Excel content. Current downloads use a separate V2 artifact key so previously generated files remain immutable while saved reports can produce the updated layout. No schema or financial calculation changes are required.
 
 ## Operational limits
 

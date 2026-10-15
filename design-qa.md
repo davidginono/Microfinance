@@ -224,3 +224,19 @@ The user's two follow-up screenshots showed split Font/Density labels and a crop
 The test instance was restarted and normal OTP sign-in re-established. The browser tool briefly stalled during print-tab creation, then recovered; final print verification completed successfully.
 
 final result: passed — follow-up layout, navigation and print acceptance.
+
+## Follow-up: concise report content and dated headings — 2026-10-15
+
+The three supplied screenshots identify verbose checks/reference IDs, duplicate breadcrumbs/headings/actions after tab navigation, and an undated Trial balance as at title.
+
+- Moved the preview breadcrumb/header outside the replaceable tab workspace. Tab responses refresh only its record actions, keeping the shell's promoted header stable.
+- Replaced technical screen wording with Draft, Save report and a collapsed Items to review list. Removed repeated source-coverage prose and internal snapshot IDs from the display. PDF, Excel and print contain one short draft notice after the figures; retained snapshots/checks and audit evidence are unchanged.
+- Added the selected end date to trial-balance and financial-position titles in the shared presentation model, including English and Kiswahili. Preview, PDF, Excel and print use that same title.
+- Updated artifact keys to retain previous immutable outputs while serving the simplified export layout for existing saved reports. PostgreSQL coverage verifies both versions remain retained.
+- Standard compilation and all 26 focused tests passed. The rendered synthetic trial-balance PDF shows TRIAL BALANCE AS AT 31 JAN 2026, complete columns and one short footer with no technical check dump or reference UUID.
+
+Live verification uses a clean copy of the last completed application plus the current statement changes, pinned to its existing version-65 test schema. A concurrent, unrelated receipt-batch migration currently fails on a missing gl_library_immutable function; its source and other working-tree changes are left untouched.
+
+Live acceptance completed after normal OTP sign-in: generated an unsaved report through 15 October 2026, switched between financial position, profit or loss and trial balance, and verified exactly one breadcrumb, one page header, one Save report button and no header nested inside the replaced workspace. The trial-balance title displays 15 Oct 2026. Inspected the rendered browser screenshot and downloaded the revised PDF through the real toolbar. The saved-report action remains in the stable header, with its selected statement context refreshed on each switch.
+
+final result: passed — concise content, stable header and dated-title acceptance. The unrelated receipt-batch migration remains outside this change.

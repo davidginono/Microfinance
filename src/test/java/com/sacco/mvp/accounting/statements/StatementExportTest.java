@@ -91,4 +91,21 @@ class StatementExportTest {
             assertThat(pdf.getPage(6).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(6).getMediaBox().getHeight());
         }
     }
+    @Test void asAtTitlesIncludeReportingDateAndExportsOmitTechnicalChecks()throws Exception{
+        var s=snapshot();
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw")))for(var kind:List.of(Kind.POSITION,Kind.TRIAL)){
+            var doc=presentation.document(s,kind,s.balances(),locale);
+            assertThat(doc.asAt()).isTrue();
+            assertThat(doc.title()).endsWith("31 "+PERIOD.through().format(java.time.format.DateTimeFormatter.ofPattern("MMM yyyy",locale)));
+            try(var pdf=Loader.loadPDF(exporter.export(s,List.of(doc),"PDF",locale))){
+                assertThat(new PDFTextStripper().getText(pdf)).contains(doc.title().toUpperCase(locale),presentation.label("fs.outputNotice",locale))
+                        .doesNotContain(s.id().toString(),presentation.label("fs.check.coverage",locale));
+            }
+            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,List.of(doc),"XLSX",locale)))){
+                var sheet=book.getSheetAt(0);assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo(doc.title().toUpperCase(locale));
+                for(var row:sheet)for(var cell:row)if(cell.getCellType()==CellType.STRING)
+                    assertThat(cell.getStringCellValue()).doesNotContain(s.id().toString(),presentation.label("fs.check.coverage",locale));
+            }
+        }
+    }
 }

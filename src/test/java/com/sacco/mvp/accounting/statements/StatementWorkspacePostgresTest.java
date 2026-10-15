@@ -62,6 +62,15 @@ class StatementWorkspacePostgresTest {
     @Test void branchTenantAndRevokedExportChecksApplyToSavedRuns(){UUID id=preview();var foreign=new AppUserPrincipal(Member.builder().id(actor.getMemberId()).saccoId(institution).stationId("B2").position(Position.ACCOUNTANT).build(),EnumSet.allOf(UserClaim.class),true);assertThatThrownBy(()->statements.get(foreign,id)).isInstanceOf(AccessDeniedException.class);doThrow(new AccessDeniedException("revoked")).when(guard).requireActor(actor,"FINANCIAL_REPORTS_EXPORT");assertThatThrownBy(()->statements.artifact(actor,id,Kind.POSITION,"PDF","en")).isInstanceOf(AccessDeniedException.class);}
     @Test void institutionAggregationDoesNotGrantCrossBranchLedgerAccess(){UUID id=statements.generate(actor,new Parameters(from,through,true),UUID.randomUUID());assertThatThrownBy(()->statements.activity(actor,id,bank,0)).isInstanceOf(AccessDeniedException.class);doThrow(new AccessDeniedException("revoked institution grant")).when(guard).requireActor(actor,"FINANCIAL_REPORTS_INSTITUTION");assertThat(statements.history(actor,0,"newest")).extracting(com.sacco.mvp.accounting.statements.repository.StatementRepository.Stored::id).doesNotContain(id);}
     @Test void concurrentIdenticalRequestsReturnOneFrozenSnapshot()throws Exception{UUID key=UUID.randomUUID();try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){var tasks=List.<java.util.concurrent.Callable<UUID>>of(()->statements.generate(actor,new Parameters(from,through,false),key),()->statements.generate(actor,new Parameters(from,through,false),key));var results=pool.invokeAll(tasks);assertThat(results.getFirst().get()).isEqualTo(results.getLast().get());}}
+    @Test void simplifiedLayoutKeepsEarlierArtifactsAndServesNewDocuments(){
+        UUID id=preview();byte[] previous="previous layout".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,'POSITION','PDF','en',?,?)",id,previous,StatementService.sha(previous));
+        assertThat(statements.artifact(actor,id,Kind.POSITION,"PDF","en")).isEmpty();
+        byte[] current="simplified layout".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(statements.retain(actor,id,Kind.POSITION,"PDF","en",current)).isEqualTo(current);
+        assertThat(jdbc.queryForObject("select count(*) from statement_run_artifact where run_id=?",Integer.class,id)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("select bytes from statement_run_artifact where run_id=? and kind='POSITION'",byte[].class,id)).isEqualTo(previous);
+    }
     @AfterAll void browserFixture()throws Exception{
         if(actor==null)return;var root=java.nio.file.Path.of("target/statement-workspace");java.nio.file.Files.createDirectories(root);UUID id=preview();
         java.nio.file.Files.writeString(root.resolve("fixture.txt"),"staff="+staffNumber+"\ninstitution="+institution+"\nrun="+id+"\n");

@@ -27,9 +27,9 @@ public class StatementExportService {
     }
     private List<String> context(Snapshot s,Document document,Locale locale){
         var result=new ArrayList<String>();result.add(s.institutionName()+" | "+(s.parameters().institutionWide()?label("fs.institutionScope",locale):s.branchName()));
-        result.add(document.title().equals(label("fs.title.POSITION",locale))?label("fs.asAt",locale)+": "+s.parameters().through()+" | TZS":label("fs.period",locale)+": "+s.parameters().from()+" — "+s.parameters().through()+" | TZS");
+        result.add(document.asAt()?label("fs.asAt",locale)+": "+s.parameters().through()+" | TZS":label("fs.period",locale)+": "+s.parameters().from()+" — "+s.parameters().through()+" | TZS");
         result.add(label("fs.previous",locale)+": "+s.parameters().previousFrom()+" — "+s.parameters().previousThrough());
-        result.add(label("fs.generated",locale)+": "+clock.zoned(s.generatedAt()).format(java.time.format.DateTimeFormatter.ofPattern("EEE dd MMM yyyy HH:mm z",locale))+" | "+label("fs.provisional",locale));return result;
+        result.add(label("fs.generated",locale)+": "+clock.zoned(s.generatedAt()).format(java.time.format.DateTimeFormatter.ofPattern("EEE dd MMM yyyy HH:mm z",locale)));return result;
     }
     private byte[] pdf(Snapshot s,List<Document> documents,Locale locale)throws IOException{
         try(var pdf=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var bytes=new ByteArrayOutputStream()){
@@ -41,9 +41,7 @@ public class StatementExportService {
                     page.columns(doc.columns().stream().map(Column::label).toList(),weights,numeric);
                     if(doc.rows().isEmpty())page.text(label("fs.noRows",locale));
                     for(var row:doc.rows())if(row.heading())page.section(row.cells().stream().map(Cell::text).filter(t->!t.isBlank()).findFirst().orElse(""));else page.row(row.cells().stream().map(Cell::text).toList(),row.total());
-                    page.endTable();page.text(label("fs.coverage",locale));
-                    for(var check:s.checks())if(!check.key().equals("coverage"))page.text(label("fs.check."+check.key(),locale)+(check.difference()==null?"":" : "+check.difference().toPlainString()));
-                    page.text(label("fs.snapshot",locale)+": "+s.id());
+                    page.endTable();page.text(label("fs.outputNotice",locale));
                 }
             }
             pdf.save(bytes);return bytes.toByteArray();
@@ -66,9 +64,7 @@ public class StatementExportService {
                     for(int i=0;i<r.cells().size();i++){var value=r.cells().get(i);var cell=row.createCell(i);if(value.amount()!=null&&value.amount().precision()<=15){cell.setCellValue(value.amount().doubleValue());cell.setCellStyle(r.total()?total:money);}else{cell.setCellValue(value.text());cell.setCellStyle(r.total()||r.heading()?bold:normal);}longest=Math.max(longest,(int)Math.ceil(value.text().length()/Math.max(10f,doc.columns().get(i).weight()*160)));}
                     row.setHeightInPoints(Math.min(300,Math.max(16,longest*13)));if(r.heading())row.setHeightInPoints(Math.max(27,row.getHeightInPoints()));
                 }
-                rowNo++;rowNo=text(sheet,rowNo,label("fs.coverage",locale),normal,count);
-                for(var check:s.checks())if(!check.key().equals("coverage"))rowNo=text(sheet,rowNo,label("fs.check."+check.key(),locale)+(check.difference()==null?"":" : "+check.difference().toPlainString()),normal,count);
-                text(sheet,rowNo,label("fs.snapshot",locale)+": "+s.id(),normal,count);
+                rowNo++;text(sheet,rowNo,label("fs.outputNotice",locale),normal,count);
                 sheet.createFreezePane(2,headerRow+1);sheet.setRepeatingRows(new CellRangeAddress(headerRow,headerRow,-1,-1));sheet.setDisplayGridlines(false);
                 sheet.getPrintSetup().setLandscape(count>5||doc.style().equals("equity"));sheet.getPrintSetup().setPaperSize(PrintSetup.A4_PAPERSIZE);sheet.getPrintSetup().setFitWidth((short)1);sheet.getPrintSetup().setFitHeight((short)0);sheet.setFitToPage(true);sheet.setAutobreaks(true);book.setPrintArea(book.getSheetIndex(sheet),0,count-1,0,sheet.getLastRowNum());sheet.getFooter().setRight("Page &P / &N");
             }
