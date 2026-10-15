@@ -97,11 +97,12 @@
             }
         });
         titlebar.querySelectorAll(':scope > a.app-btn, :scope > button.app-btn').forEach(control => actions.append(control));
-        const refresh = actions.querySelector('[data-aws-table-refresh], .app-icon-button');
+        let refresh = actions.querySelector('[data-aws-table-refresh], .app-icon-button');
         if (refresh) { refresh.replaceChildren(icon('refresh')); refresh.classList.add('resource-table-icon'); refresh.setAttribute('aria-label', l.refresh); refresh.title = l.refresh; }
         else if (region.dataset.awsNoRefresh !== 'true') {
-            const button = iconButton('refresh', l.refresh); actions.prepend(button); button.addEventListener('click', () => {window.AppLoading?.begin(region,{label:l.refresh});location.reload();});
+            refresh = iconButton('refresh', l.refresh); actions.prepend(refresh);
         }
+        if (refresh) refresh.dataset.resourceRefresh = 'true';
         const tools = node('div', 'resource-table-tools'); titlebar.after(tools);
         let filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar') || [...document.querySelectorAll('[data-table-filter-for]')].find(candidate => candidate.dataset.tableFilterFor === region.dataset.resourceTable);
         let search = filters?.querySelector('[data-aws-table-search]');
@@ -128,9 +129,11 @@
         const utilities = node('div', 'resource-table-utilities'); tools.append(utilities);
         const pager = region.querySelector('[data-table-pagination]') || [...document.querySelectorAll('[data-table-pagination][data-table-for]')].find(candidate => candidate.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
         const navigation = node('nav', 'resource-table-pagination'); navigation.setAttribute('aria-label', l.pagination);
-        const page = Number(pager?.dataset.page || 0) + 1;
+        const renderPager = source => {
+        navigation.replaceChildren();
+        const page = Number(source?.dataset.page || 0) + 1;
         ['previous', 'next'].forEach(direction => {
-            let control = pager?.querySelector('[data-page-direction="' + direction + '"]');
+            let control = source?.querySelector('[data-page-direction="' + direction + '"]');
             if (control) control = control.cloneNode(true);
             if (!control) { control = iconButton(direction, l[direction]); control.disabled = true; }
             control.className = 'resource-table-page'; control.setAttribute('aria-label', l[direction]); control.title = l[direction]; control.replaceChildren(icon(direction));
@@ -140,6 +143,8 @@
             if (direction === 'next') { const current = node('span', 'resource-table-page-number', String(page)); current.setAttribute('aria-current', 'page'); current.setAttribute('aria-label', l.page + ' ' + page); navigation.append(current); }
             navigation.append(control);
         });
+        };
+        renderPager(pager);
         if (pager) pager.dataset.tablePaginationUsed = 'true';
         utilities.append(navigation);
         const preferences = iconButton('settings', l.preferences); preferences.classList.add('resource-table-preferences-button'); utilities.append(preferences);
@@ -220,7 +225,7 @@
         };
         const clearSelection = () => {
             rowInputs().filter(input => input.checked).forEach(input => input.click());
-            region.dispatchEvent(new CustomEvent('resource-table:reset')); syncSelection();
+            region.dispatchEvent(new CustomEvent('resource-table:reset',{bubbles:true})); syncSelection();
         };
         if (selectable) {
             selectHeader = node('input'); selectHeader.type = 'checkbox'; selectHeader.className = 'resource-table-select';
@@ -238,11 +243,11 @@
         navigation.addEventListener('click', clearSelection); window.addEventListener('pageshow', clearSelection,{signal});
 
         const headers = [...head.cells];
-        headers.forEach(header => {
+        const syncSortHeaders = () => headers.forEach(header => {
             header.scope = 'col';
             let link = header.querySelector('a[data-table-sort]');
             // Explicit server sort values; never infer ordering from translated labels.
-            if (!link && (header.dataset.tableSortAsc || header.dataset.tableSortDesc)) {
+            if (header.dataset.tableSortAsc || header.dataset.tableSortDesc) {
                 const sort = filters?.querySelector('[name=sort]');
                 if (sort && filters instanceof HTMLFormElement) {
                     const asc = header.dataset.tableSortAsc, desc = header.dataset.tableSortDesc;
@@ -255,15 +260,83 @@
                     url.searchParams.set('sort', direction ? header.dataset.tableSortKey : ascending ? desc || asc : asc || desc);
                     if (direction) url.searchParams.set('direction', ascending ? 'desc' : 'asc');
                     url.searchParams.set('page','0');
-                    link = node('a'); link.href = url.href; link.dataset.tableSort = '';
-                    link.append(...header.childNodes); header.append(link);
+                    if (!link) {link = node('a');link.dataset.tableSort = '';link.append(...header.childNodes);header.append(link);}
+                    link.href = url.href;
                 }
             }
             if (!link) return;
+            if (link.classList.contains('resource-table-sort')) return;
             link.classList.add('resource-table-sort');
             const label = node('span'); label.append(...link.childNodes); link.append(label,icon('sort'));
             link.addEventListener('click', clearSelection);
         });
+        syncSortHeaders();
+        let queryUrl = new URL(location.href), request, version = 0;
+        const errorRow = node('tr','resource-table-load-error'), errorCell = node('td','',l.loadError);
+        errorCell.colSpan = headers.length; errorCell.setAttribute('role','alert'); errorRow.append(errorCell);
+        const updateTable = async (target, changeHistory = true) => {
+            const url = new URL(target || queryUrl, location.href);
+            if (url.origin !== location.origin) return;
+            const current = ++version; request?.abort(); const currentRequest = new AbortController(); request=currentRequest;
+            const timeout = setTimeout(()=>currentRequest.abort(),20000);
+            clearSelection(); errorRow.remove();window.AppLoading?.begin(region);
+            try {
+                const response = await fetch(url.href,{credentials:'same-origin',headers:{Accept:'text/html'},signal:currentRequest.signal});
+                if (!response.ok || response.redirected) throw new Error('table');
+                const page = new DOMParser().parseFromString(await response.text(),'text/html');
+                if (current !== version || !region.isConnected) return;
+                const fresh = [...page.querySelectorAll('[data-resource-table]')].find(item=>item.dataset.resourceTable===region.dataset.resourceTable);
+                const freshTable = fresh?.querySelector('table');
+                let freshHeaders = [...(freshTable?.tHead?.rows[0]?.cells || [])];
+                if (actionHeaders.length) freshHeaders = [null,...freshHeaders.filter(item=>!item.hasAttribute('data-table-actions-header'))];
+                if (!freshTable?.tBodies[0] || freshHeaders.length !== headers.length) throw new Error('table');
+                window.AppLoading?.end(region);
+                [...table.tBodies].forEach((body,index)=>body.replaceChildren(...[...(freshTable.tBodies[index]?.childNodes || [])].map(child=>document.importNode(child,true))));
+                noMatches = undefined;
+                if (fresh.dataset.tablePageSize) region.dataset.tablePageSize = fresh.dataset.tablePageSize;
+                region.querySelectorAll('.admin-register-count').forEach((summary,index)=>{
+                    const updated=fresh.querySelectorAll('.admin-register-count')[index];
+                    if(updated)summary.textContent=updated.textContent;
+                });
+                const freshFilters = fresh.querySelector('form:not([method="post"])') || [...page.querySelectorAll('[data-table-filter-for]')].find(item=>item.dataset.tableFilterFor===region.dataset.resourceTable);
+                ['sort','direction','size'].forEach(name=>{
+                    const input = filters?.querySelector('[name="'+name+'"]'), value = freshFilters?.querySelector('[name="'+name+'"]');
+                    if (input && value) {input.value=value.value;window.refreshEnhancedSelects?.(filters);}
+                });
+                headers.forEach((header,index)=>{
+                    const source = freshHeaders[index], link = header.querySelector('[data-table-sort]'), freshLink = source?.querySelector('[data-table-sort]');
+                    if (link && freshLink) {link.href=new URL(freshLink.getAttribute('href'),url).href;header.setAttribute('aria-sort',source.getAttribute('aria-sort') || 'none');}
+                });
+                syncSortHeaders();
+                const freshPager = fresh.querySelector('[data-table-pagination]') || [...page.querySelectorAll('[data-table-pagination][data-table-for]')].find(item=>item.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
+                renderPager(freshPager);
+                queryUrl=url;if(changeHistory)history.replaceState(history.state,'',url.href);
+                region.dispatchEvent(new CustomEvent('resource-table:updated',{bubbles:true}));
+                queueMicrotask(()=>{apply();applySearch();syncSelection();});
+            } catch (error) {
+                if(current===version && region.isConnected) {
+                    window.AppLoading?.end(region);
+                    table.tBodies[0].prepend(errorRow);
+                }
+            } finally {clearTimeout(timeout);if(current===version)window.AppLoading?.end(region);}
+        };
+        signal.addEventListener('abort',()=>{version++;request?.abort();window.AppLoading?.end(region);});
+        region.addEventListener('resource-table:refresh',event=>{if(!event.defaultPrevented)void updateTable(queryUrl);},{signal});
+        region.addEventListener('click',event=>{
+            if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
+            const control=event.target.closest('[data-resource-refresh],a[data-table-sort],.resource-table-pagination a[href]');
+            if(!control || control.disabled)return;
+            event.preventDefault();event.stopImmediatePropagation();
+            if(control.hasAttribute('data-resource-refresh'))region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));
+            else void updateTable(control.href);
+        },{capture:true,signal});
+        if(filters?.tagName==='FORM')filters.addEventListener('submit',event=>{
+            if(event.defaultPrevented || filters.method==='post')return;
+            event.preventDefault();event.stopImmediatePropagation();
+            const url=new URL(filters.action || queryUrl,location.href);
+            new FormData(filters).forEach((value,name)=>{if(typeof value==='string')url.searchParams.set(name,value);});
+            url.searchParams.set('page','0');void updateTable(url);
+        },{capture:true,signal});
         // Original forms and listeners remain attached when commands move into the menu.
         const menuCommands = [...actions.querySelectorAll(':scope > [data-table-command]')];
         if (menuCommands.length) actionMenu(actions,menuCommands,region.dataset.resourceTable,region,l);
@@ -272,6 +345,7 @@
         let noMatches;
         const applySearch = () => {
             if (!search) return;
+            if(table.querySelector('.app-loading-row')){if(noMatches)noMatches.hidden=true;return;}
             const query = search.value.trim().toLocaleLowerCase();
             const rows = [...table.tBodies].flatMap(body => [...body.rows]).filter(row => row !== noMatches && !row.classList.contains('app-loading-row') && row.cells.length === headers.length && ![...row.cells].some(cell => cell.colSpan > 1));
             let visible = 0;
@@ -420,13 +494,16 @@
                 clearSelection(); apply(); try { localStorage.setItem(key, JSON.stringify(settings)); } catch { /* Preferences still apply for this view. */ }
                 dialog.close();
                 const size = pageSize.find(input => input.checked)?.value;
-                if (size && size !== region.dataset.tablePageSize) { const url = new URL(location.href); url.searchParams.set('size',size); url.searchParams.set('page','0'); location.assign(url); }
+                if (size && size !== region.dataset.tablePageSize) { const url = new URL(queryUrl); url.searchParams.set('size',size); url.searchParams.set('page','0'); void updateTable(url); }
             });
             dialog.showModal(); close.focus();
         });
         window.ResourceSplitView?.init(region, {headers, originalCells, selectable, labels:l});
     }
-    window.ResourceTable = {init: root => {
+    window.ResourceTable = {refresh: control => {
+        const region=control.closest('[data-resource-table]');if(!region)return false;
+        region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));return true;
+    }, init: root => {
         for (const [region,lifetime] of lifetimes) if (!region.isConnected) {
             lifetime.controller.abort(); lifetime.observers.forEach(observer=>observer.disconnect()); lifetimes.delete(region);
         }

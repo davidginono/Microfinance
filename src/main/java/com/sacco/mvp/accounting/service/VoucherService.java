@@ -140,6 +140,6 @@ public class VoucherService {
     }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
     private static void text(String s,int max,boolean required,String field){boolean multiline=field.equals("description")||field.endsWith(".description");require(s!=null && (!required || !s.isBlank()) && s.length()<=max && s.chars().noneMatch(c->c<32 && !(multiline && (c=='\n'||c=='\r'||c=='\t'))),field,"text");}
     private static void query(String search,int page){require(search!=null && search.length()<=100 && page>=0 && page<=1000,"","filter");}
-    static void validateFilter(Filter f){require(f!=null,"","filter");query(f.search(),f.page());require(Set.of(10,25,30,50).contains(f.size()),"","filter");require(Set.of("","POSTED","REVERSED","REVERSAL").contains(f.status()) && Set.of("newest","oldest","amount").contains(f.sort()) && (f.from()==null || f.through()==null || !f.through().isBefore(f.from())),"","filter");}
+    static void validateFilter(Filter f){require(f!=null,"","filter");query(f.search(),f.page());require(Set.of(10,25,30,50).contains(f.size()),"","filter");require(Set.of("","POSTED","REVERSED","REVERSAL").contains(f.status()) && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),Set.of("number","date","party","reference","transactions","amount","status")) && (f.from()==null || f.through()==null || !f.through().isBefore(f.from())),"","filter");}
     private static void require(boolean ok,String field,String code){if(!ok)throw new Invalid(field,code);}
 }

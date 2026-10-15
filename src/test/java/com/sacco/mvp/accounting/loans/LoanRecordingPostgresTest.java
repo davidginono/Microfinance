@@ -45,6 +45,19 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
+    @Test void combinedReceiptColumnSortsExecuteOnPostedScopedSources(){
+        var id=disbursed("D-SORT");
+        var larger=receiptForm(id);larger.setReference("Z-SORT");var largeReceipt=receiptService().post(actor,larger);
+        var smaller=receiptForm(id);smaller.setReference("A-SORT");smaller.getRows().getFirst().setAmount(new BigDecimal("40.00"));var smallReceipt=receiptService().post(actor,smaller);
+        for(var column:List.of("number","date","party","reference","transactions","amount","status"))for(var direction:List.of("asc","desc")){
+            var rows=receiptService().list(actor,new com.sacco.mvp.accounting.dto.VoucherDtos.Filter("SORT",null,null,"",column+"_"+direction,0,10)).rows();
+            assertThat(rows).hasSize(2);
+            if(column.equals("amount") || column.equals("reference"))assertThat(rows.getFirst().id()).isEqualTo(direction.equals("asc")?smallReceipt.header().id():largeReceipt.header().id());
+        }
+        assertThat(receiptService().list(operator("B2"),new com.sacco.mvp.accounting.dto.VoucherDtos.Filter("SORT",null,null,"","amount_asc",0,10)).rows()).isEmpty();
+        var repository=new LoanRecordingRepository(jdbc);
+        for(var sort:List.of("number_asc","number_desc","balance_asc","balance_desc"))assertThat(repository.loans(actor,new Filter("",null,null,"",sort,0,null,null),TODAY,10,0)).hasSize(1);
+    }
     @Test void unifiedReceiptPostsAllLoansOnceAndRetainsHistoricalReceipts(){
         var first=disbursed("D-GROUP-1");var second=disbursed("D-GROUP-2");var f=receiptForm(first,second);
         var preview=receiptService().preview(actor,f);assertThat(preview).hasSize(2);assertThat(preview.getFirst().principal()).isEqualByComparingTo("100.00");

@@ -3,7 +3,6 @@
     if (!register) return;
     const inputs = () => Array.from(register.querySelectorAll('input[name="coa-selection"]'));
     const body = register.querySelector('tbody');
-    const filters = new FormData(register.querySelector('.coa-filters'));
     const view = document.getElementById('coa-view'), create = document.getElementById('coa-create');
     const status = document.getElementById('coa-status');
     const statusForm = document.getElementById('coa-status-form'), summary = document.getElementById('coa-selection-status');
@@ -72,15 +71,16 @@
             anchor = branchMessage(parent, register.dataset.loading, false); parent.after(anchor);
         } else anchor.querySelector('button').disabled = true;
         const pendingCell=anchor.cells[0];
-        const branchSpinner=window.AppLoading?.status(register.dataset.loading);
+        const branchSpinner=window.AppLoading?.status(register.dataset.loading,true);
         if(branchSpinner){branchSpinner.classList.add('coa-branch-loading');pendingCell.prepend(branchSpinner);}
         refreshBranches();
         const url = new URL(register.dataset.childrenUrl, location.href);
         url.searchParams.set('parentId', parent.dataset.id); url.searchParams.set('page', page);
-        filters.forEach((value, key) => { if (key !== 'parentId') url.searchParams.set(key, value); });
+        new FormData(register.querySelector('.coa-filters')).forEach((value, key) => { if (key !== 'parentId') url.searchParams.set(key, value); });
         const abort = new AbortController(), timeout = setTimeout(() => abort.abort(), 20000);
         try {
             const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: abort.signal});
+            if(!parent.isConnected)return;
             if (!response.ok || response.redirected || response.headers.get('X-COA-Children') !== 'true') throw new Error('children');
             const fragment = document.createElement('tbody'); fragment.innerHTML = await response.text();
             const ancestorIds = new Set([parent.dataset.id]);
@@ -145,5 +145,7 @@
     });
     statusForm?.addEventListener('submit', event => { if (!selected() || status.disabled) event.preventDefault(); else status.disabled = true; });
     window.addEventListener('pageshow', reset);
+    register.addEventListener('resource-table:reset',reset);
+    register.addEventListener('resource-table:updated',reset);
     reset();
 })();

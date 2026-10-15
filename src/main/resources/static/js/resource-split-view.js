@@ -26,7 +26,7 @@
         const tabs=el('div','resource-split-tabs'), tab=el('span','',l.details); tabs.append(tab);
         const content=el('div','resource-split-content'); panel.append(resize,top,tabs,content);
         const key='resource-split:v1:'+region.dataset.resourceTable;
-        let state={position:'bottom',size:320}, dismissed=false;
+        let state={position:'bottom',size:320};
         const wide=window.matchMedia?.('(min-width:1100px)');
         const side=()=>state.position==='side' && wide?.matches;
         const bottomTotal=()=>Math.max(160,Math.min(window.innerHeight*.38,360))+320;
@@ -64,9 +64,9 @@
             }); content.append(list);
         };
         const open=()=>{panel.hidden=false;layout.classList.add('resource-split-open');show.setAttribute('aria-expanded','true');render();apply();};
-        const sync=()=>{if(selected() && !dismissed)open();else render();};
-        show.addEventListener('click',()=>{dismissed=false;open();close.focus();});
-        close.addEventListener('click',()=>{dismissed=true;panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');apply();show.focus();});
+        const sync=()=>{if(!panel.hidden)render();};
+        show.addEventListener('click',()=>{open();close.focus();});
+        close.addEventListener('click',()=>{panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');apply();show.focus();});
         gear.setAttribute('aria-expanded','false'); gear.addEventListener('click',()=>{positions.hidden=!positions.hidden;gear.setAttribute('aria-expanded',String(!positions.hidden));if(!positions.hidden)position.focus();});
         position.addEventListener('change',()=>{state.position=position.value;apply();save();});
         resize.addEventListener('keydown',event=>{

@@ -1,13 +1,13 @@
 (() => {
     const register = document.getElementById('library-register');
     if (register) {
-        const inputs = Array.from(register.querySelectorAll('input[name="library-selection"]'));
+        const inputs = () => Array.from(register.querySelectorAll('input[name="library-selection"]'));
         const view = document.getElementById('library-view'), status = document.getElementById('library-status');
         const statusForm = document.getElementById('library-status-form'), summary = document.getElementById('library-selection-status');
-        const selected = () => inputs.find(input => input.checked && input.getClientRects().length)?.closest('[data-library-row]');
+        const selected = () => inputs().find(input => input.checked && !input.closest('tr').hidden)?.closest('[data-library-row]');
         const update = () => {
             const row = selected();
-            inputs.forEach(input => input.closest('tr').classList.toggle('coa-row-selected', input.checked));
+            inputs().forEach(input => input.closest('tr').classList.toggle('coa-row-selected', input.checked));
             view.disabled = !row;
             if (status) {
                 status.disabled = !row;
@@ -18,23 +18,25 @@
             }
             summary.textContent = row ? summary.dataset.selected + ' ' + row.querySelector('[data-library-code]').textContent.trim() + ' · ' + row.querySelector('[data-library-name]').firstChild.textContent.trim() : summary.dataset.empty;
         };
-        inputs.forEach(input => input.addEventListener('change', () => {
-            if (input.checked) inputs.forEach(other => { if (other !== input) other.checked = false; });
-            update();
-        }));
-        register.querySelectorAll('[data-library-row]').forEach(row => row.addEventListener('click', event => {
-            if (event.target.closest('a,button,input,label')) return;
-            const input = row.querySelector('input[name="library-selection"]'), checked = !input.checked;
-            inputs.forEach(other => other.checked = false);
-            input.checked = checked; input.focus(); update();
-        }));
+        register.addEventListener('change', event => {
+            const input=event.target;if(!input.matches('input[name="library-selection"]'))return;
+            if(input.checked)inputs().forEach(other=>{if(other!==input)other.checked=false;});update();
+        });
+        register.addEventListener('click', event => {
+            if(event.target.closest('a,button,input,label'))return;
+            const row=event.target.closest('[data-library-row]');if(!row)return;
+            const input=row.querySelector('input[name="library-selection"]'),checked=!input.checked;
+            inputs().forEach(other=>other.checked=false);input.checked=checked;input.focus();update();
+        });
         view.addEventListener('click', () => {
             const row = selected(); if (!row || view.disabled) return;
             location.assign(row.dataset.url);
         });
         statusForm?.addEventListener('submit', event => { if (!selected() || status.disabled) event.preventDefault(); else status.disabled = true; });
-        const reset = () => { inputs.forEach(input => input.checked = false); update(); };
+        const reset = () => { inputs().forEach(input => input.checked = false); update(); };
         window.addEventListener('pageshow', reset);
+        register.addEventListener('resource-table:reset',reset);
+        register.addEventListener('resource-table:updated',reset);
         reset();
     }
     const modal = document.getElementById('library-create-modal');

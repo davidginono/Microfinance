@@ -7,6 +7,67 @@ const voucherSource = readFileSync('src/main/resources/static/js/accounting-vouc
 const labels = `<template id="resource-table-labels" data-records="Records" data-actions="Actions" data-page-size="Page size" data-striped="Striped rows" data-sticky="Sticky first columns" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-reorder="Move column" data-details="Details" data-show-details="Show details" data-panel-position="Panel position" data-bottom="Bottom" data-side="Side" data-resize="Resize details panel" data-select-record="Select a record" data-search-page="Search this page" data-no-matches="No matching records." data-refresh="Refresh" data-pagination="Pagination" data-page="Page" data-previous="Previous page" data-next="Next page" data-preferences="Preferences" data-columns="Visible columns" data-compact="Compact rows" data-wrap="Wrap lines" data-select="Select" data-select-first="Select first row" data-clear-selection="Clear row selection" data-view="View" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
 const table = (key, body, extra = '') => `<section class="erp-table-wrap" data-resource-table="${key}" ${extra}><div class="app-table-titlebar"><h2>Records</h2><div class="accounting-actions"><a class="app-btn btn-primary" href="/create">Create</a></div></div><form method="get"><input name="search"></form><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th>Reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 const row = '<tr><td>V001</td><td>100.00</td><td>Posted</td></tr>';
+const loadingSource=readFileSync('src/main/resources/static/js/ui-loading.js','utf8');
+const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
+
+test('hydrated tables retain their own refresh request instead of fetching placeholder HTML',async()=>{
+    const {dom,window:w,document:d}=await setup(table('hydrated',row),loadingSource);
+    let hydrated=0,requests=0;
+    d.addEventListener('resource-table:refresh',event=>{event.preventDefault();hydrated++;},true);
+    w.fetch=async()=>{requests++;throw new Error('Wrong refresh owner');};
+    const refresh=d.querySelector('[data-resource-refresh]');refresh.click();await settle();
+    assert.equal(hydrated,1);assert.equal(requests,0);assert.equal(d.querySelector('tbody tr').textContent,'V001100.00Posted');
+    assert.equal(w.ResourceTable.refresh(refresh),true);assert.equal(hydrated,2);
+    assert.equal(w.ResourceTable.refresh(d.body),false);
+    dom.window.close();
+});
+
+test('a no-match search remains usable after replacing server rows',async()=>{
+    const markup=table('search-refresh',row).replace('<form method="get"><input name="search"></form>','');
+    const {dom,window:w,document:d}=await setup(markup,loadingSource);
+    const search=d.querySelector('.resource-table-search input');
+    search.value='missing';search.dispatchEvent(new w.Event('input'));
+    assert.equal(d.querySelector('.resource-table-no-matches').hidden,false);
+    w.fetch=async()=>({ok:true,redirected:false,text:async()=>markup.replace('V001','V002')});
+    d.querySelector('[data-resource-refresh]').click();await settle();await settle();
+    assert.equal(d.querySelector('.resource-table-no-matches').hidden,false);
+    search.value='V002';search.dispatchEvent(new w.Event('input'));
+    assert.equal(d.querySelector('.resource-table-no-matches').hidden,true);
+    assert.equal(d.querySelector('tbody tr').hidden,false);
+    dom.window.close();
+});
+
+test('sort and refresh replace only server rows, retain filters and use a canvas spinner',async()=>{
+    const markup=table('async',row).replace('<h2>Records</h2>','<h2>Records</h2><span class="admin-register-count">Showing 1 of 1</span>').replace('<input name="search">','<input name="search" value="cash"><select name="sort"><option value="newest" selected>Newest</option><option value="oldest">Oldest</option></select>')
+        .replace('<th>Amount</th>','<th data-table-sort-asc="oldest" data-table-sort-desc="newest">Date</th>');
+    const {dom,window:w,document:d}=await setup('<p id="page">Page</p>'+markup,loadingSource);
+    const requests=[];w.fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
+    const region=d.querySelector('section'),form=d.querySelector('form'),page=d.querySelector('#page'),body=d.querySelector('tbody');
+    d.querySelector('[data-table-sort]').click();
+    assert.equal(requests.length,1);assert.equal(new URL(requests[0].url).searchParams.get('sort'),'oldest');
+    assert.equal(d.querySelector('.erp-table-scroll .app-loading-row')!==null,true);assert.equal(d.querySelector('.resource-table-tools .app-loading-spinner'),null);
+    assert.equal([...body.rows].find(row=>row.textContent.includes('V001')).hidden,true);
+    requests[0].resolve({ok:true,redirected:false,text:async()=>markup.replace('Showing 1 of 1','Showing 1 of 2').replace('V001','V002').replace('value="newest" selected','value="newest"').replace('value="oldest"','value="oldest" selected')});await settle();await settle();
+    assert.equal(d.querySelector('.admin-register-count').textContent,'Showing 1 of 2');
+    assert.equal(d.querySelector('tbody'),body);assert.equal(d.querySelector('form'),form);assert.equal(d.querySelector('#page'),page);
+    assert.equal(body.textContent.includes('V002'),true);assert.equal(d.querySelector('th[aria-sort=ascending]')!==null,true);assert.equal(d.querySelector('.app-loading-spinner'),null);
+    form.elements.search.value='unsaved filter';d.querySelector('[data-resource-refresh]').click();
+    assert.equal(new URL(requests[1].url).searchParams.get('sort'),'oldest');assert.equal(form.elements.search.value,'unsaved filter');
+    requests[1].resolve({ok:true,redirected:false,text:async()=>markup.replace('V001','V003')});await settle();await settle();
+    assert.equal(form.elements.search.value,'unsaved filter');assert.equal(body.textContent.includes('V003'),true);assert.equal(d.querySelector('#page'),page);dom.window.close();
+});
+
+test('a newer table request cancels older results and failed authentication retains the canvas',async()=>{
+    const markup=table('race',row);const {dom,window:w,document:d}=await setup(markup,loadingSource);
+    const requests=[];w.fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));const refresh=d.querySelector('[data-resource-refresh]');
+    refresh.click();refresh.click();assert.equal(requests[0].options.signal.aborted,true);
+    requests[1].resolve({ok:true,redirected:false,text:async()=>markup.replace('V001','Latest')});await settle();await settle();
+    requests[0].resolve({ok:true,redirected:false,text:async()=>markup.replace('V001','Stale')});await settle();await settle();
+    assert.equal(d.querySelector('tbody').textContent.includes('Latest'),true);assert.equal(d.querySelector('tbody').textContent.includes('Stale'),false);
+    const record=d.querySelector('tbody tr');refresh.click();requests[2].resolve({ok:true,redirected:true,text:async()=>'<form>Login</form>'});await settle();await settle();
+    assert.equal(record.isConnected,true);assert.equal(record.hidden,false);assert.equal(d.querySelector('.resource-table-load-error [role=alert]')!==null,true);
+    assert.equal(d.querySelector('.app-loading-spinner'),null);dom.window.close();
+});
 
 test('workspace command columns retain native forms, permissions and record targets in Actions', async () => {
     const html=`<section data-resource-table="workspace"><table class="erp-table"><thead><tr><th>Name</th><th data-table-actions-header>Details</th><th data-table-actions-header>Actions</th></tr></thead><tbody><tr><td>First</td><td><a class="app-btn" href="/first">Open</a></td><td><form id="native-command" method="post" action="/first/decision"><input type="hidden" name="_csrf" value="original"><button type="button" id="approve">Approve</button></form><button disabled>Restricted</button><p>Policy restriction</p></td></tr><tr><td>Second</td><td><a class="app-btn" href="/second">Open</a></td><td><button disabled>Restricted</button></td></tr></tbody></table></section>`;
@@ -271,11 +332,12 @@ test('grouped financial totals retain their columns and heading order', async ()
     dom.window.close();
 });
 
-test('split details follow selection, stay dismissed, clear stale data and support resizing', async () => {
+test('split details open explicitly, stay closed on selection, clear stale data and support resizing', async () => {
     const markup=table('split','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
     const {dom,window:w,document:d}=await setup(markup);
     const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,true);
     d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
+    assert.equal(panel.hidden,true);d.querySelector('[aria-label="Show details"]').click();
     assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'A001');
     assert.equal(panel.querySelectorAll('dd').length,2);assert.equal(panel.querySelector('.resource-split-content a'),null);
     assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/record/1');
@@ -314,6 +376,7 @@ test('dragging the bottom divider exchanges table space and stops at pointer rel
     const markup=table('drag','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
     const {dom,window:w,document:d}=await setup(markup);
     d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
+    d.querySelector('[aria-label="Show details"]').click();
     const layout=d.querySelector('.resource-split-layout'), scroller=layout.querySelector('.erp-table-scroll'), handle=d.querySelector('[role=separator]');
     const pointer=(target,type,y,id=1)=>{const event=new w.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{button:0,pointerId:id,clientY:y,clientX:500});target.dispatchEvent(event);};
     const initialHeight=parseFloat(w.getComputedStyle(scroller).height), total=initialHeight+320;
@@ -338,6 +401,7 @@ test('side divider follows horizontal dragging and falls back to vertical resizi
     const markup=table('side-drag','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
     const {dom,window:w,document:d}=await setup(markup,'window.innerWidth=1366;window.matchMedia=()=>({get matches(){return window.innerWidth>=1100;},addEventListener(){}});');
     d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
+    d.querySelector('[aria-label="Show details"]').click();
     const handle=d.querySelector('[role=separator]'), position=d.querySelector('.resource-split-panel select'), scroller=d.querySelector('.erp-table-scroll');
     position.value='side';position.dispatchEvent(new w.Event('change'));
     const pointer=(target,type,x,y,id=1)=>{const event=new w.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{button:0,pointerId:id,clientX:x,clientY:y});target.dispatchEvent(event);};
@@ -395,6 +459,22 @@ test('register sort headings bind actual date and amount options with AWS caret 
     }
     assert.equal(new URL(links[0].href).searchParams.get('sort'),'oldest');assert.equal(new URL(links[1].href).searchParams.get('sort'),'amount');
     assert.equal(d.querySelector('th:last-child svg'),null);dom.window.close();
+});
+
+test('every data column with a server sort contract receives an AWS caret and scoped link', async () => {
+    const markup=table('all-column-sort',row).replace('<input name="search">','<input name="search" value="client"><select name="sort"><option value="newest" selected>Newest</option></select>')
+        .replace('<th>Reference</th>','<th data-table-sort-asc="number_asc" data-table-sort-desc="number_desc">Reference</th>')
+        .replace('<th>Amount</th>','<th data-table-sort-asc="amount_asc" data-table-sort-desc="amount">Amount</th>')
+        .replace('<th>Status</th>','<th data-table-sort-asc="status_asc" data-table-sort-desc="status_desc">Status</th>');
+    const {dom,document:d}=await setup(markup);const headings=[...d.querySelectorAll('thead th')];
+    assert.equal(d.querySelectorAll('.resource-table-sort').length,headings.length);
+    for(const heading of headings){
+        assert.equal(heading.getAttribute('aria-sort'),'none');
+        const link=heading.querySelector('.resource-table-sort'),url=new URL(link.href);
+        assert.equal(url.searchParams.get('search'),'client');assert.equal(url.searchParams.get('page'),'0');
+        assert.equal(link.querySelector('svg path').getAttribute('d'),'M8 11L12 5H4L8 11Z');
+    }
+    dom.window.close();
 });
 
 test('separate direction headers retain scoped filters and size and toggle ascending', async () => {

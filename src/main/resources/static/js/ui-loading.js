@@ -1,26 +1,28 @@
-/* Component-scoped loading for real requests; never mask the page or delay ready data. */
+/* Actual table requests use the canvas; full-page navigation keeps the shell preloader. */
 (() => {
     'use strict';
     const pending = new Map();
-    const status = label => {
+    const status = (label, animate=false) => {
         const element=document.createElement('div');element.className='app-loading-status';
         element.setAttribute('role','status');element.setAttribute('aria-label',label || document.body.dataset.shellLoading);
-        const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.setAttribute('aria-hidden','true');
-        element.append(spinner);return element;
+        if(animate){const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.setAttribute('aria-hidden','true');element.append(spinner);}
+        else element.textContent=label || document.body.dataset.shellLoading;
+        return element;
     };
     function begin(region, options={}) {
         if(!region || !region.isConnected || pending.has(region))return;
-        const state={loader:null,placeholders:[],busy:region.getAttribute('aria-busy')};pending.set(region,state);
         const table=options.table===false ? null : region.matches('table') ? region : region.querySelector('table');
+        if(!table)return;
+        const state={loader:null,placeholders:[],busy:region.getAttribute('aria-busy')};pending.set(region,state);
         if(table) {
             const body=table.tBodies[0] || table.createTBody(),row=document.createElement('tr'),cell=document.createElement('td');
             row.className='app-loading-row';row.dataset.uiLoadingIndicator='true';
             cell.colSpan=[...(table.tHead?.rows[0]?.cells || [])].reduce((count,heading)=>count+(heading.hidden?0:heading.colSpan),0) || 1;
-            cell.append(status(options.label));row.append(cell);
-            [...body.rows].filter(item=>item.cells.length===1 && item.cells[0].colSpan>1 && !item.hidden).forEach(item=>{item.hidden=true;state.placeholders.push(item);});
+            const height=body.getBoundingClientRect().height, scroller=table.closest('.erp-table-scroll');
+            cell.style.height=Math.max(96,Math.min(height,scroller?.clientHeight ? scroller.clientHeight-(table.tHead?.getBoundingClientRect().height || 0) : height))+'px';
+            cell.append(status(options.label,true));row.append(cell);
+            [...body.rows].filter(item=>!item.hidden).forEach(item=>{item.hidden=true;state.placeholders.push(item);});
             body.prepend(row);state.loader=row;
-        } else {
-            state.loader=status(options.label);state.loader.dataset.uiLoadingIndicator='true';region.append(state.loader);
         }
         region.classList.add('is-loading');region.setAttribute('aria-busy','true');
     }

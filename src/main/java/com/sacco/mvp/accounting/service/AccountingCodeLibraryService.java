@@ -45,7 +45,7 @@ public class AccountingCodeLibraryService {
     @Transactional(readOnly=true)
     public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,int page,int size,String sort,String direction) {
         authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);require(Set.of(10,25,30,50).contains(size),"validation");
-        require(Set.of("code","name","status").contains(sort) && Set.of("asc","desc").contains(direction),"validation");
+        require(Set.of("code","name","activity","sourceEvent","template","status").contains(sort) && Set.of("asc","desc").contains(direction),"validation");
         var rows=library.transactionRegister(actor.getSaccoId(),activity,term(search),state,"",page*size,size+1,sort,direction);
         return new Page<>(rows.stream().limit(size).toList(),page,rows.size()>size);
     }

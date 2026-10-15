@@ -270,6 +270,11 @@
                 }).finally(function () {window.AppLoading?.end(loadingRegion);});
         }
 
+        document.addEventListener('resource-table:refresh', function (event) {
+            var section=event.target.closest('[data-repayment-schedule-section="true"]');
+            if(section){event.preventDefault();hydrateSection(section,true);}
+        },true);
+
         function init() {
             document.querySelectorAll("[data-repayment-schedule-section=\"true\"]").forEach(function (section) {
                 hydrateSection(section, false);

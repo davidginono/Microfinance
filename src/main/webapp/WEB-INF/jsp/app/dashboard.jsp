@@ -268,7 +268,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.applications.label" /></p>
-                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
+                            <p class="erp-stat-value"><spring:message code="common.loading" /></p>
                         </div>
 
                     </div>
@@ -277,7 +277,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
-                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
+                            <p class="erp-stat-value"><spring:message code="common.loading" /></p>
                         </div>
 
                     </div>
@@ -286,7 +286,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.guarantorRequests.label" /></p>
-                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
+                            <p class="erp-stat-value"><spring:message code="common.loading" /></p>
                         </div>
 
                     </div>
@@ -295,7 +295,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <div class="erp-stat-main">
                         <div>
                             <p class="erp-stat-label"><spring:message code="dashboard.stat.archivedRejections.label" /></p>
-                            <p class="erp-stat-value"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></p>
+                            <p class="erp-stat-value"><spring:message code="common.loading" /></p>
                         </div>
 
                     </div>
@@ -327,7 +327,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
                     </div>
                     <div class="erp-panel-body">
-                        <div class="erp-section text-center text-sm text-slate-500"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></div>
+                        <div class="erp-section text-center text-sm text-slate-500"><spring:message code="common.loading" /></div>
                     </div>
                 </section>
                 <section class="erp-panel min-w-0 xl:self-start">
@@ -335,7 +335,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <p class="erp-panel-title"><spring:message code="dashboard.activeLoans.title" text="Active Loans" /></p>
                     </div>
                     <div class="erp-panel-body">
-                        <div class="erp-section text-center text-sm text-slate-500"><span class="app-loading-status" role="status" aria-label="<spring:message code='common.loading' />"><span class="app-loading-spinner" aria-hidden="true"></span></span></div>
+                        <div class="erp-section text-center text-sm text-slate-500"><spring:message code="common.loading" /></div>
                     </div>
                 </section>
             </div>

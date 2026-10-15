@@ -39,9 +39,9 @@ public class AccountingCodeLibraryRepository {
         return jdbc.query(TRANSACTION+" where t.sacco_id=?"+parent+" and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) and (?='' or t.source_event=?) order by "+order(sort,direction,"t.")+",t.id limit ? offset ?",this::transaction,args.toArray());
     }
     private static String order(String sort,String direction,String prefix) {
-        String column=switch(sort) {case "code"->"code";case "name"->"name";case "status"->"active";default->throw new IllegalArgumentException("library.error.validation");};
+        String column=switch(sort) {case "code"->"code";case "name"->"name";case "status"->"active";case "activity"->"activity_code";case "sourceEvent"->"source_event";case "template"->"has_template";default->throw new IllegalArgumentException("library.error.validation");};
         String order=switch(direction) {case "asc"->" asc";case "desc"->" desc";default->throw new IllegalArgumentException("library.error.validation");};
-        return prefix+column+order;
+        return (Set.of("activity","template").contains(sort)?column:prefix+column)+order;
     }
     public UUID createActivity(String institution,CodeForm form,UUID actor,OffsetDateTime now) {
         UUID id=UUID.randomUUID();

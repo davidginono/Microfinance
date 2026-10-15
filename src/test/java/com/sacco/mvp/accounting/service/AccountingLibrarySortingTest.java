@@ -15,6 +15,18 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class AccountingLibrarySortingTest {
+    @Test void everyTransactionColumnCanSortAcrossPages() {
+        for (var column : Map.of("code","t.code", "name","t.name", "activity","activity_code", "sourceEvent","t.source_event", "template","has_template", "status","t.active").entrySet()) {
+            for (String direction : List.of("asc", "desc")) {
+                var jdbc=mock(JdbcTemplate.class);
+                new AccountingCodeLibraryRepository(jdbc).transactionRegister("institution",null,"","ACTIVE","",60,31,column.getKey(),direction);
+                var call=mockingDetails(jdbc).getInvocations().iterator().next();
+                assertThat((String)call.getArgument(0)).contains("where t.sacco_id=?")
+                    .endsWith("order by "+column.getValue()+" "+direction+",t.id limit ? offset ?");
+                assertThat(call.getArguments()).contains("institution","ACTIVE",31,60);
+            }
+        }
+    }
     @Test void sortedPagesKeepTenantFiltersAndBoundedLookahead() {
         var repository=mock(AccountingCodeLibraryRepository.class);
         var ledger=mock(GeneralLedgerService.class);

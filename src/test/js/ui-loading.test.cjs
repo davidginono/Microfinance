@@ -13,7 +13,7 @@ test('table loading preserves native rows and tools, and uses a centered status 
     const region=d.querySelector('section'),record=d.querySelector('#record'),view=d.querySelector('#view');let clicks=0;view.onclick=()=>clicks++;
     w.AppLoading.begin(region);w.AppLoading.begin(region);
     assert.equal(d.querySelectorAll('.app-loading-row').length,1);assert.equal(d.querySelector('.app-loading-row td').colSpan,2);
-    assert.equal(d.querySelector('.resource-table-tools [role=status]'),null);assert.equal(region.getAttribute('aria-busy'),'true');assert.equal(record.hidden,false);
+    assert.equal(d.querySelector('.resource-table-tools [role=status]'),null);assert.equal(region.getAttribute('aria-busy'),'true');assert.equal(record.hidden,true);
     view.click();assert.equal(clicks,1);assert.equal(d.querySelector('input').value,'record');
     w.AppLoading.end(region);assert.equal(d.querySelector('#record'),record);assert.equal(d.querySelector('[role=status]'),null);assert.equal(region.hasAttribute('aria-busy'),false);dom.window.close();
 });
@@ -24,16 +24,13 @@ test('initial empty placeholders recover on failure but cannot reappear after re
     w.AppLoading.begin(region);d.querySelector('tbody').innerHTML='<tr><td>L001</td><td>Ready</td></tr>';w.AppLoading.end(region);
     assert.equal(d.querySelector('#empty'),null);assert.equal(d.querySelector('tbody').textContent,'L001Ready');assert.equal(region.classList.contains('is-loading'),false);dom.window.close();
 });
-test('async card status and cached-page restoration clear only owned indicators and preserve form values',async()=>{
-    const {dom,w,d}=await setup('<section data-ui-loading-region aria-busy="true"><form><input name="amount" value="100"><button disabled>Post</button></form></section>');
-    const region=d.querySelector('section');assert.equal(region.querySelectorAll('[role=status]').length,1);
-    region.setAttribute('aria-busy','false');await new Promise(resolve=>setTimeout(resolve,0));assert.equal(region.querySelector('[role=status]'),null);
-    const late=d.createElement('section');late.dataset.uiLoadingRegion='';late.setAttribute('aria-busy','true');d.body.append(late);
-    await new Promise(resolve=>setTimeout(resolve,0));assert.equal(late.querySelectorAll('[role=status]').length,1);
-    late.setAttribute('aria-busy','false');await new Promise(resolve=>setTimeout(resolve,0));assert.equal(late.querySelector('[role=status]'),null);
-    w.AppLoading.begin(region,{table:false});w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));
-    assert.equal(d.querySelector('input').value,'100');assert.equal(d.querySelector('button').disabled,true);assert.equal(region.querySelector('[role=status]'),null);dom.window.close();
+test('sidebar and dashboard regions never acquire component spinners',async()=>{
+    const {dom,w,d}=await setup('<nav id="appSidebar"><a href="/app">Navigation</a></nav><section id="card" data-ui-loading-region aria-busy="true">Summary</section>');
+    w.AppLoading.begin(d.querySelector('a'),{table:false});w.AppLoading.begin(d.querySelector('#card'),{table:false});
+    assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('.app-loading-status'),null);
+    assert.equal(w.AppLoading.status('Loading').textContent,'Loading');dom.window.close();
 });
+
 test('table search cannot hide a pending spinner or announce no matches before the request settles',async()=>{
     const {dom,w,d}=await setup('<template id="resource-table-labels" data-records="Records" data-refresh="Refresh" data-search-page="Search this page" data-no-matches="No matching records"></template><section class="erp-table-wrap" data-resource-table="pending-search"><table><thead><tr><th>ID</th></tr></thead><tbody><tr><td>L001</td></tr></tbody></table></section>');
     w.eval(readFileSync('src/main/resources/static/js/resource-table.js','utf8'));w.ResourceTable.init();

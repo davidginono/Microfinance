@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.repository;
 
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
+import com.sacco.mvp.accounting.dto.RegisterSort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -23,7 +24,7 @@ public class VoucherRepository {
     public boolean loanRequestExists(String institution,String branch,UUID key){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_receipt where sacco_id=? and station_id=? and request_key=?)",Boolean.class,institution,branch,key));}
     public Optional<Voucher> find(String institution,String branch,Type type,UUID id,boolean lock){return jdbc.query(HEAD+" where v.sacco_id=? and v.station_id=? and v.type=? and v.id=?"+(lock?" for update of v":""),this::voucher,institution,branch,type.name(),id).stream().findFirst();}
     public List<Voucher> list(String institution,String branch,Type type,Filter f){
-        String order=switch(f.sort()){case "oldest"->"v.effective_date,v.id";case "amount"->"v.total desc,v.id desc";default->"v.effective_date desc,v.id desc";};
+        String order=RegisterSort.order(f.sort(),Map.of("number","v.number","date","v.effective_date","party","v.party","reference","v.reference","transactions","v.transaction_count","amount","v.total","status","case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher r where r.reverses_id=v.id) then 'REVERSED' else 'POSTED' end"),"v.id");
         return jdbc.query(HEAD+"""
             where v.sacco_id=? and v.station_id=? and v.type=?
             and (?='' or strpos(lower(v.number||' '||v.party||' '||v.reference),?)>0)

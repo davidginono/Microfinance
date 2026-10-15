@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.loans.repository;
 
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
+import com.sacco.mvp.accounting.dto.RegisterSort;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -85,7 +86,7 @@ public class LoanRecordingRepository {
     private Object[] loanArgs(AppUserPrincipal a,Filter f,LocalDate today){return new Object[]{today,today,today,a.getSaccoId(),a.getStationId(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.clientId(),f.clientId(),f.productId(),f.productId()};}
     public List<LoanRow> loans(AppUserPrincipal a,Filter f,LocalDate today,int limit,int offset){
         var args=new ArrayList<>(Arrays.asList(loanArgs(a,f,today)));args.add(limit);args.add(offset);
-        String order=switch(f.sort()){case "oldest"->"r.application_date,a.id";case "amount"->"a.amount desc,a.id";default->"r.application_date desc,a.id desc";};
+        String order=RegisterSort.order(f.sort(),Map.of("number","coalesce(a.loan_id,a.application_number::text)","product","r.product_name","client","m.full_name","date","r.application_date","amount","a.amount","balance","coalesce(l.principal-l.principal_paid,0)","status","a.status"),"a.id");
         return jdbc.query(LOANS+loanWhere()+" order by "+order+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>) this::loan,args.toArray());
     }
     public List<Choice> clients(AppUserPrincipal a,String search,int page){return jdbc.query("""
@@ -170,7 +171,8 @@ public class LoanRecordingRepository {
         """;}
     private Object[] postArgs(AppUserPrincipal a,String kind,Filter f){return new Object[]{a.getSaccoId(),a.getStationId(),kind,kind,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.productId(),f.productId()};}
     public List<Posting> posts(AppUserPrincipal a,String kind,Filter f,int limit,int offset){
-        var args=new ArrayList<>(Arrays.asList(postArgs(a,kind,f)));args.add(limit);args.add(offset);String order=switch(f.sort()){case "oldest"->"p.effective_date,p.id";case "amount"->"p.amount desc,p.id";default->"p.effective_date desc,p.id desc";};
+        var args=new ArrayList<>(Arrays.asList(postArgs(a,kind,f)));args.add(limit);args.add(offset);
+        String order=RegisterSort.order(f.sort(),Map.of("number","a.loan_id","product","r.product_name","client","m.full_name","date","p.effective_date","amount","case when p.kind='REVERSAL' then -p.amount else p.amount end","reference","p.reference","status","case when p.reverses_id is not null then 'REVERSAL' when exists(select 1 from accountant_loan_post x where x.reverses_id=p.id) then 'REVERSED' else 'POSTED' end"),"p.id");
         return jdbc.query(POSTS+postWhere()+" order by "+order+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,args.toArray());
     }
     public Totals totals(AppUserPrincipal a,String kind,Filter f){return jdbc.query( "select count(*) n,coalesce(sum(case when p.kind='REVERSAL' then -p.amount else p.amount end),0) amount,coalesce(sum(case when p.kind='REVERSAL' then -p.principal_amount else p.principal_amount end),0) principal,coalesce(sum(case when p.kind='REVERSAL' then -p.interest_amount else p.interest_amount end),0) interest "+POST_FROM+postWhere(),(r,n)->new Totals(r.getLong("n"),r.getBigDecimal("amount"),r.getBigDecimal("principal"),r.getBigDecimal("interest")),postArgs(a,kind,f)).getFirst();}

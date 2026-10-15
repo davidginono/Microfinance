@@ -1,10 +1,12 @@
 <%@ page pageEncoding="UTF-8" %>
+<spring:message code="financial.networkError" var="tableLoadErrorFallback" />
 <template id="resource-table-labels"
     data-actions="<spring:message code='common.actions' />"
     data-records="<spring:message code='table.records' />"
     data-search-page="<spring:message code='table.searchPage' />"
     data-no-matches="<spring:message code='table.noMatches' />"
     data-refresh="<spring:message code='common.refresh' />"
+    data-load-error="<spring:message code='table.loadError' text='${tableLoadErrorFallback}' />"
     data-pagination="<spring:message code='table.pagination' />"
     data-page="<spring:message code='voucher.page' />"
     data-previous="<spring:message code='table.previous' />"

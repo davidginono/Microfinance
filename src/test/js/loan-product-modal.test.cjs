@@ -21,7 +21,9 @@ test('product modal locks both scroll roots and restores original values and foc
     d.querySelector('#opener').click();
     const modal=d.querySelector('[data-product-modal]');
     assert.equal(modal.parentNode,d.body);
-    assert.equal(modal.getAttribute('aria-modal'),'true');
+    assert.equal(modal.getAttribute('aria-modal'),null);
+    assert.equal(modal.querySelector('.app-modal-panel').getAttribute('aria-modal'),'true');
+    assert.equal(modal.querySelector('.app-modal-panel').getAttribute('role'),'dialog');
     assert.equal(d.documentElement.style.overflow,'hidden');
     assert.equal(d.body.style.overflow,'hidden');
     d.querySelector('#close').click();

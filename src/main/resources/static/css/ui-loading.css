@@ -7,9 +7,6 @@
 .aws-console .erp-table-wrap.is-loading .erp-table tbody {opacity:1!important;filter:none!important;}
 .aws-console .erp-table-wrap.is-loading > :not(.aws-table-loader) {pointer-events:auto;}
 .aws-console .erp-table-wrap.is-loading .aws-table-loader {display:none!important;}
-.erp-stat-value .app-loading-status {min-height:32px;justify-content:flex-start;}
-#appSidebar .app-loading-status {min-height:28px;display:inline-flex;padding:0 8px;}
-#appSidebar .app-loading-spinner {width:14px;height:14px;border-color:#aab7b8;border-top-color:#fff;}
 .neo-select-loading {display:flex;justify-content:center;align-items:center;min-height:40px;flex:none;border-top:1px solid #eaeded;}
 .neo-select-loading .app-loading-status {min-height:40px;}
 @media(prefers-reduced-motion:reduce){.app-loading-spinner{animation-duration:1.8s;}}

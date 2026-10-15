@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.repository;
 
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
+import com.sacco.mvp.accounting.dto.RegisterSort;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -59,7 +60,7 @@ public class LoanReceiptRepository {
             rows.stream().map(r->new Object[]{v.id(),a.getSaccoId(),a.getStationId(),r.lineNo(),r.postingId(),r.description()}).toList());
     }
     public List<Voucher> list(AppUserPrincipal a,Filter f,boolean includeLoans){
-        String order=switch(f.sort()){case "oldest"->"v.effective_date,v.id";case "amount"->"v.total desc,v.id desc";default->"v.effective_date desc,v.id desc";};
+        String order=RegisterSort.order(f.sort(),Map.of("number","v.number","date","v.effective_date","party","v.party","reference","v.reference","transactions","v.transaction_count","amount","v.total","status","case when v.reverses_id is not null then 'REVERSAL' when v.reversed_by is not null then 'REVERSED' else 'POSTED' end"),"v.id");
         return jdbc.query("""
             with receipts as not materialized (
               select id,sacco_id,station_id,number,request_key,effective_date,party,reference,description,evidence,money_account_id,

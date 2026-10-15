@@ -211,6 +211,11 @@
                 });
         }
 
+        document.addEventListener('resource-table:refresh', function (event) {
+            var section=event.target.closest('[data-staff-active-loans-section="true"]');
+            if(section){event.preventDefault();hydrate(section,true);}
+        },true);
+
         function init() {
             document.querySelectorAll("[data-staff-active-loans-section=\"true\"]").forEach(function (section) {
                 hydrate(section, false);
