@@ -1,3 +1,4 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
@@ -12,10 +13,10 @@
  <p><spring:message code="statement.dimension.${result.dimension}" /> · <spring:message code="${result.dimension eq 'INSTITUTION' ? 'statement.latestBranchCutoff' : 'statement.cutoff'}" />: <c:out value="${result.recordedCutoff}" /> · <spring:message code="statement.mappingVersion" />: <c:out value="${result.mappingVersion}" /></p>
  <c:if test="${result.definition.comparison}"><p><spring:message code="statement.comparison" />: <c:out value="${result.comparisonFrom}" /> — <c:out value="${result.comparisonThrough}" /> · <spring:message code="statement.cutoff" />: <c:out value="${result.comparisonCutoff}" /></p></c:if><c:if test="${not empty statementSuccess}"><p role="status"><spring:message code="${statementSuccess}" /></p></c:if>
  <sec:authorize access="@access.has(principal, 'STATEMENT_EXPORT')">
- <form method="post" target="_blank" action="<c:url value='${empty result.id ? "/reports/statements/versions/" : "/reports/statements/results/"}${empty result.id ? result.versionId : result.id}/pdf' />" class="statement-actions">
+ <form method="post" data-no-page-preloader="true" action="<c:url value='${empty result.id ? "/reports/statements/versions/" : "/reports/statements/results/"}${empty result.id ? result.versionId : result.id}/pdf' />" class="statement-actions">
   <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
   <c:if test="${empty result.id}"><input type="hidden" name="from" value="${result.from}" /><input type="hidden" name="through" value="${result.through}" /><input type="hidden" name="cutoff" value="${result.recordedCutoff}" /><c:if test="${result.definition.comparison}"><input type="hidden" name="comparisonFrom" value="${result.comparisonFrom}" /><input type="hidden" name="comparisonThrough" value="${result.comparisonThrough}" /></c:if></c:if>
-  <button class="app-btn btn-neutral"><spring:message code="voucher.pdf" /></button><button name="inline" value="true" class="app-btn btn-neutral"><spring:message code="voucher.print" /></button>
+  <button class="app-btn btn-neutral"><spring:message code="voucher.pdf" /></button><button name="inline" value="true" formtarget="_blank" class="app-btn btn-neutral"><spring:message code="voucher.print" /></button>
  </form>
  </sec:authorize>
  </section>
