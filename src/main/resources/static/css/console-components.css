@@ -4526,6 +4526,9 @@ html.session-timeout-active,
 
     .session-timeout-panel {
         position: relative;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100dvh - 3rem);
         z-index: 1;
         width: min(100%, 28rem);
         overflow: hidden;
@@ -4574,6 +4577,8 @@ html.session-timeout-active,
     }
 
     .session-timeout-body {
+        min-height: 0;
+        overflow-y: auto;
         padding: 1rem;
     }
 
@@ -4657,6 +4662,7 @@ html.session-timeout-active,
     }
 
     .session-timeout-actions {
+        flex-shrink: 0;
         display: flex;
         flex-wrap: wrap;
         align-items: center;

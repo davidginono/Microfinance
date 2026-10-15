@@ -23,11 +23,13 @@ import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.authorization.AuthorizationDecision;
@@ -622,6 +624,20 @@ public class SecurityConfig {
         AccessDeniedHandlerImpl fallback = new AccessDeniedHandlerImpl();
         fallback.setErrorPage("/error/403");
         return (request, response, exception) -> {
+            if (exception instanceof CsrfException && !hasAuthenticatedSession()
+                && "POST".equalsIgnoreCase(request.getMethod())) {
+                String path = pathWithinApplication(request);
+                if ("/session/keepalive".equals(path)) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"refreshed\":false}");
+                    return;
+                }
+                if ("/logout".equals(path)) {
+                    response.sendRedirect(response.encodeRedirectURL(request.getContextPath() + "/login?logout"));
+                    return;
+                }
+            }
             if (isExpiredLoginSubmission(request, exception)) {
                 request.getSession(true).setAttribute(
                     "loginErrorMessage",
@@ -632,6 +648,12 @@ public class SecurityConfig {
             }
             fallback.handle(request, response, exception);
         };
+    }
+
+    private boolean hasAuthenticatedSession() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+            && !(authentication instanceof AnonymousAuthenticationToken);
     }
 
     private boolean isExpiredLoginSubmission(HttpServletRequest request,

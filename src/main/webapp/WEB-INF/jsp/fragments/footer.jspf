@@ -508,6 +508,8 @@
 <spring:message code="session.timeout.progressLabel" text="Session time remaining" var="sessionTimeoutProgressLabel" />
 <spring:message code="session.timeout.refreshed" text="Session refreshed." var="sessionTimeoutRefreshedMessage" />
 <spring:message code="session.timeout.refreshFailed" text="We could not verify your password. Please try again or log out." var="sessionTimeoutRefreshFailedMessage" />
+<spring:message code="session.timeout.passwordRequired" text="Enter your current password to continue." var="sessionTimeoutPasswordRequiredMessage" />
+<spring:message code="session.timeout.passwordInvalid" text="The current password could not be verified. Please try again or log out." var="sessionTimeoutPasswordInvalidMessage" />
 <div id="sessionInactivityPrompt"
      class="session-timeout-overlay hidden"
      role="alertdialog"
@@ -521,6 +523,8 @@
      data-csrf-header="${_csrf.headerName}"
      data-csrf-token="${_csrf.token}"
      data-refresh-success-message="${fn:escapeXml(sessionTimeoutRefreshedMessage)}"
+     data-password-required-message="${fn:escapeXml(sessionTimeoutPasswordRequiredMessage)}"
+     data-password-invalid-message="${fn:escapeXml(sessionTimeoutPasswordInvalidMessage)}"
      data-refresh-error-message="${fn:escapeXml(sessionTimeoutRefreshFailedMessage)}">
     <div class="session-timeout-panel">
         <div class="session-timeout-header">
@@ -569,7 +573,7 @@
             <p class="mt-3 text-center text-xs leading-5 text-slate-500"><spring:message code="session.timeout.helper" text="Verify to stay logged in, or log out if this is not you." /></p>
         </div>
         <div class="session-timeout-actions">
-            <form id="sessionInactivityLogoutForm" action="/logout" method="post" class="shrink-0 max-sm:w-full">
+            <form id="sessionInactivityLogoutForm" action="<c:url value='/logout' />" method="post" class="shrink-0 max-sm:w-full">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <button type="submit" class="app-btn btn-reject min-w-[8rem] max-sm:w-full"><spring:message code="session.timeout.logout" text="Logout Now" /></button>
             </form>

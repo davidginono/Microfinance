@@ -50,6 +50,7 @@
         event.preventDefault(); confirmDiscard(() => location.assign(link.href));
     });
     document.addEventListener('submit', event => {
+        if (event.defaultPrevented) return;
         if (event.target === form) {
             if (submitting) { event.preventDefault(); return; }
             submitting = true; form.setAttribute('aria-busy', 'true');
@@ -59,6 +60,11 @@
         } else if (!submitting && dirty()) {
             event.preventDefault(); confirmDiscard(() => event.target.requestSubmit(event.submitter));
         }
+    });
+    // Security logout must never wait for a discard confirmation or beforeunload.
+    document.addEventListener('session:logout', () => {
+        submitting = true;
+        if (!modal.hidden) close();
     });
     window.addEventListener('beforeunload', event => { if (!submitting && dirty()) { event.preventDefault(); event.returnValue = ''; } });
     window.addEventListener('pageshow', () => {

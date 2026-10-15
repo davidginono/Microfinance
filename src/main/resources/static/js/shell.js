@@ -1818,6 +1818,8 @@
         let countdownTimer = null;
         let deadline = 0;
         let keepalivePending = false;
+        let loggingOut = false;
+        let previousFocus = null;
         let cycleStartedAt = Date.now();
         let audioContext = null;
         let audioUnlocked = false;
@@ -2006,7 +2008,12 @@
         };
 
         const expireSession = function () {
+            if (loggingOut) return;
+            loggingOut = true;
             clearCountdown();
+            if (checkTimer) window.clearTimeout(checkTimer);
+            setStayPending(true);
+            document.dispatchEvent(new Event('session:logout'));
             logoutForm.submit();
         };
 
@@ -2034,6 +2041,7 @@
             setProgress(100);
             passwordInput.value = '';
             clearPromptError();
+            previousFocus?.focus({ preventScroll: true });
         };
 
         const showPrompt = function () {
@@ -2044,7 +2052,8 @@
                 window.clearTimeout(checkTimer);
                 checkTimer = null;
             }
-            deadline = Date.now() + warningMs;
+            deadline = cycleDeadline();
+            previousFocus = document.activeElement;
             prompt.classList.remove('hidden');
             prompt.classList.add('flex');
             prompt.classList.add('is-entering');
@@ -2114,12 +2123,16 @@
         };
 
         const refreshSession = function () {
-            if (keepalivePending) {
+            if (keepalivePending || loggingOut) {
+                return;
+            }
+            if (Date.now() >= cycleDeadline()) {
+                expireSession();
                 return;
             }
             const password = passwordInput.value || '';
             if (!password.trim()) {
-                setPromptError('Enter your current password to continue.');
+                setPromptError(prompt.getAttribute('data-password-required-message') || 'Enter your current password to continue.');
                 passwordInput.focus();
                 return;
             }
@@ -2143,7 +2156,11 @@
                         })
                         .then(function (payload) {
                             if (!response.ok || response.redirected || payload.refreshed !== true) {
-                                const error = new Error(payload.message || prompt.getAttribute('data-refresh-error-message') || 'We could not verify your password. Please try again or log out.');
+                                const message = response.status === 403 && payload.refreshed === false
+                                    ? prompt.getAttribute('data-password-invalid-message') || payload.message
+                                    : prompt.getAttribute('data-refresh-error-message');
+                                const error = new Error(message || 'We could not refresh your session. Please sign in again.');
+                                error.sessionMessage = true;
                                 error.status = response.redirected ? 401 : response.status;
                                 throw error;
                             }
@@ -2151,6 +2168,7 @@
                         });
                 })
                 .then(function () {
+                    if (loggingOut) return;
                     passwordInput.value = '';
                     hidePrompt();
                     startSessionCycle();
@@ -2159,11 +2177,13 @@
                     }
                 })
                 .catch(function (error) {
+                    if (loggingOut) return;
                     if (error && error.status === 401) {
                         expireSession();
                         return;
                     }
-                    setPromptError(error && error.message ? error.message : 'We could not verify your password. Please try again or log out.');
+                    setPromptError(error && error.sessionMessage ? error.message : prompt.getAttribute('data-refresh-error-message'));
+                    setStayPending(false);
                     try {
                         passwordInput.focus({ preventScroll: true });
                         passwordInput.select();
@@ -2173,7 +2193,7 @@
                 })
                 .finally(function () {
                     keepalivePending = false;
-                    setStayPending(false);
+                    if (!loggingOut) setStayPending(false);
                 });
         };
 
@@ -2198,6 +2218,7 @@
         }
 
         const handleWake = function () {
+            if (loggingOut) return;
             if (promptVisible()) {
                 updateCountdown();
                 return;
@@ -2234,7 +2255,27 @@
                 refreshSession();
             }
         });
-        logoutForm.addEventListener('submit', clearCountdown);
+        logoutForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            expireSession();
+        });
+        prompt.addEventListener('keydown', function (event) {
+            if (event.key !== 'Tab') return;
+            const controls = Array.from(prompt.querySelectorAll('input:not([type="hidden"]), button'))
+                .filter(function (control) { return !control.disabled && control.tabIndex >= 0; });
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault(); last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault(); first?.focus();
+            }
+        });
+        document.addEventListener('focusin', function (event) {
+            if (promptVisible() && !loggingOut && !prompt.contains(event.target)) {
+                (passwordInput.disabled ? logoutForm.querySelector('button') : passwordInput).focus();
+            }
+        });
         startSessionCycle();
     };
 
