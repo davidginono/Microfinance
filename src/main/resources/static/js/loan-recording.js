@@ -32,7 +32,7 @@
     select.addEventListener('neo-select:close', () => {binding.cancel(); ++request; controller?.abort(); loading = false; picker.setLoading(false);});
     select.addEventListener('neo-select:open', () => {if (!loading && (loadedSearch !== search.value || error.textContent)) {binding.cancel(); load();}});
     window.addEventListener('pagehide', () => {binding.cancel(); ++request; controller?.abort();});
-    load();
+    if (!box.hasAttribute('data-choice-lazy')) load();
   });
   const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');
   if(disbursementSelect){let sequence=0, controller;disbursementSelect.addEventListener('change',async()=>{

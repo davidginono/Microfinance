@@ -8,7 +8,6 @@
 .policy-section summary { cursor:pointer; font-weight:700; margin-bottom:8px; }
 .policy-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding-block:10px; }
 .policy-error { padding:10px; color:#8a1c1c; background:#fff2f2; border:1px solid #e7bcbc; }
-.policy-decision { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 14px; }
 .policy-detail-list dt { font-weight:700; }
 .policy-detail-list dd { margin:4px 0 12px; overflow-wrap:anywhere; }
 .policy-overview .erp-detail-facts > div { border:0; padding:8px 12px; }
@@ -16,26 +15,22 @@
 .policy-status { display:inline-block; font-size:12px; font-weight:600; line-height:18px; color:#545b64; }
 .policy-status-approved { color:#037f0c; }
 .policy-status-rejected { color:#b12704; }
-.policy-content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; }
 .policy-content-section { min-width:0; }
 .policy-content-section > h2 { margin-bottom:0; }
-.policy-content-section > .policy-entry { margin-inline:-14px; }
-.policy-entry { min-width:0; border-top:1px solid var(--panel-border); }
-.policy-entry > summary { display:list-item; list-style-position:inside; padding:12px; cursor:pointer; font-weight:600; overflow-wrap:anywhere; }
-.policy-entry > summary .policy-status { float:right; margin-left:12px; text-align:left; }
-.policy-entry > summary:focus-visible,.policy-explanation > summary:focus-visible { outline:2px solid var(--aws-blue,#0073bb); outline-offset:-2px; }
-.policy-entry-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; }
-.policy-entry-body { padding:0 12px 14px 30px; }
-.policy-entry-notice { margin:12px 0 0; padding:10px; border-left:3px solid var(--aws-blue,#0073bb); background:#f4f8fb; line-height:1.5; overflow-wrap:anywhere; font-size:12px; }
-.policy-entry-body h3 { margin:0 0 6px; font-size:12px; color:var(--text-muted,#545b64); }
-.policy-section-note { margin:0; padding:10px 12px; color:var(--text-muted,#545b64); font-size:12px; line-height:1.5; }
-.policy-explanation > summary { cursor:pointer; font-weight:700; padding:12px; }
-.policy-explanation > .policy-detail-list { padding:0 12px 4px; margin:0; }
 .policy-form > h2 { margin:0; font-size:14px; }
-@media (max-width:1023px) {
-    .policy-content-grid { grid-template-columns:minmax(0,1fr); }
-}
 @media (max-width:640px) {
     .policy-overview .erp-detail-facts > div + div { border-left:0; border-top:1px solid var(--panel-border); }
-    .policy-entry > summary .policy-status { max-width:45%; white-space:normal; }
 }
+.policy-setting-list { margin:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:24px; }
+.policy-setting-list > div { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-top:1px solid var(--panel-border); min-width:0; }
+.policy-setting-list dt { color:var(--text-muted,#545b64); }
+.policy-setting-list dd { margin:0; font-weight:600; text-align:left; overflow-wrap:anywhere; max-width:60%; }
+.policy-settings-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.policy-settings-heading h2 { margin:0; }
+.policy-scope { color:var(--text-muted,#545b64); font-size:12px; margin:0 0 12px; }
+.policy-form .policy-section:first-of-type { border-top:0; }
+.policy-form .policy-actions { justify-content:flex-end; }
+.policy-form h2 { margin:0 0 12px; font-size:15px; }
+.policy-form .neo-select { width:100%; min-width:0; }
+.policy-field [data-choice-error] { color:#b12704; font-size:12px; }
+@media (max-width:767px) { .policy-setting-list { grid-template-columns:minmax(0,1fr); } }

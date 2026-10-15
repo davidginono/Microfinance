@@ -119,3 +119,17 @@ test('reducing balance selects annual percentage terms and configured loans reta
   set('loanMode','CONFIGURED');const configured=run();assert.equal(requests[1].options.body.get('customMethod'),null);respond(1,'50.00');await configured;
   assert.equal(d.querySelector('[data-product-method]').value,'Flat rate');dom.window.close();
 });
+
+test('settings account pickers load only when opened and retain the selected account',async()=>{
+  const dom=new JSDOM('<div data-loan-choice data-choice-lazy data-choice-url="/finance/policies/accounts"><select data-choice-select><option value="">Choose</option><option value="bank" selected>111001 - Bank</option></select><span data-choice-error data-search-label="Search" data-error="Failed"></span></div>',{runScripts:'outside-only',url:'http://localhost/finance/policies/new'});
+  const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button');let requested=[];
+  w.NeoSelect={search:()=>({input,more,setLoading:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
+  w.fetch=async url=>{requested.push(url);return {ok:true,redirected:false,json:async()=>[{id:'cash',label:'111002 - Cash'}]};};
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  assert.equal(requested.length,0);
+  const select=w.document.querySelector('select');select.dispatchEvent(new w.Event('neo-select:open'));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(requested,['/finance/policies/accounts?search=&page=0']);
+  assert.equal(select.value,'bank');assert.equal(select.selectedOptions[0].textContent,'111001 - Bank');
+  dom.window.close();
+});

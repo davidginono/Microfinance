@@ -58,6 +58,64 @@ class AccountingPolicyServiceTest {
         verify(approvals,never()).saveAndFlush(any());
     }
 
+    @Test void settingsSaveStructuredChoicesAndOnlyApprovalEnablesPosting() {
+        var form = settings(); form.getPermissions().put(PostingEvent.CAPITAL, AccountingPolicyService.PostingPermission.ALLOWED);
+        form.getAccounts().put("OWNER_CAPITAL", UUID.randomUUID());
+        var saved = service.saveSettings(actor(makerId), form);
+        assertThat(saved.decisions()).containsEntry(PolicyDecision.INTEREST_RECOGNITION, "CASH_DUE_INTEREST_V1");
+        assertThat(saved.decisions()).containsEntry(PolicyDecision.FEES_AND_TAXES, "NOT_CONFIGURED");
+        assertThat(saved.postingMatrix().get(PostingEvent.FEE).permission()).isEqualTo(AccountingPolicyService.PostingPermission.DISABLED);
+        assertThatThrownBy(() -> service.requireAllowedPosting(saved, PostingEvent.CAPITAL)).hasMessage("accounting.policy.error.unapproved");
+        var captured = ArgumentCaptor.forClass(AccountingPolicy.class); verify(policies).saveAndFlush(captured.capture());
+        when(policies.findByIdAndSaccoId(saved.id(), "I1")).thenReturn(Optional.of(captured.getValue()));
+        var approved = service.decide(saved.id(), actor(checkerId), decision());
+        assertThatCode(() -> service.requireAllowedPosting(approved, PostingEvent.CAPITAL)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> service.requireAllowedPosting(approved, PostingEvent.EXPENSE)).hasMessage("accounting.policy.error.disabled");
+    }
+    @Test void changedSettingsKeepPriorWrittenDecisionsAndUnknownMappingsWithoutChangingHistory() {
+        var source = policy(); var originalDecisions = source.getDecisionsJson();
+        UUID unknownAccount = UUID.randomUUID(); source.setAccountMappingsJson(mapper.writeValueAsString(Map.of("LEGACY_ACCOUNT", unknownAccount)));
+        when(policies.findByIdAndSaccoId(source.getId(), "I1")).thenReturn(Optional.of(source));
+        var form = settings(); form.setSourcePolicyId(source.getId()); form.setEffectiveFrom(date.plusDays(1));
+        form.setInterestRecording(AccountingPolicyForm.InterestRecording.ACCRUAL_DUE_INTEREST_V1);
+        var saved = service.saveSettings(actor(makerId), form);
+        assertThat(saved.decisions().get(PolicyDecision.REPORTING_FRAMEWORK)).isEqualTo("Synthetic policy fixture only");
+        assertThat(saved.accountMappings()).containsEntry("LEGACY_ACCOUNT", unknownAccount);
+        assertThat(source.getDecisionsJson()).isEqualTo(originalDecisions);
+        assertThat(saved.id()).isNotEqualTo(source.getId());
+    }
+    @Test void conflictingInterestModeMissingAccountsAndUnsupportedControlsCannotBeSaved() {
+        var form = settings(); form.getPermissions().put(PostingEvent.INTEREST_ACCRUAL, AccountingPolicyService.PostingPermission.ALLOWED);
+        assertThatThrownBy(() -> service.saveSettings(actor(makerId), form)).hasMessage("accounting.policy.error.interestMode");
+        form.setInterestRecording(AccountingPolicyForm.InterestRecording.ACCRUAL_DUE_INTEREST_V1);
+        assertThatThrownBy(() -> service.saveSettings(actor(makerId), form)).hasMessage("accounting.policy.error.requiredMapping");
+        form.getPermissions().put(PostingEvent.FEE, AccountingPolicyService.PostingPermission.ALLOWED);
+        assertThatThrownBy(() -> service.saveSettings(actor(makerId), form)).hasMessage("accounting.policy.error.settings");
+        verify(policies, never()).saveAndFlush(any());
+    }
+    @Test void settingsCannotInheritForeignPolicyOrChangeOpeningBoundary() {
+        var form = settings(); form.setSourcePolicyId(UUID.randomUUID());
+        assertThatThrownBy(() -> service.saveSettings(actor(makerId), form)).isInstanceOf(AccessDeniedException.class);
+        var source = policy(); when(policies.findByIdAndSaccoId(source.getId(), "I1")).thenReturn(Optional.of(source));
+        form.setSourcePolicyId(source.getId()); form.setOpeningDate(date.minusDays(1));
+        assertThatThrownBy(() -> service.saveSettings(actor(makerId), form)).hasMessage("accounting.policy.error.cutover");
+    }
+    @Test void newFormInheritsLatestApprovedSettingsAndLookupIsBounded() {
+        var source = policy(); when(policies.approvedAt(eq("I1"), eq(LocalDate.of(9999,12,31)), any())).thenReturn(List.of(source));
+        var form = service.settingsForm(actor(makerId));
+        assertThat(form.getSourcePolicyId()).isEqualTo(source.getId());
+        assertThat(form.getEffectiveFrom()).isNull();
+        service.accountChoices(actor(makerId), "bank", 3);
+        verify(accounts).policyAccountChoices("I1", "bank", 75, 26);
+        assertThatThrownBy(() -> service.accountChoices(actor(makerId), "bank", -1)).hasMessage("accounting.policy.error.validation");
+    }
+    private AccountingPolicyForm settings() {
+        var f = new AccountingPolicyForm(); f.setRequestKey(UUID.randomUUID());
+        f.setAuthoritativeLedger(AccountingPolicyService.AuthoritativeLedger.LOCAL_GL); f.setOpeningDate(date); f.setEffectiveFrom(date);
+        f.setInterestRecording(AccountingPolicyForm.InterestRecording.CASH_DUE_INTEREST_V1); f.setEvidenceReference("Test document");
+        AccountingPolicyForm.EVENTS.forEach(e -> f.getPermissions().put(e, AccountingPolicyService.PostingPermission.DISABLED)); return f;
+    }
+
     @Test void missingExplicitDecisionsCannotCreatePolicy() {
         var c = command();
         c.decisions().remove(PolicyDecision.REPORTING_FRAMEWORK);

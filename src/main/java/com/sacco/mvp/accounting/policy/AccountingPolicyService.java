@@ -44,6 +44,79 @@ public class AccountingPolicyService {
     private final SaccoRegistryService institutions;
     private final GeneralLedgerRepository accounts;
 
+    public record AccountChoice(UUID id, String label) {}
+
+    @Transactional(readOnly = true)
+    public AccountingPolicyForm settingsForm(AppUserPrincipal actor) {
+        String institution = requireActor(actor, UserClaim.ACCOUNTING_POLICIES_CREATE);
+        var approved = policies.approvedAt(institution, LocalDate.of(9999, 12, 31), PageRequest.of(0, 1));
+        if (!approved.isEmpty()) {
+            var source = approved.getFirst();
+            return AccountingPolicyForm.from(snapshot(source, approvals.findById(source.getId()).orElse(null)));
+        }
+        var form = new AccountingPolicyForm(); form.setRequestKey(UUID.randomUUID());
+        AccountingPolicyForm.EVENTS.forEach(event -> form.getPermissions().put(event, PostingPermission.DISABLED));
+        return form;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountChoice> accountChoices(AppUserPrincipal actor, String search, int page) {
+        String institution = requireActor(actor, UserClaim.ACCOUNTING_POLICIES_CREATE);
+        require(search != null && search.length() <= 100 && page >= 0 && page <= 10000, "validation");
+        return accounts.policyAccountChoices(institution, search.trim(), page * 25, 26).stream()
+            .map(a -> new AccountChoice(a.id(), a.code() + " - " + a.name())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, String> accountLabels(AppUserPrincipal actor, Collection<UUID> ids) {
+        String institution = requireActor(actor, access.has(actor, UserClaim.ACCOUNTING_POLICIES_VIEW)
+            ? UserClaim.ACCOUNTING_POLICIES_VIEW : UserClaim.ACCOUNTING_POLICIES_CREATE);
+        require(ids != null && ids.size() <= 100, "validation");
+        var labels = new LinkedHashMap<UUID, String>();
+        accounts.policyMappedAccounts(institution, ids).forEach(a -> labels.put(a.id(), a.code() + " - " + a.name()));
+        return labels;
+    }
+
+    @Transactional
+    public PolicySnapshot saveSettings(AppUserPrincipal actor, AccountingPolicyForm form) {
+        String institution = requireActor(actor, UserClaim.ACCOUNTING_POLICIES_CREATE);
+        require(form != null && form.getInterestRecording() != null && form.getPermissions() != null
+            && form.getPermissions().keySet().equals(new HashSet<>(AccountingPolicyForm.EVENTS))
+            && form.getPermissions().values().stream().allMatch(Objects::nonNull), "settings");
+        require(form.getAccounts() != null && AccountingPolicyForm.ACCOUNT_KEYS.containsAll(form.getAccounts().keySet()), "accountMappings");
+        var decisions = new EnumMap<PolicyDecision, String>(PolicyDecision.class);
+        var matrix = new EnumMap<PostingEvent, PostingRule>(PostingEvent.class);
+        var mappings = new LinkedHashMap<String, UUID>();
+        if (form.getSourcePolicyId() != null) {
+            var source = policies.findByIdAndSaccoId(form.getSourcePolicyId(), institution)
+                .orElseThrow(() -> new AccessDeniedException("Settings unavailable"));
+            decisions.putAll(readDecisions(source)); matrix.putAll(readMatrix(source)); mappings.putAll(readMappings(source));
+            require(source.getAuthoritativeLedger() == form.getAuthoritativeLedger()
+                && source.getOpeningDate().equals(form.getOpeningDate()), "cutover");
+        }
+        // Preserve the legacy storage contract without inventing written decisions or evidence.
+        for (var field : PolicyDecision.values()) decisions.putIfAbsent(field, "NOT_CONFIGURED");
+        decisions.put(PolicyDecision.INTEREST_RECOGNITION, form.getInterestRecording().name());
+        for (var event : PostingEvent.values()) matrix.putIfAbsent(event, new PostingRule(PostingPermission.DISABLED, "NOT_CONFIGURED"));
+        form.getPermissions().forEach((event, permission) -> matrix.put(event, new PostingRule(permission, "SETTINGS_V1")));
+        require(form.getPermissions().get(PostingEvent.INTEREST_ACCRUAL) != PostingPermission.ALLOWED
+            || form.getInterestRecording() == AccountingPolicyForm.InterestRecording.ACCRUAL_DUE_INTEREST_V1, "interestMode");
+        AccountingPolicyForm.ACCOUNT_KEYS.forEach(mappings::remove);
+        form.getAccounts().forEach((key, value) -> {if (value != null) mappings.put(key, value);});
+        if (form.getAuthoritativeLedger() == AuthoritativeLedger.LOCAL_GL) {
+            if (allowed(matrix, PostingEvent.DISBURSEMENT) || allowed(matrix, PostingEvent.REPAYMENT)) requireMapping(mappings, "LOAN_PRINCIPAL");
+            if (allowed(matrix, PostingEvent.REPAYMENT)) requireMapping(mappings,
+                form.getInterestRecording() == AccountingPolicyForm.InterestRecording.CASH_DUE_INTEREST_V1 ? "INTEREST_INCOME" : "INTEREST_RECEIVABLE");
+            if (allowed(matrix, PostingEvent.INTEREST_ACCRUAL)) {requireMapping(mappings, "INTEREST_INCOME"); requireMapping(mappings, "INTEREST_RECEIVABLE");}
+        }
+        return create(actor, new PolicyCommand(form.getRequestKey(), form.getAuthoritativeLedger(), form.getOpeningDate(),
+            form.getEffectiveFrom(), decisions, matrix, mappings, form.getEvidenceReference()));
+    }
+    private static boolean allowed(Map<PostingEvent, PostingRule> matrix, PostingEvent event) {
+        return matrix.get(event).permission() == PostingPermission.ALLOWED;
+    }
+    private static void requireMapping(Map<String, UUID> mappings, String key) {require(mappings.containsKey(key), "requiredMapping");}
+
     @Transactional
     public PolicySnapshot create(AppUserPrincipal actor, PolicyCommand command) {
         String institution = requireActor(actor, UserClaim.ACCOUNTING_POLICIES_CREATE);

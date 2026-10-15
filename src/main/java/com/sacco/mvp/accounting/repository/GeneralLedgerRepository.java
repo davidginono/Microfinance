@@ -91,6 +91,19 @@ public class GeneralLedgerRepository {
     public Optional<Account> account(String institution, UUID id) {
         return jdbc.query("select * from gl_account where sacco_id=? and id=?",this::account,institution,id).stream().findFirst();
     }
+    public List<Account> policyAccountChoices(String institution, String search, int offset, int limit) {
+        String term = search.toLowerCase(java.util.Locale.ROOT);
+        return jdbc.query("select * from gl_account where sacco_id=? and active and kind<>'HEADING' and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0) order by code,id limit ? offset ?",
+            this::account, institution, term, term, limit, offset);
+    }
+    public List<Account> policyMappedAccounts(String institution, java.util.Collection<UUID> mappings) {
+        var ids = new java.util.HashSet<>(mappings);
+        if (ids.isEmpty()) return List.of();
+        if (ids.size() > 100) throw new IllegalArgumentException("accounting.policy.error.validation");
+        var args = new java.util.ArrayList<Object>(); args.add(institution); args.addAll(ids);
+        return jdbc.query("select * from gl_account where sacco_id=? and id in (" + String.join(",", java.util.Collections.nCopies(ids.size(), "?")) + ") order by code,id",
+            this::account, args.toArray());
+    }
     public Optional<Account> accountCode(String institution,String code) {
         return jdbc.query("select * from gl_account where sacco_id=? and code=?",this::account,institution,code).stream().findFirst();
     }

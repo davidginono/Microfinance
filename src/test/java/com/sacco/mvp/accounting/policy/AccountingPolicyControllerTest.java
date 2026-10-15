@@ -47,18 +47,25 @@ class AccountingPolicyControllerTest {
         mvc.perform(post("/finance/policies").param("openingDate", "invalid-date")
             .with(user(actor(UserClaim.ACCOUNTING_POLICIES_CREATE))).with(csrf())).andExpect(status().isOk())
             .andExpect(view().name("accounting/policies/new")).andExpect(model().attribute("policyError", "accounting.policy.error.validation"));
-        verify(service, never()).create(any(), any());
+        verify(service, never()).saveSettings(any(), any());
     }
     @Test void eventMapsBindTypedValuesAndScopeFieldsAreIgnored() throws Exception {
         var request = post("/finance/policies").param("requestKey", UUID.randomUUID().toString())
             .param("authoritativeLedger", "LOCAL_GL").param("openingDate", "2026-10-02").param("effectiveFrom", "2026-10-02")
             .param("evidenceReference", "Synthetic evidence").param("saccoId", "OTHER").param("makerId", UUID.randomUUID().toString());
-        for (var d : PolicyDecision.values()) request.param("decisions[" + d + "]", "Synthetic decision");
-        for (var e : PostingEvent.values()) { request.param("permissions[" + e + "]", "DISABLED"); request.param("treatments[" + e + "]", "Synthetic disabled treatment"); }
-        when(service.create(any(), any())).thenThrow(new IllegalArgumentException("accounting.policy.error.incomplete"));
+        request.param("interestRecording", "CASH_DUE_INTEREST_V1").param("decisions[INTEREST_RECOGNITION]", "MALICIOUS_MODE");
+        for (var e : AccountingPolicyForm.EVENTS) request.param("permissions[" + e + "]", "DISABLED");
+        when(service.saveSettings(any(), any())).thenThrow(new IllegalArgumentException("accounting.policy.error.incomplete"));
         mvc.perform(request.with(user(actor(UserClaim.ACCOUNTING_POLICIES_CREATE))).with(csrf())).andExpect(status().isOk());
-        verify(service).create(any(), argThat(c -> c.decisions().size() == PolicyDecision.values().length
-            && c.postingMatrix().get(PostingEvent.FEE).permission() == AccountingPolicyService.PostingPermission.DISABLED));
+        verify(service).saveSettings(any(), argThat(c -> c.getInterestRecording() == AccountingPolicyForm.InterestRecording.CASH_DUE_INTEREST_V1
+            && c.getPermissions().keySet().equals(new HashSet<>(AccountingPolicyForm.EVENTS))));
+    }
+    @Test void accountPickerRequiresCreatePermissionAndBindsBoundedQuery() throws Exception {
+        mvc.perform(get("/finance/policies/accounts").with(user(actor(UserClaim.ACCOUNTING_POLICIES_VIEW)))).andExpect(status().isForbidden());
+        when(service.accountChoices(any(),eq("bank"),eq(2))).thenReturn(List.of());
+        mvc.perform(get("/finance/policies/accounts").param("search","bank").param("page","2")
+            .with(user(actor(UserClaim.ACCOUNTING_POLICIES_CREATE)))).andExpect(status().isOk()).andExpect(content().json("[]"));
+        verify(service).accountChoices(any(),eq("bank"),eq(2));
     }
     AppUserPrincipal actor(UserClaim claim) { return new AppUserPrincipal(AccountingPolicyServiceTest.member(UUID.randomUUID(), "I1"), Set.of(claim), true); }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc @EnableWebSecurity @EnableMethodSecurity
