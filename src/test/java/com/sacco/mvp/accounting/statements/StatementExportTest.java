@@ -15,6 +15,12 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static com.sacco.mvp.accounting.statements.StatementCalculatorTest.*;
 import static com.sacco.mvp.accounting.statements.StatementCalculatorTest.PERIOD;
+import com.sacco.mvp.accounting.statements.controller.StatementController;
+import com.sacco.mvp.security.AppUserPrincipal;
+import org.springframework.ui.ExtendedModelMap;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.access.AccessDeniedException;
+import static org.mockito.Mockito.*;
 
 class StatementExportTest {
     final ReloadableResourceBundleMessageSource messages=new ReloadableResourceBundleMessageSource();
@@ -48,6 +54,41 @@ class StatementExportTest {
                 for(var row:sheet)for(var cell:row)if(cell.getCellType()==CellType.STRING)
                     assertThat(cell.getStringCellValue()).doesNotContain("Details");
             }
+        }
+    }
+    @Test void printUsesFullScopedLedgerAndRequiresExportPermission(){
+        var s=snapshot();var account=s.balances().getFirst();var actor=mock(AppUserPrincipal.class);
+        var service=mock(StatementService.class);var clock=new com.sacco.mvp.service.ApplicationClock("Africa/Nairobi");
+        var controller=new StatementController(service,presentation,exporter,clock);
+        var run=new Run(s.id(),s.parameters().from(),s.parameters().through(),s.generatedAt(),false,true,s);
+        when(service.get(actor,s.id())).thenReturn(run);
+        var activity=java.util.stream.IntStream.range(0,35).mapToObj(i->new Activity(UUID.randomUUID(),PERIOD.from(),"JV-"+i,"Investment transaction",n("1"),n("0"),n(Integer.toString(i+1)),null)).toList();
+        when(service.activityExport(actor,s.id(),account.id())).thenReturn(activity);
+        var model=new ExtendedModelMap();
+        assertThat(controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),model,Locale.ENGLISH,new MockHttpServletResponse())).isEqualTo("accounting/statements/print");
+        verify(service).exportAccess(actor,run);verify(service).activityExport(actor,s.id(),account.id());
+        @SuppressWarnings("unchecked") var documents=(List<StatementPresentation.Document>)model.get("documents");
+        assertThat(documents).hasSize(1);assertThat(documents.getFirst().rows()).hasSize(37);
+        doThrow(new AccessDeniedException("Export denied")).when(service).exportAccess(actor,run);
+        clearInvocations(service);
+        assertThatThrownBy(()->controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),new ExtendedModelMap(),Locale.ENGLISH,new MockHttpServletResponse())).isInstanceOf(AccessDeniedException.class);
+        verify(service,never()).activityExport(any(),any(),any());
+    }
+    @Test void ledgerAndPackagePdfTextStaysInsideEveryPage()throws Exception{
+        var s=snapshot();var documents=new ArrayList<StatementPresentation.Document>();
+        for(var kind:List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL))documents.add(presentation.document(s,kind,s.balances(),Locale.ENGLISH));
+        documents.add(presentation.ledger(s,s.balances().getFirst(),List.of(),Locale.ENGLISH));
+        try(var pdf=Loader.loadPDF(exporter.export(s,documents,"PDF",Locale.ENGLISH))){
+            new PDFTextStripper(){
+                float pageWidth;
+                @Override protected void startPage(org.apache.pdfbox.pdmodel.PDPage page)throws IOException{pageWidth=page.getCropBox().getWidth();super.startPage(page);}
+                @Override protected void processTextPosition(org.apache.pdfbox.text.TextPosition text){
+                    assertThat(text.getXDirAdj()).isGreaterThanOrEqualTo(20);
+                    assertThat(text.getXDirAdj()+text.getWidthDirAdj()).isLessThanOrEqualTo(pageWidth-20);
+                    super.processTextPosition(text);
+                }
+            }.getText(pdf);
+            assertThat(pdf.getPage(6).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(6).getMediaBox().getHeight());
         }
     }
 }

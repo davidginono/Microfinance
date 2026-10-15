@@ -211,3 +211,16 @@ Standard Maven compilation passed. All 22 focused calculation, export, PostgreSQ
 No P0, P1 or P2 visual/interaction findings remain within this statement-workspace scope. The earlier blocked review above concerns the previous implementation and is preserved as history.
 
 final result: passed — current reference-layout and local browser acceptance; accounting completeness remains explicitly provisional.
+
+## Follow-up: settings wrapping, print clipping and tab navigation — 2026-10-15
+
+The user's two follow-up screenshots showed split Font/Density labels and a cropped rightmost ledger column in the browser print view. The downloaded ledger PDF was inspected separately: all glyphs, including Running balance and amounts, were already inside its 841.89 × 595.28 point page. The print problem came from fitting a wide PDF iframe into a portrait browser sheet.
+
+- Settings now keep each label and enhanced selector together. Checked rendered desktop/mobile screenshots; labels remain whole, controls stay inside the container, and the 360px document has equal client/scroll widths of 345px.
+- Print now uses the same frozen typed documents through a standalone print view with named A4 page rules, repeated headings, wrapped cells and no Details/source-link column. Browser print-to-PDF produced a landscape ledger (841.92 × 594.96 points) and a complete six-page package with portrait/landscape orientations matching each statement. No physical printer job was sent. PDF and Excel download behavior remains unchanged.
+- Statement tabs update the workspace through cancellable fetches. Browser document-loader identity remained unchanged across Financial position/Profit or loss switching and Back/Forward. Rapid Cash flow → Notes selection ended on Notes with no pending busy state. Export/print URLs followed the active report; display preferences were rebound after each replacement.
+- Standard compile and all 24 focused checks passed, including full-ledger print selection/export authorization and PDF glyph-boundary checks. Both generic table-contract classes retain the same eight failures on existing views/assets; this follow-up introduces no additional failures there.
+
+The test instance was restarted and normal OTP sign-in re-established. The browser tool briefly stalled during print-tab creation, then recovered; final print verification completed successfully.
+
+final result: passed — follow-up layout, navigation and print acceptance.

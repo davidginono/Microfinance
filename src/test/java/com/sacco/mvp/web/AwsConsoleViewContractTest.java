@@ -53,11 +53,12 @@ class AwsConsoleViewContractTest {
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
             if (isStandalonePrintView(path)) {
-                String prefix = path.getFileName().toString().equals("statement-print.jsp") ? "client-statement"
+                boolean statement = path.getParent().getFileName().toString().equals("statements");
+                String prefix = statement ? "financial-statement" : path.getFileName().toString().equals("statement-print.jsp") ? "client-statement"
                     : path.getParent().getFileName().toString().equals("vouchers") ? "voucher" : "loan";
                 assertThat(view).as(path.toString())
                     .contains("<!DOCTYPE html>", "name=\"viewport\"", "<body class=\"" + prefix + "-print\"")
-                    .contains("code=\"voucher.print\"")
+                    .contains("code=\"" + (statement ? "fs.print" : "voucher.print") + "\"")
                     .doesNotContain("fragments/header.jspf", "fragments/sidebar.jspf");
                 return;
             }
@@ -1335,7 +1336,8 @@ class AwsConsoleViewContractTest {
     private static boolean isStandalonePrintView(Path path) {
         return path.equals(JSP_ROOT.resolve("accounting/vouchers/print.jsp"))
             || path.equals(JSP_ROOT.resolve("accounting/loans/print.jsp"))
-            || path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp"));
+            || path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp"))
+            || path.equals(JSP_ROOT.resolve("accounting/statements/print.jsp"));
     }
 
     private static String read(Path path) {

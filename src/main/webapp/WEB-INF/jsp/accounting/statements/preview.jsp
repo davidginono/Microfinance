@@ -1,22 +1,24 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
 <c:set var="base" value="/reports/financial/statements/${run.id}" />
-<div class="accounting-workspace fs-workspace">
+<div class="accounting-workspace fs-workspace" data-tab-loading="<spring:message code='fs.tabLoading' />" data-tab-error="<spring:message code='fs.tabError' />">
  <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.preview" /></span></nav>
  <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.preview" /></h1><div class="accounting-actions">
   <c:if test="${not run.saved}"><form method="post" action="<c:url value='${base}/save' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="kind" value="${kind}" /><button class="app-btn btn-neutral"><spring:message code="fs.saveSnapshot" /></button></form></c:if>
   <span class="fs-status"><spring:message code="${run.saved?'fs.saved':'fs.preview'}" /> · <spring:message code="fs.provisional" /></span>
  </div></div>
- <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
+ <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
+ <p class="fs-tab-status fs-help" role="status" aria-live="polite" hidden></p>
  <div class="fs-toolbar">
   <details class="fs-view-settings"><summary><spring:message code="fs.viewSettings" /></summary><div class="fs-view-fields">
-   <label><spring:message code="fs.font" /><select class="aws-control" data-fs-font><option value="reference"><spring:message code="fs.referenceFont" /></option><option value="sans">Arial</option><option value="serif">Times New Roman</option><option value="mono">Courier New</option></select></label>
-   <label><spring:message code="fs.density" /><select class="aws-control" data-fs-density><option value="compact"><spring:message code="fs.compact" /></option><option value="comfortable"><spring:message code="fs.comfortable" /></option></select></label>
+   <label class="fs-select-setting"><span><spring:message code="fs.font" /></span><select class="aws-control" data-fs-font><option value="reference"><spring:message code="fs.referenceFont" /></option><option value="sans">Arial</option><option value="serif">Times New Roman</option><option value="mono">Courier New</option></select></label>
+   <label class="fs-select-setting"><span><spring:message code="fs.density" /></span><select class="aws-control" data-fs-density><option value="compact"><spring:message code="fs.compact" /></option><option value="comfortable"><spring:message code="fs.comfortable" /></option></select></label>
    <c:if test="${kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES'}"><label><input type="checkbox" checked data-fs-comparison /><spring:message code="fs.showComparison" /></label></c:if>
   <p class="fs-help"><spring:message code="fs.previewSettingsHelp" /></p></div></details>
   <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" class="accounting-actions">
    <input type="hidden" name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><input type="hidden" name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><input type="hidden" name="line" value="<c:out value='${line}' />" /></c:if><c:if test="${not empty account}"><input type="hidden" name="account" value="${account}" /></c:if>
-   <button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.pdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.excel" /></button><button class="app-btn btn-neutral" name="inline" value="true" data-download-action="true" data-print-action="true"><spring:message code="fs.print" /></button>
+   <c:url value="${base}/print" var="printUrl"><c:param name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><c:param name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><c:param name="line" value="${line}" /></c:if><c:if test="${not empty account}"><c:param name="account" value="${account}" /></c:if></c:url>
+   <button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.pdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.excel" /></button><a class="app-btn btn-neutral" href="<c:out value='${printUrl}' />" data-print-action="true"><spring:message code="fs.print" /></a>
   </form></sec:authorize>
  </div>
  <p class="fs-coverage"><spring:message code="fs.coverage" /></p>

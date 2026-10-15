@@ -51,15 +51,22 @@ public class StatementController {
         if(!Set.of("PDF","XLSX").contains(format))throw new IllegalArgumentException("fs.error.format");var run=statements.get(actor,id);statements.exportAccess(actor,run);
         boolean filtered=line!=null&&!line.isBlank()||account!=null;String language="sw".equals(locale.getLanguage())?"sw":"en";
         byte[] bytes=filtered?null:statements.artifact(actor,id,kind,format,language).orElse(null);
-        if(bytes==null){var documents=new ArrayList<StatementPresentation.Document>();
-            if(kind==Kind.ALL){for(var k:List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL))documents.add(presentation.document(run.snapshot(),k,run.snapshot().balances(),locale));}
-            else if(kind==Kind.LEDGER){if(account==null)throw new IllegalArgumentException("fs.error.selection");var activity=statements.activityExport(actor,id,account);var b=run.snapshot().balances().stream().filter(a->a.id().equals(account)).findFirst().orElseThrow();documents.add(presentation.ledger(run.snapshot(),b,activity,locale));}
-            else documents.add(presentation.document(run.snapshot(),kind,kind==Kind.TRIAL?statements.selected(run.snapshot(),selectionKind,line):run.snapshot().balances(),locale));
-            bytes=exporter.export(run.snapshot(),documents,format,locale);if(!filtered)bytes=statements.retain(actor,id,kind,format,language,bytes);
+        if(bytes==null){
+            bytes=exporter.export(run.snapshot(),documents(actor,run,kind,selectionKind,line,account,locale),format,locale);if(!filtered)bytes=statements.retain(actor,id,kind,format,language,bytes);
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
             .contentType(format.equals("PDF")?MediaType.APPLICATION_PDF:MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .header(HttpHeaders.CONTENT_DISPOSITION,(inline&&format.equals("PDF")?"inline":"attachment")+"; filename=statements-"+kind+"-"+run.through()+"."+format.toLowerCase(Locale.ROOT)).body(bytes);
+    }
+    @GetMapping("/{id}/print") public String print(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind,@RequestParam(defaultValue="POSITION") Kind selectionKind,@RequestParam(required=false) String line,@RequestParam(required=false) UUID account,Model model,Locale locale,jakarta.servlet.http.HttpServletResponse response){
+        var run=statements.get(actor,id);statements.exportAccess(actor,run);context(run,model);
+        model.addAttribute("documents",documents(actor,run,kind,selectionKind,line,account,locale));
+        response.setHeader("X-Content-Type-Options","nosniff");return "accounting/statements/print";
+    }
+    private List<StatementPresentation.Document> documents(AppUserPrincipal actor,Run run,Kind kind,Kind selectionKind,String line,UUID account,Locale locale){
+        if(kind==Kind.ALL)return List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL).stream().map(k->presentation.document(run.snapshot(),k,run.snapshot().balances(),locale)).toList();
+        if(kind==Kind.LEDGER){if(account==null)throw new IllegalArgumentException("fs.error.selection");var activity=statements.activityExport(actor,run.id(),account);var balance=run.snapshot().balances().stream().filter(a->a.id().equals(account)).findFirst().orElseThrow();return List.of(presentation.ledger(run.snapshot(),balance,activity,locale));}
+        return List.of(presentation.document(run.snapshot(),kind,kind==Kind.TRIAL?statements.selected(run.snapshot(),selectionKind,line):run.snapshot().balances(),locale));
     }
     private void context(Run run,Model model){model.addAttribute("run",run);model.addAttribute("snapshot",run.snapshot());model.addAttribute("generatedLabel",clock.zoned(run.snapshot().generatedAt()).format(java.time.format.DateTimeFormatter.ofPattern("EEE dd MMM yyyy HH:mm z")));model.addAttribute("kinds",List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL));}
     private static String key(IllegalArgumentException failure){return failure.getMessage()!=null&&failure.getMessage().startsWith("fs.error.")?failure.getMessage():"fs.error.request";}

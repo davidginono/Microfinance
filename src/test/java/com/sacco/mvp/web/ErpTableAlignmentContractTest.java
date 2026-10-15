@@ -77,6 +77,7 @@ class ErpTableAlignmentContractTest {
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp")))
                 // The user-supplied statement stationery has a document table, not a resource register.
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/statements/preview.jsp")))
+                .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/statements/print.jsp")))
                 .toList()) {
                 String view = Files.readString(path);
                 Matcher tableMatcher = TABLE_TAG.matcher(view);
