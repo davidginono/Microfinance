@@ -1,5 +1,7 @@
 # Accounting reset — 15 October 2026
 
+Subsequent user instruction on 15 October: the new [financial statement workspace](financial-statement-workspace.md) is authorized, including PDF/print/Excel and preview-only Details drill-down. It builds on the remaining posted ledger and does not reactivate archived policies, release gates, supplier/asset workflows or period-management pages.
+
 The following application pages, routes, services, forms and feature tests have been removed at the user's request:
 
 - Accounting policies and policy settings

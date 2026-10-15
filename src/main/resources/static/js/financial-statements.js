@@ -1,0 +1,7 @@
+(() => {
+ 'use strict';
+ const year=document.querySelector('[data-fs-year]');
+ if(year){const from=document.querySelector('input[name="from"]'),through=document.querySelector('input[name="through"]');year.addEventListener('change',()=>{if(!year.value)return;from.value=`${year.value}-01-01`;const end=`${year.value}-12-31`;through.value=end>through.dataset.today?through.dataset.today:end;});for(const field of [from,through])field.addEventListener('change',()=>{year.value='';});}
+ const paper=document.querySelector('[data-fs-paper]');
+ if(paper){const key=`statement-view:${paper.dataset.kind}`;let prefs={};try{prefs=JSON.parse(localStorage.getItem(key)||'{}');}catch(_){}const settings=[['font','[data-fs-font]',['reference','sans','serif','mono']],['density','[data-fs-density]',['compact','comfortable']]];for(const [name,selector,allowed] of settings){const control=document.querySelector(selector);if(!control)continue;if(allowed.includes(prefs[name]))control.value=prefs[name];paper.dataset[name]=control.value;control.addEventListener('change',()=>{paper.dataset[name]=control.value;prefs[name]=control.value;try{localStorage.setItem(key,JSON.stringify(prefs));}catch(_){}});}const comparison=document.querySelector('[data-fs-comparison]');if(comparison){comparison.checked=prefs.comparison!==false;const apply=()=>paper.dataset.comparison=comparison.checked?'shown':'hidden';apply();comparison.addEventListener('change',()=>{apply();prefs.comparison=comparison.checked;try{localStorage.setItem(key,JSON.stringify(prefs));}catch(_){}});}}
+})();

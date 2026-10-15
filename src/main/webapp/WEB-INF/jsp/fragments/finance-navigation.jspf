@@ -72,8 +72,8 @@
             </div>
         </div>
     </sec:authorize>
-    <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW')">
-        <c:set var="financeReportsActive" value="${fn:startsWith(requestUri, '/reports/financial/portfolio')}" />
+    <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')">
+        <c:set var="financeReportsActive" value="${fn:startsWith(requestUri, '/reports/financial/')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="financeReportsToggle" aria-controls="financeReportsPanel" aria-expanded="${financeReportsActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeReportsActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 3v18h18M7 14v3M12 9v8M17 5v12" /></svg></span>
@@ -81,6 +81,9 @@
                 <svg id="financeReportsChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
             <div id="financeReportsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                <a href="<c:url value='/reports/financial/statements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/reports/financial/statements' ? 'shell-nav-active' : ''}"><spring:message code="fs.workspace" /></a>
+                <a href="<c:url value='/reports/financial/statements/history' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/history') ? 'shell-nav-active' : ''}"><spring:message code="fs.history" /></a>
+                <a href="<c:url value='/reports/financial/statements/mappings' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/mappings') ? 'shell-nav-active' : ''}"><spring:message code="fs.mappings" /></a>
                 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW')">
                     <a href="<c:url value='/reports/financial/portfolio/configure' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial/portfolio') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="financial.portfolio.menu" /></a>
                 </sec:authorize>

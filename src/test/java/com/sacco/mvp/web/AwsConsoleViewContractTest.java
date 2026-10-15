@@ -79,13 +79,13 @@ class AwsConsoleViewContractTest {
                         content -> assertThat(content).contains("staff-loan-detail-header.jspf")
                     );
             }
-            if (view.contains("<table") && !isStandalonePrintView(path)) {
+            if (view.contains("<table") && !isStandalonePrintView(path) && !isStatementDocumentPreview(path)) {
                 assertThat(view)
                     .as(path.toString())
                     .contains("erp-table")
                     .contains("data-aws-table-region");
             }
-            if (view.matches("(?s).*method=[\"']get[\"'].*")) {
+            if (view.matches("(?s).*method=[\"']get[\"'].*") && !isStatementDocumentPreview(path)) {
                 assertThat(view)
                     .as(path.toString())
                     .satisfiesAnyOf(
@@ -242,6 +242,8 @@ class AwsConsoleViewContractTest {
                 if (!getForms.group().matches("(?is).*\\bmethod\\s*=\\s*[\"']get[\"'].*")) {
                     continue;
                 }
+                // These GET forms download immutable documents; they are not search/filter forms.
+                if (isStatementDocumentPreview(path) && getForms.group().contains("/export")) continue;
                 assertThat(getForms.group())
                     .as(path + " GET form")
                     .satisfiesAnyOf(
@@ -268,7 +270,7 @@ class AwsConsoleViewContractTest {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             paths.filter(path -> path.toString().endsWith(".jsp") || path.toString().endsWith(".jspf"))
                 .forEach(path -> {
-                    if (isStandalonePrintView(path)) return;
+                    if (isStandalonePrintView(path) || isStatementDocumentPreview(path)) return;
                     String view = read(path);
                     assertThat(view)
                         .as(path.toString())
@@ -1323,6 +1325,11 @@ class AwsConsoleViewContractTest {
             }
         }
         return false;
+    }
+
+    private static boolean isStatementDocumentPreview(Path path) {
+        // Reference financial stationery intentionally retains its own typography and columns.
+        return path.normalize().equals(JSP_ROOT.resolve("accounting/statements/preview.jsp").normalize());
     }
 
     private static boolean isStandalonePrintView(Path path) {

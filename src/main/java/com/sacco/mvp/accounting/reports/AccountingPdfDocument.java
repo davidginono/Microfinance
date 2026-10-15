@@ -20,6 +20,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
     private final List<String> context;
     private final PDImageXObject logo;
     private final Style style;
+    private final int firstPage;
     private final PDFont bodyFont,headingFont,titleFont;
     private PDPageContentStream stream;
     private float y;
@@ -35,6 +36,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
     }
     public AccountingPdfDocument(PDDocument document,PDFont font,boolean landscape,String title,List<String> context,PDImageXObject logo,Style style)throws IOException {
         this.document=document;this.font=font;this.title=title;this.context=context;this.logo=logo;
+        firstPage=document.getNumberOfPages();
         this.style=style;
         bodyFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
         headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
@@ -127,8 +129,8 @@ public final class AccountingPdfDocument implements AutoCloseable {
     }
     @Override public void close()throws IOException {
         if(finished)return;finished=true;if(stream!=null)stream.close();
-        for(int n=0;n<document.getNumberOfPages();n++)try(var footer=new PDPageContentStream(document,document.getPage(n),PDPageContentStream.AppendMode.APPEND,true,true)){
-            stream=footer;draw((n+1)+" / "+document.getNumberOfPages(),size.getWidth()-32,24,8,false,true);
+        for(int n=firstPage;n<document.getNumberOfPages();n++)try(var footer=new PDPageContentStream(document,document.getPage(n),PDPageContentStream.AppendMode.APPEND,true,true)){
+            stream=footer;draw((n-firstPage+1)+" / "+(document.getNumberOfPages()-firstPage),size.getWidth()-32,24,8,false,true);
         }stream=null;
     }
 }

@@ -182,3 +182,32 @@ Synthetic PDF samples were rendered with Poppler and inspected at up to 1250 pix
 - The browser tool timed out on both tab creation and surface inventory. Live page interactions, browser console state, and desktop/mobile screenshot comparison could not be verified. No full-suite, load-test or institution-policy approval claim is made.
 
 final result: blocked — live browser and mobile visual acceptance remains unverified; implementation, focused checks and PDF visual inspection completed.
+
+---
+
+# New financial statement workspace — 2026-10-15
+
+## References and implementation evidence
+
+Compared the six images attached to the current implementation request: financial position (`4d16de51`), trial balance (`1ee8d5b6`), cash flow (`d0f47bab`), equity (`74226c79`), profit or loss (`409c6818`) and notes (`cf598442`). Each source image and the corresponding final PDF rendering were inspected together. Synthetic rendered PDFs, XLSX files and page PNGs are in the ignored `target/statement-workspace/{POSITION,TRIAL,CASH_FLOW,EQUITY,INCOME,NOTES}.*` files.
+
+The new implementation uses the surviving posted ledger after the reset, at `/reports/financial/statements`. Browser acceptance used an isolated PostgreSQL database and a separate local application on port 8097. The existing application on port 8081 and its data were not restarted or modified. Normal password and OTP authentication was used; the test email sink was bound to loopback and sent no external messages.
+
+## Visual and interaction review
+
+- Reference families: Arial/Helvetica ordinary statements, Times trial/ledger, Courier equity matrix with a red sans-serif title. Exact raster font identity is not established from screenshots. Borderless rows, section spacing, numbered notes, comparison columns, parentheses and underlined totals preserve the reference hierarchy. Amounts align right on report paper; workspace registers retain the shared ERP alignment.
+- The enclosing workspace retains the existing JSP shell, sidebar and compact controls. Reviewed rendered desktop and tablet screenshots and mobile overflow. Document widths are intentionally contained in a keyboard-focusable horizontal scroll region. No page overflow at 360, 768, 1366 or 1920px viewport widths; toolbars and tabs wrap. The shared responsive sidebar settles offscreen on smaller widths.
+- Verified all six tabs, saved snapshot state, mapping search/selection/edit/save, history sorting with cleared selection, and font/density/comparison preferences. Preferences affect display only.
+- Verified Investments Details opens only its captured account in the trial balance, then its ledger with the originating journal-voucher link. Current permissions and branch boundaries are checked on each read/export.
+- Downloaded individual PDF/XLSX and complete six-statement PDF/XLSX packages through the real UI. The shared download handler clears the loader; no Details control or source-link column is exported. Print uses the PDF inline through the existing print handler. No physical printer job was submitted.
+- Corrected findings during review: assets-total placement, report date/timezone labels, UTF-8 JSP punctuation, long trial headings and download-form integration. Browser warning/error logs were empty after the final flow.
+
+Differences in balances, account labels, number of rows and fund columns are intentional: the screenshots are presentation references, not ledger data or institutional policy. Cash flow uses a documented direct method with operating/investing/financing sections. Cooperative savings/shares and reserve-allocation percentages were not imported. Coverage is explicitly provisional because source opening balances and reconciliation are not independently verified.
+
+## Verification and disposition
+
+Standard Maven compilation passed. All 22 focused calculation, export, PostgreSQL, route-reset and ledger-access checks passed, including complete six-document packages. The full suite run reported 1,028 tests, 11 failures, one error and 87 skips. Subsequently corrected the new export GET-form contract classification: download forms are not search filters. Repeating both adjusted generic table-contract classes reports eight remaining failures on existing views/assets; the new statement preview is explicitly treated as financial stationery, and its registers retain the resource-table contract. Other full-run failures concern existing dashboard/guarantor views and the loan-product controller fixture. Full-suite success and production throughput are not claimed.
+
+No P0, P1 or P2 visual/interaction findings remain within this statement-workspace scope. The earlier blocked review above concerns the previous implementation and is preserved as history.
+
+final result: passed — current reference-layout and local browser acceptance; accounting completeness remains explicitly provisional.
