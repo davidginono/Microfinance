@@ -31,7 +31,7 @@ public class LoanRepaymentLedgerService {
     private final ApplicationClock clock;
     private final AccessControlService access;
     private final AuditService audit;
-    private final com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
+    private final com.sacco.mvp.accounting.loans.service.LoanPostingGuard accountingGuard;
 
     // Called only by the actual disbursement transaction; never infer an opening balance for an old loan.
     @Transactional(propagation = Propagation.MANDATORY)

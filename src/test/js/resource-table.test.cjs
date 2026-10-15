@@ -205,17 +205,6 @@ test('fallback search clears record commands and preserves empty states and expo
     empty.dom.window.close();
 });
 
-test('search clears financial statement selection through its existing controller', async () => {
-    const markup=`<div data-statement-register>${table('statements','<tr data-statement-id="1"><td><input type="checkbox"></td><td>2026-10-01</td><td>Finalized</td></tr>','data-table-selection="single"').replace('<form method="get"><input name="search"></form>','<form id="statement-export" method="post"></form>')}<button data-statement-view disabled>View</button><button data-statement-export disabled>PDF</button><span data-statement-selection data-empty="" data-selected="Selected"></span></div>`;
-    const {dom, window:w, document:d}=await setup(markup,readFileSync('src/main/resources/static/js/financial-statements.js','utf8'));
-    d.querySelector('tbody input').click();
-    assert.equal(d.querySelector('[data-statement-view]').disabled,false);
-    const search=d.querySelector('.resource-table-search input'); search.value='missing'; search.dispatchEvent(new w.Event('input',{bubbles:true}));
-    assert.equal(d.querySelector('[data-statement-view]').disabled,true);
-    assert.equal(d.querySelector('[data-statement-export]').disabled,true);
-    assert.equal(d.querySelector('#statement-export').hasAttribute('action'),false);
-    dom.window.close();
-});
 test('a shared server pager supplies every associated table without losing a link', async () => {
     const {dom, document:d} = await setup(table('balances',row) + table('matches',row) + '<div data-table-pagination data-page="4" data-table-for="balances matches"><a data-page-direction="previous" href="?page=3&asOf=2026-10-13">Previous</a></div>');
     assert.equal(d.querySelectorAll('a.resource-table-page').length,2);

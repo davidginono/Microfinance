@@ -1,6 +1,5 @@
 package com.sacco.mvp.accounting.reports;
 
-import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -19,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
-import static com.sacco.mvp.accounting.reports.LedgerReportService.*;
+import static com.sacco.mvp.accounting.reports.LoanPortfolioReportService.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -33,7 +32,7 @@ class LoanPortfolioReportPostgresTest {
     String institution;AppUserPrincipal actor;Scope branch,wide;Parameters p;int number;
     @BeforeAll void start(){var ds=new DriverManagerDataSource(System.getenv("MICROFINANCE_ACCOUNTING_E_DATABASE_URL"),"microfinance_test","");Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);clock=mock(ApplicationClock.class);
-        var books=new LedgerReportRepository(new NamedParameterJdbcTemplate(jdbc));var access=new LedgerReportService(books,mock(AccountingPolicyService.class),members,claims,institutions,clock);repository=new LoanPortfolioReportRepository(new NamedParameterJdbcTemplate(jdbc));var proxy=new ProxyFactory(new LoanPortfolioReportService(access,books,repository));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(LoanPortfolioReportService)proxy.getProxy();}
+        repository=new LoanPortfolioReportRepository(new NamedParameterJdbcTemplate(jdbc));var proxy=new ProxyFactory(new LoanPortfolioReportService(members,claims,institutions,clock,repository));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(LoanPortfolioReportService)proxy.getProxy();}
     @BeforeEach void fixture(){reset(members,claims,institutions,clock);institution="PORTFOLIO-"+UUID.randomUUID();number=1000;
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic portfolio tests");
         for(String b:List.of("B1","B2")){jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at,access_status) values(?,?,?,true,now(),now(),'ACTIVE')",UUID.randomUUID(),institution,b);when(institutions.findStation(institution,b)).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId(b).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));}

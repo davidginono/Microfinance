@@ -1,5 +1,7 @@
 # Accounting Package And Report Customization Goal
 
+2026-10-15 reset: The user requested removal of accounting policies, financial statements, suppliers, accounting releases, source opening balances, reconciliation, period management, Business entries and Assets. Their pages and workflows have been removed. The requirements below are historical and must not be used to recreate them; wait for the user's new instructions. Applied migrations and financial history remain protected.
+
 Created: 2026-10-02. Target: Tanzania Mainland Tier 2, non-deposit-taking microfinance, initially individual business lending.
 
 2026-10-08 user mandate: core receipt/payment/journal vouchers now use direct accountant posting, not approval or verification queues. PDF and print are the only accounting/report outputs. Earlier CSV/XLSX and core maker/checker items below are superseded for this scope, not completion claims. See [core voucher architecture](core-accounting-vouchers.md); legacy specialized accounting/lending safeguards remain separate.

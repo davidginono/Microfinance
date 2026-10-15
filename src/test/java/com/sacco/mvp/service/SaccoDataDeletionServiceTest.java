@@ -4,15 +4,9 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
-import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.reporting.OperationalReportTemplateService;
-import com.sacco.mvp.accounting.reconciliation.ReconciliationService;
 import com.sacco.mvp.reporting.execution.service.ReportRunService;
-import com.sacco.mvp.accounting.statements.StatementDesignerService;
-import com.sacco.mvp.accounting.business.repository.BusinessAccountingRepository;
-import com.sacco.mvp.accounting.reports.CashFlowAllocationService;
-import com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService;
 
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
@@ -38,15 +32,10 @@ class SaccoDataDeletionServiceTest {
     @Mock SaccoRegistryService registry;
     @Mock SaccoLogoStorageService logos;
     @Mock StoredUploadStorageService uploads;
-    @Mock AccountingPolicyService accountingPolicies;
     @Mock GeneralLedgerService generalLedger;
+    @Mock com.sacco.mvp.accounting.repository.RetainedFinancialHistoryRepository retainedHistory;
     @Mock OperationalReportTemplateService reportTemplates;
-    @Mock ReconciliationService reconciliationHistory;
     @Mock ReportRunService reportRuns;
-    @Mock StatementDesignerService financialStatements;
-    @Mock BusinessAccountingRepository businessHistory;
-    @Mock CashFlowAllocationService cashFlowHistory;
-    @Mock AccountingReleaseGateService accountingReleaseHistory;
     @InjectMocks SaccoDataDeletionService service;
 
     @Test
@@ -80,14 +69,14 @@ class SaccoDataDeletionServiceTest {
             .saccoId("I-PG").saccoName("Preview Finance").active(true).build()));
         assertThatThrownBy(() -> service.deleteSacco("I-PG", "wrong confirmation"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("confirmation phrase");
-        verifyNoInteractions(jdbc, uploads, logos, registry, accountingPolicies, generalLedger, reportTemplates, reconciliationHistory, reportRuns, financialStatements, businessHistory, cashFlowHistory, accountingReleaseHistory);
+        verifyNoInteractions(jdbc, uploads, logos, registry, retainedHistory, generalLedger, reportTemplates, reportRuns);
     }
 
     @Test
-    void institutionWithOnlyPolicyEvidenceIsBlockedBeforeFilesystemDeletion() {
+    void institutionWithRetainedFinancialEvidenceIsBlockedBeforeFilesystemDeletion() {
         when(institutions.findById("I-PG")).thenReturn(Optional.of(RegisteredSacco.builder()
             .saccoId("I-PG").saccoName("Preview Finance").active(true).build()));
-        when(accountingPolicies.hasInstitutionHistory("I-PG")).thenReturn(true);
+        when(retainedHistory.hasInstitutionHistory("I-PG")).thenReturn(true);
         assertThatThrownBy(() -> service.deleteSacco("I-PG", "delete Preview Finance and all its data"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be deleted");
         verifyNoInteractions(jdbc, uploads, logos, registry, generalLedger);
@@ -104,11 +93,11 @@ class SaccoDataDeletionServiceTest {
     }
 
     @Test
-    void formerOfficerWithOnlyPolicyReviewEvidenceCannotBeDeleted() {
+    void formerReviewerWithRetainedFinancialEvidenceCannotBeDeleted() {
         UUID id = UUID.randomUUID();
         when(members.findById(id)).thenReturn(Optional.of(Member.builder().id(id).fullName("Former Officer")
             .position(Position.MINOR_ADMIN).status(MemberStatus.INACTIVE).build()));
-        when(accountingPolicies.hasMemberHistory(id)).thenReturn(true);
+        when(retainedHistory.hasMemberHistory(id)).thenReturn(true);
         assertThatThrownBy(() -> service.deleteRevokedMinorAdmin(id, "delete Former Officer"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be deleted");
         verifyNoInteractions(jdbc, uploads, logos, registry, generalLedger);
@@ -146,52 +135,12 @@ class SaccoDataDeletionServiceTest {
         verifyNoInteractions(jdbc, uploads, logos, registry);
     }
     @Test
-    void institutionWithOnlyReconciliationHistoryCannotDeleteFiles() {
-        institutionFixture();when(reconciliationHistory.hasInstitutionHistory("I-PG")).thenReturn(true);institutionBlocked();
-    }
-    @Test
     void institutionWithOnlyFrozenReportRunsCannotDeleteFiles() {
         institutionFixture();when(reportRuns.hasInstitutionHistory("I-PG")).thenReturn(true);institutionBlocked();
     }
     @Test
-    void formerReviewerWithOnlyCloseHistoryCannotBeDeleted() {
-        UUID id=formerOfficerFixture();when(reconciliationHistory.hasMemberHistory(id)).thenReturn(true);officerBlocked(id);
-    }
-    @Test
     void formerReviewerWithOnlyFrozenReportRunHistoryCannotBeDeleted() {
         UUID id=formerOfficerFixture();when(reportRuns.hasMemberHistory(id)).thenReturn(true);officerBlocked(id);
-    }
-    @Test
-    void institutionWithOnlyRetainedFinancialStatementHistoryCannotDeleteFiles() {
-        institutionFixture();when(financialStatements.hasInstitutionHistory("I-PG")).thenReturn(true);institutionBlocked();
-    }
-    @Test
-    void formerReviewerWithOnlyStatementMappingOrSubmissionHistoryCannotBeDeleted() {
-        UUID id=formerOfficerFixture();when(financialStatements.hasMemberHistory(id)).thenReturn(true);officerBlocked(id);
-    }
-    @Test
-    void institutionWithOnlyBusinessSourceOrSupplierEvidenceCannotDeleteFiles() {
-        institutionFixture();when(businessHistory.hasInstitutionHistory("I-PG")).thenReturn(true);institutionBlocked();
-    }
-    @Test
-    void formerOfficerWithOnlyBusinessSourceOrSupplierEvidenceCannotBeDeleted() {
-        UUID id=formerOfficerFixture();when(businessHistory.hasMemberHistory(id)).thenReturn(true);officerBlocked(id);
-    }
-    @Test
-    void institutionWithOnlyCashFlowClassificationEvidenceCannotDeleteFiles() {
-        institutionFixture();when(cashFlowHistory.hasInstitutionHistory("I-PG")).thenReturn(true);institutionBlocked();
-    }
-    @Test
-    void formerCashFlowClassificationReviewerCannotBeDeleted() {
-        UUID id=formerOfficerFixture();when(cashFlowHistory.hasMemberHistory(id)).thenReturn(true);officerBlocked(id);
-    }
-    @Test
-    void institutionWithOnlyStatementFilesOrReleaseReviewsCannotDeleteFiles() {
-        institutionFixture();when(accountingReleaseHistory.hasInstitutionHistory("I-PG")).thenReturn(true);institutionBlocked();
-    }
-    @Test
-    void formerStatementFileOrReleaseReviewerCannotBeDeleted() {
-        UUID id=formerOfficerFixture();when(accountingReleaseHistory.hasMemberHistory(id)).thenReturn(true);officerBlocked(id);
     }
     private void institutionFixture() {
         when(institutions.findById("I-PG")).thenReturn(Optional.of(RegisteredSacco.builder().saccoId("I-PG").saccoName("Preview Finance").active(true).build()));

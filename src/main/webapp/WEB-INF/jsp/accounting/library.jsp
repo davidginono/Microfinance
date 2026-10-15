@@ -51,7 +51,7 @@
                 <tr data-library-row data-id="${r.id}" data-active="${r.active}" data-url="<c:out value='${recordUrl}' />">
                 <td class="coa-selection-cell"><input type="checkbox" name="library-selection" value="${r.id}" aria-label="<spring:message code='coa.select' /> <c:out value='${r.code}' />" /></td>
                 <td data-library-code><c:out value="${r.code}" /></td><td data-library-name><c:out value="${r.name}" /><c:if test="${not empty r.description}"><small class="coa-description"><c:out value="${r.description}" /></small></c:if></td>
-                <c:if test="${not isActivity}"><td><c:out value="${r.activityCode}" /></td><td><spring:message code="accounting.policy.event.${r.sourceEvent}" /></td><td><c:choose><c:when test="${r.hasTemplate}"><spring:message code="library.configured" /></c:when><c:otherwise><spring:message code="library.noTemplate" /></c:otherwise></c:choose></td></c:if>
+                <c:if test="${not isActivity}"><td><c:out value="${r.activityCode}" /></td><td><spring:message code="library.event.${r.sourceEvent}" /></td><td><c:choose><c:when test="${r.hasTemplate}"><spring:message code="library.configured" /></c:when><c:otherwise><spring:message code="library.noTemplate" /></c:otherwise></c:choose></td></c:if>
                 <td><spring:message code="accounting.active.${r.active}" /></td>
             </tr></c:forEach><c:if test="${empty records.rows}"><tr><td colspan="${isActivity?4:7}"><div class="accounting-empty"><spring:message code="${not empty search or not empty state or not empty activity?'coa.noMatches':isActivity?'library.emptyActivities':'library.emptyTransactions'}" /></div></td></tr></c:if></tbody>
         </table></div>

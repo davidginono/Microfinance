@@ -271,7 +271,7 @@ class LoanRepaymentLedgerPostgresTest {
                 LoanRepaymentTransactionRepository payments, LoanRepaymentAllocationRepository allocations, LoanJournalEntryRepository journal,
                 LoanApplicationRepository loans, ObjectMapper mapper, ApplicationClock clock, AccessControlService access, AuditService audit) {
             return new LoanRepaymentLedgerService(ledgers, installments, payments, allocations, journal, loans, mapper, clock, access, audit,
-                org.mockito.Mockito.mock(com.sacco.mvp.accounting.business.service.BusinessAccountingGuard.class));
+                org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanPostingGuard.class));
         }
     }
 }

@@ -6,6 +6,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
     @Test
+    void removedAccountingPermissionsCannotBeAssignedOrRestoredFromStorage() {
+        var retired = java.util.List.of(UserClaim.ACCOUNTING_POLICIES_VIEW, UserClaim.ACCOUNTING_OPENINGS_CREATE,
+            UserClaim.ACCOUNTING_PERIODS_CREATE, UserClaim.ACCOUNTING_RELEASE_VIEW,
+            UserClaim.ACCOUNTING_BUSINESS_APPROVE, UserClaim.ACCOUNTING_JOURNALS_APPROVE);
+        for (var claim : retired) {
+            assertThat(UserClaim.fromStoredName(claim.name())).isEmpty();
+            assertThat(UserClaim.expandLegacy(java.util.List.of(claim))).isEmpty();
+            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().containsValue(claim));
+        }
+        assertThat(UserClaim.fromStoredName("ACCOUNTING_BUSINESS_CREATE")).contains(UserClaim.ACCOUNTING_BUSINESS_CREATE);
+        assertThat(UserClaim.fromStoredName("ACCOUNTING_JOURNALS_CREATE")).contains(UserClaim.ACCOUNTING_JOURNALS_CREATE);
+    }
+
+    @Test
     void roleLabelsUseMicrofinanceLanguageWithoutRenamingStoredRoles() {
         assertThat(Position.MEMBER.getDisplayName()).isEqualTo("Client");
         assertThat(Position.MINOR_ADMIN.getDisplayName()).isEqualTo("Institution Admin");

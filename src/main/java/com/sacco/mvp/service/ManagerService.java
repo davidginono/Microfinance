@@ -45,7 +45,7 @@ public class ManagerService {
     private final ObjectMapper objectMapper;
     private final RepaymentScheduleService repaymentScheduleService;
     private final LoanRepaymentLedgerService loanRepaymentLedgerService;
-    private final com.sacco.mvp.accounting.business.service.BusinessAccountingGuard accountingGuard;
+    private final com.sacco.mvp.accounting.loans.service.LoanPostingGuard accountingGuard;
     private final com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService disbursementNumbers;
 
     public ManagerDashboard dashboard(String saccoId) {

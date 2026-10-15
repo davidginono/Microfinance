@@ -2,7 +2,6 @@ package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.AccountingLibraryDtos.*;
 import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.AccountCommand;
-import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.repository.*;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -39,7 +38,7 @@ class AccountingCodeLibraryPostgresTest {
         var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
         var clock=mock(ApplicationClock.class);when(clock.now()).thenReturn(OffsetDateTime.now());
-        ledger=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),mock(AccountingPolicyService.class),new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)),manager);
+        ledger=proxy(new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions),manager);
         service=proxy(new AccountingCodeLibraryService(new AccountingCodeLibraryRepository(jdbc),ledger,audit,clock),manager);
     }
     private void seedPreviousTemplates(DriverManagerDataSource ds) {

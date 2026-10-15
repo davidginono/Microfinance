@@ -3,11 +3,10 @@ package com.sacco.mvp.accounting.loans;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
 import com.sacco.mvp.accounting.loans.repository.LoanRecordingRepository;
 import com.sacco.mvp.accounting.loans.service.LoanRecordingService;
-import com.sacco.mvp.accounting.business.repository.BusinessAccountingRepository;
-import com.sacco.mvp.accounting.business.service.BusinessAccountingGuard;
+import com.sacco.mvp.accounting.loans.repository.LoanPostingAuthorizationRepository;
+import com.sacco.mvp.accounting.loans.service.LoanPostingGuard;
 import com.sacco.mvp.accounting.repository.*;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
-import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -402,9 +401,9 @@ class LoanRecordingPostgresTest {
         @Bean MemberDirectoryService directory(){return mock(MemberDirectoryService.class);}
         @Bean UserClaimService claims(){return mock(UserClaimService.class);}
         @Bean SaccoRegistryService institutions(){return mock(SaccoRegistryService.class);}
-        @Bean GeneralLedgerService accounting(JdbcTemplate j,AuditService audit,ApplicationClock clock,UserClaimService claims,MemberDirectoryService directory,SaccoRegistryService institutions){return new GeneralLedgerService(new GeneralLedgerRepository(j),mock(AccountingPolicyService.class),new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class));}
-        @Bean BusinessAccountingGuard guard(JdbcTemplate j,ObjectMapper mapper){return new BusinessAccountingGuard(new BusinessAccountingRepository(j,mapper));}
-        @Bean LoanRepaymentLedgerService repayments(LoanLedgerRepository ledgers,LoanLedgerInstallmentRepository installments,LoanRepaymentTransactionRepository transactions,LoanRepaymentAllocationRepository allocations,LoanJournalEntryRepository journal,LoanApplicationRepository loans,ObjectMapper mapper,ApplicationClock clock,AuditService audit,BusinessAccountingGuard guard){return new LoanRepaymentLedgerService(ledgers,installments,transactions,allocations,journal,loans,mapper,clock,new AccessControlService(),audit,guard);}
+        @Bean GeneralLedgerService accounting(JdbcTemplate j,AuditService audit,ApplicationClock clock,UserClaimService claims,MemberDirectoryService directory,SaccoRegistryService institutions){return new GeneralLedgerService(new GeneralLedgerRepository(j),new AccessControlService(),audit,clock,claims,directory,institutions);}
+        @Bean LoanPostingGuard guard(JdbcTemplate j,ObjectMapper mapper){return new LoanPostingGuard(new LoanPostingAuthorizationRepository(j));}
+        @Bean LoanRepaymentLedgerService repayments(LoanLedgerRepository ledgers,LoanLedgerInstallmentRepository installments,LoanRepaymentTransactionRepository transactions,LoanRepaymentAllocationRepository allocations,LoanJournalEntryRepository journal,LoanApplicationRepository loans,ObjectMapper mapper,ApplicationClock clock,AuditService audit,LoanPostingGuard guard){return new LoanRepaymentLedgerService(ledgers,installments,transactions,allocations,journal,loans,mapper,clock,new AccessControlService(),audit,guard);}
         LoanProductWorkflowService contextWorkflows(ObjectMapper mapper,LoanProductSettingRepository products){return new LoanProductWorkflowService(mapper,products,mock(com.sacco.mvp.repository.SaccoSettingsRepository.class));}
         @Bean WorkflowRoutingService routing(ObjectMapper mapper,LoanProductSettingRepository products,com.sacco.mvp.repository.SaccoSettingsRepository settings,com.sacco.mvp.repository.BoardReviewRepository board,com.sacco.mvp.repository.LoanProductBoardReviewerRepository assigned){return new WorkflowRoutingService(settings,new ApprovalFlowService(),board,assigned,products,mock(RoleDirectoryService.class),contextWorkflows(mapper,products),mock(OutboxService.class));}
         @Bean LoanRecordingService recording(JdbcTemplate j,LoanApplicationRepository loans,LoanProductSettingRepository products,LoanRepaymentLedgerService repayments,GeneralLedgerService accounting,ObjectMapper mapper,ApplicationClock clock,AuditService audit,com.sacco.mvp.repository.StoredUploadRepository uploadRepository,WorkflowRoutingService routing,com.sacco.mvp.repository.LoanProductBoardReviewerRepository contextReviewers,com.sacco.mvp.repository.ManagerReviewRepository contextReviews){var storage=new StoredUploadStorageService(uploadRepository);org.springframework.test.util.ReflectionTestUtils.setField(storage,"uploadsRoot","target/request-upload-fixture");var numbers=mock(ApplicationNumberService.class);var next=new AtomicLong(1000000000);when(numbers.nextFor(anyString())).thenAnswer(i->next.incrementAndGet());return new LoanRecordingService(new LoanRecordingRepository(j),loans,products,numbers,new RepaymentScheduleService(mapper,products),repayments,accounting,new VoucherRepository(j),mapper,clock,audit,new LoanAttachmentService(mapper,mock(AdminAlertService.class),storage),new com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService(new com.sacco.mvp.accounting.loans.repository.LoanNumberRepository(j),new VoucherRepository(j),clock),contextWorkflows(mapper,products),routing,contextReviewers,contextReviews);}

@@ -2,7 +2,6 @@ package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
 import com.sacco.mvp.accounting.repository.*;
-import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -30,7 +29,7 @@ import static org.mockito.Mockito.*;
 class VoucherPostgresTest {
  HikariDataSource dataSource;
  JdbcTemplate jdbc; VoucherService service; TransactionTemplate tx; AuditService audit; UserClaimService claims; MemberDirectoryService directory;
- SaccoRegistryService institutions; AccountingPolicyService policies; String institution; AppUserPrincipal actor; UUID cash,capital,expense,control;
+ SaccoRegistryService institutions; String institution; AppUserPrincipal actor; UUID cash,capital,expense,control;
  final LocalDate day=LocalDate.of(2026,10,1); final OffsetDateTime now=OffsetDateTime.parse("2026-10-08T10:00:00+03:00");
  @BeforeAll void start(){
   var ds=new HikariDataSource();dataSource=ds;ds.setJdbcUrl(System.getenv("MICROFINANCE_VOUCHER_TEST_URL"));ds.setUsername("microfinance_test");ds.setPassword("");ds.addDataSourceProperty("sslmode","disable");ds.setMinimumIdle(1);ds.setMaximumPoolSize(4);ds.setConnectionTimeout(60000);
@@ -41,15 +40,15 @@ class VoucherPostgresTest {
   assertThat(jdbc.queryForObject("select character_maximum_length from information_schema.columns where table_schema=current_schema() and table_name='accounting_voucher_transaction' and column_name='transaction_name'",Integer.class)).isEqualTo(240);
   assertThat(jdbc.queryForObject("select count(*) from pg_trigger where tgname in ('core_voucher_commit','core_journal_commit') and tgdeferrable and tginitdeferred",Integer.class)).isEqualTo(2);
   var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
-  audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);policies=mock(AccountingPolicyService.class);
+  audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate());when(clock.now()).thenReturn(now);
-  var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,clock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class));
+  var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
   var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build());
   var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(VoucherService)proxy.getProxy();
  }
  @AfterAll void stop(){if(dataSource!=null)dataSource.close();}
  @BeforeEach void fixture(){
-  reset(audit,claims,directory,institutions,policies);institution="V-"+UUID.randomUUID();
+  reset(audit,claims,directory,institutions);institution="V-"+UUID.randomUUID();
   jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?, 'Synthetic voucher institution',true,now(),now())",institution);
   when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
   when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
@@ -65,7 +64,7 @@ class VoucherPostgresTest {
   f.getRows().getFirst().setAmount(new BigDecimal("1.00"));assertThatThrownBy(()->service.post(actor,Type.RECEIPT,f)).hasMessage("voucher.error.retry");
   assertThatThrownBy(()->jdbc.update("update accounting_voucher set total=1 where id=?",v.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
   assertThatThrownBy(()->jdbc.update("delete from accounting_voucher_transaction where voucher_id=?",v.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
-  verifyNoInteractions(policies);
+
  }
  @Test void paymentAndJournalDirectionsAndSameAccountSplits(){
   var payment=service.post(actor,Type.PAYMENT,form(Type.PAYMENT));assertThat(payment.transactions()).allSatisfy(t->assertThat(t.credit().id()).isEqualTo(cash));
@@ -123,7 +122,7 @@ class VoucherPostgresTest {
  @Test void configuredMappingsAreResolvedOnServerSnapshottedAndStaleRevisionsFail(){
   var configClock=mock(ApplicationClock.class);when(configClock.now()).thenReturn(now);when(configClock.today()).thenReturn(now.toLocalDate());
   var library=new AccountingCodeLibraryService(new AccountingCodeLibraryRepository(jdbc),
-   new GeneralLedgerService(new GeneralLedgerRepository(jdbc),policies,new AccessControlService(),audit,configClock,claims,directory,institutions,mock(com.sacco.mvp.reporting.execution.service.AccountingReleaseGateService.class)),audit,configClock);
+   new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,configClock,claims,directory,institutions),audit,configClock);
   var activityForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();activityForm.setCode("OPS");activityForm.setName("Operations");
   UUID activity=tx.execute(s->library.createActivity(actor,activityForm));var transactionForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();transactionForm.setActivityId(activity);transactionForm.setCode("RECEIVE");transactionForm.setName("Operating income "+"x".repeat(143));
   UUID transaction=tx.execute(s->library.createTransaction(actor,transactionForm));

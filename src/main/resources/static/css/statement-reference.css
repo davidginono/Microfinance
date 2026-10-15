@@ -22,19 +22,6 @@
 .reference-notes h3 { font: bold 14px Arial, sans-serif; }
 .reference-notes ol { padding-left: 22px; list-style: decimal; }
 .reference-notes li { margin: 6px 0; white-space: pre-line; }
-.reference-CHANGES_IN_EQUITY { font-family: "Courier New", Courier, monospace; }
-.reference-trial { font-family: "Times New Roman", Times, serif; }
-.reference-trial .reference-period { font-family: "Courier New", Courier, monospace; }
-.reference-CHANGES_IN_EQUITY .reference-title { color: #f00; font-weight: bold; }
-.reference-CHANGES_IN_EQUITY .equity-matrix { margin: 44px 0 30px; min-width: 900px; }
-.reference-CHANGES_IN_EQUITY .equity-matrix th { min-width: 140px; font-weight: bold; text-transform: none; padding-bottom: 32px; }
-.reference-CHANGES_IN_EQUITY .equity-matrix td { white-space: nowrap; }
-.reference-trial .reference-title { font-family: "Times New Roman", Times, serif; text-decoration: underline; }
-.reference-trial .reference-table { min-width: 1000px; font-size: 13px; }
-.reference-trial .reference-table thead { font-family: "Times New Roman", Times, serif; }
-.reference-trial .reference-table th { font-weight: bold; text-decoration: underline; }
-.reference-account .reference-title { font-weight: bold; text-decoration: underline; }
-.reference-account .reference-table thead th { background: #d9d9d9; padding: 5px; text-transform: none; }
 .reference-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px 32px; margin: 20px 0 12px; }
 .reference-facts > div { display: flex; gap: 20px; min-width: 0; }
 .reference-facts dt { font-weight: bold; }

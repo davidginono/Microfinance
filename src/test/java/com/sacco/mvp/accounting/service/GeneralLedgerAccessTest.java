@@ -1,6 +1,5 @@
 package com.sacco.mvp.accounting.service;
 
-import com.sacco.mvp.accounting.policy.AccountingPolicyService;
 import com.sacco.mvp.accounting.repository.GeneralLedgerRepository;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -45,7 +44,6 @@ class GeneralLedgerAccessTest {
         verifyNoInteractions(books);
     }
     @Mock GeneralLedgerRepository books;
-    @Mock AccountingPolicyService policies;
     @Mock AuditService audit;
     @Mock ApplicationClock clock;
     @Mock UserClaimService userClaims;
@@ -97,6 +95,6 @@ class GeneralLedgerAccessTest {
 
     private void deniedBeforeReadingBooks() {
         assertThatThrownBy(() -> service.accounts(actor, 0)).isInstanceOf(AccessDeniedException.class);
-        verifyNoInteractions(books, policies, audit);
+        verifyNoInteractions(books, audit);
     }
 }

@@ -87,7 +87,7 @@
         if (duplicateHeading && duplicateHeading.textContent.trim() === titlebar.querySelector('h2,h3')?.textContent.trim()) duplicateHeading.remove();
         scroller.tabIndex = 0; scroller.setAttribute('role', 'region');
         scroller.setAttribute('aria-label', titlebar.querySelector('h2,h3')?.textContent.trim() || l.records);
-        let actions = titlebar.querySelector('.accounting-actions, .app-table-toolbar, .business-actions, .reconciliation-actions');
+        let actions = titlebar.querySelector('.accounting-actions, .app-table-toolbar');
         if (!actions) { actions = node('div', 'app-table-toolbar'); titlebar.append(actions); }
         actions.classList.add('resource-table-actions');
         document.querySelectorAll('[data-table-toolbar-for]').forEach(group => {

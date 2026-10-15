@@ -2,7 +2,7 @@ package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.AccountingLibraryDtos.*;
 import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.Page;
-import com.sacco.mvp.accounting.policy.PostingEvent;
+import com.sacco.mvp.accounting.dto.AccountingEvent;
 import com.sacco.mvp.accounting.repository.AccountingCodeLibraryRepository;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -71,7 +71,7 @@ public class AccountingCodeLibraryService {
     @Transactional(readOnly=true)
     public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,String sourceEvent,int page) {
         authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);
-        require(sourceEvent!=null && (sourceEvent.isEmpty() || Arrays.stream(PostingEvent.values()).anyMatch(e->e.name().equals(sourceEvent))),"sourceEvent");
+        require(sourceEvent!=null && (sourceEvent.isEmpty() || Arrays.stream(AccountingEvent.values()).anyMatch(e->e.name().equals(sourceEvent))),"sourceEvent");
         return slice(library.transactionRegister(actor.getSaccoId(),activity,term(search),state,sourceEvent,page*25),page);
     }
     @Transactional
@@ -92,7 +92,7 @@ public class AccountingCodeLibraryService {
     @Transactional
     public UUID createTransaction(AppUserPrincipal actor,CodeForm form) {
         authorize(actor,"CREATE");validateCode(form);require(activity(actor,form.getActivityId(),true).active(),"inactiveActivity");
-        require(Arrays.stream(PostingEvent.values()).anyMatch(e->e.name().equals(form.getSourceEvent())),"sourceEvent");
+        require(Arrays.stream(AccountingEvent.values()).anyMatch(e->e.name().equals(form.getSourceEvent())),"sourceEvent");
         UUID id=library.createTransaction(actor.getSaccoId(),form,actor.getMemberId(),clock.now());event(actor,id,"TRANSACTION_CODE_CREATED");return id;
     }
     @Transactional

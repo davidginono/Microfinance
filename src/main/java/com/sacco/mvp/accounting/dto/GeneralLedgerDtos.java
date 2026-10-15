@@ -1,8 +1,5 @@
 package com.sacco.mvp.accounting.dto;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,20 +22,5 @@ public final class GeneralLedgerDtos {
     public record AccountFilter(String search,String type,String kind,String state,UUID parentId) {
         public AccountFilter(String search,String type,String kind,String state) {this(search,type,kind,state,null);}
     }
-    public record DisplayLine(String code,String name,BigDecimal debit,BigDecimal credit) { }
-    public record Line(UUID accountId, BigDecimal debit, BigDecimal credit) { }
-    public record JournalCommand(UUID requestKey, String sourceReference, LocalDate effectiveDate,
-                                 String evidenceReference, String reason, List<Line> lines) { }
-    public record Journal(UUID id, String institutionId, String branchId, UUID policyId, int policyVersion,
-                          UUID periodId, String sourceType, String sourceReference, UUID requestKey,
-                          String payloadHash, String state, String evidenceReference, String reason,
-                          LocalDate effectiveDate, UUID makerId, UUID checkerId, OffsetDateTime recordedAt,
-                          OffsetDateTime postedAt, UUID reversesId, List<Line> lines, boolean reversed) { }
-    public record SourceCancellation(UUID journal,UUID maker,UUID checker,String sourceEvent,String sourceReference,
-                                     String previousState,String evidence,String payloadChecksum,OffsetDateTime recordedAt) { }
-    public record Period(UUID id, String institutionId, LocalDate startsOn, LocalDate endsOn,
-                         String state, UUID policyId) { }
-    public record Coverage(boolean reviewedOpening, Long unbridgedOperationalVouchers,
-                           Long uncoveredLegacyLoans, String status) { }
     public record Page<T>(List<T> rows, int page, boolean hasNext) { }
 }

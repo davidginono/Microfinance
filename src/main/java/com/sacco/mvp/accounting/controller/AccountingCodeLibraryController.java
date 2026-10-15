@@ -1,7 +1,7 @@
 package com.sacco.mvp.accounting.controller;
 
 import com.sacco.mvp.accounting.dto.AccountingLibraryDtos.*;
-import com.sacco.mvp.accounting.policy.PostingEvent;
+import com.sacco.mvp.accounting.dto.AccountingEvent;
 import com.sacco.mvp.accounting.service.AccountingCodeLibraryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -132,7 +132,7 @@ public class AccountingCodeLibraryController {
         model.addAttribute("transaction",selected);model.addAttribute("transactionChoices",choices);
         model.addAttribute("isTransactions",true);
         model.addAttribute("activity",activityId==null?null:library.activity(actor,activityId));model.addAttribute("activityFilters",library.activities(actor,"","",0));
-        model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());model.addAttribute("sourceEvent",sourceEvent);model.addAttribute("state",state);
+        model.addAttribute("sourceEvents",Arrays.stream(AccountingEvent.values()).map(Enum::name).toList());model.addAttribute("sourceEvent",sourceEvent);model.addAttribute("state",state);
         if(selected!=null) {model.addAttribute("template",library.template(actor,selected.id()));}
         return "accounting/library-transaction";
     }
@@ -143,7 +143,7 @@ public class AccountingCodeLibraryController {
         model.addAttribute("accountChoices",library.accounts(actor,search,page));model.addAttribute("accountSearch",search);return "accounting/library-template-form";
     }
     private String codeForm(Model model,Activity activity) {
-        model.addAttribute("activity",activity);model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());return "accounting/library-code-form";
+        model.addAttribute("activity",activity);model.addAttribute("sourceEvents",Arrays.stream(AccountingEvent.values()).map(Enum::name).toList());return "accounting/library-code-form";
     }
     private String register(AppUserPrincipal actor,boolean transactions,UUID activityId,String search,String state,int page,Model model) {
         return register(actor,transactions,activityId,search,state,page,30,"code","asc",model);
@@ -161,7 +161,7 @@ public class AccountingCodeLibraryController {
             if(form.getTemplate().getRules()==null)form.getTemplate().setRules(new java.util.ArrayList<>());
             if(form.getTemplate().getRules().isEmpty())form.getTemplate().getRules().add(new RuleForm());
             model.addAttribute("activityChoices",library.activities(actor,"","ACTIVE",0));model.addAttribute("accountChoices",library.accounts(actor,"",0));
-            model.addAttribute("components",AccountingCodeLibraryService.COMPONENTS);model.addAttribute("sourceEvents",Arrays.stream(PostingEvent.values()).map(Enum::name).toList());
+            model.addAttribute("components",AccountingCodeLibraryService.COMPONENTS);model.addAttribute("sourceEvents",Arrays.stream(AccountingEvent.values()).map(Enum::name).toList());
         } else {
             model.addAttribute("records",library.activities(actor,search,state,page,size,sort,direction));
             if(!model.containsAttribute("codeForm"))model.addAttribute("codeForm",new CodeForm());

@@ -202,6 +202,16 @@ public enum UserClaim {
         return action;
     }
 
+    /** Retain stored identifiers without offering permissions for removed workflows. */
+    public boolean isAvailable() {
+        return switch (feature) {
+            case ACCOUNTING_OPENINGS, ACCOUNTING_PERIODS, ACCOUNTING_POLICIES, ACCOUNTING_CASH_FLOW,
+                 ACCOUNTING_RECONCILIATION, ACCOUNTING_CLOSING, FINANCIAL_STATEMENTS, REGULATORY_STATEMENTS,
+                 ACCOUNTING_RELEASE, ACCOUNTING_COMPLIANCE_RELEASE, ACCOUNTING_STAFF_ACCEPTANCE -> false;
+            default -> this != ACCOUNTING_BUSINESS_APPROVE && this != ACCOUNTING_JOURNALS_APPROVE;
+        };
+    }
+
     public String getDisplayName() {
         return feature.getDisplayName() + " - " + action.getDisplayName();
     }
@@ -210,7 +220,7 @@ public enum UserClaim {
         if (feature == null || action == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(BY_FEATURE_ACTION.getOrDefault(feature, Map.of()).get(action));
+        return Optional.ofNullable(BY_FEATURE_ACTION.getOrDefault(feature, Map.of()).get(action)).filter(UserClaim::isAvailable);
     }
 
     public static List<AccessMatrixRow> matrixRows() {
@@ -218,7 +228,9 @@ public enum UserClaim {
         for (AccessFeature feature : AccessFeature.values()) {
             Map<AccessAction, UserClaim> claimsByAction = BY_FEATURE_ACTION.get(feature);
             if (claimsByAction != null && !claimsByAction.isEmpty()) {
-                rows.add(new AccessMatrixRow(feature, feature.getDisplayName(), claimsByAction));
+                Map<AccessAction, UserClaim> available = new EnumMap<>(AccessAction.class);
+                claimsByAction.forEach((action, claim) -> {if (claim.isAvailable()) available.put(action, claim);});
+                if (!available.isEmpty()) rows.add(new AccessMatrixRow(feature, feature.getDisplayName(), available));
             }
         }
         return rows;
@@ -229,7 +241,8 @@ public enum UserClaim {
             return EnumSet.noneOf(UserClaim.class);
         }
         try {
-            return EnumSet.of(UserClaim.valueOf(claimName.trim()));
+            UserClaim claim = UserClaim.valueOf(claimName.trim());
+            return claim.isAvailable() ? EnumSet.of(claim) : EnumSet.noneOf(UserClaim.class);
         } catch (IllegalArgumentException ignored) {
             return legacyClaims(claimName.trim());
         }
@@ -241,6 +254,7 @@ public enum UserClaim {
         }
         EnumSet<UserClaim> expanded = EnumSet.noneOf(UserClaim.class);
         expanded.addAll(claims);
+        expanded.removeIf(claim -> !claim.isAvailable());
         return expanded;
     }
 
@@ -293,6 +307,7 @@ public enum UserClaim {
             default -> {
             }
         }
+        claims.removeIf(claim -> !claim.isAvailable());
         return claims;
     }
 
@@ -327,6 +342,7 @@ public enum UserClaim {
                 case ADMIN -> claims.addAll(platformAdminDefaults());
             }
         }
+        claims.removeIf(claim -> !claim.isAvailable());
         return claims;
     }
 
@@ -334,6 +350,7 @@ public enum UserClaim {
         EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
         claims.addAll(legacyClaims("ACCESS_ADMIN_SETTINGS"));
         claims.addAll(legacyClaims("ACCESS_OUTBOX_MONITOR"));
+        claims.removeIf(claim -> !claim.isAvailable());
         return claims;
     }
 
@@ -343,6 +360,7 @@ public enum UserClaim {
             SACCO_REGISTRY_VIEW, SACCO_REGISTRY_CREATE, SACCO_REGISTRY_UPDATE, SACCO_REGISTRY_DELETE,
             PLATFORM_SETTINGS_VIEW, PLATFORM_SETTINGS_UPDATE,
             SMS_USAGE_ADD);
+        claims.removeIf(claim -> !claim.isAvailable());
         return claims;
     }
 

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
-import static com.sacco.mvp.accounting.reports.LedgerReportService.*;
+import static com.sacco.mvp.accounting.reports.LoanPortfolioReportService.*;
 
 /** Ordinary loan metrics are derived from immutable postings, never mutable paid/status projections. */
 @Repository
@@ -136,4 +136,33 @@ public class LoanPortfolioReportRepository {
     public List<SourceRow> rows(Scope s,Parameters p){if(s.institutionWide())throw new IllegalArgumentException("Branch rows required");return jdbc.query(SOURCE+"SELECT * FROM exposure ORDER BY loan_id,loan_application_id LIMIT 26 OFFSET :offset",parameters(s,p),(r,n)->new SourceRow(r.getObject("loan_application_id",UUID.class),r.getString("loan_id"),r.getBoolean("complete")?r.getBigDecimal("principal"):null,r.getBoolean("complete")?r.getBigDecimal("overdue_principal"):null,r.getBoolean("complete")?r.getBigDecimal("overdue_interest"):null,r.getObject("oldest",LocalDate.class),r.getBoolean("complete")));}
     public List<Bucket> buckets(Scope s,Parameters p,boolean regulatoryReference){String bands=regulatoryReference?"CASE WHEN dpd<=5 THEN 0 WHEN dpd<=30 THEN 1 WHEN dpd<=60 THEN 2 WHEN dpd<=90 THEN 3 ELSE 4 END":"CASE WHEN dpd=0 THEN 0 WHEN dpd<=30 THEN 1 WHEN dpd<=60 THEN 2 WHEN dpd<=90 THEN 3 ELSE 4 END";return jdbc.query(SOURCE+"SELECT "+bands+" band,count(*) loans,sum(principal) principal FROM exposure WHERE complete GROUP BY band ORDER BY band",parameters(s,p),(r,n)->new Bucket(r.getInt("band"),r.getLong("loans"),r.getBigDecimal("principal")));}
     public List<BranchPerformance> branches(Scope s,Parameters p){return jdbc.query(SOURCE+", grouped AS (SELECT station_id,"+TOTALS+" FROM exposure GROUP BY station_id), branch_ids AS (SELECT station_id FROM grouped UNION SELECT station_id FROM missing) SELECT b.station_id,coalesce(g.covered,0) covered,coalesce(g.excluded,0) excluded,coalesce(m.excluded,0) missing,coalesce(g.principal,0) principal,coalesce(g.overdue_principal,0) overdue_principal,coalesce(g.overdue_interest,0) overdue_interest,coalesce(g.par1,0) par1,coalesce(g.par30,0) par30,coalesce(g.par90,0) par90,coalesce(g.disbursed,0) disbursed,coalesce(g.collected_principal,0) collected_principal,coalesce(g.collected_interest,0) collected_interest FROM branch_ids b LEFT JOIN grouped g USING(station_id) LEFT JOIN missing m USING(station_id) ORDER BY b.station_id LIMIT 1001",parameters(s,p),(r,n)->new BranchPerformance(r.getString("station_id"),summary(r,r.getLong("missing"))));}
+    public Coverage coverage(Scope scope,Parameters p) {
+        return jdbc.queryForObject("""
+            SELECT
+              (SELECT COUNT(*) FROM sacco_stations s WHERE s.sacco_id=:institution AND (:wide OR s.station_id=:branch)
+                AND (s.created_at<=:cutoff
+                  OR EXISTS(SELECT 1 FROM gl_journal known WHERE known.sacco_id=s.sacco_id AND known.station_id=s.station_id
+                    AND known.state='POSTED' AND known.effective_date<=:through AND known.recorded_at<=:cutoff AND known.posted_at<=:cutoff)
+                  OR EXISTS(SELECT 1 FROM loan_ledgers known WHERE known.sacco_id=s.sacco_id AND known.station_id=s.station_id
+                    AND known.disbursement_date<=:through AND known.created_at<=:cutoff))
+                AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
+                  WHERE c.sacco_id=s.sacco_id AND c.station_id=s.station_id AND c.complete AND c.recorded_at<=:cutoff
+                    AND c.reconciled_through<=:through AND j.state='POSTED' AND j.posted_at<=:cutoff)) missing,
+              (SELECT COUNT(DISTINCT e.voucher_id) FROM loan_journal_entries e JOIN loan_ledgers l ON l.loan_application_id=e.loan_application_id
+                WHERE l.sacco_id=:institution AND (:wide OR l.station_id=:branch)
+                AND e.effective_date<=:through AND e.posted_at<=:cutoff
+                AND NOT EXISTS(SELECT 1 FROM gl_operational_bridge b JOIN gl_journal j ON j.id=b.journal_id
+                  WHERE b.voucher_id=e.voucher_id AND b.sacco_id=l.sacco_id AND b.station_id=l.station_id AND j.state='POSTED' AND j.posted_at<=:cutoff)
+                AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
+                  WHERE c.sacco_id=l.sacco_id AND c.station_id=l.station_id AND c.complete AND c.recorded_at<=:cutoff
+                    AND c.reconciled_through>=e.effective_date AND j.state='POSTED' AND j.posted_at<=:cutoff)) unbridged,
+              (SELECT COUNT(*) FROM loan_applications a WHERE a.sacco_id=:institution AND (:wide OR a.station_id=:branch)
+                AND (a.disbursement_date<=:through OR (a.disbursement_date IS NULL AND a.status IN ('DISBURSED','PAID','DEFAULTED')))
+                AND a.created_at<=:cutoff
+                AND NOT EXISTS(SELECT 1 FROM loan_ledgers l WHERE l.loan_application_id=a.id AND l.created_at<=:cutoff)
+                AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
+                  WHERE c.sacco_id=a.sacco_id AND c.station_id=a.station_id AND c.complete AND c.recorded_at<=:cutoff
+                    AND a.disbursement_date IS NOT NULL AND c.reconciled_through>=a.disbursement_date AND j.state='POSTED' AND j.posted_at<=:cutoff)) uncovered
+            """,parameters(scope,p),(r,n)->new Coverage(r.getLong("missing"),r.getLong("unbridged"),r.getLong("uncovered")));
+    }
 }

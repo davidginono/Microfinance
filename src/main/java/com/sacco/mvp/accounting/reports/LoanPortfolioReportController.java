@@ -38,7 +38,7 @@ public class LoanPortfolioReportController {
             Model model,jakarta.servlet.http.HttpServletResponse response,java.util.Locale locale) {
         try {
             var cutoff=recordedThrough==null?clock.now().truncatedTo(ChronoUnit.SECONDS):LocalDateTime.parse(recordedThrough).atZone(clock.zoneId()).toOffsetDateTime();
-            var p=new LedgerReportService.Parameters(from==null?clock.today().withDayOfMonth(1):LocalDate.parse(from),
+            var p=new LoanPortfolioReportService.Parameters(from==null?clock.today().withDayOfMonth(1):LocalDate.parse(from),
                 through==null?clock.today():LocalDate.parse(through),cutoff,page);
             var report=reports.report(actor,p,institutionWide);model.addAttribute("report",report);
             model.addAttribute("cutoffInput",clock.zoned(cutoff).toLocalDateTime().toString());model.addAttribute("reportZone",clock.zoneId().toString());
