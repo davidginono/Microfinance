@@ -137,9 +137,12 @@ public class LoanRecordingService {
     public Detail detail(AppUserPrincipal a,UUID id){
         authorize(a,"VIEW");var record=records.record(a,id,false);var loan=loans.findById(id).orElseThrow();var f=read(record.get("metadata").toString(),RecordForm.class);
         var snapshot=schedules.parseSummary(loan.getFinancialSnapshot());var calc=LoanAmortizationCalculator.estimate(loan.getAmount(),loan.getTenorMonths(),snapshot);
+        var schedule=loan.getFirstRepaymentDate()==null
+            ?calc.rows().stream().map(r->new ScheduleRow(r.number(),null,r.principal(),r.interest(),r.amount())).toList()
+            :datedSchedule(calc,loan);
         return new Detail(records.loan(a,id,clock.today()),record.get("sacco_name").toString(),record.get("branch_name").toString(),record.get("actor_name").toString(),time(record.get("recorded_at")),
             f.getPurpose(),f.getBusiness(),f.getIncome(),f.getExpenses(),f.getOtherDebt(),f.getInformationSource(),f.getGuarantors(),f.getCollateral(),f.getEvidence(),f.getNotes(),
-            new BigDecimal(snapshot.get("interestRate").toString()),snapshot.get("interestMethod").toString(),snapshot.get("repaymentFrequency").toString(),loan.getTenorMonths(),loan.getFirstRepaymentDate(),calc.installment(),calc.totalInterest(),loan.getFirstRepaymentDate()==null?List.of():datedSchedule(calc,loan),tenure(f).unit(),tenure(f).value(),f.getInterestBasis(),f.getLoanMode(),f.getInterestEntry());
+            new BigDecimal(snapshot.get("interestRate").toString()),snapshot.get("interestMethod").toString(),snapshot.get("repaymentFrequency").toString(),loan.getTenorMonths(),loan.getFirstRepaymentDate(),calc.installment(),calc.totalInterest(),schedule,tenure(f).unit(),tenure(f).value(),f.getInterestBasis(),f.getLoanMode(),f.getInterestEntry());
     }
     @Transactional
     public Posting disburse(AppUserPrincipal a,PostForm f){return disburse(a,f,List.of());}
