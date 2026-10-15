@@ -32,4 +32,5 @@ public class LoanRepaymentTransaction {
     @Column(length = 500) private String reason;
     @Enumerated(EnumType.STRING) @Column(name = "loan_status_before", nullable = false, length = 40) private LoanStatus loanStatusBefore;
     @Column(name = "posted_at", nullable = false) private OffsetDateTime postedAt;
+    @Column(name = "allocation_policy_id") private UUID allocationPolicyId;
 }

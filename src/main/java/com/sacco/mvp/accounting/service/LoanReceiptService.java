@@ -31,6 +31,8 @@ public class LoanReceiptService {
     private final AuditService audit;
     private final ObjectMapper json;
     public boolean available(AppUserPrincipal a,String action){try{loans.authorize(a,action);return true;}catch(AccessDeniedException denied){return false;}}
+    @Transactional(readOnly=true)
+    public com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.Policy defaults(AppUserPrincipal a,Form f){authorize(a,"POST");return loans.receiptDefaults(a,f);}
     private void authorize(AppUserPrincipal a,String action){ordinary.authorize(a,Type.RECEIPT,action.equals("POST")?"CREATE":action);loans.authorize(a,action);}
     @Transactional(readOnly=true)
     public void prefill(AppUserPrincipal a,Form f,UUID loanId){authorize(a,"POST");var loan=loans.receiptLoan(a,loanId);f.setClientId(loan.clientId());f.getRows().getFirst().setLoanId(loanId);}
@@ -49,11 +51,11 @@ public class LoanReceiptService {
         var ids=f.getRows().stream().filter(Objects::nonNull).map(RowForm::getLoanId).filter(Objects::nonNull).distinct().toList();
         for(var loan:loans.receiptLoans(a,ids,f.getEffectiveDate()==null?clock.today():f.getEffectiveDate()))labels.put(loan.id(),loan.number());return labels;}
     @Transactional(readOnly=true)
-    public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){authorize(a,"POST");validate(f);var rows=new ArrayList<LoanReceiptRow>();var allocations=loans.receiptPreview(a,f);var names=selected(a,f);int n=0;
+    public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);var rows=new ArrayList<LoanReceiptRow>();var allocations=loans.receiptPreview(a,f);var names=selected(a,f);int n=0;
         for(var row:f.getRows()){var p=allocations.get(n++);rows.add(new LoanReceiptRow(n,null,row.getLoanId(),names.get(row.getLoanId()),row.getDescription(),row.getAmount(),p.principal(),p.interest(),p.principalBalance(),"","","",reference(f,n)));}return rows;}
     @Transactional
     public LoanReceipt post(AppUserPrincipal a,Form f){
-        authorize(a,"POST");validate(f);String hash=hash(f);vouchers.lockRequest(a.getSaccoId(),a.getStationId(),f.getRequestKey());var retry=receipts.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return find(a,retry.get()).orElseThrow();
+        authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);String hash=hash(f);vouchers.lockRequest(a.getSaccoId(),a.getStationId(),f.getRequestKey());var retry=receipts.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return find(a,retry.get()).orElseThrow();
         check(vouchers.byRequest(a.getSaccoId(),a.getStationId(),f.getRequestKey()).isEmpty(),"","retry");
         // Lock all loan sources in deterministic order before invoking their owning posting use case.
         loans.lockReceiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).sorted().toList(),f.getClientId());

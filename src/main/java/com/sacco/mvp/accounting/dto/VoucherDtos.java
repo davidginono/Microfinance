@@ -22,6 +22,7 @@ public final class VoucherDtos {
         private UUID transactionId,templateKey,debitAccountId,creditAccountId;
         private UUID loanId;
         private String component="TOTAL",description="";
+        @com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
         private BigDecimal amount;
     }
     public record Account(UUID id,String code,String name,String purpose) {}

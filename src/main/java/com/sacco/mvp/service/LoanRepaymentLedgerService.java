@@ -154,7 +154,8 @@ public class LoanRepaymentLedgerService {
             LoanRepaymentTransaction t = retry.get();
             require(t.getKind() == LoanRepaymentTransaction.Kind.PAYMENT && t.getLoanApplicationId().equals(loanId)
                 && t.getAmount().compareTo(amount) == 0 && t.getChannel() == command.channel()
-                && t.getChannelReference().equals(reference) && t.getPaymentDate().equals(command.paymentDate()), "retry");
+                && t.getChannelReference().equals(reference) && t.getPaymentDate().equals(command.paymentDate())
+                && Objects.equals(t.getAllocationPolicyId(),command.policyId()), "retry");
             return receipt(t, ledger.getLoanId(), reversalIds(loanId, List.of(t.getId())).get(t.getId()));
         }
         LocalDate date = command.paymentDate();
@@ -171,34 +172,31 @@ public class LoanRepaymentLedgerService {
         UUID id = UUID.randomUUID();
         Map<UUID, BigDecimal[]> parts = new LinkedHashMap<>();
         BigDecimal left = amount;
-        // Pay all due interest first, then due principal. New fee assessments are not supported in this increment.
-        for (LoanLedgerInstallment row : rows) {
-            if (row.getDueDate().isAfter(date)) continue;
-            BigDecimal take = left.min(row.getInterest().subtract(row.getInterestPaid()));
-            if (take.signum() > 0) {
-                parts.computeIfAbsent(row.getId(), ignored -> new BigDecimal[]{ZERO, ZERO})[1] = take;
-                row.setInterestPaid(row.getInterestPaid().add(take));
-                left = left.subtract(take);
-            }
-        }
-        for (LoanLedgerInstallment row : rows) {
-            if (row.getDueDate().isAfter(date)) continue;
-            BigDecimal take = left.min(row.getPrincipal().subtract(row.getPrincipalPaid()));
-            if (take.signum() > 0) {
-                parts.computeIfAbsent(row.getId(), ignored -> new BigDecimal[]{ZERO, ZERO})[0] = take;
-                row.setPrincipalPaid(row.getPrincipalPaid().add(take));
-                left = left.subtract(take);
+        // Component order is policy-owned; instalment order and due-date boundaries remain unchanged.
+        require(!command.principalFirst() || command.policyId()!=null,"request");
+        var expected=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(amount,due.duePrincipal(),due.dueInterest(),ledger.getPrincipal().subtract(ledger.getPrincipalPaid()),command.principalFirst()?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST);
+        for (boolean principalComponent : command.principalFirst()?new boolean[]{true,false}:new boolean[]{false,true}) {
+            for (LoanLedgerInstallment row : rows) {
+                if (row.getDueDate().isAfter(date)) continue;
+                BigDecimal remaining=principalComponent?row.getPrincipal().subtract(row.getPrincipalPaid()):row.getInterest().subtract(row.getInterestPaid());
+                BigDecimal take=left.min(remaining);
+                if(take.signum()>0){
+                    parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO})[principalComponent?0:1]=take;
+                    if(principalComponent)row.setPrincipalPaid(row.getPrincipalPaid().add(take));else row.setInterestPaid(row.getInterestPaid().add(take));
+                    left=left.subtract(take);
+                }
             }
         }
         require(left.signum() == 0, "schedule");
         BigDecimal principal = parts.values().stream().map(p -> p[0]).reduce(ZERO, BigDecimal::add);
         BigDecimal interest = amount.subtract(principal);
+        require(principal.compareTo(expected.principal())==0 && interest.compareTo(expected.interest())==0,"schedule");
         LoanRepaymentTransaction transaction = LoanRepaymentTransaction.builder().id(id).loanApplicationId(loanId)
             .saccoId(ledger.getSaccoId()).stationId(ledger.getStationId()).sequence(ledger.getNextSequence())
             .receiptReference("RP-" + id).requestKey(command.requestKey()).kind(LoanRepaymentTransaction.Kind.PAYMENT)
             .channel(command.channel()).channelReference(reference).paymentDate(date).amount(amount)
             .principalAmount(principal).interestAmount(interest).actorMemberId(actor.getMemberId())
-            .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).build();
+            .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).allocationPolicyId(command.policyId()).build();
         // The UUID references are deliberately not JPA associations, so flush the parent before child inserts.
         transactions.saveAndFlush(transaction);
         allocations.saveAll(parts.entrySet().stream().map(p -> LoanRepaymentAllocation.builder().id(UUID.randomUUID())
@@ -267,7 +265,7 @@ public class LoanRepaymentLedgerService {
             .channel(original.getChannel()).channelReference(original.getChannelReference()).paymentDate(correctionDate)
             .amount(original.getAmount()).principalAmount(original.getPrincipalAmount()).interestAmount(original.getInterestAmount())
             .actorMemberId(actor.getMemberId()).reversesTransactionId(paymentId).reason(explanation)
-            .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).build();
+            .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).allocationPolicyId(original.getAllocationPolicyId()).build();
         List<LoanLedgerInstallment> rows = rows(loanId);
         Map<UUID, LoanLedgerInstallment> byId = new HashMap<>();
         rows.forEach(r -> byId.put(r.getId(), r));
@@ -474,7 +472,9 @@ public class LoanRepaymentLedgerService {
     }
 
     private record Totals(BigDecimal duePrincipal, BigDecimal dueInterest, BigDecimal futureInterest, BigDecimal remaining, LocalDate oldestOverdue) {}
-    public record PaymentCommand(BigDecimal amount, LocalDate paymentDate, LoanRepaymentTransaction.Channel channel, String reference, UUID requestKey) {}
+    public record PaymentCommand(BigDecimal amount, LocalDate paymentDate, LoanRepaymentTransaction.Channel channel, String reference, UUID requestKey,UUID policyId,boolean principalFirst) {
+        public PaymentCommand(BigDecimal amount,LocalDate date,LoanRepaymentTransaction.Channel channel,String reference,UUID key){this(amount,date,channel,reference,key,null,false);}
+    }
     public record LedgerListRow(UUID id, String loanId, LocalDate disbursementDate, BigDecimal outstandingPrincipal, BigDecimal principalPaid, BigDecimal interestPaid) {}
     public record InstallmentRow(int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest, BigDecimal principalPaid, BigDecimal interestPaid) {}
     public record JournalRow(UUID voucher, LocalDate date, String account, BigDecimal debit, BigDecimal credit) {}

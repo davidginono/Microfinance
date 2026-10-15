@@ -33,7 +33,7 @@ class RecordedLoanDetailScheduleTest {
     private final AppUserPrincipal actor=mock(AppUserPrincipal.class);
     private final ObjectMapper json=new ObjectMapper();
     private final LoanRecordingService service=new LoanRecordingService(records,loans,null,null,schedules,null,
-        accounting,null,json,clock,null,null,null,null,null,null,null);
+        accounting,null,json,clock,null,null,null,null,null,null,null,null);
     private final LocalDate today=LocalDate.of(2026,10,15);
 
     @Test void reviewDetailsShowStoredInstalmentAmountsWithoutInventingDatesOrPosting() throws Exception {

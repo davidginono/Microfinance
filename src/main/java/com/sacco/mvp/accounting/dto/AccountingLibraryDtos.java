@@ -7,9 +7,9 @@ import java.util.UUID;
 
 public final class AccountingLibraryDtos {
     private AccountingLibraryDtos() { }
-    public record Activity(UUID id,String code,String name,String nameSw,String description,boolean active) { }
+    public record Activity(UUID id,String code,String name,String nameSw,String description,boolean active) { public boolean systemManaged(){return "SYSTEM.LOAN_REPAYMENT".equals(code);} }
     public record TransactionCode(UUID id,UUID activityId,String activityCode,String activityName,String activityNameSw,
-            String code,String name,String nameSw,String description,String sourceEvent,boolean active,boolean hasTemplate) { }
+            String code,String name,String nameSw,String description,String sourceEvent,boolean active,boolean hasTemplate) { public boolean systemManaged(){return "SYSTEM.REPAYMENT_PRINCIPAL".equals(code) || "SYSTEM.REPAYMENT_INTEREST".equals(code);} }
     public record Template(UUID transactionId,UUID requestKey,List<Rule> rules) { }
     public record Rule(String component,String debitCode,String debitName,String creditCode,String creditName) { }
     public record AccountChoice(String code,String name,String nameSw,String kind) { }

@@ -1,4 +1,14 @@
 <c:if test="${staffWorkspace}">
+    <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW')">
+        <c:set var="receiptBatchActive" value="${fn:startsWith(requestUri, '/finance/batches/receipts')}" />
+        <div class="shell-sidebar-group space-y-1">
+            <button type="button" id="batchProcessingToggle" aria-controls="batchProcessingPanel" aria-expanded="${receiptBatchActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${receiptBatchActive?'shell-nav-active':''}">
+                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h16v4H4z" /></svg></span>
+                <span class="min-w-0 flex-1"><spring:message code="batch.navigation" /></span><svg id="batchProcessingChevron" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+            </button>
+            <div id="batchProcessingPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner"><a href="<c:url value='/finance/batches/receipts' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${receiptBatchActive?'shell-nav-active':''}"><spring:message code="batch.receipts" /></a></div>
+        </div>
+    </sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
         <c:set var="loanAccountingActive" value="${fn:startsWith(requestUri, '/finance/loan-records') or fn:startsWith(requestUri, '/finance/loan-disbursements') or fn:startsWith(requestUri, '/finance/loan-repayments') or fn:startsWith(requestUri, '/finance/client-ledgers') or fn:startsWith(requestUri, '/finance/loan-postings')}" />
         <div class="shell-sidebar-group space-y-1">

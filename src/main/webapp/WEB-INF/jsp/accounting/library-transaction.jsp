@@ -11,7 +11,7 @@
 <div class="accounting-workspace accounting-resource-workspace">
     <section data-resource-table="accounting-library-transaction-1" class="erp-table-wrap accounting-filter-section">
         <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="coa.filterBy" /></h2>
-            <c:if test="${not empty transaction}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" action="<c:url value='/finance/library/transactions/${transaction.id}/${transaction.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${transaction.active?'accounting.deactivate':'coa.reactivate'}" /></button></form></sec:authorize></c:if>
+            <c:if test="${not empty transaction and not transaction.systemManaged()}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" action="<c:url value='/finance/library/transactions/${transaction.id}/${transaction.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${transaction.active?'accounting.deactivate':'coa.reactivate'}" /></button></form></sec:authorize></c:if>
         </div>
     <form method="get" action="<c:url value='/finance/library/templates' />" class="erp-table-toolbar coa-filters library-template-filters">
         <label class="erp-table-toolbar__control"><spring:message code="library.activity" /><select class="aws-control" name="activityId"><option value=""><spring:message code="coa.all" /></option>
@@ -32,6 +32,8 @@
     <c:if test="${not empty transaction}">
     <c:if test="${not empty transaction.description}"><p><c:out value="${transaction.description}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
+    <c:if test="${transaction.systemManaged()}"><p class="accounting-definition-note"><spring:message code="batch.systemHelp" /></p><a class="app-btn btn-neutral" href="<c:url value='/finance/batches/receipts/settings' />"><spring:message code="batch.settings" /></a></c:if>
+    <c:if test="${not transaction.systemManaged()}">
     <p class="accounting-definition-note"><spring:message code="library.definitionOnly" /></p>
     <section data-resource-table="accounting-library-transaction-2" class="erp-table-wrap" data-aws-table-region>
         <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${transaction.active}"><a class="app-btn ${empty template?'btn-launch':'btn-neutral'}" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="${empty template?'library.addTemplate':'library.editTemplate'}" /></a></c:if></sec:authorize></div>
@@ -40,6 +42,7 @@
             <tbody><c:forEach items="${template.rules}" var="rule"><tr><td><spring:message code="library.component.${rule.component}" /></td><td><c:out value="${rule.debitCode}" /> · <c:out value="${rule.debitName}" /></td><td><c:out value="${rule.creditCode}" /> · <c:out value="${rule.creditName}" /></td></tr></c:forEach><c:if test="${empty template}"><tr><td colspan="3"><spring:message code="library.noTemplate" /></td></tr></c:if></tbody>
         </table></div>
     </section>
+    </c:if>
     </c:if>
 </div>
 <%@ include file="../fragments/footer.jspf" %>

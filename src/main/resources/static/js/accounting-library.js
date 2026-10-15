@@ -10,7 +10,7 @@
             inputs().forEach(input => input.closest('tr').classList.toggle('coa-row-selected', input.checked));
             view.disabled = !row;
             if (status) {
-                status.disabled = !row;
+                status.disabled = !row || row.dataset.system === 'true';
                 const action = row?.dataset.active === 'false' ? 'reactivate' : 'deactivate';
                 status.textContent = status.dataset[action];
                 if (row) statusForm.action = statusForm.dataset.url + row.dataset.id + '/' + action;

@@ -91,19 +91,19 @@ public class AccountingCodeLibraryService {
     }
     @Transactional
     public UUID createTransaction(AppUserPrincipal actor,CodeForm form) {
-        authorize(actor,"CREATE");validateCode(form);require(activity(actor,form.getActivityId(),true).active(),"inactiveActivity");
+        authorize(actor,"CREATE");validateCode(form);var parent=activity(actor,form.getActivityId(),true);require(!parent.systemManaged(),"systemManaged");require(parent.active(),"inactiveActivity");
         require(Arrays.stream(AccountingEvent.values()).anyMatch(e->e.name().equals(form.getSourceEvent())),"sourceEvent");
         UUID id=library.createTransaction(actor.getSaccoId(),form,actor.getMemberId(),clock.now());event(actor,id,"TRANSACTION_CODE_CREATED");return id;
     }
     @Transactional
     public void activityState(AppUserPrincipal actor,UUID id,boolean active) {
-        authorize(actor,"UPDATE");activity(actor,id,true);
+        authorize(actor,"UPDATE");require(!activity(actor,id,true).systemManaged(),"systemManaged");
         require(active || !library.activeTransactions(actor.getSaccoId(),id),"activeTransactions");
         library.activityState(actor.getSaccoId(),id,active);event(actor,id,active?"ACTIVITY_REACTIVATED":"ACTIVITY_DEACTIVATED");
     }
     @Transactional
     public void transactionState(AppUserPrincipal actor,UUID id,boolean active) {
-        authorize(actor,"UPDATE");var code=transaction(actor,id,false);var parent=activity(actor,code.activityId(),true);transaction(actor,id,true);
+        authorize(actor,"UPDATE");var code=transaction(actor,id,false);require(!code.systemManaged(),"systemManaged");var parent=activity(actor,code.activityId(),true);transaction(actor,id,true);
         require(!active || parent.active(),"inactiveActivity");library.transactionState(actor.getSaccoId(),id,active);
         event(actor,id,active?"TRANSACTION_CODE_REACTIVATED":"TRANSACTION_CODE_DEACTIVATED");
     }
@@ -120,7 +120,7 @@ public class AccountingCodeLibraryService {
     @Transactional
     public UUID saveTemplate(AppUserPrincipal actor,UUID id,TemplateForm form) {
         authorize(actor,"UPDATE");validateTemplate(form);
-        var initial=transaction(actor,id,false);var parent=activity(actor,initial.activityId(),true);var code=transaction(actor,id,true);
+        var initial=transaction(actor,id,false);require(!initial.systemManaged(),"systemManaged");var parent=activity(actor,initial.activityId(),true);var code=transaction(actor,id,true);
         String hash=hash(form);var prior=library.request(actor.getSaccoId(),id,form.getRequestKey());
         if(prior.isPresent()) {require(prior.get().actor().equals(actor.getMemberId()) && prior.get().hash().equals(hash),"changedRetry");return id;}
         require(parent.active() && code.active(),"inactiveTransaction");var current=library.template(actor.getSaccoId(),id);
@@ -142,7 +142,7 @@ public class AccountingCodeLibraryService {
     }
     private static void validateCode(CodeForm form) {
         require(form!=null,"validation");form.setCode(clean(form.getCode()).toUpperCase(Locale.ROOT));form.setName(clean(form.getName()));form.setNameSw(clean(form.getNameSw()));form.setDescription(clean(form.getDescription()));
-        require(form.getCode().matches("[A-Z0-9][A-Z0-9_.-]{0,39}"),"code");text(form.getName(),160,true,"name");text(form.getNameSw(),160,false,"nameSw");text(form.getDescription(),500,false,"description");
+        require(form.getCode().matches("[A-Z0-9][A-Z0-9_.-]{0,39}") && !form.getCode().startsWith("SYSTEM."),"code");text(form.getName(),160,true,"name");text(form.getNameSw(),160,false,"nameSw");text(form.getDescription(),500,false,"description");
     }
     static void validateTemplate(TemplateForm form) {
         require(form!=null && form.getRequestKey()!=null,"validation");
