@@ -10,6 +10,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ReportExportLimiter;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.ResponseEntity;
@@ -60,6 +61,15 @@ class ClientLoanStatementDocumentTest {
             assertThat(pdf.getNumberOfPages()).isGreaterThan(2);
             String text=new PDFTextStripper().getText(pdf);assertThat(text).contains("REF-1","REF-180","Marejesho ya mkopo — é");
             var stripper=new PDFTextStripper();for(int n=1;n<=pdf.getNumberOfPages();n++){stripper.setStartPage(n);stripper.setEndPage(n);assertThat(stripper.getText(pdf).replaceAll("\\s+"," ")).contains("CLIENT LOAN STATEMENT","Principal balance");}
+            var bounds=new PDFTextStripper(){
+                @Override protected void processTextPosition(TextPosition text){
+                    assertThat(text.getXDirAdj()).as("Statement text stays inside the left page margin").isGreaterThanOrEqualTo(20);
+                    assertThat(text.getXDirAdj()+text.getWidthDirAdj()).as("All columns, including principal balance, fit on the exported page").isLessThanOrEqualTo(822);
+                    if(text.getFontSizeInPt()>=8)assertThat(text.getYDirAdj()).as("No transaction is clipped below the footer").isLessThan(555);
+                    super.processTextPosition(text);
+                }
+            };
+            bounds.getText(pdf);
         }
     }
     @Test void emptyStatementStillProducesAReadablePage() throws Exception {

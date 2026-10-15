@@ -40,11 +40,22 @@
 .statement-transactions col:nth-child(9) { width: 7.3%; }
 .statement-transactions col:nth-child(10) { width: 7.9%; }
 
-.client-statement-workspace .client-loan-statement { max-width: none; font-family: "Times New Roman", Times, serif; }
-.client-statement-workspace .client-loan-statement .reference-title { font-family: "Times New Roman", Times, serif; font-weight: bold; text-decoration: underline; }
-.client-statement-workspace .client-loan-statement .reference-table tbody { font-family: "Courier New", Courier, monospace; }
-.client-statement-workspace .client-loan-statement .reference-table { min-width: 1100px; font-size: 13px; }
-.client-statement-workspace .reference-pagination { font-family: Arial, sans-serif; }
+/* Workspace cards stretch equally; only the table canvas may scroll. */
+.client-statement-workspace { grid-template-columns: minmax(0, 1fr); }
+.client-statement-workspace > section { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; margin: 0; }
+.client-statement-workspace .erp-panel-body { padding: 16px 20px; }
+.aws-console .client-statement-workspace .erp-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-gutter: auto; overscroll-behavior-x: contain; }
+.client-statement-workspace .statement-movements .erp-table { min-width: 1120px; }
+.client-statement-workspace .statement-money { white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media print {
+    .client-statement-workspace { page: client-loan-statement; display: block; }
+    .client-statement-workspace > section { margin-bottom: 12px; }
+    .client-statement-workspace .erp-table-scroll { overflow: visible; max-height: none; }
+    .client-statement-workspace .erp-table { width: 100%; min-width: 0 !important; table-layout: fixed; }
+    .aws-console .client-statement-workspace .erp-table :is(th,td) { font-size: 7pt !important; white-space: normal !important; overflow-wrap: anywhere !important; padding: 4px !important; }
+    .client-statement-workspace .erp-table thead { display: table-header-group; }
+    .client-statement-workspace .erp-table tr { break-inside: avoid; }
+}
 
 .reference-report.client-loan-statement { max-width: none; font-family: "Times New Roman", Times, serif; }
 .reference-report.client-loan-statement h1 { font-weight: bold; }
