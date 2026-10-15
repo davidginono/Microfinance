@@ -138,6 +138,7 @@
 .resource-table-action-menu {position:relative;order:-1;}
 .resource-table-action-menu>button {display:inline-flex;align-items:center;gap:16px;}
 .resource-table-action-menu>button svg {width:16px;height:16px;flex:none;}
+.resource-table-action-menu>button[aria-expanded="true"] svg {transform:rotate(180deg);}
 .resource-table-menu {position:absolute;top:calc(100% + 2px);right:0;z-index:50;min-width:180px;background:#fff;border:1px solid #879596;box-shadow:0 2px 4px #0003;padding:4px 0;}
 .resource-table-menu[hidden] {display:none!important;}
 .aws-console [data-resource-table] .resource-table-menu form {display:block;padding:0;}
