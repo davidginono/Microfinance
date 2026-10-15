@@ -75,6 +75,34 @@ class LoanRepaymentLedgerServiceTest {
         assertThat(entries.getValue()).allMatch(e -> e.getVoucherId().equals(receipt.id()));
     }
 
+    @Test void storedScheduleUsesBoundedPagingAndPreservesContractAmountsAfterPartialPayment() {
+        var viewer=actor(posterId,"B1",Set.of(UserClaim.LOAN_RECORDING_VIEW),true);
+        when(accountingGuard.recordedLoan(loanId)).thenReturn(true);
+        rows.getFirst().setPrincipalPaid(money("50"));
+        when(installments.findAllByLoanApplicationIdOrderByInstallmentNumber(eq(loanId),any(Pageable.class)))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(rows,org.springframework.data.domain.PageRequest.of(2,25),80));
+        var result=service.schedule(loanId,viewer,2);
+        assertThat(result.getContent().getFirst().principal()).isEqualByComparingTo("100.00");
+        assertThat(result.getContent().getFirst().dueDate()).isEqualTo(today.minusMonths(1));
+        assertThat(result.hasNext()).isTrue();
+        verify(installments).findAllByLoanApplicationIdOrderByInstallmentNumber(eq(loanId),argThat(p->p.getPageSize()==25 && p.getOffset()==50));
+        verifyNoInteractions(transactions,journal);
+    }
+
+    @Test void storedScheduleCannotBeReadFromAnotherBranchOrAnUnrecordedLoan() {
+        var foreign=actor(posterId,"B2",Set.of(UserClaim.LOAN_REPAYMENTS_VIEW),true);
+        assertThatThrownBy(()->service.schedule(loanId,foreign,0)).isInstanceOf(AccessDeniedException.class);
+        var recordingViewer=actor(posterId,"B1",Set.of(UserClaim.LOAN_RECORDING_VIEW),true);
+        assertThatThrownBy(()->service.schedule(loanId,recordingViewer,0)).isInstanceOf(AccessDeniedException.class);
+        verify(installments,never()).findAllByLoanApplicationIdOrderByInstallmentNumber(any(),any());
+    }
+
+    @Test void storedScheduleRejectsUnboundedPages() {
+        assertThatThrownBy(()->service.schedule(loanId,poster(),-1)).hasMessage("repayment.error.schedule");
+        assertThatThrownBy(()->service.schedule(loanId,poster(),24)).hasMessage("repayment.error.schedule");
+        verify(installments,never()).findAllByLoanApplicationIdOrderByInstallmentNumber(any(),any());
+    }
+
     @Test void paymentUsesActualDateAndDoesNotCollectFutureInterest() {
         var receipt = service.post(loanId, poster(), command("20", today.minusMonths(1)));
         assertThat(receipt.paymentDate()).isEqualTo(today.minusMonths(1));

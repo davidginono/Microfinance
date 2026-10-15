@@ -70,12 +70,16 @@ public class LoanRecordingController {
     @PostMapping({"/loan-disbursements","/loan-repayments"}) public String post(jakarta.servlet.http.HttpServletRequest request) {
         throw new org.springframework.web.server.ResponseStatusException(HttpStatus.GONE,"Use the staff disbursement review or receipt voucher form");
     }
-    @GetMapping({"/loan-postings/{id}","/loan-disbursements/{id}","/loan-repayments/{id}"}) public String posting(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model model){var receipt=service.receiptForPosting(a,id);if(receipt.isPresent())return "redirect:/finance/vouchers/receipts/"+receipt.get();postingModel(a,id,model);return "accounting/loans/posting";}
-    private void postingModel(AppUserPrincipal a,UUID id,Model model){var p=service.posting(a,id);model.addAttribute("posting",p);model.addAttribute("detail",service.detail(a,p.loanId()));model.addAttribute("canReverse",!p.actorId().equals(a.getMemberId()));model.addAttribute("reverseKey",UUID.randomUUID());model.addAttribute("today",clock.today());}
+    @GetMapping({"/loan-postings/{id}","/loan-disbursements/{id}","/loan-repayments/{id}"}) public String posting(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int schedulePage,Model model){var receipt=service.receiptForPosting(a,id);if(receipt.isPresent())return "redirect:/finance/vouchers/receipts/"+receipt.get();postingModel(a,id,schedulePage,model);return "accounting/loans/posting";}
+    private void postingModel(AppUserPrincipal a,UUID id,int schedulePage,Model model){
+        if(schedulePage<0 || schedulePage>=24)throw new IllegalArgumentException("recording.error.filter");
+        var p=service.posting(a,id);model.addAttribute("posting",p);model.addAttribute("canReverse",!p.actorId().equals(a.getMemberId()));model.addAttribute("reverseKey",UUID.randomUUID());model.addAttribute("today",clock.today());
+        if("DISBURSEMENT".equals(p.kind()))model.addAttribute("actualSchedule",service.actualRepaymentSchedule(a,p.loanId(),schedulePage).orElse(null));
+    }
     @PostMapping("/loan-postings/{id}/reverse") public String reverse(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID requestKey,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate effectiveDate,@RequestParam String reason,Model model){
         var receipt=service.receiptForPosting(a,id);if(receipt.isPresent())return "redirect:/finance/vouchers/receipts/"+receipt.get();
         try{return "redirect:/finance/loan-postings/"+service.reverse(a,id,requestKey,effectiveDate,reason).id();}catch(IllegalArgumentException e){model.addAttribute("reverseError",error(e));}catch(DataIntegrityViolationException e){model.addAttribute("reverseError","recording.error.duplicate");}
-        postingModel(a,id,model);model.addAttribute("reverseKey",requestKey);model.addAttribute("reason",reason);model.addAttribute("today",effectiveDate);return "accounting/loans/posting";
+        postingModel(a,id,0,model);model.addAttribute("reverseKey",requestKey);model.addAttribute("reason",reason);model.addAttribute("today",effectiveDate);return "accounting/loans/posting";
     }
     @GetMapping("/loan-recording/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,category,search,page);}
     @GetMapping("/client-ledgers") public String clients(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,Model model){model.addAttribute("clients",service.choices(a,"ledger-clients",search,page));model.addAttribute("search",search);model.addAttribute("page",page);return "accounting/loans/clients";}

@@ -87,6 +87,15 @@ public class LoanRepaymentLedgerService {
     }
 
     @Transactional(readOnly = true)
+    public Page<InstallmentRow> schedule(UUID loanId, AppUserPrincipal actor, int page) {
+        require(page >= 0 && page < MAX_INSTALLMENTS / 25, "schedule");
+        readableLedger(loanId, actor);
+        return installments.findAllByLoanApplicationIdOrderByInstallmentNumber(loanId, PageRequest.of(page, 25))
+            .map(r -> new InstallmentRow(r.getInstallmentNumber(), r.getDueDate(), r.getPrincipal(), r.getInterest(),
+                r.getPrincipalPaid(), r.getInterestPaid()));
+    }
+
+    @Transactional(readOnly = true)
     public LedgerView view(UUID loanId, AppUserPrincipal actor, int page, int schedulePage) {
         LoanLedger ledger = readableLedger(loanId, actor);
         List<LoanLedgerInstallment> rows = rows(loanId);

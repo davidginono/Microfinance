@@ -21,6 +21,30 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class LoanPostingDocumentTest {
+    @Test void disbursementPageUsesStoredScheduleRatherThanRecalculatedDetailRows() {
+        var service=mock(LoanRecordingService.class);var actor=mock(AppUserPrincipal.class);
+        UUID id=UUID.randomUUID(),loan=UUID.randomUUID();var posting=mock(Posting.class);
+        when(posting.kind()).thenReturn("DISBURSEMENT");when(posting.loanId()).thenReturn(loan);when(posting.actorId()).thenReturn(UUID.randomUUID());
+        when(service.posting(actor,id)).thenReturn(posting);
+        var row=new ScheduleRow(26,LocalDate.of(2026,12,31),new BigDecimal("33.34"),new BigDecimal("1.01"),new BigDecimal("34.35"));
+        var stored=new Page<>(List.of(row),1,true);when(service.actualRepaymentSchedule(actor,loan,1)).thenReturn(Optional.of(stored));
+        var controller=new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),mock(SaccoLogoStorageService.class));
+        var model=new ExtendedModelMap();
+        assertThat(controller.posting(actor,id,1,model)).isEqualTo("accounting/loans/posting");
+        assertThat(model.get("actualSchedule")).isSameAs(stored);
+        verify(service,never()).detail(any(),any());
+    }
+
+    @Test void missingStoredScheduleRemainsUnavailableWithoutAnEstimateFallback() {
+        var service=mock(LoanRecordingService.class);var actor=mock(AppUserPrincipal.class);var id=UUID.randomUUID();var loan=UUID.randomUUID();var posting=mock(Posting.class);
+        when(posting.kind()).thenReturn("DISBURSEMENT");when(posting.loanId()).thenReturn(loan);when(posting.actorId()).thenReturn(UUID.randomUUID());
+        when(service.posting(actor,id)).thenReturn(posting);
+        var controller=new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),mock(SaccoLogoStorageService.class));
+        var model=new ExtendedModelMap();controller.posting(actor,id,0,model);
+        assertThat(model.get("actualSchedule")).isNull();verify(service,never()).detail(any(),any());
+        assertThatThrownBy(()->controller.posting(actor,id,24,new ExtendedModelMap())).hasMessage("recording.error.filter");
+    }
+
     @Test void receiptDisbursementAndReversalUseSameScopedPdfForPrintAndDownload()throws Exception {
         var service=mock(LoanRecordingService.class);var actor=mock(AppUserPrincipal.class);
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
