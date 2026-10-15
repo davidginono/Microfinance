@@ -11,3 +11,21 @@
 .policy-decision { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 14px; }
 .policy-detail-list dt { font-weight:700; }
 .policy-detail-list dd { margin:4px 0 12px; overflow-wrap:anywhere; }
+.policy-overview .erp-detail-facts > div { border:0; padding:8px 12px; }
+.policy-overview .erp-detail-facts > div + div { border-left:1px solid var(--panel-border); }
+.policy-status { display:inline-block; font-size:12px; font-weight:600; line-height:18px; color:#545b64; }
+.policy-status-approved { color:#037f0c; }
+.policy-status-rejected { color:#b12704; }
+.policy-record-table > .resource-split-layout:not(.resource-split-open) > .erp-table-scroll,
+.policy-record-table > .erp-table-scroll { max-height:260px; }
+.policy-record-table .erp-table td:nth-child(2) { min-width:160px; }
+.policy-row-summary { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; min-width:220px; max-width:75ch; white-space:normal; }
+.policy-record-table .resource-split-values { grid-template-columns:1fr; gap:12px; }
+.policy-record-table .resource-split-values > div { border:0; }
+.policy-record-table .resource-split-values dd { white-space:pre-wrap; font-size:13px; line-height:1.5; }
+.policy-form > h2 { margin:0; font-size:14px; }
+@media (max-width:640px) {
+    .policy-overview .erp-detail-facts > div + div { border-left:0; border-top:1px solid var(--panel-border); }
+    .policy-record-table .erp-table td:nth-child(2) { min-width:130px; }
+    .policy-row-summary { min-width:180px; }
+}
