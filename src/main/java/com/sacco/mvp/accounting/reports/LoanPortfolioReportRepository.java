@@ -105,7 +105,7 @@ public class LoanPortfolioReportRepository {
               AND o.lines=2 AND o.vouchers=1 AND o.net=0 AND o.principal=c.principal AND o.cleared=c.principal AND o.dates
               AND p.valid AND p.principal>=0 AND p.principal<=c.principal
               AND t.installments>0 AND t.installments<=600 AND t.contract_count=t.installments AND t.scheduled_principal=c.principal AND t.valid
-              AND NOT EXISTS(SELECT 1 FROM accounting_business_document b WHERE b.loan_id=c.loan_application_id
+              AND NOT EXISTS(SELECT 1 FROM accounting_archive.accounting_business_document b WHERE b.loan_id=c.loan_application_id
                 AND b.state='POSTED' AND b.posted_at<=:cutoff AND b.effective_date<=:through
                 AND (b.sacco_id<>c.sacco_id OR b.station_id<>c.station_id OR
                   (b.kind NOT IN('LOAN_DISBURSEMENT','LOAN_REPAYMENT','LOAN_REPAYMENT_REVERSAL','INTEREST_ACCRUAL')
@@ -145,22 +145,22 @@ public class LoanPortfolioReportRepository {
                     AND known.state='POSTED' AND known.effective_date<=:through AND known.recorded_at<=:cutoff AND known.posted_at<=:cutoff)
                   OR EXISTS(SELECT 1 FROM loan_ledgers known WHERE known.sacco_id=s.sacco_id AND known.station_id=s.station_id
                     AND known.disbursement_date<=:through AND known.created_at<=:cutoff))
-                AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
+                AND NOT EXISTS(SELECT 1 FROM accounting_archive.gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
                   WHERE c.sacco_id=s.sacco_id AND c.station_id=s.station_id AND c.complete AND c.recorded_at<=:cutoff
                     AND c.reconciled_through<=:through AND j.state='POSTED' AND j.posted_at<=:cutoff)) missing,
               (SELECT COUNT(DISTINCT e.voucher_id) FROM loan_journal_entries e JOIN loan_ledgers l ON l.loan_application_id=e.loan_application_id
                 WHERE l.sacco_id=:institution AND (:wide OR l.station_id=:branch)
                 AND e.effective_date<=:through AND e.posted_at<=:cutoff
-                AND NOT EXISTS(SELECT 1 FROM gl_operational_bridge b JOIN gl_journal j ON j.id=b.journal_id
+                AND NOT EXISTS(SELECT 1 FROM accounting_archive.gl_operational_bridge b JOIN gl_journal j ON j.id=b.journal_id
                   WHERE b.voucher_id=e.voucher_id AND b.sacco_id=l.sacco_id AND b.station_id=l.station_id AND j.state='POSTED' AND j.posted_at<=:cutoff)
-                AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
+                AND NOT EXISTS(SELECT 1 FROM accounting_archive.gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
                   WHERE c.sacco_id=l.sacco_id AND c.station_id=l.station_id AND c.complete AND c.recorded_at<=:cutoff
                     AND c.reconciled_through>=e.effective_date AND j.state='POSTED' AND j.posted_at<=:cutoff)) unbridged,
               (SELECT COUNT(*) FROM loan_applications a WHERE a.sacco_id=:institution AND (:wide OR a.station_id=:branch)
                 AND (a.disbursement_date<=:through OR (a.disbursement_date IS NULL AND a.status IN ('DISBURSED','PAID','DEFAULTED')))
                 AND a.created_at<=:cutoff
                 AND NOT EXISTS(SELECT 1 FROM loan_ledgers l WHERE l.loan_application_id=a.id AND l.created_at<=:cutoff)
-                AND NOT EXISTS(SELECT 1 FROM gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
+                AND NOT EXISTS(SELECT 1 FROM accounting_archive.gl_cutover_coverage c JOIN gl_journal j ON j.id=c.opening_journal_id
                   WHERE c.sacco_id=a.sacco_id AND c.station_id=a.station_id AND c.complete AND c.recorded_at<=:cutoff
                     AND a.disbursement_date IS NOT NULL AND c.reconciled_through>=a.disbursement_date AND j.state='POSTED' AND j.posted_at<=:cutoff)) uncovered
             """,parameters(scope,p),(r,n)->new Coverage(r.getLong("missing"),r.getLong("unbridged"),r.getLong("uncovered")));

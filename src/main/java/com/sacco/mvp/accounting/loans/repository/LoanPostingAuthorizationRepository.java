@@ -31,8 +31,8 @@ public class LoanPostingAuthorizationRepository {
 
     public boolean retainedSourceOwnsLoan(UUID loan) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
-            select exists(select 1 from accounting_business_document where loan_id=? and state<>'REJECTED')
-              or exists(select 1 from gl_operational_bridge b join loan_journal_entries e
+            select exists(select 1 from accounting_archive.accounting_business_document where loan_id=? and state<>'REJECTED')
+              or exists(select 1 from accounting_archive.gl_operational_bridge b join loan_journal_entries e
                 on e.voucher_id=b.voucher_id where e.loan_application_id=?)
             """, Boolean.class, loan, loan));
     }

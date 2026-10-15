@@ -21,7 +21,7 @@ public class GeneralLedgerRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where sacco_id=?) or exists(select 1 from accounting_period where sacco_id=?) or exists(select 1 from gl_journal where sacco_id=?)",Boolean.class,institution,institution,institution));
     }
     public boolean hasMemberHistory(UUID id) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where maker_id=?) or exists(select 1 from accounting_period where created_by=? or closed_by=?) or exists(select 1 from gl_journal where maker_id=? or checker_id=?) or exists(select 1 from gl_source_cancellation where checker_id=?)",Boolean.class,id,id,id,id,id,id));
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account where maker_id=?) or exists(select 1 from accounting_period where created_by=? or closed_by=?) or exists(select 1 from gl_journal where maker_id=? or checker_id=?) or exists(select 1 from accounting_archive.gl_source_cancellation where checker_id=?)",Boolean.class,id,id,id,id,id,id));
     }
     public void lockAccounts(String institution) {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))", "GL_SETUP/" + institution);
