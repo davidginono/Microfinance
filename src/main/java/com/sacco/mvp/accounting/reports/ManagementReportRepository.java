@@ -92,7 +92,7 @@ public class ManagementReportRepository {
             j.effective_date as date,m.member_no as "clientNumber",coalesce(v.party,r.party,m.full_name,'') as name,
             coalesce(nullif(v.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as particulars,coalesce(v.reference,r.reference,p.reference,j.source_reference) as reference,
             l.debit as "moneyIn",l.credit as "moneyOut",
-            case when p.id is not null then case when l.debit>0 then p.principal_amount else 0 end else null end as "principalIn",
+            case when q.kind='DISBURSEMENT_REVERSAL' then q.amount when p.id is not null then case when l.debit>0 then p.principal_amount else 0 end else null end as "principalIn",
             case when p.id is not null then case when l.credit>0 then p.principal_amount else 0 end else null end as "principalOut",
             case when p.id is not null then case when l.debit>0 then p.interest_amount else 0 end else null end as "interestIn",
             case when p.id is not null then case when l.credit>0 then p.interest_amount else 0 end else null end as "interestOut"
@@ -100,7 +100,9 @@ public class ManagementReportRepository {
           join gl_account b on b.id=l.account_id and b.sacco_id=j.sacco_id and b.purpose in ('CASH','BANK','MOBILE_MONEY')
           left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id
           left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=j.sacco_id and p.station_id=j.station_id and p.state='POSTED' and p.recorded_at<=:cutoff
-          left join loan_applications a on a.id=p.loan_id and a.sacco_id=p.sacco_id and a.station_id=p.station_id
+          left join loan_adjustment_decision ad on ad.journal_id=j.id
+          left join loan_adjustment_request q on q.id=ad.request_id and q.sacco_id=j.sacco_id and q.station_id=j.station_id
+          left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
           left join members m on m.id=a.applicant_member_id and m.sacco_id=j.sacco_id
           left join accountant_loan_receipt_row x on x.posting_id=p.id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff

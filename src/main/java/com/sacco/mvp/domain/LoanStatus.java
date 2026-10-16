@@ -29,5 +29,7 @@ public enum LoanStatus {
     DISBURSED,
     PAR,
     DEFAULTED,
+    WRITTEN_OFF,
+    DISBURSEMENT_REVERSED,
     PAID
 }

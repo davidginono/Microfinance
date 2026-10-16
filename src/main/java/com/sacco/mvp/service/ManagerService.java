@@ -67,7 +67,7 @@ public class ManagerService {
         long totalDisbursed = loanApplicationRepository.countDisbursedInYearForScope(
             saccoId,
             blankToNull(stationId),
-            List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID),
+            List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF, LoanStatus.PAID),
             currentYearStart,
             currentYearStartAt
         );
@@ -110,7 +110,7 @@ public class ManagerService {
         List<LoanApplication> recentDisbursements = loanApplicationRepository.findRecentDisbursementsForScope(
             saccoId,
             blankToNull(stationId),
-            List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID),
+            List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF, LoanStatus.PAID),
             recentCutoff,
             recentCutoff.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()),
             PageRequest.of(0, 5)
@@ -214,7 +214,7 @@ public class ManagerService {
 
     public List<LoanApplication> activeApplicantLoans(UUID applicantMemberId, UUID excludeLoanId, String saccoId) {
         return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
-                applicantMemberId, List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED)).stream()
+                applicantMemberId, List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF)).stream()
             .filter(loan -> loan.getSaccoId().equals(saccoId))
             .filter(loan -> excludeLoanId == null || !loan.getId().equals(excludeLoanId))
             .sorted(Comparator.comparing(

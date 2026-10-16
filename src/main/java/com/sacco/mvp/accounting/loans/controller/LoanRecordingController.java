@@ -75,7 +75,7 @@ public class LoanRecordingController {
     private void postingModel(AppUserPrincipal a,UUID id,int schedulePage,Model model){
         if(schedulePage<0 || schedulePage>=24)throw new IllegalArgumentException("recording.error.filter");
         var p=service.posting(a,id);model.addAttribute("posting",p);model.addAttribute("canReverse",!p.actorId().equals(a.getMemberId()));model.addAttribute("reverseKey",UUID.randomUUID());model.addAttribute("today",clock.today());
-        if("DISBURSEMENT".equals(p.kind()))model.addAttribute("actualSchedule",service.actualRepaymentSchedule(a,p.loanId(),schedulePage).orElse(null));
+        if("DISBURSEMENT".equals(p.kind())){model.addAttribute("actualSchedule",service.actualRepaymentSchedule(a,p.loanId(),schedulePage).orElse(null));model.addAttribute("disbursementCorrection",service.disbursementCorrection(a,id));}
     }
     @PostMapping("/loan-postings/{id}/reverse") public String reverse(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID requestKey,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate effectiveDate,@RequestParam String reason,Model model){
         var receipt=service.receiptForPosting(a,id);if(receipt.isPresent())return "redirect:/finance/vouchers/receipts/"+receipt.get();
@@ -202,7 +202,7 @@ public class LoanRecordingController {
     }
     private VoucherPdfDocument.Source postDocument(Posting p,Detail d,Locale locale,byte[] logo){
         boolean payment="DISBURSEMENT".equals(p.kind());
-        String status=label(p.reversedBy()!=null?"voucher.status.REVERSED":p.reversesId()!=null?"voucher.status.REVERSAL":"voucher.status.POSTED",locale);
+        String status=label(p.reversedBy()!=null || (payment && "DISBURSEMENT_REVERSED".equals(d.loan().status()))?"voucher.status.REVERSED":p.reversesId()!=null?"voucher.status.REVERSAL":"voucher.status.POSTED",locale);
         String date=p.date().format(java.time.format.DateTimeFormatter.ofPattern("dd / MM / uuuu"));
         var rows=new ArrayList<List<String>>();
         String reference=label("loan.loanId",locale)+": "+p.loanNumber()+"\n"+p.reference();

@@ -1,5 +1,7 @@
 # Accounting Package And Report Customization Goal
 
+2026-10-16 lending adjustment increment: scoped provision targets, fully provided principal write-offs, linked write-backs and untouched disbursement reversals are implemented for verified ordinary recorded loans. See [scope and verification](loan-provisions-and-corrections.md). This does not complete restructuring, impairment policy approval, recovery/settlement coverage or the broader accounting backlog.
+
 2026-10-15 new instruction after reset: implement the FERPS-inspired statement workspace using the six supplied accounting layout references. The new scope includes previews, exact-account trial/ledger drill-down, notes, frozen statement sets and PDF/print/Excel output without a Details export column. See [the new workspace](financial-statement-workspace.md). This supersedes the PDF-only restriction for these new statement outputs only; historical checklist items below remain historical and are not completion claims.
 
 2026-10-15 reset: The user requested removal of accounting policies, financial statements, suppliers, accounting releases, source opening balances, reconciliation, period management, Business entries and Assets. Their pages and workflows have been removed. The requirements below are historical and must not be used to recreate them; wait for the user's new instructions. Applied migrations and financial history remain protected.

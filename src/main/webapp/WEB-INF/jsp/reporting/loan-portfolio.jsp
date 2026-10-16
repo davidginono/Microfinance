@@ -47,8 +47,9 @@
 <section data-resource-table="reporting-loan-portfolio-1" class="erp-table-wrap" data-aws-table-region aria-labelledby="portfolio-table-0">
     <div class="app-table-titlebar"><div class="app-table-heading"><h2 id="portfolio-table-0"><spring:message code="financial.portfolio.balances" /></h2></div></div><div class="erp-table-scroll erp-table-scroll-sm"><table class="erp-table"><thead><tr><th scope="col"><spring:message code="financial.portfolio.measure" /></th><th scope="col" class="financial-number">TZS</th></tr></thead><tbody>
     <c:forEach items="${['principal','overduePrincipal','overdueInterest','disbursed','collectedPrincipal','collectedInterest']}" var="field"><tr><td><spring:message code="financial.portfolio.${field}" /></td><td class="financial-number"><fmt:formatNumber value="${report.summary[field]}" minFractionDigits="2" maxFractionDigits="2" /></td></tr></c:forEach>
-    <c:forEach items="${['fees','allowance','writeOff','recovery']}" var="field"><tr><td><spring:message code="financial.portfolio.${field}" /></td><td><spring:message code="financial.report.unknown" /></td></tr></c:forEach>
-  </tbody></table></div></section>
+    <c:forEach items="${['fees','recovery']}" var="field"><tr><td><spring:message code="financial.portfolio.${field}" /></td><td><spring:message code="financial.report.unknown" /></td></tr></c:forEach>
+    <c:forEach items="${['allowance','writeOff']}" var="field"><tr><td><spring:message code="financial.portfolio.${field}" /></td><td><fmt:formatNumber value="${report.adjustments[field]}" minFractionDigits="2" maxFractionDigits="2" /></td></tr></c:forEach>
+  </tbody></table></div><p class="px-4"><spring:message code="adjustment.reportCoverage" /></p></section>
     <details class="portfolio-methodology"><summary><spring:message code="financial.portfolio.basisTitle" /></summary><p><spring:message code="financial.portfolio.basis" /></p><p><spring:message code="financial.portfolio.advanced" /></p></details>
   </div>
   <div id="risk" class="portfolio-section" data-portfolio-panel aria-labelledby="portfolio-tab-risk">

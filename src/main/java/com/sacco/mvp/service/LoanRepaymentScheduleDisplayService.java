@@ -155,7 +155,7 @@ public class LoanRepaymentScheduleDisplayService {
     }
 
     private boolean isActualScheduleStatus(LoanStatus status) {
-        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAR || status == LoanStatus.PAID;
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAR || status == LoanStatus.WRITTEN_OFF || status == LoanStatus.DISBURSEMENT_REVERSED || status == LoanStatus.PAID;
     }
 
     private String loanId(LoanApplication loan) {

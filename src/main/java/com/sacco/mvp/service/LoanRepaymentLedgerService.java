@@ -79,11 +79,11 @@ public class LoanRepaymentLedgerService {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_VIEW);
         String search = loanNumber == null || loanNumber.isBlank() ? null : loanNumber.trim();
         require(search == null || search.matches("[0-9]{4,20}"), "search");
-        return ledgers.listScoped(actor.getSaccoId(), actor.getStationId(), search,
+        return ledgers.balancesScoped(actor.getSaccoId(), actor.getStationId(), search,
             PageRequest.of(Math.max(0, Math.min(page, 10000)), 25,
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("loanApplicationId"))))
             .map(l -> new LedgerListRow(l.getLoanApplicationId(), l.getLoanId(), l.getDisbursementDate(),
-                l.getPrincipal().subtract(l.getPrincipalPaid()), l.getPrincipalPaid(), l.getInterestPaid()));
+                l.getOutstandingPrincipal(), l.getPrincipalPaid(), l.getInterestPaid()));
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +101,9 @@ public class LoanRepaymentLedgerService {
         LoanLedger ledger = readableLedger(loanId, actor);
         List<LoanLedgerInstallment> rows = rows(loanId);
         Totals totals = totals(rows, clock.today());
+        String financialState=loans.findById(loanId).map(l->l.getStatus().name()).orElse("");
+        boolean cancelled=financialState.equals("DISBURSEMENT_REVERSED");
+        if(cancelled)totals=new Totals(ZERO,ZERO,ZERO,ZERO,null);
         Page<LoanRepaymentTransaction> transactionPage = transactions.findByLoanApplicationIdOrderBySequenceDesc(loanId,
             PageRequest.of(Math.max(0, Math.min(page, 10000)), 25));
         Map<UUID, UUID> reversed = reversalIds(loanId, transactionPage.getContent().stream().map(LoanRepaymentTransaction::getId).toList());
@@ -115,10 +118,10 @@ public class LoanRepaymentLedgerService {
         var displayRows=scheduleRows(rows,rows.stream().map(row->row.getPrincipal().add(row.getInterest())).reduce(BigDecimal.ZERO,BigDecimal::add));
         Page<InstallmentRow> schedule = new PageImpl<>(displayRows.subList(from, Math.min(from + 25, rows.size())), scheduleRequest, rows.size());
         return new LedgerView(loanId, ledger.getLoanId(), ledger.getStationId(), clock.today(),
-            ledger.getPrincipal().subtract(ledger.getPrincipalPaid()), ledger.getPrincipalPaid(), ledger.getInterestPaid(),
+            cancelled?ZERO:ledger.getPrincipal().subtract(ledger.getPrincipalPaid()), ledger.getPrincipalPaid(), ledger.getInterestPaid(),
             totals.duePrincipal(), totals.dueInterest(), totals.futureInterest(), totals.oldestOverdue(),
             schedule, history, latest,
-            actor.isStaffSession() ? entries : List.of());
+            actor.isStaffSession() ? entries : List.of(),financialState);
     }
 
     @Transactional(readOnly = true)
@@ -161,6 +164,7 @@ public class LoanRepaymentLedgerService {
         LocalDate date = command.paymentDate();
         require(date != null && !date.isAfter(clock.today()) && !date.isBefore(ledger.getDisbursementDate())
             && (ledger.getLastPaymentDate() == null || !date.isBefore(ledger.getLastPaymentDate())), "date");
+        requireAfterAdjustment(ledger,date);
         require(!transactions.existsBySaccoIdAndStationIdAndChannelAndChannelReferenceAndKind(ledger.getSaccoId(),
             ledger.getStationId(), command.channel(), reference, LoanRepaymentTransaction.Kind.PAYMENT), "duplicate");
         LoanApplication loan = loans.findById(loanId).orElseThrow(() -> new IllegalArgumentException("repayment.error.unavailable"));
@@ -217,6 +221,11 @@ public class LoanRepaymentLedgerService {
         return receipt(transaction, ledger.getLoanId(), null);
     }
 
+    private void requireAfterAdjustment(LoanLedger ledger,LocalDate date) {
+        LocalDate latest=ledgers.latestAdjustmentDate(ledger.getLoanApplicationId(),ledger.getSaccoId(),ledger.getStationId());
+        require(latest==null || !date.isBefore(latest),"adjustmentDate");
+    }
+
     @Transactional
     public Receipt reverse(UUID loanId, UUID paymentId, AppUserPrincipal actor, UUID requestKey, String reason) {
         return reverseAt(loanId,paymentId,actor,requestKey,reason,null);
@@ -255,6 +264,7 @@ public class LoanRepaymentLedgerService {
         require(!original.getActorMemberId().equals(actor.getMemberId()), "checker");
         LocalDate correctionDate=effectiveDate==null?original.getPaymentDate():effectiveDate;
         require(!correctionDate.isBefore(original.getPaymentDate()) && !correctionDate.isAfter(clock.today()),"date");
+        requireAfterAdjustment(ledger,correctionDate);
         accountingGuard.reversal(loanId,actor,requestKey,correctionDate,paymentId);
         LoanApplication loan = loans.findById(loanId).orElseThrow(() -> new IllegalArgumentException("repayment.error.unavailable"));
         require(Set.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID).contains(loan.getStatus()), "state");
@@ -306,6 +316,7 @@ public class LoanRepaymentLedgerService {
         LoanLedger l = found.get();
         LoanLedger locked = ledgers.lockScoped(loanId, l.getSaccoId(), l.getStationId()).orElseThrow();
         LoanApplication loan = loans.findById(loanId).orElseThrow();
+        if(loan.getStatus()==LoanStatus.DISBURSEMENT_REVERSED)return false;
         updateProjection(locked, loan, rows(loanId));
         return true;
     }
@@ -313,6 +324,7 @@ public class LoanRepaymentLedgerService {
     @Transactional(readOnly = true)
     public Optional<RiskBalance> riskBalance(UUID loanId, LocalDate today) {
         return ledgers.findById(loanId).map(l -> {
+            if(loans.findById(loanId).map(a->a.getStatus()==LoanStatus.DISBURSEMENT_REVERSED).orElse(false))return new RiskBalance(ZERO,ZERO,null);
             Totals t = totals(rows(loanId), today);
             return new RiskBalance(l.getPrincipal().subtract(l.getPrincipalPaid()).add(t.dueInterest()),
                 t.remaining(), t.oldestOverdue());
@@ -492,5 +504,5 @@ public class LoanRepaymentLedgerService {
     public record LedgerView(UUID id, String loanId, String branch, LocalDate asOf, BigDecimal outstandingPrincipal,
         BigDecimal principalPaid, BigDecimal interestPaid, BigDecimal duePrincipal, BigDecimal dueInterest,
         BigDecimal futureInterest, LocalDate oldestOverdue, Page<InstallmentRow> installments, Page<Receipt> history,
-        UUID latestPaymentId, List<JournalRow> journal) {}
+        UUID latestPaymentId, List<JournalRow> journal,String financialState) {}
 }

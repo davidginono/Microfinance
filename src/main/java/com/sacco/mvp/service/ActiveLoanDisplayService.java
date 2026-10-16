@@ -187,6 +187,7 @@ public class ActiveLoanDisplayService {
     }
 
     private String repaymentStateLabel(LoanApplication app, LocalDate today) {
+        if(app!=null && app.getStatus()==LoanStatus.WRITTEN_OFF)return loanPresentationService.statusLabel(app.getStatus());
         if (app != null && app.getStatus() == LoanStatus.PAR) {
             return "Portfolio At Risk";
         }
@@ -203,7 +204,7 @@ public class ActiveLoanDisplayService {
         if (app != null && app.getStatus() == LoanStatus.PAR) {
             return "border-amber-200 bg-amber-50 text-amber-700";
         }
-        if (app != null && app.getStatus() == LoanStatus.DEFAULTED) {
+        if (app != null && (app.getStatus() == LoanStatus.DEFAULTED || app.getStatus()==LoanStatus.WRITTEN_OFF)) {
             return "border-rose-200 bg-rose-50 text-rose-700";
         }
         if (app != null && app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
@@ -234,7 +235,7 @@ public class ActiveLoanDisplayService {
     private boolean isActiveLocalLoan(LoanApplication loan) {
         return loan != null && (loan.getStatus() == LoanStatus.DISBURSED
             || loan.getStatus() == LoanStatus.PAR
-            || loan.getStatus() == LoanStatus.DEFAULTED);
+            || loan.getStatus() == LoanStatus.DEFAULTED || loan.getStatus()==LoanStatus.WRITTEN_OFF);
     }
 
     private String loanLabel(LoanApplication loan) {

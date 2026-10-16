@@ -44,6 +44,105 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
+    com.sacco.mvp.accounting.adjustments.service.LoanAdjustmentService adjustments(){return context.getBean(com.sacco.mvp.accounting.adjustments.service.LoanAdjustmentService.class);}
+    com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Form adjustment(UUID loan,String kind){
+        var f=new com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Form();f.setLoanId(loan);f.setKind(com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Kind.valueOf(kind));f.setDate(TODAY);f.setReason("Synthetic accounting review");f.setEvidence("Synthetic approved policy evidence");return f;
+    }
+    UUID provide(UUID loan,String amount){var f=adjustment(loan,"PROVISION");f.setTargetAllowance(new BigDecimal(amount));f.setAllowanceAccountId(account("ALLOW-"+UUID.randomUUID().toString().substring(0,8),"ASSET","CREDIT","CONTROL","ALLOWANCE"));f.setExpenseAccountId(account("LOSS-"+UUID.randomUUID().toString().substring(0,8),"EXPENSE","DEBIT","POSTING","EXPENSE"));var id=adjustments().request(actor,f);adjustments().decide(operator("B1"),id,UUID.randomUUID(),true,"Synthetic independent review");return id;}
+    @Test void loanAdjustmentsPostProvisionsWriteOffAndLinkedWriteBackWithoutInventingPayments(){
+        var loan=disbursed("D-ADJ-LIFECYCLE");provide(loan,"1000.00");
+        assertThat(adjustments().context(actor,loan).allowance()).isEqualByComparingTo("1000.00");
+        var request=adjustments().request(actor,adjustment(loan,"WRITE_OFF"));var reviewer=operator("B1");var key=UUID.randomUUID();
+        adjustments().decide(reviewer,request,key,true,"Approved synthetic write-off");
+        assertThat(adjustments().decide(reviewer,request,key,true,"Approved synthetic write-off")).isEqualTo(request);
+        assertThat(status(loan)).isEqualTo("WRITTEN_OFF");assertThat(adjustments().context(actor,loan).bookPrincipal()).isZero();
+        assertThat(adjustments().context(actor,loan).outstanding()).isEqualByComparingTo("1000.00");
+        assertThat(adjustments().context(actor,loan).allowance()).isZero();
+        var reports=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(institution,"B1",false);
+        var range=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(LocalDate.of(2026,9,1),TODAY,OffsetDateTime.parse("2026-10-08T12:00:01+03:00"),0);
+        assertThat(reports.summary(scope,range).principal()).isZero();assertThat(reports.summary(scope,range).excluded()).isZero();
+        assertThat(reports.adjustments(scope,range).get("writeOff")).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select principal_paid from loan_ledgers where loan_application_id=?",BigDecimal.class,loan)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,loan)).isZero();
+        assertThatThrownBy(()->service.repay(actor,post(loan,"10.00","NO-ORDINARY-PAYMENT"))).hasMessage("repayment.error.state");
+        var back=adjustments().request(reviewer,adjustment(loan,"WRITE_BACK"));adjustments().decide(actor,back,UUID.randomUUID(),true,"Reinstate before actual recovery");
+        assertThat(status(loan)).isEqualTo("DEFAULTED");assertThat(adjustments().context(actor,loan).bookPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(adjustments().view(actor,back).reversesJournalId()).isEqualTo(adjustments().view(actor,request).journalId());
+        var receipt=post(loan,"120.00","ACTUAL-RECOVERY");receipt.setInterestAccountId(interest);service.repay(actor,receipt);
+        assertThat(adjustments().context(actor,loan).outstanding()).isEqualByComparingTo("900.00");
+        assertThat(reports.summary(scope,range).principal()).isEqualByComparingTo("900.00");
+        assertThat(reports.adjustments(scope,range).get("writeOff")).isZero();
+    }
+    @Test void provisionTargetsUseDeltasAndCannotMoveAllowanceToAnotherAccount(){
+        var loan=disbursed("D-ADJ-TARGET");var original=provide(loan,"100.00");var q=adjustments().view(actor,original);
+        var backdated=post(loan,"10.00","ADJ-BEFORE-ASSESSMENT");backdated.setInterestAccountId(interest);backdated.setEffectiveDate(LocalDate.of(2026,10,1));
+        assertThatThrownBy(()->service.repay(actor,backdated)).isInstanceOf(IllegalArgumentException.class).hasMessage("repayment.error.adjustmentDate");
+        var release=adjustment(loan,"PROVISION");release.setTargetAllowance(BigDecimal.ZERO);release.setAllowanceAccountId(q.creditId());release.setExpenseAccountId(q.debitId());
+        var id=adjustments().request(actor,release);assertThat(adjustments().view(actor,id).allowanceChange()).isEqualByComparingTo("-100.00");
+        adjustments().decide(operator("B1"),id,UUID.randomUUID(),true,"Release assessed allowance");assertThat(adjustments().context(actor,loan).allowance()).isZero();
+        var invalid=adjustment(loan,"WRITE_OFF");assertThatThrownBy(()->adjustments().request(actor,invalid)).hasMessage("adjustment.error.fullyProvided");
+    }
+    @Test void adjustmentDecisionsCheckIndependentReviewScopeFreshClaimsAndChangedBalances(){
+        var loan=disbursed("D-ADJ-SECURITY");provide(loan,"1000.00");var f=adjustment(loan,"WRITE_OFF");var id=adjustments().request(actor,f);
+        assertThat(adjustments().request(actor,f)).isEqualTo(id);f.setReason("Changed payload");assertThatThrownBy(()->adjustments().request(actor,f)).hasMessage("adjustment.error.retry");
+        assertThatThrownBy(()->adjustments().decide(actor,id,UUID.randomUUID(),true,"Self review")).hasMessage("adjustment.error.independent");
+        var otherBranch=operator("B2");assertThatThrownBy(()->adjustments().view(otherBranch,id)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->adjustments().decide(otherBranch,id,UUID.randomUUID(),true,"Foreign review")).isInstanceOf(AccessDeniedException.class);
+        var receipt=post(loan,"120.00","ADJ-CHANGED");receipt.setInterestAccountId(interest);service.repay(actor,receipt);
+        var reviewer=operator("B1");assertThatThrownBy(()->adjustments().decide(reviewer,id,UUID.randomUUID(),true,"Stale review")).hasMessage("adjustment.error.changed");
+        adjustments().decide(reviewer,id,UUID.randomUUID(),false,"Reject stale assessment");assertThat(status(loan)).isEqualTo("DISBURSED");
+        when(context.getBean(UserClaimService.class).effectiveClaims(eq(reviewer.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());
+        assertThatThrownBy(()->adjustments().view(reviewer,id)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void disbursementReversalOffsetsOriginalAccountsAndRetainsContractHistory(){
+        var loan=disbursed("D-ADJ-DISBURSEMENT");var f=adjustment(loan,"DISBURSEMENT_REVERSAL");
+        var reviewer=operator("B1");var id=adjustments().request(actor,f);
+        assertThatThrownBy(()->adjustments().decide(actor,id,UUID.randomUUID(),true,"Original teller review")).hasMessage("adjustment.error.independent");
+        adjustments().decide(reviewer,id,UUID.randomUUID(),true,"Confirmed no client funds remain");
+        assertThat(status(loan)).isEqualTo("DISBURSEMENT_REVERSED");assertThat(adjustments().context(actor,loan).bookPrincipal()).isZero();
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isZero();assertThat(ledger.view(loan,actor,0,0).outstandingPrincipal()).isZero();
+        assertThat(ledger.list(actor,null,0).getContent()).allSatisfy(row->assertThat(row.outstandingPrincipal()).isZero());
+        assertThat(ledger.refreshProjection(loan)).isFalse();
+        assertThat(jdbc.queryForObject("select count(*) from loan_ledger_installments where loan_application_id=?",Integer.class,loan)).isPositive();
+        assertThat(jdbc.queryForObject("select sum(z.debit-z.credit) from gl_journal_line z join gl_journal j on j.id=z.journal_id where j.sacco_id=? and z.account_id=?",BigDecimal.class,institution,principal)).isZero();
+        assertThatThrownBy(()->service.disburse(actor,post(loan,"1000.00","REDISBURSE"))).hasMessage("recording.error.state");
+    }
+    @Test void adjustmentsRejectRepaymentHistoryTamperingAndRollbackAuditFailures(){
+        var loan=disbursed("D-ADJ-GUARDS");var receipt=post(loan,"120.00","ADJ-RECEIPT");receipt.setInterestAccountId(interest);var paid=service.repay(actor,receipt);
+        var requester=operator("B1");service.reverse(requester,paid.id(),UUID.randomUUID(),TODAY,"Correction");
+        assertThatThrownBy(()->adjustments().request(requester,adjustment(loan,"DISBURSEMENT_REVERSAL"))).hasMessage("adjustment.error.repayments");
+        provide(loan,"1000.00");var request=adjustments().request(actor,adjustment(loan,"WRITE_OFF"));
+        assertThatThrownBy(()->jdbc.update("update loan_adjustment_request set amount=1 where id=?",request)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("update loan_applications set status='WRITTEN_OFF' where id=?",loan)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        doThrow(new IllegalStateException("Synthetic adjustment audit failure")).when(context.getBean(AuditService.class)).logEvent(eq("ACCOUNTING_LOAN_ADJUSTMENT"),eq(request),eq("LOAN_ADJUSTMENT_APPROVED"),any(),any(),any(),any(),any(),any(),any(),any());
+        assertThatThrownBy(()->adjustments().decide(requester,request,UUID.randomUUID(),true,"Audit rollback")).hasMessage("Synthetic adjustment audit failure");
+        assertThat(status(loan)).isEqualTo("DISBURSED");assertThat(adjustments().view(actor,request).state()).isEqualTo("PENDING");
+        reset(context.getBean(AuditService.class));
+    }
+    @Test void adjustmentsRejectPostingIntoAnExistingClosedPeriod(){
+        jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,'2026-09-01','2026-09-30','OPEN',?,now()),(?,?,'2026-10-01','2026-10-31','CLOSED',?,now())",UUID.randomUUID(),institution,actor.getMemberId(),UUID.randomUUID(),institution,actor.getMemberId());
+        var loan=disbursed("D-ADJ-CLOSED");var request=adjustments().request(actor,adjustment(loan,"DISBURSEMENT_REVERSAL"));
+        assertThatThrownBy(()->adjustments().decide(operator("B1"),request,UUID.randomUUID(),true,"Closed period")).isInstanceOf(IllegalArgumentException.class).hasMessage("voucher.error.period");
+        assertThat(adjustments().view(actor,request).state()).isEqualTo("PENDING");assertThat(status(loan)).isEqualTo("DISBURSED");
+    }
+    @Test void concurrentAdjustmentApprovalPostsExactlyOneJournal()throws Exception{
+        var loan=disbursed("D-ADJ-RACE");provide(loan,"1000.00");var id=adjustments().request(actor,adjustment(loan,"WRITE_OFF"));var reviewer=operator("B1");var key=UUID.randomUUID();var pool=Executors.newFixedThreadPool(2);
+        try{var first=pool.submit(()->adjustments().decide(reviewer,id,key,true,"Concurrent identical review"));var second=pool.submit(()->adjustments().decide(reviewer,id,key,true,"Concurrent identical review"));assertThat(first.get(60,TimeUnit.SECONDS)).isEqualTo(second.get(60,TimeUnit.SECONDS));}finally{pool.shutdownNow();}
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where source_type='LOAN_ADJUSTMENT' and source_reference=?",Integer.class,id.toString())).isEqualTo(1);
+    }
+    @Test void writeOffUsesRemainingPrincipalAfterPartialCollectionAndBackdatingCannotInvalidateAssessment(){
+        var loan=disbursed("D-ADJ-PARTIAL");var payment=post(loan,"120.00","ADJ-PARTIAL");payment.setInterestAccountId(interest);service.repay(actor,payment);
+        provide(loan,"900.00");var id=adjustments().request(actor,adjustment(loan,"WRITE_OFF"));adjustments().decide(operator("B1"),id,UUID.randomUUID(),true,"Reviewed remaining principal");
+        assertThat(adjustments().view(actor,id).amount()).isEqualByComparingTo("900.00");
+        assertThat(jdbc.queryForObject("select principal_paid from loan_ledgers where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("100.00");
+        var lastPoster=adjustments().view(actor,id).decidedBy();
+        var originalReviewer=new AppUserPrincipal(context.getBean(MemberDirectoryService.class).find(lastPoster).orElseThrow(),EnumSet.allOf(UserClaim.class),true);
+        var back=adjustments().request(originalReviewer,adjustment(loan,"WRITE_BACK"));adjustments().decide(actor,back,UUID.randomUUID(),true,"Reinstate remaining debt");
+        var dated=post(loan,"10.00","ADJ-BACKDATED");dated.setInterestAccountId(interest);dated.setEffectiveDate(TODAY.minusDays(1));
+        assertThatThrownBy(()->service.repay(actor,dated)).isInstanceOfAny(IllegalArgumentException.class,org.springframework.dao.DataAccessException.class);
+        assertThat(adjustments().context(actor,loan).outstanding()).isEqualByComparingTo("900.00");
+    }
     @Test void configuredProductChoicesIncludeTheirTenureUnitAndLegacyMonthDefault(){
         jdbc.update("update loan_product_settings set tenure_unit='DAYS' where id=?",product);
         var choices=service.choices(actor,"products","",0);
@@ -523,6 +622,7 @@ class LoanRecordingPostgresTest {
         @Bean ObjectMapper json(){return JsonMapper.builder().findAndAddModules().build();}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(TODAY);when(c.now()).thenReturn(OffsetDateTime.parse("2026-10-08T12:00:00+03:00"));return c;}
         @Bean AuditService audit(){return mock(AuditService.class);}
+        @Bean com.sacco.mvp.accounting.adjustments.service.LoanAdjustmentService adjustments(JdbcTemplate jdbc,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit){return new com.sacco.mvp.accounting.adjustments.service.LoanAdjustmentService(new com.sacco.mvp.accounting.adjustments.repository.LoanAdjustmentRepository(jdbc),accounting,new VoucherRepository(jdbc),clock,audit);}
         @Bean StaffSignatureService signatures(MemberRepository members,AuditService audit){return new StaffSignatureService(members,new NameSignatureService(),new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(),audit);}
         @Bean MemberDirectoryService directory(){return mock(MemberDirectoryService.class);}
         @Bean UserClaimService claims(){return mock(UserClaimService.class);}

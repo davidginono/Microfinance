@@ -53,7 +53,8 @@ public class LoanWorkflowService {
     private static final List<LoanStatus> ACTIVE_LOAN_LOCK_STATUSES = List.of(
         LoanStatus.DISBURSED,
         LoanStatus.PAR,
-        LoanStatus.DEFAULTED
+        LoanStatus.DEFAULTED,
+        LoanStatus.WRITTEN_OFF
     );
     private static final List<LoanStatus> REJECTED_ACKNOWLEDGEMENT_STATUSES = List.of(
         LoanStatus.MANAGER_REJECTED,
@@ -85,6 +86,7 @@ public class LoanWorkflowService {
         LoanStatus.DISBURSED,
         LoanStatus.PAR,
         LoanStatus.DEFAULTED,
+        LoanStatus.WRITTEN_OFF,
         LoanStatus.PAID
     );
     private final LoanProductSettingRepository loanProductSettingRepository;
@@ -1102,7 +1104,7 @@ public class LoanWorkflowService {
             .reduce(BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP), BigDecimal::add)
             .setScale(2, java.math.RoundingMode.HALF_UP);
         int defaultedRiskLoanCount = (int) activeLoans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.PAR || loan.getStatus() == LoanStatus.DEFAULTED)
+            .filter(loan -> loan.getStatus() == LoanStatus.PAR || loan.getStatus() == LoanStatus.DEFAULTED || loan.getStatus() == LoanStatus.WRITTEN_OFF)
             .count();
         return new DirectOtpFinancialSnapshot(
             activeExposure,

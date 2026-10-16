@@ -97,10 +97,21 @@ public class LoanPortfolioReportRepository {
           LEFT JOIN installment_allocations a ON a.installment_id=i.id
           LEFT JOIN contract_terms ct ON ct.loan_application_id=c.loan_application_id AND ct.number=i.installment_number
           LEFT JOIN contract_counts cc ON cc.loan_application_id=c.loan_application_id GROUP BY c.loan_application_id,cc.total
+        ), lifecycle AS (
+          SELECT c.loan_application_id,coalesce(sum(q.principal_change),0) principal_change,
+            coalesce(-sum(q.principal_change) FILTER(WHERE q.kind IN ('WRITE_OFF','WRITE_BACK')),0) written_off,
+            coalesce(sum(q.amount) FILTER(WHERE q.kind='DISBURSEMENT_REVERSAL'),0) cancelled
+          FROM cohort c LEFT JOIN loan_adjustment_request q ON q.loan_id=c.loan_application_id
+          JOIN loan_adjustment_decision d ON d.request_id=q.id JOIN gl_journal j ON j.id=d.journal_id
+          WHERE j.state='POSTED' AND q.effective_date<=:through AND j.posted_at<=:cutoff
+          GROUP BY c.loan_application_id
         ), exposure AS MATERIALIZED (
           SELECT c.loan_application_id,c.loan_id,c.station_id,c.disbursement_date,c.principal original_principal,
-            c.principal-p.principal principal,t.overdue_principal,t.overdue_interest,t.oldest,
-            coalesce(:through-t.oldest,0) dpd,p.collected_principal,p.collected_interest,
+            c.principal-p.principal+coalesce(x.principal_change,0) principal,
+            greatest(0,t.overdue_principal-coalesce(x.written_off,0)-coalesce(x.cancelled,0)) overdue_principal,
+            CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE t.overdue_interest END overdue_interest,
+            CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN null ELSE t.oldest END oldest,
+            CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE coalesce(:through-t.oldest,0) END dpd,p.collected_principal,p.collected_interest,
             p.principal paid_principal,p.interest paid_interest,t.scheduled_interest,t.periodic_payment,t.maturity,t.installments,
             coalesce(c.application_branch=c.station_id AND c.application_institution=c.sacco_id
               AND c.application_client=c.applicant_member_id AND c.top_up_source_loan_id IS NULL
@@ -113,7 +124,7 @@ public class LoanPortfolioReportRepository {
                   (b.kind NOT IN('LOAN_DISBURSEMENT','LOAN_REPAYMENT','LOAN_REPAYMENT_REVERSAL','INTEREST_ACCRUAL')
                     AND NOT(b.kind IN('LOAN_ADVANCE','UNMATCHED_RECEIPT','REFUND') AND b.principal=0 AND b.interest=0 AND b.fees=0)))),false) complete
           FROM cohort c LEFT JOIN origins o USING(loan_application_id) JOIN payments p USING(loan_application_id)
-            JOIN terms t USING(loan_application_id)
+            JOIN terms t USING(loan_application_id) LEFT JOIN lifecycle x USING(loan_application_id)
         ), missing AS (
           SELECT a.station_id,count(*) excluded FROM loan_applications a
           WHERE a.sacco_id=:institution AND (:wide OR a.station_id=:branch) AND a.created_at<=:cutoff
@@ -135,6 +146,13 @@ public class LoanPortfolioReportRepository {
         """;
     private static Summary summary(java.sql.ResultSet r,long missing)throws java.sql.SQLException {return new Summary(r.getLong("covered"),Math.addExact(r.getLong("excluded"),missing),r.getBigDecimal("principal"),r.getBigDecimal("overdue_principal"),r.getBigDecimal("overdue_interest"),r.getBigDecimal("par1"),r.getBigDecimal("par30"),r.getBigDecimal("par90"),r.getBigDecimal("disbursed"),r.getBigDecimal("collected_principal"),r.getBigDecimal("collected_interest"));}
     public Summary summary(Scope s,Parameters p){return jdbc.queryForObject(SOURCE+"SELECT "+TOTALS+",(SELECT coalesce(sum(excluded),0) FROM missing) missing FROM exposure",parameters(s,p),(r,n)->summary(r,r.getLong("missing")));}
+    public Map<String,BigDecimal> adjustments(Scope s,Parameters p){return jdbc.queryForObject("""
+        select coalesce(sum(q.allowance_change),0) allowance,
+        coalesce(sum(case q.kind when 'WRITE_OFF' then q.amount when 'WRITE_BACK' then -q.amount else 0 end),0) write_off
+        from loan_adjustment_request q join loan_adjustment_decision d on d.request_id=q.id
+        join gl_journal j on j.id=d.journal_id and j.state='POSTED'
+        where q.sacco_id=:institution and (:wide or q.station_id=:branch) and q.effective_date<=:through and j.posted_at<=:cutoff
+        """,parameters(s,p),(r,n)->Map.of("allowance",r.getBigDecimal("allowance"),"writeOff",r.getBigDecimal("write_off")));}
     public List<SourceRow> rows(Scope s,Parameters p){if(s.institutionWide())throw new IllegalArgumentException("Branch rows required");return jdbc.query(SOURCE+"SELECT * FROM exposure ORDER BY loan_id,loan_application_id LIMIT 26 OFFSET :offset",parameters(s,p),(r,n)->new SourceRow(r.getObject("loan_application_id",UUID.class),r.getString("loan_id"),r.getBoolean("complete")?r.getBigDecimal("principal"):null,r.getBoolean("complete")?r.getBigDecimal("overdue_principal"):null,r.getBoolean("complete")?r.getBigDecimal("overdue_interest"):null,r.getObject("oldest",LocalDate.class),r.getBoolean("complete")));}
     public List<Bucket> buckets(Scope s,Parameters p,boolean regulatoryReference){String bands=regulatoryReference?"CASE WHEN dpd<=5 THEN 0 WHEN dpd<=30 THEN 1 WHEN dpd<=60 THEN 2 WHEN dpd<=90 THEN 3 ELSE 4 END":"CASE WHEN dpd=0 THEN 0 WHEN dpd<=30 THEN 1 WHEN dpd<=60 THEN 2 WHEN dpd<=90 THEN 3 ELSE 4 END";return jdbc.query(SOURCE+"SELECT "+bands+" band,count(*) loans,sum(principal) principal FROM exposure WHERE complete GROUP BY band ORDER BY band",parameters(s,p),(r,n)->new Bucket(r.getInt("band"),r.getLong("loans"),r.getBigDecimal("principal")));}
     public List<BranchPerformance> branches(Scope s,Parameters p){return jdbc.query(SOURCE+", grouped AS (SELECT station_id,"+TOTALS+" FROM exposure GROUP BY station_id), branch_ids AS (SELECT station_id FROM grouped UNION SELECT station_id FROM missing) SELECT b.station_id,coalesce(g.covered,0) covered,coalesce(g.excluded,0) excluded,coalesce(m.excluded,0) missing,coalesce(g.principal,0) principal,coalesce(g.overdue_principal,0) overdue_principal,coalesce(g.overdue_interest,0) overdue_interest,coalesce(g.par1,0) par1,coalesce(g.par30,0) par30,coalesce(g.par90,0) par90,coalesce(g.disbursed,0) disbursed,coalesce(g.collected_principal,0) collected_principal,coalesce(g.collected_interest,0) collected_interest FROM branch_ids b LEFT JOIN grouped g USING(station_id) LEFT JOIN missing m USING(station_id) ORDER BY b.station_id LIMIT 1001",parameters(s,p),(r,n)->new BranchPerformance(r.getString("station_id"),summary(r,r.getLong("missing"))));}

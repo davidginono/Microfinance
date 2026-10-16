@@ -2417,6 +2417,7 @@ public class LoanReportService {
             return "-";
         }
         return switch (status) {
+            case WRITTEN_OFF, DISBURSEMENT_REVERSED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("loan.status."+status.name());
             case RECORDED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("recording.status.RECORDED");
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
@@ -3054,6 +3055,7 @@ public class LoanReportService {
             return "Unknown";
         }
         return switch (loan.getStatus()) {
+            case WRITTEN_OFF, DISBURSEMENT_REVERSED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("loan.status."+loan.getStatus().name());
             case RECORDED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("recording.status.RECORDED");
             case DRAFT -> "Draft";
             case SUBMITTED -> "Submitted";

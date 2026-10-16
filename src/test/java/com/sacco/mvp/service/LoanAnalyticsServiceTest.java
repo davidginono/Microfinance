@@ -175,7 +175,7 @@ class LoanAnalyticsServiceTest {
         );
 
         when(loanApplicationRepository.findActiveAmountRowsForApplicantScope(
-            memberId, "SACCO-01", "ST-1", java.util.EnumSet.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED)
+            memberId, "SACCO-01", "ST-1", java.util.EnumSet.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF)
         )).thenReturn(List.of(analyticsRow(activeLoan)));
 
         assertThat(service.activeLoanAmount(memberId, "SACCO-01", "ST-1"))

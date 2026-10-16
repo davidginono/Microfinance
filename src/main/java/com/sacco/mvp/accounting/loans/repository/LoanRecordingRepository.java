@@ -16,8 +16,8 @@ public class LoanRecordingRepository {
     private final JdbcTemplate jdbc;
     private static final String LOANS="""
         select a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
-        a.amount,a.status,coalesce(l.principal-l.principal_paid,0) outstanding,coalesce(l.principal_paid,0) principal_paid,
-        coalesce(l.interest_paid,0) interest_paid,coalesce(d.interest,0) due_interest,coalesce(d.arrears,0) arrears,coalesce(d.future,0) future_interest
+        a.amount,a.status,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,
+        coalesce(l.interest_paid,0) interest_paid,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(d.interest,0) end due_interest,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(d.arrears,0) end arrears,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(d.future,0) end future_interest
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id join members m on m.id=a.applicant_member_id
         left join loan_ledgers l on l.loan_application_id=a.id
         left join lateral (select sum(case when due_date<=? then interest-interest_paid else 0 end) interest,
@@ -35,6 +35,7 @@ public class LoanRecordingRepository {
         (select x.id from accountant_loan_post x where x.reverses_id=p.id) reversed_by
         """+POST_FROM;
     public void lockRequest(AppUserPrincipal a,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_RECORD/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);}
+    public UUID disbursementCorrection(AppUserPrincipal a,UUID posting){return jdbc.query("select q.id from loan_adjustment_request q join loan_adjustment_decision d on d.request_id=q.id join gl_journal j on j.id=d.journal_id and j.state='POSTED' join accountant_loan_post p on p.journal_id=q.reverses_journal_id where p.id=? and q.sacco_id=? and q.station_id=? and q.kind='DISBURSEMENT_REVERSAL'",(r,n)->r.getObject(1,UUID.class),posting,a.getSaccoId(),a.getStationId()).stream().findFirst().orElse(null);}
     public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){return jdbc.query("select receipt_id from accountant_loan_receipt_row where posting_id=? and sacco_id=? and station_id=?",(r,n)->r.getObject(1,UUID.class),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<LoanRow> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page,LocalDate today){
         return jdbc.query(LOANS+" where r.sacco_id=? and r.station_id=? and m.id=? and a.status in ('DISBURSED','PAR','DEFAULTED') and l.loan_application_id is not null and strpos(lower(a.loan_id),?)>0 order by a.loan_id,a.id limit 26 offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>)this::loan,today,today,today,a.getSaccoId(),a.getStationId(),client,search.toLowerCase(Locale.ROOT),page*25);

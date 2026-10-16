@@ -83,6 +83,7 @@ public class AppController {
         LoanStatus.DISBURSED,
         LoanStatus.PAR,
         LoanStatus.DEFAULTED,
+        LoanStatus.WRITTEN_OFF, LoanStatus.DISBURSEMENT_REVERSED,
         LoanStatus.PAID
     );
     private static final DateTimeFormatter REVERSAL_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
@@ -284,7 +285,7 @@ public class AppController {
                                                  RedirectAttributes ra) {
         LoanApplication app = loanWorkflowService.findMine(loanId, principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Loan not found"));
-        if (app.getStatus() != LoanStatus.DISBURSED && app.getStatus() != LoanStatus.PAR && app.getStatus() != LoanStatus.DEFAULTED) {
+        if (app.getStatus() != LoanStatus.DISBURSED && app.getStatus() != LoanStatus.PAR && app.getStatus() != LoanStatus.DEFAULTED && app.getStatus()!=LoanStatus.WRITTEN_OFF) {
             ra.addFlashAttribute("error", "Only active or defaulted disbursed loans can be removed from the repayment timeline.");
             return "redirect:/app/dashboard";
         }
@@ -755,7 +756,7 @@ public class AppController {
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> 3;
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED, ACCOUNTANT_APPROVED -> 4;
             case READY_FOR_DISBURSEMENT, REJECTED -> 4;
-            case DISBURSED, PAR, DEFAULTED, PAID -> 5;
+            case DISBURSED, PAR, DEFAULTED, PAID, WRITTEN_OFF, DISBURSEMENT_REVERSED -> 5;
         };
     }
 
@@ -955,6 +956,7 @@ public class AppController {
         return app.getStatus() == LoanStatus.DISBURSED
             || app.getStatus() == LoanStatus.PAR
             || app.getStatus() == LoanStatus.DEFAULTED
+            || app.getStatus() == LoanStatus.WRITTEN_OFF || app.getStatus() == LoanStatus.DISBURSEMENT_REVERSED
             || app.getStatus() == LoanStatus.PAID;
     }
 
@@ -1046,6 +1048,7 @@ public class AppController {
             || app.getStatus() == LoanStatus.DISBURSED
             || app.getStatus() == LoanStatus.PAR
             || app.getStatus() == LoanStatus.DEFAULTED
+            || app.getStatus() == LoanStatus.WRITTEN_OFF || app.getStatus() == LoanStatus.DISBURSEMENT_REVERSED
             || app.getStatus() == LoanStatus.PAID) {
             return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
         }
@@ -1059,7 +1062,7 @@ public class AppController {
         if (app.getDisbursementDate() != null) {
             return formatDashboardWorkflowDate(app.getDisbursementDate());
         }
-        if (app.getStatus() == LoanStatus.DISBURSED || app.getStatus() == LoanStatus.PAR || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.PAID) {
+        if (app.getStatus() == LoanStatus.DISBURSED || app.getStatus() == LoanStatus.PAR || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.WRITTEN_OFF || app.getStatus() == LoanStatus.DISBURSEMENT_REVERSED || app.getStatus() == LoanStatus.PAID) {
             return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
         }
         return "";
@@ -1433,10 +1436,10 @@ public class AppController {
             return "bg-slate-100 text-slate-700";
         }
         return switch (status) {
-            case DRAFT, RECORDED -> "bg-slate-100 text-slate-700";
+            case DRAFT, RECORDED, DISBURSEMENT_REVERSED -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED, WRITTEN_OFF -> "bg-rose-50 text-rose-700";
             case AWAITING_LOAN_OFFICER, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case PAR -> "bg-amber-50 text-amber-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,

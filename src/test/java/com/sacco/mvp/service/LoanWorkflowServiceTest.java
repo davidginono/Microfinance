@@ -108,7 +108,7 @@ class LoanWorkflowServiceTest {
                 .hasMessage("This product allows applications with at most 2 existing active loans.");
         }
         verify(loanApplicationRepository).countBySaccoIdAndApplicantMemberIdAndStatusIn(
-            "SACCO-01", applicant, List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED));
+            "SACCO-01", applicant, List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF));
     }
 
     @Test

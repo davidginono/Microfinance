@@ -100,6 +100,16 @@ class ActiveLoanDisplayServiceTest {
         assertThat(display.rows().getFirst().get("scheduleLoanId")).isEqualTo(existingLoan.getId().toString());
     }
 
+    @Test void writtenOffContractualDebtRemainsVisibleToTheBorrowerAndReviewer(){
+        var loan=activeLoan(UUID.randomUUID(),"4004","900.00");loan.setStatus(LoanStatus.WRITTEN_OFF);
+        org.mockito.Mockito.when(loanPresentationService.statusLabel(LoanStatus.WRITTEN_OFF)).thenReturn("Written off");
+        var borrower=service.memberDashboardRows(member("MEM001","ST01"),"IAA",List.of(loan),Set.of());
+        var reviewer=service.staffReviewRows(member("MEM001","ST01"),"IAA",null,List.of(loan));
+        assertThat(borrower.count()).isEqualTo(1);assertThat(reviewer.count()).isEqualTo(1);
+        assertThat(borrower.rows().getFirst().get("repaymentStateLabel")).isEqualTo("Written off");
+        assertThat(borrower.totalExposure()).isEqualTo("TSh 900");
+    }
+
     private LoanApplication activeLoan(UUID id, String loanId, String amount) {
         return LoanApplication.builder()
             .id(id)

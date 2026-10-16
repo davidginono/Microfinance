@@ -28,7 +28,7 @@ public class LoanPortfolioReportService {
     public record Ratios(BigDecimal par1,BigDecimal par30,BigDecimal par90) { }
     public record Report(Scope scope,Parameters parameters,Summary summary,Ratios ratios,Coverage bookCoverage,
             List<SourceRow> rows,List<Bucket> ageing,List<Bucket> classificationReference,List<BranchPerformance> branches,
-            boolean hasNext,String definitionsVersion,String regulatoryReference) { }
+            boolean hasNext,String definitionsVersion,String regulatoryReference,Map<String,BigDecimal> adjustments) { }
     public Scope configurationScope(AppUserPrincipal actor,boolean institutionWide) {
         return authorize(actor,institutionWide);
     }
@@ -43,7 +43,7 @@ public class LoanPortfolioReportService {
         var rows=institutionWide?List.<SourceRow>of():sources.rows(scope,p);var branches=sources.branches(scope,p);
         if(branches.size()>1000)throw new IllegalArgumentException("financial.portfolio.error.branches");
         return new Report(scope,p,summary,ratios,coverage,rows.stream().limit(25).toList(),sources.buckets(scope,p,false),
-            sources.buckets(scope,p,true),List.copyOf(branches),rows.size()>25,LoanRiskMetrics.VERSION,LoanRiskMetrics.REGULATORY_REFERENCE);
+            sources.buckets(scope,p,true),List.copyOf(branches),rows.size()>25,LoanRiskMetrics.VERSION,LoanRiskMetrics.REGULATORY_REFERENCE,sources.adjustments(scope,p));
     }
     private Set<UserClaim> freshClaims(AppUserPrincipal actor) {
         if(actor==null || !actor.isStaffSession() || actor.isPlatformIdentity() || actor.getMemberId()==null

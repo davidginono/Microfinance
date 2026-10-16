@@ -54,16 +54,19 @@ public class LoanAnalyticsService {
         LoanStatus.DISBURSED,
         LoanStatus.PAR,
         LoanStatus.DEFAULTED,
+        LoanStatus.WRITTEN_OFF,
         LoanStatus.PAID
     );
     private static final EnumSet<LoanStatus> ACTIVE_STATUSES = EnumSet.of(
         LoanStatus.DISBURSED,
         LoanStatus.PAR,
-        LoanStatus.DEFAULTED
+        LoanStatus.DEFAULTED,
+        LoanStatus.WRITTEN_OFF
     );
     private static final EnumSet<LoanStatus> DEFAULTED_RISK_STATUSES = EnumSet.of(
         LoanStatus.PAR,
-        LoanStatus.DEFAULTED
+        LoanStatus.DEFAULTED,
+        LoanStatus.WRITTEN_OFF
     );
 
     private final LoanApplicationRepository loanApplicationRepository;

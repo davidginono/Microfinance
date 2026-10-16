@@ -1,4 +1,7 @@
 <c:if test="${staffWorkspace}">
+    <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_VIEW')">
+        <a href="<c:url value='/finance/loan-adjustments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-adjustments')?'shell-nav-active':''}"><spring:message code="adjustment.title" /></a>
+    </sec:authorize>
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW')">
         <c:set var="receiptBatchActive" value="${fn:startsWith(requestUri, '/finance/batches/receipts')}" />
         <div class="shell-sidebar-group space-y-1">
@@ -10,7 +13,7 @@
         </div>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
-        <c:set var="loanAccountingActive" value="${fn:startsWith(requestUri, '/finance/loan-records') or fn:startsWith(requestUri, '/finance/loan-disbursements') or fn:startsWith(requestUri, '/finance/loan-repayments') or fn:startsWith(requestUri, '/finance/client-ledgers') or fn:startsWith(requestUri, '/finance/loan-postings')}" />
+        <c:set var="loanAccountingActive" value="${fn:startsWith(requestUri, '/finance/loan-records') or fn:startsWith(requestUri, '/finance/loan-disbursements') or fn:startsWith(requestUri, '/finance/loan-repayments') or fn:startsWith(requestUri, '/finance/client-ledgers') or fn:startsWith(requestUri, '/finance/loan-postings') or fn:startsWith(requestUri, '/finance/loan-adjustments')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="loanAccountingToggle" aria-controls="loanAccountingPanel" aria-expanded="${loanAccountingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${loanAccountingActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg></span>

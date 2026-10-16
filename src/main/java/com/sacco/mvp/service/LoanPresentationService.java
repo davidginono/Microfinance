@@ -343,14 +343,18 @@ public class LoanPresentationService {
         }
     }
 
+    public String statusLabel(LoanStatus status) {
+        return messageSource.getMessage("recording.status."+status.name(),null,
+            org.springframework.context.i18n.LocaleContextHolder.getLocale());
+    }
+
     public List<Map<String, Object>> buildProgressItems(LoanApplication app) {
         if (app == null || app.getStatus() == null) {
             return List.of(progressItem("Draft", true, true, "current"));
         }
 
         if (isAccountantRecorded(app)) {
-            String label = messageSource.getMessage("recording.status." + app.getStatus().name(), null,
-                org.springframework.context.i18n.LocaleContextHolder.getLocale());
+            String label = statusLabel(app.getStatus());
             return List.of(progressItem(label, true, true, "current"));
         }
 
@@ -415,6 +419,10 @@ public class LoanPresentationService {
                 labels.add("Disbursed");
                 labels.add("Portfolio At Risk");
                 labels.add("Defaulted");
+                currentIndex = labels.size() - 1;
+            }
+            case WRITTEN_OFF, DISBURSEMENT_REVERSED -> {
+                labels.add(message("loan.status."+app.getStatus().name()));
                 currentIndex = labels.size() - 1;
             }
             case PAID -> {
@@ -1707,7 +1715,7 @@ public class LoanPresentationService {
     }
 
     private boolean isActualRepaymentStatus(LoanStatus status) {
-        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
+        return status == LoanStatus.DISBURSED || status == LoanStatus.PAR || status == LoanStatus.DEFAULTED || status == LoanStatus.WRITTEN_OFF || status == LoanStatus.DISBURSEMENT_REVERSED || status == LoanStatus.PAID;
     }
 
     private Object firstNonNull(Object first, Object second) {
@@ -2865,6 +2873,7 @@ public class LoanPresentationService {
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DISBURSED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAR
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DEFAULTED
+                || app.getStatus() == LoanStatus.WRITTEN_OFF || app.getStatus() == LoanStatus.DISBURSEMENT_REVERSED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAID;
         }
 
