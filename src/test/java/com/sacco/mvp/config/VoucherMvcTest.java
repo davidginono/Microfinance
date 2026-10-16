@@ -23,7 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class,VoucherMvcTest.Config.class})
+@SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,VoucherMvcTest.Config.class})
 class VoucherMvcTest {
  @Autowired WebApplicationContext context;@Autowired VoucherService service;@Autowired VoucherPdfService pdf;@Autowired LoanReceiptService receipts;@Autowired LoanReceiptPdfService loanPdf;
  MockMvc mvc;AppUserPrincipal actor;UUID id=UUID.randomUUID();

@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
-@SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class, SessionKeepaliveSecurityTest.Endpoints.class})
+@SpringJUnitWebConfig({MvcSecurityTestConfiguration.class, SessionKeepaliveSecurityTest.Endpoints.class})
 class SessionKeepaliveSecurityTest {
     @Autowired private WebApplicationContext context;
     @Autowired private MemberDirectoryService directory;

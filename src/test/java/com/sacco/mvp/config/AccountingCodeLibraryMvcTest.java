@@ -23,7 +23,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class,AccountingCodeLibraryMvcTest.Config.class})
+@SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,AccountingCodeLibraryMvcTest.Config.class})
 class AccountingCodeLibraryMvcTest {
     @Autowired WebApplicationContext context;@Autowired AccountingCodeLibraryService library;
     MockMvc mvc;AppUserPrincipal actor;UUID activity=UUID.randomUUID(),transaction=UUID.randomUUID();

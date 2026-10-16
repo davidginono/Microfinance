@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class, FinanceWorkspaceSecurityTest.Endpoints.class})
+@SpringJUnitWebConfig({MvcSecurityTestConfiguration.class, FinanceWorkspaceSecurityTest.Endpoints.class})
 class FinanceWorkspaceSecurityTest {
     @Autowired private WebApplicationContext context;
     private MockMvc mvc;

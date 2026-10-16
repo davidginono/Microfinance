@@ -21,7 +21,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class, StaffSignatureMvcTest.Config.class})
+@SpringJUnitWebConfig({MvcSecurityTestConfiguration.class, StaffSignatureMvcTest.Config.class})
 class StaffSignatureMvcTest {
     @Autowired WebApplicationContext context;
     @Autowired StaffSignatureService signatures;

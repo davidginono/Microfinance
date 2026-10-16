@@ -25,7 +25,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringJUnitWebConfig({LoginCsrfAccessDeniedTest.TestConfig.class,ChartOfAccountsMvcTest.Config.class})
+@SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,ChartOfAccountsMvcTest.Config.class})
 class ChartOfAccountsMvcTest {
     @Autowired WebApplicationContext context;
     @Autowired GeneralLedgerService ledger;
