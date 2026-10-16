@@ -42,8 +42,8 @@ test('staff posting lookups use the scoped review endpoint and preserve the chos
 function fixture() {
   const dom = new JSDOM(`<html lang="en"><form data-loan-form>
     <input name="_csrf" value="token"><select id="loanMode" name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>
-    <div data-configured-product><select id="productId" name="productId"><option value="product">Business loan</option></select></div>
-    <input id="principal" name="principal"><select id="tenureUnit" name="tenureUnit"><option value=""></option><option>DAYS</option><option>MONTHS</option><option>YEARS</option></select>
+    <div data-configured-product><select id="productId" name="productId"><option value="product" data-tenure-unit="MONTHS">Business loan</option><option value="daily-product" data-tenure-unit="DAYS">Day loan</option><option value="yearly-product" data-tenure-unit="YEARS">Year loan</option></select></div>
+    <input id="principal" name="principal"><label data-tenure-type><select id="tenureUnit" name="tenureUnit"><option value=""></option><option>DAYS</option><option>MONTHS</option><option>YEARS</option></select></label>
     <label data-tenure-number><span data-tenure-label data-empty="Number of" data-days="Number of days" data-months="Number of months" data-years="Number of years"></span><input id="tenureValue" name="tenureValue"></label>
     <div data-custom-terms><select id="customMethod" name="customMethod"><option value="FLAT_RATE">Flat rate</option><option value="REDUCING_BALANCE">Reducing balance</option></select><select id="interestEntry" name="interestEntry"><option value="PERCENTAGE">PERCENTAGE</option><option value="AMOUNT">AMOUNT</option></select>
     <label data-custom-percentage><input id="interestPercent" name="interestPercent"></label>
@@ -65,8 +65,8 @@ function fixture() {
 
 test('progressive tenure, custom modes and percentage basis send only active fields',async()=>{
   const {w,set,run,respond,requests,dom}=fixture();const d=w.document;
-  assert.equal(d.querySelector('[data-tenure-number]').hidden,true);
-  set('tenureUnit','DAYS');set('tenureValue','14');assert.equal(d.getElementById('tenureValue').disabled,false);assert.equal(d.getElementById('tenureValue').max,'18250');
+  assert.equal(d.querySelector('[data-tenure-type]').hidden,true);
+  set('loanMode','CUSTOM');set('tenureUnit','DAYS');set('tenureValue','14');assert.equal(d.getElementById('tenureValue').disabled,false);assert.equal(d.getElementById('tenureValue').max,'18250');
   set('loanMode','CUSTOM');set('interestBasis','ANNUAL');set('interestPercent','12');set('principal','1000');
   const calculation=run();assert.equal(d.querySelector('.loan-interest-spinner').hidden,false);assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
   assert.equal(requests[0].options.body.get('productId'),null);assert.equal(requests[0].options.body.get('_csrf'),'token');assert.equal(requests[0].options.body.get('interestBasis'),'ANNUAL');
@@ -109,7 +109,7 @@ test('incomplete configuration does not request a misleading default schedule',(
 });
 
 test('weekly estimates use localized repayment periods and principal-plus-interest balances',async()=>{
-  const {w,set,run,respond,dom}=fixture();set('tenureUnit','DAYS');set('tenureValue','9');set('principal','10000');
+  const {w,set,run,respond,dom}=fixture();set('productId','daily-product');set('tenureValue','9');set('principal','10000');
   w.document.querySelector('[data-schedule-summary]').dataset.weeklyPeriod='Wiki {0}';
   const pending=run();respond(0,'183.45',true,[
     {number:1,beginningBalance:'10183.45',amount:'5091.73',principal:'4969.68',interest:'122.05',endingBalance:'5091.72'},
@@ -144,11 +144,29 @@ test('tenure labels follow the selected unit in both loan modes and use localize
   for(const mode of ['CONFIGURED','CUSTOM']) {
     set('loanMode',mode);
     for(const [unit,text] of [['DAYS','Number of days'],['MONTHS','Number of months'],['YEARS','Number of years']]) {
-      set('tenureUnit',unit);assert.equal(label.textContent,text);
+      if(mode==='CONFIGURED')set('productId',unit==='DAYS'?'daily-product':unit==='YEARS'?'yearly-product':'product');
+      else set('tenureUnit',unit);
+      assert.equal(label.textContent,text);
       assert.equal(d.querySelector('[data-tenure-number]').hidden,false);
     }
   }
   label.dataset.days='Idadi ya siku';set('tenureUnit','DAYS');assert.equal(label.textContent,'Idadi ya siku');
   set('tenureUnit','');assert.equal(d.querySelector('[data-tenure-number]').hidden,true);
+  dom.window.close();
+});
+
+
+test('configured products supply hidden tenure units while customised loans keep the selector',async()=>{
+  const {w,set,run,respond,requests,dom}=fixture();const d=w.document,unit=d.getElementById('tenureUnit'),box=d.querySelector('[data-tenure-type]');
+  assert.equal(box.hidden,true);assert.equal(unit.disabled,false);assert.equal(unit.required,false);
+  set('tenureValue','6');set('principal','1000');const monthly=run();
+  assert.equal(requests[0].options.body.get('tenureUnit'),'MONTHS');respond(0,'60.00');await monthly;
+  set('productId','daily-product');assert.equal(unit.value,'DAYS');assert.equal(box.hidden,true);
+  assert.equal(d.getElementById('tenureValue').value,'');assert.equal(d.querySelector('[data-tenure-label]').textContent,'Number of days');
+  set('tenureValue','14');const daily=run();assert.equal(requests[1].options.body.get('tenureUnit'),'DAYS');respond(1,'12.00');await daily;
+  set('loanMode','CUSTOM');assert.equal(box.hidden,false);assert.equal(unit.required,true);
+  set('tenureUnit','YEARS');assert.equal(d.querySelector('[data-tenure-label]').textContent,'Number of years');
+  set('loanMode','CONFIGURED');assert.equal(box.hidden,true);assert.equal(unit.value,'DAYS');
+  set('productId','');assert.equal(unit.value,'');assert.equal(d.querySelector('[data-tenure-number]').hidden,true);
   dom.window.close();
 });

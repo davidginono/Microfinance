@@ -19,10 +19,12 @@
         const blank = [...select.options].find(option => option.value === '')?.cloneNode(true) || new Option('', '');
         const previous = targetPage ? [...select.options].filter(option => option.value && option.dataset.searchQuery === normalized) : [];
         const options = new Map(previous.map(option => [option.value, option]));
-        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized; options.set(choice.id, option);});
+        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized;if(choice.tenureUnit)option.dataset.tenureUnit=choice.tenureUnit; options.set(choice.id, option);});
         const visible = [...options.values()].slice(-100); select.replaceChildren(blank, ...visible);
         if (value && !visible.some(option => option.value === value) && selected) select.add(selected);
         select.value = value; page = targetPage; loadedSearch = query;
+        if(box.dataset.category === 'products' && selected?.dataset.tenureUnit !== select.selectedOptions[0]?.dataset.tenureUnit)
+          select.dispatchEvent(new Event('change', {bubbles:true}));
         more.hidden = choices.length <= 25; error.textContent = '';
       } catch (failure) { if (version === request && failure.name !== 'AbortError') {error.textContent = error.dataset.error; more.hidden = true; binding.cancel();} }
       finally {if (version === request) {loading = false; picker.setLoading(false); more.disabled = false;}}
@@ -43,6 +45,8 @@
   const recordForm = document.querySelector('form:has(#loanMode)');
   if (recordForm) {
     const mode = recordForm.querySelector('#loanMode'), entry = recordForm.querySelector('#interestEntry'), unit = recordForm.querySelector('#tenureUnit'), method = recordForm.querySelector('#customMethod'), basis = recordForm.querySelector('#interestBasis');
+    const product = recordForm.querySelector('#productId'), tenureType = recordForm.querySelector('[data-tenure-type]');
+    const initialProduct = product.value, initialUnit = unit.value;
     const region = recordForm.querySelector('[data-interest-preview]'), spinner = region.querySelector('.loan-interest-spinner'), output = region.querySelector('[data-interest-value]'), description = region.querySelector('[data-interest-description]');
     const schedule = recordForm.querySelector('[data-schedule-preview]'), rows = schedule?.querySelector('[data-schedule-rows]'), summary = schedule?.querySelector('[data-schedule-summary]');
     const money = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits:2,maximumFractionDigits:2}).format(value);
@@ -50,6 +54,14 @@
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
       const custom = mode.value === 'CUSTOM', reducing = custom && method.value === 'REDUCING_BALANCE';
+      tenureType.hidden = !custom;
+      unit.required = custom;
+      if(!custom){
+        const selectedUnit = product.selectedOptions[0]?.dataset.tenureUnit || (product.value === initialProduct ? initialUnit : '');
+        const productUnit = ['DAYS','MONTHS','YEARS'].includes(selectedUnit) ? selectedUnit : '';
+        if(unit.value !== productUnit){unit.value = productUnit;recordForm.querySelector('#tenureValue').value = '';}
+      }
+      window.refreshEnhancedSelects?.(tenureType);
       if(reducing)entry.value = 'PERCENTAGE';
       entry.querySelector('option[value="AMOUNT"]').disabled = reducing;
       recordForm.querySelector('[data-reducing-terms-note]').hidden = !reducing || basis.value !== 'WHOLE_LOAN';

@@ -116,10 +116,10 @@ public class LoanRecordingRepository {
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
             r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name"),r.getString("rate_basis"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("final_due_date",LocalDate.class)),client,a.getSaccoId(),a.getStationId(),loan,loan);}
     public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
-        select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=? and active and not custom_recording_configuration
+        select id,coalesce(product_name,loan_type) label,coalesce(tenure_unit,'MONTHS') tenure_unit from loan_product_settings where sacco_id=? and active and not custom_recording_configuration
         and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
         order by coalesce(display_order,2147483647),id limit 26 offset ?
-        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),search.toLowerCase(Locale.ROOT),page*25);}
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),"",r.getString("tenure_unit")),a.getSaccoId(),search.toLowerCase(Locale.ROOT),page*25);}
     public List<Choice> filterProducts(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=?
         and strpos(lower(coalesce(product_name,loan_type)),?)>0

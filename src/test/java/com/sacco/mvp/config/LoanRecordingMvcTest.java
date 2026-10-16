@@ -52,6 +52,13 @@ class LoanRecordingMvcTest {
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf()).param("principal","invalid").param("purpose","Business stock"))
             .andExpect(view().name("accounting/loans/record-form")).andExpect(model().attributeHasFieldErrors("recordForm","principal"));
     }
+    @Test void productChoicesReturnTenureUnitWithoutAnotherLookup() throws Exception {
+        var id=UUID.randomUUID();
+        when(service.choices(actor,"products","",0)).thenReturn(List.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice(id,"Day loan","","DAYS")));
+        mvc.perform(get("/finance/loan-recording/choices/products").with(user(actor)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(id.toString()))
+            .andExpect(jsonPath("$[0].tenureUnit").value("DAYS"));
+    }
     @Test void documentDownloadChecksScopeThroughServiceAndPreventsSniffing() throws Exception {
         var id=UUID.randomUUID();when(service.attachment(eq(actor),eq(id),eq("proof"))).thenReturn(new LoanAttachmentService.AttachmentResource("%PDF synthetic".getBytes(),"proof.pdf","application/pdf"));
         mvc.perform(get("/finance/loan-records/"+id+"/attachments/proof").with(user(actor))).andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(content().contentType("application/pdf"));

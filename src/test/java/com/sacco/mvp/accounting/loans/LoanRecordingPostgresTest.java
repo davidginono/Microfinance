@@ -44,6 +44,13 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
+    @Test void configuredProductChoicesIncludeTheirTenureUnitAndLegacyMonthDefault(){
+        jdbc.update("update loan_product_settings set tenure_unit='DAYS' where id=?",product);
+        var choices=service.choices(actor,"products","",0);
+        assertThat(choices).filteredOn(c->c.id().equals(product)).singleElement().extracting(Choice::tenureUnit).isEqualTo("DAYS");
+        jdbc.update("update loan_product_settings set tenure_unit=null where id=?",product);
+        assertThat(service.choices(actor,"products","",0)).filteredOn(c->c.id().equals(product)).singleElement().extracting(Choice::tenureUnit).isEqualTo("MONTHS");
+    }
     @Test void pagedScheduleBalancesCarryForwardPrincipalAndInterestAcrossPages(){
         var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setTenureUnit("MONTHS");f.setTenureValue(12);
         f.setCustomFrequency(RepaymentFrequency.WEEKLY);f.setInterestPercent(new BigDecimal("12"));

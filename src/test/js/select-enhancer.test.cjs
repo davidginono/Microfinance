@@ -91,3 +91,12 @@ test('body-mounted menus fit the viewport and are removed with dynamic controls'
     button.click();const menu=d.querySelector('.neo-select-menu');assert.ok(Number.parseFloat(menu.style.top)<730);assert.equal(menu.style.width,'320px');
     d.querySelector('form').remove();await tick();assert.equal(d.querySelector('.neo-select-menu'),null);dom.window.close();
 });
+
+
+test('product lookups retain tenure metadata when the saved selection returns in results',async()=>{
+    const html=loan.replace('data-category="clients"','data-category="products"');
+    const {dom,d}=await setup(html,async()=>response([{id:'C1',label:'Day loan',tenureUnit:'DAYS'}]));
+    assert.equal(d.querySelector('select').value,'C1');
+    assert.equal(d.querySelector('select').selectedOptions[0].dataset.tenureUnit,'DAYS');
+    dom.window.close();
+});
