@@ -1,0 +1,14 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+<%@ include file="../../fragments/header.jspf" %>
+<%@ include file="../../fragments/sidebar.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/finance/budgets' />"><spring:message code="management.budgets" /></a><span aria-hidden="true">/</span><span aria-current="page"><c:out value="${budget.account}" /></span></nav>
+<div class="accounting-workspace accounting-create-workspace"><div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="management.budget.details" /></h1><div class="accounting-actions"><sec:authorize access="@access.has(principal,'ACCOUNTING_ACCOUNTS_CREATE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/budgets/${budget.id}/revise' />"><spring:message code="management.budget.revise" /></a></sec:authorize></div></div>
+<dl class="accounting-context"><div><dt><spring:message code="management.account" /></dt><dd><c:out value="${budget.code} ${budget.account}" /></dd></div><div><dt><spring:message code="management.year" /></dt><dd><c:out value="${budget.year}" /></dd></div><div><dt><spring:message code="management.date" /></dt><dd><c:out value="${budget.date}" /></dd></div><div><dt><spring:message code="management.revision" /></dt><dd><c:out value="${budget.revision}" /></dd></div><div><dt><spring:message code="management.recordedBy" /></dt><dd><c:out value="${budget.recordedBy}" /></dd></div></dl>
+<section class="erp-table-wrap" data-aws-no-titlebar="true" data-aws-no-refresh="true"><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="management.month" /></th><th><spring:message code="management.amount" /> (TZS)</th></tr></thead><tbody><c:forEach items="${budget.amounts}" var="amount" varStatus="s"><tr><td><spring:message code="management.month.${s.count}" /></td><td><fmt:formatNumber value="${amount}" minFractionDigits="2" maxFractionDigits="2" /></td></tr></c:forEach></tbody><tfoot><tr><th><spring:message code="management.total" /></th><td><fmt:formatNumber value="${budget.total}" minFractionDigits="2" maxFractionDigits="2" /></td></tr></tfoot></table></div></section>
+<c:if test="${not empty budget.replacesId}"><a href="<c:url value='/finance/budgets/${budget.replacesId}' />"><spring:message code="management.budget.previous" /></a></c:if>
+</div><%@ include file="../../fragments/footer.jspf" %>

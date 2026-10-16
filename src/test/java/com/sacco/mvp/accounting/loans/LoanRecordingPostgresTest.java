@@ -44,6 +44,42 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
+    @Test void referenceReportsReconcileGroupedReceiptsCorrectionsAndPortfolioBalances(){
+        var first=disbursed("D-REFERENCE-1");var second=disbursed("D-REFERENCE-2");
+        var receipt=receiptService().post(actor,receiptForm(first,second));
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY.minusMonths(1).withDayOfMonth(1),TODAY,OffsetDateTime.now().plusSeconds(1),null,null,"","",0);
+        var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false);
+        assertThat(daily.count()).isEqualTo(4);assertThat(daily.totals().get("credit")).isEqualByComparingTo("240.00");assertThat(daily.excluded()).isZero();assertThat(daily.rows()).extracting(r->r.get("component")).containsOnly("PRINCIPAL","INTEREST");
+        var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,"","",false);
+        assertThat(portfolio.count()).isEqualTo(2);assertThat(portfolio.excluded()).isZero();assertThat(portfolio.totals().get("principalBalance")).isEqualByComparingTo("1800.00");
+        var risk=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,p,"","",false);assertThat(risk.totals().get("band0")).isEqualByComparingTo("1800.00");
+        var analysis=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,"","",false);assertThat(analysis.totals().get("principalPaid")).isEqualByComparingTo("200.00");assertThat(analysis.totals().get("interestPaid")).isEqualByComparingTo("40.00");
+        var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,"","",false);assertThat(cashbook.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(cashbook.totals().get("moneyOut")).isEqualByComparingTo("2000.00");
+        assertThat(reports.read(operator("B2"),com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false).count()).isZero();
+        receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Reference report correction");
+        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false);assertThat(corrected.count()).isEqualTo(8);assertThat(corrected.totals().get("debit")).isEqualByComparingTo("240.00");assertThat(corrected.totals().get("credit")).isEqualByComparingTo("240.00");
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,"","",false).totals().get("principalBalance")).isEqualByComparingTo("2000.00");
+        for(int n=0;n<26;n++){var extra=receiptForm(first);extra.getRows().getFirst().setAmount(BigDecimal.ONE);receiptService().post(actor,extra);}
+        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("credit")).isEqualByComparingTo("266.00");
+        var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,null,"","",1);
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,secondPage,"","",false).rows()).hasSize((int)Math.min(26,all.count()-25));
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,"ZZZZ","",false).count()).isZero();
+    }
+    @Test void accountBudgetsPreserveRevisionsScopeRetriesAndConcurrentCreation()throws Exception{
+        var repo=new com.sacco.mvp.accounting.management.repository.BudgetRepository(jdbc);
+        var budget=new com.sacco.mvp.accounting.management.service.BudgetService(repo,context.getBean(GeneralLedgerService.class),context.getBean(ApplicationClock.class),context.getBean(AuditService.class));
+        var tx=new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        var f=new com.sacco.mvp.accounting.management.dto.ManagementReports.BudgetForm();f.setAccountId(cash);f.setYear(2027);f.setDate(TODAY);f.setAmounts(new ArrayList<>(Collections.nCopies(12,new BigDecimal("100.01"))));
+        UUID id=tx.execute(s->budget.save(actor,f));UUID retry=tx.execute(s->budget.save(actor,f));assertThat(retry).isEqualTo(id);assertThat(budget.view(actor,id).total()).isEqualByComparingTo("1200.12");
+        assertThatThrownBy(()->budget.view(operator("B2"),id)).hasMessage("management.error.budget");
+        f.setRequestKey(UUID.randomUUID());f.setReplacesId(id);f.getAmounts().set(0,new BigDecimal("100.02"));UUID revised=tx.execute(s->budget.save(actor,f));
+        assertThat(budget.view(actor,revised).revision()).isEqualTo(2);assertThat(budget.view(actor,id).total()).isEqualByComparingTo("1200.12");assertThat(budget.list(actor,2027,0,"code","asc").rows()).extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Budget::id).containsExactly(revised);
+        f.setRequestKey(UUID.randomUUID());assertThatThrownBy(()->tx.execute(s->budget.save(actor,f))).hasMessage("management.error.revision");
+        assertThatThrownBy(()->jdbc.update("update account_budget set budget_year=2028 where id=?",id)).hasMessageContaining("append-only");
+        f.setReplacesId(null);f.setYear(2028);f.setRequestKey(UUID.randomUUID());try(var pool=Executors.newFixedThreadPool(2)){var calls=List.<Callable<UUID>>of(()->tx.execute(s->budget.save(actor,f)),()->tx.execute(s->budget.save(actor,f)));var results=pool.invokeAll(calls);assertThat(results.getFirst().get()).isEqualTo(results.getLast().get());}
+        f.setAccountId(principal);assertThatThrownBy(()->tx.execute(s->budget.save(actor,f))).hasMessage("management.error.retry");
+    }
     @Test void combinedReceiptColumnSortsExecuteOnPostedScopedSources(){
         var id=disbursed("D-SORT");
         var larger=receiptForm(id);larger.setReference("Z-SORT");var largeReceipt=receiptService().post(actor,larger);

@@ -1,0 +1,20 @@
+.management-workspace,.management-preview{min-width:0;max-width:100%}
+.budget-months .aws-control{width:100%;max-width:24rem}.budget-months .erp-table-scroll{max-height:none}
+.management-parameters{padding:0 1rem 1rem}.management-parameters>.erp-panel-header{margin:0 -1rem 1rem}
+.management-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}
+.management-filter-grid label{display:flex;flex-direction:column;gap:.3rem;min-width:0}
+.management-filter-grid :is(input,select,.neo-select){width:100%;min-width:0;max-width:100%}
+.management-canvas{max-height:72vh;overflow:auto}.management-pager{padding:.75rem 1rem;justify-content:flex-end}
+.reference-document{padding:24px;color:#000;background:#fff;font:12px/1.4 'Courier New',Courier,monospace;min-width:1320px}
+.reference-document header{position:relative;margin-bottom:24px}.reference-document h2{text-align:center;font:700 18px/1.3 Arial,sans-serif;margin:0 0 14px}
+.reference-document header p{margin:5px 0}.reference-stamp{text-align:right}.reference-basis{font:11px/1.5 Arial,sans-serif;max-width:1100px;margin:8px 0}
+.reference-table{border-collapse:collapse;width:100%;table-layout:fixed}.reference-table th{font-family:'Times New Roman',Times,serif;font-size:12px;font-weight:bold;text-align:left;vertical-align:top;padding:8px 5px;overflow-wrap:anywhere}
+.reference-table td{padding:4px 5px;vertical-align:top;overflow-wrap:anywhere}.reference-table .reference-money{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:left}
+.reference-group th{padding-top:25px;padding-bottom:12px}.reference-total td{font-weight:700;padding-top:9px;padding-bottom:16px}.reference-total .reference-money{text-decoration:underline;text-underline-offset:3px}
+.reference-day-total td{padding-top:12px;padding-bottom:30px}.reference-CASHBOOK{min-width:1180px}.reference-CASHBOOK .reference-table tbody tr:not(.reference-group):not(.reference-total){border-bottom:1px solid #999}
+.reference-table th:nth-child(3){width:10%}.reference-LOAN_PORTFOLIO .reference-table th:nth-child(3){width:13%}.reference-PORTFOLIO_ANALYSIS .reference-table th:nth-child(2){width:13%}
+.management-print{margin:0;background:#fff}.reference-print-controls{padding:12px}.reference-print-controls button{padding:6px 14px;cursor:pointer}
+[data-budget-register] tr[data-budget-id]{cursor:pointer}[data-budget-register] tr.is-selected{background:#e5f2fc}[data-budget-register] input[type=checkbox]{width:18px;height:18px}
+@media(max-width:767px){.management-filter-grid{grid-template-columns:minmax(0,1fr)}.management-parameters{padding:.75rem}.management-parameters>.erp-panel-header{margin:-.75rem -.75rem .75rem}.management-pager{flex-wrap:wrap}.management-preview .app-table-titlebar{flex-wrap:wrap}}
+@page{size:A3 landscape;margin:12mm}
+@media print{.reference-print-controls{display:none}.reference-document,.reference-CASHBOOK{min-width:0;padding:0;font-size:7.5pt}.reference-document h2{font-size:14pt}.reference-table th{font-size:8pt}.reference-table td{padding:3px}.reference-table .reference-money{text-align:right}.reference-table thead{display:table-header-group}.reference-table tfoot{display:table-row-group}.reference-table tr{break-inside:avoid}.reference-group{break-after:avoid}.reference-basis{font-size:7pt}.reference-stamp{text-align:right}}

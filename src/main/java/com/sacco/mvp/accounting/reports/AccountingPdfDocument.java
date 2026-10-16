@@ -12,7 +12,7 @@ import java.util.*;
 
 /** Monochrome accounting stationery. Fixed columns, repeated headings and lossless row continuation. */
 public final class AccountingPdfDocument implements AutoCloseable {
-    public enum Style { ORIGINAL, STATEMENT, EQUITY, TRIAL, ACCOUNT }
+    public enum Style { ORIGINAL, STATEMENT, EQUITY, TRIAL, ACCOUNT, REFERENCE }
     private final PDDocument document;
     private final PDFont font;
     private final PDRectangle size;
@@ -38,10 +38,11 @@ public final class AccountingPdfDocument implements AutoCloseable {
         this.document=document;this.font=font;this.title=title;this.context=context;this.logo=logo;
         firstPage=document.getNumberOfPages();
         this.style=style;
-        bodyFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
-        headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
-        titleFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY||style==Style.ACCOUNT?FontName.HELVETICA_BOLD:FontName.HELVETICA);
-        size=landscape?new PDRectangle(PDRectangle.A4.getHeight(),PDRectangle.A4.getWidth()):PDRectangle.A4;
+        bodyFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REFERENCE?FontName.COURIER:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
+        headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REFERENCE?FontName.TIMES_BOLD:style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
+        titleFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY||style==Style.ACCOUNT||style==Style.REFERENCE?FontName.HELVETICA_BOLD:FontName.HELVETICA);
+        var paper=style==Style.REFERENCE?PDRectangle.A3:PDRectangle.A4;
+        size=landscape?new PDRectangle(paper.getHeight(),paper.getWidth()):paper;
         next();document.getDocumentInformation().setTitle(title);
     }
     public float width(){return size.getWidth()-64;}
@@ -83,20 +84,21 @@ public final class AccountingPdfDocument implements AutoCloseable {
     private void nextWithoutHeader()throws IOException {var saved=headers;headers=List.of();next();headers=saved;}
     public void row(List<String> values,boolean total)throws IOException {
         var lines=new ArrayList<List<String>>();var points=new ArrayList<Float>();int count=1;
+        float leading=style==Style.REFERENCE?10:13;
         for(int i=0;i<values.size();i++){
-            float max=width()*weights[i]-10,point=numeric[i]?8:9;
+            float max=width()*weights[i]-10,point=style==Style.REFERENCE?7.5f:numeric[i]?8:9;
             if(numeric[i] && values.get(i).matches("[0-9.,()\\-]+"))point=Math.min(point,(max-1)*1000/face(values.get(i),bodyFont).getStringWidth(values.get(i)));
             points.add(point);var value=wrap(values.get(i),point,max);lines.add(value);count=Math.max(count,value.size());
         }
         int offset=0;
-        if(y-Math.min(count*13+10,100)<55)next();
+        if(y-Math.min(count*leading+10,100)<55)next();
         while(offset<count){
-            if(y<70)next();int take=Math.min(count-offset,Math.max(1,(int)((y-55)/13)));
+            if(y<70)next();int take=Math.min(count-offset,Math.max(1,(int)((y-55)/leading)));
             float x=32;
-            for(int i=0;i<lines.size();i++){for(int n=0;n<take && offset+n<lines.get(i).size();n++)draw(lines.get(i).get(offset+n),numeric[i]?x+width()*weights[i]-5:x,y-n*13,points.get(i),total,numeric[i]);x+=width()*weights[i];}
-            y-=take*13;offset+=take;
+            for(int i=0;i<lines.size();i++){for(int n=0;n<take && offset+n<lines.get(i).size();n++)draw(lines.get(i).get(offset+n),numeric[i]?x+width()*weights[i]-5:x,y-n*leading,points.get(i),total,numeric[i]);x+=width()*weights[i];}
+            y-=take*leading;offset+=take;
         }
-        if(total){if(style==Style.ORIGINAL)rule(y+2);else{float x=32;for(int i=0;i<values.size();i++){if(numeric[i])line(x+width()*weights[i]-5-face(values.get(i),headingFont).getStringWidth(values.get(i))*points.get(i)/1000,x+width()*weights[i]-5,y+11);x+=width()*weights[i];}}y-=5;}
+        if(total){if(style==Style.ORIGINAL)rule(y+2);else{float x=32;for(int i=0;i<values.size();i++){if(numeric[i])line(x+width()*weights[i]-5-face(values.get(i),headingFont).getStringWidth(values.get(i))*points.get(i)/1000,x+width()*weights[i]-5,y+leading-2);x+=width()*weights[i];}}y-=5;}
         if(style==Style.ORIGINAL)y-=5;
     }
     public void text(String value)throws IOException {for(String line:wrap(value,9,width())){if(y<65)next();draw(line,32,y,9,false,false);y-=13;}y-=4;}

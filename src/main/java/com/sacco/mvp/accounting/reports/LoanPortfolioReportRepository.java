@@ -20,7 +20,7 @@ public class LoanPortfolioReportRepository {
     public record Bucket(int band,long loans,BigDecimal principal) { }
     public record BranchPerformance(String branch,Summary summary) { }
     private MapSqlParameterSource parameters(Scope s,Parameters p){return new MapSqlParameterSource().addValue("institution",s.institution()).addValue("branch",s.branch()).addValue("wide",s.institutionWide()).addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.recordedCutoff()).addValue("offset",Math.multiplyExact(p.page(),25));}
-    private static final String SOURCE="""
+    static final String SOURCE="""
         WITH cohort AS (
           SELECT l.loan_application_id,l.sacco_id,l.station_id,l.loan_id,l.applicant_member_id,l.disbursement_date,l.principal, a.station_id application_branch,a.sacco_id application_institution,
             a.applicant_member_id application_client,a.top_up_source_loan_id,a.repayment_schedule_json contract
@@ -84,6 +84,7 @@ public class LoanPortfolioReportRepository {
           SELECT loan_application_id,count(*) total FROM contract_terms GROUP BY loan_application_id
         ), terms AS (
           SELECT c.loan_application_id,count(i.id) installments,sum(i.principal) scheduled_principal,
+            sum(i.interest) scheduled_interest,max(i.principal+i.interest) periodic_payment,max(i.due_date) maturity,
             coalesce(bool_and(coalesce(a.principal,0)>=0 AND coalesce(a.principal,0)<=i.principal
               AND coalesce(a.interest,0)>=0 AND coalesce(a.interest,0)<=i.interest
               AND ct.number IS NOT NULL AND ct.principal IS NOT NULL AND ct.interest IS NOT NULL
@@ -100,6 +101,7 @@ public class LoanPortfolioReportRepository {
           SELECT c.loan_application_id,c.loan_id,c.station_id,c.disbursement_date,c.principal original_principal,
             c.principal-p.principal principal,t.overdue_principal,t.overdue_interest,t.oldest,
             coalesce(:through-t.oldest,0) dpd,p.collected_principal,p.collected_interest,
+            p.principal paid_principal,p.interest paid_interest,t.scheduled_interest,t.periodic_payment,t.maturity,t.installments,
             coalesce(c.application_branch=c.station_id AND c.application_institution=c.sacco_id
               AND c.application_client=c.applicant_member_id AND c.top_up_source_loan_id IS NULL
               AND o.lines=2 AND o.vouchers=1 AND o.net=0 AND o.principal=c.principal AND o.cleared=c.principal AND o.dates
