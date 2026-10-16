@@ -79,13 +79,19 @@ class LoanRepaymentLedgerServiceTest {
         var viewer=actor(posterId,"B1",Set.of(UserClaim.LOAN_RECORDING_VIEW),true);
         when(accountingGuard.recordedLoan(loanId)).thenReturn(true);
         rows.getFirst().setPrincipalPaid(money("50"));
+        ledger.setPrincipal(money("8000"));rows.getFirst().setInstallmentNumber(51);rows.get(1).setInstallmentNumber(52);
+        when(installments.principalBefore(loanId,51)).thenReturn(money("5000"));
         when(installments.findAllByLoanApplicationIdOrderByInstallmentNumber(eq(loanId),any(Pageable.class)))
             .thenReturn(new org.springframework.data.domain.PageImpl<>(rows,org.springframework.data.domain.PageRequest.of(2,25),80));
         var result=service.schedule(loanId,viewer,2);
         assertThat(result.getContent().getFirst().principal()).isEqualByComparingTo("100.00");
         assertThat(result.getContent().getFirst().dueDate()).isEqualTo(today.minusMonths(1));
+        assertThat(result.getContent().getFirst().beginningBalance()).isEqualByComparingTo("3000.00");
+        assertThat(result.getContent().getFirst().endingBalance()).isEqualByComparingTo("2900.00");
+        assertThat(result.getContent().get(1).beginningBalance()).isEqualByComparingTo("2900.00");
         assertThat(result.hasNext()).isTrue();
         verify(installments).findAllByLoanApplicationIdOrderByInstallmentNumber(eq(loanId),argThat(p->p.getPageSize()==25 && p.getOffset()==50));
+        verify(installments).principalBefore(loanId,51);
         verifyNoInteractions(transactions,journal);
     }
 

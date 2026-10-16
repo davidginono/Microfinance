@@ -28,6 +28,20 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RepaymentScheduleServiceTest {
 
+    @Test void displayBalancesUseOnlyPrincipalAndLeaveStoredOutstandingUntouched(){
+        var first=new java.util.LinkedHashMap<String,Object>(Map.of("installmentNumber",1,"principalComponent",new BigDecimal("40.01"),"outstandingBalance",new BigDecimal("62.00")));
+        var second=new java.util.LinkedHashMap<String,Object>(Map.of("installmentNumber",2,"principalComponent",new BigDecimal("59.99"),"outstandingBalance",BigDecimal.ZERO));
+        var display=RepaymentScheduleService.withPrincipalBalances(java.util.List.of(first,second),new BigDecimal("100.00"));
+        assertThat((BigDecimal)display.getFirst().get("beginningBalance")).isEqualByComparingTo("100.00");
+        assertThat((BigDecimal)display.getFirst().get("endingBalance")).isEqualByComparingTo("59.99");
+        assertThat((BigDecimal)display.get(1).get("beginningBalance")).isEqualByComparingTo("59.99");
+        assertThat((BigDecimal)display.get(1).get("endingBalance")).isZero();
+        assertThat(first).doesNotContainKey("beginningBalance").containsEntry("outstandingBalance",new BigDecimal("62.00"));
+        second.remove("principalComponent");
+        assertThat(RepaymentScheduleService.withPrincipalBalances(java.util.List.of(first,second),new BigDecimal("100.00"))).allSatisfy(row->{assertThat(row.get("beginningBalance")).isNull();assertThat(row.get("endingBalance")).isNull();});
+        assertThat(RepaymentScheduleService.withPrincipalBalances(java.util.List.of(first),null).getFirst().get("endingBalance")).isNull();
+    }
+
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
 
     private RepaymentScheduleService repaymentScheduleService;

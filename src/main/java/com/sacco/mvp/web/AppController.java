@@ -2707,42 +2707,24 @@ public class AppController {
         int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
         LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, snapshot);
         List<Map<String, String>> rows = new ArrayList<>();
-        List<BigDecimal> installmentAmounts = new ArrayList<>();
         for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
             Map<String, String> row = new LinkedHashMap<>();
             row.put("pmtNo", String.valueOf(installment.number()));
             boolean weekly = "WEEKLY".equals(snapshot.get("repaymentFrequency"));
-            row.put("month", messageSource.getMessage(weekly ? "newloan.calculation.week" : "newloan.calculation.month",
-                null, weekly ? "Week" : "Month", LocaleContextHolder.getLocale()) + " " + installment.number());
+            row.put("month", messageSource.getMessage(weekly ? "repayment.period.WEEKLY" : "repayment.period.MONTHLY",
+                new Object[]{installment.number()}, (weekly ? "Week " : "Month ") + installment.number(), LocaleContextHolder.getLocale()));
+            row.put("dueDate",row.get("month"));
+            row.put("beginningBalance",formatTzs(installment.remainingPrincipal().add(installment.principal())));
+            row.put("endingBalance",formatTzs(installment.remainingPrincipal()));
+            row.put("outstandingBalance",row.get("endingBalance"));
             row.put("payment", formatTzs(installment.amount()));
             row.put("loanAmount", formatTzs(installment.principal()));
             row.put("interest", formatTzs(installment.interest()));
             row.put("installment", formatTzs(installment.amount()));
             row.put("principal", formatTzs(installment.principal()));
             rows.add(row);
-            installmentAmounts.add(installment.amount());
         }
-        applyInterestInclusivePreviewBalances(rows, installmentAmounts);
         return rows;
-    }
-
-    private void applyInterestInclusivePreviewBalances(List<Map<String, String>> rows, List<BigDecimal> installmentAmounts) {
-        BigDecimal totalScheduled = installmentAmounts.stream()
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add)
-            .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal runningPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        for (int index = 0; index < rows.size(); index++) {
-            Map<String, String> row = rows.get(index);
-            row.put("beginningBalance", formatTzs(totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO)));
-            BigDecimal amount = index < installmentAmounts.size() && installmentAmounts.get(index) != null
-                ? installmentAmounts.get(index)
-                : BigDecimal.ZERO;
-            runningPaid = runningPaid.add(amount).setScale(2, RoundingMode.HALF_UP);
-            String endingBalance = formatTzs(totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO));
-            row.put("endingBalance", endingBalance);
-            row.put("outstandingBalance", endingBalance);
-        }
     }
 
     private String formatTzs(BigDecimal amount) {

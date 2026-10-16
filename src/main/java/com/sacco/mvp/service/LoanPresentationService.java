@@ -568,7 +568,7 @@ public class LoanPresentationService {
     }
 
     public List<Map<String, Object>> parseRepaymentRows(String json) {
-        return parseRepaymentRowsInternal(json, Collections.emptyList());
+        return parseRepaymentRowsInternal(json, Collections.emptyList(),null);
     }
 
     public List<Map<String, Object>> calculatedRepaymentRows(LoanApplication app) {
@@ -581,7 +581,7 @@ public class LoanPresentationService {
         }
         List<Map<String, Object>> storedRows = parseRepaymentRowsInternal(
             app.getRepaymentScheduleJson(),
-            calculatedRepaymentRowsFromSnapshot(app)
+            calculatedRepaymentRowsFromSnapshot(app),app.getAmount()
         );
         if (!storedRows.isEmpty()) {
             return storedRows;
@@ -593,16 +593,18 @@ public class LoanPresentationService {
     }
 
     private List<Map<String, Object>> parseRepaymentRowsInternal(String json,
-                                                                 List<Map<String, Object>> calculatedScheduleRows) {
+                                                                 List<Map<String, Object>> calculatedScheduleRows,BigDecimal openingPrincipal) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
         try {
-            Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<>() {});
+            Map<String, Object> raw = objectMapper.readerFor(new TypeReference<Map<String,Object>>() {}).with(tools.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readValue(json);
             Object scheduleObject = raw.get("schedule");
             if (!(scheduleObject instanceof List<?> schedule)) {
                 return Collections.emptyList();
             }
+            var storedRows=new ArrayList<Map<String,Object>>();
+            for(var entry:schedule)if(entry instanceof Map<?,?> item){var row=new LinkedHashMap<String,Object>();item.forEach((key,value)->row.put(String.valueOf(key),value));storedRows.add(row);}
             List<Map<String, Object>> correctedScheduleRows =
                 calculatedScheduleRows != null && calculatedScheduleRows.size() == schedule.size()
                     ? calculatedScheduleRows
@@ -610,10 +612,7 @@ public class LoanPresentationService {
 
             List<Map<String, Object>> rows = new java.util.ArrayList<>();
             int rowIndex = 0;
-            for (Object entry : schedule) {
-                if (!(entry instanceof Map<?, ?> item)) {
-                    continue;
-                }
+            for (var item : RepaymentScheduleService.withPrincipalBalances(storedRows,openingPrincipal==null?toBigDecimal(raw.get("disbursedPrincipal")):openingPrincipal)) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 Object installmentNumber = item.get("installmentNumber");
                 row.put("installment", installmentNumber == null ? "-" : "Installment " + installmentNumber);
@@ -623,24 +622,16 @@ public class LoanPresentationService {
                 if (dueDateValue == null) {
                     dueDateValue = item.get("month");
                 }
+                if(dueDateValue==null)dueDateValue=estimatePeriodLabel(raw,installmentNumber);
                 row.put("dueDate", dueDateValue);
+                row.put("month", dueDateValue);
                 row.put("amount", formatMoneyValue(item.get("amount")));
                 row.put("payment", formatMoneyValue(item.get("amount")));
                 row.put("loanAmount", formatMoneyValue(item.get("principalComponent")));
                 row.put("interest", formatMoneyValue(item.get("interestComponent")));
-                BigDecimal endingBalance = toBigDecimal(item.get("outstandingBalance"));
-                BigDecimal amount = toBigDecimal(item.get("amount"));
-                BigDecimal beginningBalance = toBigDecimal(item.get("beginningBalance"));
-                if (beginningBalance != null) {
-                    row.put("beginningBalance", formatMoney(beginningBalance));
-                }
-                if (endingBalance != null) {
-                    row.put("endingBalance", formatMoney(endingBalance));
-                    row.put("outstandingBalance", formatMoney(endingBalance));
-                    if (beginningBalance == null && amount != null) {
-                        row.put("beginningBalance", formatMoney(endingBalance.add(amount)));
-                    }
-                }
+                row.put("beginningBalance", formatMoneyValue(item.get("beginningBalance")));
+                row.put("endingBalance", formatMoneyValue(item.get("endingBalance")));
+                if(item.get("outstandingBalance")!=null)row.put("outstandingBalance", formatMoneyValue(item.get("outstandingBalance")));
                 row.put("scheduledBreakdown", scheduledAmountBreakdown(item));
                 Map<String, Object> correctedRow = !correctedScheduleRows.isEmpty() && rowIndex < correctedScheduleRows.size()
                     ? correctedScheduleRows.get(rowIndex)
@@ -700,8 +691,11 @@ public class LoanPresentationService {
                 row.put("installment", "Installment " + installment.number());
                 row.put("installmentNumber", String.valueOf(installment.number()));
                 row.put("pmtNo", String.valueOf(installment.number()));
-                row.put("month", estimatePeriodLabel(raw) + " " + installment.number());
-                row.put("dueDate", "-");
+                row.put("month", estimatePeriodLabel(raw,installment.number()));
+                row.put("dueDate", row.get("month"));
+                row.put("beginningBalance", formatMoney(installment.remainingPrincipal().add(installment.principal())));
+                row.put("endingBalance", formatMoney(installment.remainingPrincipal()));
+                row.put("outstandingBalance", formatMoney(installment.remainingPrincipal()));
                 row.put("amount", formatMoney(installment.amount()));
                 row.put("payment", formatMoney(installment.amount()));
                 row.put("loanAmount", formatMoney(installment.principal()));
@@ -716,27 +710,9 @@ public class LoanPresentationService {
                 row.put("paymentDate", "-");
                 rows.add(row);
             }
-            applyInterestInclusiveDisplayBalances(rows);
             return rows;
         } catch (Exception ex) {
             return Collections.emptyList();
-        }
-    }
-
-    private void applyInterestInclusiveDisplayBalances(List<Map<String, Object>> rows) {
-        BigDecimal totalScheduled = rows.stream()
-            .map(row -> toBigDecimal(row.get("scheduledTotalAmount")))
-            .map(amount -> amount == null ? BigDecimal.ZERO : amount)
-            .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add)
-            .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal runningPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        for (Map<String, Object> row : rows) {
-            row.put("beginningBalance", formatMoney(totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO)));
-            BigDecimal amount = toBigDecimal(row.get("scheduledTotalAmount"));
-            runningPaid = runningPaid.add(amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal outstanding = totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-            row.put("outstandingBalance", formatMoney(outstanding));
-            row.put("endingBalance", formatMoney(outstanding));
         }
     }
 
@@ -747,9 +723,10 @@ public class LoanPresentationService {
         return financialMessage(String.valueOf(frequency), humanizeValue(frequency));
     }
 
-    private String estimatePeriodLabel(Map<String, Object> snapshot) {
-        return "WEEKLY".equals(snapshot.get("repaymentFrequency"))
-            ? financialMessage("week", "Week") : financialMessage("month", "Month");
+    private String estimatePeriodLabel(Map<String, Object> snapshot,Object number) {
+        String frequency="WEEKLY".equals(snapshot.get("repaymentFrequency"))?"WEEKLY":"MONTHLY";
+        return messageSource.getMessage("repayment.period."+frequency,new Object[]{number},
+            (frequency.equals("WEEKLY")?"Week ":"Month ")+number,LocaleContextHolder.getLocale());
     }
 
     private String financialMessage(String code, String fallback) {
@@ -1308,14 +1285,11 @@ public class LoanPresentationService {
 
         List<Map<String, Object>> calculatedRows = printableCalculatedRepaymentRows(app);
         if (!calculatedRows.isEmpty()) {
-            Map<String, Object> repaymentTable = new LinkedHashMap<>();
-            for (Map<String, Object> row : calculatedRows) {
-                repaymentTable.put(printableRepaymentRowValue(row, "pmtNo", "installmentNumber"),
-                    printableRepaymentRowValue(row, "month", "dueDate")
-                        + " - " + printableRepaymentRowValue(row, "payment", "amount")
-                        + " - " + printableRepaymentRowValue(row, "endingBalance", "outstandingBalance"));
-            }
-            appendTable(html, "Repayment Schedule", repaymentTable);
+            html.append("<h2>").append(esc(messageSource.getMessage("repayment.schedule",null,"Repayment Schedule",LocaleContextHolder.getLocale()))).append(" (TZS)</h2><table><thead><tr>");
+            for(var header:repaymentScheduleHeaders())html.append("<th>").append(esc(header)).append("</th>");
+            html.append("</tr></thead><tbody>");
+            for(var row:calculatedRows){html.append("<tr>");for(var value:repaymentScheduleValues(row))html.append("<td>").append(esc(value)).append("</td>");html.append("</tr>");}
+            html.append("</tbody></table>");
         }
 
         appendGuarantorSummary(html, guarantorRequests, guarantorNames, guarantorMemberNumbers);
@@ -1621,8 +1595,23 @@ public class LoanPresentationService {
     }
 
     private List<Map<String, Object>> printableCalculatedRepaymentRows(LoanApplication app) {
+        if(app!=null && app.getRepaymentScheduleJson()!=null && !app.getRepaymentScheduleJson().isBlank())return reviewRepaymentRows(app);
         List<Map<String, Object>> calculatedRows = calculatedRepaymentRows(app);
         return calculatedRows.isEmpty() ? reviewRepaymentRows(app) : calculatedRows;
+    }
+
+    private String[] repaymentScheduleHeaders() {
+        String[] keys={"pmtNo","dueDate","beginningBalance","principal","interest","endingBalance"};
+        String[] defaults={"No.","Due date","Beginning Balance","Principal","Interest","Ending Balance"};
+        String[] labels=new String[keys.length];
+        for(int i=0;i<keys.length;i++)labels[i]=messageSource.getMessage("repayment."+keys[i],null,defaults[i],LocaleContextHolder.getLocale());
+        return labels;
+    }
+
+    private String[] repaymentScheduleValues(Map<String,Object> row) {
+        return new String[]{printableRepaymentRowValue(row,"pmtNo","installmentNumber"),printableRepaymentRowValue(row,"dueDate","month"),
+            printableRepaymentRowValue(row,"beginningBalance"),printableRepaymentRowValue(row,"loanAmount","principal"),
+            printableRepaymentRowValue(row,"interest"),printableRepaymentRowValue(row,"endingBalance")};
     }
 
     private String printableRepaymentRowValue(Map<String, Object> row, String... keys) {
@@ -2554,18 +2543,10 @@ public class LoanPresentationService {
         private void drawEstimatedRepaymentRows(String title, List<Map<String, Object>> repaymentRows) throws IOException {
             List<String[]> rows = new ArrayList<>();
             for (Map<String, Object> row : repaymentRows) {
-                rows.add(new String[]{
-                    repaymentRowValue(row, "pmtNo", "installmentNumber"),
-                    repaymentRowValue(row, "month", "dueDate"),
-                    repaymentRowValue(row, "beginningBalance"),
-                    repaymentRowValue(row, "payment", "amount"),
-                    repaymentRowValue(row, "loanAmount"),
-                    repaymentRowValue(row, "interest"),
-                    repaymentRowValue(row, "endingBalance", "outstandingBalance")
-                });
+                rows.add(repaymentScheduleValues(row));
             }
-            String[] headers = new String[]{"No.", "Period", "Beginning Balance", "Amount to Pay", "Loan Amount", "Interest", "Ending Balance"};
-            float[] widths = new float[]{38f, 56f, 86f, 84f, 78f, 70f, contentWidth() - 412f};
+            String[] headers = repaymentScheduleHeaders();
+            float[] widths = new float[]{38f, 72f, 102f, 92f, 84f, contentWidth() - 388f};
             ensureSectionTableStartSpace(headers, widths, rows, SMALL_SIZE, SMALL_SIZE, CELL_PADDING_Y, 2f);
             drawSuperSectionStrip(title, null);
             drawTable(
@@ -2576,19 +2557,6 @@ public class LoanPresentationService {
                 SMALL_SIZE,
                 13f
             );
-        }
-
-        private String repaymentRowValue(Map<String, Object> row, String... keys) {
-            if (row == null || keys == null) {
-                return "-";
-            }
-            for (String key : keys) {
-                Object value = row.get(key);
-                if (value != null && !String.valueOf(value).isBlank() && !"null".equalsIgnoreCase(String.valueOf(value))) {
-                    return sanitizePdfText(String.valueOf(value));
-                }
-            }
-            return "-";
         }
 
         private void drawGuarantorSection() throws IOException {

@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.DeserializationFeature;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
@@ -121,7 +122,7 @@ public class RepaymentScheduleService {
             return Collections.emptyMap();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            return objectMapper.readerFor(new TypeReference<Map<String, Object>>() {}).with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readValue(json);
         } catch (Exception ex) {
             return Collections.emptyMap();
         }
@@ -183,7 +184,26 @@ public class RepaymentScheduleService {
         return LoanAmortizationCalculator.flatInterest(app.getAmount(), annualRate, app.getTenorMonths());
     }
 
-    private BigDecimal readBigDecimal(Object value) {
+    /** Display-only principal balances; stored interest-inclusive outstanding values are retained. */
+    public static List<Map<String,Object>> withPrincipalBalances(List<Map<String,Object>> rows,BigDecimal openingPrincipal) {
+        if(rows.size()>LoanAmortizationCalculator.MAX_PAYMENTS)throw new IllegalArgumentException("Repayment schedule exceeds the supported size.");
+        BigDecimal total=BigDecimal.ZERO;
+        boolean complete=true;
+        for(var row:rows){var principal=readBigDecimal(row.get("principalComponent"));if(principal==null || principal.signum()<0){complete=false;break;}total=total.add(principal);}
+        BigDecimal remaining=openingPrincipal;
+        if(remaining==null && !rows.isEmpty()){
+            var first=readBigDecimal(rows.getFirst().get("installmentNumber"));var lastBalance=readBigDecimal(rows.getLast().get("outstandingBalance"));
+            if(first!=null && first.compareTo(BigDecimal.ONE)==0 && lastBalance!=null && lastBalance.signum()==0)remaining=total;
+        }
+        complete=complete && remaining!=null && remaining.compareTo(total)>=0;
+        var result=new ArrayList<Map<String,Object>>(rows.size());
+        for(var source:rows){var row=new LinkedHashMap<>(source);row.put("beginningBalance",complete?remaining:null);
+            if(complete)remaining=remaining.subtract(readBigDecimal(row.get("principalComponent")));
+            row.put("endingBalance",complete?remaining:null);result.add(row);}
+        return result;
+    }
+
+    private static BigDecimal readBigDecimal(Object value) {
         if (value == null) {
             return null;
         }

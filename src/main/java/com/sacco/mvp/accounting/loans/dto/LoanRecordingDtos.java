@@ -76,7 +76,10 @@ public final class LoanRecordingDtos {
         String tenureUnit,int tenureValue,String interestBasis,String loanMode,String interestEntry) {
         public Detail(LoanRow loan,String institution,String branch,String recordedBy,OffsetDateTime recordedAt,String purpose,String business,BigDecimal income,BigDecimal expenses,BigDecimal otherDebt,String informationSource,String guarantors,String collateral,String evidence,String notes,BigDecimal rate,String method,String frequency,int months,LocalDate firstPaymentDate,BigDecimal installment,BigDecimal contractualInterest,List<ScheduleRow> schedule){this(loan,institution,branch,recordedBy,recordedAt,purpose,business,income,expenses,otherDebt,informationSource,guarantors,collateral,evidence,notes,rate,method,frequency,months,firstPaymentDate,installment,contractualInterest,schedule,"MONTHS",months,"ANNUAL","CONFIGURED","PERCENTAGE");}
     }
-    public record ScheduleRow(int number, LocalDate date, BigDecimal principal, BigDecimal interest, BigDecimal amount) {}
+    public record ScheduleRow(int number, LocalDate date, BigDecimal principal, BigDecimal interest, BigDecimal amount,
+                              BigDecimal beginningBalance, BigDecimal endingBalance) {
+        public ScheduleRow(int number,LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal amount){this(number,date,principal,interest,amount,null,null);}
+    }
     public record Statement(String client, String clientNumber, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
         BigDecimal futureInterest, long loans, Page<LoanRow> page) {}
     public record Totals(long count, BigDecimal amount, BigDecimal principal, BigDecimal interest) {}

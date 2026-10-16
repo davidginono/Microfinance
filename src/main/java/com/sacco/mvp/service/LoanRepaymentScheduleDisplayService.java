@@ -44,7 +44,7 @@ public class LoanRepaymentScheduleDisplayService {
             );
         }
         Map<String, Object> summary = repaymentScheduleService.parseSummary(loan.getRepaymentScheduleJson());
-        List<Map<String, Object>> rows = repaymentScheduleService.parseRows(loan.getRepaymentScheduleJson())
+        List<Map<String, Object>> rows = RepaymentScheduleService.withPrincipalBalances(repaymentScheduleService.parseRows(loan.getRepaymentScheduleJson()),loan.getAmount())
             .stream()
             .map(this::displayRow)
             .toList();
@@ -90,13 +90,13 @@ public class LoanRepaymentScheduleDisplayService {
         display.put("pmtNo", valueOrDash(installmentNumber));
         display.put("month", valueOrDash(row.get("dueDate")));
         display.put("dueDate", valueOrDash(row.get("dueDate")));
-        display.put("beginningBalance", "-");
+        display.put("beginningBalance", moneyOrDash(readBigDecimal(row.get("beginningBalance"))));
         display.put("amount", moneyOrDash(readBigDecimal(row.get("amount"))));
         display.put("payment", moneyOrDash(readBigDecimal(row.get("amount"))));
         display.put("loanAmount", moneyOrDash(readBigDecimal(row.get("principalComponent"))));
         display.put("principal", moneyOrDash(readBigDecimal(row.get("principalComponent"))));
         display.put("interest", moneyOrDash(readBigDecimal(row.get("interestComponent"))));
-        display.put("endingBalance", moneyOrDash(readBigDecimal(row.get("outstandingBalance"))));
+        display.put("endingBalance", moneyOrDash(readBigDecimal(row.get("endingBalance"))));
         display.put("outstandingBalance", moneyOrDash(readBigDecimal(row.get("outstandingBalance"))));
         return display;
     }

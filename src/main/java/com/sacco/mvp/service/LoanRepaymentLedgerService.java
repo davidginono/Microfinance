@@ -89,10 +89,11 @@ public class LoanRepaymentLedgerService {
     @Transactional(readOnly = true)
     public Page<InstallmentRow> schedule(UUID loanId, AppUserPrincipal actor, int page) {
         require(page >= 0 && page < MAX_INSTALLMENTS / 25, "schedule");
-        readableLedger(loanId, actor);
-        return installments.findAllByLoanApplicationIdOrderByInstallmentNumber(loanId, PageRequest.of(page, 25))
-            .map(r -> new InstallmentRow(r.getInstallmentNumber(), r.getDueDate(), r.getPrincipal(), r.getInterest(),
-                r.getPrincipalPaid(), r.getInterestPaid()));
+        var ledger=readableLedger(loanId, actor);
+        var stored=installments.findAllByLoanApplicationIdOrderByInstallmentNumber(loanId, PageRequest.of(page, 25));
+        if(stored.isEmpty())return stored.map(r->new InstallmentRow(r.getInstallmentNumber(),r.getDueDate(),r.getPrincipal(),r.getInterest(),r.getPrincipalPaid(),r.getInterestPaid()));
+        var beginning=ledger.getPrincipal().subtract(installments.principalBefore(loanId,stored.getContent().getFirst().getInstallmentNumber()));
+        return new PageImpl<>(scheduleRows(stored.getContent(),beginning),stored.getPageable(),stored.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -111,9 +112,8 @@ public class LoanRepaymentLedgerService {
                 e.getAccountCode(), e.getDebit(), e.getCredit())).toList();
         PageRequest scheduleRequest = PageRequest.of(Math.max(0, Math.min(schedulePage, 10000)), 25);
         int from = (int) Math.min(scheduleRequest.getOffset(), rows.size());
-        Page<InstallmentRow> schedule = new PageImpl<>(rows.subList(from, Math.min(from + 25, rows.size())).stream()
-            .map(r -> new InstallmentRow(r.getInstallmentNumber(), r.getDueDate(), r.getPrincipal(), r.getInterest(),
-                r.getPrincipalPaid(), r.getInterestPaid())).toList(), scheduleRequest, rows.size());
+        var displayRows=scheduleRows(rows,ledger.getPrincipal());
+        Page<InstallmentRow> schedule = new PageImpl<>(displayRows.subList(from, Math.min(from + 25, rows.size())), scheduleRequest, rows.size());
         return new LedgerView(loanId, ledger.getLoanId(), ledger.getStationId(), clock.today(),
             ledger.getPrincipal().subtract(ledger.getPrincipalPaid()), ledger.getPrincipalPaid(), ledger.getInterestPaid(),
             totals.duePrincipal(), totals.dueInterest(), totals.futureInterest(), totals.oldestOverdue(),
@@ -476,7 +476,14 @@ public class LoanRepaymentLedgerService {
         public PaymentCommand(BigDecimal amount,LocalDate date,LoanRepaymentTransaction.Channel channel,String reference,UUID key){this(amount,date,channel,reference,key,null,false);}
     }
     public record LedgerListRow(UUID id, String loanId, LocalDate disbursementDate, BigDecimal outstandingPrincipal, BigDecimal principalPaid, BigDecimal interestPaid) {}
-    public record InstallmentRow(int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest, BigDecimal principalPaid, BigDecimal interestPaid) {}
+    private List<InstallmentRow> scheduleRows(List<LoanLedgerInstallment> rows,BigDecimal beginning){
+        var result=new ArrayList<InstallmentRow>(rows.size());var balance=beginning;
+        for(var row:rows){var ending=balance.subtract(row.getPrincipal());result.add(new InstallmentRow(row.getInstallmentNumber(),row.getDueDate(),row.getPrincipal(),row.getInterest(),row.getPrincipalPaid(),row.getInterestPaid(),balance,ending));balance=ending;}
+        return result;
+    }
+    public record InstallmentRow(int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest, BigDecimal principalPaid, BigDecimal interestPaid,BigDecimal beginningBalance,BigDecimal endingBalance) {
+        public InstallmentRow(int number,LocalDate dueDate,BigDecimal principal,BigDecimal interest,BigDecimal principalPaid,BigDecimal interestPaid){this(number,dueDate,principal,interest,principalPaid,interestPaid,null,null);}
+    }
     public record JournalRow(UUID voucher, LocalDate date, String account, BigDecimal debit, BigDecimal credit) {}
     public record RiskBalance(BigDecimal currentOutstanding, BigDecimal contractualRemaining, LocalDate oldestOverdue) {}
     public record Receipt(UUID id, UUID loanApplicationId, String loanId, String reference, String kind, LocalDate paymentDate, java.time.OffsetDateTime postedAt,

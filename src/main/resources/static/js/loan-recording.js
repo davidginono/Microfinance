@@ -84,7 +84,8 @@
           if(schedule && quote.schedule?.length){
             rows.replaceChildren(...quote.schedule.map(payment => {
               const row = document.createElement('tr');
-              [payment.number,'\u2014',money(payment.principal),money(payment.interest),money(payment.amount)].forEach(value => {
+              const period = summary.dataset[quote.frequency.toLowerCase() + 'Period'].replace('{0}', String(payment.number));
+              [payment.number,period,money(payment.beginningBalance),money(payment.principal),money(payment.interest),money(payment.endingBalance)].forEach(value => {
                 const cell = document.createElement('td');cell.textContent = value;row.append(cell);
               });
               return row;

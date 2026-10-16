@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,8 +46,12 @@ class AppControllerFinancialPreviewTest {
 
     @BeforeEach
     void messagesUseEnglishFallback() {
-        lenient().when(messageSource.getMessage(anyString(), isNull(), anyString(), any(java.util.Locale.class)))
-            .thenAnswer(invocation -> invocation.getArgument(2));
+        lenient().when(messageSource.getMessage(anyString(), any(), anyString(), any(java.util.Locale.class)))
+            .thenAnswer(invocation -> {
+                String fallback = invocation.getArgument(2);
+                Object[] arguments = invocation.getArgument(1);
+                return arguments == null ? fallback : java.text.MessageFormat.format(fallback, arguments);
+            });
     }
 
     @Test
@@ -136,11 +139,12 @@ class AppControllerFinancialPreviewTest {
         assertThat(rows).hasSize(6);
         assertThat(rows.get(0)).containsEntry("pmtNo", "1");
         assertThat(rows.get(0)).containsEntry("month", "Month 1");
-        assertThat(rows.get(0)).containsEntry("beginningBalance", "TSh 1,120,000");
+        assertThat(rows.get(0)).containsEntry("dueDate", "Month 1");
+        assertThat(rows.get(0)).containsEntry("beginningBalance", "TSh 1,000,000");
         assertThat(rows.get(0)).containsEntry("payment", "TSh 186,666.67");
         assertThat(rows.get(0)).containsEntry("loanAmount", "TSh 166,666.67");
         assertThat(rows.get(0)).containsEntry("interest", "TSh 20,000");
-        assertThat(rows.get(0)).containsEntry("endingBalance", "TSh 933,333.33");
+        assertThat(rows.get(0)).containsEntry("endingBalance", "TSh 833,333.33");
         assertThat(rows.get(5)).containsEntry("interest", "TSh 20,000");
         assertThat(rows.get(5)).containsEntry("endingBalance", "TSh 0");
     }

@@ -41,7 +41,7 @@ class RecordedLoanDetailScheduleTest {
         var detail=service.detail(actor,loan.getId());
         assertThat(detail.loan().status()).isEqualTo("READY_FOR_MANAGER");
         assertThat(detail.firstPaymentDate()).isNull();
-        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,null,money("1000.00"),money("17.03"),money("1017.03")));
+        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,null,money("1000.00"),money("17.03"),money("1017.03"),money("1000.00"),money("0.00")));
         assertThat(detail.contractualInterest()).isEqualByComparingTo("17.03");
         assertThat(loan.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
         assertThat(loan.getFirstRepaymentDate()).isNull();
@@ -52,7 +52,7 @@ class RecordedLoanDetailScheduleTest {
     @Test void disbursedDetailsRetainContractualDueDatesAndAmounts() throws Exception {
         var loan=fixture(true);
         var detail=service.detail(actor,loan.getId());
-        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,today.plusMonths(1),money("1000.00"),money("17.03"),money("1017.03")));
+        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,today.plusMonths(1),money("1000.00"),money("17.03"),money("1017.03"),money("1000.00"),money("0.00")));
         assertThat(detail.firstPaymentDate()).isEqualTo(today.plusMonths(1));
         verify(loans,never()).save(any());
     }
@@ -65,14 +65,14 @@ class RecordedLoanDetailScheduleTest {
         var response=(ResponseEntity<?>)controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,new ExtendedModelMap());
         try(var pdf=Loader.loadPDF((byte[])response.getBody())){
             assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," "))
-                .contains("ON REVIEW BY MANAGER","Estimated Repayment Schedule","Due dates are set at disbursement.","1 | — | 1000.00 | 17.03 | 1017.03")
+                .contains("ON REVIEW BY MANAGER","Estimated Repayment Schedule","Due dates are set at disbursement.","1 | Month 1 | 1,000.00 | 1,000.00 | 17.03 | 0.00")
                 .doesNotContain("null");
         }
         request.setRequestURI("/finance/loan-records/"+loan.getId()+"/print");
         var model=new ExtendedModelMap();
         assertThat(controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,model)).isEqualTo("accounting/loans/print");
         var document=(LoanRecordingPdfService.Document)model.get("document");
-        assertThat(document.lines()).contains("Estimated Repayment Schedule (TZS)","Due dates are set at disbursement.","1 | — | 1000.00 | 17.03 | 1017.03");
+        assertThat(document.lines()).contains("Estimated Repayment Schedule (TZS)","Due dates are set at disbursement.","1 | Month 1 | 1,000.00 | 1,000.00 | 17.03 | 0.00");
     }
 
     private LoanApplication fixture(boolean disbursed) throws Exception {

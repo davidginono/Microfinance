@@ -443,11 +443,11 @@ class LoanPresentationServiceTest {
             .containsEntry("installment", "Installment 1")
             .containsEntry("pmtNo", "1")
             .containsEntry("month", "Month 1")
-            .containsEntry("beginningBalance", "TSh 134,400")
+            .containsEntry("beginningBalance", "TSh 120,000")
             .containsEntry("payment", "TSh 44,800")
             .containsEntry("loanAmount", "TSh 40,000")
             .containsEntry("interest", "TSh 4,800")
-            .containsEntry("endingBalance", "TSh 89,600");
+            .containsEntry("endingBalance", "TSh 80,000");
         assertThat(rows.getFirst().get("scheduledBreakdown").toString())
             .contains("Loan Amount: TSh 40,000")
             .contains("Interest: TSh 4,800");
@@ -694,9 +694,10 @@ class LoanPresentationServiceTest {
     }
 
     @Test
-    void parseRepaymentRowsAlignsStoredBeginningAndEndingBalances() {
+    void parseRepaymentRowsShowsPrincipalBalancesWithoutChangingStoredInterestInclusiveOutstanding() {
         String scheduleJson = """
             {
+              "disbursedPrincipal": 700000,
               "schedule": [
                 {
                   "installmentNumber": 1,
@@ -722,11 +723,11 @@ class LoanPresentationServiceTest {
 
         assertThat(rows).hasSize(2);
         assertThat(rows.getFirst())
-            .containsEntry("beginningBalance", "TSh 770,000")
-            .containsEntry("endingBalance", "TSh 705,833.33");
-        assertThat(rows.get(1))
-            .containsEntry("beginningBalance", "TSh 705,833.33")
+            .containsEntry("beginningBalance", "TSh 700,000")
             .containsEntry("endingBalance", "TSh 641,666.67");
+        assertThat(rows.get(1))
+            .containsEntry("beginningBalance", "TSh 641,666.67")
+            .containsEntry("endingBalance", "TSh 583,333.34");
     }
 
     @Test
@@ -785,7 +786,8 @@ class LoanPresentationServiceTest {
                 .contains("No.")
                 .contains("Beginning")
                 .contains("Balance")
-                .contains("Amount to Pay")
+                .contains("Principal")
+                .doesNotContain("Amount to Pay")
                 .contains("Monthly Repayment Amount (TZS)")
                 .contains("Month 1")
                 .contains("TSh 2,000,000")
@@ -1262,7 +1264,8 @@ class LoanPresentationServiceTest {
                 .contains("Review Stage")
                 .contains("Review Note")
                 .contains("Verified At")
-                .contains("Amount to Pay")
+                .contains("Principal")
+                .doesNotContain("Amount to Pay")
                 .contains("TSh 24,000")
                 .contains("TSh 6,000")
                 .contains("TSh 5,000")

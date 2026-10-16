@@ -34,6 +34,9 @@ class LoanInterestQuoteTest {
             assertThat(quote.schedule().stream().map(row->row.principal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(f.getPrincipal());
             assertThat(quote.schedule().stream().map(row->row.interest()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.interest());
             assertThat(quote.schedule()).allSatisfy(row->assertThat(row.amount()).isEqualByComparingTo(row.principal().add(row.interest())));
+            assertThat(quote.schedule().getFirst().beginningBalance()).isEqualByComparingTo(f.getPrincipal());
+            assertThat(quote.schedule()).allSatisfy(row->assertThat(row.endingBalance()).isEqualByComparingTo(row.beginningBalance().subtract(row.principal())));
+            assertThat(quote.schedule().getLast().endingBalance()).isZero();
         }
     }
     @Test void reducingBalanceUsesAnnualOrWholeLoanRatesAndRejectsAmountEntry(){
