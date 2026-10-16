@@ -218,6 +218,12 @@ public class LoanRecordingService {
         records.lines(a,journal,raw);records.finish(id,receipt.id(),receipt.principal(),receipt.interest(),records.loan(a,original.loanId(),clock.today()).outstandingPrincipal());records.postJournal(a,journal,now);
         event(a,id,"LOAN_REPAYMENT_REVERSED",Map.of("original",originalId));return records.posting(a,id);
     }
+    public record LoanExport(Detail detail,List<Posting> payments) {}
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public LoanExport exportLoan(AppUserPrincipal a,UUID id){
+        authorize(a,"EXPORT");var detail=detail(a,id);var rows=records.loanPosts(a,id,501,0);check(rows.size()<=500,"reportLimit");
+        return new LoanExport(detail,rows.stream().filter(p->!"DISBURSEMENT".equals(p.kind())).toList());
+    }
     @Transactional(readOnly=true) public Posting posting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.posting(a,id);}
     @Transactional(readOnly=true) public Optional<Page<ScheduleRow>> actualRepaymentSchedule(AppUserPrincipal actor,UUID loanId,int page){
         authorize(actor,"VIEW");check(page>=0 && page<24,"filter");records.record(actor,loanId,false);

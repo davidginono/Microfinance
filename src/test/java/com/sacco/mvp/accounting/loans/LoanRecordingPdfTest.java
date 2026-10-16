@@ -41,8 +41,8 @@ class LoanRecordingPdfTest {
                 var response=(ResponseEntity<?>)controller.postingExport(actor,id,new MockHttpServletRequest("GET","/finance/loan-postings/"+id+"/"+format),Locale.ENGLISH,null);
                 try(var pdf=Loader.loadPDF((byte[])response.getBody())){
                     boolean moneyDebit=!payment && !reversal;
-                    assertRow(pdf,"111001",1,moneyDebit?"120.01":"",moneyDebit?"":payment?"1,000.00":"120.01");
-                    assertRow(pdf,"111002",2,moneyDebit?"":payment?"1,000.00":"100.00",moneyDebit?"100.00":"");
+                    assertRow(pdf,"111001",1,moneyDebit?"120.01":"",moneyDebit?"":payment?"1,000.00":"120.01",payment);
+                    assertRow(pdf,"111002",2,moneyDebit?"":payment?"1,000.00":"100.00",moneyDebit?"100.00":"",payment);
                     if(!payment)assertRow(pdf,"210001",3,reversal?"20.01":"",reversal?"":"20.01");
                     assertThat(pdf.getNumberOfPages()).isEqualTo(1);
                     if(format.equals("pdf")){

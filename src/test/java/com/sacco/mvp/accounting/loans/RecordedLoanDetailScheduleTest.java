@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class RecordedLoanDetailScheduleTest {
@@ -35,6 +36,21 @@ class RecordedLoanDetailScheduleTest {
     private final LoanRecordingService service=new LoanRecordingService(records,loans,null,null,schedules,null,
         accounting,null,json,clock,null,null,null,null,null,null,null,null);
     private final LocalDate today=LocalDate.of(2026,10,15);
+
+    @Test void exportIsBoundedScopedAndUsesRecordedPaymentHistory()throws Exception {
+        var loan=fixture(true);
+        var payment=mock(Posting.class);when(payment.kind()).thenReturn("PAYMENT");
+        var correction=mock(Posting.class);when(correction.kind()).thenReturn("REVERSAL");
+        var disbursement=mock(Posting.class);when(disbursement.kind()).thenReturn("DISBURSEMENT");
+        when(records.loanPosts(actor,loan.getId(),501,0)).thenReturn(List.of(disbursement,payment,correction));
+        assertThat(service.exportLoan(actor,loan.getId()).payments()).containsExactly(payment,correction);
+        verify(accounting).requireActor(actor,"LOAN_RECORDING_EXPORT");verify(records).record(actor,loan.getId(),false);
+        when(records.loanPosts(actor,loan.getId(),501,0)).thenReturn(Collections.nCopies(501,payment));
+        assertThatThrownBy(()->service.exportLoan(actor,loan.getId())).isInstanceOf(IllegalArgumentException.class).hasMessage("recording.error.reportLimit");
+        reset(records);when(records.record(actor,loan.getId(),false)).thenThrow(new org.springframework.security.access.AccessDeniedException("Loan unavailable"));
+        assertThatThrownBy(()->service.exportLoan(actor,loan.getId())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(records,never()).loanPosts(any(),any(),anyInt(),anyInt());verify(loans,never()).save(any());
+    }
 
     @Test void reviewDetailsShowStoredInstalmentAmountsWithoutInventingDatesOrPosting() throws Exception {
         var loan=fixture(false);
@@ -65,14 +81,15 @@ class RecordedLoanDetailScheduleTest {
         var response=(ResponseEntity<?>)controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,new ExtendedModelMap());
         try(var pdf=Loader.loadPDF((byte[])response.getBody())){
             assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," "))
-                .contains("ON REVIEW BY MANAGER","Estimated Repayment Schedule","Due dates are set at disbursement.","1 | Month 1 | 1,000.00 | 1,000.00 | 17.03 | 0.00")
+                .contains("ON REVIEW BY MANAGER","ESTIMATED REPAYMENT SCHEDULE","Due dates are set at disbursement.","Month 1","1,000.00","1,017.03","17.03","0.00","No payment transactions recorded.")
                 .doesNotContain("null");
         }
         request.setRequestURI("/finance/loan-records/"+loan.getId()+"/print");
-        var model=new ExtendedModelMap();
-        assertThat(controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,model)).isEqualTo("accounting/loans/print");
-        var document=(LoanRecordingPdfService.Document)model.get("document");
-        assertThat(document.lines()).contains("Estimated Repayment Schedule (TZS)","Due dates are set at disbursement.","1 | Month 1 | 1,000.00 | 1,000.00 | 17.03 | 0.00");
+        var printed=(ResponseEntity<?>)controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,new ExtendedModelMap());
+        assertThat(printed.getHeaders().getFirst("Content-Disposition")).startsWith("inline;");
+        try(var document=Loader.loadPDF((byte[])printed.getBody())){
+            assertThat(new PDFTextStripper().getText(document)).contains("LOAN AMORTIZATION SCHEDULE","Month 1");
+        }
     }
 
     private LoanApplication fixture(boolean disbursed) throws Exception {

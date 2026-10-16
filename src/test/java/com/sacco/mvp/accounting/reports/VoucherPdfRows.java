@@ -11,10 +11,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 public final class VoucherPdfRows {
     private VoucherPdfRows() {}
     public static void assertRow(PDDocument document,String account,int number,String debit,String credit)throws IOException {
+        assertRow(document,account,number,debit,credit,false);
+    }
+    public static void assertRow(PDDocument document,String account,int number,String debit,String credit,boolean payment)throws IOException {
         var baselines=new ArrayList<Float>();
         var finder=new PDFTextStripper(){
             @Override protected void writeString(String text,List<TextPosition> positions){
-                var ledger=positions.stream().filter(p->p.getXDirAdj()>=195 && p.getXDirAdj()<342).toList();
+                var ledger=positions.stream().filter(p->p.getXDirAdj()>=195 && p.getXDirAdj()<(payment?375:342)).toList();
                 String value=ledger.stream().map(TextPosition::getUnicode).collect(java.util.stream.Collectors.joining());
                 if(value.startsWith(account))baselines.add(ledger.getFirst().getYDirAdj());
             }
@@ -23,11 +26,13 @@ public final class VoucherPdfRows {
         assertThat(baselines).as("Rendered ledger row for %s",account).hasSize(1);
         var cells=new PDFTextStripperByArea();float top=baselines.getFirst()-10;
         cells.addRegion("number",new Rectangle2D.Float(22,top,30,13));
-        cells.addRegion("debit",new Rectangle2D.Float(342,top,76,13));
-        cells.addRegion("credit",new Rectangle2D.Float(419,top,76,13));
+        cells.addRegion("debit",new Rectangle2D.Float(payment?375:342,top,payment?99:76,13));
+        cells.addRegion("credit",new Rectangle2D.Float(payment?475:419,top,payment?98:76,13));
+        if(payment && number==1)cells.addRegion("header",new Rectangle2D.Float(22,top-45,551,35));
         cells.extractRegions(document.getPage(0));
         assertThat(cells.getTextForRegion("number").strip()).isEqualTo(Integer.toString(number));
         assertThat(cells.getTextForRegion("debit").strip()).isEqualTo(debit);
         assertThat(cells.getTextForRegion("credit").strip()).isEqualTo(credit);
+        if(payment && number==1)assertThat(cells.getTextForRegion("header")).contains("DEBIT","CREDIT").doesNotContain("AMOUNT");
     }
 }

@@ -23,8 +23,8 @@ class VoucherPdfTest {
    var transaction=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Synthetic account allocation",new BigDecimal("1000.00"),cashDebit?cash:other,cashDebit?other:cash);
    var voucher=new Voucher(UUID.randomUUID(),type+"-ROWS",type,LocalDate.of(2026,10,16),"Synthetic client","REF-ROWS","Synthetic demonstration only.","Reference",cash.id(),transaction.amount(),1,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-16T10:30:00+03:00"),reversal?UUID.randomUUID():null,null,"Example Microfinance Limited","Main branch",List.of(transaction));
    try(var doc=Loader.loadPDF(exporter.render(voucher,Locale.ENGLISH).bytes())){
-    assertRow(doc,"111001",1,cashDebit?"1,000.00":"",cashDebit?"":"1,000.00");
-    assertRow(doc,"111002",2,cashDebit?"":"1,000.00",cashDebit?"1,000.00":"");
+    assertRow(doc,"111001",1,cashDebit?"1,000.00":"",cashDebit?"":"1,000.00",type==Type.PAYMENT);
+    assertRow(doc,"111002",2,cashDebit?"":"1,000.00",cashDebit?"1,000.00":"",type==Type.PAYMENT);
    }
   }
  }

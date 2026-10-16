@@ -53,7 +53,8 @@ public class VoucherPdfService {
             var second=first==t.debit()?t.credit():t.debit();
             for(var account:List.of(first,second)){
                 boolean debit=account==t.debit();String amount=money(t.amount(),locale);
-                rows.add(List.of(Integer.toString(rows.size()+1),description,account.code()+" - "+account.name(),debit?amount:"",debit?"":amount,amount));
+                var row=List.of(Integer.toString(rows.size()+1),description,account.code()+" - "+account.name(),debit?amount:"",debit?"":amount,amount);
+                rows.add(receipt?row:row.subList(0,5));
             }
         }
         var moneyAccount=v.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit(),t.credit()))
@@ -74,8 +75,8 @@ public class VoucherPdfService {
             List.of(field("voucher.print.name",v.party(),locale),field("voucher.print.company","",locale),field("voucher.print.address","",locale),field("voucher.print.phone","",locale),field("voucher.print.email","",locale)),
             label(receipt?"voucher.print.receiptDetails":"voucher.print.paymentHeading",locale),
             List.of(field("voucher.print.moneyAccount",account,locale),field("voucher.print.reference",v.reference(),locale),field("voucher.date",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),locale)),
-            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"),
-            new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
+            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)").subList(0,receipt?6:5),
+            receipt?new float[]{.055f,.26f,.265f,.14f,.14f,.14f}:new float[]{.055f,.26f,.325f,.18f,.18f},rows,
             label("voucher.print.amountWords",locale),amountInWords(v.total(),locale),totals,label("voucher.print.narration",locale),v.description()+(v.evidence().isBlank()?"":"\n"+label("voucher.evidence",locale)+": "+v.evidence()),
             label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,
             label("voucher.print.method",locale),List.of(method("CASH",channel,locale),method("BANK",channel,locale),method("CHEQUE",channel,locale),method("MOBILE_MONEY",channel,locale)));

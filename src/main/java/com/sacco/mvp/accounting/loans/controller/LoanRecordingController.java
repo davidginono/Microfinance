@@ -7,6 +7,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.accounting.reports.VoucherPdfDocument;
+import com.sacco.mvp.accounting.reports.LoanAmortizationPdfDocument;
 import com.sacco.mvp.accounting.reports.VoucherPdfDocument.Field;
 import com.sacco.mvp.accounting.service.VoucherPdfService;
 import lombok.RequiredArgsConstructor;
@@ -84,7 +85,12 @@ public class LoanRecordingController {
     @GetMapping("/loan-recording/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,category,search,page);}
     @GetMapping("/client-ledgers") public String clients(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,Model model){model.addAttribute("clients",service.choices(a,"ledger-clients",search,page));model.addAttribute("search",search);model.addAttribute("page",page);return "accounting/loans/clients";}
     @GetMapping("/client-ledgers/{id}") public String statement(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="0") int movementPage,Model model){model.addAttribute("movements",service.movements(a,id,movementPage));model.addAttribute("statement",service.statement(a,id,page));model.addAttribute("clientId",id);return "accounting/loans/statement";}
-    @GetMapping({"/loan-records/{id}/pdf","/loan-records/{id}/print"}) public Object loanExport(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){service.authorize(a,"EXPORT");return output(loanDocument(service.detail(a,id),locale),request,model);}
+    @GetMapping({"/loan-records/{id}/pdf","/loan-records/{id}/print"}) public Object loanExport(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
+        var data=service.exportLoan(a,id);var document=amortizationDocument(data,locale);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=loan-"+data.detail().loan().number()+".pdf")
+            .header("X-Content-Type-Options","nosniff").body(pdf.renderAmortization(document));
+    }
     @GetMapping({"/loan-postings/{id}/pdf","/loan-postings/{id}/print","/loan-disbursements/{id}/pdf","/loan-disbursements/{id}/print","/loan-repayments/{id}/pdf","/loan-repayments/{id}/print"})
     public Object postingExport(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
         var receipt=service.receiptForPosting(a,id);
@@ -170,15 +176,30 @@ public class LoanRecordingController {
         return output(new Document(label("recording.register."+kind,locale),institution,branch,"loan-"+kind.toLowerCase(Locale.ROOT)+"-report.pdf",lines),request,model);
     }
     private Object output(Document doc,jakarta.servlet.http.HttpServletRequest request,Model model){if(request.getRequestURI().endsWith("/print")){model.addAttribute("document",doc);return "accounting/loans/print";}return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename="+doc.filename()).header("X-Content-Type-Options","nosniff").body(pdf.render(doc));}
-    private Document loanDocument(Detail d,Locale locale){var lines=new ArrayList<String>();lines.add(d.loan().number()+" | "+d.loan().clientNumber()+" | "+d.loan().client());lines.add(label("voucher.status",locale)+": "+label("recording.status."+d.loan().status(),locale));
-        pair(lines,"recording.applicationDate",d.loan().applicationDate(),locale);pair(lines,"recording.product",d.loan().product(),locale);pair(lines,"recording.purpose",d.purpose(),locale);pair(lines,"recording.principal",d.loan().principal(),locale);
-        if(!"AMOUNT".equals(d.interestEntry()))pair(lines,"recording.rate",d.rate().multiply(new BigDecimal("100"))+"% "+label("CUSTOM".equals(d.loanMode())?"recording.basis."+d.interestBasis():"recording.annual",locale),locale);pair(lines,"recording.method",label("recording.method."+d.method(),locale),locale);pair(lines,"recording.frequency",label("recording.frequency."+d.frequency(),locale),locale);pair(lines,"recording.tenureUnit",d.tenureValue()+" "+label("recording.tenure."+d.tenureUnit(),locale),locale);pair(lines,"recording.installment",d.installment(),locale);pair(lines,"recording.contractInterest",d.contractualInterest(),locale);
-        pair(lines,"recording.business",d.business(),locale);pair(lines,"recording.information",label("recording.source."+d.informationSource(),locale),locale);pair(lines,"recording.income",d.income(),locale);pair(lines,"recording.expenses",d.expenses(),locale);pair(lines,"recording.otherDebt",d.otherDebt(),locale);pair(lines,"recording.guarantors",d.guarantors(),locale);pair(lines,"recording.collateral",d.collateral(),locale);pair(lines,"voucher.evidence",d.evidence(),locale);pair(lines,"voucher.description",d.notes(),locale);
-        lines.add(label(d.firstPaymentDate()==null?"repayment.estimatedSchedule":"recording.schedule",locale)+" (TZS)");
-        if(d.firstPaymentDate()==null)lines.add(label("recording.beforeDisbursement",locale));
-        lines.add(label("recording.scheduleHeader",locale));for(var s:d.schedule())lines.add(s.number()+" | "+(s.date()==null?label("repayment.period."+d.frequency(),locale).replace("{0}",Integer.toString(s.number())):s.date())+" | "+statementMoney(s.beginningBalance(),locale)+" | "+statementMoney(s.principal(),locale)+" | "+statementMoney(s.interest(),locale)+" | "+statementMoney(s.endingBalance(),locale));
-        pair(lines,"recording.outstandingPrincipal",d.loan().outstandingPrincipal(),locale);pair(lines,"recording.dueInterest",d.loan().dueInterest(),locale);pair(lines,"recording.arrears",d.loan().arrears(),locale);pair(lines,"recording.futureInterest",d.loan().futureInterest(),locale);pair(lines,"recording.recordedBy",d.recordedBy(),locale);pair(lines,"voucher.postedAt",d.recordedAt(),locale);
-        return new Document(label("recording.loanDetails",locale)+" "+d.loan().number(),d.institution(),d.branch(),"loan-"+d.loan().number()+".pdf",lines);}
+    private LoanAmortizationPdfDocument.Source amortizationDocument(LoanRecordingService.LoanExport export,Locale locale){
+        var d=export.detail();var loan=d.loan();
+        var identity=List.of(printField("recording.amortization.lender",d.institution(),locale),printField("voucher.print.branch",d.branch(),locale),
+            printField("recording.client",loan.client(),locale),printField("voucher.print.clientNumber",loan.clientNumber(),locale),printField("loan.loanId",loan.number(),locale),
+            printField("recording.product",loan.product(),locale),printField("recording.applicationDate",statementDate(loan.applicationDate(),locale),locale),printField("voucher.status",label("recording.status."+loan.status(),locale),locale));
+        var terms=new ArrayList<Field>();terms.add(printField("recording.amortization.loanAmount",statementMoney(loan.principal(),locale),locale));
+        if("AMOUNT".equals(d.interestEntry()))terms.add(printField("recording.interestEntry",label("recording.entry.AMOUNT",locale),locale));
+        else {var percent=java.text.NumberFormat.getPercentInstance(locale);percent.setMaximumFractionDigits(4);
+            terms.add(printField("recording.rate",percent.format(d.rate())+" "+label("CUSTOM".equals(d.loanMode())?"recording.basis."+d.interestBasis():"recording.annual",locale),locale));}
+        terms.add(printField("recording.method",label("recording.method."+d.method(),locale),locale));terms.add(printField("recording.tenureUnit",d.tenureValue()+" "+label("recording.tenure."+d.tenureUnit(),locale),locale));
+        terms.add(printField("recording.frequency",label("recording.frequency."+d.frequency(),locale),locale));terms.add(printField("recording.firstPaymentDate",statementDate(d.firstPaymentDate(),locale),locale));
+        terms.add(printField("recording.amortization.paymentCount",Integer.toString(d.schedule().size()),locale));terms.add(printField("recording.amortization.installment",statementMoney(d.installment(),locale),locale));terms.add(printField("recording.amortization.interestTotal",statementMoney(d.contractualInterest(),locale),locale));
+        var payments=new ArrayList<List<String>>();
+        for(var p:export.payments()){
+            boolean reverse=p.reversesId()!=null;payments.add(List.of(statementDate(p.date(),locale),p.reference(),statementMoney(reverse?p.principal().negate():p.principal(),locale),
+                statementMoney(reverse?p.interest().negate():p.interest(),locale),statementMoney(reverse?p.amount().negate():p.amount(),locale),statementMoney(p.principalBalance(),locale),label("voucher.status."+(reverse?"REVERSAL":p.reversedBy()!=null?"REVERSED":"POSTED"),locale)));
+        }
+        var schedule=d.schedule().stream().map(s->List.of(Integer.toString(s.number()),s.date()==null?label("repayment.period."+d.frequency(),locale).replace("{0}",Integer.toString(s.number())):statementDate(s.date(),locale),
+            statementMoney(s.beginningBalance(),locale),statementMoney(s.amount(),locale),statementMoney(s.interest(),locale),statementMoney(s.principal(),locale),statementMoney(s.endingBalance(),locale))).toList();
+        return new LoanAmortizationPdfDocument.Source(label("recording.amortization.title",locale),loan.number(),identity,terms,
+            new LoanAmortizationPdfDocument.Table(label("recording.amortization.payments",locale)+" (TZS)",List.of(label("voucher.date",locale),label("voucher.reference",locale),label("recording.principal",locale),label("recording.interest",locale),label("voucher.amount",locale),label("recording.balanceAfter",locale),label("voucher.status",locale)),new float[]{.12f,.22f,.12f,.12f,.13f,.16f,.13f},new boolean[]{false,false,true,true,true,true,false},payments,label("recording.amortization.noPayments",locale)),
+            new LoanAmortizationPdfDocument.Table(label(d.firstPaymentDate()==null?"repayment.estimatedSchedule":"recording.schedule",locale)+" (TZS)",List.of(label("voucher.print.no",locale),label("recording.dueDate",locale),label("repayment.beginningBalance",locale),label("recording.amortization.scheduledPayment",locale),label("recording.interest",locale),label("recording.principal",locale),label("repayment.endingBalance",locale)),new float[]{.055f,.14f,.16f,.17f,.14f,.15f,.185f},new boolean[]{false,false,true,true,true,true,true},schedule,label("recording.scheduleUnavailable",locale)),
+            d.firstPaymentDate()==null?label("recording.beforeDisbursement",locale):"",label("voucher.page",locale));
+    }
     private VoucherPdfDocument.Source postDocument(Posting p,Detail d,Locale locale,byte[] logo){
         boolean payment="DISBURSEMENT".equals(p.kind());
         String status=label(p.reversedBy()!=null?"voucher.status.REVERSED":p.reversesId()!=null?"voucher.status.REVERSAL":"voucher.status.POSTED",locale);
@@ -192,6 +213,7 @@ public class LoanRecordingController {
             rows.add(List.of(Integer.toString(rows.size()+1),label("recording.principal",locale),Objects.toString(p.principalAccount(),""),moneyDebit?"":principal,moneyDebit?principal:"",principal));}
         if(p.interest().signum()!=0){String interest=statementMoney(p.interest(),locale);
             rows.add(List.of(Integer.toString(rows.size()+1),label("recording.interest",locale),Objects.toString(p.interestAccount(),""),moneyDebit?"":interest,moneyDebit?interest:"",interest));}
+        if(payment)rows.replaceAll(row->row.subList(0,5));
         var totals=new ArrayList<Field>();
         totals.add(printField("voucher.print.totalDebit",statementMoney(p.amount(),locale),locale));totals.add(printField("voucher.print.totalCredit",statementMoney(p.amount(),locale),locale));
         totals.add(printField("voucher.print.totalAmount",statementMoney(p.amount(),locale),locale));
@@ -205,14 +227,13 @@ public class LoanRecordingController {
             label(payment?"voucher.print.payeeDetails":"voucher.print.payerDetails",locale),
             List.of(printField("voucher.print.name",p.client(),locale),printField("voucher.print.clientNumber",p.clientNumber(),locale),printField("loan.loanId",p.loanNumber(),locale),printField("voucher.print.phone","",locale),printField("voucher.print.email","",locale)),
             label(payment?"voucher.print.paymentHeading":"voucher.print.receiptDetails",locale),details,
-            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"),
-            new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
+            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)").subList(0,payment?5:6),
+            payment?new float[]{.055f,.26f,.325f,.18f,.18f}:new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
             label("voucher.print.amountWords",locale),VoucherPdfService.amountInWords(p.amount(),locale),totals,label("voucher.print.narration",locale),label("recording.document."+p.kind(),locale)+"\n"+Objects.toString(p.notes(),"")+"\n"+label("voucher.evidence",locale)+": "+Objects.toString(p.evidence(),"")+"\n"+label("recording.balanceAfter",locale)+": "+statementMoney(p.principalBalance(),locale)+" TZS",
             label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,
             label("voucher.print.method",locale),List.of(printField("voucher.print.method.CASH","false",locale),printField("voucher.print.method.BANK","false",locale),printField("voucher.print.method.CHEQUE","false",locale),printField("voucher.print.method.MOBILE_MONEY","false",locale)));
     }
     private Field printField(String key,String value,Locale locale){return new Field(label(key,locale),Objects.toString(value,""));}
-    private void pair(List<String> lines,String key,Object value,Locale locale){lines.add(label(key,locale)+": "+Objects.toString(value,label("recording.unavailable",locale)));}
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
     private String kind(jakarta.servlet.http.HttpServletRequest r){return r.getRequestURI().contains("loan-disbursements")?"DISBURSEMENT":r.getRequestURI().contains("loan-repayments")?"PAYMENT":"LOAN";}
     private void context(String kind,Model model){model.addAttribute("kind",kind);model.addAttribute("createClaim",kind.equals("LOAN")?"LOAN_RECORDING_CREATE":kind.equals("DISBURSEMENT")?"LOAN_RECORDING_DISBURSE":"LOAN_RECORDING_POST");model.addAttribute("base",kind.equals("LOAN")?"/finance/loan-records":kind.equals("DISBURSEMENT")?"/finance/loan-disbursements":"/finance/loan-repayments");}
