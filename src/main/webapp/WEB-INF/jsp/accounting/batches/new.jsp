@@ -2,8 +2,9 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
-<div class="accounting-workspace"><nav class="erp-page-path"><a href="<c:url value='/finance/batches/receipts' />"><spring:message code="batch.receipts" /></a></nav>
-<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="batch.create" /></h1></div>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/batches/receipts' />"><spring:message code="batch.receipts" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="batch.create" /></span></nav>
+<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="batch.create" /></h1></div>
+<div class="accounting-workspace">
 <form method="post" action="<c:url value='/finance/batches/receipts/new' />" class="accounting-create-form">
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 <label><spring:message code="batch.title" /><input class="aws-control" name="title" maxlength="120" required autofocus /></label>

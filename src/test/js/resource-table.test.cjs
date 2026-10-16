@@ -154,6 +154,33 @@ test('pager keeps scoped URLs and tools outside the horizontal viewport', async 
     dom.window.close();
 });
 
+test('JSON editors use the shared pager without replacing drafts or fetching HTML', async () => {
+    const {dom,window:w,document:d}=await setup(table('receipt-editor','<tr><td><input value="draft receipt"></td><td>100.00</td><td>Draft</td></tr>','data-table-pagination-mode="external"'));
+    const region=d.querySelector('section'),input=d.querySelector('tbody input');
+    let requests=0,refreshes=0,edits=0;const pages=[];
+    w.fetch=async()=>{requests++;throw new Error('Editor owns JSON loading');};
+    input.addEventListener('input',()=>edits++);
+    region.addEventListener('resource-table:page',event=>pages.push(event.detail.page));
+    region.addEventListener('resource-table:refresh',()=>refreshes++);
+    w.ResourceTable.setPage(region,{page:0,hasNext:true,loading:false});
+    const next=d.querySelector('[aria-label="Next page"]');
+    assert.equal(d.querySelector('[aria-label="Previous page"]').disabled,true);
+    assert.equal(next.disabled,false);next.focus();
+    w.ResourceTable.setPage(region,{page:0,hasNext:true,loading:false});
+    assert.equal(d.activeElement,next);next.click();assert.deepEqual(pages,[1]);
+    w.ResourceTable.setPage(region,{page:1,hasNext:false,loading:false});
+    assert.equal(d.querySelector('.resource-table-page-number').textContent,'2');
+    assert.equal(d.querySelector('[aria-label="Next page"]').disabled,true);
+    d.querySelector('[aria-label="Previous page"]').click();assert.deepEqual(pages,[1,0]);
+    w.ResourceTable.setPage(region,{page:1,hasNext:true,loading:true});
+    assert.equal([...d.querySelectorAll('.resource-table-page')].every(button=>button.disabled),true);
+    d.querySelector('[data-resource-refresh]').click();await settle();
+    assert.equal(refreshes,1);assert.equal(requests,0);
+    assert.equal(d.querySelector('tbody input'),input);assert.equal(input.value,'draft receipt');
+    input.dispatchEvent(new w.Event('input'));assert.equal(edits,1);
+    dom.window.close();
+});
+
 test('compact density is the default while an explicit saved comfortable preference survives', async () => {
     const fresh=await setup(table('fresh-density',row));
     assert.equal(fresh.document.querySelector('section').classList.contains('resource-table-compact'),true);

@@ -129,13 +129,19 @@
         const utilities = node('div', 'resource-table-utilities'); tools.append(utilities);
         const pager = region.querySelector('[data-table-pagination]') || [...document.querySelectorAll('[data-table-pagination][data-table-for]')].find(candidate => candidate.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
         const navigation = node('nav', 'resource-table-pagination'); navigation.setAttribute('aria-label', l.pagination);
+        const externalPaging = region.dataset.tablePaginationMode === 'external';
+        let externalPage = {page:0,hasNext:false,loading:false};
         const renderPager = source => {
         navigation.replaceChildren();
-        const page = Number(source?.dataset.page || 0) + 1;
+        const page = (externalPaging ? externalPage.page : Number(source?.dataset.page || 0)) + 1;
         ['previous', 'next'].forEach(direction => {
             let control = source?.querySelector('[data-page-direction="' + direction + '"]');
             if (control) control = control.cloneNode(true);
             if (!control) { control = iconButton(direction, l[direction]); control.disabled = true; }
+            if (externalPaging) {
+                control.disabled = externalPage.loading || (direction === 'previous' ? page === 1 : !externalPage.hasNext);
+                control.addEventListener('click', () => region.dispatchEvent(new CustomEvent('resource-table:page', {detail:{page:externalPage.page + (direction === 'previous' ? -1 : 1)}})));
+            }
             control.className = 'resource-table-page'; control.setAttribute('aria-label', l[direction]); control.title = l[direction]; control.replaceChildren(icon(direction));
             if (region.dataset.tablePageSize && control.hasAttribute('href')) {
                 const url = new URL(control.href, location.href);url.searchParams.set('size',region.dataset.tablePageSize);control.href=url.href;
@@ -145,6 +151,10 @@
         });
         };
         renderPager(pager);
+        if (externalPaging) lifetime.setPage = state => {
+            if (externalPage.page === state.page && externalPage.hasNext === state.hasNext && externalPage.loading === state.loading) return;
+            externalPage = state;renderPager();
+        };
         if (pager) pager.dataset.tablePaginationUsed = 'true';
         utilities.append(navigation);
         const preferences = iconButton('settings', l.preferences); preferences.classList.add('resource-table-preferences-button'); utilities.append(preferences);
@@ -321,7 +331,7 @@
             } finally {clearTimeout(timeout);if(current===version)window.AppLoading?.end(region);}
         };
         signal.addEventListener('abort',()=>{version++;request?.abort();window.AppLoading?.end(region);});
-        region.addEventListener('resource-table:refresh',event=>{if(!event.defaultPrevented)void updateTable(queryUrl);},{signal});
+        region.addEventListener('resource-table:refresh',event=>{if(!event.defaultPrevented && !externalPaging)void updateTable(queryUrl);},{signal});
         region.addEventListener('click',event=>{
             if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
             const control=event.target.closest('[data-resource-refresh],a[data-table-sort],.resource-table-pagination a[href]');
@@ -500,7 +510,11 @@
         });
         window.ResourceSplitView?.init(region, {headers, originalCells, selectable, labels:l});
     }
-    window.ResourceTable = {refresh: control => {
+    window.ResourceTable = {setPage: (region, state) => {
+        if (region?.dataset.tablePaginationMode !== 'external') return;
+        init(region);
+        lifetimes.get(region)?.setPage({page:Math.max(0,Math.trunc(state.page)),hasNext:!!state.hasNext,loading:!!state.loading});
+    }, refresh: control => {
         const region=control.closest('[data-resource-table]');if(!region)return false;
         region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));return true;
     }, init: root => {
