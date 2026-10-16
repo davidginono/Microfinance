@@ -41,7 +41,7 @@ class LoanAmortizationPdfTest {
             try(var doc=Loader.loadPDF((byte[])response.getBody())){
                 String text=new PDFTextStripper().getText(doc);
                 String paymentTitle=messages.getMessage("recording.amortization.payments",null,locale).toUpperCase(Locale.ROOT),scheduleTitle=messages.getMessage("recording.schedule",null,locale).toUpperCase(Locale.ROOT);
-                assertThat(text).contains("RV-EXAMPLE","100101","CL10002","24","0.00").doesNotContain("null");
+                assertThat(text).contains(messages.getMessage("recording.amortization.title",null,locale).toUpperCase(Locale.ROOT),"RV-EXAMPLE","100101","CL10002","24","0.00").doesNotContain("null");
                 assertThat(text.indexOf(paymentTitle)).isLessThan(text.indexOf(scheduleTitle));
                 if(locale.equals(Locale.ENGLISH) && format.equals("pdf")){
                     Files.write(Path.of("target/loan-amortization-template.pdf"),(byte[])response.getBody());
@@ -55,7 +55,7 @@ class LoanAmortizationPdfTest {
     @Test void boundedLargeExportRetainsLastPaymentLastInstalmentAndRepeatedHeadings()throws Exception {
         var payments=IntStream.rangeClosed(1,500).mapToObj(n->List.of("16-Oct-2026","PAY-"+n,"100.00","10.00","110.00","900.00","Posted")).toList();
         var schedule=IntStream.rangeClosed(1,600).mapToObj(n->List.of(Integer.toString(n),"Month "+n,"100.00","110.00","10.00","100.00","0.00")).toList();
-        var source=new Source("Loan amortization schedule","100101",List.of(new Field("Lender","Synthetic institution")),List.of(new Field("Loan amount","1,000.00")),
+        var source=new Source("Loan application details","100101",List.of(new Field("Lender","Synthetic institution")),List.of(new Field("Loan amount","1,000.00")),
             new Table("Payment transactions",List.of("Date","Reference","Principal","Interest","Amount","Balance","Status"),new float[]{.12f,.22f,.12f,.12f,.13f,.16f,.13f},new boolean[]{false,false,true,true,true,true,false},payments,"No payments"),
             new Table("Repayment schedule",List.of("No.","Due date","Beginning balance","Scheduled payment","Interest","Principal","Ending balance"),new float[]{.055f,.14f,.16f,.17f,.14f,.15f,.185f},new boolean[]{false,false,true,true,true,true,true},schedule,"Unavailable"),"","Page");
         var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));

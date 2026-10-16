@@ -88,7 +88,7 @@ class RecordedLoanDetailScheduleTest {
         var printed=(ResponseEntity<?>)controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,new ExtendedModelMap());
         assertThat(printed.getHeaders().getFirst("Content-Disposition")).startsWith("inline;");
         try(var document=Loader.loadPDF((byte[])printed.getBody())){
-            assertThat(new PDFTextStripper().getText(document)).contains("LOAN AMORTIZATION SCHEDULE","Month 1");
+            assertThat(new PDFTextStripper().getText(document)).contains("LOAN APPLICATION DETAILS","Month 1");
         }
     }
 
