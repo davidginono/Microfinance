@@ -7,8 +7,6 @@
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/batches/receipts' />"><spring:message code="batch.receipts" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><c:out value="${summary.batch.title}" /></span></nav>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${summary.batch.title}" /></h1><span data-batch-state></span></div>
 <div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
-<p class="batch-note"><spring:message code="batch.recordedHelp" /></p>
-<p class="batch-note"><spring:message code="batch.activity" /> · <spring:message code="batch.standardTransactions" /></p>
 <div class="batch-summary" data-batch-summary aria-live="polite"></div>
 <div class="batch-alert" role="alert" tabindex="-1" data-batch-error hidden></div>
 <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2><spring:message code="batch.receiptRows" /></h2><div class="accounting-actions">
