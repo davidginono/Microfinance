@@ -19,6 +19,6 @@
   </table><footer class="reference-basis"><strong><spring:message code="management.basis" /></strong><p><spring:message code="management.coverage.${report.kind}" /></p>
   <c:if test="${report.kind=='PORTFOLIO_RISK'}"><p><spring:message code="management.riskBasis" /></p></c:if>
   <c:if test="${report.kind=='LOAN_PORTFOLIO' or report.kind=='PORTFOLIO_ANALYSIS'}"><p><spring:message code="management.interestBasis" /></p></c:if>
-  <c:if test="${report.kind!='DAILY_COLLECTIONS' and report.kind!='CASHBOOK'}"><p><spring:message code="management.exclusionBasis" /></p></c:if>
+  <c:if test="${report.excluded>0}"><p><c:if test="${report.kind!='DAILY_COLLECTIONS' and report.kind!='CASHBOOK'}"><spring:message code="management.exclusionBasis" /> </c:if><spring:message code="management.missingNext" /></p></c:if>
   <p><spring:message code="management.fullTotals" /></p></footer>
 </article>

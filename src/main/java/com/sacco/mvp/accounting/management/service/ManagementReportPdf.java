@@ -52,7 +52,10 @@ public class ManagementReportPdf {
                 page.endTable();page.section(message("basis",locale));page.text(message("coverage."+r.kind(),locale));
                 if(r.kind()==Kind.PORTFOLIO_RISK)page.text(message("riskBasis",locale));
                 if(r.kind()==Kind.LOAN_PORTFOLIO || r.kind()==Kind.PORTFOLIO_ANALYSIS)page.text(message("interestBasis",locale));
-                if(r.kind()!=Kind.DAILY_COLLECTIONS && r.kind()!=Kind.CASHBOOK)page.text(message("exclusionBasis",locale));
+                if(r.excluded()>0){
+                    if(r.kind()!=Kind.DAILY_COLLECTIONS && r.kind()!=Kind.CASHBOOK)page.text(message("exclusionBasis",locale));
+                    page.text(message("missingNext",locale));
+                }
                 page.text(message("fullTotals",locale));
             }
             document.save(out);return out.toByteArray();

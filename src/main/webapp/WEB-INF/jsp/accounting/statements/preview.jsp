@@ -22,7 +22,7 @@
    <button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.pdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.excel" /></button><a class="app-btn btn-neutral" href="<c:out value='${printUrl}' />" data-print-action="true"><spring:message code="fs.print" /></a>
   </form></sec:authorize>
  </div>
- <p class="fs-coverage"><spring:message code="fs.coverage" /></p>
+ <p class="fs-coverage"><spring:message code="${kind=='LEDGER'?'fs.outputNotice':(run.institutionWide?'fs.coverageWide':'fs.coverage')}" /></p>
  <c:if test="${filtered}"><p class="fs-help"><spring:message code="fs.filteredTrial" /></p></c:if>
  <section class="fs-paper-scroll" tabindex="0" aria-label="<spring:message code='fs.preview' />"><article class="fs-paper fs-${document.style}" data-fs-paper data-kind="${kind}">
   <h2><c:out value="${document.title}" /></h2>

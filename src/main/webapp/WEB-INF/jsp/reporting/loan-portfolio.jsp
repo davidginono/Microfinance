@@ -31,6 +31,7 @@
   <section class="portfolio-notice ${incompleteCoverage ? 'portfolio-notice-warning' : ''}" aria-labelledby="portfolio-coverage-title">
     <h2 id="portfolio-coverage-title"><spring:message code="${incompleteCoverage ? 'financial.portfolio.incompleteCoverage' : 'financial.portfolio.coverage'}" /></h2>
     <div class="financial-context"><span><spring:message code="financial.portfolio.covered" />: <strong><c:out value="${report.summary.covered}" /></strong></span><span><spring:message code="financial.portfolio.excluded" />: <strong><c:out value="${report.summary.excluded}" /></strong></span></div>
+    <c:if test="${incompleteCoverage}"><p><spring:message code="financial.portfolio.nextStep" /></p></c:if>
     <details><summary><spring:message code="financial.portfolio.coverageDetails" /></summary>
     <p><spring:message code="${incompleteCoverage ? 'financial.portfolio.coverageLimit' : 'financial.portfolio.coveredScope'}" /></p>
 
