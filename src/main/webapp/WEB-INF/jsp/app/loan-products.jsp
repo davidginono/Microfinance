@@ -172,6 +172,7 @@
                             <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
                             <th><spring:message code="repayment.dueDate" text="Due date" /></th>
                             <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                            <th><spring:message code="repayment.scheduledPayment" text="Scheduled payment" /></th>
                             <th><spring:message code="repayment.principal" text="Principal" /></th>
                             <th><spring:message code="repayment.interest" text="Interest" /></th>
                             <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
@@ -727,13 +728,15 @@
                         + "<td class='px-3 py-2'></td>"
                         + "<td class='px-3 py-2'></td>"
                         + "<td class='px-3 py-2'></td>"
-                        + "<td class='px-3 py-2'></td>";
+                        + "<td class='px-3 py-2'></td>"
+                    + "<td class='px-3 py-2'></td>";
                     row.children[0].textContent = item.pmtNo || "-";
                     row.children[1].textContent = item.month || "-";
                     row.children[2].textContent = item.beginningBalance || "-";
-                    row.children[3].textContent = item.loanAmount || item.principal || "-";
-                    row.children[4].textContent = item.interest || "-";
-                    row.children[5].textContent = item.endingBalance || item.outstandingBalance || "-";
+                    row.children[3].textContent = item.payment || item.amount || "-";
+                    row.children[4].textContent = item.loanAmount || item.principal || "-";
+                    row.children[5].textContent = item.interest || "-";
+                    row.children[6].textContent = item.endingBalance || item.outstandingBalance || "-";
                     scheduleBody.appendChild(row);
                 });
                 scheduleCard.classList.toggle("hidden", scheduleBody.children.length === 0);

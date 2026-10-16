@@ -612,7 +612,7 @@ public class LoanPresentationService {
 
             List<Map<String, Object>> rows = new java.util.ArrayList<>();
             int rowIndex = 0;
-            for (var item : RepaymentScheduleService.withPrincipalBalances(storedRows,openingPrincipal==null?toBigDecimal(raw.get("disbursedPrincipal")):openingPrincipal)) {
+            for (var item : RepaymentScheduleService.withScheduledBalances(storedRows,openingPrincipal==null?toBigDecimal(raw.get("disbursedPrincipal")):openingPrincipal)) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 Object installmentNumber = item.get("installmentNumber");
                 row.put("installment", installmentNumber == null ? "-" : "Installment " + installmentNumber);
@@ -686,6 +686,7 @@ public class LoanPresentationService {
             int months = app.getTenorMonths() == null || app.getTenorMonths() <= 0 ? 1 : app.getTenorMonths();
             LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, raw);
             List<Map<String, Object>> rows = new ArrayList<>();
+            BigDecimal scheduledBalance = calculation.totalRepayment();
             for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("installment", "Installment " + installment.number());
@@ -693,9 +694,10 @@ public class LoanPresentationService {
                 row.put("pmtNo", String.valueOf(installment.number()));
                 row.put("month", estimatePeriodLabel(raw,installment.number()));
                 row.put("dueDate", row.get("month"));
-                row.put("beginningBalance", formatMoney(installment.remainingPrincipal().add(installment.principal())));
-                row.put("endingBalance", formatMoney(installment.remainingPrincipal()));
-                row.put("outstandingBalance", formatMoney(installment.remainingPrincipal()));
+                row.put("beginningBalance", formatMoney(scheduledBalance));
+                scheduledBalance = scheduledBalance.subtract(installment.amount());
+                row.put("endingBalance", formatMoney(scheduledBalance));
+                row.put("outstandingBalance", formatMoney(scheduledBalance));
                 row.put("amount", formatMoney(installment.amount()));
                 row.put("payment", formatMoney(installment.amount()));
                 row.put("loanAmount", formatMoney(installment.principal()));
@@ -1601,8 +1603,8 @@ public class LoanPresentationService {
     }
 
     private String[] repaymentScheduleHeaders() {
-        String[] keys={"pmtNo","dueDate","beginningBalance","principal","interest","endingBalance"};
-        String[] defaults={"No.","Due date","Beginning Balance","Principal","Interest","Ending Balance"};
+        String[] keys={"pmtNo","dueDate","beginningBalance","scheduledPayment","principal","interest","endingBalance"};
+        String[] defaults={"No.","Due date","Beginning Balance","Scheduled payment","Principal","Interest","Ending Balance"};
         String[] labels=new String[keys.length];
         for(int i=0;i<keys.length;i++)labels[i]=messageSource.getMessage("repayment."+keys[i],null,defaults[i],LocaleContextHolder.getLocale());
         return labels;
@@ -1610,7 +1612,7 @@ public class LoanPresentationService {
 
     private String[] repaymentScheduleValues(Map<String,Object> row) {
         return new String[]{printableRepaymentRowValue(row,"pmtNo","installmentNumber"),printableRepaymentRowValue(row,"dueDate","month"),
-            printableRepaymentRowValue(row,"beginningBalance"),printableRepaymentRowValue(row,"loanAmount","principal"),
+            printableRepaymentRowValue(row,"beginningBalance"),printableRepaymentRowValue(row,"payment","amount"),printableRepaymentRowValue(row,"loanAmount","principal"),
             printableRepaymentRowValue(row,"interest"),printableRepaymentRowValue(row,"endingBalance")};
     }
 
@@ -2546,7 +2548,7 @@ public class LoanPresentationService {
                 rows.add(repaymentScheduleValues(row));
             }
             String[] headers = repaymentScheduleHeaders();
-            float[] widths = new float[]{38f, 72f, 102f, 92f, 84f, contentWidth() - 388f};
+            float[] widths = new float[]{32f, 65f, 86f, 90f, 78f, 70f, contentWidth() - 421f};
             ensureSectionTableStartSpace(headers, widths, rows, SMALL_SIZE, SMALL_SIZE, CELL_PADDING_Y, 2f);
             drawSuperSectionStrip(title, null);
             drawTable(

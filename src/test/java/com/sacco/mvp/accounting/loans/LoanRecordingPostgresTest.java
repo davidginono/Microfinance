@@ -44,15 +44,24 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
-    @Test void pagedScheduleBalancesCarryForwardStoredPrincipalAcrossPages(){
+    @Test void pagedScheduleBalancesCarryForwardPrincipalAndInterestAcrossPages(){
         var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setTenureUnit("MONTHS");f.setTenureValue(12);
         f.setCustomFrequency(RepaymentFrequency.WEEKLY);f.setInterestPercent(new BigDecimal("12"));
         var id=service.save(actor,f);service.disburse(actor,post(id,"1000.00","D-SCHEDULE-BALANCES"));
-        var complete=service.detail(actor,id).schedule();var page=service.actualRepaymentSchedule(actor,id,1).orElseThrow();
+        var complete=service.detail(actor,id).schedule();
+        var expectedTotal=complete.stream().map(row->row.principal().add(row.interest())).reduce(BigDecimal.ZERO,BigDecimal::add);
+        assertThat(expectedTotal).isGreaterThan(new BigDecimal("1000.00"));
+        assertThat(complete.getFirst().beginningBalance()).isEqualByComparingTo(expectedTotal);
+        assertThat(complete).allSatisfy(row->assertThat(row.endingBalance()).isEqualByComparingTo(row.beginningBalance().subtract(row.principal()).subtract(row.interest())));
+        var page=service.actualRepaymentSchedule(actor,id,1).orElseThrow();
         assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
         assertThat(page.rows().getFirst().number()).isEqualTo(26);
         assertThat(page.rows().getFirst().beginningBalance()).isEqualByComparingTo(complete.get(25).beginningBalance());
         assertThat(page.rows().getFirst().endingBalance()).isEqualByComparingTo(complete.get(25).endingBalance());
+        var repaymentPage=ledger.view(id,actor,0,1).installments().getContent();
+        assertThat(repaymentPage.getFirst().beginningBalance()).isEqualByComparingTo(page.rows().getFirst().beginningBalance());
+        assertThat(repaymentPage.getFirst().getScheduledPayment()).isEqualByComparingTo(page.rows().getFirst().amount());
+        assertThat(repaymentPage.getFirst().endingBalance()).isEqualByComparingTo(page.rows().getFirst().endingBalance());
         assertThat(service.actualRepaymentSchedule(actor,id,2).orElseThrow().rows().getLast().endingBalance()).isZero();
         assertThatThrownBy(()->service.actualRepaymentSchedule(operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
     }

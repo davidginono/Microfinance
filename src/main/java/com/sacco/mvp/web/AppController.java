@@ -2707,6 +2707,7 @@ public class AppController {
         int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
         LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, snapshot);
         List<Map<String, String>> rows = new ArrayList<>();
+        BigDecimal scheduledBalance = calculation.totalRepayment();
         for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
             Map<String, String> row = new LinkedHashMap<>();
             row.put("pmtNo", String.valueOf(installment.number()));
@@ -2714,8 +2715,9 @@ public class AppController {
             row.put("month", messageSource.getMessage(weekly ? "repayment.period.WEEKLY" : "repayment.period.MONTHLY",
                 new Object[]{installment.number()}, (weekly ? "Week " : "Month ") + installment.number(), LocaleContextHolder.getLocale()));
             row.put("dueDate",row.get("month"));
-            row.put("beginningBalance",formatTzs(installment.remainingPrincipal().add(installment.principal())));
-            row.put("endingBalance",formatTzs(installment.remainingPrincipal()));
+            row.put("beginningBalance",formatTzs(scheduledBalance));
+            scheduledBalance = scheduledBalance.subtract(installment.amount());
+            row.put("endingBalance", formatTzs(scheduledBalance));
             row.put("outstandingBalance",row.get("endingBalance"));
             row.put("payment", formatTzs(installment.amount()));
             row.put("loanAmount", formatTzs(installment.principal()));

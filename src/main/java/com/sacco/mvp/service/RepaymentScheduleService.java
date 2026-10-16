@@ -184,22 +184,39 @@ public class RepaymentScheduleService {
         return LoanAmortizationCalculator.flatInterest(app.getAmount(), annualRate, app.getTenorMonths());
     }
 
-    /** Display-only principal balances; stored interest-inclusive outstanding values are retained. */
-    public static List<Map<String,Object>> withPrincipalBalances(List<Map<String,Object>> rows,BigDecimal openingPrincipal) {
+    /** Display-only contractual principal-plus-interest balances; stored rows remain unchanged. */
+    public static List<Map<String,Object>> withScheduledBalances(List<Map<String,Object>> rows,BigDecimal openingPrincipal) {
         if(rows.size()>LoanAmortizationCalculator.MAX_PAYMENTS)throw new IllegalArgumentException("Repayment schedule exceeds the supported size.");
-        BigDecimal total=BigDecimal.ZERO;
+        BigDecimal principalTotal=BigDecimal.ZERO;
+        BigDecimal scheduledTotal=BigDecimal.ZERO;
         boolean complete=true;
-        for(var row:rows){var principal=readBigDecimal(row.get("principalComponent"));if(principal==null || principal.signum()<0){complete=false;break;}total=total.add(principal);}
-        BigDecimal remaining=openingPrincipal;
-        if(remaining==null && !rows.isEmpty()){
-            var first=readBigDecimal(rows.getFirst().get("installmentNumber"));var lastBalance=readBigDecimal(rows.getLast().get("outstandingBalance"));
-            if(first!=null && first.compareTo(BigDecimal.ONE)==0 && lastBalance!=null && lastBalance.signum()==0)remaining=total;
+        for(var row:rows){
+            var principal=readBigDecimal(row.get("principalComponent"));
+            var interest=readBigDecimal(row.get("interestComponent"));
+            if(principal==null || interest==null || principal.signum()<0 || interest.signum()<0){complete=false;break;}
+            principalTotal=principalTotal.add(principal);
+            scheduledTotal=scheduledTotal.add(principal).add(interest);
         }
-        complete=complete && remaining!=null && remaining.compareTo(total)>=0;
+        var firstNumber=rows.isEmpty()?null:readBigDecimal(rows.getFirst().get("installmentNumber"));
+        var lastOutstanding=rows.isEmpty()?null:readBigDecimal(rows.getLast().get("outstandingBalance"));
+        boolean fullSchedule=firstNumber!=null && firstNumber.compareTo(BigDecimal.ONE)==0
+            && ((openingPrincipal!=null && openingPrincipal.compareTo(principalTotal)==0)
+                || (lastOutstanding!=null && lastOutstanding.signum()==0));
         var result=new ArrayList<Map<String,Object>>(rows.size());
-        for(var source:rows){var row=new LinkedHashMap<>(source);row.put("beginningBalance",complete?remaining:null);
-            if(complete)remaining=remaining.subtract(readBigDecimal(row.get("principalComponent")));
-            row.put("endingBalance",complete?remaining:null);result.add(row);}
+        var balance=scheduledTotal;
+        for(var source:rows){
+            var row=new LinkedHashMap<>(source);
+            BigDecimal beginning=null,ending=null;
+            if(complete){
+                var payment=readBigDecimal(source.get("principalComponent")).add(readBigDecimal(source.get("interestComponent")));
+                if(fullSchedule){beginning=balance;ending=balance.subtract(payment);balance=ending;}
+                else {
+                    var storedEnding=readBigDecimal(source.get("outstandingBalance"));
+                    if(storedEnding!=null && storedEnding.signum()>=0){ending=storedEnding;beginning=ending.add(payment);}
+                }
+            }
+            row.put("beginningBalance",beginning);row.put("endingBalance",ending);result.add(row);
+        }
         return result;
     }
 

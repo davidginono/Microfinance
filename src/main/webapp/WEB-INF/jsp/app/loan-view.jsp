@@ -261,6 +261,7 @@
                     <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
                     <th><spring:message code="repayment.dueDate" text="Due date" /></th>
                     <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                    <th><spring:message code="repayment.scheduledPayment" text="Scheduled payment" /></th>
                     <th><spring:message code="repayment.principal" text="Principal" /></th>
                     <th><spring:message code="repayment.interest" text="Interest" /></th>
                     <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
@@ -272,6 +273,7 @@
                         <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
                         <td class="px-3 py-2">${row.month}</td>
                         <td class="px-3 py-2">${row.beginningBalance}</td>
+                        <td class="px-3 py-2">${not empty row.payment ? row.payment : row.amount}</td>
                         <td class="px-3 py-2">${row.loanAmount}</td>
                         <td class="px-3 py-2">${row.interest}</td>
                         <td class="px-3 py-2">${row.endingBalance}</td>
@@ -454,6 +456,7 @@
                             <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
                             <th><spring:message code="repayment.dueDate" text="Due date" /></th>
                             <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                            <th><spring:message code="repayment.scheduledPayment" text="Scheduled payment" /></th>
                             <th><spring:message code="repayment.principal" text="Principal" /></th>
                             <th><spring:message code="repayment.interest" text="Interest" /></th>
                             <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
@@ -467,6 +470,7 @@
                                         <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
                                         <td class="px-3 py-2">${not empty row.month ? row.month : row.dueDate}</td>
                                         <td class="px-3 py-2">${row.beginningBalance}</td>
+                                        <td class="px-3 py-2">${not empty row.payment ? row.payment : row.amount}</td>
                                         <td class="px-3 py-2">${not empty row.loanAmount ? row.loanAmount : row.principal}</td>
                                         <td class="px-3 py-2">${row.interest}</td>
                                         <td class="px-3 py-2">${not empty row.endingBalance ? row.endingBalance : row.outstandingBalance}</td>
@@ -475,7 +479,7 @@
                             </c:when>
                             <c:otherwise>
                                 <tr data-repayment-schedule-empty>
-                                    <td colspan="6" class="px-3 py-4 text-center text-sm text-slate-600">
+                                    <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
                                         <spring:message code="loan.repayment.schedulePending" text="Repayment schedule will appear after disbursement." />
                                     </td>
                                 </tr>

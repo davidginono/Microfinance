@@ -89,10 +89,10 @@ public class LoanRepaymentLedgerService {
     @Transactional(readOnly = true)
     public Page<InstallmentRow> schedule(UUID loanId, AppUserPrincipal actor, int page) {
         require(page >= 0 && page < MAX_INSTALLMENTS / 25, "schedule");
-        var ledger=readableLedger(loanId, actor);
+        readableLedger(loanId, actor);
         var stored=installments.findAllByLoanApplicationIdOrderByInstallmentNumber(loanId, PageRequest.of(page, 25));
         if(stored.isEmpty())return stored.map(r->new InstallmentRow(r.getInstallmentNumber(),r.getDueDate(),r.getPrincipal(),r.getInterest(),r.getPrincipalPaid(),r.getInterestPaid()));
-        var beginning=ledger.getPrincipal().subtract(installments.principalBefore(loanId,stored.getContent().getFirst().getInstallmentNumber()));
+        var beginning=installments.scheduledAmountFrom(loanId,stored.getContent().getFirst().getInstallmentNumber());
         return new PageImpl<>(scheduleRows(stored.getContent(),beginning),stored.getPageable(),stored.getTotalElements());
     }
 
@@ -112,7 +112,7 @@ public class LoanRepaymentLedgerService {
                 e.getAccountCode(), e.getDebit(), e.getCredit())).toList();
         PageRequest scheduleRequest = PageRequest.of(Math.max(0, Math.min(schedulePage, 10000)), 25);
         int from = (int) Math.min(scheduleRequest.getOffset(), rows.size());
-        var displayRows=scheduleRows(rows,ledger.getPrincipal());
+        var displayRows=scheduleRows(rows,rows.stream().map(row->row.getPrincipal().add(row.getInterest())).reduce(BigDecimal.ZERO,BigDecimal::add));
         Page<InstallmentRow> schedule = new PageImpl<>(displayRows.subList(from, Math.min(from + 25, rows.size())), scheduleRequest, rows.size());
         return new LedgerView(loanId, ledger.getLoanId(), ledger.getStationId(), clock.today(),
             ledger.getPrincipal().subtract(ledger.getPrincipalPaid()), ledger.getPrincipalPaid(), ledger.getInterestPaid(),
@@ -478,10 +478,11 @@ public class LoanRepaymentLedgerService {
     public record LedgerListRow(UUID id, String loanId, LocalDate disbursementDate, BigDecimal outstandingPrincipal, BigDecimal principalPaid, BigDecimal interestPaid) {}
     private List<InstallmentRow> scheduleRows(List<LoanLedgerInstallment> rows,BigDecimal beginning){
         var result=new ArrayList<InstallmentRow>(rows.size());var balance=beginning;
-        for(var row:rows){var ending=balance.subtract(row.getPrincipal());result.add(new InstallmentRow(row.getInstallmentNumber(),row.getDueDate(),row.getPrincipal(),row.getInterest(),row.getPrincipalPaid(),row.getInterestPaid(),balance,ending));balance=ending;}
+        for(var row:rows){var ending=balance.subtract(row.getPrincipal()).subtract(row.getInterest());result.add(new InstallmentRow(row.getInstallmentNumber(),row.getDueDate(),row.getPrincipal(),row.getInterest(),row.getPrincipalPaid(),row.getInterestPaid(),balance,ending));balance=ending;}
         return result;
     }
     public record InstallmentRow(int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest, BigDecimal principalPaid, BigDecimal interestPaid,BigDecimal beginningBalance,BigDecimal endingBalance) {
+        public BigDecimal getScheduledPayment(){return principal.add(interest);}
         public InstallmentRow(int number,LocalDate dueDate,BigDecimal principal,BigDecimal interest,BigDecimal principalPaid,BigDecimal interestPaid){this(number,dueDate,principal,interest,principalPaid,interestPaid,null,null);}
     }
     public record JournalRow(UUID voucher, LocalDate date, String account, BigDecimal debit, BigDecimal credit) {}

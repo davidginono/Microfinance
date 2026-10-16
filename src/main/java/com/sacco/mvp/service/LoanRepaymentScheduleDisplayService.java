@@ -44,7 +44,7 @@ public class LoanRepaymentScheduleDisplayService {
             );
         }
         Map<String, Object> summary = repaymentScheduleService.parseSummary(loan.getRepaymentScheduleJson());
-        List<Map<String, Object>> rows = RepaymentScheduleService.withPrincipalBalances(repaymentScheduleService.parseRows(loan.getRepaymentScheduleJson()),loan.getAmount())
+        List<Map<String, Object>> rows = RepaymentScheduleService.withScheduledBalances(repaymentScheduleService.parseRows(loan.getRepaymentScheduleJson()),loan.getAmount())
             .stream()
             .map(this::displayRow)
             .toList();

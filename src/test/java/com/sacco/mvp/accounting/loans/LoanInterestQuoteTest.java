@@ -34,8 +34,8 @@ class LoanInterestQuoteTest {
             assertThat(quote.schedule().stream().map(row->row.principal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(f.getPrincipal());
             assertThat(quote.schedule().stream().map(row->row.interest()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.interest());
             assertThat(quote.schedule()).allSatisfy(row->assertThat(row.amount()).isEqualByComparingTo(row.principal().add(row.interest())));
-            assertThat(quote.schedule().getFirst().beginningBalance()).isEqualByComparingTo(f.getPrincipal());
-            assertThat(quote.schedule()).allSatisfy(row->assertThat(row.endingBalance()).isEqualByComparingTo(row.beginningBalance().subtract(row.principal())));
+            assertThat(quote.schedule().getFirst().beginningBalance()).isEqualByComparingTo(f.getPrincipal().add(quote.interest()));
+            assertThat(quote.schedule()).allSatisfy(row->assertThat(row.endingBalance()).isEqualByComparingTo(row.beginningBalance().subtract(row.principal()).subtract(row.interest())));
             assertThat(quote.schedule().getLast().endingBalance()).isZero();
         }
     }
@@ -43,6 +43,8 @@ class LoanInterestQuoteTest {
         var f=custom();f.setCustomMethod(InterestMethod.REDUCING_BALANCE);f.setInterestBasis("ANNUAL");
         var quote=service.interestQuote(actor,f);
         assertThat(quote.method()).isEqualTo("REDUCING_BALANCE");
+        assertThat(quote.schedule().getFirst().beginningBalance()).isEqualByComparingTo(f.getPrincipal().add(quote.interest()));
+        assertThat(quote.schedule()).allSatisfy(row->assertThat(row.beginningBalance().subtract(row.principal()).subtract(row.interest())).isEqualByComparingTo(row.endingBalance()));
         assertThat(quote.interest()).isLessThan(new BigDecimal("60.00"));
         assertThat(quote.schedule().getFirst().interest()).isEqualByComparingTo("10.00");
         assertThat(quote.schedule().getLast().interest()).isLessThan(quote.schedule().getFirst().interest());

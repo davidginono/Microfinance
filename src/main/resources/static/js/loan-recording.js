@@ -85,7 +85,7 @@
             rows.replaceChildren(...quote.schedule.map(payment => {
               const row = document.createElement('tr');
               const period = summary.dataset[quote.frequency.toLowerCase() + 'Period'].replace('{0}', String(payment.number));
-              [payment.number,period,money(payment.beginningBalance),money(payment.principal),money(payment.interest),money(payment.endingBalance)].forEach(value => {
+              [payment.number,period,money(payment.beginningBalance),money(payment.amount),money(payment.principal),money(payment.interest),money(payment.endingBalance)].forEach(value => {
                 const cell = document.createElement('td');cell.textContent = value;row.append(cell);
               });
               return row;

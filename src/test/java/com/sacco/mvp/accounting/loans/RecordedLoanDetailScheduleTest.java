@@ -57,7 +57,7 @@ class RecordedLoanDetailScheduleTest {
         var detail=service.detail(actor,loan.getId());
         assertThat(detail.loan().status()).isEqualTo("READY_FOR_MANAGER");
         assertThat(detail.firstPaymentDate()).isNull();
-        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,null,money("1000.00"),money("17.03"),money("1017.03"),money("1000.00"),money("0.00")));
+        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,null,money("1000.00"),money("17.03"),money("1017.03"),money("1017.03"),money("0.00")));
         assertThat(detail.contractualInterest()).isEqualByComparingTo("17.03");
         assertThat(loan.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
         assertThat(loan.getFirstRepaymentDate()).isNull();
@@ -68,7 +68,7 @@ class RecordedLoanDetailScheduleTest {
     @Test void disbursedDetailsRetainContractualDueDatesAndAmounts() throws Exception {
         var loan=fixture(true);
         var detail=service.detail(actor,loan.getId());
-        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,today.plusMonths(1),money("1000.00"),money("17.03"),money("1017.03"),money("1000.00"),money("0.00")));
+        assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,today.plusMonths(1),money("1000.00"),money("17.03"),money("1017.03"),money("1017.03"),money("0.00")));
         assertThat(detail.firstPaymentDate()).isEqualTo(today.plusMonths(1));
         verify(loans,never()).save(any());
     }

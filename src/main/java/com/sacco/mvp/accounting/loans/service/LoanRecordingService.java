@@ -105,7 +105,7 @@ public class LoanRecordingService {
         }
         if(f.getTenureValue()==null){check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE && (!"ANNUAL".equals(f.getInterestBasis()) || "AMOUNT".equals(f.getInterestEntry())),"terms");f.setTenureUnit("MONTHS");f.setTenureValue(1);}
         f.setMonths(tenure(f).compatibilityMonths());var p=product(a,f);var result=calculate(f,p);
-        return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),result.rows().stream().map(r->scheduleRow(r,null)).toList(),tenure(f).unit(),tenure(f).value());
+        return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),scheduleRows(result,null),tenure(f).unit(),tenure(f).value());
     }
     @Transactional(readOnly=true)
     public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");validateRecord(f);check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);
@@ -140,7 +140,7 @@ public class LoanRecordingService {
         authorize(a,"VIEW");var record=records.record(a,id,false);var loan=loans.findById(id).orElseThrow();var f=read(record.get("metadata").toString(),RecordForm.class);
         var snapshot=schedules.parseSummary(loan.getFinancialSnapshot());var calc=LoanAmortizationCalculator.estimate(loan.getAmount(),loan.getTenorMonths(),snapshot);
         var schedule=loan.getFirstRepaymentDate()==null
-            ?calc.rows().stream().map(r->scheduleRow(r,null)).toList()
+            ?scheduleRows(calc,null)
             :datedSchedule(calc,loan);
         return new Detail(records.loan(a,id,clock.today()),record.get("sacco_name").toString(),record.get("branch_name").toString(),record.get("actor_name").toString(),time(record.get("recorded_at")),
             f.getPurpose(),f.getBusiness(),f.getIncome(),f.getExpenses(),f.getOtherDebt(),f.getInformationSource(),f.getGuarantors(),f.getCollateral(),f.getEvidence(),f.getNotes(),
@@ -275,8 +275,19 @@ public class LoanRecordingService {
         return term.calculate(f.getPrincipal(),p.getInterestRate(),p.getInterestMethod(),p.getResolvedRepaymentFrequency(),null,flat,
             "CUSTOM".equals(f.getLoanMode()) && p.getInterestMethod()==InterestMethod.REDUCING_BALANCE && "WHOLE_LOAN".equals(f.getInterestBasis()));
     }
-    private ScheduleRow scheduleRow(LoanAmortizationCalculator.Installment r,LocalDate date){return new ScheduleRow(r.number(),date,r.principal(),r.interest(),r.amount(),r.remainingPrincipal().add(r.principal()),r.remainingPrincipal());}
-    private List<ScheduleRow> datedSchedule(LoanAmortizationCalculator.Result c,LoanApplication loan){var t=LoanTenure.fromSnapshot(schedules.parseSummary(loan.getFinancialSnapshot()),loan.getTenorMonths());return c.rows().stream().map(r->scheduleRow(r,t.dueDate(loan.getDisbursementDate(),loan.getFirstRepaymentDate(),loan.getRepaymentFrequency(),r.number(),c.rows().size()))).toList();}
+    private List<ScheduleRow> scheduleRows(LoanAmortizationCalculator.Result calculation,LoanApplication loan){
+        var result=new ArrayList<ScheduleRow>(calculation.rows().size());
+        var balance=calculation.totalRepayment();
+        var term=loan==null?null:LoanTenure.fromSnapshot(schedules.parseSummary(loan.getFinancialSnapshot()),loan.getTenorMonths());
+        for(var row:calculation.rows()){
+            var ending=balance.subtract(row.amount());
+            var date=loan==null?null:term.dueDate(loan.getDisbursementDate(),loan.getFirstRepaymentDate(),loan.getRepaymentFrequency(),row.number(),calculation.rows().size());
+            result.add(new ScheduleRow(row.number(),date,row.principal(),row.interest(),row.amount(),balance,ending));
+            balance=ending;
+        }
+        return result;
+    }
+    private List<ScheduleRow> datedSchedule(LoanAmortizationCalculator.Result calculation,LoanApplication loan){return scheduleRows(calculation,loan);}
     private static void nonnegativeMoney(BigDecimal amount){check(amount!=null && amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private static void validateFiles(List<org.springframework.web.multipart.MultipartFile> files){check(files!=null && files.size()<=10 && files.stream().allMatch(f->f.getSize()<=25L*1024*1024),"attachments");}
     @Transactional(readOnly=true) public List<Map<String,Object>> attachments(AppUserPrincipal a,UUID id){authorize(a,"VIEW");records.record(a,id,false);return attachments.parse(loans.findById(id).orElseThrow().getAttachmentsJson());}

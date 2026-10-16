@@ -93,10 +93,10 @@ test('schedule uses server rows, preserves cents, and clears stale estimates on 
   const {w,set,run,respond,dom}=fixture();const d=w.document,preview=d.querySelector('[data-schedule-preview]');
   set('tenureUnit','MONTHS');set('tenureValue','6');set('principal','1000');const pending=run();
   assert.equal(preview.hidden,true);
-  respond(0,'17.03',true,[{number:1,principal:'9007199254740991.01',interest:'17.03',amount:'9007199254741008.04',beginningBalance:'9007199254740991.01',endingBalance:'0.00'}]);await pending;
+  respond(0,'17.03',true,[{number:1,principal:'9007199254740991.01',interest:'17.03',amount:'9007199254741008.04',beginningBalance:'9007199254741008.04',endingBalance:'0.00'}]);await pending;
   assert.equal(preview.hidden,false);
   assert.equal(d.querySelector('[data-schedule-summary]').textContent,'Monthly · 6 Months');
-  assert.deepEqual([...d.querySelectorAll('[data-schedule-rows] td')].map(cell=>cell.textContent),['1','Month 1','9,007,199,254,740,991.01','9,007,199,254,740,991.01','17.03','0.00']);
+  assert.deepEqual([...d.querySelectorAll('[data-schedule-rows] td')].map(cell=>cell.textContent),['1','Month 1','9,007,199,254,741,008.04','9,007,199,254,741,008.04','9,007,199,254,740,991.01','17.03','0.00']);
   set('tenureValue','12');assert.equal(preview.hidden,true);assert.equal(d.querySelector('[data-schedule-rows]').children.length,0);
   const failed=run();respond(1,null,false);await failed;assert.equal(preview.hidden,true);
   dom.window.close();
@@ -108,15 +108,15 @@ test('incomplete configuration does not request a misleading default schedule',(
   dom.window.close();
 });
 
-test('weekly estimates use localized repayment periods and principal balances rather than calendar dates',async()=>{
+test('weekly estimates use localized repayment periods and principal-plus-interest balances',async()=>{
   const {w,set,run,respond,dom}=fixture();set('tenureUnit','DAYS');set('tenureValue','9');set('principal','10000');
   w.document.querySelector('[data-schedule-summary]').dataset.weeklyPeriod='Wiki {0}';
   const pending=run();respond(0,'183.45',true,[
-    {number:1,beginningBalance:'10000.00',principal:'4969.68',interest:'122.05',endingBalance:'5030.32'},
-    {number:2,beginningBalance:'5030.32',principal:'5030.32',interest:'61.40',endingBalance:'0.00'}
+    {number:1,beginningBalance:'10183.45',amount:'5091.73',principal:'4969.68',interest:'122.05',endingBalance:'5091.72'},
+    {number:2,beginningBalance:'5091.72',amount:'5091.72',principal:'5030.32',interest:'61.40',endingBalance:'0.00'}
   ],'REDUCING_BALANCE','WEEKLY');await pending;
   const rows=[...w.document.querySelectorAll('[data-schedule-rows] tr')].map(row=>[...row.cells].map(cell=>cell.textContent));
-  assert.deepEqual(rows,[['1','Wiki 1','10,000.00','4,969.68','122.05','5,030.32'],['2','Wiki 2','5,030.32','5,030.32','61.40','0.00']]);
+  assert.deepEqual(rows,[['1','Wiki 1','10,183.45','5,091.73','4,969.68','122.05','5,091.72'],['2','Wiki 2','5,091.72','5,091.72','5,030.32','61.40','0.00']]);
   dom.window.close();
 });
 

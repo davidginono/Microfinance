@@ -12,6 +12,6 @@ import java.util.UUID;
 public interface LoanLedgerInstallmentRepository extends JpaRepository<LoanLedgerInstallment, UUID> {
     List<LoanLedgerInstallment> findByLoanApplicationIdOrderByInstallmentNumber(UUID id, Pageable pageable);
     Page<LoanLedgerInstallment> findAllByLoanApplicationIdOrderByInstallmentNumber(UUID id, Pageable pageable);
-    @Query("select coalesce(sum(i.principal),0) from LoanLedgerInstallment i where i.loanApplicationId=:loanId and i.installmentNumber<:number")
-    BigDecimal principalBefore(UUID loanId,int number);
+    @Query("select coalesce(sum(i.principal + i.interest),0) from LoanLedgerInstallment i where i.loanApplicationId=:loanId and i.installmentNumber>=:number")
+    BigDecimal scheduledAmountFrom(UUID loanId,int number);
 }
