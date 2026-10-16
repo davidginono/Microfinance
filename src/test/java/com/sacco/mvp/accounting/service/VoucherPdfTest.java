@@ -11,8 +11,23 @@ import java.nio.file.*;
 import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
+import static com.sacco.mvp.accounting.reports.VoucherPdfRows.assertRow;
 
 class VoucherPdfTest {
+ @Test void paymentAndReceiptAccountRowsRetainPostedSidesIncludingReversals()throws Exception {
+  var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+  var cash=new Account(UUID.randomUUID(),"111001","QA Cash","CASH");var other=new Account(UUID.randomUUID(),"111002","QA Loan Principal","OTHER");
+  var exporter=new VoucherPdfService(messages,new ReportExportLimiter(1));
+  for(var type:List.of(Type.PAYMENT,Type.RECEIPT))for(boolean reversal:List.of(false,true)){
+   boolean cashDebit=(type==Type.RECEIPT)!=reversal;
+   var transaction=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Synthetic account allocation",new BigDecimal("1000.00"),cashDebit?cash:other,cashDebit?other:cash);
+   var voucher=new Voucher(UUID.randomUUID(),type+"-ROWS",type,LocalDate.of(2026,10,16),"Synthetic client","REF-ROWS","Synthetic demonstration only.","Reference",cash.id(),transaction.amount(),1,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-16T10:30:00+03:00"),reversal?UUID.randomUUID():null,null,"Example Microfinance Limited","Main branch",List.of(transaction));
+   try(var doc=Loader.loadPDF(exporter.render(voucher,Locale.ENGLISH).bytes())){
+    assertRow(doc,"111001",1,cashDebit?"1,000.00":"",cashDebit?"":"1,000.00");
+    assertRow(doc,"111002",2,cashDebit?"":"1,000.00",cashDebit?"1,000.00":"");
+   }
+  }
+ }
  @Test void formalVoucherSamplesAndExactAmountWords()throws Exception {
   assertThat(VoucherPdfService.amountInWords(new BigDecimal("1000.10"),Locale.ENGLISH)).isEqualTo("one thousand Tanzanian shillings and ten cents");
   assertThat(VoucherPdfService.amountInWords(new BigDecimal("0.01"),Locale.ENGLISH)).isEqualTo("zero Tanzanian shillings and one cent");

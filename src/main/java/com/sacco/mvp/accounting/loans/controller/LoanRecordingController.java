@@ -185,13 +185,15 @@ public class LoanRecordingController {
         String date=p.date().format(java.time.format.DateTimeFormatter.ofPattern("dd / MM / uuuu"));
         var rows=new ArrayList<List<String>>();
         String reference=label("loan.loanId",locale)+": "+p.loanNumber()+"\n"+p.reference();
-        String accounts=Objects.toString(p.moneyAccount(),"")+"\n"+Objects.toString(p.principalAccount(),"");
-        if(p.interestAccount()!=null && !p.interestAccount().isBlank())accounts+="\n"+p.interestAccount();
-        rows.add(payment?List.of("1",label("recording.principal",locale),accounts,statementMoney(p.principal(),locale),statementMoney(p.principal(),locale),statementMoney(p.principal(),locale)):
-            List.of("1",label("recording.principal",locale),reference+"\n"+accounts,statementMoney(p.principal(),locale)));
-        if(p.interest().signum()!=0)rows.add(List.of("2",label("recording.interest",locale),reference+"\n"+Objects.toString(p.interestAccount(),""),statementMoney(p.interest(),locale)));
+        boolean moneyDebit=!payment && p.reversesId()==null;
+        String amount=statementMoney(p.amount(),locale);
+        rows.add(List.of("1",reference,Objects.toString(p.moneyAccount(),""),moneyDebit?amount:"",moneyDebit?"":amount,amount));
+        if(p.principal().signum()!=0){String principal=statementMoney(p.principal(),locale);
+            rows.add(List.of(Integer.toString(rows.size()+1),label("recording.principal",locale),Objects.toString(p.principalAccount(),""),moneyDebit?"":principal,moneyDebit?principal:"",principal));}
+        if(p.interest().signum()!=0){String interest=statementMoney(p.interest(),locale);
+            rows.add(List.of(Integer.toString(rows.size()+1),label("recording.interest",locale),Objects.toString(p.interestAccount(),""),moneyDebit?"":interest,moneyDebit?interest:"",interest));}
         var totals=new ArrayList<Field>();
-        if(payment){totals.add(printField("voucher.print.totalDebit",statementMoney(p.amount(),locale),locale));totals.add(printField("voucher.print.totalCredit",statementMoney(p.amount(),locale),locale));}
+        totals.add(printField("voucher.print.totalDebit",statementMoney(p.amount(),locale),locale));totals.add(printField("voucher.print.totalCredit",statementMoney(p.amount(),locale),locale));
         totals.add(printField("voucher.print.totalAmount",statementMoney(p.amount(),locale),locale));
         var posting=new ArrayList<Field>(List.of(printField("voucher.postedBy",p.actor(),locale),printField("voucher.postedAt",
             p.recordedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),locale),printField("voucher.status",status,locale)));
@@ -203,9 +205,8 @@ public class LoanRecordingController {
             label(payment?"voucher.print.payeeDetails":"voucher.print.payerDetails",locale),
             List.of(printField("voucher.print.name",p.client(),locale),printField("voucher.print.clientNumber",p.clientNumber(),locale),printField("loan.loanId",p.loanNumber(),locale),printField("voucher.print.phone","",locale),printField("voucher.print.email","",locale)),
             label(payment?"voucher.print.paymentHeading":"voucher.print.receiptDetails",locale),details,
-            payment?List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"):
-                List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("voucher.amount",locale)+" (TZS)"),
-            payment?new float[]{.055f,.26f,.265f,.14f,.14f,.14f}:new float[]{.06f,.44f,.30f,.20f},rows,
+            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"),
+            new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
             label("voucher.print.amountWords",locale),VoucherPdfService.amountInWords(p.amount(),locale),totals,label("voucher.print.narration",locale),label("recording.document."+p.kind(),locale)+"\n"+Objects.toString(p.notes(),"")+"\n"+label("voucher.evidence",locale)+": "+Objects.toString(p.evidence(),"")+"\n"+label("recording.balanceAfter",locale)+": "+statementMoney(p.principalBalance(),locale)+" TZS",
             label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,
             label("voucher.print.method",locale),List.of(printField("voucher.print.method.CASH","false",locale),printField("voucher.print.method.BANK","false",locale),printField("voucher.print.method.CHEQUE","false",locale),printField("voucher.print.method.MOBILE_MONEY","false",locale)));

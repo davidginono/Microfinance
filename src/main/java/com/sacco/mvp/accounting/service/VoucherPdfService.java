@@ -49,16 +49,19 @@ public class VoucherPdfService {
         for(var t:v.transactions()){
             String description=t.description();if(!t.transactionName().isBlank())description+="\n"+t.transactionName();
             if(!"TOTAL".equals(t.component()))description+="\n"+label("library.component."+t.component(),locale);
-            String accounts=label("accounting.debit",locale)+": "+t.debit().code()+" - "+t.debit().name()+"\n"+label("accounting.credit",locale)+": "+t.credit().code()+" - "+t.credit().name();
-            rows.add(receipt?List.of(Integer.toString(t.lineNo()),description,accounts,money(t.amount(),locale)):
-                List.of(Integer.toString(t.lineNo()),description,accounts,money(t.amount(),locale),money(t.amount(),locale),money(t.amount(),locale)));
+            var first=t.debit().id().equals(v.moneyAccountId())?t.debit():t.credit();
+            var second=first==t.debit()?t.credit():t.debit();
+            for(var account:List.of(first,second)){
+                boolean debit=account==t.debit();String amount=money(t.amount(),locale);
+                rows.add(List.of(Integer.toString(rows.size()+1),description,account.code()+" - "+account.name(),debit?amount:"",debit?"":amount,amount));
+            }
         }
         var moneyAccount=v.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit(),t.credit()))
             .filter(a->a.id().equals(v.moneyAccountId())).findFirst();
         String account=moneyAccount.map(a->a.code()+" - "+a.name()).orElse("");
         String channel=moneyAccount.map(a->a.purpose()).orElse("");
         var totals=new ArrayList<Field>();
-        if(!receipt){totals.add(field("voucher.print.totalDebit",money(v.total(),locale),locale));totals.add(field("voucher.print.totalCredit",money(v.total(),locale),locale));}
+        totals.add(field("voucher.print.totalDebit",money(v.total(),locale),locale));totals.add(field("voucher.print.totalCredit",money(v.total(),locale),locale));
         totals.add(field("voucher.print.totalAmount",money(v.total(),locale),locale));
         var posting=new ArrayList<Field>(List.of(field("voucher.postedBy",v.postedByName(),locale),
             field("voucher.postedAt",v.postedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),locale),
@@ -71,9 +74,8 @@ public class VoucherPdfService {
             List.of(field("voucher.print.name",v.party(),locale),field("voucher.print.company","",locale),field("voucher.print.address","",locale),field("voucher.print.phone","",locale),field("voucher.print.email","",locale)),
             label(receipt?"voucher.print.receiptDetails":"voucher.print.paymentHeading",locale),
             List.of(field("voucher.print.moneyAccount",account,locale),field("voucher.print.reference",v.reference(),locale),field("voucher.date",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),locale)),
-            receipt?List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("voucher.amount",locale)+" (TZS)"):
-                List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"),
-            receipt?new float[]{.06f,.44f,.30f,.20f}:new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
+            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)"),
+            new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
             label("voucher.print.amountWords",locale),amountInWords(v.total(),locale),totals,label("voucher.print.narration",locale),v.description()+(v.evidence().isBlank()?"":"\n"+label("voucher.evidence",locale)+": "+v.evidence()),
             label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,
             label("voucher.print.method",locale),List.of(method("CASH",channel,locale),method("BANK",channel,locale),method("CHEQUE",channel,locale),method("MOBILE_MONEY",channel,locale)));
