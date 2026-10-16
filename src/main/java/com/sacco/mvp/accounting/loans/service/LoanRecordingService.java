@@ -103,7 +103,7 @@ public class LoanRecordingService {
             check(f.getProductId()!=null,"product");var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));
             f.setTenureUnit(p.getResolvedTenureUnit());f.setTenureValue(p.getResolvedMinimumTenure());
         }
-        if(f.getTenureValue()==null){check(!"ANNUAL".equals(f.getInterestBasis()) || "AMOUNT".equals(f.getInterestEntry()),"terms");f.setTenureUnit("MONTHS");f.setTenureValue(1);}
+        if(f.getTenureValue()==null){check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE && (!"ANNUAL".equals(f.getInterestBasis()) || "AMOUNT".equals(f.getInterestEntry())),"terms");f.setTenureUnit("MONTHS");f.setTenureValue(1);}
         f.setMonths(tenure(f).compatibilityMonths());var p=product(a,f);var result=calculate(f,p);
         return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),result.rows().stream().map(r->new ScheduleRow(r.number(),null,r.principal(),r.interest(),r.amount())).toList(),tenure(f).unit(),tenure(f).value());
     }
@@ -252,7 +252,7 @@ public class LoanRecordingService {
             var configured=products.findBySaccoIdAndCustomRecordingConfigurationTrue(a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration"));
             check(configured.getStatus()==LoanProductStatus.ACTIVE,"customConfiguration");
             check(Set.of("PERCENTAGE","AMOUNT").contains(f.getInterestEntry()) && Set.of("WHOLE_LOAN","ANNUAL").contains(f.getInterestBasis()) && f.getCustomFrequency()!=null && f.getCustomMethod()!=null,"terms");
-            check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE || ("PERCENTAGE".equals(f.getInterestEntry()) && "ANNUAL".equals(f.getInterestBasis())),"terms");
+            check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE || "PERCENTAGE".equals(f.getInterestEntry()),"terms");
             BigDecimal rate=BigDecimal.ZERO;
             if("AMOUNT".equals(f.getInterestEntry()))nonnegativeMoney(f.getInterestAmount());
             else {check(f.getInterestPercent()!=null && f.getInterestPercent().signum()>=0 && f.getInterestPercent().compareTo(new BigDecimal("10000"))<=0 && f.getInterestPercent().scale()<=4,"terms");rate=f.getInterestPercent().movePointLeft(2);}
@@ -266,7 +266,8 @@ public class LoanRecordingService {
     private LoanAmortizationCalculator.Result calculate(RecordForm f,LoanProductSetting p){
         var term=tenure(f);BigDecimal flat=term.flatInterest(f.getPrincipal(),p.getInterestRate());
         if("CUSTOM".equals(f.getLoanMode()))flat="AMOUNT".equals(f.getInterestEntry())?f.getInterestAmount():"WHOLE_LOAN".equals(f.getInterestBasis())?f.getPrincipal().multiply(p.getInterestRate()).setScale(2,RoundingMode.HALF_UP):flat;
-        return term.calculate(f.getPrincipal(),p.getInterestRate(),p.getInterestMethod(),p.getResolvedRepaymentFrequency(),null,flat);
+        return term.calculate(f.getPrincipal(),p.getInterestRate(),p.getInterestMethod(),p.getResolvedRepaymentFrequency(),null,flat,
+            "CUSTOM".equals(f.getLoanMode()) && p.getInterestMethod()==InterestMethod.REDUCING_BALANCE && "WHOLE_LOAN".equals(f.getInterestBasis()));
     }
     private List<ScheduleRow> datedSchedule(LoanAmortizationCalculator.Result c,LoanApplication loan){var t=LoanTenure.fromSnapshot(schedules.parseSummary(loan.getFinancialSnapshot()),loan.getTenorMonths());return c.rows().stream().map(r->new ScheduleRow(r.number(),t.dueDate(loan.getDisbursementDate(),loan.getFirstRepaymentDate(),loan.getRepaymentFrequency(),r.number(),c.rows().size()),r.principal(),r.interest(),r.amount())).toList();}
     private static void nonnegativeMoney(BigDecimal amount){check(amount!=null && amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}

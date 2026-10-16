@@ -500,7 +500,8 @@ public class LoanPresentationService {
             putValue(display, "Final Due Date", raw.get("finalDueDate"));
             putValue(display, "Repayment Frequency", humanizeValue(raw.get("repaymentFrequency")));
             putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
-            putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
+            if (LoanAmortizationCalculator.usesWholeLoanReducingRate(raw)) putSnapshotInterestRate(display, raw);
+            else putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
             putMoney(display, "Disbursed Principal", raw.get("disbursedPrincipal"));
             putMoney(display, "Deposit Amount", raw.get("depositAmount"));
             putMoney(display, "Installment Amount", raw.get("installmentAmount"));

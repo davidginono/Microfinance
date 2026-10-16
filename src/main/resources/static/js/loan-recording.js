@@ -50,19 +50,19 @@
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
       const custom = mode.value === 'CUSTOM', reducing = custom && method.value === 'REDUCING_BALANCE';
-      if(reducing){entry.value = 'PERCENTAGE';basis.value = 'ANNUAL';}
+      if(reducing)entry.value = 'PERCENTAGE';
       entry.querySelector('option[value="AMOUNT"]').disabled = reducing;
-      basis.querySelector('option[value="WHOLE_LOAN"]').disabled = reducing;
+      recordForm.querySelector('[data-reducing-terms-note]').hidden = !reducing || basis.value !== 'WHOLE_LOAN';
       const amount = entry.value === 'AMOUNT';
       show(recordForm.querySelector('[data-configured-product]'), !custom);
-      show(recordForm.querySelector('[data-configured-method]'), !custom);
-      const productMethod = recordForm.querySelector('[data-product-method]');productMethod.value = '\u2014';
       const productNote=recordForm.querySelector('[data-configured-terms-note]');if(productNote)productNote.hidden=custom;
       show(recordForm.querySelector('[data-custom-terms]'), custom);
       recordForm.querySelectorAll('[data-custom-percentage]').forEach(box => show(box, custom && !amount));
       show(recordForm.querySelector('[data-custom-amount]'), custom && amount);
       window.refreshEnhancedSelects?.(recordForm.querySelector('[data-custom-terms]'));
       show(recordForm.querySelector('[data-tenure-number]'), !!unit.value);
+      const tenureLabel = recordForm.querySelector('[data-tenure-label]');
+      tenureLabel.textContent = tenureLabel.dataset[unit.value.toLowerCase()] || tenureLabel.dataset.empty;
       recordForm.querySelector('#tenureValue').max = unit.value === 'DAYS' ? '18250' : unit.value === 'YEARS' ? '50' : '600';
       clearTimeout(timer); controller?.abort(); ++version;
       spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
@@ -80,7 +80,6 @@
           const quote = await response.json();if(current !== version)return;
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
           output.textContent = money(quote.interest);
-          productMethod.value = [...method.options].find(option => option.value === quote.method)?.textContent || '\u2014';
           description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
           if(schedule && quote.schedule?.length){
             rows.replaceChildren(...quote.schedule.map(payment => {

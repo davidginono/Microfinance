@@ -43,12 +43,11 @@ function fixture() {
   const dom = new JSDOM(`<html lang="en"><form data-loan-form>
     <input name="_csrf" value="token"><select id="loanMode" name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>
     <div data-configured-product><select id="productId" name="productId"><option value="product">Business loan</option></select></div>
-    <label data-configured-method><input data-product-method readonly></label>
     <input id="principal" name="principal"><select id="tenureUnit" name="tenureUnit"><option value=""></option><option>DAYS</option><option>MONTHS</option><option>YEARS</option></select>
-    <label data-tenure-number><input id="tenureValue" name="tenureValue"></label>
+    <label data-tenure-number><span data-tenure-label data-empty="Number of" data-days="Number of days" data-months="Number of months" data-years="Number of years"></span><input id="tenureValue" name="tenureValue"></label>
     <div data-custom-terms><select id="customMethod" name="customMethod"><option value="FLAT_RATE">Flat rate</option><option value="REDUCING_BALANCE">Reducing balance</option></select><select id="interestEntry" name="interestEntry"><option value="PERCENTAGE">PERCENTAGE</option><option value="AMOUNT">AMOUNT</option></select>
     <label data-custom-percentage><input id="interestPercent" name="interestPercent"></label>
-    <label data-custom-percentage><select id="interestBasis" name="interestBasis"><option value="WHOLE_LOAN">For the whole loan</option><option value="ANNUAL">Annual rate</option></select></label>
+    <label data-custom-percentage><select id="interestBasis" name="interestBasis"><option value="WHOLE_LOAN">For the whole loan</option><option value="ANNUAL">Annual rate</option></select><small data-reducing-terms-note hidden>Reducing balance uses an annual percentage. For whole-loan interest, select Flat rate.</small></label>
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
     <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span class="loan-interest-spinner" hidden></span><output data-interest-value></output><p data-interest-description></p></div>
     <section data-schedule-preview hidden><span data-schedule-summary data-monthly="Monthly" data-weekly="Weekly"></span><table><tbody data-schedule-rows></tbody></table></section>
@@ -109,13 +108,35 @@ test('incomplete configuration does not request a misleading default schedule',(
   dom.window.close();
 });
 
-test('reducing balance selects annual percentage terms and configured loans retain their product method',async()=>{
+test('reducing balance accepts either percentage basis and configured loans hide custom terms',async()=>{
   const {w,set,run,respond,requests,dom}=fixture();const d=w.document;
   set('loanMode','CUSTOM');set('tenureUnit','MONTHS');set('tenureValue','6');set('interestPercent','12');set('principal','1000');set('customMethod','REDUCING_BALANCE');
-  assert.equal(d.getElementById('interestBasis').value,'ANNUAL');assert.equal(d.getElementById('interestEntry').value,'PERCENTAGE');
+  assert.equal(d.getElementById('interestBasis').value,'WHOLE_LOAN');assert.equal(d.getElementById('interestEntry').value,'PERCENTAGE');
   assert.equal(d.querySelector('#interestEntry option[value="AMOUNT"]').disabled,true);
-  const reducing=run();assert.equal(requests[0].options.body.get('customMethod'),'REDUCING_BALANCE');respond(0,'35.29',true,[],'REDUCING_BALANCE');await reducing;
+  assert.equal(d.querySelector('#interestBasis option[value="WHOLE_LOAN"]').disabled,false);
+  assert.equal(d.querySelector('[data-reducing-terms-note]').hidden,false);
+  const reducing=run();assert.equal(requests[0].options.body.get('customMethod'),'REDUCING_BALANCE');assert.equal(requests[0].options.body.get('interestBasis'),'WHOLE_LOAN');respond(0,'71.16',true,[],'REDUCING_BALANCE');await reducing;
+  set('interestBasis','ANNUAL');assert.equal(d.getElementById('interestBasis').value,'ANNUAL');assert.equal(d.querySelector('[data-reducing-terms-note]').hidden,true);
+  set('interestBasis','WHOLE_LOAN');assert.equal(d.getElementById('interestBasis').value,'WHOLE_LOAN');
   set('customMethod','FLAT_RATE');assert.equal(d.querySelector('#interestEntry option[value="AMOUNT"]').disabled,false);
-  set('loanMode','CONFIGURED');const configured=run();assert.equal(requests[1].options.body.get('customMethod'),null);respond(1,'50.00');await configured;
-  assert.equal(d.querySelector('[data-product-method]').value,'Flat rate');dom.window.close();
+  assert.equal(d.querySelector('#interestBasis option[value="WHOLE_LOAN"]').disabled,false);
+  assert.equal(d.querySelector('[data-reducing-terms-note]').hidden,true);
+  set('interestBasis','WHOLE_LOAN');const whole=run();assert.equal(requests[1].options.body.get('interestBasis'),'WHOLE_LOAN');respond(1,'120.00');await whole;
+  set('loanMode','CONFIGURED');const configured=run();assert.equal(requests[2].options.body.get('customMethod'),null);respond(2,'50.00');await configured;
+  assert.equal(d.querySelector('[data-custom-terms]').hidden,true);
+  assert.equal(d.querySelector('[data-interest-value]').textContent,'50.00');dom.window.close();
+});
+
+test('tenure labels follow the selected unit in both loan modes and use localized text',()=>{
+  const {w,set,dom}=fixture();const d=w.document,label=d.querySelector('[data-tenure-label]');
+  for(const mode of ['CONFIGURED','CUSTOM']) {
+    set('loanMode',mode);
+    for(const [unit,text] of [['DAYS','Number of days'],['MONTHS','Number of months'],['YEARS','Number of years']]) {
+      set('tenureUnit',unit);assert.equal(label.textContent,text);
+      assert.equal(d.querySelector('[data-tenure-number]').hidden,false);
+    }
+  }
+  label.dataset.days='Idadi ya siku';set('tenureUnit','DAYS');assert.equal(label.textContent,'Idadi ya siku');
+  set('tenureUnit','');assert.equal(d.querySelector('[data-tenure-number]').hidden,true);
+  dom.window.close();
 });

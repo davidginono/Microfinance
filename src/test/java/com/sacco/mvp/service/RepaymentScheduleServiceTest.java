@@ -41,6 +41,26 @@ class RepaymentScheduleServiceTest {
     }
 
     @Test
+    void wholeLoanReducingScheduleMatchesItsSavedAssessmentAndRejectsRepricing() {
+        var snapshot=new java.util.LinkedHashMap<String,Object>();var term=new LoanTenure("MONTHS",6);
+        term.snapshot(snapshot);snapshot.put("calculationVersion",LoanAmortizationCalculator.VERSION);
+        snapshot.put("loanMode","CUSTOM");snapshot.put("interestBasis","WHOLE_LOAN");snapshot.put("interestMethod","REDUCING_BALANCE");
+        snapshot.put("interestRate",new BigDecimal("0.12"));snapshot.put("repaymentFrequency","MONTHLY");
+        snapshot.put("principalAmount",new BigDecimal("1000.00"));snapshot.put("tenorMonths",6);snapshot.put("numberOfPayments",6);
+        var expected=LoanAmortizationCalculator.estimate(new BigDecimal("1000.00"),6,snapshot);
+        snapshot.put("periodicRepaymentAmount",expected.installment());snapshot.put("maximumInstallmentAmount",expected.maximumInstallment());snapshot.put("interestAmount",expected.totalInterest());
+        var mapper=JsonMapper.builder().findAndAddModules().build();var app=baseApplication(mapper.writeValueAsString(snapshot));app.setAmount(new BigDecimal("1000.00"));app.setTenorMonths(6);
+        var built=repaymentScheduleService.buildSchedule(app,LocalDate.of(2026,1,1),LocalDate.of(2026,2,1),RepaymentFrequency.MONTHLY,null,null,null);
+        var rows=repaymentScheduleService.parseRows(built.scheduleJson());
+        assertThat(repaymentScheduleService.parseSummary(built.scheduleJson())).containsEntry("interestBasis","WHOLE_LOAN");
+        assertThat(built.installmentAmount()).isEqualByComparingTo(expected.installment());
+        assertThat(new BigDecimal(rows.getFirst().get("interestComponent").toString())).isEqualByComparingTo("20.00");
+        assertThat(rows.stream().map(row->new BigDecimal(row.get("interestComponent").toString())).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(expected.totalInterest());
+        snapshot.put("interestBasis","ANNUAL");app.setFinancialSnapshot(mapper.writeValueAsString(snapshot));
+        assertThatThrownBy(()->repaymentScheduleService.buildSchedule(app,LocalDate.of(2026,1,1),LocalDate.of(2026,2,1),RepaymentFrequency.MONTHLY,null,null,null)).hasMessageContaining("reassessment");
+    }
+
+    @Test
     void buildScheduleUsesStoredReducingBalanceTermsAfterProductChanges() {
         LoanApplication app = baseApplication("""
             {"interestMethod":"REDUCING_BALANCE","interestRate":0.1200}

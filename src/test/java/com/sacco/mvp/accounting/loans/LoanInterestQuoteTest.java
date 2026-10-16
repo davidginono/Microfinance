@@ -36,7 +36,7 @@ class LoanInterestQuoteTest {
             assertThat(quote.schedule()).allSatisfy(row->assertThat(row.amount()).isEqualByComparingTo(row.principal().add(row.interest())));
         }
     }
-    @Test void reducingBalanceUsesAnnualRatesAndRejectsConflictingPricingModes(){
+    @Test void reducingBalanceUsesAnnualOrWholeLoanRatesAndRejectsAmountEntry(){
         var f=custom();f.setCustomMethod(InterestMethod.REDUCING_BALANCE);f.setInterestBasis("ANNUAL");
         var quote=service.interestQuote(actor,f);
         assertThat(quote.method()).isEqualTo("REDUCING_BALANCE");
@@ -44,8 +44,22 @@ class LoanInterestQuoteTest {
         assertThat(quote.schedule().getFirst().interest()).isEqualByComparingTo("10.00");
         assertThat(quote.schedule().getLast().interest()).isLessThan(quote.schedule().getFirst().interest());
         assertThat(quote.schedule().stream().map(row->row.principal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("1000.00");
-        f.setInterestBasis("WHOLE_LOAN");assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+        f.setInterestBasis("WHOLE_LOAN");var whole=service.interestQuote(actor,f);
+        assertThat(whole.rate()).isEqualByComparingTo("0.12");
+        assertThat(whole.schedule().getFirst().interest()).isEqualByComparingTo("20.00");
+        assertThat(whole.interest()).isBetween(quote.interest(),new BigDecimal("120.00"));
+        assertThat(whole.schedule().getLast().interest()).isLessThan(whole.schedule().getFirst().interest());
+        assertThat(whole.schedule().stream().map(row->row.principal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("1000.00");
         f.setInterestBasis("ANNUAL");f.setInterestEntry("AMOUNT");f.setInterestAmount(new BigDecimal("17.03"));assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+    }
+    @Test void wholeLoanReducingRateRequiresExplicitTenureAndValidPercentage(){
+        var f=custom();f.setCustomMethod(InterestMethod.REDUCING_BALANCE);f.setTenureValue(null);
+        assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+        f.setTenureValue(6);f.setInterestPercent(new BigDecimal("-1"));
+        assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+        f.setInterestPercent(new BigDecimal("10001"));
+        assertThatThrownBy(()->service.interestQuote(actor,f)).hasMessage("recording.error.terms");
+        f.setInterestPercent(BigDecimal.ZERO);assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("0.00");
     }
     @Test void customPricingRequiresInstitutionWorkflowAndCannotMasqueradeAsConfiguredProduct(){
         when(actor.getSaccoId()).thenReturn("I1");

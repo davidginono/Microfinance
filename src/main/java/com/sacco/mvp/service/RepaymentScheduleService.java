@@ -52,7 +52,7 @@ public class RepaymentScheduleService {
         BigDecimal configuredRate = resolveAnnualInterestRate(app, product);
         InterestMethod interestMethod = resolveInterestMethod(app, product);
         LoanAmortizationCalculator.Result calculation = decimalQuote
-            ? tenure.calculate(app.getAmount(), configuredRate, interestMethod, frequency, installmentOverride, resolveFlatInterestAmount(app, configuredRate))
+            ? tenure.calculate(app.getAmount(), configuredRate, interestMethod, frequency, installmentOverride, resolveFlatInterestAmount(app, configuredRate), LoanAmortizationCalculator.usesWholeLoanReducingRate(snapshot))
             : LoanAmortizationCalculator.calculate(app.getAmount(), installments, configuredRate, interestMethod, frequency, installmentOverride, resolveFlatInterestAmount(app, configuredRate));
         BigDecimal baseInstallment = calculation.installment();
         if (decimalQuote && (readBigDecimal(snapshot.get("tenorMonths")) == null
@@ -100,6 +100,10 @@ public class RepaymentScheduleService {
         summary.put("interestMethod", interestMethod.name());
         summary.put("interestRate", configuredRate);
         summary.put("calculationVersion", decimalQuote ? LoanAmortizationCalculator.VERSION : "LEGACY_PERIOD_COUNT_DECIMAL");
+        if (LoanAmortizationCalculator.usesWholeLoanReducingRate(snapshot)) {
+            summary.put("loanMode", "CUSTOM");
+            summary.put("interestBasis", "WHOLE_LOAN");
+        }
         summary.put("disbursementReference", disbursementReference == null ? "" : disbursementReference);
         summary.put("disbursementNotes", disbursementNotes == null ? "" : disbursementNotes);
         summary.put("schedule", rows);

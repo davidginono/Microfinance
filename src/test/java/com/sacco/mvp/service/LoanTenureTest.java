@@ -8,6 +8,23 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class LoanTenureTest {
+    @Test void wholeLoanReducingRatesUseActualPaymentsForEveryTenureAndFrequency() {
+        for(var term:List.of(new LoanTenure("DAYS",9),new LoanTenure("MONTHS",6),new LoanTenure("YEARS",2))) {
+            for(var frequency:RepaymentFrequency.values()) {
+                var principal=new BigDecimal("1000.01");var rate=new BigDecimal("0.12");
+                var result=term.calculate(principal,rate,InterestMethod.REDUCING_BALANCE,frequency,null,BigDecimal.ZERO,true);
+                var expectedFirst=principal.multiply(rate).divide(BigDecimal.valueOf(term.payments(frequency)),2,java.math.RoundingMode.HALF_UP);
+                assertThat(result.rows().getFirst().interest()).isEqualByComparingTo(expectedFirst);
+                assertThat(result.rows().stream().map(LoanAmortizationCalculator.Installment::principal).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(principal);
+                assertThat(result.rows().getLast().remainingPrincipal()).isEqualByComparingTo("0.00");
+                assertThat(result.totalRepayment()).isEqualByComparingTo(principal.add(result.totalInterest()));
+                var snapshot=new HashMap<String,Object>();term.snapshot(snapshot);snapshot.put("calculationVersion",LoanAmortizationCalculator.VERSION);
+                snapshot.put("repaymentFrequency",frequency.name());snapshot.put("interestMethod","REDUCING_BALANCE");snapshot.put("interestRate",rate);
+                snapshot.put("loanMode","CUSTOM");snapshot.put("interestBasis","WHOLE_LOAN");snapshot.put("interestAmount",result.totalInterest());
+                assertThat(LoanAmortizationCalculator.estimate(principal,term.compatibilityMonths(),snapshot)).isEqualTo(result);
+            }
+        }
+    }
     @Test void yearsPreserveExistingMonthlyPricingAndExactPrincipal() {
         var term=new LoanTenure("YEARS",2);
         var a=term.calculate(new BigDecimal("100000.01"),new BigDecimal("0.12"),InterestMethod.REDUCING_BALANCE,RepaymentFrequency.MONTHLY,null,BigDecimal.ZERO);

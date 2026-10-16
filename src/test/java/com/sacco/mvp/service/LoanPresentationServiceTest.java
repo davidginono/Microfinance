@@ -120,6 +120,16 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void disbursedReducingRateRetainsItsWholeLoanBasis() {
+        var summary=loanPresentationService.parseRepaymentSummary("""
+            {"calculationVersion":"DECIMAL_PERIODIC_V1","loanMode":"CUSTOM","interestBasis":"WHOLE_LOAN",
+             "interestMethod":"REDUCING_BALANCE","interestRate":0.12}
+            """);
+        assertThat(summary).containsEntry("For the whole loan","12.00%")
+            .doesNotContainKeys("Annual Interest Rate","Interest Rate");
+    }
+
+    @Test
     void previousApprovedReviewsShowsOnlyApprovedEarlierStages() {
         UUID loanId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();

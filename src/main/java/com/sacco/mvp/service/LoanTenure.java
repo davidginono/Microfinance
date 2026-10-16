@@ -43,10 +43,14 @@ public record LoanTenure(String unit, int value) {
     }
     public LoanAmortizationCalculator.Result calculate(BigDecimal principal, BigDecimal annualRate, InterestMethod method,
                                                         RepaymentFrequency frequency, BigDecimal override, BigDecimal flat) {
+        return calculate(principal, annualRate, method, frequency, override, flat, false);
+    }
+    public LoanAmortizationCalculator.Result calculate(BigDecimal principal, BigDecimal rate, InterestMethod method,
+                                                        RepaymentFrequency frequency, BigDecimal override, BigDecimal flat, boolean wholeLoanRate) {
         int count = payments(frequency);
-        BigDecimal effectiveRate = unit.equals("DAYS") ? annualRate.multiply(months()).multiply(BigDecimal.valueOf(frequency == RepaymentFrequency.WEEKLY ? 52 : 12))
-            .divide(BigDecimal.valueOf(12L * count), MathContext.DECIMAL128) : annualRate;
-        return LoanAmortizationCalculator.calculate(principal, count, effectiveRate, method, frequency, override, flat);
+        BigDecimal effectiveRate = !wholeLoanRate && unit.equals("DAYS") ? rate.multiply(months()).multiply(BigDecimal.valueOf(frequency == RepaymentFrequency.WEEKLY ? 52 : 12))
+            .divide(BigDecimal.valueOf(12L * count), MathContext.DECIMAL128) : rate;
+        return LoanAmortizationCalculator.calculate(principal, count, effectiveRate, method, frequency, override, flat, wholeLoanRate);
     }
     public LocalDate firstDate(LocalDate start,RepaymentFrequency frequency){return unit.equals("DAYS")?start.plusDays((value+payments(frequency)-1)/payments(frequency)):frequency==RepaymentFrequency.WEEKLY?start.plusWeeks(1):start.plusMonths(1);}
     public LocalDate end(LocalDate start) { return unit.equals("DAYS") ? start.plusDays(value) : start.plusMonths(compatibilityMonths()); }

@@ -29,7 +29,12 @@ public final class LoanAmortizationCalculator {
         BigDecimal flat = decimal(snapshot.get("interestAmount"), flatInterest(principal, rate, months));
         BigDecimal legacyPayment = !current && method == InterestMethod.REDUCING_BALANCE
             ? decimal(snapshot.get("monthlyRepaymentAmount"), null) : null;
-        return LoanTenure.fromSnapshot(snapshot, months).calculate(principal, rate, method, frequency, legacyPayment, flat);
+        return LoanTenure.fromSnapshot(snapshot, months).calculate(principal, rate, method, frequency, legacyPayment, flat, usesWholeLoanReducingRate(snapshot));
+    }
+
+    public static boolean usesWholeLoanReducingRate(Map<String, Object> snapshot) {
+        return VERSION.equals(snapshot.get("calculationVersion")) && "CUSTOM".equals(snapshot.get("loanMode")) && "WHOLE_LOAN".equals(snapshot.get("interestBasis"))
+            && "REDUCING_BALANCE".equals(snapshot.get("interestMethod"));
     }
 
     private static BigDecimal decimal(Object value, BigDecimal fallback) {
@@ -82,16 +87,23 @@ public final class LoanAmortizationCalculator {
     public static Result calculate(BigDecimal principal, int payments, BigDecimal annualRate,
                                    InterestMethod method, RepaymentFrequency frequency,
                                    BigDecimal installmentOverride, BigDecimal flatInterest) {
+        return calculate(principal, payments, annualRate, method, frequency, installmentOverride, flatInterest, false);
+    }
+
+    /** Whole-loan reducing rates are divided by the actual scheduled payment count. */
+    public static Result calculate(BigDecimal principal, int payments, BigDecimal rateValue,
+                                   InterestMethod method, RepaymentFrequency frequency,
+                                   BigDecimal installmentOverride, BigDecimal flatInterest, boolean wholeLoanRate) {
         validatePayments(payments);
         principal = exactMoney(principal, "Loan amount");
         if (principal.signum() <= 0 || principal.precision() > 19) {
             throw new IllegalArgumentException("Loan amount must be positive and within the supported range.");
         }
-        if (annualRate == null || annualRate.signum() < 0 || annualRate.compareTo(new BigDecimal("100")) > 0
-            || method == null || frequency == null) {
+        if (rateValue == null || rateValue.signum() < 0 || rateValue.compareTo(new BigDecimal("100")) > 0
+            || method == null || frequency == null || (wholeLoanRate && method != InterestMethod.REDUCING_BALANCE)) {
             throw new IllegalArgumentException("Valid interest terms and repayment frequency are required.");
         }
-        BigDecimal rate = annualRate.divide(BigDecimal.valueOf(frequency == RepaymentFrequency.WEEKLY ? 52 : 12), PRECISION);
+        BigDecimal rate = rateValue.divide(BigDecimal.valueOf(wholeLoanRate ? payments : frequency == RepaymentFrequency.WEEKLY ? 52 : 12), PRECISION);
         BigDecimal totalFlatInterest = method == InterestMethod.FLAT_RATE ? exactMoney(flatInterest, "Flat interest") : ZERO;
         if (totalFlatInterest.signum() < 0) {
             throw new IllegalArgumentException("Interest cannot be negative.");
