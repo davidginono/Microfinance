@@ -40,7 +40,7 @@
     </c:if></c:forEach>
   </div>
 </section>
-<c:if test="${not empty report}"><div class="reconciliation-basis"><p><spring:message code="reconciliation.coverage" /></p><p><spring:message code="reconciliation.interestBasis" /></p><p><spring:message code="reconciliation.liveBasis" /></p></div></c:if>
+<c:if test="${not empty report}"><div class="reconciliation-basis reconciliation-screen-note"><p><spring:message code="reconciliation.screenNote" /></p></div></c:if>
 </div>
 <script src="<c:url value='/js/sl-gl-reconciliation.js' />" defer></script>
 <%@ include file="../../fragments/footer.jspf" %>

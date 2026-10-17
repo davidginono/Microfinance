@@ -22,6 +22,7 @@ The current interface is a compact operational ERP, not a lending marketing site
 
 ## Surfaces And Typography
 
+- Keep optional helper copy absent or limited to one or two short, plain-language sentences, following the [governance copy guidance](../microfinance-ui-governance/SKILL.md#localization-and-privacy). Essential on-screen notes should use at least 14px text, comfortable line spacing and readable contrast, and wrap naturally on mobile. Do not shrink dense explanations into small-print footers.
 - Reuse shared tokens and ERP classes for workspace canvas, neutral surfaces, borders, text, and status colors. Keep navigation and institution identity distinct from the data workspace.
 - Prefer unframed page sections and a restrained white surface for genuinely framed forms, tables, or dialogs. Do not nest cards or turn every section into a floating card.
 - Use square resource cards/table containers and 2px control corners for the supplied classic AWS reference; use modest corners elsewhere, compact headings, ordinary letter spacing, and the existing local font. Do not introduce oversized headings, viewport-scaled type, decorative gradients, or visual effects behind financial data.

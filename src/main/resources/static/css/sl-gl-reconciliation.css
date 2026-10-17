@@ -16,6 +16,7 @@
 .reconciliation-empty {padding:20px;text-align:center!important;}
 .reconciliation-basis {padding:12px 0;color:#545b64;font-size:12px;}
 .reconciliation-basis p {margin:4px 0;}
+.reconciliation-screen-note {font-size:14px;line-height:1.5;}
 .reconciliation-print {margin:24px;background:white;color:black;}
 .reconciliation-print main {overflow:auto;}
 .reconciliation-print .reconciliation-table {font:11px 'Courier New',monospace;}
