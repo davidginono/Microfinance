@@ -208,6 +208,7 @@ public enum UserClaim {
 
     /** Retain stored identifiers without offering permissions for removed workflows. */
     public boolean isAvailable() {
+        if (this == ACCOUNTING_RECONCILIATION_VIEW) return true;
         return switch (feature) {
             case ACCOUNTING_OPENINGS, ACCOUNTING_PERIODS, ACCOUNTING_POLICIES, ACCOUNTING_CASH_FLOW,
                  ACCOUNTING_RECONCILIATION, ACCOUNTING_CLOSING, FINANCIAL_STATEMENTS, REGULATORY_STATEMENTS,

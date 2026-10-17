@@ -1,0 +1,37 @@
+.reconciliation-workspace {min-width:0;max-width:100%;}
+.reconciliation-canvas {min-width:0;max-width:100%;background:#fff;}
+.reconciliation-document-table {max-width:100%;overflow:auto;}
+.reconciliation-heading {padding:16px 12px 8px;min-width:0;}
+.reconciliation-heading h2 {font-size:17px;text-align:center;margin:0 0 8px;}
+.reconciliation-heading p {margin:4px 0;font-size:12px;overflow-wrap:anywhere;}
+.reconciliation-cutoff {text-align:right;font-variant-numeric:tabular-nums;}
+.reconciliation-table {min-width:1250px;width:100%;border-collapse:collapse;}
+.reconciliation-table :is(th,td) {text-align:left;vertical-align:top;}
+.reconciliation-table .reconciliation-money {font-variant-numeric:tabular-nums;white-space:nowrap;text-align:left!important;}
+.reconciliation-reference {max-width:190px;overflow-wrap:anywhere;}
+.reconciliation-account {display:block;color:#545b64;}
+.reconciliation-table .reconciliation-group th {background:#fff;padding-top:18px;font-weight:700;}
+.reconciliation-total {font-weight:700;}
+.reconciliation-total-context {font-weight:400;}
+.reconciliation-empty {padding:20px;text-align:center!important;}
+.reconciliation-basis {padding:12px 0;color:#545b64;font-size:12px;}
+.reconciliation-basis p {margin:4px 0;}
+.reconciliation-print {margin:24px;background:white;color:black;}
+.reconciliation-print main {overflow:auto;}
+.reconciliation-print .reconciliation-table {font:11px 'Courier New',monospace;}
+.reconciliation-print .reconciliation-table :is(th,td) {padding:6px 8px;}
+.reconciliation-print .reconciliation-table thead {font-family:'Times New Roman',serif;}
+.reconciliation-print .reconciliation-heading h2 {font-family:Arial,sans-serif;}
+@page {size:A3 landscape;margin:12mm;}
+@media print {
+  .reconciliation-print {margin:0;}
+  .reconciliation-print-command {display:none;}
+  .reconciliation-print main {overflow:visible;}
+  .reconciliation-document-table {overflow:visible;}
+  .reconciliation-table {min-width:0;table-layout:fixed;}
+  .reconciliation-table thead {display:table-header-group;}
+  .reconciliation-table tr {break-inside:avoid;}
+  .reconciliation-table :is(td,th) {overflow-wrap:anywhere;}
+  .reconciliation-table .reconciliation-money {white-space:normal;}
+  .reconciliation-group {break-after:avoid;}
+}

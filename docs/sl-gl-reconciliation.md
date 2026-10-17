@@ -1,0 +1,49 @@
+# Discrepancy-only SL GL reconciliation
+
+New user-authorized scope: 2026-10-16. This restores a focused read-only report after the accounting reset, not the retired reconciliation decisions, opening import, closing or release workflows.
+
+## Operation and layout
+
+Open **Accountant Office → Reports → SL GL Reconciliation**, `/reports/financial/sl-gl-reconciliation`. Select an effective-date period and activity. Principal is the default; allowances, collected-interest clearing, accrued-interest coverage and all activities are available separately.
+
+The supplied report is the presentation reference: centered title, institution/branch/period and recorded cutoff, activity headings, Client No., Loan ID / Account No., Document Ref. No., Document Date, Transaction, Description, SL Debits, SL Credits, GL Debits, GL Credits, Debits Variance and Credits Variance. Microfinance lending terminology replaces the reference's shares activity.
+
+**Only discrepancies leave the database and appear in the report.** Matching transactions are omitted from screen, PDF and print. Missing source links and duplicate postings remain exceptions even when their numerical variance is zero. Missing coverage has unavailable amounts, not invented zeros. The description identifies the discrepancy; ordinary transactions are not added as report detail.
+
+Movement, opening, closing and coverage sections have independent totals of their discrepancy rows. A balance row expresses the recorded signed balance as debit or credit. No grand total mixes a balance with its movements. Screen pages contain at most 25 exceptions, with totals over every matching exception in the group. PDF and print include all matching exceptions, subject to a 5,000-row bound; an over-limit report is rejected with a narrowing instruction, never silently truncated. No spreadsheet/CSV output or financial mutation is exposed.
+
+Report-wide criteria and Refresh navigate together with the heading, cutoff and export links. Shared asynchronous table paging retains the current criteria and cutoff. Changing criteria or refreshing obtains a new cutoff; a page change does not.
+
+## Sources and matching
+
+1. Principal movements use `loan_journal_entries` independently of `gl_journal_line`. Repayment component amounts and allocation sums cross-check the subledger; initial principal is checked against the loan ledger. `accountant_loan_post` supplies the exact journal/account links, not the SL amount.
+2. Opening and closing differences aggregate each independent side before the period and through its end. A loan without a directly recorded opening and local ledger, or without its origin posting, produces an unavailable-coverage exception. No historical opening is fabricated or certified.
+3. Approved adjustment requests/decisions provide independent principal and allowance effects for provisions/releases, write-offs, write-backs and disbursement reversals. The comparison never derives these SL amounts from their GL lines.
+4. Supported interest is **posted loan collections clearing**, using the existing independent repayment entries and original clearing mappings. Its GL comparison includes linked loan postings and orphan loan-payment/reversal journals on those mappings; unrelated ordinary clearing activity is outside this component. These are loan-component balances, not a certification of an entire shared clearing account. Future scheduled interest is excluded. `INTEREST_RECEIVABLE` GL postings have no supported independent accrual source in this increment: SL and variance amounts remain unavailable and the report flags unsupported coverage.
+
+Each side is aggregated by source journal, component, exact posting account and effective date before a full outer join. Unmapped SL vouchers retain their own identities. Duplicate bridge identities and duplicate journal source references are exceptions. Matching never uses a human reference alone, net totals alone or only an inner join. Debit variance is SL debit minus GL debit; credit variance is SL credit minus GL credit. Original and reversal entries remain separate at their effective dates.
+
+All queries use institution and selected branch scope. Loan ownership uses `LoanApplication.stationId`, including when a client later moves. Out-of-scope source links do not expose foreign client identifiers. The report deliberately does not provide cross-branch registry access.
+
+## Integrity and limits
+
+- Service-owned `REPEATABLE_READ`, read-only transactions give the count, group totals and page one database snapshot. Both books apply the same recorded cutoff and effective-date horizon, including backdated sources and linked corrections.
+- This is a **live diagnostic**, not a frozen reconciliation certificate. A transaction committed later can have a posting timestamp before an earlier cutoff, so reruns can change. No successful/no-difference message certifies institution-wide historical coverage.
+- Current staff identity, active institution/branch and current claims are rechecked. View requires `FINANCIAL_REPORTS_VIEW`, `LOAN_REPORTS_VIEW`, and `ACCOUNTING_RECONCILIATION_VIEW`; outputs additionally require `FINANCIAL_REPORTS_EXPORT`. Only the reconciliation View permission returns to the access matrix. No default role grants, Create or Approve workflow is enabled.
+- Corrections stay in the owning repayment/adjustment workflows. The report never posts a balancing entry, changes historical entries, submits a voucher for approval or alters existing financial protections.
+- Parameter bounds, SQL aggregation, fixed paging, transaction timeout and the existing report concurrency limiter bound request work. No 1,000-RPS throughput claim is made.
+
+## Verification
+
+The dedicated PostgreSQL suite uses actual owning disbursement, repayment, reversal and adjustment services for valid financial cases. Corruption scenarios use transaction-local shadow copies with an explicit temporary search path; financial triggers and retained source records are never disabled or changed. Tests cover missing counterparts, duplicate links, amount/allocation differences, partial collections, reversals, adjustments, effective-date differences, cutoff handling, unavailable openings, branch scope, moved clients, current permissions, consistent concurrent reads and all-page totals/exports. MVC tests cover session boundaries, binding, malformed criteria, output routing and absence of write/spreadsheet endpoints. PDF checks exercise English and Kiswahili.
+
+Verification on 2026-10-17:
+
+- PostgreSQL 17.9 validated all 88 migrations through V69. No application migration, business seed or financial protection was changed for this report.
+- The latest lending regression passed 47 actual PostgreSQL cases, including the owning posting and correction paths. A subsequent report/security run passed 84 cases and failed one pre-existing standalone-print classification for `accounting/management/print.jsp`; the new reconciliation print view was accepted.
+- The full workspace run was not green (1,116 tests, 12 failures, 3 errors, 69 skipped). It included existing dashboard/loading/guarantor contracts, statement-layout/accessor contracts and loan-PDF/product-controller fixtures. It also identified missing record-style accessors in the new report DTOs; those were corrected and the report was rendered afterward. This increment does not claim a successful whole-project regression.
+- Headless Chrome rendered the actual JSP/shared shell with synthetic report data in English and Kiswahili at 360, 768, 1366 and 1920 pixels: eight HTTP 200 checks, no document horizontal overflow and no JavaScript page exceptions. Generate, shared asynchronous Next page, visible activity selection/regeneration and all-31-row print output passed. Preview-only `/profile/image/me` and `/header/notifications` endpoints returned 404; no report asset failed. This fixture is not a live institutional browser session. Existing-session browser inventory timed out, so full live-session login/logout acceptance is not claimed.
+- PDFBox rendered and inspected the English/Kiswahili reference layouts; the multi-page PDF test retained the last of 120 exceptions and repeated column headings. Neither output includes Details/Actions columns. Temporary previews, PDFs, screenshots, scripts and the synthetic database are outside the repository.
+- A bounded-page `EXPLAIN (ANALYZE, BUFFERS)` on the small synthetic fixture recorded execution 55.824 ms and cold planning 636.671 ms. This is query-shape evidence, not a capacity benchmark.
+
+Final focused verification: **30 passed, zero failures/errors/skips** (19 actual PostgreSQL cases, 5 unit/PDF checks and 6 MVC/security checks), completed 2026-10-17 20:50 EAT in 61.556 seconds. This includes a real backdated collection's opening/closing effects and ordinary activity in a shared interest-clearing account. After the normal Maven application compilation passed, the dedicated tests and existing security/posting fixture were compiled with Java 25 `javac -proc:none` and executed by the installed JUnit Platform 6.0.3 launcher against the same dependencies; the broad test-compilation retry was stopped during slow annotation processing. No production compiler settings or dependencies were altered. The standard reproducible selection remains `mvn '-Dtest=com.sacco.mvp.accounting.loans.ReconciliationPostgresTest,com.sacco.mvp.accounting.reconciliation.ReconciliationTest,com.sacco.mvp.config.ReconciliationMvcTest' test`.
