@@ -39,6 +39,16 @@ public class LoanRepaymentLedgerService {
         if (loan.getTopUpSourceLoanId() != null) {
             return;
         }
+        openLedger(loan);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void openAtTopUp(LoanApplication loan) {
+        require(loan.getTopUpSourceLoanId()!=null && accountingGuard.recordedLoan(loan.getId()),"state");
+        openLedger(loan);
+    }
+
+    private void openLedger(LoanApplication loan) {
         require(loan.getStatus() == LoanStatus.DISBURSED && loan.getStationId() != null
             && !loan.getStationId().isBlank() && loan.getDisbursementDate() != null
             && !loan.getDisbursementDate().isAfter(clock.today()), "schedule");
@@ -71,6 +81,7 @@ public class LoanRepaymentLedgerService {
         LoanLedger ledger = readableLedger(id, actor);
         require(effectiveDate != null && !effectiveDate.isBefore(ledger.getDisbursementDate()) && !effectiveDate.isAfter(clock.today()), "date");
         Totals t = totals(rows(id), effectiveDate);
+        if(transactions.settledThroughTopUp(id))return new PaymentBalance(ZERO,ZERO,ZERO);
         return new PaymentBalance(t.duePrincipal(), t.dueInterest(), ledger.getPrincipal().subtract(ledger.getPrincipalPaid()));
     }
 
@@ -103,12 +114,13 @@ public class LoanRepaymentLedgerService {
         Totals totals = totals(rows, clock.today());
         String financialState=loans.findById(loanId).map(l->l.getStatus().name()).orElse("");
         boolean cancelled=financialState.equals("DISBURSEMENT_REVERSED");
-        if(cancelled)totals=new Totals(ZERO,ZERO,ZERO,ZERO,null);
+        if(cancelled || transactions.settledThroughTopUp(loanId))totals=new Totals(ZERO,ZERO,ZERO,ZERO,null);
         Page<LoanRepaymentTransaction> transactionPage = transactions.findByLoanApplicationIdOrderBySequenceDesc(loanId,
             PageRequest.of(Math.max(0, Math.min(page, 10000)), 25));
         Map<UUID, UUID> reversed = reversalIds(loanId, transactionPage.getContent().stream().map(LoanRepaymentTransaction::getId).toList());
         Page<Receipt> history = transactionPage.map(t -> receipt(t, ledger.getLoanId(), reversed.get(t.getId())));
         UUID latest = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
+            .filter(t->t.getKind()==LoanRepaymentTransaction.Kind.PAYMENT)
             .map(LoanRepaymentTransaction::getId).findFirst().orElse(null);
         List<JournalRow> entries = !actor.isStaffSession() ? List.of() : journal.findByLoanApplicationIdOrderByPostedAtDescId(loanId,
             PageRequest.of(0, 30)).stream().map(e -> new JournalRow(e.getVoucherId(), e.getEffectiveDate(),
@@ -146,6 +158,7 @@ public class LoanRepaymentLedgerService {
     }
 
     private Receipt postInternal(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
+        require(command.channel()!=LoanRepaymentTransaction.Channel.INTERNAL,"channel");
         accountingGuard.repayment(loanId, actor, command);
         LoanLedger ledger = lockedLedger(loanId, actor);
         BigDecimal amount = money(command.amount());
@@ -261,6 +274,7 @@ public class LoanRepaymentLedgerService {
         }
         LoanRepaymentTransaction original = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
             .findFirst().filter(t -> t.getId().equals(paymentId)).orElseThrow(() -> new IllegalArgumentException("repayment.error.latest"));
+        require(original.getKind()==LoanRepaymentTransaction.Kind.PAYMENT,"state");
         require(!original.getActorMemberId().equals(actor.getMemberId()), "checker");
         LocalDate correctionDate=effectiveDate==null?original.getPaymentDate():effectiveDate;
         require(!correctionDate.isBefore(original.getPaymentDate()) && !correctionDate.isAfter(clock.today()),"date");
@@ -324,6 +338,7 @@ public class LoanRepaymentLedgerService {
     @Transactional(readOnly = true)
     public Optional<RiskBalance> riskBalance(UUID loanId, LocalDate today) {
         return ledgers.findById(loanId).map(l -> {
+            if(transactions.settledThroughTopUp(loanId))return new RiskBalance(ZERO,ZERO,null);
             if(loans.findById(loanId).map(a->a.getStatus()==LoanStatus.DISBURSEMENT_REVERSED).orElse(false))return new RiskBalance(ZERO,ZERO,null);
             Totals t = totals(rows(loanId), today);
             return new RiskBalance(l.getPrincipal().subtract(l.getPrincipalPaid()).add(t.dueInterest()),
@@ -416,7 +431,9 @@ public class LoanRepaymentLedgerService {
             Map<String, Object> snapshot = loan.getFinancialSnapshot() == null || loan.getFinancialSnapshot().isBlank()
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(mapper.readValue(loan.getFinancialSnapshot(), new TypeReference<Map<String, Object>>() {}));
             Totals due = totals(rows, clock.today());
-            BigDecimal principal = ledger.getPrincipal().subtract(ledger.getPrincipalPaid());
+            boolean cancelled=loan.getStatus()==LoanStatus.DISBURSEMENT_REVERSED;
+            if(cancelled || transactions.settledThroughTopUp(loan.getId()))due=new Totals(ZERO,ZERO,ZERO,ZERO,null);
+            BigDecimal principal = cancelled?ZERO:ledger.getPrincipal().subtract(ledger.getPrincipalPaid());
             snapshot.put(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_OUTSTANDING_PRINCIPAL, principal);
             snapshot.put(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_OUTSTANDING_INTEREST, due.dueInterest());
             snapshot.put(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING, principal.add(due.dueInterest()));
@@ -440,6 +457,7 @@ public class LoanRepaymentLedgerService {
             case CASH -> "CASH_CLEARING";
             case BANK -> "BANK_CLEARING";
             case MOBILE_MONEY -> "MOBILE_MONEY_CLEARING";
+            case INTERNAL -> "TOPUP_CLEARING";
         };
         List<LoanJournalEntry> lines = new ArrayList<>();
         lines.add(entry(ledger, t.getId(), t.getId(), receiving, reverse ? ZERO : t.getAmount(), reverse ? t.getAmount() : ZERO, t.getPaymentDate()));
@@ -466,6 +484,61 @@ public class LoanRepaymentLedgerService {
         return new Receipt(t.getId(), t.getLoanApplicationId(), loanNumber, t.getReceiptReference(), t.getKind().name(), t.getPaymentDate(),
             t.getPostedAt(), t.getAmount(), t.getPrincipalAmount(), t.getInterestAmount(), t.getChannel().name(),
             t.getChannelReference(), t.getReversesTransactionId(), t.getReason(), reversedBy);
+    }
+
+    /** Internal refinancing is a distinct append-only movement, never a cash receipt. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void refreshCancelledTopUp(UUID loanId,AppUserPrincipal actor) {
+        requireStaff(actor,UserClaim.LOAN_RECORDING_REVERSE);var ledger=lockedLedger(loanId,actor);var loan=loans.findById(loanId).orElseThrow();
+        require(loan.getTopUpSourceLoanId()!=null && loan.getStatus()==LoanStatus.DISBURSEMENT_REVERSED && accountingGuard.recordedLoan(loanId),"state");
+        updateProjection(ledger,loan,rows(loanId));loans.flush();
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID settleRecordedTopUp(UUID source,AppUserPrincipal actor,LocalDate date,UUID key,UUID event,long sequence,BigDecimal principal,BigDecimal interest) {
+        requireStaff(actor,UserClaim.DISBURSEMENT_QUEUE_DISBURSE);
+        require(accountingGuard.recordedLoan(source),"state");
+        LoanLedger ledger=lockedLedger(source,actor);LoanApplication loan=loans.findById(source).orElseThrow();
+        var rows=rows(source);var due=totals(rows,date);
+        require(loan.getStatus()==LoanStatus.DISBURSED && ledger.getNextSequence()==sequence,"state");
+        require(principal.compareTo(ledger.getPrincipal().subtract(ledger.getPrincipalPaid()))==0 && interest.compareTo(due.dueInterest())==0,"amount");
+        require(date!=null && !date.isAfter(clock.today()) && !date.isBefore(ledger.getDisbursementDate()) && (ledger.getLastPaymentDate()==null || !date.isBefore(ledger.getLastPaymentDate())),"date");
+        requireAfterAdjustment(ledger,date);
+        UUID id=UUID.randomUUID();
+        var transaction=LoanRepaymentTransaction.builder().id(id).loanApplicationId(source).saccoId(ledger.getSaccoId()).stationId(ledger.getStationId())
+            .sequence(sequence).receiptReference("TS-"+id).requestKey(key).kind(LoanRepaymentTransaction.Kind.SETTLEMENT).channel(LoanRepaymentTransaction.Channel.INTERNAL)
+            .channelReference(event.toString()).paymentDate(date).amount(principal.add(interest)).principalAmount(principal).interestAmount(interest)
+            .actorMemberId(actor.getMemberId()).loanStatusBefore(loan.getStatus()).postedAt(clock.now()).build();
+        transactions.saveAndFlush(transaction);
+        var parts=new ArrayList<LoanRepaymentAllocation>();
+        for(var row:rows){var p=row.getPrincipal().subtract(row.getPrincipalPaid());var i=row.getDueDate().isAfter(date)?ZERO:row.getInterest().subtract(row.getInterestPaid());
+            if(p.add(i).signum()>0)parts.add(LoanRepaymentAllocation.builder().id(UUID.randomUUID()).transactionId(id).installmentId(row.getId()).principalAmount(p).interestAmount(i).build());
+            row.setPrincipalPaid(row.getPrincipal());row.setInterestPaid(row.getInterestPaid().add(i));}
+        allocations.saveAll(parts);installments.saveAll(rows);ledger.setPrincipalPaid(ledger.getPrincipal());ledger.setInterestPaid(ledger.getInterestPaid().add(interest));
+        ledger.setLastPaymentDate(date);ledger.setNextSequence(sequence+1);writePaymentJournal(ledger,transaction,false);
+        loan.setStatus(LoanStatus.PAID);loan.setPaidAt(clock.now());loan.setPaidMarkedByManagerId(actor.getMemberId());
+        updateProjection(ledger,loan,rows);audit(transaction);return id;
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID undoRecordedTopUp(UUID source,UUID originalId,AppUserPrincipal actor,UUID key,UUID event,LocalDate date,String reason) {
+        requireStaff(actor,UserClaim.LOAN_RECORDING_REVERSE);LoanLedger ledger=lockedLedger(source,actor);
+        var original=transactions.findById(originalId).orElseThrow();
+        require(original.getLoanApplicationId().equals(source) && original.getKind()==LoanRepaymentTransaction.Kind.SETTLEMENT
+            && !original.getActorMemberId().equals(actor.getMemberId()) && transactions.settledThroughTopUp(source),"state");
+        require(!date.isBefore(original.getPaymentDate()) && !date.isAfter(clock.today()),"date");
+        var loan=loans.findById(source).orElseThrow();var rows=rows(source);var byId=new HashMap<UUID,LoanLedgerInstallment>();rows.forEach(r->byId.put(r.getId(),r));
+        var parts=allocations.findByTransactionId(originalId,PageRequest.of(0,MAX_INSTALLMENTS));UUID id=UUID.randomUUID();
+        var reversal=LoanRepaymentTransaction.builder().id(id).loanApplicationId(source).saccoId(ledger.getSaccoId()).stationId(ledger.getStationId())
+            .sequence(ledger.getNextSequence()).receiptReference("TU-"+id).requestKey(key).kind(LoanRepaymentTransaction.Kind.SETTLEMENT_UNDO).channel(LoanRepaymentTransaction.Channel.INTERNAL)
+            .channelReference(event.toString()).paymentDate(date).amount(original.getAmount()).principalAmount(original.getPrincipalAmount()).interestAmount(original.getInterestAmount())
+            .actorMemberId(actor.getMemberId()).loanStatusBefore(loan.getStatus()).postedAt(clock.now()).reversesTransactionId(originalId).reason(reason).build();
+        transactions.saveAndFlush(reversal);
+        allocations.saveAll(parts.stream().map(p->{var r=byId.get(p.getInstallmentId());r.setPrincipalPaid(r.getPrincipalPaid().subtract(p.getPrincipalAmount()));r.setInterestPaid(r.getInterestPaid().subtract(p.getInterestAmount()));
+            return LoanRepaymentAllocation.builder().id(UUID.randomUUID()).transactionId(id).installmentId(r.getId()).principalAmount(p.getPrincipalAmount()).interestAmount(p.getInterestAmount()).build();}).toList());
+        installments.saveAll(rows);ledger.setPrincipalPaid(ledger.getPrincipalPaid().subtract(original.getPrincipalAmount()));ledger.setInterestPaid(ledger.getInterestPaid().subtract(original.getInterestAmount()));
+        ledger.setNextSequence(ledger.getNextSequence()+1);ledger.setLastPaymentDate(date);writePaymentJournal(ledger,reversal,true);
+        loan.setStatus(original.getLoanStatusBefore());loan.setPaidAt(null);loan.setPaidMarkedByManagerId(null);updateProjection(ledger,loan,rows);audit(reversal);return id;
     }
 
     private static BigDecimal money(BigDecimal value) {

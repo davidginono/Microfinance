@@ -11,8 +11,8 @@ import java.util.UUID;
 @Table(name = "loan_repayment_transactions")
 @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class LoanRepaymentTransaction {
-    public enum Kind { PAYMENT, REVERSAL }
-    public enum Channel { CASH, BANK, MOBILE_MONEY }
+    public enum Kind { PAYMENT, REVERSAL, SETTLEMENT, SETTLEMENT_UNDO }
+    public enum Channel { CASH, BANK, MOBILE_MONEY, INTERNAL }
     @Id private UUID id;
     @Column(name = "loan_application_id", nullable = false) private UUID loanApplicationId;
     @Column(name = "sacco_id", nullable = false) private String saccoId;

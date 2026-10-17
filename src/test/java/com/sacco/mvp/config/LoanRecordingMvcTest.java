@@ -74,6 +74,20 @@ class LoanRecordingMvcTest {
         mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf())).andExpect(redirectedUrl("/finance/loan-records/"+id));
         verify(service).submitRecordedApplication(actor,id);
     }
+    @Test void topUpPreviewIsScopedUncacheableAndPreservesDecimalStrings() throws Exception {
+        var source=UUID.randomUUID();var date=java.time.LocalDate.of(2026,10,8);
+        when(service.topUpQuote(actor,source,date,null)).thenReturn(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.TopUpQuote(source,"202600001",UUID.randomUUID(),"Synthetic client",date,new BigDecimal("1000.00"),new BigDecimal("20.00"),new BigDecimal("50.00"),3));
+        mvc.perform(get("/finance/loan-recording/top-up-quote").with(user(actor)).param("source",source.toString()).param("date",date.toString()).param("principal","9007199254740992.01"))
+            .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.principal").value("1000.00")).andExpect(jsonPath("$.cash").value("9007199254739972.01"));
+        verify(service).authorize(actor,"CREATE");verify(service).topUpQuote(actor,source,date,null);
+    }
+    @Test void topUpCorrectionRequiresCsrfAndDelegatesTheLinkedCommand() throws Exception {
+        var id=UUID.randomUUID();var key=UUID.randomUUID();
+        mvc.perform(post("/finance/loan-records/"+id+"/reverse-top-up").with(user(actor))).andExpect(status().isForbidden());
+        mvc.perform(post("/finance/loan-records/"+id+"/reverse-top-up").with(user(actor)).with(csrf()).param("requestKey",key.toString()).param("date","2026-10-08").param("reason","Correct transfer").param("evidence","Synthetic bank evidence"))
+            .andExpect(redirectedUrl("/finance/loan-records/"+id));
+        verify(service).reverseTopUp(actor,id,key,java.time.LocalDate.of(2026,10,8),"Correct transfer","Synthetic bank evidence");
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}
         @Bean LoanRecordingService service(){return mock(LoanRecordingService.class);}

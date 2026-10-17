@@ -44,6 +44,70 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
+    UUID topUpSource(){var f=form();f.setMonths(2);var id=service.save(actor,f);service.disburse(actor,post(id,"1000.00","D-TOPUP-"+UUID.randomUUID()));return id;}
+    UUID recordTopUp(UUID source){var f=form();f.setTopUpSourceLoanId(source);f.setApplicationDate(TODAY);f.setFirstPaymentDate(null);f.setPrincipal(new BigDecimal("1500.00"));f.setEvidence("Synthetic signed top-up agreement");return service.save(actor,f);}
+    PostForm topUpPost(UUID loan){var f=post(loan,"1500.00","TOPUP-"+UUID.randomUUID());f.setFirstPaymentDate(TODAY.plusMonths(1));f.setInterestAccountId(interest);f.setEvidence("Synthetic signed top-up and verified bank transfer");var q=service.disbursementTopUp(actor,loan,TODAY).orElseThrow();f.setSettlementSequence(q.sequence());f.setSettlementPrincipal(q.principal());f.setSettlementInterest(q.interest());return f;}
+    @Test void topUpSeparatesInternalSettlementFromCashAndExcludesFutureInterest(){
+        var source=topUpSource();assertThat(service.detail(actor,source).loan().topUpEligible()).isTrue();
+        var loan=recordTopUp(source);assertThat(service.detail(actor,source).loan().topUpEligible()).isFalse();var f=topUpPost(loan);var q=service.disbursementTopUp(actor,loan,TODAY).orElseThrow();
+        assertThat(q.principal()).isEqualByComparingTo("1000.00");assertThat(q.interest()).isEqualByComparingTo("20.00");assertThat(q.excludedInterest()).isEqualByComparingTo("20.00");
+        var p=service.disburse(actor,f);assertThat(service.disburse(actor,f).id()).isEqualTo(p.id());
+        var topup=service.topUp(actor,loan).orElseThrow();assertThat(topup.cash()).isEqualByComparingTo("480.00");assertThat(status(source)).isEqualTo("PAID");
+        assertThat(service.detail(actor,loan).loan().topUpEligible()).isFalse();
+        assertThat(ledger.riskBalance(source,TODAY).orElseThrow().currentOutstanding()).isZero();assertThat(ledger.view(source,actor,0,0).futureInterest()).isZero();
+        assertThat(service.detail(actor,source).loan().futureInterest()).isZero();assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1500.00");
+        assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("480.00");
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and kind='PAYMENT'",Integer.class,source)).isZero();
+        assertThat(service.history(actor,source,0).rows()).anySatisfy(row->assertThat(row.kind()).isEqualTo("SETTLEMENT"));
+        assertThatThrownBy(()->service.topUpQuote(operator("B2"),source,TODAY,null)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void topUpRequiresFreshPreviewAndKeepsRecordedTermsFrozen(){
+        var source=topUpSource();var loan=recordTopUp(source);var f=topUpPost(loan);
+        var received=post(source,"120.00","SOURCE-PARTIAL");received.setInterestAccountId(interest);service.repay(actor,received);
+        assertThatThrownBy(()->service.disburse(actor,f)).hasMessage("recording.error.topUpChanged");
+        assertThat(status(source)).isEqualTo("DISBURSED");assertThat(service.topUp(actor,loan)).isEmpty();
+        var refreshed=topUpPost(loan);service.disburse(actor,refreshed);assertThat(service.topUp(actor,loan).orElseThrow().cash()).isEqualByComparingTo("600.00");
+        assertThat(service.detail(actor,loan).loan().principal()).isEqualByComparingTo("1500.00");
+        var duplicate=form();duplicate.setTopUpSourceLoanId(source);duplicate.setApplicationDate(TODAY);duplicate.setPrincipal(new BigDecimal("2000.00"));duplicate.setEvidence("Synthetic agreement");
+        assertThatThrownBy(()->service.save(actor,duplicate)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void topUpCorrectionIsIndependentLinkedIdempotentAndRestoresSource(){
+        var source=topUpSource();var loan=recordTopUp(source);service.disburse(actor,topUpPost(loan));var original=service.topUp(actor,loan).orElseThrow();
+        assertThatThrownBy(()->service.reverseTopUp(actor,loan,UUID.randomUUID(),TODAY,"Correct transfer","Synthetic cash return proof")).hasMessage("recording.error.checker");
+        var other=operator("B1");var key=UUID.randomUUID();var reversal=service.reverseTopUp(other,loan,key,TODAY,"Correct transfer","Synthetic cash return proof");
+        assertThat(service.reverseTopUp(other,loan,key,TODAY,"Correct transfer","Synthetic cash return proof").id()).isEqualTo(reversal.id());
+        assertThat(status(source)).isEqualTo("DISBURSED");assertThat(status(loan)).isEqualTo("DISBURSEMENT_REVERSED");
+        assertThat(service.detail(actor,source).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(service.detail(actor,source).loan().futureInterest()).isEqualByComparingTo("20.00");
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isZero();assertThat(service.topUp(actor,loan).orElseThrow().reversedBy()).isEqualTo(reversal.id());
+        assertThat(jdbc.queryForObject("select (financial_snapshot->>'paymentSummaryTotalOutstanding')::numeric from loan_applications where id=?",BigDecimal.class,loan)).isZero();
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,original.journalId(),reversal.journalId())).isZero();
+        var reversals=new Filter("",null,null,"REVERSAL","newest",0,null);
+        assertThat(service.register(actor,"DISBURSEMENT",reversals).rows()).anySatisfy(row->assertThat(row.kind()).isEqualTo("FUNDING_UNDO"));
+        assertThat(service.totals(actor,"DISBURSEMENT",reversals).amount()).isEqualByComparingTo("-480.00");
+    }
+    @Test void concurrentTopUpRetriesPostOnce()throws Exception{
+        var source=topUpSource();var loan=recordTopUp(source);var f=topUpPost(loan);var start=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)){
+            var first=pool.submit(()->{start.await();return service.disburse(actor,f).id();});var second=pool.submit(()->{start.await();return service.disburse(actor,f).id();});start.countDown();
+            assertThat(first.get(60,TimeUnit.SECONDS)).isEqualTo(second.get(60,TimeUnit.SECONDS));
+        }
+        assertThat(jdbc.queryForObject("select count(*) from accountant_loan_topup where loan_id=?",Integer.class,loan)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and kind='SETTLEMENT'",Integer.class,source)).isEqualTo(1);
+    }
+    @Test void topUpClosedPeriodCannotSettleSource(){
+        var source=topUpSource();var loan=recordTopUp(source);var f=topUpPost(loan);
+        jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,'2026-10-01','2026-10-31','CLOSED',?,now())",UUID.randomUUID(),institution,actor.getMemberId());
+        assertThatThrownBy(()->service.disburse(actor,f)).hasMessage("voucher.error.period");assertThat(status(source)).isEqualTo("DISBURSED");assertThat(service.topUp(actor,loan)).isEmpty();
+    }
+    @Test void topUpCorrectionRefusesDependentPaymentsAndAuditFailureRollsEverythingBack(){
+        var source=topUpSource();var loan=recordTopUp(source);var f=topUpPost(loan);var audit=context.getBean(AuditService.class);
+        doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).logEvent(eq("LOAN_REPAYMENT"),any(),eq("LOAN_REPAYMENT_SETTLEMENT"),any(),any(),any(),any(),any(),any(),any(),any());
+        assertThatThrownBy(()->service.disburse(actor,f)).isInstanceOf(IllegalStateException.class);reset(audit);
+        assertThat(status(source)).isEqualTo("DISBURSED");assertThat(service.topUp(actor,loan)).isEmpty();
+        service.disburse(actor,f);
+        // A zero-principal financial adjustment is still a dependency requiring its own resolution.
+        var dependent=form();dependent.setTopUpSourceLoanId(loan);dependent.setApplicationDate(TODAY);dependent.setFirstPaymentDate(null);dependent.setPrincipal(new BigDecimal("2500.00"));dependent.setEvidence("Synthetic dependent signed agreement");service.save(actor,dependent);assertThatThrownBy(()->service.reverseTopUp(operator("B1"),loan,UUID.randomUUID(),TODAY,"Correct transfer","Synthetic proof")).hasMessage("recording.error.topUpDependencies");
+    }
     com.sacco.mvp.accounting.adjustments.service.LoanAdjustmentService adjustments(){return context.getBean(com.sacco.mvp.accounting.adjustments.service.LoanAdjustmentService.class);}
     com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Form adjustment(UUID loan,String kind){
         var f=new com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Form();f.setLoanId(loan);f.setKind(com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Kind.valueOf(kind));f.setDate(TODAY);f.setReason("Synthetic accounting review");f.setEvidence("Synthetic approved policy evidence");return f;

@@ -555,6 +555,12 @@ public class LoanPresentationService {
             putMoney(display, "Estimated Installment", firstNonNull(raw.get("periodicRepaymentAmount"), raw.get("monthlyRepaymentAmount")));
             putMoney(display, "Total Interest", raw.get("interestAmount"));
             putMoney(display, "Total Principal", app.getAmount());
+            if(app.getTopUpSourceLoanId()!=null && raw.containsKey("topUpSourceLoanNumber")) {
+                putValue(display,financialMessage("topUpSource","Existing Loan ID"),raw.get("topUpSourceLoanNumber"));
+                putMoney(display,financialMessage("topUpSettlement","Existing loan settlement estimate"),raw.get("topUpSettlementAmount"));
+                putMoney(display,financialMessage("topUpCash","Cash payable estimate"),raw.get("topUpRequestedAmount"));
+                putValue(display,financialMessage("topUpQuoteDate","Settlement estimate date"),raw.get("topUpQuoteDate"));
+            }
             putMoney(display, "Total Amount", raw.get("principalPlusInterest"));
             putMoney(display, "Estimated Total Repayment", raw.get("principalPlusInterest"));
             return display;
@@ -1730,6 +1736,12 @@ public class LoanPresentationService {
             Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
             putMoney(display, "Total Interest", raw.get("interestAmount"));
             putMoney(display, "Total Principal", app.getAmount());
+            if(app.getTopUpSourceLoanId()!=null && raw.containsKey("topUpSourceLoanNumber")) {
+                putValue(display,financialMessage("topUpSource","Existing Loan ID"),raw.get("topUpSourceLoanNumber"));
+                putMoney(display,financialMessage("topUpSettlement","Existing loan settlement estimate"),raw.get("topUpSettlementAmount"));
+                putMoney(display,financialMessage("topUpCash","Cash payable estimate"),raw.get("topUpRequestedAmount"));
+                putValue(display,financialMessage("topUpQuoteDate","Settlement estimate date"),raw.get("topUpQuoteDate"));
+            }
             Object totalAmount = raw.get("principalPlusInterest");
             if (totalAmount == null) {
                 totalAmount = raw.get("loanPlusInterest");

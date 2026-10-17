@@ -83,6 +83,39 @@ public class LoanRecordingService {
         default->throw new IllegalArgumentException("recording.error.filter");};}
     @Transactional(readOnly=true)
     public Choice filterProduct(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.filter"));}
+    @Transactional(readOnly=true)
+    public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date,UUID excluded){
+        authorize(a,"VIEW");check(date!=null && !date.isAfter(clock.today()),"date");check(records.topUpEnabled(a.getSaccoId()),"topUpDisabled");
+        var quote=records.topUpQuote(a,source,date);check(quote.principal().signum()>0,"topUpUnavailable");check(!records.pendingTopUp(source,excluded),"topUpPending");return quote;
+    }
+    @Transactional(readOnly=true)
+    public Optional<TopUpQuote> disbursementTopUp(AppUserPrincipal a,UUID loan,LocalDate date){
+        accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");records.record(a,loan,false);return records.topUpSource(a,loan).map(id->topUpQuote(a,id,date==null?clock.today():date,loan));
+    }
+    @Transactional(readOnly=true) public Optional<TopUpPosting> topUp(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.record(a,loan,false);return records.topUp(a,loan);}
+    @Transactional(readOnly=true) public Optional<TopUpPosting> sourceTopUp(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.record(a,loan,false);return records.sourceTopUp(a,loan);}
+    @Transactional(readOnly=true) public Optional<TopUpPosting> transactionTopUp(AppUserPrincipal a,UUID transaction){authorize(a,"VIEW");return records.transactionTopUp(a,transaction);}
+    @Transactional(readOnly=true) public Optional<TopUpQuote> recordedTopUpQuote(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.record(a,loan,false);return records.topUpSource(a,loan).map(id->topUpQuote(a,id,clock.today(),loan));}
+    @Transactional
+    public TopUpPosting reverseTopUp(AppUserPrincipal a,UUID loan,UUID key,LocalDate date,String reason,String evidence){
+        authorize(a,"REVERSE");text(reason,500,true);text(evidence,500,true);check(key!=null && date!=null && !date.isAfter(clock.today()),"date");
+        var original=records.topUp(a,loan).orElseThrow(()->new IllegalArgumentException("recording.error.topUpUnavailable"));
+        var f=new PostForm();f.setLoanId(loan);f.setRequestKey(key);f.setEffectiveDate(date);f.setNotes(reason);f.setEvidence(evidence);f.setAmount(original.principal().add(original.interest()).add(original.cash()));
+        String hash=hash(f);records.lockRequest(a,key);var prior=records.topUpRequest(a,key,hash);if(prior.isPresent())return prior.get();
+        records.lockTopUpPair(a,original.sourceId(),loan);original=records.topUp(a,loan).orElseThrow();
+        check(original.reversedBy()==null,"reversal");check(!original.actorId().equals(a.getMemberId()),"checker");check(!date.isBefore(original.date()),"date");
+        long sequence=records.topUpCorrectionSequence(a,original);UUID period=periods.period(a.getSaccoId(),date,a.getMemberId(),clock.now());
+        UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
+        records.topUpJournal(a,id,journal,f,hash,period,original.journalId(),now);
+        UUID transaction=repayments.undoRecordedTopUp(original.sourceId(),original.transactionId(),a,key,id,date,reason);
+        var quote=new TopUpQuote(original.sourceId(),original.sourceNumber(),null,"",date,original.principal(),original.interest(),original.excludedInterest(),sequence);
+        records.insertTopUp(a,id,original.sourceId(),original.id(),transaction,journal,f,hash,quote,original.id(),now);
+        records.lines(a,journal,records.reversedLines(original.journalId()));
+        var replacement=loans.findForDisbursement(loan).orElseThrow();replacement.setStatus(LoanStatus.DISBURSEMENT_REVERSED);replacement.setUpdatedAt(now);loans.saveAndFlush(replacement);
+        repayments.refreshCancelledTopUp(loan,a);
+        records.postJournal(a,journal,now);event(a,id,"LOAN_TOPUP_REVERSED",Map.of("loan",loan,"source",original.sourceId(),"reason",reason));
+        return records.topUpRequest(a,key,hash).orElseThrow();
+    }
     public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule,String tenureUnit,int tenureValue) {}
     public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance) {}
     @Transactional(readOnly=true)
@@ -117,15 +150,23 @@ public class LoanRecordingService {
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
         check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);var now=clock.now();
+        TopUpQuote settlement=null;
+        if(f.getTopUpSourceLoanId()!=null){
+            check(records.lockReceiptLoans(a,List.of(f.getTopUpSourceLoanId()),f.getClientId()).size()==1,"topUpUnavailable");
+            settlement=topUpQuote(a,f.getTopUpSourceLoanId(),f.getApplicationDate(),null);
+            check(settlement.clientId().equals(f.getClientId()),"client");check(f.getPrincipal().compareTo(settlement.total())>0,"topUpCash");
+            text(f.getEvidence(),500,true);
+        }
         var snapshot=new LinkedHashMap<String,Object>();snapshot.put("calculationVersion",LoanAmortizationCalculator.VERSION);snapshot.put("principalAmount",f.getPrincipal());
         snapshot.put("interestRate",product.getInterestRate());snapshot.put("interestMethod",product.getInterestMethod().name());snapshot.put("repaymentFrequency",product.getResolvedRepaymentFrequency().name());
         tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
+        if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()));snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
         long number=numbers.nextFor(a.getSaccoId());
         var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
-            .applicantMemberId(f.getClientId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
+            .applicantMemberId(f.getClientId()).topUpSourceLoanId(f.getTopUpSourceLoanId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
             .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(f))
             .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
@@ -152,6 +193,8 @@ public class LoanRecordingService {
     public Posting disburse(AppUserPrincipal a,PostForm f,List<org.springframework.web.multipart.MultipartFile> files){
         validateFiles(files);
         accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
+        var source=records.topUpSource(a,f.getLoanId());
+        if(source.isPresent())records.lockTopUpPair(a,source.get(),f.getLoanId());
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
@@ -161,15 +204,35 @@ public class LoanRecordingService {
         check(!f.getEffectiveDate().isBefore(((java.sql.Date)record.get("application_date")).toLocalDate()) && first.isAfter(f.getEffectiveDate()),"date");
         UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
         var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,f.getPrincipalAccountId(),"PRINCIPAL");
-        check(f.getInterestAccountId()==null,"account");UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
-        records.journal(a,journal,id,f,hash,period,"DISBURSEMENT",null,now);records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
+        TopUpQuote settlement=source.isPresent()?topUpQuote(a,source.get(),f.getEffectiveDate(),loan.getId()):null;
+        Choice settlementInterest=null;
+        if(settlement!=null){
+            check(loan.getApplicantMemberId().equals(settlement.clientId()),"client");
+            check(f.getSettlementSequence()!=null && f.getSettlementSequence()==settlement.sequence() && f.getSettlementPrincipal()!=null && f.getSettlementInterest()!=null
+                && f.getSettlementPrincipal().compareTo(settlement.principal())==0 && f.getSettlementInterest().compareTo(settlement.interest())==0,"topUpChanged");
+            check(f.getAmount().compareTo(settlement.total())>0,"topUpCash");text(f.getEvidence(),500,true);
+            if(settlement.interest().signum()>0)settlementInterest=records.account(a,f.getInterestAccountId(),"INTEREST");
+        }else check(f.getInterestAccountId()==null,"account");
+        UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
+        if(settlement==null)records.journal(a,journal,id,f,hash,period,"DISBURSEMENT",null,now);
+        else records.topUpJournal(a,id,journal,f,hash,period,null,now);
+        records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
         var schedule=schedules.buildSchedule(loan,f.getEffectiveDate(),first,loan.getRepaymentFrequency(),null,f.getReference(),f.getNotes());
         loan.setFirstRepaymentDate(first);
         loan.setStatus(LoanStatus.DISBURSED);loan.setDisbursementDate(f.getEffectiveDate());loan.setDisbursementReference(f.getReference().strip());loan.setDisbursementNotes(f.getNotes().strip());
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,loan.getAttachmentsJson(),LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF));
         disbursementNumbers.assign(loan,a.getMemberId(),f.getEffectiveDate());
-        loan.setRepaymentScheduleJson(schedule.scheduleJson());loan.setFinalDueDate(schedule.finalDueDate());loan.setUpdatedAt(now);loans.saveAndFlush(loan);repayments.openAtDisbursement(loan);
-        records.lines(a,journal,List.of(new Object[]{principal.id(),f.getAmount(),ZERO},new Object[]{money.id(),ZERO,f.getAmount()}));
+        loan.setRepaymentScheduleJson(schedule.scheduleJson());loan.setFinalDueDate(schedule.finalDueDate());loan.setUpdatedAt(now);loans.saveAndFlush(loan);
+        if(settlement==null){repayments.openAtDisbursement(loan);records.lines(a,journal,List.of(new Object[]{principal.id(),f.getAmount(),ZERO},new Object[]{money.id(),ZERO,f.getAmount()}));}
+        else {
+            repayments.openAtTopUp(loan);
+            UUID transaction=repayments.settleRecordedTopUp(source.get(),a,f.getEffectiveDate(),f.getRequestKey(),id,settlement.sequence(),settlement.principal(),settlement.interest());
+            loans.flush();
+            records.insertTopUp(a,id,source.get(),id,transaction,journal,f,hash,settlement,null,now);
+            var lines=new ArrayList<Object[]>();lines.add(new Object[]{principal.id(),f.getAmount(),ZERO});lines.add(new Object[]{records.principalAccount(source.get()),ZERO,settlement.principal()});
+            lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(settlement.total())});if(settlementInterest!=null)lines.add(new Object[]{settlementInterest.id(),ZERO,settlement.interest()});
+            records.lines(a,journal,lines);
+        }
         records.finish(id,null,f.getAmount(),ZERO,f.getAmount());records.postJournal(a,journal,now);
         reviews.save(ManagerReview.builder().id(UUID.randomUUID()).loanApplicationId(loan.getId()).managerMemberId(a.getMemberId()).reviewStage(ApprovalWorkflowStage.DISBURSEMENT_OFFICER).decision(ManagerDecision.ACCEPT).reasons(f.getNotes()).createdAt(now).build());
         routing.announceRecordedDisbursement(loan,a.getMemberId());
@@ -332,14 +395,14 @@ public class LoanRecordingService {
     public List<Choice> postingAccounts(AppUserPrincipal actor,UUID loan,String category,String search,int page) {
         accounting.requireActor(actor,"DISBURSEMENT_QUEUE_DISBURSE");records.record(actor,loan,false);
         check(allowedTeller(loans.findById(loan).orElseThrow(),actor.getMemberId()),"customTeller");
-        check(Set.of("money","principal").contains(category) && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
+        check(Set.of("money","principal","interest").contains(category) && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
         return records.accounts(actor,category.toUpperCase(Locale.ROOT),search,page);
     }
     @Transactional(readOnly=true)
     public Choice postingAccount(AppUserPrincipal actor,UUID loan,UUID id,String category) {
         accounting.requireActor(actor,"DISBURSEMENT_QUEUE_DISBURSE");records.record(actor,loan,false);
         check(allowedTeller(loans.findById(loan).orElseThrow(),actor.getMemberId()),"customTeller");
-        check(Set.of("MONEY","PRINCIPAL").contains(category),"filter");
+        check(Set.of("MONEY","PRINCIPAL","INTEREST").contains(category),"filter");
         return records.account(actor,id,category,false);
     }
 

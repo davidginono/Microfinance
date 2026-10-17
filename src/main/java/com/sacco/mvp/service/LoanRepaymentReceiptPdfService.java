@@ -39,6 +39,10 @@ public class LoanRepaymentReceiptPdfService {
             .orElseThrow(()->new AccessDeniedException("Forbidden"));
         String institution=institutions.findById(actor.getSaccoId()).map(RegisteredSacco::getSaccoName).orElse("");
         String branch=branches.findBySaccoIdAndStationId(actor.getSaccoId(),loan.getStationId()).map(SaccoStation::getAddressLocation).filter(s->s!=null && !s.isBlank()).orElse(loan.getStationId());
+        if("INTERNAL".equals(r.channel()))return pdf.render(new LoanRecordingPdfService.Document(label("recording.document."+r.kind(),locale),institution,branch,"loan-settlement-"+r.reference()+".pdf",
+            List.of(label("loan.loanId",locale)+": "+r.loanId(),label("recording.client",locale)+": "+client.getFullName(),label("voucher.reference",locale)+": "+r.reference(),
+                label("voucher.date",locale)+": "+r.paymentDate(),label("recording.principal",locale)+": TZS "+money(r.principal(),locale),label("recording.dueInterest",locale)+": TZS "+money(r.interest(),locale),
+                label("recording.topUp.internal",locale),Objects.toString(r.reason(),""))));
         String status=label(r.reversedBy()!=null?"repayment.reversed":"repayment.kind."+r.kind(),locale);
         String date=r.paymentDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu"));
         String reference=label("loan.loanId",locale)+": "+r.loanId()+"\n"+r.channelReference();

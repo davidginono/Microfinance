@@ -12,6 +12,8 @@ public final class LoanRecordingDtos {
     @Data public static class RecordForm {
         private UUID requestKey = UUID.randomUUID();
         private UUID clientId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private UUID topUpSourceLoanId;
         private UUID productId;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate applicationDate;
         private BigDecimal requestedPrincipal;
@@ -47,6 +49,9 @@ public final class LoanRecordingDtos {
         private UUID moneyAccountId;
         private UUID principalAccountId;
         private UUID interestAccountId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private Long settlementSequence;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal settlementPrincipal;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal settlementInterest;
         private String reference = "";
         private String evidence = "";
         private String notes = "";
@@ -55,6 +60,14 @@ public final class LoanRecordingDtos {
         public Choice(UUID id,String label,String purpose){this(id,label,purpose,null);}
     }
     public record ReceiptLoan(UUID id,UUID clientId,String number,String client,String clientNumber,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal outstandingPrincipal,LocalDate disbursed,LocalDate lastPayment,String status) {}
+    public record TopUpQuote(UUID sourceId,String sourceNumber,UUID clientId,String client,LocalDate date,
+        BigDecimal principal,BigDecimal interest,BigDecimal excludedInterest,long sequence) {
+        public BigDecimal total(){return principal.add(interest);}
+        public BigDecimal getTotal(){return total();}
+    }
+    public record TopUpPosting(UUID id,UUID loanId,UUID sourceId,String loanNumber,String sourceNumber,
+        LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal excludedInterest,BigDecimal cash,
+        UUID journalId,UUID transactionId,UUID reversesId,UUID reversedBy,UUID actorId,String evidence,String reason) {}
     public record Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId, UUID productId) {
         public Filter(String search, LocalDate from, LocalDate through, String status, String sort, int page, UUID clientId) {
             this(search, from, through, status, sort, page, clientId, null);
@@ -64,7 +77,13 @@ public final class LoanRecordingDtos {
     public record LoanRow(UUID id, String number, UUID clientId, String client, String clientNumber,
         String product, LocalDate applicationDate, BigDecimal requestedPrincipal, BigDecimal principal,
         String status, BigDecimal outstandingPrincipal, BigDecimal dueInterest, BigDecimal arrears,
-        BigDecimal futureInterest, BigDecimal principalPaid, BigDecimal interestPaid) {}
+        BigDecimal futureInterest, BigDecimal principalPaid, BigDecimal interestPaid, boolean topUpEligible) {
+        public LoanRow(UUID id,String number,UUID clientId,String client,String clientNumber,String product,LocalDate applicationDate,
+            BigDecimal requestedPrincipal,BigDecimal principal,String status,BigDecimal outstandingPrincipal,BigDecimal dueInterest,
+            BigDecimal arrears,BigDecimal futureInterest,BigDecimal principalPaid,BigDecimal interestPaid) {
+            this(id,number,clientId,client,clientNumber,product,applicationDate,requestedPrincipal,principal,status,outstandingPrincipal,dueInterest,arrears,futureInterest,principalPaid,interestPaid,false);
+        }
+    }
     public record Posting(UUID id, UUID loanId, String loanNumber, String client, String clientNumber,
         String kind, LocalDate date, String reference, BigDecimal amount, BigDecimal principal, BigDecimal interest,
         String moneyAccount, String principalAccount, String interestAccount, String evidence, String notes,

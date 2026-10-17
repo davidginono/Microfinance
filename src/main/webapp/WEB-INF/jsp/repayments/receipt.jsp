@@ -5,7 +5,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/loan-repayments.css' />" />
 <article class="repayment-workspace repayment-receipt">
-    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="repayment.receipt" /></h1><p class="repayment-reference"><c:out value="${receipt.reference}" /></p></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${receipt.channel eq 'INTERNAL' ? 'recording.document.'.concat(receipt.kind) : 'repayment.receipt'}" /></h1><p class="repayment-reference"><c:out value="${receipt.reference}" /></p></div>
     <c:if test="${not empty receipt.reversedBy}"><div class="repayment-error" role="status"><spring:message code="repayment.reversed" /> <a href="<c:url value='/repayments/loans/${receipt.loanApplicationId}/receipts/${receipt.reversedBy}' />"><spring:message code="repayment.correction" /></a></div></c:if>
     <dl class="repayment-facts">
         <div><dt><spring:message code="loan.loanId" /></dt><dd><c:out value="${receipt.loanId}" /></dd></div>

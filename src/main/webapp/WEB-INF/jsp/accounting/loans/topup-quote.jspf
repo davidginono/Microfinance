@@ -1,0 +1,14 @@
+<%@ page pageEncoding="UTF-8" %>
+<section class="accounting-section erp-detail-card loan-topup-summary" data-topup-summary data-source="${recordForm.topUpSourceLoanId}" data-error="<spring:message code='recording.error.topUpUnavailable' />" aria-live="polite">
+    <h2><spring:message code="recording.topUp.breakdown" /></h2>
+    <c:if test="${not empty topUpError}"><p role="alert"><spring:message code="${topUpError}" /></p></c:if>
+    <p><spring:message code="recording.topUp.source" />: <a href="<c:url value='/finance/loan-records/${topUpQuote.sourceId}' />"><c:out value="${topUpQuote.sourceNumber}" /></a> · <spring:message code="recording.asOf" /> <span data-topup-date><c:out value="${topUpQuote.date}" /></span></p>
+    <dl class="loan-topup-facts">
+        <div><dt><spring:message code="recording.outstandingPrincipal" /> (TZS)</dt><dd data-topup-principal><fmt:formatNumber value="${topUpQuote.principal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="recording.dueInterest" /> (TZS)</dt><dd data-topup-interest><fmt:formatNumber value="${topUpQuote.interest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="recording.topUp.settlement" /> (TZS)</dt><dd data-topup-total><fmt:formatNumber value="${topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="recording.topUp.excluded" /> (TZS)</dt><dd data-topup-excluded><fmt:formatNumber value="${topUpQuote.excludedInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-topup-cash><c:choose><c:when test="${not empty detail and not empty topUpQuote}"><fmt:formatNumber value="${detail.loan.principal-topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
+    </dl>
+    <p><spring:message code="recording.topUp.explanation" /></p><p data-topup-error role="alert"></p>
+</section>

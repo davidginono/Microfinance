@@ -42,7 +42,7 @@ class RecordedApplicationDisbursementTest {
         var proof=new MockMultipartFile("disbursementProofFile","proof.pdf","application/pdf","%PDF fixture".getBytes());
         var document=new MockMultipartFile("attachments","agreement.pdf","application/pdf","%PDF fixture".getBytes());
         var flash=new RedirectAttributesModelMap();
-        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("1000"),"untrusted-id","D1","Note","123456",proof,key,money,principal,List.of(document),flash)).isEqualTo("redirect:/disbursement/archive?filter=DISBURSED");
+        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("1000"),"untrusted-id","D1","Note","123456",proof,key,money,principal,null,null,null,null,null,false,List.of(document),flash)).isEqualTo("redirect:/disbursement/archive?filter=DISBURSED");
         var order=inOrder(recording,otp);
         order.verify(recording).recordedForStaff(actor,id);
         order.verify(recording).disburse(eq(actor),argThat(f->id.equals(f.getLoanId()) && key.equals(f.getRequestKey()) && money.equals(f.getMoneyAccountId()) && principal.equals(f.getPrincipalAccountId()) && date.equals(f.getEffectiveDate()) && due.equals(f.getFirstPaymentDate()) && f.getAmount().compareTo(new BigDecimal("1000"))==0),argThat(files->files.equals(List.of(proof,document))));
@@ -51,18 +51,27 @@ class RecordedApplicationDisbursementTest {
     }
     @Test void changedAmountCannotPostOrConsumeOtpAndErrorRetainsAccountingFields(){
         var flash=new RedirectAttributesModelMap();
-        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("999"),null,"D1","Note","123456",null,key,money,principal,List.of(),flash)).isEqualTo("redirect:/disbursement/loan-applications/"+id);
+        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("999"),null,"D1","Note","123456",null,key,money,principal,null,null,null,null,null,false,List.of(),flash)).isEqualTo("redirect:/disbursement/loan-applications/"+id);
         verify(recording,never()).disburse(any(),any(),any());verify(otp,never()).consumeOtpById(any());
         assertThat(flash.getFlashAttributes().get("disbursementRequestKey")).isEqualTo(key);
         assertThat(flash.getFlashAttributes().get("postingMoneyAccountId")).isEqualTo(money);
         assertThat(flash.getFlashAttributes().get("postingPrincipalAccountId")).isEqualTo(principal);
         assertThat(flash.getFlashAttributes().get("postingFirstPaymentDate")).isEqualTo(due);
     }
+    @Test void topUpPassesNetCashAndSettlementPreviewWithoutChangingContractualPrincipal(){
+        UUID source=UUID.randomUUID(),interest=UUID.randomUUID();
+        when(manager.get(id,"I1","B1")).thenReturn(LoanApplication.builder().id(id).topUpSourceLoanId(source).amount(new BigDecimal("1000.00")).status(LoanStatus.READY_FOR_DISBURSEMENT).build());
+        var flash=new RedirectAttributesModelMap();
+        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("480.00"),null,"TOPUP","Note","123456",null,key,money,principal,interest,3L,new BigDecimal("500.00"),new BigDecimal("20.00"),"Signed agreement",true,List.of(),flash)).isEqualTo("redirect:/disbursement/archive?filter=DISBURSED");
+        verify(recording).disburse(eq(actor),argThat(f->f.getAmount().compareTo(new BigDecimal("1000.00"))==0 && f.getSettlementPrincipal().compareTo(new BigDecimal("500.00"))==0
+            && f.getSettlementInterest().compareTo(new BigDecimal("20.00"))==0 && f.getSettlementSequence()==3L && interest.equals(f.getInterestAccountId()) && f.getEvidence().equals("Signed agreement")),eq(List.of()));
+        verify(otp).consumeOtpById(token);
+    }
     @Test void disabledApprovalOtpDoesNotRequireOrConsumeAnOtpDuringTellerPosting(){
         reset(otp,members);
         when(otpSettings.requiresApprovalOtp(actor.getMemberId(),"I1","B1")).thenReturn(false);
         var flash=new RedirectAttributesModelMap();
-        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("1000"),null,"D-NO-OTP","Synthetic test",null,null,key,money,principal,List.of(),flash)).isEqualTo("redirect:/disbursement/archive?filter=DISBURSED");
+        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("1000"),null,"D-NO-OTP","Synthetic test",null,null,key,money,principal,null,null,null,null,null,false,List.of(),flash)).isEqualTo("redirect:/disbursement/archive?filter=DISBURSED");
         verify(recording).disburse(eq(actor),any(),eq(List.of()));
         verifyNoInteractions(otp);
     }

@@ -4,3 +4,5 @@
 
 .accounting-create-form[data-loan-form]{min-width:0;max-width:100%}.loan-repayment-terms{margin:24px 0}.loan-repayment-terms>h2,.loan-schedule-preview>h2{margin:0 0 16px;font-size:16px;font-weight:700}.loan-amount-row{margin-top:20px}.loan-schedule-preview{margin:24px 0;min-width:0;max-width:100%}.loan-schedule-preview>p{font-size:13px;margin:0 0 12px;color:#52606d}.loan-schedule-preview[hidden]{display:none!important}.loan-schedule-preview .erp-table{min-width:560px;width:100%}.loan-schedule-preview td{font-variant-numeric:tabular-nums;white-space:nowrap}
 .loan-field-hint{font-size:12px;font-weight:400;color:#52606d;overflow-wrap:anywhere}
+
+.loan-topup-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:16px;margin:16px 0}.loan-topup-facts>div{min-width:0}.loan-topup-facts dt{font-size:12px;color:#545b64}.loan-topup-facts dd{margin:4px 0 0;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}.loan-topup-summary [data-topup-error]:empty{display:none}.loan-topup-summary p{overflow-wrap:anywhere}

@@ -53,6 +53,7 @@
     let timer, controller, version = 0;
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
+      const approvedRate=recordForm.querySelector('[data-approved-rate]');if(approvedRate)approvedRate.hidden=true;
       const custom = mode.value === 'CUSTOM', reducing = custom && method.value === 'REDUCING_BALANCE';
       tenureType.hidden = !custom;
       unit.required = custom;
@@ -92,6 +93,7 @@
           const quote = await response.json();if(current !== version)return;
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
           output.textContent = money(quote.interest);
+          const approvedRate=recordForm.querySelector('[data-approved-rate]');if(approvedRate){approvedRate.hidden=custom;if(!custom)approvedRate.textContent=approvedRate.dataset.label+': '+quote.ratePercent+'% · '+approvedRate.dataset.basis;}
           description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
           if(schedule && quote.schedule?.length){
             rows.replaceChildren(...quote.schedule.map(payment => {

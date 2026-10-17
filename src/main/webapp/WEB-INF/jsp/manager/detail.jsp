@@ -489,7 +489,7 @@
                 <input type="date" name="disbursementDate" value="${postingDisbursementDate ne null ? postingDisbursementDate : app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
                             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.disbursementAmount" text="Disbursement Amount" /> <span class="text-rose-600">*</span></label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="${not empty app.topUpSourceLoanId ? 'recording.topUp.cash' : 'loan.disbursement.disbursementAmount'}" text="Disbursement Amount" /> <span class="text-rose-600">*</span></label>
                 <input type="text"
                        id="depositAmountInput"
                        name="depositAmount" ${recordedLoanApplication ? 'readonly' : ''}
@@ -571,7 +571,7 @@
                             <span class="mt-1 block font-semibold text-slate-900" data-disbursement-fees-amount>${totalDeductions}</span>
             </div>
                         <div>
-                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.disbursementAmount" text="Disbursement Amount" /></span>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="${not empty app.topUpSourceLoanId ? 'recording.topUp.cash' : 'loan.disbursement.disbursementAmount'}" text="Disbursement Amount" /></span>
                             <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : disbursementBaseAmount}" minFractionDigits="0" maxFractionDigits="2" /></span>
             </div>
                 </div>
@@ -769,7 +769,7 @@
             const decimals = parts[1] || "";
             const formattedWhole = new Intl.NumberFormat("en-US", {
                 maximumFractionDigits: 0
-            }).format(Number(whole));
+            }).format(BigInt(whole));
             if (forceDecimals) {
                 const trimmedDecimals = decimals.replace(/0+$/, "");
                 return trimmedDecimals ? formattedWhole + "." + trimmedDecimals : formattedWhole;

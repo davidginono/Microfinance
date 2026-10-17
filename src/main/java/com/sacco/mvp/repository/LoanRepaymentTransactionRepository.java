@@ -14,9 +14,12 @@ public interface LoanRepaymentTransactionRepository extends JpaRepository<LoanRe
         LoanRepaymentTransaction.Channel channel, String reference, LoanRepaymentTransaction.Kind kind);
 
     @Query("""
-        select t from LoanRepaymentTransaction t where t.loanApplicationId = :loanId and t.kind = 'PAYMENT'
+        select t from LoanRepaymentTransaction t where t.loanApplicationId = :loanId and t.kind in ('PAYMENT','SETTLEMENT')
         and not exists (select r.id from LoanRepaymentTransaction r where r.reversesTransactionId = t.id)
         order by t.sequence desc
         """)
     List<LoanRepaymentTransaction> latestUnreversed(@Param("loanId") UUID id, Pageable pageable);
+
+    @Query("select count(t)>0 from LoanRepaymentTransaction t where t.loanApplicationId=:loanId and t.kind='SETTLEMENT' and not exists(select r.id from LoanRepaymentTransaction r where r.reversesTransactionId=t.id)")
+    boolean settledThroughTopUp(@Param("loanId") UUID id);
 }

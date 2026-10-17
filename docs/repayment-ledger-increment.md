@@ -27,7 +27,7 @@
 This is a controlled implementation increment, not a production-readiness or compliance certification.
 
 - Existing loans are not backfilled from snapshots, status flags, or schedules. Opening balances and known historical receipts require a reviewed cutover procedure. Unknown is not zero.
-- Top-up loans do not receive an invented ledger opening. Top-up disbursement cannot mark a ledger-backed source paid; a verified settlement transaction must be implemented first. Legacy top-up handling remains unchanged and is a release gate.
+- Top-up loans do not receive an invented ledger opening. The later [recorded-loan top-up increment](loan-topup-recording.md) opens a replacement ledger only alongside its verified internal settlement and owning GL posting. Borrower and legacy top-up paths retain their safeguards and cutover gates.
 - Only scheduled instalments due on the payment date may be paid. Excess/advance payments and full or partial early settlement are rejected with a clear message; unmatched funds/refunds require a separate approved workflow. Staff must not treat rejection as a receipt for money already received.
 - No new fee/penalty obligations are assessed or collected by this command. Product fees, permitted costs, and their accrual/financing treatment still need approval and accounting work.
 - Receipt entries debit cash/bank/mobile-money **clearing** and credit principal or interest-collections clearing. Disbursement entries debit principal and credit disbursement clearing. These are balanced operational entries, not mapped bank accounts, an interest-accrual model, a general ledger, or channel reconciliation.

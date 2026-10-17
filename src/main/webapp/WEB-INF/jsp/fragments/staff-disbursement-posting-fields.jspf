@@ -1,5 +1,18 @@
 <%@ page pageEncoding="UTF-8" %>
+<link rel="stylesheet" href="<c:url value='/css/loan-recording.css' />" />
 <spring:message code="common.choose" text="Choose" var="chooseLabel" />
+<c:if test="${not empty topUpUnavailable}"><div class="md:col-span-2 loan-error-summary" role="alert"><spring:message code="${topUpUnavailable}" /></div></c:if>
+<c:if test="${not empty topUpQuote}">
+<div class="md:col-span-2 loan-topup-summary" data-topup-summary data-topup-posting data-confirmation="<spring:message code='recording.topUp.confirm' />" data-source-number="${fn:escapeXml(topUpQuote.sourceNumber)}" data-quote-url="<c:url value='/disbursement/loan-applications/${app.id}/top-up-quote' />" data-error="<spring:message code='recording.error.topUpUnavailable' />" aria-live="polite">
+    <h3><spring:message code="recording.topUp.breakdown" /></h3><p><spring:message code="recording.topUp.source" />: <c:out value="${topUpQuote.sourceNumber}" /> · <span data-topup-date><c:out value="${topUpQuote.date}" /></span></p>
+    <dl class="loan-topup-facts"><div><dt><spring:message code="recording.topUp.newPrincipal" /> (TZS)</dt><dd><fmt:formatNumber value="${app.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.outstandingPrincipal" /> (TZS)</dt><dd data-topup-principal></dd></div><div><dt><spring:message code="recording.dueInterest" /> (TZS)</dt><dd data-topup-interest></dd></div><div><dt><spring:message code="recording.topUp.settlement" /> (TZS)</dt><dd data-topup-total></dd></div><div><dt><spring:message code="recording.topUp.excluded" /> (TZS)</dt><dd data-topup-excluded></dd></div><div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-topup-cash></dd></div></dl>
+    <p><spring:message code="recording.topUp.explanation" /></p><p data-topup-error role="alert"></p>
+    <input type="hidden" name="settlementSequence" value="${topUpQuote.sequence}" /><input type="hidden" name="settlementPrincipal" value="${topUpQuote.principal}" /><input type="hidden" name="settlementInterest" value="${topUpQuote.interest}" />
+    <div data-topup-interest-account data-loan-choice data-category="interest" data-choice-url="${pageContext.request.contextPath}/disbursement/loan-applications/${app.id}/posting-accounts/interest" ${topUpQuote.interest==0 ? 'hidden' : ''}><label><spring:message code="recording.interestAccount" /><select name="interestAccountId" class="aws-control" data-choice-select><option value="">${chooseLabel}</option><c:if test="${not empty postingInterestAccount}"><option value="${postingInterestAccount.id}" selected><c:out value="${postingInterestAccount.label}" /></option></c:if></select></label><%@ include file="../accounting/loans/choice-search.jspf" %></div>
+    <label><spring:message code="recording.topUp.agreement" /><input class="aws-control" name="settlementEvidence" maxlength="500" value="${fn:escapeXml(postingSettlementEvidence)}" required /></label>
+    <label><input type="checkbox" name="settlementConfirmed" value="true" required /> <spring:message code="recording.topUp.confirm" /></label>
+</div>
+</c:if>
 <div class="md:col-span-2"><label><spring:message code="recording.paymentReference" />
     <input name="disbursementReference" class="aws-control" required maxlength="100" value="${fn:escapeXml(postingDisbursementReference)}" />
 </label></div>
@@ -14,3 +27,5 @@
 <div class="md:col-span-2"><label><spring:message code="recording.attachments" />
     <span class="attachment-dropzone" data-attachment-dropzone><input type="file" name="attachments" multiple accept=".pdf,.png,.jpg,.jpeg" class="attachment-dropzone-input" data-attachment-input /><span class="attachment-dropzone-main"><span class="attachment-dropzone-copy"><span class="attachment-dropzone-title"><spring:message code="recording.attachments.drop" /></span><span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" /></span></span><span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.chooseOne" text="Choose files" /></span></span></span>
 </label></div>
+
+<script src="<c:url value='/js/loan-topup.js' />" defer></script>
