@@ -5707,17 +5707,23 @@ details.erp-detail-card:not([open]) > summary { margin-bottom: -14px; border-bot
     color: var(--aws-ink);
 }
 
-.erp-page-path__link {
-    color: var(--aws-blue);
+.aws-console .erp-page-path a[href],
+.aws-console .erp-breadcrumb a[href],
+.aws-console nav[aria-label="Breadcrumb"] a[href] {
+    color: var(--aws-blue, #0972d3) !important;
     text-decoration: none;
 }
 
-.erp-page-path__link:hover {
-    color: var(--aws-blue-dark);
+.aws-console .erp-page-path a[href]:is(:hover, :focus-visible),
+.aws-console .erp-breadcrumb a[href]:is(:hover, :focus-visible),
+.aws-console nav[aria-label="Breadcrumb"] a[href]:is(:hover, :focus-visible) {
+    color: var(--aws-blue-dark, #033160) !important;
     text-decoration: underline;
 }
 
-.erp-page-path__link:focus-visible {
+.aws-console .erp-page-path a[href]:focus-visible,
+.aws-console .erp-breadcrumb a[href]:focus-visible,
+.aws-console nav[aria-label="Breadcrumb"] a[href]:focus-visible {
     outline: 2px solid var(--aws-blue);
     outline-offset: 2px;
 }
