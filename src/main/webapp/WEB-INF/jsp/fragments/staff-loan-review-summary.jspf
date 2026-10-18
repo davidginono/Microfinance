@@ -130,6 +130,10 @@
         <c:forEach items="${['topUpSource','topUpSettlement','topUpCash','topUpQuoteDate']}" var="topUpField"><spring:message code="newloan.calculation.${topUpField}" var="topUpFieldLabel" /><div class="loan-hero-inline-fact"><dt class="loan-hero-inline-label"><c:out value="${topUpFieldLabel}" /></dt><dd class="loan-hero-inline-value"><c:out value="${topUpReviewSummary[topUpFieldLabel]}" /></dd></div></c:forEach>
     </dl></div>
     </c:if>
+    <spring:message code="charges.policyReference" var="chargePolicyLabel" />
+    <c:if test="${not empty topUpReviewSummary[chargePolicyLabel]}"><div class="loan-staff-review-financials"><h2 class="loan-staff-review-section-title"><spring:message code="charges.title" /></h2><dl class="loan-staff-review-facts">
+    <c:forEach items="${['policyReference','agreementReference','kind.APPLICATION','kind.PROCESSING','kind.INSURANCE','provider','total','contractTotal','sourceSettlement','deductions']}" var="chargeKey"><spring:message code="charges.${chargeKey}" var="chargeLabel" /><c:if test="${not empty topUpReviewSummary[chargeLabel]}"><div class="loan-hero-inline-fact"><dt class="loan-hero-inline-label"><c:out value="${chargeLabel}" /></dt><dd class="loan-hero-inline-value"><c:out value="${topUpReviewSummary[chargeLabel]}" /></dd></div></c:if></c:forEach>
+    </dl><p><spring:message code="charges.notPaid" /></p></div></c:if>
     <div class="loan-staff-review-progress">
         <%@ include file="loan-application-progress.jspf" %>
     </div>

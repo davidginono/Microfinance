@@ -67,7 +67,7 @@ public class ReceiptBatchService {
         var contexts=loans.receiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).toList(),f.getEffectiveDate());var lines=new ArrayList<PlanLine>();BigDecimal principal=BigDecimal.ZERO,interest=BigDecimal.ZERO;
         for(var row:f.getRows()){
             var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();var previous=staged.getOrDefault(loan.id(),new BigDecimal[]{BigDecimal.ZERO,BigDecimal.ZERO});
-            var duePrincipal=loan.duePrincipal().subtract(previous[0]);var dueInterest=loan.dueInterest().subtract(previous[1]);var outstanding=loan.outstandingPrincipal().subtract(previous[0]);
+            if(loan.charges().signum()>0)throw new IllegalArgumentException("charges.error.batch");var duePrincipal=loan.duePrincipal().subtract(previous[0]);var dueInterest=loan.dueInterest().subtract(previous[1]);var outstanding=loan.outstandingPrincipal().subtract(previous[0]);
             var split=RepaymentAllocationCalculator.allocate(row.getAmount(),duePrincipal,dueInterest,outstanding,policy.allocationOrder());var account=loans.receiptPrincipalAccount(a,loan.id());
             lines.add(new PlanLine(loan.id(),loan.number(),row.getAmount(),outstanding,duePrincipal,dueInterest,split.principal(),split.interest(),split.principalBalance(),account.label()));principal=principal.add(split.principal());interest=interest.add(split.interest());
         }

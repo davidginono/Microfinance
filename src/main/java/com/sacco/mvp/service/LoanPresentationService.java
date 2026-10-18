@@ -158,7 +158,7 @@ public class LoanPresentationService {
         }
         try {
             Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
-            BigDecimal total = readBigDecimal(raw.get("totalDeductions"));
+            BigDecimal total = readBigDecimal(raw.containsKey("recordedCharges")?raw.get("recordedChargeDeductions"):raw.get("totalDeductions"));
             return total == null ? BigDecimal.ZERO.setScale(2) : total.setScale(2, java.math.RoundingMode.HALF_UP);
         } catch (Exception ex) {
             return BigDecimal.ZERO.setScale(2);
@@ -191,6 +191,7 @@ public class LoanPresentationService {
         try {
             Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
             List<Map<String, Object>> rows = new ArrayList<>();
+            if(raw.get("recordedCharges") instanceof Map<?,?> plan && plan.get("terms") instanceof List<?> terms){for(var value:terms)if(value instanceof Map<?,?> t && "DEDUCT".equals(t.get("timing")))addDeductibleFeeRow(rows,message("charges.kind."+t.get("kind")),t.get("amount"));return rows;}
             addDeductibleFeeRow(rows, "Application Fee", raw.get("applicationFee"));
             addDeductibleFeeRow(rows, feeLabelWithRate("Insurance Fee", raw.get("insuranceRate")), raw.get("insuranceFee"));
             addDeductibleFeeRow(rows, feeLabelWithRate("Loan Processing Fee", raw.get("processingFeeRate")), raw.get("processingFee"));
@@ -234,6 +235,7 @@ public class LoanPresentationService {
             addFinancialRow(fees, feeLabelWithRate("Insurance Fee", raw.get("insuranceRate")), raw.get("insuranceFee"));
             addFinancialRow(fees, feeLabelWithRate("Loan Processing Fee", raw.get("processingFeeRate")), raw.get("processingFee"));
             addFinancialRow(fees, "Total Fees (TZS)", raw.get("totalDeductions"));
+            if(raw.containsKey("recordedCharges")){fees.clear();putFrozenCharges(fees,raw);}
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
             if (isTopUpSnapshot(raw)) {
                 addFinancialRow(calculations, "Existing Loan Settlement (TZS)", raw.get("topUpSettlementAmount"));
@@ -555,6 +557,7 @@ public class LoanPresentationService {
             putMoney(display, "Estimated Installment", firstNonNull(raw.get("periodicRepaymentAmount"), raw.get("monthlyRepaymentAmount")));
             putMoney(display, "Total Interest", raw.get("interestAmount"));
             putMoney(display, "Total Principal", app.getAmount());
+            putFrozenCharges(display,raw);
             if(app.getTopUpSourceLoanId()!=null && raw.containsKey("topUpSourceLoanNumber")) {
                 putValue(display,financialMessage("topUpSource","Existing Loan ID"),raw.get("topUpSourceLoanNumber"));
                 putMoney(display,financialMessage("topUpSettlement","Existing loan settlement estimate"),raw.get("topUpSettlementAmount"));
@@ -822,6 +825,19 @@ public class LoanPresentationService {
             case "Paid" -> message("loan.status.PAID");
             default -> label;
         };
+    }
+
+    private void putFrozenCharges(Map<String,Object> display,Map<String,Object> raw){
+        if(!(raw.get("recordedCharges") instanceof Map<?,?> plan) || !(plan.get("terms") instanceof List<?> terms) || terms.isEmpty())return;
+        putValue(display,message("charges.policyReference"),plan.get("policyReference"));putValue(display,message("charges.agreementReference"),plan.get("agreementReference"));
+        for(var value:terms)if(value instanceof Map<?,?> t){
+            BigDecimal basis=readBigDecimal(t.get("basisValue"));String basisText=basis==null?"":("PRINCIPAL_RATE".equals(t.get("basis"))?basis.movePointRight(2).stripTrailingZeros().toPlainString()+"%":"TZS "+formatMoney(basis));
+            putValue(display,message("charges.kind."+t.get("kind")),message("charges.basis."+t.get("basis"))+" "+basisText+" / TZS "+formatMoney(readBigDecimal(t.get("amount")))+" / "+message("charges.timing."+t.get("timing")));
+            if(t.get("evidence")!=null && !t.get("evidence").toString().isBlank())putValue(display,message("charges.supportingEvidence")+" / "+message("charges.kind."+t.get("kind")),t.get("evidence"));
+            if(t.get("provider")!=null && !t.get("provider").toString().isBlank())putValue(display,message("charges.provider"),t.get("provider")+" / "+t.get("verification"));
+        }
+        putMoney(display,message("charges.total"),raw.get("recordedChargeTotal"));putMoney(display,message("charges.contractTotal"),raw.get("recordedTotalPayable"));putMoney(display,message("recording.topUp.cash"),raw.get("recordedNetCashEstimate"));if(raw.containsKey("topUpSettlementCharges"))putMoney(display,message("charges.sourceSettlement"),raw.get("topUpSettlementCharges"));putMoney(display,message("charges.deductions"),raw.get("recordedChargeDeductions"));
+        putValue(display,message("charges.notPaid"),"--");
     }
 
     private String message(String code) {
@@ -1736,6 +1752,7 @@ public class LoanPresentationService {
             Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
             putMoney(display, "Total Interest", raw.get("interestAmount"));
             putMoney(display, "Total Principal", app.getAmount());
+            putFrozenCharges(display,raw);
             if(app.getTopUpSourceLoanId()!=null && raw.containsKey("topUpSourceLoanNumber")) {
                 putValue(display,financialMessage("topUpSource","Existing Loan ID"),raw.get("topUpSourceLoanNumber"));
                 putMoney(display,financialMessage("topUpSettlement","Existing loan settlement estimate"),raw.get("topUpSettlementAmount"));

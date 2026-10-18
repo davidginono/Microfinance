@@ -22,6 +22,7 @@ public class LoanAdjustmentService {
     private final VoucherRepository periods;
     private final ApplicationClock clock;
     private final AuditService audit;
+    private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal a,String action){accounting.requireActor(a,"LOAN_ADJUSTMENTS_"+action);}
     @Transactional(readOnly=true) public Request view(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return adjustments.find(a,id);}
@@ -52,6 +53,7 @@ public class LoanAdjustmentService {
                 amount=c.writtenOff();debit=c.principalAccount();credit=c.allowanceAccount();allowanceChange=amount;principalChange=amount;reverses=c.writeOffJournal();
             }
             case DISBURSEMENT_REVERSAL -> {
+                charges.checkFundingCorrection(a,c.id());
                 active(c);check(c.sequence()==1 && c.outstanding().compareTo(c.principal())==0,"repayments");
                 check(c.allowance().signum()==0 && c.writtenOff().signum()==0,"allowanceFirst");
                 amount=c.principal();debit=c.moneyAccount();credit=c.principalAccount();principalChange=amount.negate();reverses=c.disbursementJournal();
@@ -74,7 +76,10 @@ public class LoanAdjustmentService {
             if(q.kind()==Kind.WRITE_BACK)check(!Objects.equals(c.writeOffPostedBy(),a.getMemberId()),"independent");
             var now=clock.now();UUID period=periods.period(a.getSaccoId(),q.date(),a.getMemberId(),now),journal=UUID.randomUUID();
             adjustments.decide(a,id,key,true,q.date(),reason.strip(),journal,now);
-            adjustments.post(a,q,key,journal,period,now);
+            if(q.kind()==Kind.DISBURSEMENT_REVERSAL && !charges.frozen(a,c.id()).terms().isEmpty()){
+                charges.checkFundingCorrection(a,c.id());adjustments.beginPosting(a,q,key,journal,period,now);
+                var lines=charges.correctFunding(a,c.id(),q.reversesJournalId(),journal,key,q.date(),q.evidence(),q.reason());adjustments.postingLines(a,q,journal,lines);adjustments.finishPosting(journal,now);
+            }else adjustments.post(a,q,key,journal,period,now);
             switch(q.kind()){case WRITE_OFF->adjustments.status(c.id(),"WRITTEN_OFF",clock.now());case WRITE_BACK->adjustments.status(c.id(),"DEFAULTED",clock.now());case DISBURSEMENT_REVERSAL->adjustments.status(c.id(),"DISBURSEMENT_REVERSED",clock.now());default->{}}
         }else adjustments.decide(a,id,key,false,q.date(),reason.strip(),null,clock.now());
         event(a,id,approve?"LOAN_ADJUSTMENT_APPROVED":"LOAN_ADJUSTMENT_REJECTED",Map.of("loan",c.id(),"kind",q.kind().name()));return id;

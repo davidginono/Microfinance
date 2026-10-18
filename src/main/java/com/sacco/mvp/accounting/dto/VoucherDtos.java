@@ -43,7 +43,11 @@ public final class VoucherDtos {
     public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows) {}
     public record LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,
                                  BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,
-                                 String moneyAccount,String principalAccount,String interestAccount,String reference) {}
+                                 String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount) {
+        public LoanReceiptRow(int line,UUID posting,UUID loan,String number,String description,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,String money,String principalAccount,String interestAccount,String reference){this(line,posting,loan,number,description,amount,principal,interest,balance,money,principalAccount,interestAccount,reference,"");}
+        public BigDecimal charges(){return amount.subtract(principal).subtract(interest);}
+        public BigDecimal getCharges(){return charges();}
+    }
     public static class Invalid extends IllegalArgumentException {
         private final String field;
         public Invalid(String field,String code){super("voucher.error."+code);this.field=field;}

@@ -17,7 +17,7 @@
         <dl class="erp-detail-facts">
             <div><dt><spring:message code="recording.outstandingPrincipal" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.principal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
             <div><dt><spring:message code="recording.dueInterest" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.interest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
-            <div><dt><spring:message code="recording.arrears" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.arrears}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+            <div><dt><spring:message code="charges.outstanding" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.charges}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.arrears" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.arrears}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
             <div><dt><spring:message code="recording.futureInterest" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.futureInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         </dl>
         </div>
@@ -28,12 +28,12 @@
             <table class="erp-table">
                 <thead><tr>
                     <th scope="col"><spring:message code="recording.loan" /></th><th scope="col"><spring:message code="recording.product" /></th><th scope="col"><spring:message code="voucher.status" /></th>
-                    <th scope="col"><spring:message code="recording.outstandingPrincipal" /></th><th scope="col"><spring:message code="recording.dueInterest" /></th><th scope="col"><spring:message code="recording.arrears" /></th>
+                    <th scope="col"><spring:message code="recording.outstandingPrincipal" /></th><th scope="col"><spring:message code="recording.dueInterest" /></th><th scope="col"><spring:message code="charges.outstanding" /></th><th scope="col"><spring:message code="recording.arrears" /></th>
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${statement.page.rows}" var="l"><tr>
                         <td><a href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><spring:message code="recording.status.${l.status}" /></td>
-                        <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.00;(#,##0.00)" /></td>
+                        <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.charges}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.00;(#,##0.00)" /></td>
                     </tr></c:forEach>
                 </tbody>
             </table>

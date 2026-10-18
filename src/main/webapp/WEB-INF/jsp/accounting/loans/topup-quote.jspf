@@ -6,9 +6,9 @@
     <dl class="loan-topup-facts">
         <div><dt><spring:message code="recording.outstandingPrincipal" /> (TZS)</dt><dd data-topup-principal><fmt:formatNumber value="${topUpQuote.principal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="recording.dueInterest" /> (TZS)</dt><dd data-topup-interest><fmt:formatNumber value="${topUpQuote.interest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
-        <div><dt><spring:message code="recording.topUp.settlement" /> (TZS)</dt><dd data-topup-total><fmt:formatNumber value="${topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="charges.sourceSettlement" /> (TZS)</dt><dd data-topup-charges><fmt:formatNumber value="${topUpQuote.charges}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.topUp.settlement" /> (TZS)</dt><dd data-topup-total><fmt:formatNumber value="${topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="recording.topUp.excluded" /> (TZS)</dt><dd data-topup-excluded><fmt:formatNumber value="${topUpQuote.excludedInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
-        <div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-topup-cash><c:choose><c:when test="${not empty detail and not empty topUpQuote}"><fmt:formatNumber value="${detail.loan.principal-topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
+        <div><dt><spring:message code="charges.cashBeforeDeductions" /> (TZS)</dt><dd data-topup-cash><c:choose><c:when test="${not empty detail and not empty topUpQuote}"><fmt:formatNumber value="${detail.loan.principal-topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
     </dl>
     <p><spring:message code="recording.topUp.explanation" /></p><p data-topup-error role="alert"></p>
 </section>

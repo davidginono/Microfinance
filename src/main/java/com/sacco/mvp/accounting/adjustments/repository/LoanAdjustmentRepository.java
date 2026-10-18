@@ -64,15 +64,18 @@ public class LoanAdjustmentRepository {
         """,id,c.id(),a.getSaccoId(),a.getStationId(),f.getRequestKey(),hash,f.getKind().name(),f.getDate(),amount,allowanceChange,principalChange,debit,credit,c.outstanding(),c.allowance(),c.writtenOff(),c.sequence(),c.lastAdjustment(),f.getReason().strip(),f.getEvidence().strip(),a.getMemberId(),now,reverses);}
     public void decide(AppUserPrincipal a,UUID id,UUID key,boolean approve,LocalDate date,String reason,UUID journal,OffsetDateTime now){jdbc.update("insert into loan_adjustment_decision(request_id,sacco_id,station_id,decision,actor_id,request_key,effective_date,reason,journal_id,recorded_at) values(?,?,?,?,?,?,?,?,?,?)",id,a.getSaccoId(),a.getStationId(),approve?"APPROVED":"REJECTED",a.getMemberId(),key,date,reason,journal,now);}
     public UUID post(AppUserPrincipal a,Request q,UUID key,UUID journal,UUID period,OffsetDateTime now){
+        beginPosting(a,q,key,journal,period,now);
+        postingLines(a,q,journal,null);finishPosting(journal,now);return journal;
+    }
+    public void beginPosting(AppUserPrincipal a,Request q,UUID key,UUID journal,UUID period,OffsetDateTime now){
         jdbc.update("""
             insert into gl_journal(id,sacco_id,station_id,policy_version,period_id,source_type,source_reference,request_key,payload_hash,currency,state,evidence_reference,reason,effective_date,maker_id,recorded_at,reverses_id,direct_post)
             select ?,sacco_id,station_id,1,?,'LOAN_ADJUSTMENT',id::text,?,payload_hash,'TZS','DRAFT',evidence,reason,effective_date,?,?,reverses_journal_id,true from loan_adjustment_request where id=?
             """,journal,period,key,a.getMemberId(),now,q.id());
-        jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,0),(?,?,?,?,?,0,?)",UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),q.debitId(),q.amount(),UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),q.creditId(),q.amount());
         jdbc.update("insert into accounting_outbox(id,journal_id,sacco_id,station_id,event_type,created_at) values(?,?,?,?,'LOAN_ADJUSTMENT_POSTED',?)",UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),now);
-        jdbc.update("update gl_journal set state='POSTED',posted_at=? where id=?",now,journal);
-        return journal;
     }
+    public void postingLines(AppUserPrincipal a,Request q,UUID journal,List<Object[]> reversal){if(reversal==null){jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,0),(?,?,?,?,?,0,?)",UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),q.debitId(),q.amount(),UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),q.creditId(),q.amount());}else for(var line:reversal)jdbc.update("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,?)",UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),line[0],line[1],line[2]);}
+    public void finishPosting(UUID journal,OffsetDateTime now){jdbc.update("update gl_journal set state='POSTED',posted_at=? where id=?",now,journal);}
     public void status(UUID loan,String status,OffsetDateTime now){jdbc.update("""
         update loan_applications set status=?,updated_at=?,version=version+1,financial_snapshot=case when ?='DISBURSEMENT_REVERSED'
         then financial_snapshot::jsonb||'{"paymentSummaryOutstandingPrincipal":0,"paymentSummaryOutstandingInterest":0,"paymentSummaryTotalOutstanding":0,"ledgerFutureScheduledInterest":0}'::jsonb

@@ -18,7 +18,7 @@ public class LoanPostingAuthorizationRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             select exists(select 1 from accountant_loan_post p join accountant_loan_record r on r.loan_id=p.loan_id
             where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.actor_id=? and p.request_key=? and p.kind=?
-            and p.reference=? and p.amount=? and p.effective_date=? and p.state='POSTING')
+            and p.reference=? and p.amount-coalesce((select sum(amount) from loan_charge_event where posting_id=p.id and kind='COLLECT'),0)=? and p.effective_date=? and p.state='POSTING')
             """,Boolean.class,loan,actor.getSaccoId(),actor.getStationId(),actor.getMemberId(),key,kind,reference,amount,date));
     }
     public boolean recordedReversal(UUID loan, AppUserPrincipal actor, UUID key, LocalDate date, UUID original) {

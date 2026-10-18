@@ -7,6 +7,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
+<spring:message code="charges.policyReference" var="chargePolicyLabel" /><c:if test="${not empty financialFields[chargePolicyLabel]}"><a class="app-btn btn-neutral" href="<c:url value='/app/loan-applications/${app.id}/charges' />"><spring:message code="charges.title" /></a></c:if>
 <c:set var="showTopUpAction" value="${canRequestTopUp}" />
 <c:if test="${showTopUpAction}">
     <c:url value="/app/loan-applications/new" var="topUpLoanUrl">

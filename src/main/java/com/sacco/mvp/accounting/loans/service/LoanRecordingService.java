@@ -39,6 +39,7 @@ public class LoanRecordingService {
     private final LoanProductBoardReviewerRepository productReviewers;
     private final ManagerReviewRepository reviews;
     private final com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicies;
+    private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -65,7 +66,7 @@ public class LoanRecordingService {
         for(var row:f.getRows()){var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();
             check(loan.clientId().equals(f.getClientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
             check(loan.disbursed()!=null && !f.getEffectiveDate().isBefore(loan.disbursed()) && (loan.lastPayment()==null || !f.getEffectiveDate().isBefore(loan.lastPayment())),"date");
-            check(row.getAmount().compareTo(loan.duePrincipal().add(loan.dueInterest()))<=0,"advance");var split=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(row.getAmount(),loan.duePrincipal(),loan.dueInterest(),loan.outstandingPrincipal(),policy.allocationOrder());result.add(new AllocationPreview(split.principal(),split.interest(),split.principalBalance()));
+            result.add(chargeAllocation(row.getAmount(),loan.duePrincipal(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
         }
         if(result.stream().anyMatch(p->p.interest().signum()>0))records.account(a,policy.id()==null?f.getInterestAccountId():policy.interestAccountId(),"INTEREST",false);return result;
     }
@@ -86,7 +87,7 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date,UUID excluded){
         authorize(a,"VIEW");check(date!=null && !date.isAfter(clock.today()),"date");check(records.topUpEnabled(a.getSaccoId()),"topUpDisabled");
-        var quote=records.topUpQuote(a,source,date);check(quote.principal().signum()>0,"topUpUnavailable");check(!records.pendingTopUp(source,excluded),"topUpPending");return quote;
+        var quote=records.topUpQuote(a,source,date);check(quote.principal().signum()>0,"topUpUnavailable");check(!records.pendingTopUp(source,excluded),"topUpPending");var b=charges.balance(a,source,LocalDate.MAX);check(b.lastDate()==null || !b.lastDate().isAfter(date),"date");return new TopUpQuote(quote.sourceId(),quote.sourceNumber(),quote.clientId(),quote.client(),date,quote.principal(),quote.interest(),quote.excludedInterest(),quote.sequence(),b.outstanding(),b.sequence());
     }
     @Transactional(readOnly=true)
     public Optional<TopUpQuote> disbursementTopUp(AppUserPrincipal a,UUID loan,LocalDate date){
@@ -100,16 +101,18 @@ public class LoanRecordingService {
     public TopUpPosting reverseTopUp(AppUserPrincipal a,UUID loan,UUID key,LocalDate date,String reason,String evidence){
         authorize(a,"REVERSE");text(reason,500,true);text(evidence,500,true);check(key!=null && date!=null && !date.isAfter(clock.today()),"date");
         var original=records.topUp(a,loan).orElseThrow(()->new IllegalArgumentException("recording.error.topUpUnavailable"));
-        var f=new PostForm();f.setLoanId(loan);f.setRequestKey(key);f.setEffectiveDate(date);f.setNotes(reason);f.setEvidence(evidence);f.setAmount(original.principal().add(original.interest()).add(original.cash()));
+        var f=new PostForm();f.setLoanId(loan);f.setRequestKey(key);f.setEffectiveDate(date);f.setNotes(reason);f.setEvidence(evidence);f.setAmount(original.principal().add(original.interest()).add(original.cash()).add(original.sourceCharges()).add(original.newDeductions()));
         String hash=hash(f);records.lockRequest(a,key);var prior=records.topUpRequest(a,key,hash);if(prior.isPresent())return prior.get();
         records.lockTopUpPair(a,original.sourceId(),loan);original=records.topUp(a,loan).orElseThrow();
         check(original.reversedBy()==null,"reversal");check(!original.actorId().equals(a.getMemberId()),"checker");check(!date.isBefore(original.date()),"date");
         long sequence=records.topUpCorrectionSequence(a,original);UUID period=periods.period(a.getSaccoId(),date,a.getMemberId(),clock.now());
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
         records.topUpJournal(a,id,journal,f,hash,period,original.journalId(),now);
+        charges.undoCollections(a,original.journalId(),journal,original.id(),date,evidence,reason);
+        charges.reverseAssessmentsForFunding(a,loan,key,date,evidence,reason);
         UUID transaction=repayments.undoRecordedTopUp(original.sourceId(),original.transactionId(),a,key,id,date,reason);
-        var quote=new TopUpQuote(original.sourceId(),original.sourceNumber(),null,"",date,original.principal(),original.interest(),original.excludedInterest(),sequence);
-        records.insertTopUp(a,id,original.sourceId(),original.id(),transaction,journal,f,hash,quote,original.id(),now);
+        var quote=new TopUpQuote(original.sourceId(),original.sourceNumber(),null,"",date,original.principal(),original.interest(),original.excludedInterest(),sequence,original.sourceCharges(),0);
+        records.insertTopUp(a,id,original.sourceId(),original.id(),transaction,journal,f,hash,quote,original.id(),now,original.newDeductions());
         records.lines(a,journal,records.reversedLines(original.journalId()));
         var replacement=loans.findForDisbursement(loan).orElseThrow();replacement.setStatus(LoanStatus.DISBURSEMENT_REVERSED);replacement.setUpdatedAt(now);loans.saveAndFlush(replacement);
         repayments.refreshCancelledTopUp(loan,a);
@@ -117,7 +120,16 @@ public class LoanRecordingService {
         return records.topUpRequest(a,key,hash).orElseThrow();
     }
     public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule,String tenureUnit,int tenureValue) {}
-    public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance) {}
+    public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges) {
+        public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance){this(principal,interest,balance,ZERO);}
+    }
+    private AllocationPreview chargeAllocation(BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,BigDecimal fees){
+        if(amount.compareTo(principal.add(interest).add(fees))>0)throw new IllegalArgumentException("repayment.error.advance");var i=amount.min(interest);var fee=amount.subtract(i).min(fees);var p=amount.subtract(i).subtract(fee);return new AllocationPreview(p,i,balance.subtract(p),fee);
+    }
+    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan chargeQuote(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");return charges.quote(a,f,product(a,f),false);}
+    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary chargeSummary(AppUserPrincipal a,UUID loan,int page){authorize(a,"VIEW");records.record(a,loan,false);return charges.summary(a,loan,page);}
+    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary fundingCharges(AppUserPrincipal a,UUID loan){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");return charges.summary(a,loan,0);}
+    @Transactional(readOnly=true) public BigDecimal fundingCash(AppUserPrincipal a,UUID id,LocalDate date){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");var loan=records.loan(a,id,clock.today());var source=disbursementTopUp(a,id,date);return loan.principal().subtract(source.map(TopUpQuote::total).orElse(ZERO)).subtract(charges.frozen(a,id).deductions());}
     @Transactional(readOnly=true)
     public AllocationPreview postingPreview(AppUserPrincipal a,PostForm f,String kind){
         authorize(a,kind.equals("DISBURSEMENT")?"DISBURSE":"POST");validatePost(f);records.record(a,f.getLoanId(),false);
@@ -126,8 +138,7 @@ public class LoanRecordingService {
         if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.RECORDED,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
         check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
-        check(f.getAmount().compareTo(balance.duePrincipal().add(balance.dueInterest()))<=0,"advance");
-        var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);var split=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),policy.allocationOrder());if(split.interest().signum()>0)records.account(a,policy.id()==null?f.getInterestAccountId():policy.interestAccountId(),"INTEREST",false);return new AllocationPreview(split.principal(),split.interest(),split.principalBalance());
+        var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);var split=chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());if(split.interest().signum()>0)records.account(a,policy.id()==null?f.getInterestAccountId():policy.interestAccountId(),"INTEREST",false);return split;
     }
     @Transactional(readOnly=true)
     public Quote interestQuote(AppUserPrincipal a,RecordForm f){
@@ -149,12 +160,12 @@ public class LoanRecordingService {
     public UUID save(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files){
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
-        check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);var now=clock.now();
+        check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);var chargePlan=charges.quote(a,f,product,true);var now=clock.now();
         TopUpQuote settlement=null;
         if(f.getTopUpSourceLoanId()!=null){
             check(records.lockReceiptLoans(a,List.of(f.getTopUpSourceLoanId()),f.getClientId()).size()==1,"topUpUnavailable");
             settlement=topUpQuote(a,f.getTopUpSourceLoanId(),f.getApplicationDate(),null);
-            check(settlement.clientId().equals(f.getClientId()),"client");check(f.getPrincipal().compareTo(settlement.total())>0,"topUpCash");
+            check(settlement.clientId().equals(f.getClientId()),"client");check(f.getPrincipal().subtract(chargePlan.deductions()).compareTo(settlement.total())>0,"topUpCash");
             text(f.getEvidence(),500,true);
         }
         var snapshot=new LinkedHashMap<String,Object>();snapshot.put("calculationVersion",LoanAmortizationCalculator.VERSION);snapshot.put("principalAmount",f.getPrincipal());
@@ -162,8 +173,9 @@ public class LoanRecordingService {
         tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
-        if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()));snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
+        if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
+        snapshot.put("recordedCharges",chargePlan);snapshot.put("recordedChargeTotal",chargePlan.total());snapshot.put("recordedChargeDeductions",chargePlan.deductions());snapshot.put("recordedNetCashEstimate",f.getPrincipal().subtract(settlement==null?ZERO:settlement.total()).subtract(chargePlan.deductions()));snapshot.put("recordedTotalPayable",f.getPrincipal().add(calculation.totalInterest()).add(chargePlan.total()));policy.put("recordedChargePolicy",Objects.toString(chargePlan.policyId(),""));
         long number=numbers.nextFor(a.getSaccoId());
         var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).topUpSourceLoanId(f.getTopUpSourceLoanId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
@@ -173,6 +185,7 @@ public class LoanRecordingService {
             .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,null));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
+        charges.freeze(a,id,chargePlan);
         routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);
         event(a,id,"LOAN_APPLICATION_RECORDED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
     }
@@ -203,6 +216,8 @@ public class LoanRecordingService {
         check(first!=null,"date");
         check(!f.getEffectiveDate().isBefore(((java.sql.Date)record.get("application_date")).toLocalDate()) && first.isAfter(f.getEffectiveDate()),"date");
         UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
+        var chargePlan=charges.frozen(a,loan.getId());charges.assessAtFunding(a,loan.getId(),f.getEffectiveDate(),f.getEvidence());
+        BigDecimal deductions=chargePlan.deductions();
         var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,f.getPrincipalAccountId(),"PRINCIPAL");
         TopUpQuote settlement=source.isPresent()?topUpQuote(a,source.get(),f.getEffectiveDate(),loan.getId()):null;
         Choice settlementInterest=null;
@@ -210,11 +225,13 @@ public class LoanRecordingService {
             check(loan.getApplicantMemberId().equals(settlement.clientId()),"client");
             check(f.getSettlementSequence()!=null && f.getSettlementSequence()==settlement.sequence() && f.getSettlementPrincipal()!=null && f.getSettlementInterest()!=null
                 && f.getSettlementPrincipal().compareTo(settlement.principal())==0 && f.getSettlementInterest().compareTo(settlement.interest())==0,"topUpChanged");
-            check(f.getAmount().compareTo(settlement.total())>0,"topUpCash");text(f.getEvidence(),500,true);
+            check((settlement.charges().signum()==0 && f.getSettlementCharges()==null || f.getSettlementCharges()!=null && f.getSettlementCharges().compareTo(settlement.charges())==0)
+                && (settlement.chargeSequence()==0 && f.getSettlementChargeSequence()==null || f.getSettlementChargeSequence()!=null && f.getSettlementChargeSequence()==settlement.chargeSequence()),"topUpChanged");
+            check(f.getAmount().subtract(deductions).compareTo(settlement.total())>0,"topUpCash");text(f.getEvidence(),500,true);
             if(settlement.interest().signum()>0)settlementInterest=records.account(a,f.getInterestAccountId(),"INTEREST");
         }else check(f.getInterestAccountId()==null,"account");
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
-        if(settlement==null)records.journal(a,journal,id,f,hash,period,"DISBURSEMENT",null,now);
+        if(settlement==null)records.journal(a,journal,id,f,hash,period,deductions.signum()>0?"LOAN_CHARGE_FUNDING":"DISBURSEMENT",null,now);
         else records.topUpJournal(a,id,journal,f,hash,period,null,now);
         records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
         var schedule=schedules.buildSchedule(loan,f.getEffectiveDate(),first,loan.getRepaymentFrequency(),null,f.getReference(),f.getNotes());
@@ -223,14 +240,16 @@ public class LoanRecordingService {
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,loan.getAttachmentsJson(),LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF));
         disbursementNumbers.assign(loan,a.getMemberId(),f.getEffectiveDate());
         loan.setRepaymentScheduleJson(schedule.scheduleJson());loan.setFinalDueDate(schedule.finalDueDate());loan.setUpdatedAt(now);loans.saveAndFlush(loan);
-        if(settlement==null){repayments.openAtDisbursement(loan);records.lines(a,journal,List.of(new Object[]{principal.id(),f.getAmount(),ZERO},new Object[]{money.id(),ZERO,f.getAmount()}));}
+        if(settlement==null){repayments.openAtDisbursement(loan);var lines=new ArrayList<Object[]>();lines.add(new Object[]{principal.id(),f.getAmount(),ZERO});check(f.getAmount().compareTo(deductions)>0,"disbursementAmount");lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(deductions)});lines.addAll(charges.collect(a,loan.getId(),"DEDUCT",deductions,f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes()));records.lines(a,journal,lines);}
         else {
             repayments.openAtTopUp(loan);
             UUID transaction=repayments.settleRecordedTopUp(source.get(),a,f.getEffectiveDate(),f.getRequestKey(),id,settlement.sequence(),settlement.principal(),settlement.interest());
             loans.flush();
-            records.insertTopUp(a,id,source.get(),id,transaction,journal,f,hash,settlement,null,now);
+            records.insertTopUp(a,id,source.get(),id,transaction,journal,f,hash,settlement,null,now,deductions);
             var lines=new ArrayList<Object[]>();lines.add(new Object[]{principal.id(),f.getAmount(),ZERO});lines.add(new Object[]{records.principalAccount(source.get()),ZERO,settlement.principal()});
-            lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(settlement.total())});if(settlementInterest!=null)lines.add(new Object[]{settlementInterest.id(),ZERO,settlement.interest()});
+            lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(settlement.total()).subtract(deductions)});if(settlementInterest!=null)lines.add(new Object[]{settlementInterest.id(),ZERO,settlement.interest()});
+            lines.addAll(charges.collect(a,source.get(),"SETTLE",settlement.charges(),f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes()));
+            lines.addAll(charges.collect(a,loan.getId(),"DEDUCT",deductions,f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes()));
             records.lines(a,journal,lines);
         }
         records.finish(id,null,f.getAmount(),ZERO,f.getAmount());records.postJournal(a,journal,now);
@@ -245,13 +264,18 @@ public class LoanRecordingService {
         UUID principalId=records.principalAccount(f.getLoanId());check(f.getPrincipalAccountId()==null || principalId.equals(f.getPrincipalAccountId()),"account");
         var principal=records.account(a,principalId,"PRINCIPAL");var money=records.account(a,f.getMoneyAccountId(),"MONEY");
         var interest=f.getInterestAccountId()==null?null:records.account(a,f.getInterestAccountId(),"INTEREST");
-        UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();records.journal(a,journal,id,f,hash,period,"PAYMENT",null,now);
+        var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());var feeBalance=charges.balance(a,f.getLoanId(),LocalDate.MAX);
+        check(feeBalance.lastDate()==null || !f.getEffectiveDate().isBefore(feeBalance.lastDate()),"date");
+        var allocation=chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),feeBalance.outstanding());
+        UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();records.journal(a,journal,id,f,hash,period,allocation.charges().signum()>0?"LOAN_CHARGE_RECEIPT":"PAYMENT",null,now);
         records.ticket(a,id,"PAYMENT",f,hash,journal,null,money,principal,interest,now);
-        var receipt=repayments.postRecorded(f.getLoanId(),a,new LoanRepaymentLedgerService.PaymentCommand(f.getAmount(),f.getEffectiveDate(),LoanRepaymentTransaction.Channel.valueOf(money.purpose()),f.getReference().strip(),f.getRequestKey(),policy.id(),policy.allocationOrder()==com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST));
+        var feeLines=charges.collect(a,f.getLoanId(),"COLLECT",allocation.charges(),f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes());
+        var debtAmount=f.getAmount().subtract(allocation.charges());
+        var receipt=debtAmount.signum()==0?null:repayments.postRecorded(f.getLoanId(),a,new LoanRepaymentLedgerService.PaymentCommand(debtAmount,f.getEffectiveDate(),LoanRepaymentTransaction.Channel.valueOf(money.purpose()),f.getReference().strip(),f.getRequestKey(),policy.id(),false));
         loans.flush();
-        check(receipt.interest().signum()==0 || interest!=null,"interestAccount");var lines=new ArrayList<Object[]>();lines.add(new Object[]{money.id(),f.getAmount(),ZERO});
-        if(receipt.principal().signum()>0)lines.add(new Object[]{principal.id(),ZERO,receipt.principal()});if(receipt.interest().signum()>0)lines.add(new Object[]{interest.id(),ZERO,receipt.interest()});
-        records.lines(a,journal,lines);records.finish(id,receipt.id(),receipt.principal(),receipt.interest(),records.loan(a,f.getLoanId(),clock.today()).outstandingPrincipal());records.postJournal(a,journal,now);
+        check(allocation.interest().signum()==0 || interest!=null,"interestAccount");var lines=new ArrayList<Object[]>();lines.add(new Object[]{money.id(),f.getAmount(),ZERO});
+        if(allocation.principal().signum()>0)lines.add(new Object[]{principal.id(),ZERO,allocation.principal()});if(allocation.interest().signum()>0)lines.add(new Object[]{interest.id(),ZERO,allocation.interest()});lines.addAll(feeLines);
+        records.lines(a,journal,lines);records.finish(id,receipt==null?null:receipt.id(),allocation.principal(),allocation.interest(),records.loan(a,f.getLoanId(),clock.today()).outstandingPrincipal(),allocation.charges());records.postJournal(a,journal,now);
         event(a,id,"LOAN_REPAYMENT_POSTED",Map.of("loan",f.getLoanId(),"amount",f.getAmount()));return records.posting(a,id);
     }
     @Transactional
@@ -269,24 +293,27 @@ public class LoanRecordingService {
         var f=new PostForm();f.setRequestKey(key);f.setLoanId(original.loanId());f.setEffectiveDate(date);f.setAmount(original.amount());f.setReference(original.reference());f.setEvidence(original.evidence());f.setNotes(reason.strip());
         validatePost(f);String hash=hash(Map.of("original",originalId,"form",f));records.lockRequest(a,key);var prior=records.postRequest(a,key,hash);if(prior.isPresent())return prior.get();
         records.record(a,original.loanId(),true);original=records.posting(a,originalId);check(original.reversedBy()==null,"reversal");check(!date.isBefore(original.date()),"date");
+        charges.beforeCorrection(a,original.loanId(),original.id(),date);
         UUID period=periods.period(a.getSaccoId(),date,a.getMemberId(),clock.now());var raw=records.reversedLines(original.journalId());
         // Original accounts are retained; corrections cannot switch the receiving account or allocation.
         var money=new Choice((UUID)raw.stream().filter(l->((BigDecimal)l[2]).signum()>0).findFirst().orElseThrow()[0],original.moneyAccount(),"");
         var principal=new Choice(records.principalAccount(original.loanId()),original.principalAccount(),"");
-        var interest=original.interest().signum()>0?new Choice((UUID)raw.stream().filter(l->((BigDecimal)l[1]).signum()>0 && !l[0].equals(principal.id())).findFirst().orElseThrow()[0],original.interestAccount(),""):null;
-        UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();records.journal(a,journal,id,f,hash,period,"REVERSAL",original.journalId(),now);
+        var interest=original.interest().signum()>0?new Choice(records.postingInterestAccount(original.id()),original.interestAccount(),""):null;
+        boolean chargeReceipt=charges.hasCollections(original.journalId());UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();records.journal(a,journal,id,f,hash,period,chargeReceipt?"LOAN_CHARGE_REVERSAL":"REVERSAL",original.journalId(),now);
         records.ticket(a,id,"REVERSAL",f,hash,journal,original.id(),money,principal,interest,now);
-        var receipt=repayments.reverseRecorded(original.loanId(),original.transactionId(),a,key,reason.strip(),date);
+        if(chargeReceipt){charges.undoCollections(a,original.journalId(),journal,id,date,original.evidence(),reason);}
+        var receipt=original.transactionId()==null?null:repayments.reverseRecorded(original.loanId(),original.transactionId(),a,key,reason.strip(),date);
         loans.flush();
-        records.lines(a,journal,raw);records.finish(id,receipt.id(),receipt.principal(),receipt.interest(),records.loan(a,original.loanId(),clock.today()).outstandingPrincipal());records.postJournal(a,journal,now);
+        records.lines(a,journal,raw);records.finish(id,receipt==null?null:receipt.id(),original.principal(),original.interest(),records.loan(a,original.loanId(),clock.today()).outstandingPrincipal(),original.charges());records.postJournal(a,journal,now);
         event(a,id,"LOAN_REPAYMENT_REVERSED",Map.of("original",originalId));return records.posting(a,id);
     }
-    public record LoanExport(Detail detail,List<Posting> payments) {}
+    public record LoanExport(Detail detail,List<Posting> payments,com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan charges) { public LoanExport(Detail detail,List<Posting> payments){this(detail,payments,new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan(null,"","",List.of(),true,""));} }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public LoanExport exportLoan(AppUserPrincipal a,UUID id){
         authorize(a,"EXPORT");var detail=detail(a,id);var rows=records.loanPosts(a,id,501,0);check(rows.size()<=500,"reportLimit");
-        return new LoanExport(detail,rows.stream().filter(p->!"DISBURSEMENT".equals(p.kind())).toList());
+        return new LoanExport(detail,rows.stream().filter(p->!Set.of("DISBURSEMENT","CHARGE_ASSESS","CHARGE_UNDO").contains(p.kind())).toList(),charges.frozen(a,id));
     }
+    @Transactional(readOnly=true) public List<JournalLine> postingLines(AppUserPrincipal a,UUID id){authorize(a,"EXPORT");var posting=records.posting(a,id);return records.journalLines(a,posting.journalId());}
     @Transactional(readOnly=true) public Posting posting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.posting(a,id);}
     @Transactional(readOnly=true) public UUID disbursementCorrection(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.disbursementCorrection(a,id);}
     @Transactional(readOnly=true) public Optional<Page<ScheduleRow>> actualRepaymentSchedule(AppUserPrincipal actor,UUID loanId,int page){
@@ -314,7 +341,7 @@ public class LoanRecordingService {
         var f=new Filter("",null,null,"","oldest",0,client);var loans=records.loans(a,f,clock.today(),501,0);var movements=records.clientPosts(a,client,501,0);
         check(loans.size()<=500 && movements.size()<=500,"reportLimit");return new StatementExport(c.label(),loans,movements,records.statementTerms(a,client));
     }
-    @Transactional(readOnly=true) public Statement statement(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));var f=new Filter("",null,null,"","newest",page,client);filter(f,false);var t=records.clientTotals(a,f,clock.today());var rows=records.loans(a,f,clock.today(),26,page*25);return new Statement(c.label(),c.label().split(" - ",2)[0],(BigDecimal)t.get("principal"),(BigDecimal)t.get("interest"),(BigDecimal)t.get("arrears"),(BigDecimal)t.get("future_interest"),((Number)t.get("loans")).longValue(),new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25));}
+    @Transactional(readOnly=true) public Statement statement(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));var f=new Filter("",null,null,"","newest",page,client);filter(f,false);var t=records.clientTotals(a,f,clock.today());var rows=records.loans(a,f,clock.today(),26,page*25);return new Statement(c.label(),c.label().split(" - ",2)[0],(BigDecimal)t.get("principal"),(BigDecimal)t.get("interest"),(BigDecimal)t.get("arrears"),(BigDecimal)t.get("future_interest"),((Number)t.get("loans")).longValue(),new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25),(BigDecimal)t.get("charges"));}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public List<Posting> report(AppUserPrincipal a,String kind,Filter f){authorize(a,"EXPORT");filter(f,true);kind(kind);var total=records.totals(a,kind,f);check(total.count()<=500,"reportLimit");return records.posts(a,kind,f,500,0);}
     @Transactional(readOnly=true) public Totals totals(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);return records.totals(a,kind,f);}
     private LoanProductSetting product(AppUserPrincipal a,RecordForm f){
@@ -326,12 +353,12 @@ public class LoanRecordingService {
             BigDecimal rate=BigDecimal.ZERO;
             if("AMOUNT".equals(f.getInterestEntry()))nonnegativeMoney(f.getInterestAmount());
             else {check(f.getInterestPercent()!=null && f.getInterestPercent().signum()>=0 && f.getInterestPercent().compareTo(new BigDecimal("10000"))<=0 && f.getInterestPercent().scale()<=4,"terms");rate=f.getInterestPercent().movePointLeft(2);}
-            return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(f.getCustomMethod()).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).build();
+            return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(f.getCustomMethod()).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).applicationFee(configured.getApplicationFee()).processingFeeRate(configured.getProcessingFeeRate()).insuranceRate(configured.getInsuranceRate()).build();
         }
         var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
         check((p.getMinimumAmount()==null || f.getPrincipal().compareTo(p.getMinimumAmount())>=0) && (p.getMaximumAmount()==null || f.getPrincipal().compareTo(p.getMaximumAmount())<=0),"productLimits");
         tenure(f).validate(p);
-        check((p.getApplicationFee()==null || p.getApplicationFee().signum()==0) && (p.getProcessingFeeRate()==null || p.getProcessingFeeRate().signum()==0) && (p.getInsuranceRate()==null || p.getInsuranceRate().signum()==0),"productFees");return p;}
+        return p;}
     private LoanTenure tenure(RecordForm f){Integer value=f.getTenureValue()==null?f.getMonths():f.getTenureValue();check(value!=null,"terms");return new LoanTenure(f.getTenureUnit(),value);}
     private LoanAmortizationCalculator.Result calculate(RecordForm f,LoanProductSetting p){
         var term=tenure(f);BigDecimal flat=term.flatInterest(f.getPrincipal(),p.getInterestRate());

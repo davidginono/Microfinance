@@ -69,7 +69,7 @@ public class DisbursementController {
         @org.springframework.web.bind.annotation.RequestParam @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate date) {
         var loan=requireVisibleApplication(id,actor.getSaccoId(),actor.getStationId());
         try{var q=loanRecordingService.disbursementTopUp(actor,id,date).orElseThrow(()->new IllegalArgumentException("recording.error.topUpUnavailable"));
-            return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(java.util.Map.of("principal",q.principal().toPlainString(),"interest",q.interest().toPlainString(),"excludedInterest",q.excludedInterest().toPlainString(),"total",q.total().toPlainString(),"cash",loan.getAmount().subtract(q.total()).toPlainString(),"sequence",q.sequence()));
+            return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(java.util.Map.of("principal",q.principal().toPlainString(),"interest",q.interest().toPlainString(),"excludedInterest",q.excludedInterest().toPlainString(),"total",q.total().toPlainString(),"charges",q.charges().toPlainString(),"chargeSequence",q.chargeSequence(),"cash",loanRecordingService.fundingCash(actor,id,date).toPlainString(),"sequence",q.sequence()));
         }catch(IllegalArgumentException ex){return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",message(ex.getMessage())));}
     }
     private final com.sacco.mvp.service.ArchivedLoanDeletionService archivedLoanDeletionService;
@@ -402,7 +402,7 @@ public class DisbursementController {
         }
         if(recordedApplication && canDisburseLoan)try {
             var date=model.getAttribute("postingDisbursementDate") instanceof LocalDate retainedDate?retainedDate:null;
-            var topUp=loanRecordingService.disbursementTopUp(principal,app.getId(),date).orElse(null);model.addAttribute("topUpQuote",topUp);if(topUp!=null)model.addAttribute("disbursementBaseAmount",app.getAmount().subtract(topUp.total()));
+            var topUp=loanRecordingService.disbursementTopUp(principal,app.getId(),date).orElse(null);model.addAttribute("topUpQuote",topUp);model.addAttribute("disbursementBaseAmount",loanRecordingService.fundingCash(principal,app.getId(),date));model.addAttribute("fundingCharges",loanRecordingService.fundingCharges(principal,app.getId()));
         }catch(IllegalArgumentException ex){model.addAttribute("topUpUnavailable",ex.getMessage());}
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("disbursementOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(
@@ -470,6 +470,8 @@ public class DisbursementController {
                            @RequestParam(required = false) Long settlementSequence,
                            @RequestParam(required = false) BigDecimal settlementPrincipal,
                            @RequestParam(required = false) BigDecimal settlementInterest,
+                           @RequestParam(required = false) BigDecimal settlementCharges,
+                           @RequestParam(required = false) Long settlementChargeSequence,
                            @RequestParam(required = false) String settlementEvidence,
                            @RequestParam(defaultValue = "false") boolean settlementConfirmed,
                            @RequestParam(required = false) List<MultipartFile> attachments,
@@ -483,10 +485,10 @@ public class DisbursementController {
                 var form=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm();
                 form.setRequestKey(requestKey);form.setLoanId(id);form.setEffectiveDate(disbursementDate);form.setFirstPaymentDate(firstRepaymentDate);
                 form.setAmount(application.getAmount());form.setMoneyAccountId(moneyAccountId);form.setPrincipalAccountId(principalAccountId);
-                form.setInterestAccountId(interestAccountId);form.setSettlementSequence(settlementSequence);form.setSettlementPrincipal(settlementPrincipal);form.setSettlementInterest(settlementInterest);form.setEvidence(settlementEvidence==null?"":settlementEvidence);
+                form.setInterestAccountId(interestAccountId);form.setSettlementSequence(settlementSequence);form.setSettlementPrincipal(settlementPrincipal);form.setSettlementInterest(settlementInterest);form.setSettlementCharges(settlementCharges);form.setSettlementChargeSequence(settlementChargeSequence);form.setEvidence(settlementEvidence==null?"":settlementEvidence);
                 if(application.getTopUpSourceLoanId()!=null && !settlementConfirmed)throw new IllegalArgumentException("recording.error.topUpChanged");
                 form.setReference(disbursementReference==null?"":disbursementReference);form.setNotes(disbursementNotes==null?"":disbursementNotes);
-                if(depositAmount!=null && depositAmount.compareTo(application.getTopUpSourceLoanId()==null?application.getAmount():application.getAmount().subtract(settlementPrincipal==null?BigDecimal.ZERO:settlementPrincipal).subtract(settlementInterest==null?BigDecimal.ZERO:settlementInterest))!=0)throw new IllegalArgumentException("recording.error.disbursementAmount");
+                if(depositAmount!=null && depositAmount.compareTo(loanRecordingService.fundingCash(principal,id,disbursementDate))!=0)throw new IllegalArgumentException("recording.error.disbursementAmount");
                 var documents=new java.util.ArrayList<MultipartFile>();if(disbursementProofFile!=null && !disbursementProofFile.isEmpty())documents.add(disbursementProofFile);
                 if(attachments!=null)documents.addAll(attachments);
                 loanRecordingService.disburse(principal,form,documents);
@@ -507,7 +509,7 @@ public class DisbursementController {
             ra.addFlashAttribute("message", message("recording.disbursedSuccess"));
             return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage()!=null && ex.getMessage().startsWith("recording.error.")?message(ex.getMessage()):ex.getMessage());
+            ra.addFlashAttribute("error", ex.getMessage()!=null && (ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("charges.error."))?message(ex.getMessage()):ex.getMessage());
             ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);ra.addFlashAttribute("postingInterestAccountId",interestAccountId);ra.addFlashAttribute("postingSettlementEvidence",settlementEvidence);
             ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
             ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);

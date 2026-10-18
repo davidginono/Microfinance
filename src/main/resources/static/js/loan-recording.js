@@ -78,7 +78,7 @@
       tenureLabel.textContent = tenureLabel.dataset[unit.value.toLowerCase()] || tenureLabel.dataset.empty;
       recordForm.querySelector('#tenureValue').max = unit.value === 'DAYS' ? '18250' : unit.value === 'YEARS' ? '50' : '600';
       clearTimeout(timer); controller?.abort(); ++version;
-      spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
+      recordForm.dispatchEvent(new CustomEvent('loan:quote-pending'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
       if(schedule){schedule.hidden = true;rows.replaceChildren();summary.textContent = '';}
       if (!recordForm.querySelector('#principal').value || !unit.value || !recordForm.querySelector('#tenureValue').value
         || (!custom && !recordForm.querySelector('#productId').value)
@@ -92,7 +92,7 @@
           if(response.redirected)throw new Error(region.dataset.error);
           const quote = await response.json();if(current !== version)return;
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
-          output.textContent = money(quote.interest);
+          recordForm.dispatchEvent(new CustomEvent('loan:quote',{detail:quote}));output.textContent = money(quote.interest);
           const approvedRate=recordForm.querySelector('[data-approved-rate]');if(approvedRate){approvedRate.hidden=custom;if(!custom)approvedRate.textContent=approvedRate.dataset.label+': '+quote.ratePercent+'% · '+approvedRate.dataset.basis;}
           description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
           if(schedule && quote.schedule?.length){
@@ -107,11 +107,11 @@
             summary.textContent = summary.dataset[quote.frequency.toLowerCase()] + ' \u00b7 ' + quote.tenureValue + ' ' + region.dataset[quote.tenureUnit.toLowerCase()];
             schedule.hidden = false;
           }
-        } catch(error) {if(current === version && error.name !== 'AbortError')description.textContent = error.message || region.dataset.error;}
+        } catch(error) {if(current === version && error.name !== 'AbortError'){description.textContent = error.message || region.dataset.error;recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));}}
         finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');}}
       }, 150);
     }
-    const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod']);
+    const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod','applicationDate','customApplicationCharge','customProcessingCharge','insurancePremium','insuranceEvidence','evidence']);
     const changed = event => {if(pricing.has(event.target.name))refresh();};
     recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
     window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;});

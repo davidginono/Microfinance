@@ -1,5 +1,7 @@
 # Linked loan top-up recording
 
+2026-10-18 charge extension: supported source charge balances are settled separately from replacement charges/deductions, with an additional accepted charge sequence and exact linked corrections. New management fees on top-ups are blocked. See [shared charge behavior and policy gates](recorded-loan-charges.md). Earlier fee exclusions below describe the original increment; unverified charges remain unsupported.
+
 Staff record a replacement agreement from a selected Loan record or its details using **Record top-up**. The new application retains the product's frozen review path and teller restrictions. Saving does not discharge the source or move money. Existing borrower application routes keep their existing safeguards.
 
 ## Settlement and cash
