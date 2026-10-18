@@ -26,9 +26,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,VoucherMvcTest.Config.class})
 class VoucherMvcTest {
  @Autowired WebApplicationContext context;@Autowired VoucherService service;@Autowired VoucherPdfService pdf;@Autowired LoanReceiptService receipts;@Autowired LoanReceiptPdfService loanPdf;
+ @Autowired com.sacco.mvp.accounting.approval.service.VoucherApprovalGate gate;
+ @Autowired com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows;
+ @Autowired com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService workflowPosting;
+ @Autowired com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents;
  MockMvc mvc;AppUserPrincipal actor;UUID id=UUID.randomUUID();
  @BeforeEach void setup(){
-  reset(service,pdf,receipts,loanPdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  reset(service,pdf,receipts,loanPdf,gate,workflows,workflowPosting,documents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   var m=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class),true);
   lenient().when(service.selectedAccounts(any(),any(),any())).thenReturn(Map.of());
  }
@@ -77,6 +81,32 @@ class VoucherMvcTest {
   when(receipts.export(actor,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Export revoked"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/pdf").with(user(actor))).andExpect(status().isForbidden());
  }
  @Test void printCannotBypassResourceExportAuthorization()throws Exception {when(service.export(actor,Type.RECEIPT,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Outside branch"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(pdf);}
+ @Test void configuredIndividualFormSavesApprovalDraftWithoutPosting()throws Exception{
+  UUID workflow=UUID.randomUUID();when(gate.required(actor,Type.JOURNAL)).thenReturn(true);when(workflows.capture(eq(actor),eq(Type.JOURNAL),any())).thenReturn(workflow);
+  mvc.perform(post("/finance/vouchers/journals").with(user(actor)).with(csrf()).param("party","Prepared voucher").param("rows[0].amount","1.00"))
+   .andExpect(redirectedUrl("/finance/approval/"+workflow));verify(service,never()).post(any(),any(),any());
+ }
+ @Test void approvalCommandsRequireCsrfAndPassOnlyTheirScopedRecordContext()throws Exception{
+  mvc.perform(post("/finance/approval/"+id+"/actions").with(user(actor)).param("version","2").param("action","APPROVE")).andExpect(status().isForbidden());
+  mvc.perform(post("/finance/approval/"+id+"/actions").with(user(actor)).with(csrf()).param("version","2").param("action","REJECT").param("comments","Wrong reference").param("saccoId","FOREIGN"))
+   .andExpect(redirectedUrl("/finance/approval/"+id));verify(workflows).action(actor,id,2,"REJECT","Wrong reference");
+  doThrow(new org.springframework.security.access.AccessDeniedException("Outside branch")).when(workflows).details(actor,id);
+  mvc.perform(get("/finance/approval/"+id).with(user(actor))).andExpect(status().isForbidden());
+ }
+ @Test void ruleBindingIsBoundedAndDoesNotAcceptApprovalEvidence()throws Exception{
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("type","PAYMENT").param("rules[0].name","Office payments").param("rules[0].minimum","0").param("individuals","true").param("approvedBy",UUID.randomUUID().toString()))
+   .andExpect(redirectedUrl("/finance/approval/configuration?type=PAYMENT"));
+  verify(workflows).configure(eq(actor),argThat(f->f.isIndividuals() && f.getRules().size()==1 && f.getType()==Type.PAYMENT));
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[999].name","Overflow")).andExpect(status().isBadRequest());
+ }
+ @Test void supportingDocumentUsesRecordAuthorizationAndRestrictiveHeaders()throws Exception{
+  UUID document=UUID.randomUUID();when(documents.get(actor,id,document)).thenReturn(new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Document(document,"evidence.pdf","application/pdf",new byte[]{1,2,3}));
+  mvc.perform(get("/finance/approval/"+id+"/documents/"+document).with(user(actor))).andExpect(status().isOk()).andExpect(content().contentType("application/pdf"))
+   .andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("X-Content-Type-Options","nosniff"))
+   .andExpect(header().string("Content-Security-Policy","sandbox; default-src 'none'; frame-ancestors 'self'"));
+  doThrow(new org.springframework.security.access.AccessDeniedException("Claim revoked")).when(documents).get(actor,id,document);
+  mvc.perform(get("/finance/approval/"+id+"/documents/"+document).with(user(actor))).andExpect(status().isForbidden());
+ }
  @Configuration @EnableWebMvc static class Config {
   @Bean("access") @Primary com.sacco.mvp.service.AccessControlService access(){return new com.sacco.mvp.service.AccessControlService();}
   @Bean VoucherService service(){return mock(VoucherService.class);}
@@ -84,6 +114,11 @@ class VoucherMvcTest {
   @Bean ApplicationClock voucherClock(){var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(LocalDate.of(2026,10,8));return clock;}
   @Bean LoanReceiptService receipts(){return mock(LoanReceiptService.class);}
   @Bean LoanReceiptPdfService loanPdf(){return mock(LoanReceiptPdfService.class);}
-  @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock,LoanReceiptService receipts,LoanReceiptPdfService loanPdf){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),receipts,loanPdf);}
+  @Bean com.sacco.mvp.accounting.approval.service.VoucherApprovalGate gate(){return mock(com.sacco.mvp.accounting.approval.service.VoucherApprovalGate.class);}
+  @Bean com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows(){return mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService.class);}
+  @Bean com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService workflowPosting(){return mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService.class);}
+  @Bean com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents(){return mock(com.sacco.mvp.accounting.approval.service.VoucherDocumentService.class);}
+  @Bean com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController workflowController(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows,com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService posting,ApplicationClock clock,com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents){return new com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController(workflows,posting,clock,documents);}
+  @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock,LoanReceiptService receipts,LoanReceiptPdfService loanPdf,com.sacco.mvp.accounting.approval.service.VoucherApprovalGate gate,com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),receipts,loanPdf,gate,workflows);}
  }
 }

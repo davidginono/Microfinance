@@ -42,13 +42,14 @@ public class VoucherRepository {
         return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING' and id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by id"+(lock?" for share":""),this::account,args.toArray());
     }
     public List<Mapping> mappings(String institution,String search,int offset){return mappingQuery(institution,null,search,offset,false);}
+    public List<Mapping> selectedMappings(String institution,List<UUID> ids){return ids.isEmpty()?List.of():mappingQuery(institution,ids,"",0,false);}
     public List<Mapping> lockMappings(String institution,List<UUID> ids){return mappingQuery(institution,ids,"",0,true);}
     private List<Mapping> mappingQuery(String institution,List<UUID> ids,String search,int offset,boolean lock){
         var args=new ArrayList<Object>();args.add(institution);
         String filter;
         if(ids==null){filter=" and strpos(lower(concat_ws(' ',t.code,t.name,d.component,da.code,da.name,ca.code,ca.name)),?)>0";args.add(search.toLowerCase(Locale.ROOT));}
         else {filter=" and t.id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+")";args.addAll(ids);}
-        if(!lock)args.add(offset);
+        if(!lock && ids==null)args.add(offset);
         return jdbc.query("""
             select t.id,t.code||' - '||t.name transaction_name,p.request_key,d.component,
             da.id debit_id,da.code debit_code,da.name debit_name,da.purpose debit_purpose,
@@ -60,7 +61,7 @@ public class VoucherRepository {
             join gl_account da on da.id=d.account_id and da.sacco_id=t.sacco_id and da.active and da.kind='POSTING'
             join gl_account ca on ca.id=c.account_id and ca.sacco_id=t.sacco_id and ca.active and ca.kind='POSTING'
             where t.sacco_id=? and t.active and a.active
-            """+filter+" order by t.id,d.component"+(lock?" for share of a,t,p,d,c,da,ca":" limit 26 offset ?"),
+            """+filter+" order by t.id,d.component"+(lock?" for share of a,t,p,d,c,da,ca":ids==null?" limit 26 offset ?":" limit 250"),
             (r,n)->new Mapping(r.getObject("id",UUID.class),r.getObject("request_key",UUID.class),r.getString("transaction_name"),r.getString("component"),
                 new Account(r.getObject("debit_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),r.getString("debit_purpose")),
                 new Account(r.getObject("credit_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),r.getString("credit_purpose"))),args.toArray());

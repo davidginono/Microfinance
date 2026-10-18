@@ -2,6 +2,7 @@ package com.sacco.mvp.domain;
 
 public enum AccessAction {
     VIEW("View"),
+    VALIDATE("Validate"), POST("Post"), INITIATE("Initiate"), WITHDRAW("Withdraw"), HOLD("Hold"), FORCE_APPROVE("Force approve"), ESCALATED_APPROVE("Escalated approval"),
     ADD("Add"),
     CREATE("Create"),
     UPDATE("Update"),

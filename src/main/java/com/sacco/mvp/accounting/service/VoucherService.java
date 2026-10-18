@@ -24,6 +24,7 @@ public class VoucherService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final JsonMapper json;
+    private final com.sacco.mvp.accounting.approval.service.VoucherApprovalGate approvals;
     private static final Set<String> COMPONENTS=Set.of("TOTAL","PRINCIPAL","INTEREST","FEES","TAX");
     public void authorize(AppUserPrincipal actor,Type type,String action){
         ledger.requireActor(actor,(type==Type.JOURNAL?"ACCOUNTING_JOURNALS_":"ACCOUNTING_BUSINESS_")+action);
@@ -52,12 +53,40 @@ public class VoucherService {
         if(form.getRows()!=null)for(var row:form.getRows()){if(row!=null){if(row.getDebitAccountId()!=null)ids.add(row.getDebitAccountId());if(row.getCreditAccountId()!=null)ids.add(row.getCreditAccountId());}}
         if(ids.size()>101)throw new Invalid("","rows");var result=new HashMap<UUID,Account>();vouchers.selectedAccounts(actor.getSaccoId(),new ArrayList<>(ids),false).forEach(a->result.put(a.id(),a));return result;
     }
+    @Transactional(readOnly=true)
+    public Map<String,Account> reviewAccounts(AppUserPrincipal actor,Type type,Form form){
+        approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");authorize(actor,type,"VIEW");
+        require(form.getRows()!=null && form.getRows().size()<=50,"","rows");
+        var ids=new TreeSet<UUID>();if(form.getMoneyAccountId()!=null)ids.add(form.getMoneyAccountId());
+        for(var row:form.getRows()){if(row.getDebitAccountId()!=null)ids.add(row.getDebitAccountId());if(row.getCreditAccountId()!=null)ids.add(row.getCreditAccountId());}
+        require(ids.size()<=101,"","rows");var byId=new HashMap<UUID,Account>();vouchers.selectedAccounts(actor.getSaccoId(),new ArrayList<>(ids),false).forEach(a->byId.put(a.id(),a));
+        var mappings=vouchers.selectedMappings(actor.getSaccoId(),form.getRows().stream().map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().toList());
+        var result=new HashMap<String,Account>();if(byId.containsKey(form.getMoneyAccountId()))result.put("moneyAccountId",byId.get(form.getMoneyAccountId()));
+        for(int n=0;n<form.getRows().size();n++){
+            var row=form.getRows().get(n);Account debit=byId.get(row.getDebitAccountId()),credit=byId.get(row.getCreditAccountId());
+            if(row.getTransactionId()!=null){var mapping=mappings.stream().filter(m->m.transactionId().equals(row.getTransactionId()) && m.templateKey().equals(row.getTemplateKey()) && m.component().equals(row.getComponent())).findFirst();debit=mapping.map(Mapping::debit).orElse(null);credit=mapping.map(Mapping::credit).orElse(null);}
+            if(debit!=null)result.put("rows["+n+"].debitAccountId",debit);if(credit!=null)result.put("rows["+n+"].creditAccountId",credit);
+        }
+        return result;
+    }
     @Transactional
     public Preview preview(AppUserPrincipal actor,Type type,Form form){authorize(actor,type,"CREATE");validate(form,type,clock.today());return plan(actor,type,form);}
+    @Transactional(noRollbackFor=IllegalArgumentException.class)
+    public Preview approvalPreview(AppUserPrincipal actor,Type type,Form form){
+        approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");
+        authorize(actor,type,"VIEW");
+        String claim=java.util.stream.Stream.of("VOUCHER_WORKSPACE_VALIDATE","VOUCHER_APPROVAL_APPROVE","VOUCHER_APPROVAL_ESCALATED_APPROVE","VOUCHER_APPROVAL_FORCE","VOUCHER_APPROVAL_INITIATE","VOUCHER_WORKSPACE_POST")
+            .filter(actor.getClaims()::contains).findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Voucher validation permission required"));
+        approvals.authorize(actor,claim);validate(form,type,clock.today());return plan(actor,type,form);
+    }
     @Transactional
     public Voucher post(AppUserPrincipal actor,Type type,Form form){
         authorize(actor,type,"CREATE");validate(form,type,clock.today());
-        String hash=hash(type,form);vouchers.lockRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
+        String hash=hash(type,form);
+        var completed=vouchers.byRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
+        if(completed.isPresent()){require(completed.get().type()==type && vouchers.sameRequest(completed.get().id(),hash,actor.getMemberId()),"","retry");return details(completed.get());}
+        var approvalProof=approvals.beforePosting(actor,type,form);
+        vouchers.lockRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
         require(!vouchers.loanRequestExists(actor.getSaccoId(),actor.getStationId(),form.getRequestKey()),"","retry");
         var prior=vouchers.byRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
         if(prior.isPresent()){
@@ -65,6 +94,7 @@ public class VoucherService {
         }
         UUID period=vouchers.period(actor.getSaccoId(),form.getEffectiveDate(),actor.getMemberId(),clock.now());
         var plan=plan(actor,type,form);
+        approvals.verifyPlan(approvalProof,plan);
         return persist(actor,type,form,hash,plan,null,null,period);
     }
     @Transactional
@@ -109,7 +139,8 @@ public class VoucherService {
                 require(matches.size()==1,field+".transactionId","template");var m=matches.getFirst();
                 require(m.templateKey().equals(row.getTemplateKey()),field+".transactionId","staleTemplate");debit=m.debit();credit=m.credit();name=m.transactionName();template=m.templateKey();
             }else {debit=type==Type.RECEIPT?money:accounts.get(row.getDebitAccountId());credit=type==Type.PAYMENT?money:accounts.get(row.getCreditAccountId());}
-            require(debit!=null && credit!=null && !debit.id().equals(credit.id()),field+(type==Type.RECEIPT?".creditAccountId":".debitAccountId"),"account");
+            require(debit!=null,field+".debitAccountId","account");require(credit!=null,field+".creditAccountId","account");
+            require(!debit.id().equals(credit.id()),field+".creditAccountId","account");
             require(type==Type.JOURNAL || (type==Type.RECEIPT?debit.id():credit.id()).equals(money.id()),field+".transactionId","direction");
             require(type==Type.JOURNAL || !Set.of("CASH","BANK","MOBILE_MONEY").contains((type==Type.RECEIPT?credit:debit).purpose()),field+".transactionId","transfer");
             BigDecimal amount=row.getAmount().setScale(2,RoundingMode.UNNECESSARY);total=total.add(amount);

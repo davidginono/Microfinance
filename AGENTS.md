@@ -137,6 +137,10 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 ## UI Conventions
 
+### Configurable voucher approvals (2026-10-18)
+
+- The user's newer instruction enables approval for **individual ordinary receipt/payment/journal vouchers and batches according to branch configuration**. This supersedes the no-approval restriction below only for configured scopes. Preserve direct posting when individual approval is disabled and preserve specialized loan receipt/repayment safeguards. All workspaces and actions require explicit claims; do not grant them automatically. See `docs/voucher-approval-workspaces.md`.
+
 ### Core accounting mandate (2026-10-08)
 
 - Receipt vouchers, payment vouchers and journal vouchers support multiple transactions and accountant **direct posting**. Do not add submission, verification, maker/checker, approval or release-gate steps to these core workflows or fabricate approval evidence. Server-side accounting validation, scope, closed-period protection, audit, idempotency and linked reversals remain mandatory.

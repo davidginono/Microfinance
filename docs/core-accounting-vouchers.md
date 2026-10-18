@@ -1,5 +1,7 @@
 # Core accounting vouchers
 
+2026-10-18: Configurable individual and batch approval now applies where enabled; unconfigured individual posting and specialized loan controls retain their existing behavior. See [voucher approval workspaces](voucher-approval-workspaces.md).
+
 User mandate: 2026-10-08. Receipt, payment and journal vouchers post directly, in one transaction, into the existing general ledger. No submit, verify, checker, policy approval or accounting release approval is required for these core vouchers. Ordinary accounting validation is not an approval workflow.
 
 ## Resource structure

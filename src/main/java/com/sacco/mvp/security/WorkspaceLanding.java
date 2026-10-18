@@ -71,6 +71,12 @@ public final class WorkspaceLanding {
         if (hasClaim(claims, UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW)) {
             return "/credit-committee/dashboard";
         }
+        if (hasClaim(claims, UserClaim.VOUCHER_WORKSPACE_VIEW)) {
+            return "/finance/approval";
+        }
+        if (hasClaim(claims, UserClaim.VOUCHER_RULE_VIEW)) {
+            return "/finance/approval/configuration";
+        }
         return null;
     }
 

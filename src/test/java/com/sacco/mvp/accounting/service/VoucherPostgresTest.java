@@ -30,6 +30,10 @@ class VoucherPostgresTest {
  HikariDataSource dataSource;
  JdbcTemplate jdbc; VoucherService service; TransactionTemplate tx; AuditService audit; UserClaimService claims; MemberDirectoryService directory;
  SaccoRegistryService institutions; String institution; AppUserPrincipal actor; UUID cash,capital,expense,control;
+ com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository workflowRepository;
+ com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows;
+ com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService workflowPosting;
+ com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents;
  final LocalDate day=LocalDate.of(2026,10,1); final OffsetDateTime now=OffsetDateTime.parse("2026-10-08T10:00:00+03:00");
  @BeforeAll void start(){
   var ds=new HikariDataSource();dataSource=ds;ds.setJdbcUrl(System.getenv("MICROFINANCE_VOUCHER_TEST_URL"));ds.setUsername("microfinance_test");ds.setPassword("");ds.addDataSourceProperty("sslmode","disable");ds.setMinimumIdle(1);ds.setMaximumPoolSize(4);ds.setConnectionTimeout(60000);
@@ -43,8 +47,14 @@ class VoucherPostgresTest {
   audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate());when(clock.now()).thenReturn(now);
   var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
-  var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build());
+  var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build()),ledger));
   var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(VoucherService)proxy.getProxy();
+  workflowRepository=new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build());
+  var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger);
+  workflows=transactional(new com.sacco.mvp.accounting.approval.service.VoucherWorkflowService(workflowRepository,gate,service,audit,clock,directory,claims),manager);
+  workflowPosting=transactional(new com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService(workflowRepository,gate,service,clock,audit),manager);
+  documents=transactional(new com.sacco.mvp.accounting.approval.service.VoucherDocumentService(workflowRepository,workflows,clock,audit),manager);
+
  }
  @AfterAll void stop(){if(dataSource!=null)dataSource.close();}
  @BeforeEach void fixture(){
@@ -137,6 +147,7 @@ class VoucherPostgresTest {
   assertThat(lookup.mappings(institution,"total",26)).isEmpty();
   UUID revision=library.template(actor,transaction).requestKey();var f=form(Type.RECEIPT);
   for(var row:f.getRows()){row.setTransactionId(transaction);row.setTemplateKey(revision);row.setCreditAccountId(control);}
+  var reviewed=service.reviewAccounts(actor,Type.RECEIPT,f);assertThat(reviewed.get("rows[0].debitAccountId").id()).isEqualTo(cash);assertThat(reviewed.get("rows[0].creditAccountId").id()).isEqualTo(capital);
   var v=service.post(actor,Type.RECEIPT,f);assertThat(v.transactions()).allSatisfy(t->{assertThat(t.credit().id()).isEqualTo(capital);assertThat(t.transactionName()).contains("Operating income").hasSizeGreaterThan(160);});
   template.setRequestKey(UUID.randomUUID());template.setExpectedRequestKey(revision);rule.setCreditCode("EXPENSE");tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   assertThat(service.post(actor,Type.RECEIPT,f).id()).isEqualTo(v.id());
@@ -145,9 +156,113 @@ class VoucherPostgresTest {
   tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   assertThat(lookup.mappings(institution,"interest",0)).singleElement().satisfies(m->assertThat(m.component()).isEqualTo("INTEREST"));
  }
+
+ @Test void configuredIndividualApprovalBlocksBypassAndSupportsIndependentApprovalAndPosting(){
+  configure(true,true,false,false);var f=form(Type.JOURNAL);
+  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
+  UUID id=workflows.capture(actor,Type.JOURNAL,f);validateWorkflow(id);
+  command(actor,id,"INITIATE","");assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("INITIATED");
+  assertThatThrownBy(()->command(actor,id,"APPROVE","")).hasMessage("approval.error.assignment");
+  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
+  var reviewer=operator("B1");command(reviewer,id,"APPROVE","Reviewed");
+  workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version());
+  var d=workflows.details(actor,id);assertThat(d.workflow().posting()).isEqualTo("POSTED");assertThat(d.items()).allSatisfy(i->assertThat(i.voucherId()).isNotNull());
+  workflowPosting.post(actor,id,0);assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(d.items().getFirst().voucherId());
+  assertThatThrownBy(()->workflows.save(actor,id,d.items().getFirst().id(),d.workflow().version(),0,f)).hasMessage("approval.error.stale");
+ }
+ @Test void withdrawHoldRejectAndMaterialCorrectionsRequireResubmission(){
+  configure(true,true,false,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);
+  command(actor,id,"HOLD","Check reference");assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("HELD_FROM_APPROVAL");
+  command(actor,id,"RESUBMIT","");command(actor,id,"WITHDRAW","");command(actor,id,"RESUBMIT","");
+  var reviewer=operator("B1");command(reviewer,id,"REJECT","Wrong account");command(actor,id,"RESUBMIT","");command(reviewer,id,"APPROVE","");
+  var d=workflows.details(actor,id);var item=d.items().getFirst();item.form().getRows().getFirst().setAmount(new BigDecimal("11.00"));
+  workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());
+  assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("RESUBMIT_FOR_APPROVAL");
+  assertThatThrownBy(()->workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version())).hasMessage("approval.error.validate");
+  validateWorkflow(id);command(actor,id,"RESUBMIT","");command(reviewer,id,"APPROVE","");
+ }
+ @Test void batchPostingIsAtomicWhenLaterVoucherFailsAndCanRetryAfterCorrection(){
+  configure(false,true,true,false);UUID id=batch(2);var before=workflows.details(actor,id);var later=before.items().get(1);later.form().setEffectiveDate(day.plusDays(1));workflows.save(actor,id,later.id(),before.workflow().version(),later.version(),later.form());
+  validateWorkflow(id);command(actor,id,"INITIATE","");
+  jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'OPEN',?,?)",UUID.randomUUID(),institution,day,day,actor.getMemberId(),now);
+  jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'CLOSED',?,?)",UUID.randomUUID(),institution,day.plusDays(1),day.plusDays(1),actor.getMemberId(),now);
+  var version=workflows.details(actor,id).workflow().version();assertThatThrownBy(()->workflowPosting.post(actor,id,version)).hasMessage("voucher.error.period");
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
+  assertThat(workflows.details(actor,id).items()).allSatisfy(i->assertThat(i.voucherId()).isNull());
+  workflowPosting.failed(actor,id,version,new IllegalArgumentException("voucher.error.period"));assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("FAILED");
+  var d=workflows.details(actor,id);var item=d.items().get(1);item.form().setEffectiveDate(day);workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());
+  validateWorkflow(id);command(actor,id,"RESUBMIT","");workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version());
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(2);
+ }
+ @Test void forceApprovalRequiresEnabledOptionCurrentClaimsAndReason(){
+  configure(true,true,false,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);
+  assertThatThrownBy(()->command(actor,id,"FORCE","Urgent")).hasMessage("approval.error.force");
+  configure(true,true,false,true);validateWorkflow(id);
+  assertThatThrownBy(()->command(actor,id,"FORCE","")).hasMessage("approval.error.comments");
+  var allowed=EnumSet.allOf(UserClaim.class);allowed.remove(UserClaim.VOUCHER_APPROVAL_FORCE);when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(allowed);
+  assertThatThrownBy(()->command(actor,id,"FORCE","Urgent")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));command(actor,id,"FORCE","Documented exception");
+  assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("MANUALLY_APPROVED");
+ }
+ @Test void sequentialStagesRequireDistinctApproversAndPolicyChangesInvalidatePosting(){
+  var f=ruleForm(true,true,false,false);f.getRules().getFirst().setSecondClaim("VOUCHER_APPROVAL_ESCALATED_APPROVE");workflows.configure(actor,f);
+  UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
+  var reviewer=operator("B1");command(reviewer,id,"APPROVE","");assertThatThrownBy(()->command(reviewer,id,"APPROVE","")).hasMessage("approval.error.independent");
+  var senior=operator("B1");var reviewerOnly=new AppUserPrincipal(directory.find(senior.getMemberId()).orElseThrow(),EnumSet.of(UserClaim.VOUCHER_WORKSPACE_VIEW,UserClaim.VOUCHER_APPROVAL_ESCALATED_APPROVE,UserClaim.ACCOUNTING_JOURNALS_VIEW),true);
+  assertThat(workflows.selectedAccounts(reviewerOnly,id,workflows.details(reviewerOnly,id).items().getFirst().form())).containsKeys("rows[0].debitAccountId","rows[0].creditAccountId");command(reviewerOnly,id,"APPROVE","");
+  configure(true,true,false,false);
+  assertThatThrownBy(()->workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version())).hasMessage("approval.error.configurationChanged");
+ }
+ @Test void validationRecordsFieldWarningsAndRejectsCrossBranchOrRevokedWorkspaceAccess(){
+  UUID id=workflows.capture(actor,Type.PAYMENT,form(Type.PAYMENT));var d=workflows.details(actor,id);var i=d.items().getFirst();i.form().getRows().getFirst().setAmount(null);i.form().setParty("");workflows.save(actor,id,i.id(),d.workflow().version(),i.version(),i.form());validateWorkflow(id);
+  var invalid=workflows.details(actor,id);assertThat(invalid.workflow().validation()).isEqualTo("ERROR");assertThat(invalid.items().getFirst().issues()).extracting(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Issue::field).contains("party","rows[0].amount");
+  assertThatThrownBy(()->workflows.details(operator("B2"),id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());assertThatThrownBy(()->workflows.details(actor,id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+ }
+ @Test void validationRetainsEngineErrorsWithoutRollingBackOtherVoucherResults(){
+  UUID id=batch(2);var d=workflows.details(actor,id);var item=d.items().get(1);item.form().getRows().getFirst().setCreditAccountId(control);
+  workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());validateWorkflow(id);
+  var result=workflows.details(actor,id);assertThat(result.workflow().validation()).isEqualTo("ERROR");
+  assertThat(result.items().getFirst().planHash()).isNotNull();assertThat(result.items().get(1).issues()).extracting(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Issue::code).contains("voucher.error.account");
+ }
+ @Test void postingAndFailureRecordingCannotBypassVoucherTypeViewClaims(){
+  configure(true,true,true,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
+  int version=workflows.details(actor,id).workflow().version();var restricted=EnumSet.allOf(UserClaim.class);restricted.remove(UserClaim.ACCOUNTING_JOURNALS_VIEW);
+  var withoutTypeView=new AppUserPrincipal(directory.find(actor.getMemberId()).orElseThrow(),restricted,true);
+  assertThatThrownBy(()->workflowPosting.post(withoutTypeView,id,version)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  assertThatThrownBy(()->workflowPosting.failed(withoutTypeView,id,version,new IllegalArgumentException("voucher.error.account"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("NOT_POSTED");
+ }
+ @Test void policyRevisionsAndApprovalContextRemainImmutableAfterConfigurationChanges(){
+  configure(true,true,true,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
+  var original=jdbc.queryForObject("select definition::text from voucher_approval_configuration_history where sacco_id=? and version=1",String.class,institution);
+  configure(true,true,false,false);
+  assertThat(jdbc.queryForObject("select definition::text from voucher_approval_configuration_history where sacco_id=? and version=1",String.class,institution)).isEqualTo(original);
+  assertThat(jdbc.queryForObject("select (context->>'configurationVersion')::integer from voucher_workflow_history where workflow_id=? and action='INITIATE'",Integer.class,id)).isEqualTo(1);
+  assertThatThrownBy(()->jdbc.update("delete from voucher_approval_configuration_history where sacco_id=?",institution)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+ }
+ @Test void documentEvidenceIsScopedAndInvalidatesAnApproval(){
+  configure(true,true,true,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
+  documents.add(actor,id,"proof.pdf","application/pdf","%PDF-1.7 synthetic".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+  assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("RESUBMIT_FOR_APPROVAL");var doc=documents.list(actor,id).getFirst();assertThat(doc.content()).isNull();
+  assertThat(documents.get(actor,id,doc.id()).content()).isNotEmpty();assertThatThrownBy(()->documents.get(operator("B2"),id,doc.id())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  assertThatThrownBy(()->documents.add(actor,id,"x.pdf","application/pdf","not a pdf".getBytes())).hasMessage("approval.error.document");
+ }
+ @Test void concurrentWorkflowPostingCommitsOneBatchAndRulesRejectOverlaps()throws Exception{
+  configure(false,true,true,false);UUID id=batch(2);validateWorkflow(id);command(actor,id,"INITIATE","");int version=workflows.details(actor,id).workflow().version();
+  var pool=Executors.newFixedThreadPool(2);try{var a=pool.submit(()->workflowPosting.post(actor,id,version));var b=pool.submit(()->workflowPosting.post(actor,id,version));a.get(30,TimeUnit.SECONDS);b.get(30,TimeUnit.SECONDS);}finally{pool.shutdownNow();}
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(2);
+  var f=ruleForm(true,true,false,false);var row=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow();row.setName("Overlapping");f.getRules().add(row);assertThatThrownBy(()->workflows.configure(actor,f)).hasMessage("approval.error.overlap");
+ }
+ UUID batch(int count){var f=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.CreateForm();f.setTitle("Synthetic batch");UUID id=workflows.create(actor,f);for(int n=0;n<count;n++){var form=form(Type.JOURNAL);workflows.save(actor,id,form.getRequestKey(),workflows.details(actor,id).workflow().version(),0,form);}return id;}
+ void validateWorkflow(UUID id){workflows.validate(actor,id,workflows.details(actor,id).workflow().version());}
+ void command(AppUserPrincipal user,UUID id,String action,String comments){workflows.action(user,id,workflows.details(user,id).workflow().version(),action,comments);}
+ void configure(boolean individual,boolean batch,boolean automatic,boolean force){workflows.configure(actor,ruleForm(individual,batch,automatic,force));}
+ com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm ruleForm(boolean individual,boolean batch,boolean automatic,boolean force){var f=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm();f.setVersion(workflows.configuration(actor,Type.JOURNAL).version());f.setIndividuals(individual);f.setBatches(batch);f.setForceAllowed(force);f.getRules().getFirst().setName("Default approval rule");f.getRules().getFirst().setAutomatic(automatic);return f;}
+ @SuppressWarnings("unchecked") static <T>T transactional(T raw,org.springframework.transaction.PlatformTransactionManager manager){var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));return (T)proxy.getProxy();}
  Form form(Type type){var f=new Form();f.setEffectiveDate(day);f.setParty("Synthetic payer");f.setReference("REF-"+UUID.randomUUID());if(type!=Type.JOURNAL)f.setMoneyAccountId(cash);var rows=new ArrayList<RowForm>();for(String amount:List.of("10.01","20.02")){var r=new RowForm();r.setDescription("Synthetic transaction "+amount);r.setAmount(new BigDecimal(amount));r.setDebitAccountId(expense);r.setCreditAccountId(capital);rows.add(r);}f.setRows(rows);return f;}
  UUID account(String code,String type,String balance,String kind,String purpose){UUID id=UUID.randomUUID();jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,?,?,?,?,?,?,?,?,?)",id,institution,code,"Synthetic "+code,type,balance,kind,purpose,actor.getMemberId(),now);return id;}
- AppUserPrincipal operator(String branch){UUID id=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) values(?,?,?,?,?,'ACTIVE','ACCOUNTANT',now(),false,'test-only')",id,institution,branch,id.toString(),"Synthetic accountant");
+ AppUserPrincipal operator(String branch){jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at) values(?,?,?,true,now(),now()) on conflict(sacco_id,station_id) do nothing",UUID.randomUUID(),institution,branch);UUID id=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) values(?,?,?,?,?,'ACTIVE','ACCOUNTANT',now(),false,'test-only')",id,institution,branch,id.toString(),"Synthetic accountant");
   var member=Member.builder().id(id).saccoId(institution).stationId(branch).memberNo(id.toString()).fullName("Synthetic accountant").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).build();when(directory.find(id)).thenReturn(Optional.of(member));return new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);
  }
 }

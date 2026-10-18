@@ -6,6 +6,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
     @Test
+    void voucherWorkflowPermissionsAreExplicitAndUseAccurateActions() {
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()), true))
+            .doesNotContain(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.VOUCHER_WORKSPACE_POST,
+                UserClaim.VOUCHER_APPROVAL_APPROVE, UserClaim.VOUCHER_APPROVAL_FORCE, UserClaim.VOUCHER_RULE_CONFIGURE);
+        assertThat(UserClaim.forFeatureAction(AccessFeature.VOUCHER_WORKSPACE, AccessAction.POST))
+            .contains(UserClaim.VOUCHER_WORKSPACE_POST);
+        assertThat(UserClaim.fromStoredName("VOUCHER_APPROVAL_FORCE")).contains(UserClaim.VOUCHER_APPROVAL_FORCE);
+    }
+
+    @Test
+    void staffWithOnlyVoucherWorkspaceClaimsCanReachTheirWorkspaceAfterLogin() {
+        var member = Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B")
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
+        var principal = new com.sacco.mvp.security.AppUserPrincipal(member,
+            java.util.Set.of(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.ACCOUNTING_JOURNALS_VIEW), true);
+        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(principal)).isEqualTo("/finance/approval");
+    }
+
+    @Test
     void removedAccountingPermissionsCannotBeAssignedOrRestoredFromStorage() {
         var retired = java.util.List.of(UserClaim.ACCOUNTING_POLICIES_VIEW, UserClaim.ACCOUNTING_OPENINGS_CREATE,
             UserClaim.ACCOUNTING_PERIODS_CREATE, UserClaim.ACCOUNTING_RELEASE_VIEW,

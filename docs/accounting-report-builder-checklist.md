@@ -1,5 +1,7 @@
 # Accounting Package And Report Customization Goal
 
+2026-10-18 user-requested increment: configurable individual and batch voucher approvals, with independent validation/approval/posting states and explicit claims. See [scope and verification](voucher-approval-workspaces.md). This does not restore removed accounting workspaces or complete the broader backlog.
+
 2026-10-18 recorded-charge increment: product-derived management/insurance terms, separate collections, deductions, specialized charge accounting and linked corrections are implemented for supported recorded loans/top-ups. See [behavior, verification and policy gates](recorded-loan-charges.md). This does not complete financed fees, recognition, insurer remittance or the broader accounting backlog.
 
 2026-10-16 lending adjustment increment: scoped provision targets, fully provided principal write-offs, linked write-backs and untouched disbursement reversals are implemented for verified ordinary recorded loans. See [scope and verification](loan-provisions-and-corrections.md). This does not complete restructuring, impairment policy approval, recovery/settlement coverage or the broader accounting backlog.
