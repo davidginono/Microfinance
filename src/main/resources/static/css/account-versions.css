@@ -1,0 +1,6 @@
+.coav-details {display:flex;flex-direction:column;gap:16px;min-width:0}
+.coav-details .accounting-context {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.coav-details .accounting-context dd {overflow-wrap:anywhere;margin:0}
+.coav-details .accounting-create-form {max-width:640px;margin-top:16px}
+.coav-details .erp-table-scroll {max-width:100%}
+#account-version-register tr.coa-row-selected {background:#f1faff}

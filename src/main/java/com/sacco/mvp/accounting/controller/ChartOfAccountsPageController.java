@@ -24,7 +24,7 @@ import java.util.UUID;
 public class ChartOfAccountsPageController {
     private final GeneralLedgerService ledger;
     @InitBinder("accountForm") void bind(WebDataBinder binder) {
-        binder.setAllowedFields("parentId","code","name","nameSw","normalBalance","kind","purpose","description");
+        binder.setAllowedFields("parentId","code","name","nameSw","normalBalance","kind","purpose","description","requestKey","reason");
     }
     @GetMapping
     String chart(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,
@@ -72,12 +72,13 @@ public class ChartOfAccountsPageController {
     @PostMapping({"/groups","/posting"})
     @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String save(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("accountForm") AccountOnboardingForm form,
-            BindingResult errors,jakarta.servlet.http.HttpServletRequest request,Model model,RedirectAttributes flash) {
+            BindingResult errors,jakarta.servlet.http.HttpServletRequest request,Model model,RedirectAttributes flash,@RequestParam(defaultValue="SAVE") String command) {
         boolean group=request.getRequestURI().endsWith("/groups");
         if(!errors.hasErrors()) {
             try {
-                ledger.onboardAccount(actor,form,group);
-                flash.addFlashAttribute("accountingSuccess","coa.saved");return "redirect:/finance/accounts?parentId="+form.getParentId();
+                if(!List.of("SAVE","DRAFT").contains(command))throw new IllegalArgumentException("accounting.error.versionInput");
+                UUID version=ledger.onboardVersion(actor,form,group,command.equals("SAVE"));
+                return "redirect:/finance/accounts/versions/"+version;
             } catch(IllegalArgumentException failure) {
                 String key=errorKey(failure);
                 String field=switch(key) {
@@ -103,14 +104,6 @@ public class ChartOfAccountsPageController {
         }
         model.addAttribute("accountPurposes",List.of("CASH","BANK","MOBILE_MONEY","CLEARING","SUSPENSE","LOAN_PRINCIPAL","INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE","PAYABLE","FUNDING","CAPITAL","INCOME","EXPENSE","FIXED_ASSET","PREPAYMENT","TAX","INTERNAL_TRANSFER","OTHER"));
         return "accounting/account-form";
-    }
-    @PostMapping("/{id}/deactivate")
-    String deactivate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash) {
-        ledger.deactivateAccount(actor,id);flash.addFlashAttribute("accountingSuccess","coa.deactivated");return "redirect:/finance/accounts";
-    }
-    @PostMapping("/{id}/reactivate")
-    String reactivate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash) {
-        ledger.reactivateAccount(actor,id);flash.addFlashAttribute("accountingSuccess","coa.reactivated");return "redirect:/finance/accounts";
     }
     @ExceptionHandler(IllegalArgumentException.class)
     String error(IllegalArgumentException failure,RedirectAttributes flash,jakarta.servlet.http.HttpServletRequest request,

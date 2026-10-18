@@ -5,10 +5,13 @@
     const body = register.querySelector('tbody');
     const view = document.getElementById('coa-view'), create = document.getElementById('coa-create');
     const status = document.getElementById('coa-status');
+    const history = document.getElementById('coa-history'), newVersion = document.getElementById('coa-new-version');
     const statusForm = document.getElementById('coa-status-form'), summary = document.getElementById('coa-selection-status');
     const selected = () => inputs().find(input => input.checked && !input.closest('tr').hidden)?.closest('[data-coa-row]');
     const update = () => {
         const row = selected();
+        if (history) history.disabled = !row;
+        if (newVersion) newVersion.disabled = !row;
         inputs().forEach(input => input.closest('tr').classList.toggle('coa-row-selected', input.checked));
         view.disabled = !row || row.dataset.heading !== 'true';
         view.textContent = row?.dataset.expanded === 'true' ? register.dataset.collapse : row?.dataset.family === 'true' ? view.dataset.accountsLabel : view.dataset.groupsLabel;
@@ -22,7 +25,7 @@
             status.disabled = !row || row.dataset.lifecycle !== 'true';
             const action = row?.dataset.active === 'false' ? 'reactivate' : 'deactivate';
             status.textContent = status.dataset[action];
-            if (row) statusForm.action = statusForm.dataset.url + row.dataset.id + '/' + action;
+            if (row) { statusForm.action = statusForm.dataset.url + row.dataset.id + '/versions/new'; statusForm.elements.operation.value = action.toUpperCase(); }
             else statusForm.removeAttribute('action');
         }
         summary.textContent = row ? summary.dataset.selected + ' ' + row.querySelector('.coa-account-code').textContent.trim() + ' · ' + row.querySelector('[data-coa-name]').firstChild.textContent.trim() : summary.dataset.empty;
@@ -144,6 +147,8 @@
         const url = new URL(create.dataset.url, location.href); url.searchParams.set('parentId', row.dataset.id); location.assign(url.href);
     });
     statusForm?.addEventListener('submit', event => { if (!selected() || status.disabled) event.preventDefault(); else status.disabled = true; });
+    history?.addEventListener('click', () => { const row = selected(); if (row) location.assign(history.dataset.url + row.dataset.id + '/history'); });
+    newVersion?.addEventListener('click', () => { const row = selected(); if (row) location.assign(newVersion.dataset.url + row.dataset.id + '/versions/new'); });
     window.addEventListener('pageshow', reset);
     register.addEventListener('resource-table:reset',reset);
     register.addEventListener('resource-table:updated',reset);

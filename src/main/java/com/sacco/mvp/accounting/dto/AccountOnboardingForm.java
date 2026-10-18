@@ -6,6 +6,8 @@ import java.util.UUID;
 /** Only accountant-entered chart metadata; classification and institution are server-derived. */
 @Data
 public class AccountOnboardingForm {
+    private UUID requestKey = UUID.randomUUID();
+    private String reason = "";
     private UUID parentId;
     private String code;
     private String name;

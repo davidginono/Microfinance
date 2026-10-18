@@ -21,6 +21,8 @@ public enum AccessFeature {
     LOAN_RECORDING("Accountant loan recording"),
     LOAN_ADJUSTMENTS("Loan provisions and corrections"),
     ACCOUNTING_ACCOUNTS("Chart of accounts"),
+    ACCOUNTING_ACCOUNT_APPROVAL("Institution account version approvals"),
+    ACCOUNTING_ACCOUNT_RULES("Institution account approval configuration"),
     ACCOUNTING_JOURNALS("Journal vouchers"),
     ACCOUNTING_OPENINGS("Opening balances"),
     ACCOUNTING_PERIODS("Accounting periods"),

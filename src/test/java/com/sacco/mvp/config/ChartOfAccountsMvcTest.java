@@ -79,15 +79,16 @@ class ChartOfAccountsMvcTest {
         mvc.perform(get("/finance/accounts/children").param("parentId",parent.toString()).param("sort","status").param("direction","desc").with(user(accountant))).andExpect(status().isOk());
         verify(ledger).chart(eq(accountant),eq(new AccountFilter("","","","",parent)),eq(0),eq(25),eq("status"),eq("desc"));
     }
-    @Test void savesDirectlyAndIgnoresSubmittedInstitutionClassificationAndActiveState() throws Exception {
+    @Test void createsVersionAndIgnoresSubmittedInstitutionClassificationAndActiveState() throws Exception {
+        UUID version=UUID.randomUUID();when(ledger.onboardVersion(any(),any(),eq(false),eq(true))).thenReturn(version);
         mvc.perform(post("/finance/accounts/posting").with(user(accountant)).with(csrf()).param("parentId",parent.toString())
             .param("code","121001").param("name","Land").param("normalBalance","DEBIT").param("saccoId","FOREIGN")
             .param("type","INCOME").param("active","false"))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/accounts?parentId="+parent));
-        verify(ledger).onboardAccount(eq(accountant),argThat(f->f.getName().equals("Land") && f.getParentId().equals(parent)),eq(false));
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/accounts/versions/"+version));
+        verify(ledger).onboardVersion(eq(accountant),argThat(f->f.getName().equals("Land") && f.getParentId().equals(parent)),eq(false),eq(true));
     }
     @Test void duplicatePreservesValuesAndShowsInlineCodeError() throws Exception {
-        when(ledger.onboardAccount(any(),any(),eq(false))).thenThrow(new IllegalArgumentException("accounting.error.duplicate"));
+        when(ledger.onboardVersion(any(),any(),eq(false),eq(true))).thenThrow(new IllegalArgumentException("accounting.error.duplicate"));
         var result=mvc.perform(post("/finance/accounts/posting").with(user(accountant)).with(csrf()).param("parentId",parent.toString())
             .param("code","121001").param("name","Land").param("nameSw","Ardhi"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/account-form"))
@@ -97,7 +98,7 @@ class ChartOfAccountsMvcTest {
     @Test void invalidParentBindingDoesNotCallTheMutation() throws Exception {
         mvc.perform(post("/finance/accounts/groups").with(user(accountant)).with(csrf()).param("parentId","invalid").param("name","Assets"))
             .andExpect(status().isOk()).andExpect(model().attributeHasFieldErrors("accountForm","parentId"));
-        verify(ledger,never()).onboardAccount(any(),any(),anyBoolean());
+        verify(ledger,never()).onboardVersion(any(),any(),anyBoolean(),anyBoolean());
     }
     @Test void mainGroupSetupIsUnavailableAndSaveRequiresCsrfAndStaffAccess() throws Exception {
         mvc.perform(post("/finance/accounts/initialize").with(user(accountant))).andExpect(status().isForbidden());

@@ -1,6 +1,6 @@
 # Chart of accounts onboarding
 
-Implemented for the user-requested direct-accountant setup on 2026-10-07. Account creation and activation have no approval stage. This increment creates account metadata; it does not initialize balances or change the existing journal, repayment, policy, reconciliation, closing, or release workflows.
+The original direct-accountant setup was implemented on 2026-10-07. The newer 2026-10-18 mandate adds account versions with institution-configured automatic or independent approval for creation, metadata edits and lifecycle changes. See [account version approvals](account-version-approvals.md) for the superseding workflow, access model and historical-evidence limits. This creates account metadata; it does not initialize balances or change lending approvals.
 
 ## Ownership and permission model
 

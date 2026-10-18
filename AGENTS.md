@@ -137,6 +137,11 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 ## UI Conventions
 
+### Versioned chart of accounts (2026-10-18)
+
+- Account creation, metadata edits, deactivation and reactivation use account versions with institution-wide automatic or independent approval configuration. Save draft retains an incomplete proposal; Save version validates and either approves/applies it automatically or freezes it for a different authorized reviewer. The current account remains effective until approval. This supersedes older direct-only COA guidance.
+- Preserve submitted snapshots, reasons, real reviewer decisions and permanent audit events. New configuration/review claims require explicit assignment. Account codes, classification, balance type, purpose and hierarchy retain their existing immutability protections. Existing account baselines do not establish historical approval; old journal lines without version evidence remain unchanged. See `docs/account-version-approvals.md`.
+
 ### Configurable voucher approvals (2026-10-18)
 
 - The user's newer instruction enables approval for **individual ordinary receipt/payment/journal vouchers and batches according to branch configuration**. This supersedes the no-approval restriction below only for configured scopes. Preserve direct posting when individual approval is disabled and preserve specialized loan receipt/repayment safeguards. All workspaces and actions require explicit claims; do not grant them automatically. See `docs/voucher-approval-workspaces.md`.

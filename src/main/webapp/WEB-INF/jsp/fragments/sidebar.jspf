@@ -405,7 +405,7 @@
                         </a>
                     </div>
                 </c:if>
-                <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings' or requestUri eq '/account/security' or requestUri eq '/profile'}" />
+                <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings' or requestUri eq '/account/security' or requestUri eq '/profile' or requestUri eq '/finance/accounts/approval-configuration'}" />
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="staffSettingsToggle"
@@ -421,6 +421,7 @@
                         </svg>
                     </button>
                     <div id="staffSettingsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNT_RULES_VIEW')"><a href="<c:url value='/finance/accounts/approval-configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/finance/accounts/approval-configuration'?'shell-nav-active':''}"><spring:message code="coav.configuration" /></a></sec:authorize>
                         <a href="/staff/settings"
                            class="shell-sidebar-subitem ${requestUri eq '/staff/settings' ? 'shell-nav-active' : ''}"
                            <c:if test="${requestUri eq '/staff/settings'}">aria-current="page"</c:if>>

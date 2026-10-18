@@ -54,6 +54,11 @@
         if (event.target === form) {
             if (submitting) { event.preventDefault(); return; }
             submitting = true; form.setAttribute('aria-busy', 'true');
+            if (form.hasAttribute('data-account-version-form') && event.submitter?.name) {
+                const command = document.createElement('input');
+                command.type = 'hidden'; command.name = event.submitter.name; command.value = event.submitter.value;
+                command.dataset.accountVersionCommand = ''; form.appendChild(command);
+            }
             form.querySelectorAll('button[type="submit"],button:not([type])').forEach(button => {
                 if (!button.disabled) { disabledOnSubmit.add(button); button.disabled = true; }
             });
@@ -70,6 +75,7 @@
     window.addEventListener('pageshow', () => {
         submitting = false; form.removeAttribute('aria-busy');
         disabledOnSubmit.forEach(button => button.disabled = false); disabledOnSubmit.clear();
+        form.querySelectorAll('[data-account-version-command]').forEach(input => input.remove());
     });
     form.querySelectorAll('label').forEach((label, index) => {
         const error = label.querySelector('.coa-error'), control = label.querySelector('input,select,textarea');

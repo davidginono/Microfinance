@@ -34,8 +34,9 @@
         <h2><spring:message code="${groupMode?'coa.groupDetails':'coa.accountDetails'}" /></h2>
         <c:if test="${not empty selectedParent}"><dl class="accounting-context"><div><dt><spring:message code="coa.parentGroup" /></dt><dd><c:out value="${selectedParent.code}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty selectedParent.nameSw?selectedParent.nameSw:selectedParent.name}" /></dd></div><div><dt><spring:message code="accounting.type" /></dt><dd><spring:message code="accounting.option.${selectedParent.type}" /></dd></div></dl></c:if>
         <c:url value="${formBase}" var="saveUrl" />
-        <form:form method="post" action="${saveUrl}" modelAttribute="accountForm" cssClass="accounting-create-form">
+        <form:form method="post" action="${saveUrl}" modelAttribute="accountForm" cssClass="accounting-create-form" data-account-version-form="true">
             <form:hidden path="parentId" />
+            <form:hidden path="requestKey" />
             <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>
             <form:errors path="parentId" cssClass="coa-error" element="p" />
             <div class="accounting-grid">
@@ -50,7 +51,9 @@
                     </div></fieldset>
                 </c:if>
             <details class="accounting-additional" ${not empty accountForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>
-            <c:url value="/finance/accounts" var="cancelChart"><c:param name="parentId" value="${selectedParent.id}" /></c:url><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:out value='${cancelChart}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" data-aws-action-pin="true"><spring:message code="${groupMode?'coa.createGroup':'coa.createAccount'}" /></button></div>
+            <label><spring:message code="coav.reason" /><form:textarea path="reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /></label>
+            <p><spring:message code="coav.saveHelp" /></p>
+            <c:url value="/finance/accounts" var="cancelChart"><c:param name="parentId" value="${selectedParent.id}" /></c:url><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:out value='${cancelChart}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-neutral" name="command" value="DRAFT" formnovalidate><spring:message code="coav.saveDraft" /></button><button class="app-btn btn-launch" name="command" value="SAVE" data-aws-action-pin="true"><spring:message code="coav.saveVersion" /></button></div>
         </form:form>
     </section>
 </div>
