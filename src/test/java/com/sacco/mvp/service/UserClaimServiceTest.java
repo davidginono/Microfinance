@@ -33,6 +33,61 @@ class UserClaimServiceTest {
 
     private UserClaimService userClaimService;
 
+    @Test
+    void retiredStructuredAndLegacyJsonGrantsCannotRestoreRoleDefaults() {
+        UUID member = UUID.randomUUID();
+        when(memberAccessClaimRepository.findByIdMemberId(member))
+            .thenReturn(List.of(accessClaim(member, "REPORT_RUN")));
+        assertThat(userClaimService.effectiveClaims(member, List.of(Position.ACCOUNTANT), false)).isEmpty();
+        verifyNoInteractions(userSettingsRepository);
+        when(memberAccessClaimRepository.findByIdMemberId(member)).thenReturn(List.of());
+        var settings = UserSettings.builder().memberId(member)
+            .notificationPrefs("{\"claims\":[\"REPORT_EXPORT\",\"REPORT_JOBS_REVIEW\",\"FINANCIAL_REPORTS_FINALIZE\"]}").build();
+        when(userSettingsRepository.findById(member)).thenReturn(Optional.of(settings));
+        when(userSettingsRepository.findAllById(List.of(member))).thenReturn(List.of(settings));
+        assertThat(userClaimService.effectiveClaims(member, List.of(Position.ACCOUNTANT), false)).isEmpty();
+        assertThat(userClaimService.effectiveClaims(java.util.Map.of(member,
+            new UserClaimService.ClaimSubject(List.of(Position.ACCOUNTANT), false))).get(member)).isEmpty();
+    }
+
+    @Test
+    void batchedStructuredGrantsKeepActiveClaimsAndIgnoreRetiredOnes() {
+        UUID member = UUID.randomUUID();
+        when(memberAccessClaimRepository.findByIdMemberIdIn(Set.of(member)))
+            .thenReturn(List.of(accessClaim(member, "REPORT_TEMPLATE_DESIGN"), accessClaim(member, "FINANCIAL_REPORTS_VIEW")));
+        assertThat(userClaimService.effectiveClaims(java.util.Map.of(member,
+            new UserClaimService.ClaimSubject(List.of(Position.ACCOUNTANT), false))).get(member))
+            .containsExactly(UserClaim.FINANCIAL_REPORTS_VIEW);
+        verifyNoInteractions(userSettingsRepository);
+    }
+
+    @Test
+    void assignmentFiltersRetiredClaimsAndRevocationRemainsEmptyAfterReload() {
+        UUID member = UUID.randomUUID();
+        UserSettings settings = UserSettings.builder().memberId(member).notificationPrefs("{\"theme\":\"compact\"}").build();
+        when(userSettingsRepository.findById(member)).thenReturn(Optional.of(settings));
+        userClaimService.updateClaims(member, List.of(UserClaim.REPORT_RUN, UserClaim.FINANCIAL_REPORTS_VIEW));
+        verify(memberAccessClaimRepository).save(claimNamed(member, "FINANCIAL_REPORTS_VIEW"));
+        org.mockito.Mockito.verify(memberAccessClaimRepository, org.mockito.Mockito.never())
+            .save(claimNamed(member, "REPORT_RUN"));
+        userClaimService.updateClaims(member, List.of());
+        assertThat(settings.getNotificationPrefs()).contains("\"claims\":[]", "theme");
+        assertThat(userClaimService.effectiveClaims(member, List.of(Position.ACCOUNTANT), false)).isEmpty();
+        when(userSettingsRepository.findAllById(List.of(member))).thenReturn(List.of(settings));
+        assertThat(userClaimService.effectiveClaims(java.util.Map.of(member,
+            new UserClaimService.ClaimSubject(List.of(Position.ACCOUNTANT), false))).get(member)).isEmpty();
+    }
+
+    @Test
+    void emptyAssignmentCreatesExplicitRevocationEvenWithoutExistingPreferences() {
+        UUID member = UUID.randomUUID();
+        when(userSettingsRepository.findById(member)).thenReturn(Optional.empty());
+        userClaimService.updateClaims(member, List.of(UserClaim.REPORT_RUN));
+        verify(userSettingsRepository).save(argThat(settings -> member.equals(settings.getMemberId())
+            && "{\"claims\":[]}".equals(settings.getNotificationPrefs()) && settings.getCreatedAt() != null));
+        org.mockito.Mockito.verify(memberAccessClaimRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
     @BeforeEach
     void setUp() {
         userClaimService = new UserClaimService(

@@ -1,5 +1,7 @@
 # Phase H: execution, security, and release evidence
 
+Runtime retirement, 2026-10-19: the operational report builder/execution workspaces and permissions described below are retired. Their unused runtime and worker were removed; historical tables, artifacts, audit evidence and deletion protections remain. See [permission cleanup](../permission-cleanup.md).
+
 This record separates executable controls and test evidence from human approval. The institution has not supplied approved accounting policies, a chart of accounts, or verified opening balances. No live release or accountant/compliance acceptance is asserted.
 
 ## Durable operational execution increment

@@ -43,6 +43,25 @@ class VoucherMvcTest {
    .andExpect(redirectedUrl("/finance/vouchers/receipts/"+id));
   verify(service).post(eq(actor),eq(Type.RECEIPT),argThat(f->f.getRows().size()==2 && f.getRows().get(1).getAmount().compareTo(new BigDecimal("2.02"))==0));
  }
+ @Test void retiredReportGrantsCannotOpenVoucherRoutesAndRevokedCreateCannotPost()throws Exception{
+  var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC")
+   .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
+  var retired=new AppUserPrincipal(member,Set.of(UserClaim.REPORT_RUN,UserClaim.FINANCIAL_REPORTS_FINALIZE),true);
+  var repository=mock(com.sacco.mvp.accounting.repository.VoucherRepository.class);
+  var directory=mock(com.sacco.mvp.service.MemberDirectoryService.class);
+  var ledger=new GeneralLedgerService(mock(com.sacco.mvp.accounting.repository.GeneralLedgerRepository.class),
+   new com.sacco.mvp.service.AccessControlService(),mock(com.sacco.mvp.service.AuditService.class),context.getBean(ApplicationClock.class),
+   mock(com.sacco.mvp.service.UserClaimService.class),directory,mock(com.sacco.mvp.service.SaccoRegistryService.class));
+  var realService=new VoucherService(repository,ledger,context.getBean(ApplicationClock.class),mock(com.sacco.mvp.service.AuditService.class),tools.jackson.databind.json.JsonMapper.builder().build(),gate);
+  var controller=context.getBean(VoucherController.class);
+  org.springframework.test.util.ReflectionTestUtils.setField(controller,"vouchers",realService);
+  try{
+   mvc.perform(get("/finance/vouchers/journals").with(user(retired))).andExpect(status().isForbidden());
+   var readOnly=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW),true);
+   mvc.perform(post("/finance/vouchers/journals").with(user(readOnly)).with(csrf())).andExpect(status().isForbidden());
+   verifyNoInteractions(repository,directory,receipts,gate,workflows,workflowPosting);
+  }finally{org.springframework.test.util.ReflectionTestUtils.setField(controller,"vouchers",service);}
+ }
  @Test void previewDoesNotPostAndBindingErrorsKeepUserValues()throws Exception{
   when(service.preview(any(),any(),any())).thenReturn(new Preview(List.of(),BigDecimal.ZERO));
   mvc.perform(post("/finance/vouchers/journals").with(user(actor)).with(csrf()).param("action","preview").param("party","Context").param("rows[0].amount","2.02"))

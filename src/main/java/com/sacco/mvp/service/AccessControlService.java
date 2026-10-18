@@ -19,9 +19,6 @@ public class AccessControlService {
             return false;
         }
         Set<String> principalClaims = principal.getClaims();
-        if (principalClaims.contains(claimName)) {
-            return true;
-        }
         return UserClaim.fromStoredName(claimName).stream()
             .map(UserClaim::name)
             .anyMatch(principalClaims::contains);
@@ -107,8 +104,6 @@ public class AccessControlService {
         return isStaffSession(principal) && isAdminScope(principal) && hasAny(principal,
             UserClaim.ADMIN_DASHBOARD_VIEW,
             UserClaim.USER_ACCESS_VIEW,
-            UserClaim.ACCESS_MATRIX_VIEW,
-            UserClaim.ACCESS_MATRIX_UPDATE,
             UserClaim.WORKSPACE_SETTINGS_VIEW,
             UserClaim.WORKSPACE_SETTINGS_UPDATE,
             UserClaim.WORKSPACE_SETTINGS_CONFIGURE,
@@ -156,7 +151,6 @@ public class AccessControlService {
                 UserClaim.GUARANTOR_REQUESTS_APPROVE,
                 UserClaim.GUARANTOR_REQUESTS_REJECT,
                 UserClaim.LOAN_DOCUMENTS_VIEW,
-                UserClaim.LOAN_DOCUMENTS_CREATE,
                 UserClaim.LOAN_DOCUMENTS_EXPORT,
                 UserClaim.LOAN_REPORTS_VIEW,
                 UserClaim.LOAN_REPORTS_EXPORT,

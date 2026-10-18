@@ -24,6 +24,8 @@ public class RetainedFinancialHistoryRepository {
             or exists(select 1 from accounting_archive.cash_flow_allocations where sacco_id=:id)
             or exists(select 1 from accounting_archive.accounting_release_requests where sacco_id=:id)
             or exists(select 1 from accounting_archive.statement_output_sets where sacco_id=:id)
+            or exists(select 1 from operational_report_templates where sacco_id=:id)
+            or exists(select 1 from report_runs where sacco_id=:id)
             """, Map.of("id", institution), Boolean.class));
     }
     public boolean hasMemberHistory(UUID member) {
@@ -55,6 +57,9 @@ public class RetainedFinancialHistoryRepository {
             or exists(select 1 from accounting_archive.accounting_release_invalidations where actor_id=:id)
             or exists(select 1 from accounting_archive.statement_output_sets where generated_by=:id)
             or exists(select 1 from accounting_archive.statement_output_reviews where reviewer=:id)
+            or exists(select 1 from operational_report_templates where created_by=:id)
+            or exists(select 1 from operational_report_template_versions where made_by=:id or checked_by=:id)
+            or exists(select 1 from report_runs where requested_by=:id or approved_by=:id)
             """, Map.of("id", member), Boolean.class));
     }
 }

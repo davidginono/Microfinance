@@ -1,0 +1,134 @@
+# Selectable permission trace — 2026-10-19
+
+Source audit of all 128 selectable claims after retirement. Each row identifies a production authorization consumer, including dynamic claim-name construction. This is a dependency trace, not a claim of end-to-end manual execution of every operation. Access remains subject to the existing session, institution, branch, ownership and workflow checks.
+
+| Claim | Implemented authorization consumer |
+| --- | --- |
+| `VOUCHER_WORKSPACE_VIEW` | [VoucherService](../src/main/java/com/sacco/mvp/accounting/service/VoucherService.java#L58) |
+| `VOUCHER_WORKSPACE_CREATE` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L80) |
+| `VOUCHER_WORKSPACE_UPDATE` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L88) |
+| `VOUCHER_WORKSPACE_VALIDATE` | [VoucherWorkflowController](../src/main/java/com/sacco/mvp/accounting/approval/controller/VoucherWorkflowController.java#L61) |
+| `VOUCHER_WORKSPACE_POST` | [VoucherApprovalGate](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherApprovalGate.java#L35) |
+| `VOUCHER_APPROVAL_INITIATE` | [VoucherWorkflowController](../src/main/java/com/sacco/mvp/accounting/approval/controller/VoucherWorkflowController.java#L61) |
+| `VOUCHER_APPROVAL_WITHDRAW` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L70) |
+| `VOUCHER_APPROVAL_HOLD` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L71) |
+| `VOUCHER_APPROVAL_APPROVE` | [VoucherService](../src/main/java/com/sacco/mvp/accounting/service/VoucherService.java#L78) |
+| `VOUCHER_APPROVAL_REJECT` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L53) |
+| `VOUCHER_APPROVAL_FORCE` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L137) |
+| `VOUCHER_APPROVAL_ESCALATED_APPROVE` | [VoucherService](../src/main/java/com/sacco/mvp/accounting/service/VoucherService.java#L78) |
+| `VOUCHER_RULE_VIEW` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L57) |
+| `VOUCHER_RULE_CONFIGURE` | [VoucherWorkflowService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherWorkflowService.java#L57) |
+| `VOUCHER_DOCUMENT_VIEW` | [VoucherDocumentService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherDocumentService.java#L23) |
+| `VOUCHER_DOCUMENT_CREATE` | [VoucherDocumentService](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherDocumentService.java#L31) |
+| `USER_ACCESS_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L839) |
+| `USER_ACCESS_CREATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L895) |
+| `USER_ACCESS_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L867) |
+| `USER_ACCESS_DELETE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L974) |
+| `ADMIN_DASHBOARD_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L118) |
+| `SACCO_REGISTRY_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1853) |
+| `SACCO_REGISTRY_CREATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1958) |
+| `SACCO_REGISTRY_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L2124) |
+| `SACCO_REGISTRY_DELETE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L2200) |
+| `PLATFORM_SETTINGS_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L275) |
+| `PLATFORM_SETTINGS_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L290) |
+| `WORKSPACE_SETTINGS_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L105) |
+| `WORKSPACE_SETTINGS_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1317) |
+| `WORKSPACE_SETTINGS_CONFIGURE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L2293) |
+| `LOAN_PRODUCTS_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L997) |
+| `LOAN_PRODUCTS_CREATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1198) |
+| `LOAN_PRODUCTS_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1048) |
+| `LOAN_PRODUCTS_CONFIGURE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1149) |
+| `LOAN_PRODUCTS_DELETE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1184) |
+| `APPROVAL_FLOW_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L997) |
+| `APPROVAL_FLOW_CONFIGURE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1720) |
+| `SMS_USAGE_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L133) |
+| `SMS_USAGE_ADD` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L242) |
+| `SMS_USAGE_CONFIGURE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L260) |
+| `OUTBOX_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1738) |
+| `OUTBOX_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1779) |
+| `MEMBER_SETTINGS_VIEW` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L2364) |
+| `MEMBER_SETTINGS_UPDATE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L2386) |
+| `PAYMENT_DETAILS_VIEW` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L2364) |
+| `PAYMENT_DETAILS_UPDATE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L2399) |
+| `LOAN_REPAYMENTS_VIEW` | [LoanRepaymentLedgerService](../src/main/java/com/sacco/mvp/service/LoanRepaymentLedgerService.java#L362) |
+| `LOAN_RECORDING_VIEW` | [LoanRepaymentLedgerService](../src/main/java/com/sacco/mvp/service/LoanRepaymentLedgerService.java#L363) |
+| `LOAN_RECORDING_CREATE` | [LoanRecordingController](../src/main/java/com/sacco/mvp/accounting/loans/controller/LoanRecordingController.java#L298) |
+| `LOAN_RECORDING_DISBURSE` | [LoanRecordingController](../src/main/java/com/sacco/mvp/accounting/loans/controller/LoanRecordingController.java#L298) |
+| `LOAN_RECORDING_POST` | [LoanChargeService](../src/main/java/com/sacco/mvp/accounting/charges/service/LoanChargeService.java#L77) |
+| `LOAN_RECORDING_REVERSE` | [LoanChargeService](../src/main/java/com/sacco/mvp/accounting/charges/service/LoanChargeService.java#L100) |
+| `LOAN_RECORDING_EXPORT` | [export authorization](../src/main/java/com/sacco/mvp/accounting/loans/service/LoanRecordingService.java#L44) |
+| `LOAN_CHARGES_CUSTOM` | [LoanChargeService](../src/main/java/com/sacco/mvp/accounting/charges/service/LoanChargeService.java#L50) |
+| `LOAN_ADJUSTMENTS_VIEW` | [loan adjustment authorization](../src/main/java/com/sacco/mvp/accounting/adjustments/service/LoanAdjustmentService.java#L27) |
+| `LOAN_ADJUSTMENTS_CREATE` | [loan adjustment authorization](../src/main/java/com/sacco/mvp/accounting/adjustments/service/LoanAdjustmentService.java#L27) |
+| `LOAN_ADJUSTMENTS_APPROVE` | [loan adjustment authorization](../src/main/java/com/sacco/mvp/accounting/adjustments/service/LoanAdjustmentService.java#L27) |
+| `LOAN_ADJUSTMENTS_EXPORT` | [loan adjustment authorization](../src/main/java/com/sacco/mvp/accounting/adjustments/service/LoanAdjustmentService.java#L27) |
+| `LOAN_REPAYMENTS_CREATE` | [LoanRepaymentController](../src/main/java/com/sacco/mvp/web/LoanRepaymentController.java#L57) |
+| `LOAN_REPAYMENTS_REVERSE` | [LoanRepaymentController](../src/main/java/com/sacco/mvp/web/LoanRepaymentController.java#L76) |
+| `ACCOUNTING_ACCOUNTS_VIEW` | [AccountingCodeLibraryController](../src/main/java/com/sacco/mvp/accounting/controller/AccountingCodeLibraryController.java#L21) |
+| `ACCOUNTING_ACCOUNTS_CREATE` | [AccountingCodeLibraryController](../src/main/java/com/sacco/mvp/accounting/controller/AccountingCodeLibraryController.java#L50) |
+| `ACCOUNTING_ACCOUNTS_UPDATE` | [AccountingCodeLibraryController](../src/main/java/com/sacco/mvp/accounting/controller/AccountingCodeLibraryController.java#L62) |
+| `ACCOUNTING_ACCOUNT_APPROVAL_VIEW` | [GeneralLedgerService](../src/main/java/com/sacco/mvp/accounting/service/GeneralLedgerService.java#L308) |
+| `ACCOUNTING_ACCOUNT_APPROVAL_APPROVE` | [account version decision](../src/main/java/com/sacco/mvp/accounting/service/GeneralLedgerService.java#L308) |
+| `ACCOUNTING_ACCOUNT_APPROVAL_REJECT` | [account version decision](../src/main/java/com/sacco/mvp/accounting/service/GeneralLedgerService.java#L308) |
+| `ACCOUNTING_ACCOUNT_RULES_VIEW` | [AccountVersionController](../src/main/java/com/sacco/mvp/accounting/controller/AccountVersionController.java#L82) |
+| `ACCOUNTING_ACCOUNT_RULES_CONFIGURE` | [AccountVersionController](../src/main/java/com/sacco/mvp/accounting/controller/AccountVersionController.java#L86) |
+| `ACCOUNTING_JOURNALS_VIEW` | [ManagementReportService](../src/main/java/com/sacco/mvp/accounting/management/service/ManagementReportService.java#L23) |
+| `ACCOUNTING_JOURNALS_CREATE` | [VoucherApprovalGate](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherApprovalGate.java#L25) |
+| `ACCOUNTING_JOURNALS_REVERSE` | [VoucherController](../src/main/java/com/sacco/mvp/accounting/controller/VoucherController.java#L110) |
+| `ACCOUNTING_BUSINESS_VIEW` | [ReceiptBatchController](../src/main/java/com/sacco/mvp/accounting/batch/controller/ReceiptBatchController.java#L24) |
+| `ACCOUNTING_BUSINESS_CREATE` | [VoucherApprovalGate](../src/main/java/com/sacco/mvp/accounting/approval/service/VoucherApprovalGate.java#L25) |
+| `ACCOUNTING_BUSINESS_REVERSE` | [VoucherController](../src/main/java/com/sacco/mvp/accounting/controller/VoucherController.java#L110) |
+| `MEMBER_LOANS_VIEW` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L58) |
+| `MEMBER_LOANS_CREATE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L301) |
+| `MEMBER_LOANS_UPDATE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L261) |
+| `MEMBER_LOANS_ASSIGN` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L1540) |
+| `MEMBER_LOANS_DELETE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L1563) |
+| `GUARANTOR_REQUESTS_VIEW` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L67) |
+| `GUARANTOR_REQUESTS_UPDATE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L2236) |
+| `GUARANTOR_REQUESTS_APPROVE` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L1914) |
+| `GUARANTOR_REQUESTS_REJECT` | [AppController](../src/main/java/com/sacco/mvp/web/AppController.java#L2221) |
+| `LOAN_DOCUMENTS_VIEW` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L109) |
+| `LOAN_DOCUMENTS_EXPORT` | [LoanDocumentController](../src/main/java/com/sacco/mvp/web/LoanDocumentController.java#L68) |
+| `STAFF_ANALYTICS_VIEW` | [AccessControlService](../src/main/java/com/sacco/mvp/service/AccessControlService.java#L209) |
+| `STAFF_ANALYTICS_EXPORT` | [LoanDocumentController](../src/main/java/com/sacco/mvp/web/LoanDocumentController.java#L245) |
+| `LOAN_OFFICER_QUEUE_VIEW` | [WorkspaceLanding](../src/main/java/com/sacco/mvp/security/WorkspaceLanding.java#L53) |
+| `LOAN_OFFICER_QUEUE_ASSIGN` | [WorkflowRoutingService](../src/main/java/com/sacco/mvp/service/WorkflowRoutingService.java#L95) |
+| `LOAN_OFFICER_QUEUE_APPROVE` | [LoanOfficerController](../src/main/java/com/sacco/mvp/web/LoanOfficerController.java#L410) |
+| `LOAN_OFFICER_QUEUE_REJECT` | [LoanOfficerController](../src/main/java/com/sacco/mvp/web/LoanOfficerController.java#L410) |
+| `LOAN_OFFICER_QUEUE_EXPORT` | [LoanDocumentController](../src/main/java/com/sacco/mvp/web/LoanDocumentController.java#L415) |
+| `MANAGER_QUEUE_VIEW` | [WorkspaceLanding](../src/main/java/com/sacco/mvp/security/WorkspaceLanding.java#L56) |
+| `MANAGER_QUEUE_APPROVE` | [ManagerController](../src/main/java/com/sacco/mvp/web/ManagerController.java#L370) |
+| `MANAGER_QUEUE_REJECT` | [ManagerController](../src/main/java/com/sacco/mvp/web/ManagerController.java#L370) |
+| `MANAGER_QUEUE_EXPORT` | [LoanDocumentController](../src/main/java/com/sacco/mvp/web/LoanDocumentController.java#L379) |
+| `ACCOUNTANT_QUEUE_VIEW` | [WorkspaceLanding](../src/main/java/com/sacco/mvp/security/WorkspaceLanding.java#L59) |
+| `ACCOUNTANT_QUEUE_APPROVE` | [AccountantController](../src/main/java/com/sacco/mvp/web/AccountantController.java#L396) |
+| `ACCOUNTANT_QUEUE_REJECT` | [AccountantController](../src/main/java/com/sacco/mvp/web/AccountantController.java#L396) |
+| `ACCOUNTANT_QUEUE_EXPORT` | [AccountantController](../src/main/java/com/sacco/mvp/web/AccountantController.java#L214) |
+| `BOARD_QUEUE_VIEW` | [WorkspaceLanding](../src/main/java/com/sacco/mvp/security/WorkspaceLanding.java#L68) |
+| `BOARD_QUEUE_APPROVE` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L182) |
+| `BOARD_QUEUE_REJECT` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L191) |
+| `BOARD_QUEUE_EXPORT` | [BoardController](../src/main/java/com/sacco/mvp/web/BoardController.java#L199) |
+| `CHAIRPERSON_QUEUE_VIEW` | [WorkspaceLanding](../src/main/java/com/sacco/mvp/security/WorkspaceLanding.java#L65) |
+| `CHAIRPERSON_QUEUE_APPROVE` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L181) |
+| `CHAIRPERSON_QUEUE_REJECT` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L190) |
+| `CHAIRPERSON_QUEUE_EXPORT` | [BoardController](../src/main/java/com/sacco/mvp/web/BoardController.java#L199) |
+| `PROCESSED_LOANS_VIEW` | [AccessControlService](../src/main/java/com/sacco/mvp/service/AccessControlService.java#L185) |
+| `SACCO_CONFIGURATIONS_VIEW` | [AccessControlService](../src/main/java/com/sacco/mvp/service/AccessControlService.java#L189) |
+| `CREDIT_COMMITTEE_QUEUE_VIEW` | [WorkspaceLanding](../src/main/java/com/sacco/mvp/security/WorkspaceLanding.java#L71) |
+| `CREDIT_COMMITTEE_QUEUE_APPROVE` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L183) |
+| `CREDIT_COMMITTEE_QUEUE_REJECT` | [AuthzService](../src/main/java/com/sacco/mvp/security/AuthzService.java#L192) |
+| `CREDIT_COMMITTEE_QUEUE_EXPORT` | [BoardController](../src/main/java/com/sacco/mvp/web/BoardController.java#L199) |
+| `DISBURSEMENT_QUEUE_VIEW` | [LoanRecordingService](../src/main/java/com/sacco/mvp/accounting/loans/service/LoanRecordingService.java#L408) |
+| `DISBURSEMENT_QUEUE_EXPORT` | [DisbursementController](../src/main/java/com/sacco/mvp/web/DisbursementController.java#L266) |
+| `DISBURSEMENT_QUEUE_DISBURSE` | [ArchivedLoanDeletionService](../src/main/java/com/sacco/mvp/service/ArchivedLoanDeletionService.java#L70) |
+| `LOAN_REPORTS_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L1714) |
+| `LOAN_REPORTS_EXPORT` | [LoanDocumentController](../src/main/java/com/sacco/mvp/web/LoanDocumentController.java#L211) |
+| `NOTIFICATIONS_VIEW` | [AccountantController](../src/main/java/com/sacco/mvp/web/AccountantController.java#L493) |
+| `NOTIFICATIONS_UPDATE` | [AccountantController](../src/main/java/com/sacco/mvp/web/AccountantController.java#L516) |
+| `SUPPORT_VIEW` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L493) |
+| `SUPPORT_CREATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L786) |
+| `SUPPORT_UPDATE` | [AdminController](../src/main/java/com/sacco/mvp/web/AdminController.java#L654) |
+| `FINANCIAL_REPORTS_VIEW` | [ManagementReportService](../src/main/java/com/sacco/mvp/accounting/management/service/ManagementReportService.java#L22) |
+| `FINANCIAL_REPORTS_EXPORT` | [VoucherService](../src/main/java/com/sacco/mvp/accounting/service/VoucherService.java#L32) |
+| `FINANCIAL_REPORTS_INSTITUTION` | [StatementService](../src/main/java/com/sacco/mvp/accounting/statements/service/StatementService.java#L31) |
+| `ACCOUNTING_RECONCILIATION_VIEW` | [ReconciliationService](../src/main/java/com/sacco/mvp/accounting/reconciliation/service/ReconciliationService.java#L22) |

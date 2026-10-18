@@ -93,9 +93,6 @@ public class UserClaimService {
         if (principal == null || claimName == null || claimName.isBlank()) {
             return false;
         }
-        if (principal.getClaims().contains(claimName)) {
-            return true;
-        }
         return UserClaim.fromStoredName(claimName).stream()
             .map(UserClaim::name)
             .anyMatch(principal.getClaims()::contains);
@@ -109,6 +106,7 @@ public class UserClaimService {
         memberAccessClaimRepository.deleteByMemberId(memberId);
         List<UserClaim> normalizedClaims = claims == null ? List.of() : claims.stream()
             .filter(java.util.Objects::nonNull)
+            .filter(UserClaim::isAvailable)
             .distinct()
             .toList();
         normalizedClaims.forEach(claim -> memberAccessClaimRepository.save(MemberAccessClaim.builder()
@@ -118,13 +116,19 @@ public class UserClaimService {
         if (settingsResult == null) {
             return;
         }
-        settingsResult.ifPresent(settings -> {
-            Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
-            prefs.remove("claims");
-            settings.setNotificationPrefs(writePrefs(prefs));
-            settings.setUpdatedAt(OffsetDateTime.now());
-            userSettingsRepository.save(settings);
-        });
+        if (settingsResult.isEmpty() && !normalizedClaims.isEmpty()) {
+            return;
+        }
+        UserSettings settings = settingsResult.orElseGet(() -> UserSettings.builder()
+            .memberId(memberId).language("en").notificationPrefs("{}")
+            .createdAt(OffsetDateTime.now()).build());
+        Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
+        // An explicit empty assignment must not fall back to role defaults on the next request.
+        if (normalizedClaims.isEmpty()) prefs.put("claims", List.of());
+        else prefs.remove("claims");
+        settings.setNotificationPrefs(writePrefs(prefs));
+        settings.setUpdatedAt(OffsetDateTime.now());
+        userSettingsRepository.save(settings);
     }
 
     public Set<UserClaim> parseClaims(String notificationPrefs) {

@@ -2422,6 +2422,7 @@ public class AdminService {
         if (requestedClaims != null) {
             requestedClaims.stream()
                 .filter(java.util.Objects::nonNull)
+                .filter(UserClaim::isAvailable)
                 .forEach(normalized::add);
         } else {
             normalized.addAll(userClaimService.defaultClaims(staffRoles, memberAccess));

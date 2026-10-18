@@ -6,6 +6,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
     @Test
+    void obsoleteReportClaimsKeepIdentifiersButCannotBeAssignedOrLoaded() {
+        var retired = java.util.List.of(UserClaim.REPORT_TEMPLATE_DESIGN, UserClaim.REPORT_TEMPLATE_PUBLISH,
+            UserClaim.REPORT_TEMPLATE_SHARE, UserClaim.REPORT_RUN, UserClaim.REPORT_EXPORT,
+            UserClaim.REPORT_RUN_APPROVE, UserClaim.REPORT_JOBS_REVIEW, UserClaim.FINANCIAL_REPORTS_FINALIZE,
+            UserClaim.ACCESS_MATRIX_VIEW, UserClaim.ACCESS_MATRIX_UPDATE, UserClaim.LOAN_DOCUMENTS_CREATE);
+        for (var claim : retired) {
+            assertThat(UserClaim.valueOf(claim.name())).isSameAs(claim);
+            assertThat(claim.isAvailable()).isFalse();
+            assertThat(UserClaim.fromStoredName(claim.name())).isEmpty();
+            assertThat(UserClaim.expandLegacy(java.util.List.of(claim))).isEmpty();
+            assertThat(UserClaim.forFeatureAction(claim.getFeature(), claim.getAction())).isEmpty();
+            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().containsValue(claim));
+        }
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()), true)).doesNotContainAnyElementsOf(retired);
+        assertThat(UserClaim.matrixRows()).noneMatch(row -> row.feature() == AccessFeature.REPORT_BUILDER
+            || row.feature() == AccessFeature.REPORT_EXECUTION);
+        for (var active : java.util.List.of(UserClaim.FINANCIAL_REPORTS_VIEW, UserClaim.FINANCIAL_REPORTS_EXPORT,
+            UserClaim.FINANCIAL_REPORTS_INSTITUTION, UserClaim.ACCOUNTING_RECONCILIATION_VIEW,
+            UserClaim.VOUCHER_WORKSPACE_CREATE, UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_APPROVE,
+            UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_REJECT)) {
+            assertThat(UserClaim.fromStoredName(active.name())).containsExactly(active);
+            assertThat(UserClaim.matrixRows()).anyMatch(row -> row.claimsByAction().containsValue(active));
+        }
+    }
+
+    @Test
     void voucherWorkflowPermissionsAreExplicitAndUseAccurateActions() {
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()), true))
             .doesNotContain(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.VOUCHER_WORKSPACE_POST,
@@ -57,15 +83,15 @@ class UserClaimTest {
     @Test
     void matrixRowsKeepUnsupportedActionCellsAsMissingClaims() {
         UserClaim.AccessMatrixRow accessMatrix = UserClaim.matrixRows().stream()
-            .filter(row -> row.feature() == AccessFeature.ACCESS_MATRIX)
+            .filter(row -> row.feature() == AccessFeature.LOAN_DOCUMENTS)
             .findFirst()
             .orElseThrow();
 
         assertThat(accessMatrix.claimsByAction().get(AccessAction.VIEW))
-            .isEqualTo(UserClaim.ACCESS_MATRIX_VIEW);
+            .isEqualTo(UserClaim.LOAN_DOCUMENTS_VIEW);
         assertThat(accessMatrix.claimsByAction().get(AccessAction.ADD))
             .isNull();
-        assertThat(UserClaim.forFeatureAction(AccessFeature.ACCESS_MATRIX, AccessAction.ADD))
+        assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_DOCUMENTS, AccessAction.ADD))
             .isEmpty();
     }
 
@@ -130,8 +156,6 @@ class UserClaimTest {
     void administratorRecoveryClaimsKeepTheAccessMatrixReachable() {
         assertThat(UserClaim.administratorRecoveryClaims()).containsExactlyInAnyOrder(
             UserClaim.ADMIN_DASHBOARD_VIEW,
-            UserClaim.ACCESS_MATRIX_VIEW,
-            UserClaim.ACCESS_MATRIX_UPDATE,
             UserClaim.USER_ACCESS_VIEW,
             UserClaim.USER_ACCESS_UPDATE
         );

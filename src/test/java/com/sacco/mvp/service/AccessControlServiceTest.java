@@ -20,6 +20,25 @@ class AccessControlServiceTest {
     private final AccessControlService access = new AccessControlService();
 
     @Test
+    void rawClaimsFromAnOlderSessionCannotReactivateRetiredPermissions() {
+        var actor = org.mockito.Mockito.mock(AppUserPrincipal.class);
+        var stored = java.util.Arrays.stream(UserClaim.values()).map(UserClaim::name).collect(java.util.stream.Collectors.toSet());
+        org.mockito.Mockito.when(actor.getClaims()).thenReturn(stored);
+        var userClaims = new UserClaimService(null, null, null);
+        for (var claim : UserClaim.values()) {
+            assertThat(access.has(actor, claim)).as(claim.name()).isEqualTo(claim.isAvailable());
+            assertThat(userClaims.has(actor, claim.name())).as(claim.name()).isEqualTo(claim.isAvailable());
+        }
+    }
+
+    @Test
+    void newPrincipalsDropUnavailableClaims() {
+        var actor = principal(List.of(Position.ACCOUNTANT), false, true, java.util.EnumSet.allOf(UserClaim.class));
+        assertThat(actor.getClaims()).contains(UserClaim.FINANCIAL_REPORTS_VIEW.name())
+            .doesNotContain(UserClaim.REPORT_RUN.name(), UserClaim.FINANCIAL_REPORTS_FINALIZE.name());
+    }
+
+    @Test
     void staffQueueRequiresStaffSessionAndGranularClaim() {
         assertThat(access.canAccessManagerArea(principal(List.of(Position.MANAGER), false, true, Set.of())))
             .isFalse();

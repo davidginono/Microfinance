@@ -1,5 +1,7 @@
 # Phase F: controlled operational report builder
 
+Runtime retirement, 2026-10-19: this builder and its report execution worker have been removed. Historical definitions, runs, artifacts, audit evidence and deletion protections remain. See [permission cleanup](../permission-cleanup.md).
+
 Implementation date: 2026-10-02. This document records software evidence, not institution accounting approval or live release approval.
 
 ## Scope and contracts

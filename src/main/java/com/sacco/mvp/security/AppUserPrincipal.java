@@ -58,7 +58,7 @@ public class AppUserPrincipal implements UserDetails {
         this.authorities = java.util.Collections.emptyList();
         this.claims = claims == null || claims.isEmpty()
             ? java.util.Collections.emptySet()
-            : claims.stream().map(UserClaim::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
+            : claims.stream().filter(UserClaim::isAvailable).map(UserClaim::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private Set<Position> resolveGrantedPositions(Set<Position> staffRoles, boolean memberAccess) {
