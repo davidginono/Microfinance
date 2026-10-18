@@ -254,7 +254,13 @@ class VoucherPostgresTest {
   assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(2);
   var f=ruleForm(true,true,false,false);var row=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow();row.setName("Overlapping");f.getRules().add(row);assertThatThrownBy(()->workflows.configure(actor,f)).hasMessage("approval.error.overlap");
  }
- UUID batch(int count){var f=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.CreateForm();f.setTitle("Synthetic batch");UUID id=workflows.create(actor,f);for(int n=0;n<count;n++){var form=form(Type.JOURNAL);workflows.save(actor,id,form.getRequestKey(),workflows.details(actor,id).workflow().version(),0,form);}return id;}
+ // Existing batch records are fixture data, not a production creation API.
+ UUID batch(int count){return tx.execute(status->{var workflow=workflowRepository.create(actor,UUID.randomUUID(),Type.JOURNAL,"BATCH","Synthetic existing batch",now);for(int n=0;n<count;n++){var f=form(Type.JOURNAL);workflowRepository.save(workflow,actor,f.getRequestKey(),n+1,f,true);}jdbc.update("update voucher_workflow set item_count=?,validation='NOT_VALIDATED' where id=?",count,workflow.id());return workflow.id();});}
+ @Test void correctingAnApprovalCannotAppendAnUnknownVoucher(){
+  UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));var before=workflows.details(actor,id);var extra=form(Type.JOURNAL);
+  assertThatThrownBy(()->workflows.save(actor,id,extra.getRequestKey(),before.workflow().version(),0,extra)).hasMessage("approval.error.unavailable");
+  var after=workflows.details(actor,id);assertThat(after.items()).hasSize(1);assertThat(after.workflow().version()).isEqualTo(before.workflow().version());
+ }
  void validateWorkflow(UUID id){workflows.validate(actor,id,workflows.details(actor,id).workflow().version());}
  void command(AppUserPrincipal user,UUID id,String action,String comments){workflows.action(user,id,workflows.details(user,id).workflow().version(),action,comments);}
  void configure(boolean individual,boolean batch,boolean automatic,boolean force){workflows.configure(actor,ruleForm(individual,batch,automatic,force));}

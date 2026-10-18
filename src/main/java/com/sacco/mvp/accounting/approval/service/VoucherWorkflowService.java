@@ -54,13 +54,6 @@ public class VoucherWorkflowService {
         return new Details(w,repository.items(id),repository.history(id),Set.copyOf(actions));
     }
     @Transactional
-    public UUID create(AppUserPrincipal a,CreateForm f) {
-        authorize(a,"VOUCHER_WORKSPACE_CREATE");require(f.getType()!=null,"input");viewAccess(a,f.getType());vouchers.authorize(a,f.getType(),"CREATE");
-        require(f.getRequestKey()!=null && Set.of("SINGLE","BATCH").contains(f.getScope()) && f.getTitle()!=null && !f.getTitle().isBlank() && f.getTitle().length()<=160,"input");
-        repository.requestLock(a,f.getRequestKey());var prior=repository.request(a,f.getRequestKey());if(prior.isPresent()) {var p=prior.get();require(p.owner().equals(a.getMemberId()) && p.type()==f.getType() && p.scope().equals(f.getScope()) && p.title().equals(f.getTitle().strip()),"retry");return p.id();}
-        var w=repository.create(a,f.getRequestKey(),f.getType(),f.getScope(),f.getTitle().strip(),clock.now());event(a,w,"CREATED","");return w.id();
-    }
-    @Transactional
     public UUID capture(AppUserPrincipal a,Type type,Form source) {
         authorize(a,"VOUCHER_WORKSPACE_CREATE");viewAccess(a,type);vouchers.authorize(a,type,"CREATE");
         var form=gate.canonical(source,source.getRequestKey());repository.requestLock(a,source.getRequestKey());var existing=repository.request(a,source.getRequestKey());
@@ -71,16 +64,10 @@ public class VoucherWorkflowService {
     @Transactional
     public UUID save(AppUserPrincipal a,UUID id,UUID item,int expectedVersion,int itemVersion,Form source) {
         authorize(a,"VOUCHER_WORKSPACE_UPDATE");var w=editable(a,id,expectedVersion);vouchers.authorize(a,w.type(),"CREATE");
-        var items=repository.items(id);var prior=items.stream().filter(i->i.id().equals(item)).findFirst();
-        require(prior.isPresent()?prior.get().version()==itemVersion:itemVersion==0,"stale");
-        require(prior.isPresent() || items.size()<(w.scope().equals("SINGLE")?1:50),"limit");
-        var form=gate.canonical(source,item);int line=prior.map(Item::line).orElseGet(()->java.util.stream.IntStream.rangeClosed(1,50).filter(n->items.stream().noneMatch(i->i.line()==n)).findFirst().orElseThrow(()->new Invalid("limit")));
-        repository.save(w,a,item,line,form,prior.isEmpty());repository.invalidate(id);changed(w,items.size()+(prior.isEmpty()?1:0));event(a,w,"CORRECTED","");return item;
-    }
-    @Transactional
-    public void delete(AppUserPrincipal a,UUID id,UUID item,int version) {
-        authorize(a,"VOUCHER_WORKSPACE_UPDATE");var w=editable(a,id,version);require(repository.item(id,item).isPresent(),"unavailable");
-        repository.delete(id,item);repository.invalidate(id);changed(w,w.itemCount()-1);event(a,w,"ITEM_REMOVED","");
+        var prior=repository.item(id,item).orElseThrow(()->new Invalid("unavailable"));
+        require(prior.version()==itemVersion,"stale");
+        var form=gate.canonical(source,item);
+        repository.save(w,a,item,prior.line(),form,false);repository.invalidate(id);changed(w,w.itemCount());event(a,w,"CORRECTED","");return item;
     }
     private void changed(Workflow w,int count) {
         var approval=w.approval().approved()?Approval.RESUBMIT_FOR_APPROVAL:w.approval();

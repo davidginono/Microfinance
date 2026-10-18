@@ -99,6 +99,19 @@ class VoucherMvcTest {
   verify(workflows).configure(eq(actor),argThat(f->f.isIndividuals() && f.getRules().size()==1 && f.getType()==Type.PAYMENT));
   mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[999].name","Overflow")).andExpect(status().isBadRequest());
  }
+ @Test void standaloneApprovalCreationAndItemRemovalEndpointsAreUnavailable()throws Exception{
+  mvc.perform(get("/finance/approval/new").with(user(actor))).andExpect(status().is4xxClientError());
+  mvc.perform(post("/finance/approval").with(user(actor)).with(csrf()).param("type","JOURNAL").param("scope","BATCH").param("title","Removed creation flow")).andExpect(status().isMethodNotAllowed());
+  mvc.perform(post("/finance/approval/"+id+"/vouchers/"+UUID.randomUUID()+"/delete").with(user(actor)).with(csrf()).param("version","1")).andExpect(status().isNotFound());
+  verifyNoInteractions(workflows,workflowPosting);
+ }
+ @Test void correctionRoutesCannotCreateAnUnknownVoucher()throws Exception{
+  when(workflows.details(actor,id)).thenReturn(new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details(null,List.of(),List.of(),Set.of("EDIT")));
+  UUID item=UUID.randomUUID();
+  mvc.perform(get("/finance/approval/"+id+"/vouchers/"+item).with(user(actor))).andExpect(status().isNotFound());
+  mvc.perform(post("/finance/approval/"+id+"/vouchers/"+item).with(user(actor)).with(csrf()).param("version","1").param("itemVersion","0").param("party","Forged creation")).andExpect(status().isNotFound());
+  verify(workflows,never()).save(any(),any(),any(),anyInt(),anyInt(),any());verifyNoInteractions(workflowPosting);
+ }
  @Test void supportingDocumentUsesRecordAuthorizationAndRestrictiveHeaders()throws Exception{
   UUID document=UUID.randomUUID();when(documents.get(actor,id,document)).thenReturn(new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Document(document,"evidence.pdf","application/pdf",new byte[]{1,2,3}));
   mvc.perform(get("/finance/approval/"+id+"/documents/"+document).with(user(actor))).andExpect(status().isOk()).andExpect(content().contentType("application/pdf"))
@@ -118,7 +131,7 @@ class VoucherMvcTest {
   @Bean com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows(){return mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService.class);}
   @Bean com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService workflowPosting(){return mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService.class);}
   @Bean com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents(){return mock(com.sacco.mvp.accounting.approval.service.VoucherDocumentService.class);}
-  @Bean com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController workflowController(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows,com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService posting,ApplicationClock clock,com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents){return new com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController(workflows,posting,clock,documents);}
+  @Bean com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController workflowController(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows,com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService posting,com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents){return new com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController(workflows,posting,documents);}
   @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock,LoanReceiptService receipts,LoanReceiptPdfService loanPdf,com.sacco.mvp.accounting.approval.service.VoucherApprovalGate gate,com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),receipts,loanPdf,gate,workflows);}
  }
 }

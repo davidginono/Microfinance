@@ -5,7 +5,6 @@ import com.sacco.mvp.accounting.approval.service.*;
 import com.sacco.mvp.accounting.dto.VoucherDtos.Form;
 import com.sacco.mvp.accounting.dto.VoucherDtos.Type;
 import com.sacco.mvp.security.AppUserPrincipal;
-import com.sacco.mvp.service.ApplicationClock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -20,13 +19,11 @@ import java.util.*;
 public class VoucherWorkflowController {
     private final VoucherWorkflowService workflows;
     private final VoucherWorkflowPostingService posting;
-    private final ApplicationClock clock;
     private final VoucherDocumentService documents;
     @InitBinder("voucherForm") void formBinder(WebDataBinder b) {
         b.setAutoGrowCollectionLimit(50);b.setAllowedFields("requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId",
             "rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].transactionId","rows[*].templateKey","rows[*].component");
     }
-    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields("requestKey","type","scope","title");}
     @InitBinder("ruleForm") void ruleBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(20);b.setAllowedFields("type","version","individuals","batches","forceAllowed","rules[*].name","rules[*].minimum","rules[*].maximum","rules[*].automatic","rules[*].firstClaim","rules[*].secondClaim","rules[*].firstMember","rules[*].secondMember");}
     @ExceptionHandler({org.springframework.beans.InvalidPropertyException.class,Invalid.class})
     @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST) @ResponseBody String invalid() {return "Invalid voucher workflow request";}
@@ -38,15 +35,8 @@ public class VoucherWorkflowController {
         var rows=workflows.list(a,type,search,category,sort,page,size);m.addAttribute("records",rows);
         m.addAttribute("sort",sort);m.addAttribute("type",type);m.addAttribute("search",search);m.addAttribute("category",category);m.addAttribute("approvalStates",Approval.values());return "accounting/approval/register";
     }
-    @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="JOURNAL") Type type,Model m) {
-        workflows.authorize(a,"VOUCHER_WORKSPACE_VIEW");workflows.authorize(a,"VOUCHER_WORKSPACE_CREATE");var f=new CreateForm();f.setType(type);m.addAttribute("createForm",f);return "accounting/approval/new";
-    }
-    @PostMapping public String create(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute CreateForm createForm,BindingResult errors,Model m) {
-        if(!errors.hasErrors())try{return redirect(workflows.create(a,createForm));}catch(Invalid e){errors.reject(e.getMessage());}
-        return "accounting/approval/new";
-    }
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m) {
-        var d=workflows.details(a,id);m.addAttribute("newItemId",UUID.randomUUID());m.addAttribute("details",d);support(a,id,m);m.addAttribute("ownerNames",workflows.ownerNames(a,List.of(d.workflow())));return "accounting/approval/details";
+        var d=workflows.details(a,id);m.addAttribute("details",d);support(a,id,m);m.addAttribute("ownerNames",workflows.ownerNames(a,List.of(d.workflow())));return "accounting/approval/details";
     }
     @PostMapping("/{id}/actions") public String action(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam int version,@RequestParam String action,
                                                       @RequestParam(defaultValue="") String comments,RedirectAttributes flash) {
@@ -60,22 +50,25 @@ public class VoucherWorkflowController {
         return redirect(id);
     }
     @GetMapping("/{id}/vouchers/{item}") public String edit(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID item,Model m) {
-        var d=workflows.details(a,id);
-        var row=d.items().stream().filter(i->i.id().equals(item)).findFirst();if(row.isEmpty() && !d.actions().contains("EDIT"))throw new org.springframework.security.access.AccessDeniedException("Voucher unavailable");var f=row.map(Item::form).orElseGet(()->{var form=new Form();form.setRequestKey(item);form.setEffectiveDate(clock.today());return form;});
-        m.addAttribute("voucherForm",f);editor(a,d,item,row.map(Item::version).orElse(0),m);return "accounting/approval/editor";
+        var d=workflows.details(a,id);var row=existingItem(d,item);
+        m.addAttribute("voucherForm",row.form());editor(a,d,item,row.version(),m);return "accounting/approval/editor";
     }
     @PostMapping("/{id}/vouchers/{item}") public String save(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID item,
         @RequestParam int version,@RequestParam int itemVersion,@ModelAttribute("voucherForm") Form f,BindingResult errors,Model m) {
+        var before=workflows.details(a,id);existingItem(before,item);
         if(!errors.hasErrors())try{workflows.save(a,id,item,version,itemVersion,f);return redirect(id);}
         catch(IllegalArgumentException e){errors.reject(VoucherWorkflowService.safeError(e));}
         var d=workflows.details(a,id);editor(a,d,item,itemVersion,m);return "accounting/approval/editor";
     }
+    private Item existingItem(Details details,UUID item) {
+        return details.items().stream().filter(row->row.id().equals(item)).findFirst()
+            .orElseThrow(()->new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+    }
     private void editor(AppUserPrincipal a,Details d,UUID item,int itemVersion,Model m) {
         support(a,d.workflow().id(),m);m.addAttribute("readOnly",!d.actions().contains("EDIT"));m.addAttribute("details",d);m.addAttribute("itemId",item);m.addAttribute("itemVersion",itemVersion);
         var f=(Form)m.getAttribute("voucherForm");m.addAttribute("accounts",workflows.selectedAccounts(a,d.workflow().id(),f));
-        m.addAttribute("existingItem",d.items().stream().anyMatch(i->i.id().equals(item)));m.addAttribute("issues",d.items().stream().filter(i->i.id().equals(item)).findFirst().map(Item::issues).orElse(List.of()));
+        m.addAttribute("issues",d.items().stream().filter(i->i.id().equals(item)).findFirst().map(Item::issues).orElse(List.of()));
     }
-    @PostMapping("/{id}/vouchers/{item}/delete") public String remove(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID item,@RequestParam int version) {workflows.delete(a,id,item,version);return redirect(id);}
     @GetMapping("/{id}/accounts") @ResponseBody public Object accounts(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return workflows.accounts(a,id,search,page);}
     @GetMapping("/configuration") public String configuration(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="JOURNAL") Type type,@RequestParam(required=false) java.math.BigDecimal example,Model m) {
         var c=workflows.configuration(a,type);

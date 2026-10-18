@@ -32,11 +32,6 @@ public final class VoucherWorkflowDtos {
     public record Details(Workflow workflow, List<Item> items, List<History> history, Set<String> actions) {}
     public record Page(List<Workflow> rows, int page, int size, boolean hasNext, Map<String, Long> counts) {}
     public record Proof(String planHash) {}
-    @Data public static class CreateForm {
-        private UUID requestKey = UUID.randomUUID();
-        private Type type = Type.JOURNAL;
-        private String scope = "BATCH", title = "";
-    }
     @Data public static class RuleForm {
         private Type type = Type.JOURNAL;
         private int version;

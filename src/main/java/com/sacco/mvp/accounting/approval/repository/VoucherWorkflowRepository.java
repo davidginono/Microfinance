@@ -92,7 +92,6 @@ public class VoucherWorkflowRepository {
         if(fresh)jdbc.update("insert into voucher_workflow_item(id,workflow_id,sacco_id,station_id,line,form_json) values(?,?,?,?,?,?::jsonb)",id,w.id(),a.getSaccoId(),a.getStationId(),line,write(form));
         else jdbc.update("update voucher_workflow_item set form_json=?::jsonb,version=version+1 where workflow_id=? and id=? and voucher_id is null",write(form),w.id(),id);
     }
-    public void delete(UUID workflow,UUID item) { jdbc.update("delete from voucher_workflow_item where workflow_id=? and id=? and voucher_id is null",workflow,item); }
     public void invalidate(UUID workflow) { jdbc.update("update voucher_workflow_item set plan_hash=null,issues='[]'::jsonb where workflow_id=? and voucher_id is null",workflow); }
     public void issues(UUID workflow, UUID item, List<Issue> issues, String hash) { jdbc.update("update voucher_workflow_item set issues=?::jsonb,plan_hash=? where workflow_id=? and id=?",write(issues),hash,workflow,item); }
     public void update(Workflow w, Approval approval, String validation, String posting, BigDecimal total, BigDecimal amount,

@@ -5,7 +5,6 @@ The user-requested 2026-10-18 increment enables approval for individual ordinary
 ## Screens and access
 
 - `/finance/approval`: branch-scoped status tiles and a bounded, sortable register. Validation, approval and posting are independent columns. Select one row to open its details.
-- `/finance/approval/new`: one voucher or a homogeneous batch of up to 50 vouchers. Each voucher has up to 50 transactions.
 - Record details: permitted actions, approval route, field warning links, evidence and the latest 100 audit events. Approval never implies a posted journal.
 - Voucher editor: dense editable lines, warning-to-field focus, scoped account lookup and read-only inspection for reviewers. Save returns to its parent; validation and submission operate on the complete workspace.
 - `/finance/approval/configuration`: independent individual/batch switches, non-overlapping inclusive-minimum/exclusive-maximum TZS ranges, explicit automatic approval or up to two approver groups, and a saved-rule amount test. Journal batches use their largest voucher total; receipt/payment batches use the batch total. Gaps fail closed with a missing-rule error.
@@ -31,3 +30,11 @@ The application started successfully against that database. In-app browser check
 The full suite is not green: it reported existing failures in ActiveLoanHydrationViewContractTest, AdminControllerUserAccessSecurityTest, AwsConsoleViewContractTest, DirectOtpGuarantorSearchViewContractTest, ErpTableAlignmentContractTest and JspRecordAccessorCompatibilityTest. It was then interrupted while an unrelated LoanPresentationServiceTest was rendering a PDF watermark. These unrelated sources were left unchanged; the final focused run above passed after the voucher test fixture correction.
 
 The architectural 1,000 requests/second target remains unmeasured for this workload; queues fetch at most size+1 records (10/30/50), account lookup is bounded to 25, and financial batches are capped at 2,500 total transaction rows.
+
+## Standalone creation workflow removed (2026-10-18)
+
+The approval area is a review and correction queue. Its separate Create voucher workspace page, GET creation form, POST creation endpoint, creation DTO/service operation, Add voucher links and item-removal endpoint have been removed. Editor GET/POST routes accept existing scoped items only; a forged new item ID cannot create a draft or append to a batch. Dead creation/removal labels and styling were removed.
+
+Normal receipt/payment/journal forms still capture individual approval drafts when configuration requires approval, and retain direct posting when approval is not configured. Existing single and batch records, claim checks, validation/corrections, approval configuration, history, documents and posting safeguards remain. This removal adds no replacement batch-creation flow and performs no data/schema deletion. Existing batch approval tests use direct disposable fixtures rather than a removed production API.
+
+Verification: the focused working-tree run passed 44 tests (23 PostgreSQL workflow, 16 MVC, one JSP compilation covering the five retained voucher/approval pages, and four workspace-security tests). Browser checks with disposable synthetic records confirmed no creation link in the approval queue, no Add voucher link on batch details, existing warning/correction access and a contained 360-pixel page width. The preview was left running locally. Earlier design edits remain outside this removal commit.
