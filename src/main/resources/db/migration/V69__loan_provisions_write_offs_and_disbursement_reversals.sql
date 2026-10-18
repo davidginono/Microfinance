@@ -54,25 +54,11 @@ CREATE FUNCTION loan_adjustment_validate_journal(j gl_journal) RETURNS void LANG
 DECLARE q loan_adjustment_request; d loan_adjustment_decision; l loan_ledgers; a loan_applications;
  b record; p accountant_loan_post; dr gl_account; cr gl_account; period accounting_period; original gl_journal;
 BEGIN
- SELECT * INTO q FROM loan_adjustment_request WHERE id=j.source_reference::uuid;
+ SELECT * INTO q FROM loan_adjustment_request WHERE id::text=j.source_reference;
  SELECT * INTO d FROM loan_adjustment_decision WHERE request_id=q.id;
  SELECT * INTO a FROM loan_applications WHERE id=q.loan_id;
  SELECT * INTO l FROM loan_ledgers WHERE loan_application_id=q.loan_id FOR UPDATE;
- -- The GL constraint trigger runs at commit, after this adjustment is posted.
- -- Compare the frozen request against earlier events, excluding its own effects.
- WITH prior AS (
-  SELECT r.*,x.journal_id,x.event_sequence FROM loan_adjustment_request r
-  JOIN loan_adjustment_decision x ON x.request_id=r.id
-  JOIN gl_journal g ON g.id=x.journal_id AND g.state='POSTED'
-  WHERE r.loan_id=q.loan_id AND x.event_sequence<d.event_sequence
- ) SELECT coalesce(sum(allowance_change),0) allowance,
-  coalesce(-sum(principal_change) FILTER(WHERE kind IN ('WRITE_OFF','WRITE_BACK')),0) written_off,
-  max(effective_date) last_date,
-  (SELECT id FROM prior ORDER BY event_sequence DESC LIMIT 1) last_adjustment,
-  (SELECT CASE WHEN allowance_change>0 THEN credit_account_id ELSE debit_account_id END
-   FROM prior WHERE kind='PROVISION' ORDER BY event_sequence DESC LIMIT 1) allowance_account,
-  (SELECT journal_id FROM prior WHERE kind='WRITE_OFF' ORDER BY event_sequence DESC LIMIT 1) write_off_journal
- INTO b FROM prior;
+ SELECT * INTO b FROM loan_adjustment_balance WHERE loan_id=q.loan_id;
  SELECT * INTO p FROM accountant_loan_post WHERE loan_id=q.loan_id AND kind='DISBURSEMENT' AND state='POSTED';
  SELECT * INTO period FROM accounting_period WHERE id=j.period_id FOR SHARE;
  IF q.id IS NULL OR d.decision IS DISTINCT FROM 'APPROVED' OR d.journal_id IS DISTINCT FROM j.id OR NOT j.direct_post
@@ -102,29 +88,29 @@ BEGIN
   IF a.status NOT IN ('DISBURSED','PAR','DEFAULTED','PAID') OR b.written_off<>0 OR b.allowance+q.allowance_change<0
     OR b.allowance+q.allowance_change>q.outstanding_before
     OR NOT ((q.allowance_change>0 AND dr.type='EXPENSE' AND dr.kind='POSTING' AND dr.purpose='EXPENSE'
-      AND cr.type='ASSET' AND cr.kind='CONTROL' AND cr.purpose='ALLOWANCE'
+      AND cr.type='ASSET' AND cr.kind='POSTING' AND cr.purpose='ALLOWANCE'
       AND (b.allowance=0 OR cr.id=b.allowance_account))
      OR (q.allowance_change<0 AND cr.type='EXPENSE' AND cr.kind='POSTING' AND cr.purpose='EXPENSE'
-      AND dr.type='ASSET' AND dr.kind='CONTROL' AND dr.purpose='ALLOWANCE' AND dr.id=b.allowance_account))
+      AND dr.type='ASSET' AND dr.kind='POSTING' AND dr.purpose='ALLOWANCE' AND dr.id=b.allowance_account))
   THEN RAISE EXCEPTION 'Invalid provision target or mapping'; END IF;
  ELSIF q.kind='WRITE_OFF' THEN
-  IF a.status<>'WRITTEN_OFF' OR q.amount<>q.outstanding_before OR q.amount<>b.allowance OR b.written_off<>0
+  IF a.status NOT IN ('DISBURSED','PAR','DEFAULTED') OR q.amount<>q.outstanding_before OR q.amount<>b.allowance OR b.written_off<>0
    OR dr.id<>b.allowance_account OR cr.id<>p.principal_account_id
   THEN RAISE EXCEPTION 'Full principal write-off requires its exact allowance'; END IF;
  ELSIF q.kind='WRITE_BACK' THEN
-  IF a.status<>'DEFAULTED' OR q.amount<>b.written_off OR q.amount<>q.outstanding_before
+  IF a.status<>'WRITTEN_OFF' OR q.amount<>b.written_off OR q.amount<>q.outstanding_before
    OR dr.id<>p.principal_account_id OR cr.id<>b.allowance_account OR q.reverses_journal_id<>b.write_off_journal
   THEN RAISE EXCEPTION 'Write-back must restore the linked write-off'; END IF;
  ELSIF q.kind='DISBURSEMENT_REVERSAL' THEN
-  IF a.status<>'DISBURSEMENT_REVERSED' OR q.amount<>l.principal OR l.next_sequence<>1 OR l.principal_paid<>0 OR l.interest_paid<>0
+  IF a.status NOT IN ('DISBURSED','PAR','DEFAULTED') OR q.amount<>l.principal OR l.next_sequence<>1 OR l.principal_paid<>0 OR l.interest_paid<>0
    OR EXISTS(SELECT 1 FROM loan_repayment_transactions WHERE loan_application_id=q.loan_id)
    OR b.allowance<>0 OR b.written_off<>0 OR dr.id<>p.money_account_id OR cr.id<>p.principal_account_id
-   OR q.reverses_journal_id<>p.journal_id OR p.actor_id=d.actor_id
+   OR q.reverses_journal_id<>p.journal_id OR p.actor_id IN (q.actor_id,d.actor_id)
   THEN RAISE EXCEPTION 'Untouched disbursement and independent correction required'; END IF;
  END IF;
  IF q.reverses_journal_id IS NOT NULL THEN
   SELECT * INTO original FROM gl_journal WHERE id=q.reverses_journal_id FOR UPDATE;
-  IF original.state<>'POSTED' OR original.maker_id=d.actor_id OR j.effective_date<original.effective_date
+  IF original.state<>'POSTED' OR j.effective_date<original.effective_date
    OR (SELECT count(*) FROM gl_journal_line WHERE journal_id=original.id)<>2
    OR EXISTS((SELECT account_id,debit,credit FROM gl_journal_line WHERE journal_id=j.id)
      EXCEPT ALL(SELECT account_id,credit,debit FROM gl_journal_line WHERE journal_id=original.id))
@@ -182,28 +168,13 @@ BEGIN
 END $$;
 CREATE CONSTRAINT TRIGGER loan_adjustment_commit AFTER INSERT ON loan_adjustment_decision DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION loan_adjustment_commit_guard();
 
-CREATE OR REPLACE FUNCTION core_post_commit_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE journal uuid;
-BEGIN
- IF TG_TABLE_NAME='gl_journal' THEN journal:=NEW.id; ELSE journal:=NEW.journal_id; END IF;
- IF EXISTS(SELECT 1 FROM gl_journal j JOIN accountant_loan_post x ON x.journal_id=j.id WHERE j.id=journal AND j.direct_post AND j.state='POSTED' AND x.state='POSTED' AND j.source_type LIKE 'LOAN_RECORD_%') THEN RETURN NULL; END IF;
- IF EXISTS(SELECT 1 FROM gl_journal j JOIN loan_adjustment_decision d ON d.journal_id=j.id JOIN loan_adjustment_request q ON q.id=d.request_id
-  WHERE j.id=journal AND j.direct_post AND j.state='POSTED' AND j.source_type='LOAN_ADJUSTMENT' AND j.source_reference=q.id::text
-  AND d.decision='APPROVED' AND j.sacco_id=q.sacco_id AND j.station_id=q.station_id) THEN RETURN NULL; END IF;
- IF NOT EXISTS(SELECT 1 FROM gl_journal j JOIN accounting_voucher v ON v.journal_id=j.id
-  WHERE j.id=journal AND j.direct_post AND j.state='POSTED')
- THEN RAISE EXCEPTION 'Core vouchers must commit as posted documents'; END IF;
- RETURN NULL;
-END $$;
+
 
 CREATE FUNCTION loan_adjustment_payment_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  PERFORM 1 FROM loan_ledgers WHERE loan_application_id=NEW.loan_application_id FOR UPDATE;
  IF EXISTS(SELECT 1 FROM loan_applications WHERE id=NEW.loan_application_id AND status IN ('WRITTEN_OFF','DISBURSEMENT_REVERSED'))
  THEN RAISE EXCEPTION 'Written-off or reversed loans cannot receive ordinary repayment mutations'; END IF;
- IF NEW.payment_date<(SELECT max(q.effective_date) FROM loan_adjustment_request q JOIN loan_adjustment_decision d ON d.request_id=q.id
-  JOIN gl_journal j ON j.id=d.journal_id AND j.state='POSTED' WHERE q.loan_id=NEW.loan_application_id)
- THEN RAISE EXCEPTION 'Repayment date cannot precede a posted loan adjustment'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER loan_adjustment_payment BEFORE INSERT ON loan_repayment_transactions FOR EACH ROW EXECUTE FUNCTION loan_adjustment_payment_guard();
