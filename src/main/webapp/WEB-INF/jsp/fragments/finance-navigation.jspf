@@ -1,6 +1,4 @@
 <c:if test="${staffWorkspace}">
-    <sec:authorize access="@access.has(principal, 'VOUCHER_WORKSPACE_VIEW')"><a href="<c:url value='/finance/approval' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.workspace" /></a></sec:authorize>
-    <sec:authorize access="@access.has(principal, 'VOUCHER_RULE_VIEW')"><a href="<c:url value='/finance/approval/configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.configuration" /></a></sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_VIEW')">
         <a href="<c:url value='/finance/loan-adjustments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-adjustments')?'shell-nav-active':''}"><spring:message code="adjustment.title" /></a>
     </sec:authorize>

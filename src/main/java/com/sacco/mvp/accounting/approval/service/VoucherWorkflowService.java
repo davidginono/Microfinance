@@ -34,8 +34,30 @@ public class VoucherWorkflowService {
     @Transactional(readOnly=true)
     public Page list(AppUserPrincipal a,Type type,String search,String category,String sort,int page,int size) {
         viewAccess(a,type);require(search!=null && search.length()<=100 && page>=0 && page<=10000 && Set.of(10,30,50).contains(size),"input");
-        require(category!=null && (category.isEmpty() || Set.of("OTHERS","INCOMPLETE","NOT_VALIDATED","VALIDATED","ERROR","NOT_POSTED","FAILED","POSTED").contains(category) || Arrays.stream(Approval.values()).anyMatch(s->s.name().equals(category))),"input");
+        require(category!=null && (category.isEmpty() || Set.of("OTHERS","INCOMPLETE","NOT_VALIDATED","VALIDATED","ERROR","NOT_POSTED","FAILED","POSTED","RECENT_CREATED","RECENT_UPDATED","READY","ACCOUNT_ERRORS","MISSING_DETAILS","UNBALANCED").contains(category) || Arrays.stream(Approval.values()).anyMatch(s->s.name().equals(category))),"input");
         var rows=repository.list(a,type,search,category,sort,page,size);return new Page(rows.stream().limit(size).toList(),page,size,rows.size()>size,repository.counts(a,type));
+    }
+    @Transactional(readOnly=true)
+    public Page register(AppUserPrincipal a,Type type,String search,String category,String sort,int days,int page,int size) {
+        authorize(a,"VOUCHER_WORKSPACE_VIEW");require(search!=null && search.length()<=100 && page>=0 && page<=10000 && Set.of(10,30,50).contains(size) && Set.of(0,7,30,90).contains(days),"input");
+        var types=Arrays.stream(Type.values()).filter(t->type==null||type==t).filter(t->a.getClaims().contains(t==Type.JOURNAL?"ACCOUNTING_JOURNALS_VIEW":"ACCOUNTING_BUSINESS_VIEW")).toList();
+        if(types.isEmpty())throw new AccessDeniedException("Voucher type unavailable");for(var t:types)vouchers.authorize(a,t,"VIEW");
+        require(category!=null && (category.isEmpty() || Set.of("OTHERS","INCOMPLETE","NOT_VALIDATED","VALIDATED","ERROR","NOT_POSTED","FAILED","POSTED","RECENT_CREATED","RECENT_UPDATED","READY","ACCOUNT_ERRORS","MISSING_DETAILS","UNBALANCED").contains(category) || Arrays.stream(Approval.values()).anyMatch(v->v.name().equals(category))),"input");
+        var rows=repository.register(a,types,search,category,sort,days,page,size,clock.now());var counts=repository.registerCounts(a,types,clock.now());counts.putAll(repository.warningCounts(a,types));return new Page(rows.stream().limit(size).toList(),page,size,rows.size()>size,counts);
+    }
+    @Transactional(readOnly=true)
+    public Map<UUID,String> transactionDates(AppUserPrincipal a,List<Workflow> rows) {authorize(a,"VOUCHER_WORKSPACE_VIEW");require(rows.size()<=50,"limit");return repository.transactionDates(a,rows);}
+    @Transactional(readOnly=true)
+    public Map<UUID,Set<String>> reviewActions(AppUserPrincipal a,List<Workflow> rows) {
+        authorize(a,"VOUCHER_WORKSPACE_VIEW");require(rows.size()<=50,"limit");var approved=repository.approvedWorkflows(a,rows);var out=new HashMap<UUID,Set<String>>();
+        for(var w:rows){var available=new HashSet<String>();if(!w.owner().equals(a.getMemberId()) && assigned(a,w) && !approved.contains(w.id())){available.add("APPROVE");if(a.getClaims().contains("VOUCHER_APPROVAL_REJECT"))available.add("REJECT");}out.put(w.id(),available);}return out;
+    }
+    @Transactional(readOnly=true)
+    public List<Map<String,String>> reviewers(AppUserPrincipal a,String claim,String search,int page) {
+        authorize(a,"VOUCHER_RULE_VIEW");authorize(a,"VOUCHER_RULE_CONFIGURE");require(REVIEW_CLAIMS.contains(claim) && search!=null && search.length()<=100 && page>=0 && page<=10000,"input");
+        var candidates=members.findAll(repository.reviewerCandidates(a,search,page));var subjects=new LinkedHashMap<UUID,UserClaimService.ClaimSubject>();
+        for(var member:candidates)if(member.isStaffAccessActive())subjects.put(member.getId(),new UserClaimService.ClaimSubject(member.getActiveStaffRolesResolved(),member.isMemberAccess()));
+        var permissions=claims.effectiveClaims(subjects);return candidates.stream().filter(m->permissions.getOrDefault(m.getId(),Set.of()).contains(UserClaim.valueOf(claim))).limit(25).map(m->Map.of("id",m.getId().toString(),"name",m.getFullName())).toList();
     }
     @Transactional(readOnly=true)
     public Details details(AppUserPrincipal a,UUID id) {
@@ -166,6 +188,15 @@ public class VoucherWorkflowService {
     @Transactional
     public void configure(AppUserPrincipal a,RuleForm f) {
         authorize(a,"VOUCHER_RULE_VIEW");authorize(a,"VOUCHER_RULE_CONFIGURE");repository.policyLock(a,true);
+        var definition=configurationDefinition(a,f);
+        repository.configure(a,definition,clock.now());
+        audit.logEvent("ACCOUNTING",UUID.randomUUID(),"VOUCHER_APPROVAL_CONFIGURED",a.getMemberId(),AuditEventStatus.SUCCESS,"Voucher approval configuration","VOUCHER_RULE",f.getType().name(),a.getSaccoId(),a.getStationId(),Map.of("version",f.getVersion()+1));
+    }
+    @Transactional(readOnly=true)
+    public void validateConfiguration(AppUserPrincipal a,RuleForm f) {
+        authorize(a,"VOUCHER_RULE_VIEW");authorize(a,"VOUCHER_RULE_CONFIGURE");configurationDefinition(a,f);
+    }
+    private Configuration configurationDefinition(AppUserPrincipal a,RuleForm f) {
         require(f.getType()!=null && f.getRules()!=null && f.getRules().size()<=20,"input");
         require(repository.configuration(a,f.getType()).version()==f.getVersion(),"stale");var rules=new ArrayList<Rule>();
         for(var row:f.getRules()) {
@@ -177,8 +208,7 @@ public class VoucherWorkflowService {
         }
         rules.sort(Comparator.comparing(Rule::minimum));for(int n=1;n<rules.size();n++)require(rules.get(n-1).maximum()!=null && rules.get(n-1).maximum().compareTo(rules.get(n).minimum())<=0,"overlap");
         require(!(f.isIndividuals() || f.isBatches()) || !rules.isEmpty(),"configuration");
-        repository.configure(a,new Configuration(f.getType(),f.getVersion()+1,f.isIndividuals(),f.isBatches(),f.isForceAllowed(),List.copyOf(rules)),clock.now());
-        audit.logEvent("ACCOUNTING",UUID.randomUUID(),"VOUCHER_APPROVAL_CONFIGURED",a.getMemberId(),AuditEventStatus.SUCCESS,"Voucher approval configuration","VOUCHER_RULE",f.getType().name(),a.getSaccoId(),a.getStationId(),Map.of("version",f.getVersion()+1));
+        return new Configuration(f.getType(),f.getVersion()+1,f.isIndividuals(),f.isBatches(),f.isForceAllowed(),List.copyOf(rules));
     }
     private Stage stage(AppUserPrincipal a,String claim,UUID member) {
         require(REVIEW_CLAIMS.contains(claim),"configuration");if(member!=null) {

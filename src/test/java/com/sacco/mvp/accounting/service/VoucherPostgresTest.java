@@ -219,6 +219,23 @@ class VoucherPostgresTest {
   assertThatThrownBy(()->workflows.details(operator("B2"),id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
   when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());assertThatThrownBy(()->workflows.details(actor,id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
  }
+ @Test void mixedRegisterUsesScopedTypesDatesCountsAndRealSorts(){
+  UUID journal=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));workflows.capture(actor,Type.PAYMENT,form(Type.PAYMENT));workflows.capture(actor,Type.RECEIPT,form(Type.RECEIPT));
+  var result=workflows.register(actor,null,"","","date_asc",0,0,10);assertThat(result.rows()).hasSize(3);assertThat(result.counts().get("ALL")).isEqualTo(3L);assertThat(result.counts().get("recent_created")).isEqualTo(3L);
+  assertThat(workflows.transactionDates(actor,result.rows()).get(journal)).isEqualTo(day.toString());
+  assertThat(workflows.register(actor,null,"","RECENT_CREATED","owner_desc",7,0,10).rows()).hasSize(3);
+  var restricted=EnumSet.allOf(UserClaim.class);restricted.remove(UserClaim.ACCOUNTING_BUSINESS_VIEW);var journalOnly=new AppUserPrincipal(directory.find(actor.getMemberId()).orElseThrow(),restricted,true);
+  assertThat(workflows.register(journalOnly,null,"","","type_asc",0,0,10).rows()).extracting(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Workflow::type).containsExactly(Type.JOURNAL);
+  assertThatThrownBy(()->workflows.register(journalOnly,Type.PAYMENT,"","","date_desc",0,0,10)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  configure(true,true,false,false);validateWorkflow(journal);command(actor,journal,"INITIATE","");var reviewer=operator("B1");var workflow=workflows.details(actor,journal).workflow();
+  assertThat(workflows.reviewActions(reviewer,List.of(workflow)).get(journal)).contains("APPROVE","REJECT");assertThat(workflows.reviewActions(actor,List.of(workflow)).get(journal)).isEmpty();
+  assertThat(workflows.register(operator("B2"),null,"","","date_desc",0,0,10).rows()).isEmpty();
+ }
+ @Test void ruleValidationDoesNotActivateOrSaveAPolicy(){
+  var f=ruleForm(true,true,false,false);workflows.validateConfiguration(actor,f);assertThat(workflows.configuration(actor,Type.JOURNAL).version()).isZero();
+  var overlap=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow();overlap.setName("Overlap");f.getRules().add(overlap);
+  assertThatThrownBy(()->workflows.validateConfiguration(actor,f)).hasMessage("approval.error.overlap");assertThat(workflows.configuration(actor,Type.JOURNAL).individuals()).isFalse();
+ }
  @Test void validationRetainsEngineErrorsWithoutRollingBackOtherVoucherResults(){
   UUID id=batch(2);var d=workflows.details(actor,id);var item=d.items().get(1);item.form().getRows().getFirst().setCreditAccountId(control);
   workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());validateWorkflow(id);

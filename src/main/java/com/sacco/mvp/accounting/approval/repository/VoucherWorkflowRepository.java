@@ -56,9 +56,44 @@ public class VoucherWorkflowRepository {
         return jdbc.query("select * from voucher_workflow where sacco_id=? and station_id=? and type=? and (strpos(lower(title),?)>0 or strpos(lower(number),?)>0) and "+where+" order by "+order+",id limit ? offset ?",
             this::workflow,a.getSaccoId(),a.getStationId(),type.name(),search.toLowerCase(Locale.ROOT),search.toLowerCase(Locale.ROOT),size+1,page*size);
     }
+    public List<Workflow> register(AppUserPrincipal a,List<Type> types,String search,String category,String sort,int days,int page,int size,OffsetDateTime now) {
+        String placeholders=String.join(",",Collections.nCopies(types.size(),"?"));
+        var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId()));types.forEach(t->args.add(t.name()));
+        args.add(search.toLowerCase(Locale.ROOT));args.add(search.toLowerCase(Locale.ROOT));String dateFilter="true",categoryFilter=categorySql(category);
+        if(days>0){dateFilter="updated_at>=?";args.add(now.minusDays(days));}
+        if(category.equals("RECENT_CREATED") || category.equals("RECENT_UPDATED")){categoryFilter=category.equals("RECENT_CREATED")?"created_at>=?":"updated_at>=? and updated_at>created_at";args.add(now.minusDays(7));}
+        args.add(size+1);args.add(page*size);
+        return jdbc.query("select * from voucher_workflow where sacco_id=? and station_id=? and type in ("+placeholders+") and (strpos(lower(title),?)>0 or strpos(lower(number),?)>0) and "+dateFilter+" and "+categoryFilter+" order by "+sortSql(sort)+",id limit ? offset ?",this::workflow,args.toArray());
+    }
+    public Map<String,Long> registerCounts(AppUserPrincipal a,List<Type> types,OffsetDateTime now) {
+        String placeholders=String.join(",",Collections.nCopies(types.size(),"?"));
+        var args=new ArrayList<Object>(List.<Object>of(now.minusDays(7),now.minusDays(14),now.minusDays(7),now.minusDays(7),now.minusDays(7),now.minusDays(7),a.getSaccoId(),a.getStationId()));types.forEach(t->args.add(t.name()));
+        return jdbc.query("select approval,validation,posting,count(*) n, count(*) filter(where validation<>'VALIDATED' and created_at>=?) age7, count(*) filter(where validation<>'VALIDATED' and created_at>=? and created_at<?) age14, count(*) filter(where created_at>=?) recent_created,count(*) filter(where updated_at>=? and updated_at>created_at) recent_updated,count(*) filter(where updated_at>=?) recent_total from voucher_workflow where sacco_id=? and station_id=? and type in ("+placeholders+") group by approval,validation,posting",r->{var out=new HashMap<String,Long>();while(r.next()){
+            for(String key:List.of(r.getString("approval"),r.getString("validation"),r.getString("posting")))out.merge(key,r.getLong("n"),Long::sum);
+            if(r.getString("validation").equals("VALIDATED") && Set.of("NOT_REQUIRED","WORKFLOW_APPROVED","MANUALLY_APPROVED").contains(r.getString("approval")) && r.getString("posting").equals("NOT_POSTED"))out.merge("READY",r.getLong("n"),Long::sum);
+            out.merge("ALL",r.getLong("n"),Long::sum);if(!Set.of("INITIATED","REJECTED").contains(r.getString("approval")))out.merge("OTHERS",r.getLong("n"),Long::sum);
+            for(String key:List.of("age7","age14","recent_created","recent_updated","recent_total"))out.merge(key,r.getLong(key),Long::sum);
+            if(!r.getString("validation").equals("VALIDATED"))out.merge("unfinished",r.getLong("n"),Long::sum);
+        }out.put("age15",out.getOrDefault("unfinished",0L)-out.getOrDefault("age7",0L)-out.getOrDefault("age14",0L));return out;},args.toArray());
+    }
+    public Map<String,Long> warningCounts(AppUserPrincipal a,List<Type> types) {
+        var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId()));types.forEach(t->args.add(t.name()));
+        return jdbc.query("select count(distinct w.id) filter(where issue->>'code' like '%account%' or issue->>'code' like '%Account%' or issue->>'code' like '%Template%') account_errors,count(distinct w.id) filter(where issue->>'code' in ('approval.error.requiredField','voucher.error.date','voucher.error.amount')) missing_details,count(distinct w.id) filter(where lower(issue->>'code') like '%balanc%') unbalanced from voucher_workflow w join voucher_workflow_item i on i.workflow_id=w.id cross join lateral jsonb_array_elements(i.issues) issue where w.sacco_id=? and w.station_id=? and w.type in ("+String.join(",",Collections.nCopies(types.size(),"?"))+")",r->{var out=new HashMap<String,Long>();if(r.next()){out.put("ACCOUNT_ERRORS",r.getLong(1));out.put("MISSING_DETAILS",r.getLong(2));out.put("UNBALANCED",r.getLong(3));}return out;},args.toArray());
+    }
+    public Map<UUID,String> transactionDates(AppUserPrincipal a,List<Workflow> rows) {
+        if(rows.isEmpty())return Map.of();var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId()));rows.forEach(w->args.add(w.id()));
+        return jdbc.query("select workflow_id,min(form_json->>'effectiveDate') d from voucher_workflow_item where sacco_id=? and station_id=? and workflow_id in ("+String.join(",",Collections.nCopies(rows.size(),"?"))+") group by workflow_id",r->{var out=new HashMap<UUID,String>();while(r.next())out.put(r.getObject(1,UUID.class),Objects.toString(r.getString(2),""));return out;},args.toArray());
+    }
+    public Set<UUID> approvedWorkflows(AppUserPrincipal a,List<Workflow> rows) {
+        if(rows.isEmpty())return Set.of();var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId(),a.getMemberId()));rows.forEach(w->args.add(w.id()));
+        return new HashSet<>(jdbc.query("select distinct w.id from voucher_workflow w join voucher_workflow_history h on h.workflow_id=w.id and h.round=w.round where w.sacco_id=? and w.station_id=? and h.actor_id=? and h.action='APPROVE' and w.id in ("+String.join(",",Collections.nCopies(rows.size(),"?"))+")",(r,n)->r.getObject(1,UUID.class),args.toArray()));
+    }
+    public List<UUID> reviewerCandidates(AppUserPrincipal a,String search,int page) {
+        return jdbc.query("select id from members where sacco_id=? and station_id=? and status='ACTIVE' and (strpos(lower(full_name),?)>0 or strpos(lower(coalesce(staff_no,'')),?)>0) order by full_name,id limit 26 offset ?",(r,n)->r.getObject(1,UUID.class),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),search.toLowerCase(Locale.ROOT),page*25);
+    }
     private static String sortSql(String sort) {
         String[] parts=sort.split("_");
-        String column=switch(parts[0]) {case "number"->"number";case "title"->"title";case "scope"->"scope";case "count"->"item_count";case "total"->"total";case "approval"->"approval";case "validation"->"validation";case "posting"->"posting";case "updated"->"updated_at";default->throw new Invalid("input");};
+        String column=switch(parts[0]) {case "number"->"number";case "title"->"title";case "scope"->"scope";case "count"->"item_count";case "total"->"total";case "approval"->"approval";case "validation"->"validation";case "posting"->"posting";case "updated"->"updated_at";case "type"->"type";case "owner"->"(select m.full_name from members m where m.id=voucher_workflow.owner_id)";case "date"->"(select min(i.form_json->>'effectiveDate') from voucher_workflow_item i where i.workflow_id=voucher_workflow.id)";default->throw new Invalid("input");};
         if(parts.length!=2 || !Set.of("asc","desc").contains(parts[1]))throw new Invalid("input");
         return column+" "+parts[1];
     }
@@ -74,6 +109,13 @@ public class VoucherWorkflowRepository {
     }
     private static String categorySql(String c) {
         if(c.isEmpty())return "true";
+        if(c.equals("RECENT_CREATED"))return "created_at>=current_timestamp-interval '7 days'";
+        if(c.equals("RECENT_UPDATED"))return "updated_at>=current_timestamp-interval '7 days' and updated_at>created_at";
+        if(c.equals("READY"))return "validation='VALIDATED' and approval in ('NOT_REQUIRED','WORKFLOW_APPROVED','MANUALLY_APPROVED') and posting='NOT_POSTED'";
+        if(Set.of("ACCOUNT_ERRORS","MISSING_DETAILS","UNBALANCED").contains(c)){
+            String issue=c.equals("ACCOUNT_ERRORS")?"(issue->>'code' like '%account%' or issue->>'code' like '%Account%' or issue->>'code' like '%Template%')":c.equals("MISSING_DETAILS")?"issue->>'code' in ('approval.error.requiredField','voucher.error.date','voucher.error.amount')":"lower(issue->>'code') like '%balanc%'";
+            return "exists(select 1 from voucher_workflow_item i cross join lateral jsonb_array_elements(i.issues) issue where i.workflow_id=voucher_workflow.id and "+issue+")";
+        }
         if(c.equals("OTHERS"))return "approval not in ('INITIATED','REJECTED')";
         if(Set.of("INCOMPLETE","NOT_VALIDATED","VALIDATED","ERROR").contains(c))return "validation='"+c+"'";
         if(Set.of("NOT_POSTED","FAILED","POSTED").contains(c))return "posting='"+c+"'";

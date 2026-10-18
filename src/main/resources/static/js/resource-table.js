@@ -313,6 +313,25 @@
                     const input = filters?.querySelector('[name="'+name+'"]'), value = freshFilters?.querySelector('[name="'+name+'"]');
                     if (input && value) {input.value=value.value;window.refreshEnhancedSelects?.(filters);}
                 });
+                if (region.dataset.tableSyncQuery === 'true') {
+                    // Keep existing controls, card links and their listeners mounted.
+                    [...(filters?.elements || [])].forEach(input=>{
+                        if (!input.name || ['submit','button'].includes(input.type)) return;
+                        const source=freshFilters?.elements.namedItem(input.name);
+                        if (source && 'value' in source) input.value=source.value;
+                    });
+                    window.refreshEnhancedSelects?.(filters);
+                    const heading=titlebar.querySelector('h2,h3'), sourceHeading=fresh.querySelector('.app-table-titlebar h2,.app-table-titlebar h3');
+                    if (heading && sourceHeading) {heading.textContent=sourceHeading.textContent;scroller.setAttribute('aria-label',heading.textContent.trim());}
+                    const states=[...page.querySelectorAll('[data-table-query-state-for]')].filter(item=>item.dataset.tableQueryStateFor===region.dataset.resourceTable);
+                    document.querySelectorAll('[data-table-query-state-for]').forEach(state=>{
+                        if (state.dataset.tableQueryStateFor!==region.dataset.resourceTable) return;
+                        state.querySelectorAll('[data-table-query-value]').forEach(value=>{
+                            const source=states.flatMap(item=>[...item.querySelectorAll('[data-table-query-value]')]).find(item=>item.dataset.tableQueryValue===value.dataset.tableQueryValue);
+                            if(source)value.textContent=source.textContent;
+                        });
+                    });
+                }
                 headers.forEach((header,index)=>{
                     const source = freshHeaders[index], link = header.querySelector('[data-table-sort]'), freshLink = source?.querySelector('[data-table-sort]');
                     if (link && freshLink) {link.href=new URL(freshLink.getAttribute('href'),url).href;header.setAttribute('aria-sort',source.getAttribute('aria-sort') || 'none');}
@@ -331,6 +350,21 @@
             } finally {clearTimeout(timeout);if(current===version)window.AppLoading?.end(region);}
         };
         signal.addEventListener('abort',()=>{version++;request?.abort();window.AppLoading?.end(region);});
+        document.addEventListener('click',event=>{
+            if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
+            const link=event.target.closest('a[data-table-query-for]');
+            if(!link || link.dataset.tableQueryFor!==region.dataset.resourceTable || externalPaging)return;
+            const target=new URL(link.href,location.href);
+            if(target.origin!==location.origin || target.pathname!==queryUrl.pathname)return;
+            event.preventDefault();
+            if(link.dataset.tableQueryParam){
+                const parameter=link.dataset.tableQueryParam;
+                const url=new URL(queryUrl);
+                if(filters?.tagName==='FORM')new FormData(filters).forEach((value,name)=>{if(typeof value==='string')url.searchParams.set(name,value);});
+                url.searchParams.set(parameter,target.searchParams.get(parameter)||'');
+                url.searchParams.set('page','0');void updateTable(url);
+            }else void updateTable(target);
+        },{signal});
         region.addEventListener('resource-table:refresh',event=>{if(!event.defaultPrevented && !externalPaging)void updateTable(queryUrl);},{signal});
         region.addEventListener('click',event=>{
             if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;

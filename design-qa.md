@@ -240,3 +240,7 @@ Live verification uses a clean copy of the last completed application plus the c
 Live acceptance completed after normal OTP sign-in: generated an unsaved report through 15 October 2026, switched between financial position, profit or loss and trial balance, and verified exactly one breadcrumb, one page header, one Save report button and no header nested inside the replaced workspace. The trial-balance title displays 15 Oct 2026. Inspected the rendered browser screenshot and downloaded the revised PDF through the real toolbar. The saved-report action remains in the stable header, with its selected statement context refreshed on each switch.
 
 final result: passed — concise content, stable header and dated-title acceptance. The unrelated receipt-batch migration remains outside this change.
+
+## 2026-10-18 Approval design verification
+
+Visual verification in progress against the four supplied reference screenshots.

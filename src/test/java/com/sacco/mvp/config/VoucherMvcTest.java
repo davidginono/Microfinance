@@ -99,6 +99,18 @@ class VoucherMvcTest {
   verify(workflows).configure(eq(actor),argThat(f->f.isIndividuals() && f.getRules().size()==1 && f.getType()==Type.PAYMENT));
   mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[999].name","Overflow")).andExpect(status().isBadRequest());
  }
+ @Test void anIndividualEditorCannotSubmitItsParentBatch()throws Exception{
+  var details=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details.class);var workflow=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Workflow.class);
+  when(details.workflow()).thenReturn(workflow);when(workflow.scope()).thenReturn("BATCH");UUID itemId=UUID.randomUUID();var item=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Item.class);when(item.id()).thenReturn(itemId);when(details.items()).thenReturn(List.of(item));when(details.actions()).thenReturn(Set.of("EDIT"));when(workflows.details(actor,id)).thenReturn(details);
+  mvc.perform(post("/finance/approval/"+id+"/vouchers/"+itemId).with(user(actor)).with(csrf()).param("version","1").param("itemVersion","1").param("command","SUBMIT"))
+   .andExpect(status().isOk()).andExpect(view().name("accounting/approval/editor"));
+  verify(workflows,never()).save(any(),any(),any(),anyInt(),anyInt(),any());verify(workflows,never()).action(any(),any(),anyInt(),any(),any());
+ }
+ @Test void configurationValidateDoesNotSaveTheRules()throws Exception{
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("type","JOURNAL").param("command","VALIDATE").param("rules[0].name","Review").param("rules[0].minimum","0"))
+   .andExpect(status().isOk()).andExpect(view().name("accounting/approval/configuration")).andExpect(model().attribute("configurationValid",true));
+  verify(workflows).validateConfiguration(eq(actor),any());verify(workflows,never()).configure(any(),any());
+ }
  @Test void standaloneApprovalCreationAndItemRemovalEndpointsAreUnavailable()throws Exception{
   mvc.perform(get("/finance/approval/new").with(user(actor))).andExpect(status().is4xxClientError());
   mvc.perform(post("/finance/approval").with(user(actor)).with(csrf()).param("type","JOURNAL").param("scope","BATCH").param("title","Removed creation flow")).andExpect(status().isMethodNotAllowed());
