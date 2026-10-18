@@ -1,7 +1,7 @@
 package com.sacco.mvp.domain;
 
 public enum AccessFeature {
-    VOUCHER_WORKSPACE("Voucher and batch workspace"),
+    VOUCHER_WORKSPACE("Approval Voucher Workspace"),
     VOUCHER_APPROVAL("Voucher approval actions"),
     VOUCHER_RULES("Voucher approval configuration"),
     VOUCHER_DOCUMENTS("Voucher supporting documents"),
