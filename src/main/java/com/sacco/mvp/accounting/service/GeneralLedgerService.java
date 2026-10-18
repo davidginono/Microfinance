@@ -239,14 +239,14 @@ public class GeneralLedgerService {
     public UUID proposeAccountVersion(AppUserPrincipal actor,UUID account,UUID base,String operation,UUID key,EditForm form,boolean complete) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");books.lockAccounts(actor.getSaccoId());
         require(Set.of("UPDATE","DEACTIVATE","REACTIVATE").contains(operation) && key!=null,"versionInput");
-        String hash=requestHash(Arrays.asList(account,base,operation,form.getName(),form.getNameSw(),form.getDescription(),form.getReason(),complete));
+        String hash=requestHash(Arrays.asList(account,base,operation,form.getName(),form.getDescription(),form.getReason(),complete));
         var prior=books.versionRequest(actor.getSaccoId(),key);
         if(prior.isPresent()) {require(prior.get().creator().equals(actor.getMemberId()) && Objects.equals(prior.get().branch(),actor.getStationId()) && prior.get().requestHash().equals(hash),"versionRetry");return prior.get().id();}
         var current=books.currentVersion(actor.getSaccoId(),account).orElseThrow(()->invalid("account"));
         require(current.id().equals(base),"versionStale");require(!books.openVersion(actor.getSaccoId(),account),"versionOpen");
         var a=current.proposed();var proposed=new Account(a.id(),a.code(),a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),operation.equals("REACTIVATE") || !operation.equals("DEACTIVATE") && a.active(),a.nameSw(),a.description());
         var v=newDraft(actor,account,base,operation,a,proposed,key,hash);books.createVersion(actor.getSaccoId(),v);
-        return saveAccountVersion(actor,v.id(),versionForm(operation.equals("UPDATE")?new Account(a.id(),a.code(),form.getName(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),form.getNameSw(),form.getDescription()):proposed,form.getReason(),0),complete);
+        return saveAccountVersion(actor,v.id(),versionForm(operation.equals("UPDATE")?new Account(a.id(),a.code(),form.getName(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),form.getDescription()):proposed,form.getReason(),0),complete);
     }
     private Version newDraft(AppUserPrincipal actor,UUID account,UUID base,String op,Account before,Account proposed,UUID key,String hash) {
         return new Version(UUID.randomUUID(),account,books.nextVersion(actor.getSaccoId(),account),base,op,"DRAFT",before,proposed,actor.getMemberId(),"",actor.getStationId(),"",0,0,"DRAFT",null,null,"",clock.now(),null,null,key,hash);
@@ -256,7 +256,7 @@ public class GeneralLedgerService {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");books.lockAccounts(actor.getSaccoId());var old=findVersion(actor,id);
         require(owner(actor,old) && Set.of("REJECTED","WITHDRAWN").contains(old.state()),"versionTransition");
         requireActor(actor,old.operation().equals("CREATE")?"ACCOUNTING_ACCOUNTS_CREATE":"ACCOUNTING_ACCOUNTS_UPDATE");
-        String hash=requestHash(Arrays.asList(id,form.getName(),form.getNameSw(),form.getDescription(),form.getReason(),complete));
+        String hash=requestHash(Arrays.asList(id,form.getName(),form.getDescription(),form.getReason(),complete));
         var prior=books.versionRequest(actor.getSaccoId(),key);if(prior.isPresent()){require(owner(actor,prior.get()) && prior.get().requestHash().equals(hash),"versionRetry");return prior.get().id();}
         require(key!=null && !books.openVersion(actor.getSaccoId(),old.accountId()),"versionOpen");
         var current=books.currentVersion(actor.getSaccoId(),old.accountId());var before=current.map(Version::proposed).orElse(null);
@@ -271,9 +271,9 @@ public class GeneralLedgerService {
     public UUID saveAccountVersion(AppUserPrincipal actor,UUID id,EditForm form,boolean complete) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");books.lockAccounts(actor.getSaccoId());var v=findVersion(actor,id);requireActor(actor,v.operation().equals("CREATE")?"ACCOUNTING_ACCOUNTS_CREATE":"ACCOUNTING_ACCOUNTS_UPDATE");
         require(owner(actor,v) && v.state().equals("DRAFT"),"versionTransition");require(v.revision()==form.getRevision(),"versionStale");
-        require(form.getReason()!=null && form.getReason().length()<=500 && form.getName()!=null && form.getName().length()<=160 && (form.getNameSw()==null || form.getNameSw().length()<=160) && (form.getDescription()==null || form.getDescription().length()<=500),"versionInput");
+        require(form.getReason()!=null && form.getReason().length()<=500 && form.getName()!=null && form.getName().length()<=160 && (form.getDescription()==null || form.getDescription().length()<=500),"versionInput");
         var a=v.proposed();boolean metadata=Set.of("CREATE","UPDATE").contains(v.operation());
-        var proposed=new Account(a.id(),a.code(),metadata?trim(form.getName()):a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),metadata?trim(form.getNameSw()):a.nameSw(),metadata?trim(form.getDescription()):a.description());
+        var proposed=new Account(a.id(),a.code(),metadata?trim(form.getName()):a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),metadata?trim(form.getDescription()):a.description());
         books.saveVersionDraft(actor.getSaccoId(),v,proposed,trim(form.getReason()));v=books.version(actor.getSaccoId(),id).orElseThrow();
         versionEvent(actor,v,"DRAFT_SAVED",v.reason());
         if(complete) {

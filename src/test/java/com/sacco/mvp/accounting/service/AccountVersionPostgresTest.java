@@ -89,6 +89,21 @@ class AccountVersionPostgresTest {
         assertThat(books.account(institution,account).orElseThrow().name()).isEqualTo("New name");assertThat(version(current.id()).proposed().name()).isEqualTo("Old name");
         assertThatThrownBy(()->jdbc.update("update gl_account set name='Bypass' where id=?",account)).hasStackTraceContaining("approved matching version");
     }
+    @Test void singleNameEditsPreserveStoredTranslationsAcrossDraftsAndRevisions(){
+        var setup=form(family,"111051","Office cash");setup.setNameSw("Fedha za ofisi");UUID account=ledger.onboardAccount(maker,setup,false);var current=ledger.accountCurrent(maker,account);
+        var edit=new EditForm();edit.setName("Branch cash");edit.setReason("Correct account name");
+        UUID id=ledger.proposeAccountVersion(maker,account,current.id(),"UPDATE",UUID.randomUUID(),edit,false);
+        assertThat(version(id).proposed().nameSw()).isEqualTo("Fedha za ofisi");
+        edit.setRevision(version(id).revision());edit.setNameSw("Uneditable name");ledger.saveAccountVersion(maker,id,edit,true);
+        assertThat(books.account(institution,account).orElseThrow().nameSw()).isEqualTo("Fedha za ofisi");
+        current=ledger.accountCurrent(maker,account);edit.setName("Counter cash");
+        UUID withdrawn=ledger.proposeAccountVersion(maker,account,current.id(),"UPDATE",UUID.randomUUID(),edit,false);
+        ledger.accountVersionAction(maker,withdrawn,version(withdrawn).revision(),"WITHDRAW","Revise wording");
+        edit.setNameSw("");edit.setName("Counter cash revised");UUID revised=ledger.reviseAccountVersion(maker,withdrawn,UUID.randomUUID(),edit,true);
+        assertThat(version(revised).proposed().nameSw()).isEqualTo("Fedha za ofisi");
+        assertThat(books.account(institution,account).orElseThrow().name()).isEqualTo("Counter cash revised");
+        assertThat(books.account(institution,account).orElseThrow().nameSw()).isEqualTo("Fedha za ofisi");
+    }
     @Test void rejectionAndWithdrawalPreserveEvidenceAndPermitANewNumberedVersion(){
         ledger.configureAccountApproval(maker,policy(false,true,true,true));UUID id=ledger.onboardVersion(maker,form(family,"111005","Rejected cash"),false,true);var reviewer=operator("B2",EnumSet.allOf(UserClaim.class));
         ledger.accountVersionAction(reviewer,id,version(id).revision(),"REJECT","Wrong wording");var old=version(id);

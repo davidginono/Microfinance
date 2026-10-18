@@ -37,6 +37,10 @@ The existing account deactivate/reactivate POST URLs remain CSRF- and permission
 
 All mutations retain session authentication and CSRF; request models allowlist editable metadata. Page labels are English/Kiswahili and use the shared responsive JSP shell and resource tables.
 
+Account forms use one Name field; there is no separate Kiswahili name input or comparison row. Existing translated names remain in stored account facts and version snapshots and are preserved when drafts are edited or revised.
+
+The single-name follow-up passed 36 focused Java checks (including PostgreSQL preservation, MVC field binding and six-page JSP compilation) and 24 browser checks across English/Kiswahili at 360/768/1366/1920 pixels. Forms and comparisons contained no separate translated-name field; document widths were contained and there were no page JavaScript errors. Mobile and desktop screenshots were inspected using the disposable fixture described below.
+
 ## Verification on 2026-10-18
 
 - Final changed Java sources compiled with Java 25. Direct JUnit Platform runs passed 57 distinct checks with zero failures, aborts or skips: 16 real PostgreSQL version/approval checks, six version MVC checks, 12 existing COA MVC checks, the six-page Jasper compilation check, and 22 existing claim/workspace security checks. Jasper compiled all six pages again after the final UTF-8 and form-spacing corrections.

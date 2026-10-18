@@ -33,8 +33,8 @@ class AccountVersionMvcTest {
     }
     @Test void savingDraftAllowListsMetadataAndDelegatesWithoutApproval()throws Exception{
         UUID id=UUID.randomUUID();when(ledger.saveAccountVersion(any(),eq(id),any(),eq(false))).thenReturn(id);
-        mvc.perform(post("/finance/accounts/versions/"+id+"/edit").with(user(actor)).with(csrf()).param("command","DRAFT").param("revision","3").param("name","Cash").param("saccoId","OTHER").param("active","false").param("reviewer","OTHER")).andExpect(redirectedUrl("/finance/accounts/versions/"+id));
-        verify(ledger).saveAccountVersion(eq(actor),eq(id),argThat(f->f.getRevision()==3 && f.getName().equals("Cash")),eq(false));
+        mvc.perform(post("/finance/accounts/versions/"+id+"/edit").with(user(actor)).with(csrf()).param("command","DRAFT").param("revision","3").param("name","Cash").param("nameSw","Uneditable name").param("saccoId","OTHER").param("active","false").param("reviewer","OTHER")).andExpect(redirectedUrl("/finance/accounts/versions/"+id));
+        verify(ledger).saveAccountVersion(eq(actor),eq(id),argThat(f->f.getRevision()==3 && f.getName().equals("Cash") && f.getNameSw().isEmpty()),eq(false));
     }
     @Test void policyUsesExpectedVersionAndFourIndependentModes()throws Exception{
         mvc.perform(post("/finance/accounts/approval-configuration").with(user(actor)).with(csrf()).param("version","4").param("createAutomatic","true").param("updateAutomatic","false").param("deactivateAutomatic","false").param("reactivateAutomatic","true").param("reason","Institution decision")).andExpect(redirectedUrl("/finance/accounts/approval-configuration"));

@@ -13,9 +13,8 @@
    <div class="accounting-error-summary" role="alert"><form:errors path="*" cssClass="coa-error" element="p" /></div>
    <c:choose><c:when test="${operation=='UPDATE' or operation=='CREATE'}">
     <label><spring:message code="coav.field.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
-    <label><spring:message code="coav.field.nameSw" /><form:input path="nameSw" cssClass="aws-control" maxlength="160" /></label>
     <label><spring:message code="coav.field.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="3" /></label>
-   </c:when><c:otherwise><form:hidden path="name" /><form:hidden path="nameSw" /><form:hidden path="description" /></c:otherwise></c:choose>
+   </c:when><c:otherwise><form:hidden path="name" /><form:hidden path="description" /></c:otherwise></c:choose>
    <label><spring:message code="coav.reason" /><form:textarea path="reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /></label>
    <div class="accounting-actions accounting-form-actions">
     <a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/versions' />"><spring:message code="common.cancel" /></a>
