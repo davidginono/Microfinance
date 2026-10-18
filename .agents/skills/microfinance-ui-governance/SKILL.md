@@ -20,6 +20,7 @@ Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/c
 
 - The sidebar owns global workspace navigation. Body actions operate on the current record or task; do not duplicate sidebar destinations inside panels.
 - Tables must not have an Actions column or per-row command buttons. Put record commands in the table header/toolbar and enable them through row selection, following the [table selection contract](../microfinance-table-standard/SKILL.md#selection-and-record-commands). Creation and other commands independent of a record remain available without selection.
+- Resource IDs/codes are blue native links to their existing authorized details page, following the same table contract. This is a permitted navigation exception to selection-dependent toolbar actions. Preserve permission gates, tenant/branch scope and normal keyboard/modified-click navigation; resources without an authorized destination remain plain text.
 - Keep institution portfolios, registries, review queues, and archives as separate focused views. On dashboards, show high-level portfolio KPIs instead of full registries.
 - A client or loan detail page may show compact record-specific facts needed for a decision. This is not permission to add portfolio KPI strips to every page.
 - On lending review screens, group income and expenses, existing debt, affordability, business/employment evidence, repayment history, guarantors, collateral, and documents around the current loan.

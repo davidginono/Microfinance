@@ -58,8 +58,8 @@
         <tbody>
         <c:forEach items="${reportRows}" var="row">
             <tr>
-                <td>${row.shortId}</td>
-                <td><c:out value="${empty row.loanId ? '-' : row.loanId}" /></td>
+                <td><a class="resource-table-id-link" href="<c:url value='/loan-officer/loan-applications/${row.id}' />">${row.shortId}</a></td>
+                <td><c:choose><c:when test="${not empty row.loanId and row.loanId != '-'}"><a class="resource-table-id-link" href="<c:url value='/loan-officer/loan-applications/${row.id}' />"><c:out value="${row.loanId}" /></a></c:when><c:otherwise><c:out value="${empty row.loanId ? '-' : row.loanId}" /></c:otherwise></c:choose></td>
                 <td>${row.applicantName}</td>
                 <td>${row.loanTypeLabel}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>

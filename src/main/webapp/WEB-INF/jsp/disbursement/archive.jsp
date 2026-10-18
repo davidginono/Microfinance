@@ -86,8 +86,8 @@
         <tbody>
         <c:forEach items="${archiveRows}" var="row">
             <tr>
-                <td><c:out value="${row.loanId}" /></td>
-                <td>${row.applicationNumber}</td>
+                <td><c:choose><c:when test="${not empty row.loanId and row.loanId != '-'}"><a class="resource-table-id-link" href="<c:url value='/disbursement/loan-applications/${row.id}' />"><c:out value="${row.loanId}" /></a></c:when><c:otherwise><c:out value="${row.loanId}" /></c:otherwise></c:choose></td>
+                <td><a class="resource-table-id-link" href="<c:url value='/disbursement/loan-applications/${row.id}' />">${row.applicationNumber}</a></td>
                 <td><c:out value="${row.loanProductName}" /></td>
                 <td>${row.applicantName}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>

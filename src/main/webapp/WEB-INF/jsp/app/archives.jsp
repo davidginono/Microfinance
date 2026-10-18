@@ -156,8 +156,8 @@
                     <tbody>
                     <c:forEach items="${archives}" var="app">
                         <tr>
-                            <td>${app.applicationNumber}</td>
-                            <td><c:out value="${empty app.loanId ? '-' : app.loanId}" /></td>
+                            <td><a class="resource-table-id-link" href="<c:url value='/app/loan-applications/${app.id}' />">${app.applicationNumber}</a></td>
+                            <td><c:choose><c:when test="${not empty app.loanId and app.loanId != '-'}"><a class="resource-table-id-link" href="<c:url value='/app/loan-applications/${app.id}' />"><c:out value="${app.loanId}" /></a></c:when><c:otherwise><c:out value="${empty app.loanId ? '-' : app.loanId}" /></c:otherwise></c:choose></td>
                             <td>
                                 <c:choose>
                                     <c:when test="${not empty app.loanProductSettingId and not empty loanProductNamesById[app.loanProductSettingId]}"><c:out value="${loanProductNamesById[app.loanProductSettingId]}" /></c:when>

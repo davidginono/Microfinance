@@ -167,6 +167,7 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 - Keep visual changes consistent with the current ERP-style staff/client layout. Rebranding does not authorize a framework migration or a wholesale visual redesign.
 - Keep panel-header and toolbar action buttons compact by default. Do not stretch actions such as Restore Default Permissions to full width unless a specific mobile form flow explicitly calls for it.
 - Workspace table values align with their column headings at the left leading edge, especially Debit/Credit and amounts; do not right-align amounts across wide columns. Retain tabular numerals, precision and contained horizontal scrolling. Standalone PDF/print financial layouts are separate.
+- Resource table IDs/codes link directly to their existing authorized details destination using the shared blue `resource-table-id-link` style. These native navigation links do not require checkbox selection; selection still controls toolbar commands. Keep missing or unauthorized destinations as plain text and preserve the no-row-action-button rule. See the project table skill.
 - Use one shared modal language across the app. Default to the shared modal shell with calm white surfaces, modest system-aligned corner radii, thin grey borders, light shadows, right-aligned footer actions, and a simple top-right close icon.
 - Reduce short-term memory overload:
   - keep page-header explanations brief

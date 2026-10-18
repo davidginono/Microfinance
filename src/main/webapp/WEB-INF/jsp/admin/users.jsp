@@ -102,7 +102,7 @@
             <c:otherwise>
                 <c:forEach items="${users}" var="user">
                     <tr>
-                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700"><c:out value="${user.userIdLabel}" /></td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700"><c:choose><c:when test="${canEditUsers}"><a class="resource-table-id-link" href="<c:url value='/admin/users/${user.accountId}/edit' />"><c:out value="${user.userIdLabel}" /></a></c:when><c:otherwise><c:out value="${user.userIdLabel}" /></c:otherwise></c:choose></td>
                         <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.memberNumber}" /></td>
                         <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.staffMemberNumber}" /></td>
                         <td class="px-3 py-2 align-top">

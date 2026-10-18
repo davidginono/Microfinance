@@ -32,7 +32,7 @@
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${statement.page.rows}" var="l"><tr>
-                        <td><a href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><spring:message code="recording.status.${l.status}" /></td>
+                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><spring:message code="recording.status.${l.status}" /></td>
                         <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.charges}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.00;(#,##0.00)" /></td>
                     </tr></c:forEach>
                 </tbody>
@@ -56,7 +56,7 @@
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${movements.rows}" var="p"><tr>
-                        <td>${p.date}</td><td><c:out value="${p.loanNumber}" /></td><td><c:out value="${p.product}" /></td><td><a href="<c:url value='/finance/loan-postings/${p.id}' />"><c:out value="${p.reference}" /></a></td><td><spring:message code="recording.document.${p.kind}" /></td>
+                        <td>${p.date}</td><td><c:out value="${p.loanNumber}" /></td><td><c:out value="${p.product}" /></td><td><a class="resource-table-id-link" href="<c:url value='/finance/loan-postings/${p.id}' />"><c:out value="${p.reference}" /></a></td><td><spring:message code="recording.document.${p.kind}" /></td>
                         <td class="statement-money"><fmt:formatNumber value="${p.kind=='REVERSAL'?-p.amount:p.amount}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${p.principal}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${p.interest}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${p.principalBalance}" pattern="#,##0.00;(#,##0.00)" /></td>
                     </tr></c:forEach>
                     <c:if test="${empty movements.rows}"><tr><td colspan="9"><spring:message code="recording.statement.empty" /></td></tr></c:if>

@@ -82,12 +82,12 @@
         <tbody>
         <c:forEach items="${archiveEntries}" var="entry">
             <tr>
-                <td>
+                <td><c:choose><c:when test="${archiveLoanIdMode and (empty entry.loan.loanId or entry.loan.loanId == '-')}">-</c:when><c:otherwise><a class="resource-table-id-link" href="<c:url value='/accountant/loan-applications/${entry.loan.id}' />">
                     <c:choose>
                         <c:when test="${archiveLoanIdMode}"><c:out value="${empty entry.loan.loanId ? '-' : entry.loan.loanId}" /></c:when>
                         <c:otherwise>${entry.loan.applicationNumber}</c:otherwise>
                     </c:choose>
-                </td>
+                </a></c:otherwise></c:choose></td>
                 <td>
                     <c:out value="${applicationProductNames[entry.loan.id]}" />
                 </td>

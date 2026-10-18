@@ -62,8 +62,8 @@
                 <tbody>
                 <c:forEach items="${processedLoans.rows}" var="row">
                     <tr>
-                        <td class="whitespace-nowrap"><span class="font-semibold text-slate-800"><c:out value="${row.applicationId}" /></span></td>
-                        <td class="whitespace-nowrap"><c:out value="${empty row.loanId ? '-' : row.loanId}" /></td>
+                        <td class="whitespace-nowrap"><a class="resource-table-id-link" href="<c:url value='/chairperson/processed-loans/${row.id}' />"><c:out value="${row.applicationId}" /></a></td>
+                        <td class="whitespace-nowrap"><c:choose><c:when test="${not empty row.loanId and row.loanId != '-'}"><a class="resource-table-id-link" href="<c:url value='/chairperson/processed-loans/${row.id}' />"><c:out value="${row.loanId}" /></a></c:when><c:otherwise><c:out value="${empty row.loanId ? '-' : row.loanId}" /></c:otherwise></c:choose></td>
                         <td><c:out value="${row.applicantName}" /><div class="text-xs text-slate-500"><c:out value="${row.memberNo}" /></div></td>
                         <td><c:out value="${row.productName}" /></td>
                         <td>TSh <fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>

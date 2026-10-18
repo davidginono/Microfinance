@@ -53,7 +53,7 @@
     <tbody>
     <c:forEach items="${apps}" var="app">
         <tr>
-            <td class="px-3 py-2">${app.applicationNumber}</td>
+            <td class="px-3 py-2"><a class="resource-table-id-link" href="<c:url value='/manager/loan-applications/${app.id}' />">${app.applicationNumber}</a></td>
             <td class="px-3 py-2">
                 <c:out value="${applicationProductNames[app.id]}" />
             </td>

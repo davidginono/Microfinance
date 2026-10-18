@@ -110,7 +110,7 @@
             <tbody>
                 <c:forEach items="${configuration.products}" var="row">
                     <tr>
-                        <td class="chairperson-table-code"><c:out value="${row.code}" /></td>
+                        <td class="chairperson-table-code"><a class="resource-table-id-link" href="<c:url value='/chairperson/configurations/loan-products/${row.id}' />"><c:out value="${row.code}" /></a></td>
                         <td><c:out value="${row.name}" /></td>
                         <td><span class="erp-status-badge"><spring:message code="status.${fn:toLowerCase(row.status)}" text="${row.status}" /></span></td>
                         <td>

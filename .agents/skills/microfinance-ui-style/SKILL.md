@@ -32,6 +32,7 @@ The current interface is a compact operational ERP, not a lending marketing site
 ## Controls And Forms
 
 - Resource tables use the [reusable console table contract](../microfinance-table-standard/SKILL.md#reusable-console-table-component): compact rectangular header actions, a separate filter/paginator/preferences row, and an independently scrolling table canvas. Reuse `resource-table.css` and `resource-table.js`; do not create page-specific gear dialogs or paginator styling.
+- Render navigable table IDs/codes with the shared `resource-table-id-link` class: blue (`--aws-blue`, fallback `#0972d3`) in normal and visited states, darker blue and underlined on hover/focus, with a visible keyboard focus outline. These are native resource-navigation links, separate from checkbox selection and toolbar commands; do not style them as action buttons.
 - Use the shared default Cloudscape-style pagination in that tools row for every table, including batch receipt editors. Never add boxed Previous/Next footer buttons or a separate "Page 1" footer. JSON editors use the table skill's external paging contract so draft saving and server-side paging remain intact.
 - `workspace-resources.css` promotes the shared square form/card surfaces, gray headings, thin borders and compact controls across member and staff workspaces. Keep workflow-specific wizards, permission states, mandatory disclosures and inline editors intact. Avoid loading legacy table enhancement on opted-in resource tables, which otherwise duplicates filters, actions or paging.
 

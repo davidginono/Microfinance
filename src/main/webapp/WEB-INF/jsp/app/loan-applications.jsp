@@ -46,7 +46,7 @@
         <tbody>
             <c:forEach items="${apps}" var="app">
                 <tr>
-                    <td class="px-3 py-2">${app.applicationNumber}</td>
+                    <td class="px-3 py-2"><a class="resource-table-id-link" href="<c:url value='/app/loan-applications/${app.id}' />">${app.applicationNumber}</a></td>
                     <td class="px-3 py-2">
                         <c:choose>
                             <c:when test="${not empty app.loanProductSettingId and not empty loanProductNamesById[app.loanProductSettingId]}"><c:out value="${loanProductNamesById[app.loanProductSettingId]}" /></c:when>

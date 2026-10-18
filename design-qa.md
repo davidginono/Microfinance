@@ -244,3 +244,10 @@ final result: passed — concise content, stable header and dated-title acceptan
 ## 2026-10-18 Approval design verification
 
 Visual verification in progress against the four supplied reference screenshots.
+
+## 2026-10-19 Resource ID link verification
+
+- Added native blue ID/reference/code links in 33 admin, staff review, queue, archive and accounting resource views. Destinations reuse existing record routes and permission gates. Unavailable identifiers and users without an authorized record destination retain plain text. Updated all three project UI skills and AGENTS.md to make direct ID navigation compatible with toolbar selection.
+- Compiled all 34 changed JSPs, including the previously uncommitted loan-adjustment form layout. The focused JSP/security/MVC run passed all 28 checks; shared table JavaScript passed all 35 tests. No backend or database changes were made for these links.
+- In a local, isolated Tomcat fixture rendering the actual JSPs/assets with synthetic records, verified blue IDs, native click and keyboard navigation, visible focus, read-only plain-text fallback, checkbox toolbar actions, selection reset on Back, and retained links after server pagination. Checked Users and roles, manager queue and the shared board review queue, including Kiswahili. At 360px the document remained 360px wide with table overflow contained; desktop layout was checked at 1366px.
+- The existing signed-in application correctly denied admin access for its current account. Synthetic fixture checks do not establish production role/branch acceptance or financial workflow completeness; existing server authorization was preserved.
