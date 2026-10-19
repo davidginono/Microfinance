@@ -16,6 +16,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @Query("""
+        update Member m set m.employeeNumber = :number
+        where m.id = :id and m.saccoId = :institution and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (m.memberAccount = true or (m.memberAccount is null and m.position = com.sacco.mvp.domain.Position.MEMBER))
+        """)
+    int updateEmployeeNumberForActiveClient(@Param("id") UUID id, @Param("institution") String institution, @Param("number") String number);
     interface StatusCountProjection {
         MemberStatus getStatus();
         long getTotal();

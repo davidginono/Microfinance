@@ -1,0 +1,1 @@
+<c:if test="${not empty payrollError}"><div class="accounting-error-summary" role="alert" tabindex="-1"><p class="coa-error"><spring:message code="${payrollError}" /></p></div></c:if>

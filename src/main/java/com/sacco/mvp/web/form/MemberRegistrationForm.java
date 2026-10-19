@@ -13,6 +13,10 @@ public class MemberRegistrationForm {
     @NotBlank(message = "Enter your member number.")
     private String memberNo;
 
+    @Size(max = 50, message = "{payroll.employeeNumber.invalid}")
+    @Pattern(regexp = "^[A-Za-z0-9/._ -]*$", message = "{payroll.employeeNumber.invalid}")
+    private String employeeNumber;
+
     @Email(message = "Enter a valid email address.")
     @NotBlank(message = "Enter your email address.")
     private String email;

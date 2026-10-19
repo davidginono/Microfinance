@@ -1,0 +1,6 @@
+<div data-loan-choice data-choice-url="<c:url value='/finance/payroll/choices/employers' />">
+    <label for="payrollEmployer" class="grid gap-2"><spring:message code="payroll.employer" />
+    <form:select path="employerId" id="payrollEmployer" cssClass="aws-control" data-choice-select="true" required="required"><option value=""><spring:message code="payroll.select" /></option><c:if test="${selectedEmployer!=null}"><form:option value="${selectedEmployer.id}"><c:out value="${selectedEmployer.name}" /></form:option></c:if></form:select>
+    <form:errors path="employerId" cssClass="coa-error" /></label>
+    <span data-choice-error role="status" data-search-label="<spring:message code='common.search' />" data-error="<spring:message code='payroll.error.lookup' />"></span>
+</div>

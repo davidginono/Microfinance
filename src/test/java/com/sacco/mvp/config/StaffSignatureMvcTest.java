@@ -25,9 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StaffSignatureMvcTest {
     @Autowired WebApplicationContext context;
     @Autowired StaffSignatureService signatures;
+    @Autowired EmployeeProfileService employeeProfile;
     MockMvc mvc; AppUserPrincipal actor;
     @BeforeEach void setup() {
-        reset(signatures);
+        reset(signatures,employeeProfile);
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         actor = new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
             .position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(), EnumSet.allOf(UserClaim.class), true);
@@ -47,15 +48,24 @@ class StaffSignatureMvcTest {
             .andExpect(flash().attribute("signatureError", "Enter two names"))
             .andExpect(result -> org.junit.jupiter.api.Assertions.assertFalse(result.getFlashMap().containsKey("currentPassword")));
     }
+    @Test void employeeNumberEditRequiresCsrfAndAlwaysUsesTheSessionOwner()throws Exception {
+        mvc.perform(post("/profile/employee-number").with(user(actor)).param("employeeNumber","0001")).andExpect(status().isForbidden());
+        verifyNoInteractions(employeeProfile);
+        mvc.perform(post("/profile/employee-number").with(user(actor)).with(csrf()).param("employeeNumber","0001").param("memberId",UUID.randomUUID().toString()))
+            .andExpect(redirectedUrl("/profile")).andExpect(flash().attribute("message","Saved"));
+        verify(employeeProfile).update(actor,"0001");
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean StaffSignatureService signatures() { return mock(StaffSignatureService.class); }
-        @Bean ProfileController profile(StaffSignatureService signatures) {
+        @Bean EmployeeProfileService employeeProfile() { return mock(EmployeeProfileService.class); }
+        @Bean ProfileController profile(StaffSignatureService signatures,EmployeeProfileService employeeProfile) {
             var messages = new StaticMessageSource();
             for (var locale : List.of(Locale.ENGLISH, Locale.getDefault())) {
                 messages.addMessage("profile.signature.saved", locale, "Saved");
+                messages.addMessage("payroll.employeeNumber.saved", locale, "Saved");
                 messages.addMessage("profile.signature.invalidName", locale, "Enter two names");
             }
-            return new ProfileController(mock(MemberDirectoryService.class), mock(MemberProfileImageService.class), mock(PlatformAdminProfileService.class), signatures, messages);
+            return new ProfileController(mock(MemberDirectoryService.class), mock(MemberProfileImageService.class), mock(PlatformAdminProfileService.class), signatures, messages, employeeProfile);
         }
     }
 }

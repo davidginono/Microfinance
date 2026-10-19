@@ -31,6 +31,21 @@ public class ProfileController {
     private final PlatformAdminProfileService platformAdminProfileService;
     private final StaffSignatureService staffSignatureService;
     private final MessageSource messageSource;
+    private final com.sacco.mvp.service.EmployeeProfileService employeeProfileService;
+
+    @PostMapping("/profile/employee-number")
+    public String updateEmployeeNumber(@AuthenticationPrincipal AppUserPrincipal principal,
+                                      @RequestParam(defaultValue = "") String employeeNumber,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            employeeProfileService.update(principal, employeeNumber);
+            redirectAttributes.addFlashAttribute("message", messageSource.getMessage("payroll.employeeNumber.saved", null, LocaleContextHolder.getLocale()));
+        } catch (IllegalArgumentException failure) {
+            redirectAttributes.addFlashAttribute("employeeNumberValue", employeeNumber.substring(0, Math.min(employeeNumber.length(), 50)));
+            redirectAttributes.addFlashAttribute("employeeNumberError", messageSource.getMessage("payroll.employeeNumber.invalid", null, LocaleContextHolder.getLocale()));
+        }
+        return "redirect:/profile";
+    }
 
     @GetMapping("/profile")
     public String profile(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {

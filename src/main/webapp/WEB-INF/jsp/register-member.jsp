@@ -47,6 +47,12 @@
                             <form:errors path="memberNo" cssClass="mt-1 block text-xs text-rose-600" />
                         </div>
                         <div>
+                            <label for="employeeNumber" class="mb-1.5 block registration-section-label"><spring:message code="payroll.employeeNumber.optional" /></label>
+                            <form:input path="employeeNumber" id="employeeNumber" maxlength="50" pattern="[A-Za-z0-9/._ -]*" cssClass="registration-field" aria-describedby="employeeNumberHelp employeeNumberErrors" />
+                            <p id="employeeNumberHelp" class="mt-1 text-sm"><spring:message code="payroll.employeeNumber.help" /></p>
+                            <form:errors path="employeeNumber" id="employeeNumberErrors" cssClass="mt-1 block text-sm text-rose-600" />
+                        </div>
+                        <div>
                             <spring:bind path="registrationForm.saccoId">
                                 <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
                             </spring:bind>

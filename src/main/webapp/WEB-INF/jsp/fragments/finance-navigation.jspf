@@ -1,4 +1,10 @@
 <c:if test="${staffWorkspace}">
+    <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW')">
+        <c:forEach items="${['batches','employers','instructions']}" var="payrollNav">
+            <c:set var="payrollPath" value="/finance/payroll${payrollNav=='batches'?'':payrollNav=='employers'?'/employers':'/instructions'}" />
+            <a href="<c:url value='${payrollPath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri==payrollPath?'shell-nav-active':''}"><spring:message code="payroll.nav.${payrollNav}" /></a>
+        </c:forEach>
+    </sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_VIEW')">
         <a href="<c:url value='/finance/loan-adjustments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-adjustments')?'shell-nav-active':''}"><spring:message code="adjustment.title" /></a>
     </sec:authorize>

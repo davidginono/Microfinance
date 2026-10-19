@@ -64,6 +64,22 @@
     </section>
 </c:if>
 
+<c:if test="${profileMember.memberAccess and not isPlatformAdminIdentity}">
+    <section class="erp-panel aws-settings-panel" aria-labelledby="employeeNumberTitle">
+        <div class="aws-settings-header"><h2 id="employeeNumberTitle" class="aws-settings-title"><spring:message code="payroll.employeeNumber" /></h2></div>
+        <form action="<c:url value='/profile/employee-number' />" method="post" class="aws-settings-form">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <c:if test="${not empty employeeNumberError}"><p id="employeeNumberError" role="alert" class="coa-error"><c:out value="${employeeNumberError}" /></p></c:if>
+            <label class="aws-settings-field" for="profileEmployeeNumber"><spring:message code="payroll.employeeNumber.optional" />
+                <input id="profileEmployeeNumber" name="employeeNumber" class="aws-control" maxlength="50" pattern="[A-Za-z0-9/._ -]*"
+                    aria-describedby="profileEmployeeHelp${not empty employeeNumberError?' employeeNumberError':''}" aria-invalid="${not empty employeeNumberError}"
+                    value="<c:out value='${employeeNumberValue != null ? employeeNumberValue : profileMember.employeeNumber}' />" />
+            </label>
+            <p id="profileEmployeeHelp"><spring:message code="payroll.employeeNumber.profileHelp" /></p>
+            <div class="aws-settings-footer"><button type="submit" class="app-btn btn-launch"><spring:message code="common.save" /></button></div>
+        </form>
+    </section>
+</c:if>
 <c:if test="${staffSignatureAvailable}">
     <section class="erp-panel aws-settings-panel" aria-labelledby="staffSignatureTitle">
         <div class="aws-settings-header">

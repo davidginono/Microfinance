@@ -47,6 +47,7 @@ public class MemberRegistrationService {
             .id(UUID.randomUUID())
             .saccoId(sacco.getSaccoId())
             .memberNo(verified.memberNo())
+            .employeeNumber(EmployeeNumber.normalize(form.getEmployeeNumber()))
             .stationId(verified.stationId())
             .fullName(verified.fullName())
             .phone(normalizedPhone)

@@ -32,6 +32,9 @@ public class Member {
     @Column(name = "staff_no")
     private String staffNo;
 
+    @Column(name = "employee_number", length = 50)
+    private String employeeNumber;
+
     @Column(name = "station_id")
     private String stationId;
 
