@@ -216,7 +216,7 @@
 </c:choose>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-detail-2" data-resource-split data-resource-header-source>
+    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-detail-2" data-table-tools="none" data-resource-split data-resource-header-source>
         <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="manager-detail-2"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h2>
         <div class="erp-table-scroll">
         <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
@@ -252,7 +252,7 @@
 </c:if>
 
 <c:if test="${not hideDisbursementSupportSections}">
-<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-detail-3" data-resource-split data-resource-header-source>
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-detail-3" data-table-tools="none" data-resource-split data-resource-header-source>
     <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="manager-detail-3"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h2>
     <div class="erp-table-scroll">
     <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
@@ -283,7 +283,7 @@
 </c:if>
 
 <c:if test="${not hideDisbursementSupportSections}">
-<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-detail-4" data-resource-header-source data-resource-split>
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-detail-4" data-table-tools="none" data-resource-header-source data-resource-split>
     <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="manager-detail-4"><spring:message code="loan.guarantors" text="Guarantors" /></h2>
     <div class="erp-table-scroll">
     <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">

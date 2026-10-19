@@ -8,7 +8,7 @@
                  aria-label="${fn:escapeXml(section.key)}"
                  data-aws-table-region
                  data-aws-no-titlebar="true"
-                 data-resource-table="review-financial-section-${sectionLoop.index}"
+                 data-resource-table="review-financial-section-${sectionLoop.index}" data-table-tools="none"
                  data-aws-no-refresh="true">
             <div class="app-table-titlebar">
                 <h2><c:out value="${section.key}" /></h2>

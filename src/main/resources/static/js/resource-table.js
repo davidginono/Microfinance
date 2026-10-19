@@ -103,7 +103,8 @@
             refresh = iconButton('refresh', l.refresh); actions.prepend(refresh);
         }
         if (refresh) refresh.dataset.resourceRefresh = 'true';
-        const tools = node('div', 'resource-table-tools'); titlebar.after(tools);
+        const tools = node('div', 'resource-table-tools'), showTools = region.dataset.tableTools !== 'none';
+        if (showTools) titlebar.after(tools);
         let filters = region.querySelector(':scope > form:not([method="post"]), :scope > .aws-filter-toolbar') || [...document.querySelectorAll('[data-table-filter-for]')].find(candidate => candidate.dataset.tableFilterFor === region.dataset.resourceTable);
         let search = filters?.querySelector('[data-aws-table-search]');
         if (!filters || !filters.querySelector('input:not([type="hidden"]),select,textarea')) {
@@ -422,7 +423,7 @@
         const defaultOrder = headers.map((_, index) => index);
         let settings = {hidden: [], compact: true, wrap: false, striped: false, sticky: 0, order: defaultOrder};
         try {
-            const stored = JSON.parse(localStorage.getItem(key));
+            const stored = showTools ? JSON.parse(localStorage.getItem(key)) : null;
             if (stored && Array.isArray(stored.hidden)) settings = {...settings, ...stored,
                 hidden: stored.hidden.filter(n => Number.isInteger(n) && n >= 0 && n < headers.length),
                 sticky: [0,1,2].includes(stored.sticky) ? stored.sticky : 0,
@@ -542,7 +543,7 @@
             });
             dialog.showModal(); close.focus();
         });
-        window.ResourceSplitView?.init(region, {headers, originalCells, selectable, labels:l});
+        if (showTools) window.ResourceSplitView?.init(region, {headers, originalCells, selectable, labels:l});
     }
     window.ResourceTable = {setPage: (region, state) => {
         if (region?.dataset.tablePaginationMode !== 'external') return;

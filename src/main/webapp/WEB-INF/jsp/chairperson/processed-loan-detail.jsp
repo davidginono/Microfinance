@@ -58,7 +58,7 @@
 <c:set var="calculatedRepaymentRows" value="${loan.calculatedRepaymentRows}" />
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
-<section class="erp-panel mt-4 overflow-hidden" data-aws-table-region data-resource-table="chairperson-processed-loan-detail-1">
+<section class="erp-panel mt-4 overflow-hidden" data-aws-table-region data-resource-table="chairperson-processed-loan-detail-1" data-table-tools="none">
     <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold text-slate-900" data-table-heading-for="chairperson-processed-loan-detail-1"><spring:message code="review.guarantors" text="Guarantors" /></h2></div>
     <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="common.name" text="Name" /></th><th><spring:message code="Member.memberNo" text="Client No" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="common.amount" text="Amount" /></th><th><spring:message code="review.reason" text="Reason" /></th></tr></thead><tbody>
         <c:forEach items="${loan.guarantors}" var="guarantor"><tr><td><c:out value="${guarantor.name}" /></td><td><c:out value="${guarantor.memberNo}" /></td><td><c:out value="${guarantor.status}" /></td><td><fmt:formatNumber value="${guarantor.committedAmount}" maxFractionDigits="2" /></td><td><c:out value="${guarantor.reason}" /></td></tr></c:forEach>
@@ -67,7 +67,7 @@
 </section>
 
 <sec:authorize access="@access.has(principal, 'LOAN_DOCUMENTS_VIEW')">
-<section class="erp-panel mt-4 overflow-hidden" data-resource-table="chairperson-processed-loan-detail-2" data-resource-split>
+<section class="erp-panel mt-4 overflow-hidden" data-resource-table="chairperson-processed-loan-detail-2" data-table-tools="none" data-resource-split>
     <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold text-slate-900" data-table-heading-for="chairperson-processed-loan-detail-2"><spring:message code="loan.attachments" text="Attachments" /></h2></div>
     <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="common.file" text="File" /></th><th><spring:message code="common.size" text="Size" /></th><th><spring:message code="common.uploaded" text="Uploaded" /></th><th data-table-actions-header></th></tr></thead><tbody>
         <c:forEach items="${loan.attachments}" var="attachment"><tr><td><c:out value="${not empty attachment.originalName ? attachment.originalName : attachment.name}" /></td><td><c:out value="${attachment.sizeLabel}" /></td><td><c:out value="${appTime:format(attachment.uploadedAt)}" /></td><td><div class="flex flex-wrap gap-2"><a class="app-btn btn-neutral" target="_blank" rel="noopener" href="${pageContext.request.contextPath}/documents/loan-applications/${loan.id}/attachments/${attachment.id}/view"><spring:message code="common.view" text="View" /></a><a class="app-btn btn-primary" data-download-action="true" href="${pageContext.request.contextPath}/documents/loan-applications/${loan.id}/attachments/${attachment.id}"><spring:message code="common.download" text="Download" /></a></div></td></tr></c:forEach>

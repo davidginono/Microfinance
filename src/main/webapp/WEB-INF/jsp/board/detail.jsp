@@ -217,7 +217,7 @@
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-3" data-resource-split data-resource-header-source>
+    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-3" data-table-tools="none" data-resource-split data-resource-header-source>
         <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-3"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h2>
         <div class="erp-table-scroll">
         <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
@@ -252,7 +252,7 @@
                         </div>
 </c:if>
 
-<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-4" data-resource-split data-resource-header-source>
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-4" data-table-tools="none" data-resource-split data-resource-header-source>
     <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-4"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h2>
     <div class="erp-table-scroll">
     <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
@@ -281,7 +281,7 @@
                     </div>
 </div>
 
-<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-5" data-resource-header-source data-resource-split>
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-5" data-table-tools="none" data-resource-header-source data-resource-split>
     <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-5"><spring:message code="loan.guarantors" text="Guarantors" /></h2>
     <div class="erp-table-scroll">
     <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">

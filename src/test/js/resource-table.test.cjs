@@ -143,6 +143,22 @@ async function setup(html, integration = '') {
     if (window.document.readyState !== 'complete') await new Promise(resolve => window.addEventListener('load', resolve, {once:true}));
     return {dom, window, document:window.document};
 }
+test('bounded detail tables omit tools and retain all columns and record commands', async () => {
+    const markup=table('loan-documents','<tr><td>Proof.pdf</td><td>1 KB</td><td><a class="app-btn" href="/proof" data-download-action="true">Download</a></td></tr>','data-table-tools="none" data-aws-no-refresh="true" data-resource-split')
+        .replace('<form method="get"><input name="search"></form>','').replace('<th>Status</th>','<th data-table-actions-header></th>');
+    const saved='localStorage.setItem("resource-table:v1:loan-documents",JSON.stringify({hidden:[1],order:[2,1,0]}));';
+    const {dom,document:d}=await setup(markup+table('next-detail',row,'data-table-tools="none"'),saved);
+    assert.equal(d.querySelector('.resource-table-tools'),null);
+    assert.equal(d.querySelector('[type="search"],.resource-table-pagination,.resource-table-preferences-button'),null);
+    assert.equal(d.querySelector('.app-table-titlebar h2').textContent,'Records');
+    assert.equal(d.querySelector('.resource-split-layout'),null);
+    assert.equal(d.querySelector('[data-resource-table="next-detail"]').dataset.resourceTableReady,'true');
+    assert.equal([...d.querySelectorAll('tbody td')].every(cell=>!cell.hidden),true);
+    assert.equal(d.querySelector('tbody td:last-child').textContent,'1 KB');
+    d.querySelector('tbody input[type="checkbox"]').click();
+    assert.equal(d.querySelector('.resource-table-actions a[data-download-action]').getAttribute('href'),'/proof');
+    dom.window.close();
+});
 test('pager keeps scoped URLs and tools outside the horizontal viewport', async () => {
     const {dom, document:d} = await setup(table('receipts', row) + '<div data-table-pagination data-page="2" data-table-for="receipts"><a data-page-direction="previous" href="?page=1&search=V001">Previous</a><a data-page-direction="next" href="?page=3&search=V001">Next</a></div>');
     assert.equal(d.querySelector('.resource-table-page-number').textContent, '3');

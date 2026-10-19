@@ -159,7 +159,7 @@
     <c:when test="${not empty financialFieldSections}">
         <div class="grid gap-3 md:grid-cols-2">
             <c:forEach items="${financialFieldSections}" var="section" varStatus="financialSectionLoop">
-<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-loading-label="Loading results..." data-resource-table="app-loan-view-1-${financialSectionLoop.index}" data-table-title-id="app-loan-view-title">
+<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-loading-label="Loading results..." data-resource-table="app-loan-view-1-${financialSectionLoop.index}" data-table-tools="none" data-table-title-id="app-loan-view-title">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -218,7 +218,7 @@
 </c:choose>
 
 <c:if test="${not empty calculatedRepaymentRows}">
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-3">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-3" data-table-tools="none">
         <div class="app-table-titlebar">
             <div class="app-table-heading">
                 <h2>
@@ -427,7 +427,7 @@
                     <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
                 </span>
             </summary>
-            <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true" data-resource-table="app-loan-view-4">
+            <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true" data-resource-table="app-loan-view-4" data-table-tools="none">
                 <div class="erp-table-scroll">
                 <table class="erp-table loan-repayment-schedule-table">
                     <thead>
@@ -473,7 +473,7 @@
 </c:if>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-5" data-resource-split>
+    <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-5" data-table-tools="none" data-resource-split>
         <div class="app-table-titlebar">
             <div class="app-table-heading"><h2><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></h2></div>
 </div>
@@ -512,7 +512,7 @@
                                 </div>
 </c:if>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-6" data-resource-split>
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-6" data-table-tools="none" data-resource-split>
     <div class="app-table-titlebar">
         <div class="app-table-heading"><h2><spring:message code="loan.attachments.applicationAttachments" text="Application Attachments" /></h2></div>
 </div>
@@ -546,7 +546,7 @@
                 </div>
             </div>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-7" data-resource-split>
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-view-7" data-table-tools="none" data-resource-split>
     <div class="app-table-titlebar">
         <div class="app-table-heading"><h2><spring:message code="loan.guarantors" /></h2></div>
             </div>

@@ -68,7 +68,7 @@
                             </svg>
                         </span>
                     </summary>
-                    <div class="erp-table-wrap rounded-none border-0" data-resource-table="staff-repayment-schedule" data-aws-no-refresh="true">
+                    <div class="erp-table-wrap rounded-none border-0" data-resource-table="staff-repayment-schedule" data-table-tools="none" data-aws-no-refresh="true">
                         <div class="app-table-titlebar"><h2><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></h2></div>
                         <div class="erp-table-scroll">
                         <table class="erp-table">

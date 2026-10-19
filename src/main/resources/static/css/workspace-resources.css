@@ -35,6 +35,10 @@
 }
 .aws-console .loan-staff-review-template[data-staff-review-page] .loan-staff-review-overview {padding:20px;}
 .aws-console .loan-view-hero-summary > .erp-panel-body {padding:20px!important;background:#fff!important;}
+.aws-console .loan-view-hero-summary .erp-detail-facts dd {white-space:normal;}
+.aws-console .loan-view-hero-summary .loan-status-badge {vertical-align:top;max-width:100%;}
+.aws-console .loan-staff-review-template[data-staff-review-page] .loan-hero-with-photo {align-items:start;}
+.aws-console .loan-view-hero-summary .loan-applicant-photo-card {align-self:start;min-height:0;}
 /* Forms and record facts belong on white sections, never directly on the workspace canvas.
    accounting-section is the existing finance alias; new workspaces use erp-resource-section. */
 .aws-console :is(.erp-resource-section,.accounting-section,.erp-detail-card) {
