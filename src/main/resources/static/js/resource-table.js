@@ -169,20 +169,19 @@
             const actionIndexes = actionHeaders.map(header => header.cellIndex), columnCount = head.cells.length;
             actionHeaders.forEach(header => header.remove()); head.prepend(node('th'));
             const commands = node('div', 'resource-table-record-actions'); actions.prepend(commands);
-            const records = new Map(), commandLabels = new Map();
+            const records = new Map(), commandLabels = new Set();
             const secondary = actionMenu(commands,[],region.dataset.resourceTable+'-record',region,l);
             const context = node('div','resource-table-command-context'); context.hidden = true; region.append(context);
             let active, placements = [];
             const announcement = node('span', 'sr-only'); announcement.setAttribute('role', 'status'); region.append(announcement);
-            const kind = control => control.tagName === 'A' && !control.hasAttribute('download') && !control.hasAttribute('data-download-action') && !/\.pdf(?:$|[?#])/.test(control.getAttribute('href') || '') ? 'navigation' : 'command';
             const resetCommands = () => {
                 placements.forEach(({control,parent,next}) => parent.insertBefore(control,next?.parentNode === parent ? next : null)); placements=[];
                 if (active) { active.content.append(...context.childNodes); active = null; }
                 records.forEach(record => { record.input.checked = false; record.row.classList.remove('resource-table-selected'); });
-                commands.querySelectorAll(':scope > button, :scope > a').forEach(control => control.remove()); secondary.menu.replaceChildren();
-                (commandLabels.size ? [...commandLabels] : [[l.view,'navigation']]).forEach(([label,type]) => {
+                secondary.menu.replaceChildren();
+                (commandLabels.size ? [...commandLabels] : [l.view]).forEach(label => {
                     const button = node('button','app-btn btn-neutral',label); button.type='button'; button.disabled=true;
-                    (type === 'navigation' ? commands : secondary.menu).append(button);
+                    button.setAttribute('role','menuitem'); secondary.menu.append(button);
                 });
                 secondary.trigger.hidden = !secondary.menu.children.length; secondary.close(false); secondary.sync(); context.hidden=true; announcement.textContent = '';
             };
@@ -192,7 +191,7 @@
                     if (records.has(row) || row.cells.length !== columnCount || row.cells[0].colSpan > 1 || row.querySelector('.resource-table-selection')) return;
                     const content = document.createDocumentFragment(), commandCells = actionIndexes.map(index => row.cells[index]);
                     commandCells.forEach(cell => {
-                        cell.querySelectorAll('a.app-btn,button').forEach(control => commandLabels.set(control.textContent.trim(),kind(control)));
+                        cell.querySelectorAll('a.app-btn,button').forEach(control => commandLabels.add(control.textContent.trim()));
                         content.append(...cell.childNodes); cell.remove();
                     });
                     const selectCell = node('td','resource-table-selection'), input = node('input'); input.type='checkbox';
@@ -201,7 +200,6 @@
                     input.addEventListener('change', () => {
                         const selected=input.checked; resetCommands();
                         if (selected) {
-                            commands.querySelectorAll(':scope > button, :scope > a').forEach(control => control.remove());
                             secondary.menu.replaceChildren();
                             active=record; input.checked=true; row.classList.add('resource-table-selected'); context.append(content);
                             const controls=[...context.querySelectorAll('a.app-btn,button')];
@@ -210,8 +208,7 @@
                                 if (placements.some(item=>item.control===moved)) return;
                                 placements.push({control:moved,parent:moved.parentNode,next:moved.nextSibling});
                                 control.classList.add('app-btn');
-                                if (kind(control)==='navigation') commands.append(moved);
-                                else {control.setAttribute('role','menuitem');secondary.menu.append(moved);}
+                                control.setAttribute('role','menuitem'); secondary.menu.append(moved);
                             });
                             secondary.trigger.hidden=!secondary.menu.children.length; secondary.sync();
                             context.hidden=!context.textContent.trim() || context.textContent.trim()==='-'; announcement.textContent=input.getAttribute('aria-label');

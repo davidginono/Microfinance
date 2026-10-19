@@ -75,15 +75,15 @@ test('workspace command columns retain native forms, permissions and record targ
     assert.equal(d.querySelectorAll('thead th').length,2);assert.equal(d.querySelector('thead [data-table-actions-header]'),null);
     d.querySelector('tbody input').click();
     const form=d.querySelector('#native-command'),button=d.querySelector('#approve');let commands=0;button.addEventListener('click',()=>commands++);
-    assert.equal(d.querySelectorAll('.resource-table-record-actions > button,.resource-table-record-actions > a').length,1);
-    assert.equal(d.querySelector('.resource-table-record-actions > a').textContent,'Open');
+    assert.equal(d.querySelectorAll('.resource-table-record-actions > button,.resource-table-record-actions > a').length,0);
+    assert.equal(d.querySelector('.resource-table-menu > a').textContent,'Open');
     assert.equal(d.querySelectorAll('.resource-table-menu #approve').length,1);
     assert.equal([...d.querySelectorAll('.resource-table-menu button')].filter(control=>control.textContent==='Approve').length,1);
     assert.equal(form.closest('[role=menu]')!==null,true);assert.equal(form.action,'http://localhost/first/decision');assert.equal(form.querySelector('input').value,'original');
     assert.equal(d.querySelector('.resource-table-command-context').hidden,false);
     d.querySelector('.resource-table-action-menu > button').click();button.click();assert.equal(commands,1);
-    d.querySelectorAll('tbody input')[1].click();assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/second');assert.equal(d.querySelector('.resource-table-action-menu > button').disabled,true);
-    assert.equal(d.querySelectorAll('.resource-table-record-actions > button,.resource-table-record-actions > a').length,1);
+    d.querySelectorAll('tbody input')[1].click();assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/second');assert.equal(d.querySelector('.resource-table-action-menu > button').disabled,false);
+    assert.equal(d.querySelectorAll('.resource-table-record-actions > button,.resource-table-record-actions > a').length,0);
     d.querySelector('tbody input').click();assert.equal(d.querySelector('#native-command'),form);assert.equal(d.querySelector('#approve'),button);
     d.querySelector('.resource-table-search input').dispatchEvent(new w.Event('input'));assert.equal(d.querySelector('tbody input').checked,false);dom.window.close();
 });
@@ -294,6 +294,33 @@ test('header selection cooperates with existing voucher command rules', async ()
     d.querySelector('thead input').click();
     w.dispatchEvent(new w.Event('pageshow'));
     assert.equal(d.querySelector('[data-selection-action]').disabled,true);
+    dom.window.close();
+});
+
+test('selected loan View, PDF, Print and top-up commands share one menu and retain controller rules', async () => {
+    const commands = '<button data-table-command data-selection-action="details" disabled>View</button><button data-table-command data-selection-action="pdf" disabled>Download PDF</button><button data-table-command data-selection-action="print" disabled>Print</button><button data-table-command data-selection-action="topup" disabled>Top up</button>';
+    const rows = '<tr data-voucher-id="first" data-topup-eligible="true"><td><input type="checkbox"></td><td><a class="resource-table-id-link" href="/loans/first">L001</a></td><td>100</td></tr><tr data-voucher-id="second" data-topup-eligible="false"><td><input type="checkbox"></td><td><a class="resource-table-id-link" href="/loans/second">L002</a></td><td>200</td></tr>';
+    const markup = '<div data-voucher-register data-base="/loans">'+table('loans',rows,'data-table-selection="single"').replace('<a class="app-btn btn-primary"',commands+'<a class="app-btn btn-primary"')+'<span data-selection-status data-empty="" data-selected="Selected"></span></div>';
+    const {dom,window:w,document:d}=await setup(markup,voucherSource);
+    const menu=d.querySelector('[role=menu]'),trigger=d.querySelector('[aria-haspopup=menu]'),view=d.querySelector('[data-selection-action=details]');
+    assert.equal(d.querySelectorAll('[role=menu]').length,1);
+    assert.equal(d.querySelectorAll('.resource-table-actions > [data-selection-action]').length,0);
+    assert.deepEqual([...menu.querySelectorAll('[role=menuitem]')].map(item=>item.textContent),['View','Download PDF','Print','Top up']);
+    assert.equal(trigger.disabled,true);assert.equal(menu.hidden,true);
+    assert.equal(d.querySelector('.resource-table-actions > a').getAttribute('href'),'/create');
+    assert.equal(d.querySelector('tbody .resource-table-id-link').getAttribute('href'),'/loans/first');
+    d.querySelector('thead input').click();await settle();assert.equal(trigger.disabled,false);
+    trigger.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+    assert.equal(menu.hidden,false);assert.equal(d.activeElement,view);
+    const printed=[];w.printExport=url=>printed.push(url);
+    d.querySelector('[data-selection-action=print]').click();await settle();
+    assert.deepEqual(printed,['/loans/first/print']);assert.equal(menu.hidden,true);
+    d.querySelectorAll('tbody input')[1].click();await settle();
+    assert.equal(d.querySelector('[data-selection-action=topup]').disabled,true);
+    trigger.click();d.querySelector('[data-selection-action=print]').click();await settle();
+    assert.deepEqual(printed,['/loans/first/print','/loans/second/print']);
+    trigger.click();d.querySelector('.resource-table-filters input').dispatchEvent(new w.Event('input',{bubbles:true}));await settle();
+    assert.equal(menu.hidden,true);assert.equal(trigger.disabled,true);assert.equal(view.disabled,true);
     dom.window.close();
 });
 test('preferences cancel does not change columns; confirm persists display settings', async () => {

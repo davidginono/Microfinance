@@ -5,7 +5,7 @@
 <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="adjustment.title" /></h1></div>
 <section class="erp-table-wrap" data-resource-table="loan-adjustments" data-table-selection="single" data-budget-register>
 <div class="app-table-titlebar"><h2><spring:message code="adjustment.requests" /></h2><div class="accounting-actions">
-<button class="app-btn btn-neutral" data-budget-view data-url="<c:url value='/finance/loan-adjustments/' />" disabled type="button"><spring:message code="common.view" /></button>
+<button class="app-btn btn-neutral" data-table-command data-budget-view data-url="<c:url value='/finance/loan-adjustments/' />" disabled type="button"><spring:message code="common.view" /></button>
 <sec:authorize access="@access.has(principal,'LOAN_ADJUSTMENTS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-adjustments/new' />"><spring:message code="adjustment.create" /></a></sec:authorize></div></div>
 <form method="get" class="erp-table-toolbar" action="<c:url value='/finance/loan-adjustments' />">
 <label class="erp-table-toolbar__control"><spring:message code="common.search" /><input class="aws-control" name="search" maxlength="100" value="<c:out value='${search}' />" /></label>
