@@ -47,7 +47,7 @@ public class PayrollPdfService {
         for(var line:lines)if(line.issue().isEmpty() && line.amount().signum()>0)grouped.computeIfAbsent(line.clientId(),ignored->new ArrayList<>()).add(line);
         var result=new ArrayList<ExportRow>();
         for(var entry:grouped.entrySet()) {
-            var first=entry.getValue().getFirst();String reference=UUID.nameUUIDFromBytes((batch+"/"+entry.getKey()).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString().toUpperCase(Locale.ROOT);
+            var first=entry.getValue().getFirst();String reference=PayrollFeedbackService.reference(batch,entry.getKey());
             result.add(new ExportRow(first.employeeNumber(),first.clientName(),reference,entry.getValue().stream().map(Line::amount).reduce(new BigDecimal("0.00"),BigDecimal::add)));
         }
         return result;

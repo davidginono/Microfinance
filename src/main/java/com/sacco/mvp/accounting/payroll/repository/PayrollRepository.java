@@ -16,6 +16,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PayrollRepository {
     private final JdbcTemplate jdbc;
+    public boolean hasFeedback(UUID batch){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from payroll_feedback where batch_id=?)",Boolean.class,batch));}
     public void lock(AppUserPrincipal a, String resource) {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))", "PAYROLL/"+a.getSaccoId()+"/"+a.getStationId()+"/"+resource);
     }

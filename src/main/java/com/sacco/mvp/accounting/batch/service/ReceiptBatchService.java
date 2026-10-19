@@ -37,10 +37,12 @@ public class ReceiptBatchService {
     @Transactional(readOnly=true)
     public Summary get(AppUserPrincipal a,UUID id){authorize(a,false);return repository.summary(find(a,id,false));}
     @Transactional(readOnly=true)
+    public boolean payrollLinked(AppUserPrincipal a,UUID id){authorize(a,false);find(a,id,false);return repository.payrollLinked(id);}
+    @Transactional(readOnly=true)
     public Page<Item> items(AppUserPrincipal a,UUID id,int page,String state){authorize(a,false);query("",page);require(Set.of("","DRAFT","READY","FAILED","POSTED").contains(state),"input");find(a,id,false);var rows=repository.items(id,page,state);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional
     public Item save(AppUserPrincipal a,UUID batch,UUID id,SaveItem input){
-        authorize(a,true);var b=editable(a,batch);require(input!=null && input.form()!=null,"input");var prior=repository.item(batch,id);require(prior.isEmpty() || (!prior.get().state().equals("POSTED") && prior.get().version()==input.expectedVersion()),"stale");
+        authorize(a,true);var b=editable(a,batch);require(!repository.payrollLinked(batch),"payroll");require(input!=null && input.form()!=null,"input");var prior=repository.item(batch,id);require(prior.isEmpty() || (!prior.get().state().equals("POSTED") && prior.get().version()==input.expectedVersion()),"stale");
         require(prior.isPresent() || input.expectedVersion()==0,"stale");require(prior.isPresent() || repository.summary(b).receipts()<1000,"limit");
         Form f=canonical(id,input.form());int existing=prior.map(p->p.form().getRows().size()).orElse(0);require(repository.transactions(batch)-existing+f.getRows().size()<=2000,"limit");
         var labels=new HashMap<>(receipts.selected(a,f));if(f.getMoneyAccountId()!=null)labels.put(f.getMoneyAccountId(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label());String client=f.getClientId()==null?"":loans.receiptClient(a,f.getClientId()).label();
@@ -49,7 +51,7 @@ public class ReceiptBatchService {
         repository.save(b,id,prior.map(Item::lineNo).orElseGet(()->repository.nextLine(batch)),input.expectedVersion(),f,client,labels,total,prior.isEmpty());repository.invalidate(batch);repository.state(batch,"DRAFT",clock.now());return repository.item(batch,id).orElseThrow();
     }
     @Transactional
-    public void delete(AppUserPrincipal a,UUID batch,UUID item,int version){authorize(a,true);editable(a,batch);var row=repository.item(batch,item).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));require(row.version()==version && !row.state().equals("POSTED"),"stale");repository.delete(batch,item);repository.invalidate(batch);repository.state(batch,"DRAFT",clock.now());}
+    public void delete(AppUserPrincipal a,UUID batch,UUID item,int version){authorize(a,true);editable(a,batch);require(!repository.payrollLinked(batch),"payroll");var row=repository.item(batch,item).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));require(row.version()==version && !row.state().equals("POSTED"),"stale");repository.delete(batch,item);repository.invalidate(batch);repository.state(batch,"DRAFT",clock.now());}
     @Transactional
     public void start(AppUserPrincipal a,UUID batch,int version,boolean post){
         authorize(a,true);var b=editable(a,batch);require(b.version()==version,"stale");var s=repository.summary(b);require(s.receipts()>s.posted(),"empty");

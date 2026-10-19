@@ -12,6 +12,7 @@ public enum AccessAction {
     ASSIGN("Assign"),
     CONFIGURE("Configure"),
     EXPORT("Export"),
+    IMPORT("Import"),
     DISBURSE("Disburse"),
     REVERSE("Reverse"),
     DELETE("Delete");

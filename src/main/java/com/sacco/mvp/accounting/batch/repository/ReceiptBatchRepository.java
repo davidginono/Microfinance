@@ -17,6 +17,7 @@ import java.util.*;
 public class ReceiptBatchRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    public boolean payrollLinked(UUID batch){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from payroll_remittance where receipt_batch_id=?)",Boolean.class,batch));}
     public UUID create(AppUserPrincipal a,String title,OffsetDateTime now){UUID id=UUID.randomUUID();jdbc.update("insert into receipt_batch(id,sacco_id,station_id,created_by,title,created_at,updated_at) values(?,?,?,?,?,?,?)",id,a.getSaccoId(),a.getStationId(),a.getMemberId(),title,now,now);return id;}
     public List<Batch> list(AppUserPrincipal a,String search,int page){return jdbc.query("select * from receipt_batch where sacco_id=? and station_id=? and strpos(lower(title),?)>0 order by created_at desc,id limit 26 offset ?",this::batch,a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
     public Optional<Batch> find(AppUserPrincipal a,UUID id,boolean lock){return jdbc.query("select * from receipt_batch where id=? and sacco_id=? and station_id=?"+(lock?" for update":""),this::batch,id,a.getSaccoId(),a.getStationId()).stream().findFirst();}

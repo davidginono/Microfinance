@@ -136,6 +136,7 @@ public class PayrollService {
         records.batch(a,id);records.lock(a,"EMPLOYER/"+records.employerForBatch(a,id));var old=records.batch(a,id);
         if(old.state().equals(kind))return;
         check(!old.state().equals("CANCELLED"),"state");
+        check(!kind.equals("CANCELLED") || !records.hasFeedback(id),"feedback");
         check(!kind.equals("CANCELLED") || !old.state().equals("SENT") || withdrawalConfirmed,"withdrawal");
         records.event(a,id,kind,evidence,clock.now());event(a,id,"BATCH_"+kind,Map.of("evidence",evidence,"withdrawalConfirmed",withdrawalConfirmed));
     }

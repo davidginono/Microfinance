@@ -6,7 +6,8 @@
 <sec:authorize access="@access.has(principal,'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal,'LOAN_RECORDING_POST')" var="canPostBatch" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/batches/receipts' />"><spring:message code="batch.receipts" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><c:out value="${summary.batch.title}" /></span></nav>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${summary.batch.title}" /></h1></div>
-<div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
+<div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-payroll-sealed="${payrollLinked}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
+<c:if test="${payrollLinked}"><p role="status"><spring:message code="payroll.feedback.sealed" /></p></c:if>
 <section class="erp-resource-section"><h2><spring:message code="batch.batchDetails" /></h2><dl class="erp-detail-facts" data-batch-summary aria-live="polite"></dl></section>
 <div class="batch-alert" role="alert" tabindex="-1" data-batch-error hidden></div>
 <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2><spring:message code="batch.receiptRows" /></h2><div class="accounting-actions">
