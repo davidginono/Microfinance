@@ -32,7 +32,7 @@
         </div>
         <div class="platform-settings-actions">
             <p>Choose between 2 and 480 minutes. Active users are refreshed silently before the final warning minute.</p>
-            <button type="submit" class="app-btn btn-primary">Save Timeout</button>
+            <button type="submit" class="app-btn btn-launch">Save Timeout</button>
         </div>
     </form>
 </section>
@@ -84,7 +84,7 @@
         </div>
         <div class="platform-settings-actions">
             <p>Save at least a phone number or email address to show this contact in workspace sidebars.</p>
-            <button type="submit" class="app-btn btn-primary">Save Contact</button>
+            <button type="submit" class="app-btn btn-launch">Save Contact</button>
         </div>
     </form>
 </section>
@@ -179,7 +179,7 @@
         </div>
         <div class="platform-settings-actions">
             <p>Leave the password blank to keep the saved value. New passwords are stored encrypted.</p>
-            <button type="submit" class="app-btn btn-primary">Save Email Settings</button>
+            <button type="submit" class="app-btn btn-launch">Save Email Settings</button>
         </div>
     </form>
     <form action="/admin/platform-settings/email/test" method="post" class="erp-panel-body platform-settings-form border-t border-slate-200">
@@ -264,7 +264,7 @@
         </div>
         <div class="platform-settings-actions">
             <p>Branch SMS balances and warning thresholds remain on the SMS Usage page.</p>
-            <button type="submit" class="app-btn btn-primary">Save SMS Gateway</button>
+            <button type="submit" class="app-btn btn-launch">Save SMS Gateway</button>
         </div>
     </form>
     <form action="/admin/platform-settings/sms-gateway/test" method="post" class="erp-panel-body platform-settings-form border-t border-slate-200">
@@ -335,7 +335,7 @@
                                                     <span class="aws-settings-checkbox-title">Allow</span>
                                                 </span>
                                             </label>
-                                            <button type="submit" class="app-btn btn-primary">Save</button>
+                                            <button type="submit" class="app-btn btn-launch">Save</button>
                                         </form>
                                     </td>
                                 </tr>
@@ -401,7 +401,7 @@
         </div>
         <div class="platform-settings-actions">
             <p>${logoUploadPolicy.helpText}</p>
-            <button type="submit" class="app-btn btn-primary">Save Rules</button>
+            <button type="submit" class="app-btn btn-launch">Save Rules</button>
         </div>
     </form>
 </section>

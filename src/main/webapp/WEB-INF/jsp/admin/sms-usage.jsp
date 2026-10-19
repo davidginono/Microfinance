@@ -65,7 +65,7 @@
                     Critical %
                     <input type="number" name="criticalPercent" min="1" max="98" value="${smsSettings.criticalPercent}" required class="fcms-control mt-1 w-full" />
                 </label>
-                <button type="submit" class="app-btn btn-primary shrink-0" data-aws-action-pin="true">Save Thresholds</button>
+                <button type="submit" class="app-btn btn-launch shrink-0" data-aws-action-pin="true">Save Thresholds</button>
             </form>
         </div>
     </section>

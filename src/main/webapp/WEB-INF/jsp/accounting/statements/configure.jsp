@@ -16,7 +16,7 @@
   </section>
   <p class="fs-help"><spring:message code="fs.comparisonHelp" /></p>
   <p class="fs-coverage"><spring:message code="fs.coverageStart" /></p>
-  <div class="accounting-actions accounting-form-actions"><button class="app-btn btn-neutral" type="submit"><spring:message code="fs.generate" /></button></div>
+  <div class="accounting-actions accounting-form-actions"><button class="app-btn btn-launch" type="submit"><spring:message code="fs.generate" /></button></div>
  </form>
 </div>
 <%@ include file="../../fragments/footer.jspf" %>

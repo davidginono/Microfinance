@@ -205,7 +205,7 @@
                 </div>
                 <div class="app-modal-actions">
                     <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="create-Sacco"><spring:message code="common.cancel" text="Cancel" /></button>
-                    <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveSacco" text="Save Institution" /></button>
+                    <button type="submit" class="app-btn btn-launch"><spring:message code="admin.saccoRegistry.saveSacco" text="Save Institution" /></button>
         </div>
             </form>
     </div>
@@ -241,7 +241,7 @@
                     </label>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="add-Station-${Sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveStation" text="Save Branch" /></button>
+                        <button type="submit" class="app-btn btn-launch"><spring:message code="admin.saccoRegistry.saveStation" text="Save Branch" /></button>
             </div>
                 </form>
         </div>
@@ -346,7 +346,7 @@
                                 Remove Logo
                             </button>
                         </c:if>
-                        <button type="submit" class="app-btn btn-primary">${saveChangesLabel}</button>
+                        <button type="submit" class="app-btn btn-launch">${saveChangesLabel}</button>
             </div>
                 </form>
         </div>
@@ -464,7 +464,7 @@
                                 Remove Logo
                             </button>
                         </c:if>
-                        <button type="submit" class="app-btn btn-primary">Save Logo</button>
+                        <button type="submit" class="app-btn btn-launch">Save Logo</button>
             </div>
                 </form>
         </div>

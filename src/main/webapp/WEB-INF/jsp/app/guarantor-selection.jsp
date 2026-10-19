@@ -45,7 +45,7 @@
     </section>
 
     <div class="loan-flow-navigation">
-        <button type="submit" class="app-btn btn-primary"><spring:message code="guarantor.selection.save" text="Save Guarantors" /></button>
+        <button type="submit" class="app-btn btn-launch"><spring:message code="guarantor.selection.save" text="Save Guarantors" /></button>
     </div>
 </form>
 

@@ -20,7 +20,7 @@
         <option value="en" ${settings.defaultLanguage == 'en' ? 'selected' : ''}><spring:message code="language.english" text="English" /></option>
         <option value="sw" ${settings.defaultLanguage == 'sw' ? 'selected' : ''}><spring:message code="language.swahili" text="Kiswahili" /></option>
     </select>
-    <button class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
+    <button class="app-btn btn-launch"><spring:message code="common.save" text="Save" /></button>
 </form>
 
 <%@ include file="../fragments/footer.jspf" %>

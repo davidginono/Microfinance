@@ -24,7 +24,7 @@
             <textarea name="message" rows="7" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder="<spring:message code='support.member.messagePlaceholder' text='Describe the problem clearly. Include the page and what happened.' />" required></textarea>
         </label>
         <div class="flex justify-end">
-            <button type="submit" class="app-btn btn-primary"><spring:message code="support.member.send" text="Send To Branch Admin" /></button>
+            <button type="submit" class="app-btn btn-launch"><spring:message code="support.member.send" text="Send To Branch Admin" /></button>
         </div>
     </form>
 </section>

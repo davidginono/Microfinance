@@ -500,7 +500,8 @@
         });
 
         const tableActions = Array.from(document.querySelectorAll('a.app-btn, button.app-btn')).filter(function (control) {
-            if (control.closest('table')
+            if (control.form || control.closest('form')
+                || control.closest('table')
                 || control.closest('[data-resource-table], [data-table-toolbar-for], [data-table-pagination]')
                 || control.closest('.app-table-titlebar')
                 || control.closest('.erp-page-header')

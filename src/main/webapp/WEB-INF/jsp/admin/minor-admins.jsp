@@ -291,7 +291,7 @@
 
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-minor-admin-modal-close="edit-${minorAdmin.accountId}"><spring:message code="common.cancel" text="Cancel" /></button>
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" /></button>
+                        <button type="submit" class="app-btn btn-launch"><spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" /></button>
             </div>
                 </form>
         </div>

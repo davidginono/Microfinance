@@ -51,7 +51,7 @@
                 <label class="mb-1 block text-sm font-semibold text-slate-700">Resolution Note</label>
                 <textarea name="resolutionNote" rows="7" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">${incident.resolutionNote}</textarea>
             </div>
-            <button type="submit" class="app-btn btn-primary">Save Incident</button>
+            <button type="submit" class="app-btn btn-launch">Save Incident</button>
         </form>
     </div>
 </section>
@@ -70,7 +70,7 @@
                     <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
                     <textarea name="message" rows="6" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
                 </div>
-                <button type="submit" class="app-btn btn-primary">Send Reply</button>
+                <button type="submit" class="app-btn btn-launch">Send Reply</button>
             </form>
         </div>
 
@@ -87,7 +87,7 @@
                     <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
                     <textarea name="message" rows="6" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
                 </div>
-                <button type="submit" class="app-btn btn-primary">Send Broadcast</button>
+                <button type="submit" class="app-btn btn-launch">Send Broadcast</button>
             </form>
         </div>
         </c:if>

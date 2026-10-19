@@ -32,7 +32,7 @@
                 </label>
             </div>
             <div class="aws-settings-footer">
-                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.language.save" text="Save Language" /></button>
+                <button type="submit" class="app-btn btn-launch"><spring:message code="admin.settings.language.save" text="Save Language" /></button>
             </div>
         </form>
     </section>
@@ -96,7 +96,7 @@
             </div>
             <div class="relative mt-5 flex flex-row items-center justify-between gap-2 flex-wrap">
                 <p class="text-sm text-slate-500"><spring:message code="admin.settings.otp.reserveNotice" text="The three reserved SMS alert units are never used for OTP codes." /></p>
-                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.otp.save" text="Save OTP Settings" /></button>
+                <button type="submit" class="app-btn btn-launch"><spring:message code="admin.settings.otp.save" text="Save OTP Settings" /></button>
             </div>
         </form>
     </section>
@@ -198,7 +198,7 @@
             </div>
 
             <div class="app-modal-actions !justify-start md:justify-end">
-                <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
+                <button type="submit" class="app-btn btn-launch"><spring:message code="common.save" text="Save" /></button>
             </div>
         </form>
     </div>
@@ -214,7 +214,7 @@
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="aws-settings-commandbar">
                 <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="Set applicant, guarantor, and portfolio risk rules for this Branch. Product-specific guarantor Disposable Income is configured inside each loan product." /></p>
-                <button type="submit" class="app-btn btn-primary aws-settings-save-action"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
+                <button type="submit" class="app-btn btn-launch aws-settings-save-action"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
             </div>
             <div class="aws-settings-grid aws-qualification-grid">
                 <section class="aws-settings-group" aria-labelledby="loan-applicant-policy-title">
@@ -584,7 +584,7 @@
                                 data-product-modal-close="application-fee">
                             Cancel
                         </button>
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
+                        <button type="submit" class="app-btn btn-launch"><spring:message code="common.save" text="Save" /></button>
                     </div>
                 </form>
             </div>
@@ -1425,7 +1425,7 @@
                             data-product-modal-close="product-${product.id}">
                         <spring:message code="common.cancel" text="Cancel" />
                     </button>
-                    <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
+                    <button type="submit" class="app-btn btn-launch"><spring:message code="common.save" text="Save" /></button>
                 </div>
             </form>
             </div>

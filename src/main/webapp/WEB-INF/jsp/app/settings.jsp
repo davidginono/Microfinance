@@ -38,7 +38,7 @@
             </p>
         </div>
         <div class="aws-settings-footer">
-            <button type="submit" class="app-btn btn-primary"><spring:message code="member.settings.language.save" /></button>
+            <button type="submit" class="app-btn btn-launch"><spring:message code="member.settings.language.save" /></button>
         </div>
     </form>
 </section>
@@ -93,7 +93,7 @@
             <button id="requestPaymentDetailsOtpButton" type="button" class="app-btn btn-neutral">
                 <spring:message code="member.settings.payment.requestOtp" text="Request OTP" />
             </button>
-            <button type="submit" class="app-btn btn-primary"><spring:message code="member.settings.payment.save" text="Save Financial Details" /></button>
+            <button type="submit" class="app-btn btn-launch"><spring:message code="member.settings.payment.save" text="Save Financial Details" /></button>
         </div>
     </form>
 </section>

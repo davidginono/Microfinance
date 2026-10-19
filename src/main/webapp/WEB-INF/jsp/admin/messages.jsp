@@ -74,7 +74,7 @@
                 <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
                 <textarea name="message" rows="5" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
     </div>
-            <button type="submit" class="app-btn btn-primary">Send Reply</button>
+            <button type="submit" class="app-btn btn-launch">Send Reply</button>
         </form>
             </div>
 
@@ -90,7 +90,7 @@
                 <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
                 <textarea name="message" rows="6" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
     </div>
-            <button type="submit" class="app-btn btn-approve">Send Broadcast</button>
+            <button type="submit" class="app-btn btn-launch">Send Broadcast</button>
         </form>
     </div>
 </section>

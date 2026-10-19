@@ -73,7 +73,7 @@
 
         <div class="aws-settings-footer">
             <button id="requestSecurityOtpButton" type="button" class="app-btn btn-neutral">Request OTP</button>
-            <button type="submit" class="app-btn btn-primary">Save OTP Preferences</button>
+            <button type="submit" class="app-btn btn-launch">Save OTP Preferences</button>
         </div>
     </form>
 </section>

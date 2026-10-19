@@ -58,7 +58,7 @@
                        autocomplete="current-password" class="aws-control" />
             </label>
             <div class="aws-settings-footer">
-                <button type="submit" class="app-btn btn-primary">Save Contact Details</button>
+                <button type="submit" class="app-btn btn-launch">Save Contact Details</button>
             </div>
         </form>
     </section>
@@ -85,7 +85,7 @@
                         <input id="signatureCurrentPassword" name="currentPassword" type="password" class="aws-control" required maxlength="128" autocomplete="current-password" />
                     </label>
                     <label class="flex items-center gap-2 mt-3"><input type="checkbox" name="confirmed" value="true" required /><span><spring:message code="profile.signature.confirm" /></span></label>
-                    <div class="aws-settings-footer"><button type="submit" class="app-btn btn-neutral"><spring:message code="profile.signature.save" /></button></div>
+                    <div class="aws-settings-footer"><button type="submit" class="app-btn btn-launch"><spring:message code="profile.signature.save" /></button></div>
                 </form>
                 <%@ include file="accounting/accounting-form-support.jspf" %>
             </c:otherwise>
@@ -176,7 +176,7 @@
                             <spring:message code="profile.photo.remove" text="Remove Photo" />
                         </button>
                     </c:if>
-                    <button type="submit" class="app-btn btn-primary"><spring:message code="profile.photo.save" text="Save Photo" /></button>
+                    <button type="submit" class="app-btn btn-launch"><spring:message code="profile.photo.save" text="Save Photo" /></button>
                 </div>
             </form>
         </div>

@@ -39,5 +39,5 @@
 <%@ include file="attachments.jspf" %>
 <label><spring:message code="voucher.description" /><form:textarea path="notes" cssClass="aws-control" maxlength="500" rows="3" /></label>
 </div></details>
-<div class="accounting-actions loan-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-primary" name="action" value="save"><spring:message code="recording.save" /></button></div>
+<div class="accounting-actions loan-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" name="action" value="save"><spring:message code="recording.save" /></button></div>
 </form:form></div><%@ include file="../../fragments/attachment-dropzone.jspf" %><%@ include file="../accounting-form-support.jspf" %><script src="<c:url value='/js/loan-recording.js' />" defer></script><script src="<c:url value='/js/loan-charges.js' />" defer></script><script src="<c:url value='/js/loan-topup.js' />" defer></script><%@ include file="../../fragments/footer.jspf" %>

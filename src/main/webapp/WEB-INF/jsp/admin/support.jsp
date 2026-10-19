@@ -24,7 +24,7 @@
             <textarea name="message" rows="7" class="mt-1 w-full rounded border border-slate-300 px-3 py-3 text-sm text-slate-800 focus:border-sacco-blue focus:outline-none" placeholder='<spring:message code="admin.support.messagePlaceholder" text="Describe the issue, Branch, page, and expected outcome." />' required></textarea>
         </label>
         <div class="flex justify-end">
-            <button type="submit" class="app-btn btn-primary">Send To Platform Admin</button>
+            <button type="submit" class="app-btn btn-launch">Send To Platform Admin</button>
         </div>
     </form>
 </section>

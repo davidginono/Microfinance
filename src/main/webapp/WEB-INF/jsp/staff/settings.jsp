@@ -25,7 +25,7 @@
             </label>
         </div>
         <div class="aws-settings-footer">
-            <button type="submit" class="app-btn btn-primary"><spring:message code="member.settings.language.save" /></button>
+            <button type="submit" class="app-btn btn-launch"><spring:message code="member.settings.language.save" /></button>
         </div>
     </form>
 </section>

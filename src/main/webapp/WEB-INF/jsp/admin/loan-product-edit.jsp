@@ -438,7 +438,7 @@
                     <div class="product-config-save-actions">
                         <span class="product-config-save-state" data-product-config-save-state>Changes save only when you select Save product.</span>
                         <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
-                        <button type="submit" class="app-btn btn-primary">Save product</button>
+                        <button type="submit" class="app-btn btn-launch">Save product</button>
                 </div>
     </div>
         </form>

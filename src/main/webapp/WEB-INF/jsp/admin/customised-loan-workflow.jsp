@@ -51,7 +51,7 @@
     <label class="flex items-center gap-2"><form:checkbox path="disbursementProofRequired" /><spring:message code="customised.workflow.proof" /></label>
         </div>
     </section>
-    <div class="app-modal-actions"><a href="<c:url value='/admin/settings-controls?section=loan' />" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a><button class="app-btn btn-neutral" type="submit"><spring:message code="common.save" /></button></div>
+    <div class="app-modal-actions"><a href="<c:url value='/admin/settings-controls?section=loan' />" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="common.save" /></button></div>
 </form:form>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

@@ -109,8 +109,10 @@ public class VoucherPdfService {
         void write()throws IOException{
             page();
             pair(label("voucher.date",locale),v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),label("voucher.reference",locale),v.reference());
-            section(label(v.type().name().equals("RECEIPT")?"voucher.print.payer":v.type().name().equals("PAYMENT")?"voucher.print.payee":"voucher.party",locale));
-            pair(label("voucher.print.name",locale),v.party(),label(v.moneyAccountId()==null?"voucher.type":"voucher.print.paymentDetails",locale),moneyAccount());
+            if(!v.party().isBlank()){
+                section(label(v.type().name().equals("RECEIPT")?"voucher.print.payer":v.type().name().equals("PAYMENT")?"voucher.print.payee":"voucher.party",locale));
+                pair(label("voucher.print.name",locale),v.party(),label(v.moneyAccountId()==null?"voucher.type":"voucher.print.paymentDetails",locale),moneyAccount());
+            }
             if(v.clientNumber()!=null)paragraph(label("recording.statement.clientNumber",locale)+": "+v.clientNumber(),9,ink);
             if(!v.evidence().isBlank())paragraph(label("voucher.evidence",locale)+": "+v.evidence(),9,muted);
             y-=10;tableHeader();

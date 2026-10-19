@@ -119,7 +119,7 @@ public class VoucherWorkflowService {
     public List<Issue> basicIssues(Form f,Type type) {
         var result=new ArrayList<Issue>();
         if(f.getEffectiveDate()==null || f.getEffectiveDate().isAfter(clock.today()))result.add(new Issue("effectiveDate","voucher.error.date"));
-        if(f.getParty().isBlank())result.add(new Issue("party","approval.error.requiredField"));
+        if(type!=Type.JOURNAL && f.getParty().isBlank())result.add(new Issue("party","approval.error.requiredField"));
         if(f.getReference().isBlank())result.add(new Issue("reference","approval.error.requiredField"));
         if(type!=Type.JOURNAL && f.getMoneyAccountId()==null)result.add(new Issue("moneyAccountId","voucher.error.moneyAccount"));
         for(int n=0;n<f.getRows().size();n++) {var r=f.getRows().get(n);String p="rows["+n+"].";

@@ -231,7 +231,7 @@
             </button>
         </c:if>
         <a href="/admin/users" class="app-btn btn-neutral">Cancel</a>
-        <button type="submit" class="app-btn btn-primary">Save</button>
+        <button type="submit" class="app-btn btn-launch">Save</button>
     </div>
 </form>
 

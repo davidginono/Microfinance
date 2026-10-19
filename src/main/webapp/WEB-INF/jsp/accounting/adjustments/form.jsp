@@ -7,7 +7,7 @@
 <section class="accounting-create-card erp-panel"><form method="get" action="<c:url value='/finance/loan-adjustments/new' />" class="accounting-create-form"><section class="accounting-form-section"><div class="accounting-grid loan-form-grid">
 <label data-loan-choice data-choice-url="<c:url value='/finance/loan-adjustments/choices/loans' />"><spring:message code="recording.loan" /><select class="aws-control" name="loanId" required data-choice-select data-searchable="true"><option value=""><spring:message code="recording.choose" /></option></select><%@ include file="../loans/choice-search.jspf" %></label>
 <label><spring:message code="adjustment.column.kind" /><select class="aws-control" name="kind"><c:forEach items="${kinds}" var="k"><option value="${k}" ${adjustmentForm.kind==k?'selected':''}><spring:message code="adjustment.kind.${k}" /></option></c:forEach></select></label></div></section>
-<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-adjustments' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-neutral"><spring:message code="adjustment.continue" /></button></div></form></section>
+<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-adjustments' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch"><spring:message code="adjustment.continue" /></button></div></form></section>
 </c:when><c:otherwise>
 <section class="accounting-section erp-detail-card"><h2><c:out value="${loan.number}" /> · <c:out value="${loan.client}" /></h2><%@ include file="summary.jspf" %></section>
 <section class="accounting-create-card erp-panel"><div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="adjustment.kind.${adjustmentForm.kind}" /></h2></div>
@@ -24,6 +24,6 @@
 <label><spring:message code="adjustment.policyEvidence" /><form:textarea path="evidence" maxlength="500" required="required" cssClass="aws-control" rows="3" /></label></div>
 <p><spring:message code="adjustment.effect.${adjustmentForm.kind}" /></p>
 <label><input type="checkbox" name="confirmed" value="true" required /> <spring:message code="adjustment.confirmRequest" /></label></section>
-<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-adjustments' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-neutral" type="submit"><spring:message code="adjustment.submit" /></button></div>
+<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-adjustments' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="adjustment.submit" /></button></div>
 </form:form></section></c:otherwise></c:choose></div>
 <%@ include file="../accounting-form-support.jspf" %><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../../fragments/footer.jspf" %>

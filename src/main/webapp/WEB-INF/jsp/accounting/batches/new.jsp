@@ -8,5 +8,5 @@
 <form method="post" action="<c:url value='/finance/batches/receipts/new' />" class="accounting-create-form">
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 <section class="erp-resource-section"><h2><spring:message code="batch.create" /></h2><label class="grid gap-2"><spring:message code="batch.title" /><input class="aws-control" name="title" maxlength="120" required autofocus /></label></section>
-<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/batches/receipts' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-neutral"><spring:message code="batch.create" /></button></div>
+<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/batches/receipts' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch"><spring:message code="batch.create" /></button></div>
 </form></div><%@ include file="../../fragments/footer.jspf" %>

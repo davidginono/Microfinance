@@ -26,7 +26,7 @@
                         <input name="guarantorsRequired" type="number" class="w-20 border border-slate-300 px-2 py-2" value="${product.guarantorsRequired}" />
                         <input name="maxLoanSavingsRatio" type="number" step="0.0001" class="w-28 border border-slate-300 px-2 py-2" value="${product.maxLoanSavingsRatio}" />
                         <label class="inline-flex items-center gap-2 text-sm text-slate-700"><input name="active" type="checkbox" value="true" ${product.active ? 'checked' : ''} /> Active</label>
-                        <button type="submit" class="app-btn btn-primary">Save</button>
+                        <button type="submit" class="app-btn btn-launch">Save</button>
                     </form>
                 </td>
             </tr>

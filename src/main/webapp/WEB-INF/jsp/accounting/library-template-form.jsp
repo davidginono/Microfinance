@@ -29,7 +29,7 @@
             <c:set var="ruleForms" value="${templateForm.rules}" /><c:set var="rulePrefix" value="" />
             <%@ include file="library-rule-fields.jspf" %>
             <p class="library-lookup-status" role="status" data-lookup-failure="<spring:message code='library.lookupUnavailable' />"></p>
-            <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/library/transactions/${transaction.id}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-primary" ${not transaction.active?'disabled':''}><spring:message code="library.saveTemplate" /></button></div>
+            <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/library/transactions/${transaction.id}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" ${not transaction.active?'disabled':''}><spring:message code="library.saveTemplate" /></button></div>
         </form:form>
     </section>
 </div>

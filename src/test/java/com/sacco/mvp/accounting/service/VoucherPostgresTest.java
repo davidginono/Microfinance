@@ -76,6 +76,17 @@ class VoucherPostgresTest {
   assertThatThrownBy(()->jdbc.update("delete from accounting_voucher_transaction where voucher_id=?",v.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
 
  }
+ @Test void journalsWithoutPartyPreviewPostRetryAndReverseWithoutChangingHistory(){
+  var f=form(Type.JOURNAL);f.setParty("");
+  assertThat(service.preview(actor,Type.JOURNAL,f).total()).isEqualByComparingTo("30.03");
+  var posted=service.post(actor,Type.JOURNAL,f);assertThat(posted.party()).isEmpty();
+  assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(posted.id());
+  var key=UUID.randomUUID();var reversed=service.reverse(actor,Type.JOURNAL,posted.id(),key,day.plusDays(1),"Synthetic correction");
+  assertThat(reversed.party()).isEmpty();assertThat(reversed.reversesId()).isEqualTo(posted.id());
+  assertThat(service.reverse(actor,Type.JOURNAL,posted.id(),key,day.plusDays(1),"Synthetic correction").id()).isEqualTo(reversed.id());
+  assertThat(service.view(actor,Type.JOURNAL,posted.id()).reversedBy()).isEqualTo(reversed.id());
+  assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,posted.journalId(),reversed.journalId())).isEqualByComparingTo("0");
+ }
  @Test void clientSubledgersAreScopedBoundedAndPreservedOnAllVoucherTypesAndReversals(){
   UUID client=client("B1","CL-001"),other=client("B1","CL-002"),foreign=client("B2","CL-FOREIGN");
   jdbc.update("update members set status='INACTIVE' where id=?",other);
@@ -194,7 +205,7 @@ class VoucherPostgresTest {
  }
 
  @Test void configuredIndividualApprovalBlocksBypassAndSupportsIndependentApprovalAndPosting(){
-  configure(true,true,false,false);var f=form(Type.JOURNAL);UUID client=client("B1","CL-APPROVED");f.setClientId(client);
+  configure(true,true,false,false);var f=form(Type.JOURNAL);f.setParty("");UUID client=client("B1","CL-APPROVED");f.setClientId(client);
   assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
   UUID id=workflows.capture(actor,Type.JOURNAL,f);assertThat(workflows.details(actor,id).items().getFirst().form().getClientId()).isEqualTo(client);validateWorkflow(id);
   command(actor,id,"INITIATE","");assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("INITIATED");

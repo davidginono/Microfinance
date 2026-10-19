@@ -14,6 +14,15 @@ import static org.assertj.core.api.Assertions.*;
 import static com.sacco.mvp.accounting.reports.VoucherPdfRows.assertRow;
 
 class VoucherPdfTest {
+ @Test void journalWithoutPartyExportsTransactionsWithoutAnEmptyPartySection()throws Exception {
+  var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+  var debit=new Account(UUID.randomUUID(),"111001","Cash","CASH");var credit=new Account(UUID.randomUUID(),"411001","Income","OTHER");
+  var row=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Journal transaction",new BigDecimal("123.45"),debit,credit);
+  var voucher=new Voucher(UUID.randomUUID(),"JV-NO-PARTY",Type.JOURNAL,LocalDate.of(2026,10,19),"","REF-JOURNAL","Adjustment","",null,row.amount(),1,UUID.randomUUID(),UUID.randomUUID(),"Accountant",OffsetDateTime.parse("2026-10-19T10:30:00+03:00"),null,null,"Example Microfinance","Main branch",List.of(row));
+  try(var doc=Loader.loadPDF(new VoucherPdfService(messages,new ReportExportLimiter(1)).render(voucher,Locale.ENGLISH).bytes())){
+   assertThat(new PDFTextStripper().getText(doc)).contains("JV-NO-PARTY","Journal transaction","123.45","111001","411001").doesNotContain(messages.getMessage("voucher.party",null,Locale.ENGLISH));
+  }
+ }
  @Test void paymentsRetainPostedSidesWhileReceiptsShowTransactionsOnceIncludingReversals()throws Exception {
   var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
   var cash=new Account(UUID.randomUUID(),"111001","QA Cash","CASH");var other=new Account(UUID.randomUUID(),"111002","QA Loan Principal","OTHER");

@@ -14,7 +14,7 @@
    <label class="fs-full"><spring:message code="fs.noteText" /><textarea class="aws-control" name="noteText" maxlength="2000" rows="4"><c:out value="${mapping.noteText}" /></textarea></label>
   </div></section>
   <p class="fs-help"><spring:message code="fs.mappingHelp" /></p>
-  <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/reports/financial/statements/mappings' />"><spring:message code="fs.cancel" /></a><button class="app-btn btn-neutral"><spring:message code="fs.saveMapping" /></button></div>
+  <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/reports/financial/statements/mappings' />"><spring:message code="fs.cancel" /></a><button class="app-btn btn-launch"><spring:message code="fs.saveMapping" /></button></div>
  </form>
 </div>
 <%@ include file="../../fragments/footer.jspf" %>

@@ -29,7 +29,7 @@
                     <label for="channel"><spring:message code="repayment.channel" /><form:select path="channel" id="channel" required="required" cssClass="aws-control"><form:option value=""><spring:message code="repayment.selectChannel" /></form:option><form:option value="CASH"><spring:message code="repayment.channel.CASH" /></form:option><form:option value="BANK"><spring:message code="repayment.channel.BANK" /></form:option><form:option value="MOBILE_MONEY"><spring:message code="repayment.channel.MOBILE_MONEY" /></form:option></form:select></label>
                     <label for="reference"><spring:message code="repayment.channelReference" /><form:input path="reference" id="reference" maxlength="100" required="required" cssClass="aws-control" /></label>
                     <label class="repayment-confirm"><form:checkbox path="confirmed" required="required" /><spring:message code="repayment.confirmReceived" /></label>
-                    <button type="submit" class="app-btn btn-primary" data-repayment-submit><i data-lucide="check" aria-hidden="true"></i><spring:message code="repayment.post" /></button>
+                    <button type="submit" class="app-btn btn-launch" data-repayment-submit><i data-lucide="check" aria-hidden="true"></i><spring:message code="repayment.post" /></button>
                 </form:form>
             </section>
         </c:if>

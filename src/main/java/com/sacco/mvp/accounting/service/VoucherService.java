@@ -160,7 +160,7 @@ public class VoucherService {
         require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");
         require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getLoanId()==null),"","request");
         require(f!=null && f.getRequestKey()!=null,"","request");require(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(today),"effectiveDate","date");
-        text(f.getParty(),160,true,"party");text(f.getReference(),160,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
+        text(f.getParty(),160,type!=Type.JOURNAL,"party");text(f.getReference(),160,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
         require(type!=Type.JOURNAL || f.getMoneyAccountId()==null,"moneyAccountId","moneyAccount");require(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");
         for(int n=0;n<f.getRows().size();n++){
             var r=f.getRows().get(n);String field="rows["+n+"]";require(r!=null,field,"rows");text(r.getDescription(),500,true,field+".description");

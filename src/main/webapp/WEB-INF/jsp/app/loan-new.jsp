@@ -169,7 +169,7 @@
 
         </div>
         <div class="loan-flow-navigation">
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Loan Calculations</button>
+            <button type="button" class="app-btn btn-launch" data-loan-step-next>Continue to Loan Calculations</button>
         </div>
     </section>
 
@@ -277,7 +277,7 @@
             </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Select Guarantor</button>
+            <button type="button" class="app-btn btn-launch" data-loan-step-next>Continue to Select Guarantor</button>
         </div>
     </section>
 
@@ -409,7 +409,7 @@
             </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Attachments</button>
+            <button type="button" class="app-btn btn-launch" data-loan-step-next>Continue to Attachments</button>
         </div>
     </section>
 
@@ -546,7 +546,7 @@
             </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Save and Submit</button>
+            <button type="button" class="app-btn btn-launch" data-loan-step-next>Continue to Save and Submit</button>
         </div>
     </section>
 
@@ -623,7 +623,7 @@
 
     <div class="loan-action-row">
         <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-        <button class="app-btn btn-neutral px-5 py-3 text-sm"
+        <button class="app-btn ${empty formValues['applicationId']?'btn-launch':'btn-neutral'} px-5 py-3 text-sm"
                 type="submit"
                 data-form-action="SAVE_DRAFT">
             <spring:message code="common.savedraft" />
@@ -631,14 +631,14 @@
         <c:if test="${not empty formValues['applicationId']}">
             <c:choose>
                 <c:when test="${requiredGuarantors gt 0}">
-                    <button class="app-btn btn-approve px-5 py-3 text-sm"
+                    <button class="app-btn btn-launch px-5 py-3 text-sm"
                             type="submit"
                             data-form-action="SEND_TO_GUARANTORS">
                         <spring:message code="newloan.actions.sendToGuarantors" />
                     </button>
                 </c:when>
                 <c:otherwise>
-                    <button class="app-btn btn-approve px-5 py-3 text-sm"
+                    <button class="app-btn btn-launch px-5 py-3 text-sm"
                             type="submit"
                             data-form-action="SEND_TO_GUARANTORS">
                         <spring:message code="common.submit" />
