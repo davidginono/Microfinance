@@ -1,0 +1,33 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:if test="${waiversLoaded}">
+<div class="accounting-workspace accounting-servicing-workspace" id="interest-waivers">
+<c:if test="${not empty prepaymentError}"><div class="coa-error" role="alert" tabindex="-1"><spring:message code="${prepaymentError}" /></div></c:if>
+<c:if test="${prepaymentSaved}"><p role="status"><spring:message code="prepayment.saved" /></p></c:if>
+<sec:authorize access="@access.has(principal,'LOAN_INTEREST_WAIVE')">
+<c:url value="${waiverBase}/interest-waivers" var="waiverAction" />
+<c:if test="${waiverQuote.legacy and waiverQuote.sequence==1}"><section class="accounting-section accounting-form"><h2><spring:message code="prepayment.adopt" /></h2><p><spring:message code="prepayment.adoptHelp" /></p>
+<form method="post" action="<c:url value='${waiverBase}/prepayment-terms' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><label><spring:message code="prepayment.reason" /><textarea name="reason" maxlength="500" required></textarea></label><label class="accounting-servicing-confirm"><input type="checkbox" name="confirmed" value="true" required /><span><spring:message code="prepayment.adoptHelp" /></span></label><div class="accounting-actions"><button class="app-btn btn-neutral"><spring:message code="prepayment.adopt" /></button></div></form></section></c:if>
+<c:if test="${not empty waiverQuote and empty waiverForm.reverses}"><form:form method="post" action="${waiverAction}" modelAttribute="waiverForm" cssClass="accounting-create-form">
+<details class="accounting-section accounting-form" ${not empty prepaymentError?'open':''}><summary><spring:message code="prepayment.waive" /></summary>
+<form:hidden path="requestKey" /><div class="accounting-grid">
+<label><spring:message code="voucher.date" /><form:input path="effectiveDate" cssClass="aws-control" type="date" max="${waiverToday}" required="required" /></label>
+<label><spring:message code="voucher.amount" /> (TZS)<form:input path="amount" cssClass="aws-control" type="number" min="0.01" step="0.01" required="required" /></label>
+<label><spring:message code="prepayment.reason" /><form:textarea path="reason" cssClass="aws-control" rows="3" maxlength="500" required="required" /></label>
+</div><p><spring:message code="prepayment.waiverHelp" /></p>
+<label class="accounting-servicing-confirm"><input type="checkbox" name="confirmed" value="true" required /><span><spring:message code="prepayment.confirmWaiver" /></span></label>
+<div class="accounting-actions accounting-form-actions"><button class="app-btn btn-launch"><spring:message code="prepayment.waive" /></button></div></details>
+</form:form></c:if></sec:authorize>
+<c:if test="${not empty waivers or waiverPage>0}"><section class="erp-table-wrap" data-resource-table="interest-waivers"><div class="app-table-titlebar"><h2><spring:message code="prepayment.history" /></h2></div>
+<div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="voucher.reference" /></th><th><spring:message code="voucher.date" /></th><th><spring:message code="voucher.amount" /> (TZS)</th><th><spring:message code="voucher.type" /></th><th><spring:message code="prepayment.reason" /></th></tr></thead><tbody>
+<c:forEach items="${waivers}" var="w"><tr><td><a class="resource-table-id-link" href="?waiverPage=${waiverPage}&amp;waiverId=${w.id}#interest-waivers">IW-<c:out value="${w.sequence}" /></a></td><td><c:out value="${appTime:display(w.date)}" /></td><td><fmt:formatNumber value="${w.amount}" minFractionDigits="2" maxFractionDigits="2" /></td><td><c:choose><c:when test="${not empty w.reverses}"><spring:message code="prepayment.reversal" /></c:when><c:when test="${not empty w.reversedBy}"><spring:message code="voucher.status.REVERSED" /></c:when><c:otherwise><spring:message code="prepayment.waiver" /></c:otherwise></c:choose></td><td><c:out value="${w.reason}" /></td></tr></c:forEach>
+<c:if test="${empty waivers}"><tr><td colspan="5"><spring:message code="prepayment.empty" /></td></tr></c:if></tbody></table></div>
+<div data-table-pagination data-page="${waiverPage}" data-table-for="interest-waivers"><c:if test="${waiverPage>0}"><a data-page-direction="previous" href="?waiverPage=${waiverPage-1}"><spring:message code="common.previous" /></a></c:if><c:if test="${waiverHasNext}"><a data-page-direction="next" href="?waiverPage=${waiverPage+1}"><spring:message code="common.next" /></a></c:if></div></section></c:if>
+<c:if test="${not empty selectedWaiver}"><section class="accounting-section accounting-form"><h2><spring:message code="prepayment.waiver" /></h2><p>IW-<c:out value="${selectedWaiver.sequence}" /> · TZS <fmt:formatNumber value="${selectedWaiver.amount}" minFractionDigits="2" maxFractionDigits="2" /></p><p><c:out value="${selectedWaiver.reason}" /></p>
+<sec:authorize access="@access.has(principal,'LOAN_INTEREST_WAIVE') and @access.hasAny(principal,'LOAN_RECORDING_REVERSE','LOAN_REPAYMENTS_REVERSE')"><c:if test="${empty selectedWaiver.reverses and empty selectedWaiver.reversedBy and selectedWaiver.actor ne principal.memberId}">
+<form method="post" action="<c:url value='${waiverBase}/interest-waivers' />" class="accounting-form">
+<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="requestKey" value="${waiverForm.requestKey}" /><input type="hidden" name="reverses" value="${selectedWaiver.id}" /><input type="hidden" name="amount" value="${selectedWaiver.amount}" />
+<label><spring:message code="voucher.date" /><input type="date" name="effectiveDate" value="${waiverToday}" min="${selectedWaiver.date}" max="${waiverToday}" required /></label><label><spring:message code="prepayment.reason" /><textarea name="reason" maxlength="500" required><c:out value="${waiverForm.reason}" /></textarea></label>
+<label class="accounting-servicing-confirm"><input type="checkbox" name="confirmed" value="true" required /><span><spring:message code="prepayment.confirmReversal" /></span></label><div class="accounting-actions"><button class="app-btn btn-neutral"><spring:message code="prepayment.reverse" /></button></div></form></c:if></sec:authorize></section></c:if>
+</div>
+<%@ include file="../accounting/accounting-form-support.jspf" %>
+</c:if>

@@ -19,7 +19,6 @@ import java.util.*;
 @Controller @RequiredArgsConstructor
 public class LoanPrepaymentController {
     private final LoanRepaymentLedgerService ledger;
-    private final ApplicationClock clock;
     private final AdminService admin;
     private final AdminScopeService scope;
     @Data public static class PolicyForm {
@@ -55,34 +54,32 @@ public class LoanPrepaymentController {
     }
     @GetMapping({"/finance/loan-records/{id}/settlement","/repayments/loans/{id}/settlement"})
     @PreAuthorize("@access.hasAny(principal,'LOAN_RECORDING_VIEW','LOAN_REPAYMENTS_VIEW')")
-    public String settlement(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,
-        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,
-        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="0") int schedulePage,@RequestParam(required=false) UUID waiverId,Model model){
+    public String retiredSettlement(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,jakarta.servlet.http.HttpServletRequest request){
         if(!actor.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Forbidden");
-        if(date==null)date=clock.today();var history=ledger.interestWaivers(id,actor,page);model.addAttribute("servicingSchedule",ledger.schedule(id,actor,schedulePage));
-        model.addAttribute("waivers",history.stream().limit(25).toList());model.addAttribute("hasNext",history.size()>25);model.addAttribute("page",page);
-        model.addAttribute("selectedWaiver",history.stream().filter(w->w.id().equals(waiverId)).findFirst().orElse(null));
-        try{model.addAttribute("quote",ledger.settlementQuote(id,actor,date));}catch(IllegalArgumentException e){model.addAttribute("prepaymentError",error(e));}
-        model.addAttribute("loanId",id);model.addAttribute("date",date);model.addAttribute("today",clock.today());
-        if(!model.containsAttribute("waiverForm")){var f=new WaiverForm();f.setRequestKey(UUID.randomUUID());f.setEffectiveDate(clock.today());model.addAttribute("waiverForm",f);}
-        return "repayments/settlement";
+        return "redirect:"+loanDetails(id,request);
     }
-    @PostMapping("/repayments/loans/{id}/interest-waivers")
+    @PostMapping({"/repayments/loans/{id}/interest-waivers","/finance/loan-records/{id}/interest-waivers"})
     @PreAuthorize("@access.has(principal,'LOAN_INTEREST_WAIVE')")
     public String waiver(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("waiverForm") WaiverForm f,
-        org.springframework.validation.BindingResult errors,Model model,RedirectAttributes redirect){
+        org.springframework.validation.BindingResult errors,Model model,RedirectAttributes redirect,jakarta.servlet.http.HttpServletRequest request){
         if(!f.isConfirmed())model.addAttribute("prepaymentError","prepayment.error.confirmation");
-        else if(!errors.hasErrors())try{ledger.waiveInterest(id,actor,f.getRequestKey(),f.getEffectiveDate(),f.getAmount(),f.getReason(),f.getReverses());redirect.addFlashAttribute("prepaymentSaved",true);return "redirect:/repayments/loans/"+id+"/settlement";}
+        else if(!errors.hasErrors())try{ledger.waiveInterest(id,actor,f.getRequestKey(),f.getEffectiveDate(),f.getAmount(),f.getReason(),f.getReverses());redirect.addFlashAttribute("prepaymentSaved",true);return "redirect:"+loanDetails(id,request)+"#interest-waivers";}
         catch(IllegalArgumentException e){model.addAttribute("prepaymentError",error(e));}
         catch(org.springframework.dao.DataAccessException e){model.addAttribute("prepaymentError","prepayment.error.conflict");}
         else model.addAttribute("prepaymentError","prepayment.error.input");
-        return settlement(id,actor,clock.today(),0,0,f.getReverses(),model);
+        redirect.addFlashAttribute("prepaymentError",model.getAttribute("prepaymentError"));
+        redirect.addFlashAttribute("waiverForm",f);
+        redirect.addFlashAttribute(org.springframework.validation.BindingResult.MODEL_KEY_PREFIX+"waiverForm",errors);
+        return "redirect:"+loanDetails(id,request)+(f.getReverses()==null?"":"?waiverId="+f.getReverses())+"#interest-waivers";
     }
-    @PostMapping("/repayments/loans/{id}/prepayment-terms")
+    @PostMapping({"/repayments/loans/{id}/prepayment-terms","/finance/loan-records/{id}/prepayment-terms"})
     @PreAuthorize("@access.has(principal,'LOAN_INTEREST_WAIVE')")
-    public String adopt(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String reason,@RequestParam(defaultValue="false") boolean confirmed,RedirectAttributes redirect){
+    public String adopt(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String reason,@RequestParam(defaultValue="false") boolean confirmed,RedirectAttributes redirect,jakarta.servlet.http.HttpServletRequest request){
         try{if(!confirmed)throw new IllegalArgumentException("prepayment.error.confirmation");ledger.adoptPrepaymentTerms(id,actor,reason);redirect.addFlashAttribute("prepaymentSaved",true);}catch(IllegalArgumentException e){redirect.addFlashAttribute("prepaymentError",error(e));}
-        return "redirect:/repayments/loans/"+id+"/settlement";
+        return "redirect:"+loanDetails(id,request)+"#interest-waivers";
+    }
+    private static String loanDetails(UUID id,jakarta.servlet.http.HttpServletRequest request){
+        return request.getRequestURI().startsWith(request.getContextPath()+"/finance/")?"/finance/loan-records/"+id:"/repayments/loans/"+id;
     }
     private static String error(IllegalArgumentException e){String s=e.getMessage();if("voucher.error.period".equals(s))return s;return s!=null && s.matches("(?:prepayment|repayment)\\.error\\.[A-Za-z]+")?s:"prepayment.error.input";}
 }
