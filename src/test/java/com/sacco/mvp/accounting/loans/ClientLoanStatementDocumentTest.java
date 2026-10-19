@@ -78,6 +78,30 @@ class ClientLoanStatementDocumentTest {
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);assertThat(new PDFTextStripper().getText(pdf)).contains("0001","Hakuna miamala iliyowekwa.");
         }
     }
+    @Test void localizedFieldsAndRightmostAmountsStayWithinPrintableMargins() throws Exception {
+        var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
+            var columns=List.of("date","reference","documentNumber","activity","accountCode","description","debit","credit","interest","balance").stream()
+                .map(key->messages.getMessage("recording.statement."+key,null,locale)).toList();
+            var rows=IntStream.rangeClosed(1,45).mapToObj(n->List.of("19-OCT-2026","REFERENCE-"+n,"Unavailable","Repayment","111001",
+                "Posted repayment with a description that wraps across several lines.","9,999,999.99","9,999,999.99","999,999.99","9,999,999.99")).toList();
+            var source=new StatementDocument(messages.getMessage("recording.statement",null,locale).toUpperCase(locale),
+                List.of(new StatementField("Client Number","CL10001"),new StatementField("Name","Long client name for statement layout checks"),new StatementField("As of","19-OCT-2026")),
+                List.of(new StatementSection(List.of(new StatementField("Institution / Branch","Long institution name / Branch office with a long name")),columns,rows)),"No transactions","Amounts in TZS.");
+            try(var pdf=Loader.loadPDF(new LoanRecordingPdfService(new ReportExportLimiter(1)).renderStatement(source))){
+                assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+                float right=pdf.getPage(0).getMediaBox().getWidth()-36;
+                new PDFTextStripper(){
+                    @Override protected void processTextPosition(TextPosition text){
+                        assertThat(text.getXDirAdj()).as("Text respects the printable left margin").isGreaterThanOrEqualTo(36f);
+                        assertThat(text.getXDirAdj()+text.getWidthDirAdj()).as("Rightmost text respects the printable right margin").isLessThanOrEqualTo(right+.01f);
+                        super.processTextPosition(text);
+                    }
+                }.getText(pdf);
+                assertThat(new PDFTextStripper().getText(pdf)).contains("REFERENCE-45","9,999,999.99");
+            }
+        }
+    }
     private static BigDecimal money(String value){return new BigDecimal(value);}
     private static Posting post(UUID loan,String kind,LocalDate date,String reference,String principal,String interest,String balance){
         return new Posting(UUID.randomUUID(),loan,"7526","James Mafumba","0001",kind,date,reference,money(principal).add(money(interest)),money(principal),money(interest),

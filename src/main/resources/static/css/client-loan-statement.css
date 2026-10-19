@@ -1,4 +1,4 @@
-@page client-loan-statement { size: A4 landscape; margin: 8mm; }
+@page client-loan-statement { size: A4 landscape; margin: 12.7mm; }
 .client-statement-print { margin: 0; padding: 20px; color: #000; background: #fff; font-family: "Times New Roman", serif; }
 .client-loan-statement { max-width: 1120px; margin: 0 auto; }
 .client-loan-statement h1 { margin: 0 0 18px; font-size: 16pt; text-align: center; text-decoration: underline; }
@@ -57,6 +57,12 @@
     .client-statement-workspace .erp-table tr { break-inside: avoid; }
 }
 
+.loan-statement-workspace { grid-template-columns: minmax(0,1fr); }
+.statement-preview-scroll { width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.statement-preview-scroll:focus-visible { outline: 2px solid #0073bb; outline-offset: 2px; }
+.statement-preview-scroll .reference-report.client-loan-statement { box-sizing: border-box; width: 100%; min-width: 1120px; margin: 0; }
+.statement-preview-scroll .statement-transactions { overflow: visible; }
+.statement-preview-scroll .reference-report.client-loan-statement .statement-facts { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .reference-report.client-loan-statement { max-width: none; font-family: "Times New Roman", Times, serif; }
 .reference-report.client-loan-statement h1 { font-weight: bold; }
 .reference-report.client-loan-statement .statement-facts { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px 24px; }
@@ -64,3 +70,9 @@
 .reference-report.client-loan-statement .statement-facts dd { font-weight: bold; font-style: italic; }
 .reference-report.client-loan-statement .statement-transactions td { font-family: "Courier New", Courier, monospace; }
 @media (max-width: 767px) { .reference-report.client-loan-statement .statement-facts { grid-template-columns: minmax(0,1fr); } }
+@media print {
+    .loan-statement-workspace { page: client-loan-statement; }
+    .statement-preview-scroll { overflow: visible; }
+    .statement-preview-scroll .reference-report.client-loan-statement { min-width: 0; padding: 0; }
+    .statement-preview-scroll .statement-transactions table { min-width: 0; }
+}

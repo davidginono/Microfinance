@@ -2,6 +2,7 @@
 <%@ include file="support.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" />
 <div class="accounting-workspace client-statement-workspace">
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/finance/client-ledgers' />"><spring:message code="recording.clientLedgers" /></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><c:out value="${statement.client}" /></span></nav>
     <div class="erp-page-header erp-detail-header" data-aws-page-header>
         <h1 class="erp-page-title"><spring:message code="recording.statement" /></h1>
         <sec:authorize access="@access.has(principal,'LOAN_RECORDING_EXPORT')">
