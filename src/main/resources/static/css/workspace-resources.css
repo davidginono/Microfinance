@@ -1,4 +1,13 @@
 /* Shared AWS resource surfaces for member and staff JSP workspaces. */
+/* A bounded dashboard summary shares table styling without register controls. */
+.aws-console .staff-recent-disbursements-scroll { min-width:0; max-width:100%; scrollbar-gutter:auto; }
+.aws-console .staff-recent-disbursements-table { width:100%; min-width:960px; border-collapse:collapse; }
+.aws-console .staff-recent-disbursements-table :is(th,td) { padding:6px 12px!important; font-size:13px!important; line-height:18px!important; text-align:left!important; vertical-align:top; }
+.aws-console .staff-recent-disbursements-table td { border-bottom:1px solid #eaeded; overflow-wrap:anywhere; }
+.aws-console .staff-recent-disbursements-table tr:last-child td { border-bottom:0; }
+.aws-console .staff-recent-disbursements-table :is(.staff-recent-disbursements-number,.staff-recent-disbursements-date) { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.aws-console .staff-recent-disbursements-status { display:inline-block; padding:2px 6px; border:1px solid #eaeded; background:#f2f3f3; color:#414d5c; font-size:12px; line-height:18px; }
+.aws-console .staff-recent-disbursements-table td[colspan] { text-align:center!important; padding:24px 16px!important; color:#545b64; white-space:normal; }
 .aws-console .erp-panel,
 .aws-console .erp-form-wrap:not(.aws-filter-toolbar):not(.erp-filter-form),
 .aws-console .loan-flow-panel,

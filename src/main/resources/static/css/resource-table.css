@@ -101,10 +101,15 @@
 .aws-console [data-resource-table] .erp-table td {background:#fff;color:#16191f;font-size:13px!important;line-height:18px!important;}
 .aws-console [data-resource-table] .erp-table td a {color:#0073bb;}
 .aws-console [data-resource-table] .erp-table a.resource-table-id-link,
-.aws-console [data-resource-table] .erp-table a.resource-table-id-link:visited {color:var(--aws-blue,#0972d3)!important;text-decoration:none;}
+.aws-console [data-resource-table] .erp-table a.resource-table-id-link:visited,
+.aws-console .staff-recent-disbursements-table a.resource-table-id-link,
+.aws-console .staff-recent-disbursements-table a.resource-table-id-link:visited {color:var(--aws-blue,#0972d3)!important;text-decoration:none;}
 .aws-console [data-resource-table] .erp-table a.resource-table-id-link:hover,
-.aws-console [data-resource-table] .erp-table a.resource-table-id-link:focus-visible {color:var(--aws-blue-dark,#033160)!important;text-decoration:underline;}
-.aws-console [data-resource-table] .erp-table a.resource-table-id-link:focus-visible {outline:2px solid var(--aws-blue,#0972d3);outline-offset:2px;border-radius:2px;}
+.aws-console [data-resource-table] .erp-table a.resource-table-id-link:focus-visible,
+.aws-console .staff-recent-disbursements-table a.resource-table-id-link:hover,
+.aws-console .staff-recent-disbursements-table a.resource-table-id-link:focus-visible {color:var(--aws-blue-dark,#033160)!important;text-decoration:underline;}
+.aws-console [data-resource-table] .erp-table a.resource-table-id-link:focus-visible,
+.aws-console .staff-recent-disbursements-table a.resource-table-id-link:focus-visible {outline:2px solid var(--aws-blue,#0972d3);outline-offset:2px;border-radius:2px;}
 .aws-console [data-resource-table]:not(.resource-table-wrap-lines) .erp-table :is(th,td) {white-space:nowrap;}
 .aws-console [data-resource-table] .resource-table-no-matches td {white-space:normal;}
 .aws-console [data-resource-table].resource-table-striped .erp-table tbody tr:nth-child(even)>td {background:#fafafa;}

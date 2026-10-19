@@ -328,41 +328,38 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     })();
 </script>
 
-<section id="recentDisbursements" class="erp-panel mt-4">
+<section id="recentDisbursements" class="erp-panel staff-recent-disbursements mt-4" aria-labelledby="recentDisbursementsTitle">
     <div class="erp-panel-header">
-        <div>
-            <p class="erp-panel-title"><spring:message code="manager.dashboard.recentDisbursements" text="Recent Disbursements" /></p>
-        </div>
+        <h2 id="recentDisbursementsTitle" class="erp-panel-title"><spring:message code="manager.dashboard.recentDisbursements" /></h2>
     </div>
-    <div class="erp-panel-body">
-        <div class="manager-recent-disbursements-scroll erp-table-scroll erp-table-scroll-sm space-y-3">
+    <div class="erp-table-scroll erp-table-scroll-sm staff-recent-disbursements-scroll" tabindex="0" role="region" aria-labelledby="recentDisbursementsTitle">
+        <table class="erp-table staff-recent-disbursements-table">
+            <thead><tr>
+                <th scope="col"><spring:message code="loan.applicationId" /></th>
+                <th scope="col"><spring:message code="loan.loanId" /></th>
+                <th scope="col"><spring:message code="recording.client" /></th>
+                <th scope="col"><spring:message code="recording.product" /></th>
+                <th scope="col"><spring:message code="common.amount" /> (TZS)</th>
+                <th scope="col"><spring:message code="analytics.disbursed" /></th>
+                <th scope="col"><spring:message code="common.status" /></th>
+            </tr></thead>
+            <tbody>
             <c:forEach items="${dashboardDisbursementRows}" var="loan">
-                <a href="${dashboardDetailBasePathValue}/${loan.id}" class="block rounded border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:bg-slate-50">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="font-semibold text-slate-900">${loan.applicantName}</p>
-                            <p class="mt-1 text-sm text-slate-600">${loan.loanTypeLabel}</p>
-                        </div>
-                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                            ${loan.statusLabel}
-                        </span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
-                        <span><spring:message code="loan.applicationId" text="Loan Application ID" />: ${loan.shortId}</span>
-                        <c:if test="${not empty loan.loanId}">
-                            <span><spring:message code="loan.loanId" text="Loan ID" />: ${loan.loanId}</span>
-                        </c:if>
-                        <span><spring:message code="common.amount" text="Amount" />: <fmt:formatNumber value="${loan.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
-                        <span><spring:message code="analytics.disbursed" text="Disbursed" />: ${loan.disbursementDate}</span>
-                    </div>
-                </a>
+                <tr>
+                    <td><c:choose><c:when test="${not empty loan.shortId}"><a class="resource-table-id-link" href="<c:url value='${dashboardDetailBasePathValue}/${loan.id}' />"><c:out value="${loan.shortId}" /></a></c:when><c:otherwise>—</c:otherwise></c:choose></td>
+                    <td><c:out value="${empty loan.loanId ? '—' : loan.loanId}" /></td>
+                    <td><c:out value="${loan.applicantName}" /></td>
+                    <td><c:out value="${loan.loanTypeLabel}" /></td>
+                    <td class="staff-recent-disbursements-number"><c:choose><c:when test="${empty loan.amount or loan.amount eq '-'}"><spring:message code="recording.unavailable" /></c:when><c:otherwise><fmt:formatNumber value="${loan.amount}" minFractionDigits="2" maxFractionDigits="2" /></c:otherwise></c:choose></td>
+                    <td class="staff-recent-disbursements-date"><c:out value="${loan.disbursementDate}" /></td>
+                    <td><span class="staff-recent-disbursements-status"><c:out value="${loan.statusLabel}" /></span></td>
+                </tr>
             </c:forEach>
             <c:if test="${empty dashboardDisbursementRows}">
-                <div class="erp-section-muted">
-                    <p class="text-slate-600"><spring:message code="manager.dashboard.noRecentDisbursements" arguments="${dashboardRecentDisbursementDays}" text="No loans were disbursed in the recent period." /></p>
-                </div>
+                <tr><td colspan="7"><spring:message code="manager.dashboard.noRecentDisbursements" arguments="${dashboardRecentDisbursementDays}" /></td></tr>
             </c:if>
-        </div>
+            </tbody>
+        </table>
     </div>
 </section>
 

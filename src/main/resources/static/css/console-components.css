@@ -7836,13 +7836,6 @@ html.session-timeout-active,
     .manager-pie-chart.is-hovering .manager-pie-slice-group .manager-pie-subtext {
         opacity: 0.55;
     }
-    .manager-recent-disbursements-scroll {
-        max-height: 18rem;
-        overflow-y: auto;
-        padding-right: 0.35rem;
-        scrollbar-gutter: stable;
-    }
-
 /* Source: src/main/webapp/WEB-INF/jsp/manager/archive.jsp */
 .manager-archive-search-form {
         width: 100%;
