@@ -1,3 +1,4 @@
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
@@ -12,8 +13,8 @@
   <h1><c:out value="${document.title}" /></h1>
   <header>
    <p><c:out value="${snapshot.institutionName}" /> | <c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose></p>
-   <p><spring:message code="${document.asAt?'fs.asAt':'fs.period'}" />: <c:if test="${not document.asAt}">${run.from} — </c:if>${run.through} | TZS</p>
-   <p><spring:message code="fs.previous" />: ${snapshot.parameters.previousFrom()} — ${snapshot.parameters.previousThrough()}</p>
+   <p><spring:message code="${document.asAt?'fs.asAt':'fs.period'}" />: <c:if test="${not document.asAt}">${appTime:display(run.from)} — </c:if>${appTime:display(run.through)} | TZS</p>
+   <p><spring:message code="fs.previous" />: ${appTime:display(snapshot.parameters.previousFrom())} — ${appTime:display(snapshot.parameters.previousThrough())}</p>
    <p><spring:message code="fs.generated" />: <c:out value="${generatedLabel}" /></p>
   </header>
   <table>

@@ -1,3 +1,4 @@
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
@@ -86,7 +87,7 @@
                     <button type="submit" class="w-full bg-[#3F9C4B] px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#357f3f]">Activate account</button>
                 </form>
 
-                <p class="mt-6 text-xs text-slate-500">This activation link expires at <span class="font-semibold">${invitationExpiresAt}</span>. Ask your Super Admin to resend if it lapses.</p>
+                <p class="mt-6 text-xs text-slate-500">This activation link expires at <span class="font-semibold">${appTime:display(invitationExpiresAt)}</span>. Ask your Super Admin to resend if it lapses.</p>
             </c:otherwise>
         </c:choose>
     </div>

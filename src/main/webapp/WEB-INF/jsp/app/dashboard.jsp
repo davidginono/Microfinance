@@ -559,10 +559,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                         <c:when test="${not empty activeLoanChartRows}">
                                             <c:forEach items="${activeLoanChartRows}" var="loanRow">
                                                 <tr data-active-loans-row data-loan-application-id="${loanRow.applicationId}">
-                                                    <td class="px-3 py-3 text-sm font-semibold text-slate-700">${loanRow.disbursementDate}</td>
+                                                    <td class="px-3 py-3 text-sm font-semibold text-slate-700">${appTime:display(loanRow.disbursementDate)}</td>
                                                     <td class="px-3 py-3 text-sm font-semibold text-slate-700">
                                                         <c:choose>
-                                                            <c:when test="${not empty loanRow.finalDueDate}">${loanRow.finalDueDate}</c:when>
+                                                            <c:when test="${not empty loanRow.finalDueDate}">${appTime:display(loanRow.finalDueDate)}</c:when>
                                                             <c:otherwise>-</c:otherwise>
                                                         </c:choose>
                                                     </td>

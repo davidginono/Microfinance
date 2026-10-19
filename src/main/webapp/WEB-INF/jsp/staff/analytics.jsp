@@ -337,7 +337,8 @@ window.addEventListener('load', function () {
 
     dateFilterControls.forEach(function (control) {
         const dateInput = control.querySelector('input[type="date"]');
-        control.addEventListener('click', function () {
+        control.addEventListener('click', function (event) {
+            if(event.target.closest('.erp-date-control'))return;
             openDateFilterPicker(dateInput);
         });
     });

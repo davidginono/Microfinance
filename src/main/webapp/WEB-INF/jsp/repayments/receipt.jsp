@@ -9,7 +9,7 @@
     <c:if test="${not empty receipt.reversedBy}"><div class="repayment-error" role="status"><spring:message code="repayment.reversed" /> <a href="<c:url value='/repayments/loans/${receipt.loanApplicationId}/receipts/${receipt.reversedBy}' />"><spring:message code="repayment.correction" /></a></div></c:if>
     <dl class="repayment-facts">
         <div><dt><spring:message code="loan.loanId" /></dt><dd><c:out value="${receipt.loanId}" /></dd></div>
-        <div><dt><spring:message code="repayment.paymentDate" /></dt><dd><c:out value="${receipt.paymentDate}" /></dd></div>
+        <div><dt><spring:message code="repayment.paymentDate" /></dt><dd><c:out value="${appTime:display(receipt.paymentDate)}" /></dd></div>
         <div><dt><spring:message code="common.status" /></dt><dd><c:choose><c:when test="${not empty receipt.reversedBy}"><spring:message code="repayment.reversed" /></c:when><c:otherwise><spring:message code="repayment.kind.${receipt.kind}" /></c:otherwise></c:choose></dd></div>
         <div><dt><spring:message code="common.amount" /></dt><dd>TZS <fmt:formatNumber value="${receipt.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.principal" /></dt><dd>TZS <fmt:formatNumber value="${receipt.principal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>

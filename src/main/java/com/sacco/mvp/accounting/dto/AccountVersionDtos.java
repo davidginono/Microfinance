@@ -33,7 +33,7 @@ public final class AccountVersionDtos {
         public String getRecordedLabel(){return displayTime(recordedAt);}
     }
     private static String displayTime(OffsetDateTime value) {
-        return value==null?"":value.atZoneSameInstant(java.time.ZoneId.of("Africa/Nairobi")).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        return value==null?"":value.atZoneSameInstant(java.time.ZoneId.of("Africa/Nairobi")).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss"));
     }
     public record Details(Version version, UUID currentId, String parentLabel, Set<String> actions, List<Version> history,
                           int historyPage, boolean historyHasNext, List<Event> events,

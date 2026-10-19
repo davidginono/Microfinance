@@ -469,7 +469,7 @@ public class AppUsageAnalyticsService {
         private static final DateTimeFormatter HOUR_KEY = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:00");
         private static final DateTimeFormatter DAY_KEY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final DateTimeFormatter HOUR_DISPLAY = DateTimeFormatter.ofPattern("HH:00");
-        private static final DateTimeFormatter DAY_DISPLAY = DateTimeFormatter.ofPattern("MMM d");
+        private static final DateTimeFormatter DAY_DISPLAY = DateTimeFormatter.ofPattern("dd/MM/uuuu");
 
         private final String key;
         private final String sqlPattern;

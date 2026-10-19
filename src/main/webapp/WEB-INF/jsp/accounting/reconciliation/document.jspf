@@ -1,8 +1,9 @@
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page pageEncoding="UTF-8" %>
 <div class="reconciliation-heading">
   <h2><spring:message code="reconciliation.title" /></h2>
-  <p><c:out value="${report.institution}" /> | <c:out value="${report.branch}" /> | <c:out value="${report.parameters.from}" /> — <c:out value="${report.parameters.through}" /> | TZS</p>
-  <p class="reconciliation-cutoff"><spring:message code="reconciliation.cutoff" />: <c:out value="${report.parameters.cutoff}" /></p>
+  <p><c:out value="${report.institution}" /> | <c:out value="${report.branch}" /> | <c:out value="${appTime:display(report.parameters.from)}" /> — <c:out value="${appTime:display(report.parameters.through)}" /> | TZS</p>
+  <p class="reconciliation-cutoff"><spring:message code="reconciliation.cutoff" />: <c:out value="${appTime:display(report.parameters.cutoff)}" /></p>
   <p><spring:message code="reconciliation.exceptionsOnly" /></p>
 </div>
 <div class="erp-table-scroll reconciliation-document-table"><table class="erp-table reconciliation-table">
@@ -13,7 +14,7 @@
       <tr class="reconciliation-group"><th colspan="12" scope="rowgroup"><spring:message code="reconciliation.activity" />: <spring:message code="reconciliation.component.${group.component}" /> — <spring:message code="reconciliation.section.${group.section}" /> (<c:out value="${group.count}" />)</th></tr>
       <c:forEach items="${report.rows}" var="row"><c:if test="${row.group==group.key}">
         <tr><td><c:out value="${row.client}" /></td><td><c:out value="${row.loan}" /><c:if test="${not empty row.account}"><span class="reconciliation-account"><c:out value="${row.account}" /></span></c:if></td>
-          <td class="reconciliation-reference"><c:out value="${row.reference}" /></td><td><c:out value="${row.date}" /></td>
+          <td class="reconciliation-reference"><c:out value="${row.reference}" /></td><td><c:out value="${appTime:display(row.date)}" /></td>
           <td><spring:message code="reconciliation.event.${row.activity}" /></td><td><spring:message code="reconciliation.issue.${row.issue}" /></td>
           <c:forEach items="${row.amounts}" var="amount"><td class="reconciliation-money"><c:choose><c:when test="${amount!=null}"><fmt:formatNumber value="${amount}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></td></c:forEach>
         </tr>

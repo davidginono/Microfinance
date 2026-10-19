@@ -30,7 +30,7 @@ public class LoanReceiptPdfService {
         }
         var principal=receipt.rows().stream().map(r->r.principal()).reduce(BigDecimal.ZERO,BigDecimal::add);
         var interest=receipt.rows().stream().map(r->r.interest()).reduce(BigDecimal.ZERO,BigDecimal::add);
-        var date=v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu"));
+        var date=v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu"));
         return renderer.renderPosting(new Source(label("voucher.title.RECEIPT",locale),v.institutionName(),v.branchName(),v.number(),label("voucher.status."+v.status(),locale),
             List.of(field("voucher.print.number",v.number(),locale),field("voucher.print.receiptDate",date,locale),field("voucher.print.branch",v.branchName(),locale)),
             label("voucher.print.payerDetails",locale),List.of(field("voucher.print.name",v.party(),locale),field("voucher.print.clientNumber",receipt.clientNumber(),locale)),

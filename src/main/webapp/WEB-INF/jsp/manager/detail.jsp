@@ -149,9 +149,9 @@
                                     <div class="font-medium text-slate-900">${loan.installmentAmount}</div>
                                     <div class="mt-1 text-xs uppercase tracking-wide text-slate-500">${loan.repaymentFrequency}</div>
                                 </td>
-                                <td class="px-3 py-2 text-slate-700">${loan.disbursedAt}</td>
+                                <td class="px-3 py-2 text-slate-700">${appTime:display(loan.disbursedAt)}</td>
                                 <td class="px-3 py-2">
-                                    <div class="font-medium text-slate-900">${loan.finalDueDate}</div>
+                                    <div class="font-medium text-slate-900">${appTime:display(loan.finalDueDate)}</div>
                                     <c:if test="${not empty loan.countdown}">
                                         <div class="mt-1 text-xs text-slate-500">${loan.countdown}</div>
                                     </c:if>

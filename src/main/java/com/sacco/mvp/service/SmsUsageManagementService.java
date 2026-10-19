@@ -36,7 +36,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SmsUsageManagementService {
     private static final DateTimeFormatter USAGE_TIMESTAMP =
-        DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH);
+        DateTimeFormatter.ofPattern("dd/MM/uuuu, HH:mm", Locale.ENGLISH);
     private static final int MAX_APPLICANT_FILTERS = 50;
     private static final int MAX_APPLICANT_SEARCH_RESULTS = 10;
     private static final UUID UNUSED_APPLICANT_ID = new UUID(0L, 0L);

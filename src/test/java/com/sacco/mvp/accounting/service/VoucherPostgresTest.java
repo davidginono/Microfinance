@@ -76,6 +76,42 @@ class VoucherPostgresTest {
   assertThatThrownBy(()->jdbc.update("delete from accounting_voucher_transaction where voucher_id=?",v.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
 
  }
+ @Test void clientSubledgersAreScopedBoundedAndPreservedOnAllVoucherTypesAndReversals(){
+  UUID client=client("B1","CL-001"),other=client("B1","CL-002"),foreign=client("B2","CL-FOREIGN");
+  jdbc.update("update members set status='INACTIVE' where id=?",other);
+  assertThat(service.clients(actor,Type.JOURNAL,"CL-",0)).extracting(Client::id).containsExactly(client);
+  assertThat(service.clients(actor,Type.JOURNAL,"accountant",0)).isEmpty();
+  for(int n=0;n<27;n++)client("B1",String.format("BOUND-%02d",n));
+  assertThat(service.clients(actor,Type.JOURNAL,"BOUND-",0)).hasSize(26);
+  assertThat(service.clients(actor,Type.JOURNAL,"BOUND-",1)).hasSize(2);
+  assertThatThrownBy(()->service.clients(actor,Type.JOURNAL,"",10001)).isInstanceOf(IllegalArgumentException.class);
+  for(UUID invalid:List.of(other,foreign,actor.getMemberId(),UUID.randomUUID())){
+   var f=form(Type.JOURNAL);f.setClientId(invalid);
+   assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,f)).hasMessage("voucher.error.client");
+   assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("voucher.error.client");
+  }
+  for(Type type:Type.values()){
+   var f=form(type);f.setClientId(client);var posted=service.post(actor,type,f);
+   assertThat(posted.clientId()).isEqualTo(client);assertThat(posted.clientNumber()).isEqualTo(clientNumber("CL-001"));
+   assertThat(service.post(actor,type,f).id()).isEqualTo(posted.id());
+   f.setClientId(other);assertThatThrownBy(()->service.post(actor,type,f)).hasMessage("voucher.error.retry");
+   assertThatThrownBy(()->jdbc.update("update accounting_voucher set client_number='CHANGED' where id=?",posted.id())).hasMessageContaining("append-only");
+   jdbc.update("update members set member_no=?,station_id='B2',status='INACTIVE' where id=?",clientNumber("CL-RENAMED"),client);
+   var reversal=service.reverse(actor,type,posted.id(),UUID.randomUUID(),day.plusDays(1),"Synthetic correction");
+   assertThat(reversal.clientId()).isEqualTo(client);assertThat(reversal.clientNumber()).isEqualTo(clientNumber("CL-001"));
+   jdbc.update("update members set member_no=?,station_id='B1',status='ACTIVE' where id=?",clientNumber("CL-001"),client);
+  }
+ }
+ @Test void databaseRejectsForgedClientSnapshotsAndCorrections(){
+  UUID client=client("B1","CL-VALID"),foreign=client("B2","CL-OTHER");
+  var f=form(Type.JOURNAL);f.setClientId(client);var original=service.post(actor,Type.JOURNAL,f);
+  String insert="""
+   insert into accounting_voucher(id,sacco_id,station_id,number,type,request_key,payload_hash,effective_date,party,reference,description,evidence,money_account_id,total,transaction_count,journal_id,posted_by,posted_at,reverses_id,client_id,client_number)
+   select ?,sacco_id,station_id,?,type,?,payload_hash,effective_date,party,?,description,evidence,money_account_id,total,transaction_count,journal_id,posted_by,posted_at,?, ?, ? from accounting_voucher where id=?
+   """;
+  for(UUID wrong:List.of(client,foreign))assertThatThrownBy(()->jdbc.update(insert,UUID.randomUUID(),"F-"+UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID().toString(),null,wrong,"CL-FORGED",original.id())).hasMessageContaining("active client");
+  assertThatThrownBy(()->jdbc.update(insert,UUID.randomUUID(),"F-"+UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID().toString(),original.id(),foreign,"CL-OTHER",original.id())).hasMessageContaining("preserve the recorded client");
+ }
  @Test void paymentAndJournalDirectionsAndSameAccountSplits(){
   var payment=service.post(actor,Type.PAYMENT,form(Type.PAYMENT));assertThat(payment.transactions()).allSatisfy(t->assertThat(t.credit().id()).isEqualTo(cash));
   var journal=service.post(actor,Type.JOURNAL,form(Type.JOURNAL));assertThat(journal.transactions()).allSatisfy(t->{assertThat(t.debit().id()).isEqualTo(expense);assertThat(t.credit().id()).isEqualTo(capital);});
@@ -158,16 +194,16 @@ class VoucherPostgresTest {
  }
 
  @Test void configuredIndividualApprovalBlocksBypassAndSupportsIndependentApprovalAndPosting(){
-  configure(true,true,false,false);var f=form(Type.JOURNAL);
+  configure(true,true,false,false);var f=form(Type.JOURNAL);UUID client=client("B1","CL-APPROVED");f.setClientId(client);
   assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
-  UUID id=workflows.capture(actor,Type.JOURNAL,f);validateWorkflow(id);
+  UUID id=workflows.capture(actor,Type.JOURNAL,f);assertThat(workflows.details(actor,id).items().getFirst().form().getClientId()).isEqualTo(client);validateWorkflow(id);
   command(actor,id,"INITIATE","");assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("INITIATED");
   assertThatThrownBy(()->command(actor,id,"APPROVE","")).hasMessage("approval.error.assignment");
   assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
   var reviewer=operator("B1");command(reviewer,id,"APPROVE","Reviewed");
   workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version());
   var d=workflows.details(actor,id);assertThat(d.workflow().posting()).isEqualTo("POSTED");assertThat(d.items()).allSatisfy(i->assertThat(i.voucherId()).isNotNull());
-  workflowPosting.post(actor,id,0);assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(d.items().getFirst().voucherId());
+  workflowPosting.post(actor,id,0);assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(d.items().getFirst().voucherId());assertThat(service.view(actor,Type.JOURNAL,d.items().getFirst().voucherId()).clientNumber()).isEqualTo(clientNumber("CL-APPROVED"));
   assertThatThrownBy(()->workflows.save(actor,id,d.items().getFirst().id(),d.workflow().version(),0,f)).hasMessage("approval.error.stale");
  }
  @Test void withdrawHoldRejectAndMaterialCorrectionsRequireResubmission(){
@@ -284,6 +320,8 @@ class VoucherPostgresTest {
  com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm ruleForm(boolean individual,boolean batch,boolean automatic,boolean force){var f=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm();f.setVersion(workflows.configuration(actor,Type.JOURNAL).version());f.setIndividuals(individual);f.setBatches(batch);f.setForceAllowed(force);f.getRules().getFirst().setName("Default approval rule");f.getRules().getFirst().setAutomatic(automatic);return f;}
  @SuppressWarnings("unchecked") static <T>T transactional(T raw,org.springframework.transaction.PlatformTransactionManager manager){var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));return (T)proxy.getProxy();}
  Form form(Type type){var f=new Form();f.setEffectiveDate(day);f.setParty("Synthetic payer");f.setReference("REF-"+UUID.randomUUID());if(type!=Type.JOURNAL)f.setMoneyAccountId(cash);var rows=new ArrayList<RowForm>();for(String amount:List.of("10.01","20.02")){var r=new RowForm();r.setDescription("Synthetic transaction "+amount);r.setAmount(new BigDecimal(amount));r.setDebitAccountId(expense);r.setCreditAccountId(capital);rows.add(r);}f.setRows(rows);return f;}
+ String clientNumber(String base){return base+"-"+actor.getMemberId().toString().substring(0,8);}
+ UUID client(String branch,String number){UUID id=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) values(?,?,?,?,?,'ACTIVE','MEMBER',now(),true,'test-only')",id,institution,branch,clientNumber(number),"Synthetic client "+number);return id;}
  UUID account(String code,String type,String balance,String kind,String purpose){UUID id=UUID.randomUUID();jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,?,?,?,?,?,?,?,?,?)",id,institution,code,"Synthetic "+code,type,balance,kind,purpose,actor.getMemberId(),now);return id;}
  AppUserPrincipal operator(String branch){jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at) values(?,?,?,true,now(),now()) on conflict(sacco_id,station_id) do nothing",UUID.randomUUID(),institution,branch);UUID id=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) values(?,?,?,?,?,'ACTIVE','ACCOUNTANT',now(),false,'test-only')",id,institution,branch,id.toString(),"Synthetic accountant");
   var member=Member.builder().id(id).saccoId(institution).stationId(branch).memberNo(id.toString()).fullName("Synthetic accountant").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).build();when(directory.find(id)).thenReturn(Optional.of(member));return new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);

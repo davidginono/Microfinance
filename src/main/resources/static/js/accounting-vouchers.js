@@ -38,7 +38,7 @@ function update(){
 form.querySelector('[data-receipt-purpose]')?.addEventListener('change',()=>{
  rows.querySelectorAll('input').forEach(input=>{if(/\.(loanId|transactionId|templateKey|debitAccountId|creditAccountId)$/.test(input.name))input.value='';});
  rows.querySelectorAll('[data-account-label],[data-mapping-label]').forEach(el=>el.textContent='');
- if(!loanMode()){form.elements.clientId.value='';form.elements.interestAccountId.value='';}
+ if(!loanMode())form.elements.interestAccountId.value='';
  update();form.dispatchEvent(new Event('input',{bubbles:true}));
 });
 form.addEventListener('input',()=>{const preview=form.querySelector('[data-voucher-preview]');if(preview)preview.hidden=true;update();});
@@ -58,13 +58,13 @@ async function load(){
  controller?.abort();controller=new AbortController();
  const token=++version;ps.textContent=ps.dataset.loading;window.AppLoading?.end(results);results.replaceChildren();window.AppLoading?.begin(results,{table:false});picker.querySelector('[data-picker-prev]').disabled=true;picker.querySelector('[data-picker-next]').disabled=true;
  try{
-  const url=new URL(form.dataset.base+'/'+(mode.startsWith('loan-')?'loan-choices/'+mode.slice(5):mode==='mapping'?'transactions':'accounts'),location.origin);url.searchParams.set('search',searchForm.elements.search.value);url.searchParams.set('page',page);if(mode==='loan-loans')url.searchParams.set('clientId',form.elements.clientId.value);
+  const url=new URL(form.dataset.base+'/'+(mode.startsWith('loan-')?'loan-choices/'+mode.slice(5):mode==='client'?'clients':mode==='mapping'?'transactions':'accounts'),location.origin);url.searchParams.set('search',searchForm.elements.search.value);url.searchParams.set('page',page);if(mode==='loan-loans')url.searchParams.set('clientId',form.elements.clientId.value);
   const response=await fetch(url,{headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},credentials:'same-origin',cache:'no-store',signal:controller.signal});if(!response.ok)throw Error();const data=await response.json();if(token!==version)return;
   const eligible=data.slice(0,25).filter(a=>mode!=='money'||moneyOnly.has(a.purpose));ps.textContent=eligible.length?'':ps.dataset.empty;
-  eligible.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='voucher-picker-option';b.textContent=mode.startsWith('loan-')?a.label:mode==='mapping'?a.transactionName+' · '+a.component+' · '+a.debit.code+' → '+a.credit.code:a.code+' · '+a.name;
+  eligible.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='voucher-picker-option';b.textContent=mode==='client'?a.name+' · '+a.number:mode.startsWith('loan-')?a.label:mode==='mapping'?a.transactionName+' · '+a.component+' · '+a.debit.code+' → '+a.credit.code:a.code+' · '+a.name;
    b.addEventListener('click',()=>{
     if(mode==='mapping'){field(target,'transactionId').value=a.transactionId;field(target,'templateKey').value=a.templateKey;field(target,'component').value=a.component;target.querySelector('[data-mapping-label]').textContent=b.textContent;if(!field(target,'description').value)field(target,'description').value=a.transactionName;}
-    else {const input=form.elements.namedItem(target);input.value=a.id;input.parentElement.querySelector('[data-account-label]').textContent=mode.startsWith('loan-')?a.label:a.code+' · '+a.name;
+    else {const input=form.elements.namedItem(target);input.value=a.id;input.parentElement.querySelector('[data-account-label]').textContent=b.textContent;
      if(mode==='loan-clients'){rows.querySelectorAll('input[name$=".loanId"]').forEach(i=>{i.value='';i.parentElement.querySelector('[data-account-label]').textContent='';});}
     }
     update();form.dispatchEvent(new Event('input',{bubbles:true}));close();
@@ -76,10 +76,11 @@ const searchBinding=window.AppSearch.bind(searchForm.elements.search,()=>{if(!pi
 searchForm.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();searchBinding.run();});
 picker.querySelector('[data-picker-prev]').addEventListener('click',()=>{searchBinding.cancel();page--;load();});picker.querySelector('[data-picker-next]').addEventListener('click',()=>{searchBinding.cancel();page++;load();});
 form.addEventListener('click',e=>{
+ const clearClient=e.target.closest('[data-client-clear]');if(clearClient&&!loanMode()){form.elements.clientId.value='';clearClient.closest('.voucher-account-choice').querySelector('[data-account-label]').textContent='';form.dispatchEvent(new Event('input',{bubbles:true}));return;}
  const remove=e.target.closest('[data-remove-row]');if(remove && rows.children.length>1){const previous=remove.closest('[data-voucher-row]').previousElementSibling;remove.closest('[data-voucher-row]').remove();update();(previous||rows.firstElementChild).querySelector('input[name$=".description"]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
  const manual=e.target.closest('[data-manual]');if(manual){const row=manual.closest('[data-voucher-row]');field(row,'transactionId').value='';field(row,'templateKey').value='';field(row,'component').value='TOTAL';row.querySelector('[data-mapping-label]').textContent='';update();row.querySelector('[data-account-for]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
- const button=e.target.closest('[data-account-for],[data-mapping],[data-loan-choice]');if(!button || button.disabled)return;
- opener=button;mode=button.dataset.loanChoice?'loan-'+button.dataset.loanChoice:button.hasAttribute('data-mapping')?'mapping':button.hasAttribute('data-money-only')?'money':'account';target=mode==='mapping'?button.closest('[data-voucher-row]'):button.dataset.choiceFor||button.dataset.accountFor;page=0;searchForm.reset();previousOverflow=document.body.style.overflow;previousRootOverflow=document.documentElement.style.overflow;document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';picker.hidden=false;picker.classList.add('is-open');searchForm.elements.search.focus();load();
+ const button=e.target.closest('[data-account-for],[data-mapping],[data-loan-choice],[data-voucher-client]');if(!button || button.disabled)return;
+ opener=button;mode=button.hasAttribute('data-voucher-client')?(loanMode()?'loan-clients':'client'):button.dataset.loanChoice?'loan-'+button.dataset.loanChoice:button.hasAttribute('data-mapping')?'mapping':button.hasAttribute('data-money-only')?'money':'account';target=mode==='mapping'?button.closest('[data-voucher-row]'):button.dataset.choiceFor||button.dataset.accountFor;page=0;searchForm.reset();previousOverflow=document.body.style.overflow;previousRootOverflow=document.documentElement.style.overflow;document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';picker.hidden=false;picker.classList.add('is-open');searchForm.elements.search.focus();load();
 });
 update();
 })();

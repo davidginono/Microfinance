@@ -29,6 +29,11 @@ The current interface is a compact operational ERP, not a lending marketing site
 - Use semantic status colors with readable labels or icons; color alone must not communicate approval, delinquency, or reversal.
 - Institution logos and names belong in the shared shell. Do not add SACCO/cooperative branding or decorative stock imagery to operational loan screens.
 
+## Dates
+
+- Display calendar dates as `DD/MM/YYYY` across workspaces, tables, details, statements, reports and exports; timestamps retain their time and application timezone after that date. Reuse `appTime:date` / `appTime:display` and `ApplicationTimestamps` for presentation.
+- Shared `date-controls.js` wraps native date inputs with a fixed-order text field and calendar action. Keep the named native input and ISO values for form submissions, filtering, links, sorting, JSON and stored snapshots; never format machine values as display dates. Preserve required/min/max checks, reset and dynamic table replacement.
+
 ## Controls And Forms
 
 - Resource tables use the [reusable console table contract](../microfinance-table-standard/SKILL.md#reusable-console-table-component): compact rectangular header actions, a separate filter/paginator/preferences row, and an independently scrolling table canvas. Reuse `resource-table.css` and `resource-table.js`; do not create page-specific gear dialogs or paginator styling.

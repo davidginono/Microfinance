@@ -80,19 +80,38 @@ public class StatementRepository {
         where statement_account_mapping.revision=? and statement_account_mapping.sacco_id=excluded.sacco_id
         """,m.accountId(),a.getSaccoId(),m.line(),m.section(),m.cashSection(),m.equityComponent(),m.note(),m.noteText(),UUID.randomUUID(),a.getMemberId(),now,expected);}
     public List<Activity> activity(UUID run,UUID account,Parameters p,int page,int limit){return jdbc.query("""
-        select j.id,j.effective_date,j.source_reference,j.reason,sum(l.debit) debit,sum(l.credit) credit,
-         sum(sum(l.debit-l.credit)) over(order by j.effective_date,j.id) running,
-         v.id voucher_id,v.type voucher_type,lp.id loan_post_id,lp.kind loan_kind
-        from statement_run_journal c join gl_journal j on j.id=c.journal_id
-        join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
-        left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id
-        left join accountant_loan_post lp on lp.journal_id=j.id and lp.sacco_id=j.sacco_id and lp.station_id=j.station_id
-        where c.run_id=? and l.account_id=? and j.effective_date between ? and ?
-        group by j.id,v.id,v.type,lp.id,lp.kind order by j.effective_date,j.id limit ? offset ?
-        """,(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("source_reference"),r.getString("reason"),r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r)),run,account,p.from(),p.through(),limit,page*30);}
+        with activity as (
+         select j.id,j.sacco_id,j.station_id,j.effective_date,j.reason,sum(l.debit) debit,sum(l.credit) credit,
+          sum(sum(l.debit-l.credit)) over(order by j.effective_date,j.id) running,
+          v.id voucher_id,v.type voucher_type,v.client_number
+         from statement_run_journal c join gl_journal j on j.id=c.journal_id
+         join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
+         left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id
+         where c.run_id=? and l.account_id=? and j.effective_date between ? and ?
+         group by j.id,v.id,v.type order by j.effective_date,j.id limit ? offset ?
+        )
+        select activity.*,coalesce(subledger.account_number,activity.client_number) account_number from activity
+        left join lateral (
+         select string_agg(distinct nullif(a.loan_id,''),', ' order by nullif(a.loan_id,'')) account_number
+         from (
+          select loan_id from accountant_loan_post where journal_id=activity.id and sacco_id=activity.sacco_id and station_id=activity.station_id and state='POSTED'
+          union
+          select loan_id from loan_charge_command where journal_id=activity.id and sacco_id=activity.sacco_id and station_id=activity.station_id
+          union
+          select q.loan_id from loan_adjustment_decision d join loan_adjustment_request q on q.id=d.request_id and q.sacco_id=d.sacco_id and q.station_id=d.station_id
+           where d.journal_id=activity.id and d.sacco_id=activity.sacco_id and d.station_id=activity.station_id and d.decision='APPROVED'
+          union
+          select loans.loan_id from accountant_loan_topup t cross join lateral (values(t.loan_id),(t.source_id)) loans(loan_id)
+           where t.journal_id=activity.id and t.sacco_id=activity.sacco_id and t.station_id=activity.station_id
+         ) linked
+         join loan_applications a on a.id=linked.loan_id and a.sacco_id=activity.sacco_id and a.station_id=activity.station_id
+        ) subledger on true
+        order by activity.effective_date,activity.id
+        """,(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("reason"),r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r)),run,account,p.from(),p.through(),limit,page*30);}
     // Keep earlier immutable documents while serving the current, simplified layout.
-    public Optional<Artifact> artifact(UUID id,Kind kind,String format,String language){return jdbc.query("select bytes,checksum from statement_run_artifact where run_id=? and kind=? and format=? and language=?",(r,n)->new Artifact(r.getBytes(1),r.getString(2)),id,kind.name()+"_V2",format,language).stream().findFirst();}
-    public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,kind.name()+"_V2",format,language,bytes,checksum);}
+    public Optional<Artifact> artifact(UUID id,Kind kind,String format,String language){return jdbc.query("select bytes,checksum from statement_run_artifact where run_id=? and kind=? and format=? and language=?",(r,n)->new Artifact(r.getBytes(1),r.getString(2)),id,artifactKind(kind),format,language).stream().findFirst();}
+    public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,artifactKind(kind),format,language,bytes,checksum);}
+    private static String artifactKind(Kind kind){return kind.name()+"_V3";}
     private Stored stored(ResultSet r,int n)throws SQLException{return new Stored(r.getObject("id",UUID.class),r.getObject("date_from",LocalDate.class),r.getObject("date_through",LocalDate.class),r.getObject("generated_at",OffsetDateTime.class),r.getBoolean("institution_wide"),r.getObject("saved_at")!=null,r.getString("payload"),r.getString("checksum"));}
     private Mapping mapping(ResultSet r)throws SQLException{return r.getString("line_name")==null?null:new Mapping(r.getObject("id",UUID.class),r.getString("line_name"),r.getString("section"),r.getString("cash_section"),r.getString("equity_component"),r.getInt("note_no"),r.getString("note_text"));}
     private String source(ResultSet r)throws SQLException{if(r.getObject("voucher_id")!=null)return "/finance/vouchers/"+switch(r.getString("voucher_type")){case "RECEIPT"->"receipts";case "PAYMENT"->"payments";default->"journals";}+"/"+r.getObject("voucher_id");return null;}

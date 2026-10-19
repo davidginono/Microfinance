@@ -43,7 +43,8 @@ class ManagementReportTest {
             var result=new Result(kind,parameters(0),"Synthetic reference institution","Main branch",columns,rows,List.of(group),totals,60,0,false,"110101 — 110199");
             byte[] bytes=exporter.build(result,Locale.forLanguageTag(language));
             try(var doc=Loader.loadPDF(bytes)){
-                String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59").contains("5,999,999,999,999,999.40");
+                String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.40");
+                if(kind!=Kind.PORTFOLIO_RISK && kind!=Kind.PORTFOLIO_ANALYSIS)assertThat(text).contains("01/10/2026");
                 assertThat(doc.getNumberOfPages()).isGreaterThan(1);
                 for(var c:columns)assertThat(text.replaceAll("\\s","")).contains(exporter.message("field."+c.key(),Locale.forLanguageTag(language)).split(" ")[0]);
             }

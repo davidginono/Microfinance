@@ -86,7 +86,7 @@ public class AppController {
         LoanStatus.WRITTEN_OFF, LoanStatus.DISBURSEMENT_REVERSED,
         LoanStatus.PAID
     );
-    private static final DateTimeFormatter REVERSAL_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
+    private static final DateTimeFormatter REVERSAL_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm", Locale.ENGLISH);
     private static final String DISMISSED_ACTIVE_LOAN_CHARTS_KEY = "dismissedActiveLoanCharts";
     private static final String GUARANTOR_APPROVAL_MODE_FIELD = "guarantorApprovalMode";
     private static final String GUARANTOR_APPROVAL_MODE_LOGIN = "LOGIN";
@@ -974,14 +974,14 @@ public class AppController {
         if (timestamp == null) {
             return "";
         }
-        return com.sacco.mvp.service.ApplicationTimestamps.zoned(timestamp).format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH));
+        return com.sacco.mvp.service.ApplicationTimestamps.zoned(timestamp).format(DateTimeFormatter.ofPattern("dd/MM/uuuu, HH:mm", Locale.ENGLISH));
     }
 
     private String formatDashboardWorkflowDate(LocalDate date) {
         if (date == null) {
             return "";
         }
-        return date.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH));
+        return date.format(DateTimeFormatter.ofPattern("dd/MM/uuuu", Locale.ENGLISH));
     }
 
     private String dashboardGuarantorStageDate(LoanApplication app) {

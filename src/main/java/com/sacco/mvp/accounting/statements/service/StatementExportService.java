@@ -27,9 +27,9 @@ public class StatementExportService {
     }
     private List<String> context(Snapshot s,Document document,Locale locale){
         var result=new ArrayList<String>();result.add(s.institutionName()+" | "+(s.parameters().institutionWide()?label("fs.institutionScope",locale):s.branchName()));
-        result.add(document.asAt()?label("fs.asAt",locale)+": "+s.parameters().through()+" | TZS":label("fs.period",locale)+": "+s.parameters().from()+" — "+s.parameters().through()+" | TZS");
-        result.add(label("fs.previous",locale)+": "+s.parameters().previousFrom()+" — "+s.parameters().previousThrough());
-        result.add(label("fs.generated",locale)+": "+clock.zoned(s.generatedAt()).format(java.time.format.DateTimeFormatter.ofPattern("EEE dd MMM yyyy HH:mm z",locale)));return result;
+        result.add(document.asAt()?label("fs.asAt",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().through())+" | TZS":label("fs.period",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().from())+" — "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().through())+" | TZS");
+        result.add(label("fs.previous",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().previousFrom())+" — "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().previousThrough()));
+        result.add(label("fs.generated",locale)+": "+clock.zoned(s.generatedAt()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm z",locale)));return result;
     }
     private byte[] pdf(Snapshot s,List<Document> documents,Locale locale)throws IOException{
         try(var pdf=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var bytes=new ByteArrayOutputStream()){

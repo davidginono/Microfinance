@@ -37,7 +37,7 @@ class VoucherPdfTest {
   var cash=new Account(UUID.randomUUID(),"111001","Branch bank account","BANK");var other=new Account(UUID.randomUUID(),"411001","Service income","OTHER");
   for(var type:Type.values()){
    var rows=new ArrayList<Transaction>();for(int i=1;i<=3;i++)rows.add(new Transaction(UUID.randomUUID(),i,null,null,"","TOTAL","Office services - transaction "+i,new BigDecimal("10000.25"),type==Type.PAYMENT?other:cash,type==Type.PAYMENT?cash:other));
-   var v=new Voucher(UUID.randomUUID(),type+"-SAMPLE",type,LocalDate.of(2026,10,11),"Synthetic Example Company","REF-2026-1042","Office services and materials. Synthetic demonstration only.","INV-2026-114",type==Type.JOURNAL?null:cash.id(),new BigDecimal("30000.75"),3,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-11T11:30:00+03:00"),null,null,"Example Microfinance Limited","Dar es Salaam - Main branch",rows);
+   var v=new Voucher(UUID.randomUUID(),type+"-SAMPLE",type,LocalDate.of(2026,10,11),"Synthetic Example Company","REF-2026-1042","Office services and materials. Synthetic demonstration only.","INV-2026-114",type==Type.JOURNAL?null:cash.id(),new BigDecimal("30000.75"),3,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-11T11:30:00+03:00"),null,null,"Example Microfinance Limited","Dar es Salaam - Main branch",rows,UUID.randomUUID(),"CL-000045");
    var output=new VoucherPdfService(messages,new ReportExportLimiter(1)).render(v,Locale.ENGLISH);
    try(var doc=Loader.loadPDF(output.bytes())){
     assertThat(doc.getNumberOfPages()).isEqualTo(1);String text=new PDFTextStripper().getText(doc);
@@ -53,11 +53,11 @@ class VoucherPdfTest {
   for(Type type:Type.values())for(Locale locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
    var debit=new Account(UUID.randomUUID(),"111001","Cash at branch","CASH");var credit=new Account(UUID.randomUUID(),"411001","Administration service income","OTHER");
    var rows=new ArrayList<Transaction>();for(int n=1;n<=50;n++)rows.add(new Transaction(UUID.randomUUID(),n,null,null,"","TOTAL","Synthetic transaction "+n+" — equipment and office services "+(n==50?"last-marker":""),new BigDecimal("10000.01"),debit,credit));
-   var v=new Voucher(UUID.randomUUID(),"RV-2026-00000001",type,LocalDate.of(2026,10,8),"Synthetic customer — sample only","BANK-REF-1001","Multiple transactions posted together. Synthetic preview, not a live receipt.","INV-2026-012",type==Type.JOURNAL?null:debit.id(),new BigDecimal("500000.50"),50,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-08T10:30:00+03:00"),null,null,"Synthetic Microfinance Ltd","Dar es Salaam — Main branch",rows);
+   var v=new Voucher(UUID.randomUUID(),"RV-2026-00000001",type,LocalDate.of(2026,10,8),"Synthetic customer — sample only","BANK-REF-1001","Multiple transactions posted together. Synthetic preview, not a live receipt.","INV-2026-012",type==Type.JOURNAL?null:debit.id(),new BigDecimal("500000.50"),50,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-08T10:30:00+03:00"),null,null,"Synthetic Microfinance Ltd","Dar es Salaam — Main branch",rows,UUID.randomUUID(),"CL-000045");
    var result=exporter.render(v,locale);
    try(var doc=Loader.loadPDF(result.bytes())){
     assertThat(doc.getNumberOfPages()).isGreaterThan(3);
-    String text=new PDFTextStripper().getText(doc);assertThat(text).contains("last-marker","RV-2026-00000001","111001","411001",type==Type.JOURNAL?messages.getMessage("voucher.title."+type,null,locale):messages.getMessage("voucher.title."+type,null,locale).toUpperCase(locale));
+    String text=new PDFTextStripper().getText(doc);assertThat(text).contains("CL-000045");assertThat(text).contains("last-marker","RV-2026-00000001","111001","411001",type==Type.JOURNAL?messages.getMessage("voucher.title."+type,null,locale):messages.getMessage("voucher.title."+type,null,locale).toUpperCase(locale));
     assertThat(text.replaceAll("\\s+","")).contains("500,000.50");
     if(type==Type.RECEIPT && locale.equals(Locale.ENGLISH)){
      Files.write(Path.of("target/voucher-preview.pdf"),result.bytes());

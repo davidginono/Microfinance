@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/manager")
 @PreAuthorize("@access.canAccessManagerArea(principal)")
 public class ManagerController {
-    private static final DateTimeFormatter REPORT_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter REPORT_DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm");
     private final ManagerService managerService;
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;

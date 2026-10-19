@@ -69,12 +69,14 @@ public class VoucherPdfService {
             field("voucher.status",label("voucher.status."+v.status(),locale),locale)));
         if(v.reversesId()!=null)posting.add(field("voucher.reversal",v.reference(),locale));
         if(v.reversedBy()!=null)posting.add(field("voucher.reversal",v.reversedBy().toString(),locale));
+        var header=new ArrayList<Field>(List.of(field("voucher.print.number",v.number(),locale),field(receipt?"voucher.print.receiptDate":"voucher.print.paymentDate",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),locale),field("voucher.print.branch",v.branchName(),locale)));
+        if(v.clientNumber()!=null)header.add(field("recording.statement.clientNumber",v.clientNumber(),locale));
         return new Source(label("voucher.title."+v.type(),locale),v.institutionName(),v.branchName(),v.number(),label("voucher.status."+v.status(),locale),
-            List.of(field("voucher.print.number",v.number(),locale),field(receipt?"voucher.print.receiptDate":"voucher.print.paymentDate",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),locale),field("voucher.print.branch",v.branchName(),locale)),
+            header,
             label(receipt?"voucher.print.payerDetails":"voucher.print.payeeDetails",locale),
             List.of(field("voucher.print.name",v.party(),locale),field("voucher.print.company","",locale),field("voucher.print.address","",locale),field("voucher.print.phone","",locale),field("voucher.print.email","",locale)),
             label(receipt?"voucher.print.receiptDetails":"voucher.print.paymentHeading",locale),
-            List.of(field("voucher.print.moneyAccount",account,locale),field("voucher.print.reference",v.reference(),locale),field("voucher.date",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),locale)),
+            List.of(field("voucher.print.moneyAccount",account,locale),field("voucher.print.reference",v.reference(),locale),field("voucher.date",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),locale)),
             List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)").subList(0,receipt?6:5),
             receipt?new float[]{.055f,.26f,.265f,.14f,.14f,.14f}:new float[]{.055f,.26f,.325f,.18f,.18f},rows,
             label("voucher.print.amountWords",locale),amountInWords(v.total(),locale),totals,label("voucher.print.narration",locale),v.description()+(v.evidence().isBlank()?"":"\n"+label("voucher.evidence",locale)+": "+v.evidence()),
@@ -105,9 +107,10 @@ public class VoucherPdfService {
         Layout(PDDocument document,PDType0Font font,Voucher voucher,Locale locale){this.document=document;this.font=font;this.v=voucher;this.locale=locale;}
         void write()throws IOException{
             page();
-            pair(label("voucher.date",locale),v.effectiveDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu")),label("voucher.reference",locale),v.reference());
+            pair(label("voucher.date",locale),v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),label("voucher.reference",locale),v.reference());
             section(label(v.type().name().equals("RECEIPT")?"voucher.print.payer":v.type().name().equals("PAYMENT")?"voucher.print.payee":"voucher.party",locale));
             pair(label("voucher.print.name",locale),v.party(),label(v.moneyAccountId()==null?"voucher.type":"voucher.print.paymentDetails",locale),moneyAccount());
+            if(v.clientNumber()!=null)paragraph(label("recording.statement.clientNumber",locale)+": "+v.clientNumber(),9,ink);
             if(!v.evidence().isBlank())paragraph(label("voucher.evidence",locale)+": "+v.evidence(),9,muted);
             y-=10;tableHeader();
             for(var t:v.transactions()){

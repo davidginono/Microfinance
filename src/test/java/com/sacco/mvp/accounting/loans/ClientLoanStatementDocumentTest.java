@@ -41,7 +41,7 @@ class ClientLoanStatementDocumentTest {
         var print=(ResponseEntity<?>)controller.statementExport(actor,client,request,Locale.ENGLISH,model);
         assertThat(print.getHeaders().getFirst("Content-Disposition")).startsWith("inline");
         try(var printed=Loader.loadPDF((byte[])print.getBody())){
-            assertThat(new PDFTextStripper().getText(printed).replaceAll("\\s+"," ")).contains("16-SEP-2027","1,000.00","24.00","900.00","-10.00");
+            assertThat(new PDFTextStripper().getText(printed).replaceAll("\\s+"," ")).contains("16/09/2027","1,000.00","24.00","900.00","-10.00");
         }
         request.setRequestURI("/finance/client-ledgers/"+client+"/pdf");
         var response=(ResponseEntity<?>)controller.statementExport(actor,client,request,Locale.ENGLISH,new ExtendedModelMap());

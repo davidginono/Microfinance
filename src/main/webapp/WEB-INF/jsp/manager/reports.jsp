@@ -65,7 +65,7 @@
                 <td>${row.loanTypeLabel}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>${row.managerDecisionLabel}</td>
-                <td>${row.reviewedAt}</td>
+                <td>${appTime:display(row.reviewedAt)}</td>
                 <td>${row.currentStatusLabel}</td>
                 <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>

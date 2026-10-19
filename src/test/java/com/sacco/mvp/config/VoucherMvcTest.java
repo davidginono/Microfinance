@@ -43,6 +43,17 @@ class VoucherMvcTest {
    .andExpect(redirectedUrl("/finance/vouchers/receipts/"+id));
   verify(service).post(eq(actor),eq(Type.RECEIPT),argThat(f->f.getRows().size()==2 && f.getRows().get(1).getAmount().compareTo(new BigDecimal("2.02"))==0));
  }
+ @Test void clientLookupAndVoucherBindingUseTheAuthenticatedWorkspace()throws Exception{
+  UUID client=UUID.randomUUID();when(service.clients(actor,Type.PAYMENT,"CL-",1)).thenReturn(List.of(new Client(client,"CL-012","Synthetic client")));
+  mvc.perform(get("/finance/vouchers/payments/clients").with(user(actor)).param("search","CL-").param("page","1").param("stationId","FOREIGN"))
+   .andExpect(status().isOk()).andExpect(jsonPath("$[0].number").value("CL-012"));verify(service).clients(actor,Type.PAYMENT,"CL-",1);
+  when(service.post(any(),eq(Type.PAYMENT),any())).thenReturn(voucher());
+  mvc.perform(post("/finance/vouchers/payments").with(user(actor)).with(csrf()).param("clientId",client.toString()).param("clientNumber","FORGED").param("party","Payee"))
+   .andExpect(redirectedUrl("/finance/vouchers/payments/"+id));verify(service).post(eq(actor),eq(Type.PAYMENT),argThat(f->client.equals(f.getClientId())));
+  when(workflows.clients(actor,id,"CL-",0)).thenReturn(List.of(new Client(client,"CL-012","Synthetic client")));
+  mvc.perform(get("/finance/approval/"+id+"/clients").with(user(actor)).param("search","CL-"))
+   .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(client.toString()));
+ }
  @Test void retiredReportGrantsCannotOpenVoucherRoutesAndRevokedCreateCannotPost()throws Exception{
   var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC")
    .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();

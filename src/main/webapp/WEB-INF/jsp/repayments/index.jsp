@@ -20,7 +20,7 @@
                 <thead><tr><th><spring:message code="loan.loanId" /></th><th><spring:message code="repayment.disbursed" /></th><th class="money"><spring:message code="repayment.principalOutstanding" /> (TZS)</th><th class="money"><spring:message code="repayment.principalPaid" /> (TZS)</th><th class="money"><spring:message code="repayment.interestPaid" /> (TZS)</th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead>
                 <tbody>
                 <c:forEach items="${loans.content}" var="row"><tr>
-                    <td><a class="resource-table-id-link" href="<c:url value='/repayments/loans/${row.id}' />"><c:out value="${row.loanId}" /></a></td><td><c:out value="${row.disbursementDate}" /></td>
+                    <td><a class="resource-table-id-link" href="<c:url value='/repayments/loans/${row.id}' />"><c:out value="${row.loanId}" /></a></td><td><c:out value="${appTime:display(row.disbursementDate)}" /></td>
                     <td class="money"><fmt:formatNumber value="${row.outstandingPrincipal}" minFractionDigits="2" maxFractionDigits="2" /></td>
                     <td class="money"><fmt:formatNumber value="${row.principalPaid}" minFractionDigits="2" maxFractionDigits="2" /></td>
                     <td class="money"><fmt:formatNumber value="${row.interestPaid}" minFractionDigits="2" maxFractionDigits="2" /></td>

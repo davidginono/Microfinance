@@ -18,7 +18,7 @@ public class StatementPresentation {
     public record Document(String title,String style,List<Column> columns,List<DisplayRow> rows,int detailsBefore,boolean asAt) {}
     private String title(Snapshot snapshot,Kind kind,Locale locale){
         String title=label("fs.title."+kind,locale);
-        return kind==Kind.POSITION||kind==Kind.TRIAL?title+" "+snapshot.parameters().through().format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy",locale)):title;
+        return kind==Kind.POSITION||kind==Kind.TRIAL?title+" "+snapshot.parameters().through().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu",locale)):title;
     }
     public String label(String text,Locale locale){return text!=null&&text.startsWith("fs.")?messages.getMessage(text,null,text,locale):text;}
     public Document document(Snapshot s,Kind kind,List<Balance> selected,Locale locale){
@@ -66,11 +66,11 @@ public class StatementPresentation {
     }
     public DisplayRow row(boolean total,boolean heading,String details,Object... values){return new DisplayRow(Arrays.stream(values).map(this::cell).toList(),total,heading,details);}
     public Document ledger(Snapshot s,Balance b,List<Activity> activity,Locale locale){
-        var columns=List.of(new Column(label("fs.date",locale),false,.12f),new Column(label("fs.reference",locale),false,.16f),new Column(label("fs.description",locale),false,.32f),new Column(label("fs.debit",locale),true,.13f),new Column(label("fs.credit",locale),true,.13f),new Column(label("fs.balance",locale),true,.14f));
+        var columns=List.of(new Column(label("fs.date",locale),false,.12f),new Column(label("fs.accountNumber",locale),false,.16f),new Column(label("fs.description",locale),false,.32f),new Column(label("fs.debit",locale),true,.13f),new Column(label("fs.credit",locale),true,.13f),new Column(label("fs.balance",locale),true,.14f));
         var rows=new ArrayList<DisplayRow>();rows.add(row(true,false,null,"","",label("fs.opening",locale),"","",b.opening()));
-        for(var a:activity)rows.add(row(false,false,a.sourceUrl(),a.date(),a.reference(),a.description(),a.debit(),a.credit(),b.opening().add(a.running())));
+        for(var a:activity)rows.add(row(false,false,a.sourceUrl(),a.date(),a.accountNumber()==null||a.accountNumber().isBlank()?label("fs.unavailable",locale):a.accountNumber(),a.description(),a.debit(),a.credit(),b.opening().add(a.running())));
         rows.add(row(true,false,null,"","",label("fs.periodTotal",locale),b.debit(),b.credit(),b.closing()));
         return new Document(label("fs.title.LEDGER",locale)+" — "+b.code()+" "+b.name(),"trial",columns,rows,-1,false);
     }
-    private Cell cell(Object value){if(value instanceof BigDecimal amount){var f=new DecimalFormat("#,##0.00;(#,##0.00)",DecimalFormatSymbols.getInstance(Locale.UK));return new Cell(f.format(amount),amount);}return new Cell(value==null?"":value.toString(),null);}
+    private Cell cell(Object value){if(value instanceof BigDecimal amount){var f=new DecimalFormat("#,##0.00;(#,##0.00)",DecimalFormatSymbols.getInstance(Locale.UK));return new Cell(f.format(amount),amount);}return new Cell(value==null?"":com.sacco.mvp.service.ApplicationTimestamps.display(value),null);}
 }

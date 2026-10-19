@@ -21,7 +21,7 @@
   <section class="erp-panel" aria-labelledby="portfolio-context-title">
     <div class="erp-panel-header portfolio-context-header"><h2 class="erp-panel-title" id="portfolio-context-title"><spring:message code="financial.portfolio.reportDetails" /></h2><span class="portfolio-draft"><spring:message code="financial.report.draft" /></span></div>
     <dl class="accounting-context portfolio-context">
-      <div><dt><spring:message code="financial.portfolio.period" /></dt><dd><c:out value="${report.parameters.from}" /> — <c:out value="${report.parameters.through}" /></dd></div>
+      <div><dt><spring:message code="financial.portfolio.period" /></dt><dd><c:out value="${appTime:display(report.parameters.from)}" /> — <c:out value="${appTime:display(report.parameters.through)}" /></dd></div>
       <div><dt><spring:message code="financial.report.scope" /></dt><dd><spring:message code="${report.scope.institutionWide ? 'financial.report.institution' : 'financial.report.branch'}" /></dd></div>
       <div><dt><spring:message code="financial.report.recordedThrough" /></dt><dd><c:out value="${fn:replace(cutoffInput, 'T', ' ')}" /><small><c:out value="${reportZone}" /></small></dd></div>
       <div><dt><spring:message code="financial.portfolio.currency" /></dt><dd>TZS</dd></div>

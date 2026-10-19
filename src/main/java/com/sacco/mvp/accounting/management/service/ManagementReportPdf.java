@@ -27,8 +27,8 @@ public class ManagementReportPdf {
         try(var document=new PDDocument();var out=new ByteArrayOutputStream();var input=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream()){
             var font=PDType0Font.load(document,input);
             boolean asAt=r.kind()==Kind.PORTFOLIO_RISK || r.kind()==Kind.PORTFOLIO_ANALYSIS;
-            var context=new ArrayList<>(List.of(r.institution()+" | "+r.branch(),message(asAt?"asAt":"period",locale)+": "+(asAt?"":r.parameters().from()+" — ")+r.parameters().through()+" | TZS",
-                message("cutoff",locale)+": "+r.parameters().cutoff(),message("excluded",locale)+": "+r.excluded()));
+            var context=new ArrayList<>(List.of(r.institution()+" | "+r.branch(),message(asAt?"asAt":"period",locale)+": "+(asAt?"":com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().from())+" — ")+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().through())+" | TZS",
+                message("cutoff",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().cutoff()),message("excluded",locale)+": "+r.excluded()));
             if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message("accounts",locale)+": "+(r.parameters().startAccount()==null && r.parameters().endAccount()==null?message("allAccounts",locale):r.accountRange()));
             if(!r.parameters().client().isBlank())context.add(message("clientSearch",locale)+": "+r.parameters().client());
             if(!r.parameters().product().isBlank())context.add(message("productSearch",locale)+": "+r.parameters().product());
@@ -41,7 +41,7 @@ public class ManagementReportPdf {
                     if(r.kind()==Kind.DAILY_COLLECTIONS && day!=null && !group.name().startsWith(day))page.row(totalRow(r,r.getDailyTotals().get(day),message("dayTotal",locale),locale),true);
                     String activity=group.name().contains(" | ")?group.name().substring(group.name().indexOf(" | ")+3):"";
                     String groupTitle=Set.of("@loan","@general").contains(activity)?group.name().substring(0,group.name().indexOf(" | ")+3)+message(activity.equals("@loan")?"loanRepayments":"generalReceipts",locale):group.name();
-                    page.endTable();page.section(groupTitle);page.columns(labels,widths,numeric);
+                    page.endTable();page.section(com.sacco.mvp.service.ApplicationTimestamps.display(groupTitle));page.columns(labels,widths,numeric);
                     for(var row:r.rows())if(Objects.equals(row.get("groupName"),group.name()))page.row(r.columns().stream().map(c->"transaction".equals(c.key()) && Set.of("PRINCIPAL","INTEREST").contains(Objects.toString(row.get("component"),""))?message("component."+row.get("component"),locale)+" — "+value(row.get(c.key()),locale):value(row.get(c.key()),locale)).toList(),false);
                     page.row(totalRow(r,group.totals(),message("groupTotal",locale),locale),true);
                     day=group.name().substring(0,Math.min(10,group.name().length()));
@@ -62,5 +62,5 @@ public class ManagementReportPdf {
         }catch(IOException failure){throw new IllegalStateException("PDF generation failed",failure);}
     }
     private List<String> totalRow(Result r,Map<String,BigDecimal> totals,String title,Locale locale){var values=new ArrayList<String>();for(int n=0;n<r.columns().size();n++){var c=r.columns().get(n);values.add(n==0?title:c.money()?value(totals.get(c.key()),locale):"");}return values;}
-    private String value(Object value,Locale locale){if(value==null)return "—";if(value instanceof BigDecimal n){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(n);}return value.toString();}
+    private String value(Object value,Locale locale){if(value==null)return "—";if(value instanceof BigDecimal n){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(n);}return com.sacco.mvp.service.ApplicationTimestamps.display(value);}
 }

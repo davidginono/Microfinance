@@ -135,7 +135,7 @@ class LoanReportServiceTest {
             assertThat(workbook.getSheet("Trends")).isNotNull();
             assertThat(workbook.getSheet("Financial Summary")).isNotNull();
             assertThat(workbook.getSheet("Activity Log")).isNotNull();
-            assertThat(sheetContains(workbook, "Summary", "17 Jun 2025 - 17 Jun 2026")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "17/06/2025 - 17/06/2026")).isTrue();
             assertThat(sheetContains(workbook, "Product Performance", "15,000")).isTrue();
         }
     }

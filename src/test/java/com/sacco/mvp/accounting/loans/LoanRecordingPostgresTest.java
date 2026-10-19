@@ -60,6 +60,35 @@ class LoanRecordingPostgresTest {
     }
     UUID chargedLoan(){var f=form();f.setInsurancePremium(new BigDecimal("10.00"));f.setInsuranceEvidence("Synthetic actual insurer premium 10.00 / "+UUID.randomUUID());f.setEvidence("Synthetic signed agreement");return service.save(actor,f);}
     PostForm chargedFunding(UUID id){var f=post(id,"1000.00","D-CHARGED-"+UUID.randomUUID());f.setEvidence("Synthetic signed agreement and bank transfer");return f;}
+    List<com.sacco.mvp.accounting.statements.dto.StatementModels.Activity> statementActivity(UUID account){
+        var repository=new com.sacco.mvp.accounting.statements.repository.StatementRepository(jdbc);
+        var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(LocalDate.of(2026,9,1),TODAY,false);
+        var run=UUID.randomUUID();var cutoff=OffsetDateTime.now();repository.create(run,actor,period,cutoff,UUID.randomUUID());repository.capture(run,actor,period,cutoff);
+        return repository.activity(run,account,period,0,5001);
+    }
+    @Test void statementAccountNumbersFollowLoansAcrossFundingFeesRepaymentsReversalsAndAdjustments(){
+        chargePolicy("SEPARATE");var loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
+        var payment=post(loan,"120.00","STATEMENT-PAYMENT");payment.setInterestAccountId(interest);
+        var paid=service.repay(actor,payment);service.reverse(operator("B1"),paid.id(),UUID.randomUUID(),TODAY,"Synthetic receipt correction");
+        var adjustment=provide(loan,"100.00");String number=service.detail(actor,loan).loan().number();
+        for(var account:List.of(cash,principal,chargeAccount)){
+            var activity=statementActivity(account);assertThat(activity).isNotEmpty();
+            assertThat(activity).extracting(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::accountNumber).containsOnly(number);
+            assertThat(activity).extracting(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::journalId).doesNotHaveDuplicates();
+            assertThat(activity.stream().map(r->r.debit().subtract(r.credit())).reduce(BigDecimal.ZERO,BigDecimal::add))
+                .isEqualByComparingTo(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and station_id='B1' and account_id=?",BigDecimal.class,institution,account));
+        }
+        var provisionJournal=jdbc.queryForObject("select journal_id from loan_adjustment_decision where request_id=?",UUID.class,adjustment);
+        var provisionAccount=jdbc.queryForObject("select debit_account_id from loan_adjustment_request where id=?",UUID.class,adjustment);
+        assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);});
+    }
+    @Test void statementTopUpListsBothLoanIdsWithoutDuplicatingJournalAmounts(){
+        var source=topUpSource();var loan=recordTopUp(source);var posting=service.disburse(actor,topUpPost(loan));
+        var numbers=java.util.stream.Stream.of(service.detail(actor,source).loan().number(),service.detail(actor,loan).loan().number()).sorted().toList();
+        var rows=statementActivity(principal).stream().filter(r->r.journalId().equals(posting.journalId())).toList();
+        assertThat(rows).hasSize(1);assertThat(rows.getFirst().accountNumber()).isEqualTo(String.join(", ",numbers));
+        assertThat(rows.getFirst().debit()).isEqualByComparingTo("1500.00");assertThat(rows.getFirst().credit()).isEqualByComparingTo("1000.00");
+    }
     @Test void customisedFeesAreRecordedWithoutMoneyAndCollectedOnlyAtDisbursement(){
         product=jdbc.queryForObject("select id from loan_product_settings where sacco_id=? and custom_recording_configuration",UUID.class,institution);
         chargePolicy("DEDUCT",true,new BigDecimal("20.00"));

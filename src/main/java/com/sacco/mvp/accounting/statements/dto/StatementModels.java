@@ -32,6 +32,6 @@ public final class StatementModels {
                            String institutionName,String branchName,List<Balance> balances,List<Row> position,List<Row> income,
                            List<Row> cashFlow,List<String> equityColumns,List<EquityRow> equity,List<Check> checks) {}
     public record Run(UUID id,LocalDate from,LocalDate through,OffsetDateTime createdAt,boolean institutionWide,boolean saved,Snapshot snapshot) {}
-    public record Activity(UUID journalId,LocalDate date,String reference,String description,BigDecimal debit,BigDecimal credit,BigDecimal running,String sourceUrl) {}
+    public record Activity(UUID journalId,LocalDate date,String accountNumber,String description,BigDecimal debit,BigDecimal credit,BigDecimal running,String sourceUrl) {}
     public record MappingRow(UUID id,String code,String name,String type,String purpose,Mapping mapping,UUID revision) {}
 }

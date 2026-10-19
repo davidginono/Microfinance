@@ -1,3 +1,4 @@
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../loans/support.jspf" %>
 <nav class="erp-page-path"><a href="<c:url value='/finance/loan-adjustments' />"><spring:message code="adjustment.title" /></a><span>›</span><span aria-current="page"><spring:message code="adjustment.kind.${adjustment.kind}" /></span></nav>
@@ -5,13 +6,13 @@
 <c:if test="${not empty formError}"><div class="loan-error-summary" role="alert" tabindex="-1"><spring:message code="${formError}" /></div></c:if>
 <section class="accounting-section erp-detail-card"><h2><c:out value="${adjustment.client}" /></h2><dl class="erp-detail-facts">
 <div><dt><spring:message code="voucher.status" /></dt><dd><spring:message code="adjustment.state.${adjustment.state}" /></dd></div>
-<div><dt><spring:message code="voucher.date" /></dt><dd>${adjustment.date}</dd></div>
+<div><dt><spring:message code="voucher.date" /></dt><dd>${appTime:display(adjustment.date)}</dd></div>
 <div><dt><spring:message code="voucher.amount" /> (TZS)</dt><dd><fmt:formatNumber value="${adjustment.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
 <div><dt><spring:message code="accounting.debit" /></dt><dd><c:out value="${adjustment.debitName}" /></dd></div><div><dt><spring:message code="accounting.credit" /></dt><dd><c:out value="${adjustment.creditName}" /></dd></div>
 <div><dt><spring:message code="adjustment.principalChange" /> (TZS)</dt><dd>${adjustment.principalChange}</dd></div><div><dt><spring:message code="adjustment.allowanceChange" /> (TZS)</dt><dd>${adjustment.allowanceChange}</dd></div>
 <div><dt><spring:message code="recording.reason" /></dt><dd><c:out value="${adjustment.reason}" /></dd></div><div><dt><spring:message code="adjustment.policyEvidence" /></dt><dd><c:out value="${adjustment.evidence}" /></dd></div>
-<div><dt><spring:message code="adjustment.requestedBy" /></dt><dd><c:out value="${adjustment.requester}" /> · ${adjustment.requestedAt}</dd></div>
-<c:if test="${not empty adjustment.decidedAt}"><div><dt><spring:message code="adjustment.reviewedBy" /></dt><dd><c:out value="${adjustment.reviewer}" /> · ${adjustment.decidedAt}</dd></div><div><dt><spring:message code="recording.reason" /></dt><dd><c:out value="${adjustment.decisionReason}" /></dd></div></c:if></dl>
+<div><dt><spring:message code="adjustment.requestedBy" /></dt><dd><c:out value="${adjustment.requester}" /> · ${appTime:display(adjustment.requestedAt)}</dd></div>
+<c:if test="${not empty adjustment.decidedAt}"><div><dt><spring:message code="adjustment.reviewedBy" /></dt><dd><c:out value="${adjustment.reviewer}" /> · ${appTime:display(adjustment.decidedAt)}</dd></div><div><dt><spring:message code="recording.reason" /></dt><dd><c:out value="${adjustment.decisionReason}" /></dd></div></c:if></dl>
 <p><spring:message code="adjustment.effect.${adjustment.kind}" /></p></section>
 <section class="accounting-section erp-detail-card"><h2><spring:message code="recording.balances" /></h2><%@ include file="summary.jspf" %></section>
 <c:if test="${adjustment.state=='PENDING'}"><sec:authorize access="@access.has(principal,'LOAN_ADJUSTMENTS_APPROVE')"><section class="accounting-section erp-detail-card"><h2><spring:message code="adjustment.review" /></h2>

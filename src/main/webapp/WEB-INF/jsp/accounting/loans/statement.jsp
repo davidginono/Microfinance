@@ -1,3 +1,4 @@
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" />
@@ -57,7 +58,7 @@
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${movements.rows}" var="p"><tr>
-                        <td>${p.date}</td><td><c:out value="${p.loanNumber}" /></td><td><c:out value="${p.product}" /></td><td><a class="resource-table-id-link" href="<c:url value='/finance/loan-postings/${p.id}' />"><c:out value="${p.reference}" /></a></td><td><spring:message code="recording.document.${p.kind}" /></td>
+                        <td>${appTime:display(p.date)}</td><td><c:out value="${p.loanNumber}" /></td><td><c:out value="${p.product}" /></td><td><a class="resource-table-id-link" href="<c:url value='/finance/loan-postings/${p.id}' />"><c:out value="${p.reference}" /></a></td><td><spring:message code="recording.document.${p.kind}" /></td>
                         <td class="statement-money"><fmt:formatNumber value="${p.kind=='REVERSAL'?-p.amount:p.amount}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${p.principal}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${p.interest}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${p.principalBalance}" pattern="#,##0.00;(#,##0.00)" /></td>
                     </tr></c:forEach>
                     <c:if test="${empty movements.rows}"><tr><td colspan="9"><spring:message code="recording.statement.empty" /></td></tr></c:if>

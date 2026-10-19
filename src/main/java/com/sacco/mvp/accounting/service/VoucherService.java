@@ -45,6 +45,12 @@ public class VoucherService {
     @Transactional(readOnly=true)
     public List<Account> accounts(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.accounts(actor.getSaccoId(),search,page*25);}
     @Transactional(readOnly=true)
+    public List<Client> clients(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.clients(actor.getSaccoId(),actor.getStationId(),search,page*25);}
+    @Transactional(readOnly=true)
+    public Optional<Client> selectedClient(AppUserPrincipal actor,Type type,UUID id){authorize(actor,type,"CREATE");return id==null?Optional.empty():vouchers.client(actor.getSaccoId(),actor.getStationId(),id,false);}
+    @Transactional(readOnly=true)
+    public Optional<Client> reviewClient(AppUserPrincipal actor,Type type,UUID id){approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");authorize(actor,type,"VIEW");return id==null?Optional.empty():vouchers.client(actor.getSaccoId(),actor.getStationId(),id,false);}
+    @Transactional(readOnly=true)
     public List<Mapping> mappings(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.mappings(actor.getSaccoId(),search,page*25);}
     @Transactional(readOnly=true)
     public Map<UUID,Account> selectedAccounts(AppUserPrincipal actor,Type type,Form form){
@@ -95,7 +101,7 @@ public class VoucherService {
         UUID period=vouchers.period(actor.getSaccoId(),form.getEffectiveDate(),actor.getMemberId(),clock.now());
         var plan=plan(actor,type,form);
         approvals.verifyPlan(approvalProof,plan);
-        return persist(actor,type,form,hash,plan,null,null,period);
+        return persist(actor,type,form,hash,plan,null,null,period,client(actor,form));
     }
     @Transactional
     public Voucher reverse(AppUserPrincipal actor,Type type,UUID originalId,UUID key,LocalDate date,String reason){
@@ -104,6 +110,7 @@ public class VoucherService {
         vouchers.lockRequest(actor.getSaccoId(),actor.getStationId(),key);
         var original=details(scoped(actor,type,originalId,true));
         var f=new Form();f.setRequestKey(key);f.setEffectiveDate(date);f.setParty(original.party());f.setReference(original.number());
+        f.setClientId(original.clientId());
         f.setDescription(reason.strip());f.setEvidence(original.evidence());f.setMoneyAccountId(original.moneyAccountId());f.setRows(List.of());
         String hash=hash(type,f);
         var prior=vouchers.byRequest(actor.getSaccoId(),actor.getStationId(),key);
@@ -113,16 +120,17 @@ public class VoucherService {
         var ids=original.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit().id(),t.credit().id())).distinct().sorted().toList();
         require(vouchers.lockAccounts(actor.getSaccoId(),ids).size()==ids.size(),"","account");
         var rows=original.transactions().stream().map(t->new Transaction(UUID.randomUUID(),t.lineNo(),t.transactionId(),t.templateKey(),t.transactionName(),t.component(),t.description(),t.amount(),t.credit(),t.debit())).toList();
-        return persist(actor,type,f,hash,new Preview(rows,original.total()),original.id(),original.journalId(),period);
+        return persist(actor,type,f,hash,new Preview(rows,original.total()),original.id(),original.journalId(),period,original.clientId()==null?null:new Client(original.clientId(),original.clientNumber(),""));
     }
-    private Voucher persist(AppUserPrincipal actor,Type type,Form f,String hash,Preview plan,UUID reverses,UUID journal,UUID period){
+    private Voucher persist(AppUserPrincipal actor,Type type,Form f,String hash,Preview plan,UUID reverses,UUID journal,UUID period,Client client){
         var now=clock.now();
-        var v=new Voucher(UUID.randomUUID(),vouchers.number(type,f.getEffectiveDate()),type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows());
+        var v=new Voucher(UUID.randomUUID(),vouchers.number(type,f.getEffectiveDate()),type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
         vouchers.insert(v,actor.getSaccoId(),actor.getStationId(),f,hash,period,journal);
         audit.logEvent("ACCOUNTING",v.id(),reverses==null?"VOUCHER_POSTED":"VOUCHER_REVERSED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Voucher posted","VOUCHER",v.number(),actor.getSaccoId(),actor.getStationId(),Map.of("type",type.name(),"amount",v.total(),"transactions",v.transactionCount(),"journal",v.journalId()));
         return details(scoped(actor,type,v.id(),false));
     }
     private Preview plan(AppUserPrincipal actor,Type type,Form f){
+        client(actor,f);
         var transactionIds=f.getRows().stream().map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().sorted().toList();
         var mappings=transactionIds.isEmpty()?List.<Mapping>of():vouchers.lockMappings(actor.getSaccoId(),transactionIds);
         var accountIds=new TreeSet<UUID>();if(f.getMoneyAccountId()!=null)accountIds.add(f.getMoneyAccountId());
@@ -149,7 +157,7 @@ public class VoucherService {
         require(total.precision()<=18,"","amount");return new Preview(List.copyOf(result),total);
     }
     static void validate(Form f,Type type,LocalDate today){
-        require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getClientId()==null && f.getInterestAccountId()==null,"","request");
+        require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");
         require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getLoanId()==null),"","request");
         require(f!=null && f.getRequestKey()!=null,"","request");require(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(today),"effectiveDate","date");
         text(f.getParty(),160,true,"party");text(f.getReference(),160,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
@@ -161,11 +169,12 @@ public class VoucherService {
         }
     }
     private Voucher scoped(AppUserPrincipal actor,Type type,UUID id,boolean lock){return vouchers.find(actor.getSaccoId(),actor.getStationId(),type,id,lock).orElseThrow(()->new AccessDeniedException("Voucher outside your workspace"));}
-    private Voucher details(Voucher v){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),vouchers.transactions(v.id()));}
+    private Client client(AppUserPrincipal actor,Form f){return f.getClientId()==null?null:vouchers.client(actor.getSaccoId(),actor.getStationId(),f.getClientId(),true).orElseThrow(()->new Invalid("clientId","client"));}
+    private Voucher details(Voucher v){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),vouchers.transactions(v.id()),v.clientId(),v.clientNumber());}
     private String hash(Type type,Form f){try{
         // Keep ordinary-voucher retry hashes compatible with the pre-unification form.
         var payload=(tools.jackson.databind.node.ObjectNode)json.valueToTree(f);
-        payload.remove("receiptPurpose");payload.remove("clientId");payload.remove("interestAccountId");
+        payload.remove("receiptPurpose");if(f.getClientId()==null)payload.remove("clientId");payload.remove("interestAccountId");
         for(var row:payload.path("rows"))((tools.jackson.databind.node.ObjectNode)row).remove("loanId");
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((type.name()+json.writeValueAsString(payload)).getBytes(StandardCharsets.UTF_8)));
     }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

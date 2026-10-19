@@ -45,7 +45,7 @@ public class PlatformAdminService {
     private static final BigDecimal AMBER_LIQUIDITY_THRESHOLD = new BigDecimal("1.00");
     private static final BigDecimal GREEN_DEFAULT_THRESHOLD = new BigDecimal("8.00");
     private static final BigDecimal RED_DEFAULT_THRESHOLD = new BigDecimal("12.00");
-    private static final DateTimeFormatter DATE_LABEL = DateTimeFormatter.ofPattern("dd MMM yyyy");
+    private static final DateTimeFormatter DATE_LABEL = DateTimeFormatter.ofPattern("dd/MM/uuuu");
     private static final List<LoanStatus> REJECTED_LOAN_STATUSES = List.of(
         LoanStatus.MANAGER_REJECTED,
         LoanStatus.LOAN_OFFICER_REJECTED,
@@ -825,7 +825,7 @@ public class PlatformAdminService {
         }
 
         public String getAccessSuspendedAtLabel() {
-            return accessSuspendedAt == null ? "Not suspended" : ApplicationTimestamps.zoned(accessSuspendedAt).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
+            return accessSuspendedAt == null ? "Not suspended" : ApplicationTimestamps.zoned(accessSuspendedAt).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm"));
         }
 
         public String accessSuspendedAtLabel() {

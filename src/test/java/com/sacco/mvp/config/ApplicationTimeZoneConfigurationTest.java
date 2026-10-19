@@ -43,12 +43,12 @@ class ApplicationTimeZoneConfigurationTest {
     void storedUtcApprovalAndLoginTimesDisplayInNairobiWithoutChangingTheirInstant() {
         try (var context = startApplicationTime()) {
             OffsetDateTime stored = OffsetDateTime.parse("2026-09-09T21:30:00Z");
-            assertThat(ApplicationTimestamps.format(stored)).isEqualTo("2026-09-10 00:30");
-            assertThat(ApplicationTimestamps.format(stored.toString())).isEqualTo("2026-09-10 00:30");
-            assertThat(ApplicationTimestamps.format(stored.toInstant())).isEqualTo("2026-09-10 00:30");
+            assertThat(ApplicationTimestamps.format(stored)).isEqualTo("10/09/2026 00:30");
+            assertThat(ApplicationTimestamps.format(stored.toString())).isEqualTo("10/09/2026 00:30");
+            assertThat(ApplicationTimestamps.format(stored.toInstant())).isEqualTo("10/09/2026 00:30");
             assertThat(ApplicationTimestamps.zoned(stored).toInstant()).isEqualTo(stored.toInstant());
             assertThat(ApplicationTimestamps.format(stored.withOffsetSameInstant(ZoneOffset.ofHours(3))))
-                .isEqualTo("2026-09-10 00:30");
+                .isEqualTo("10/09/2026 00:30");
             assertThat(context.getBean(ApplicationClock.class).zoned(stored).toLocalDate().toString())
                 .isEqualTo("2026-09-10");
         }
@@ -58,10 +58,18 @@ class ApplicationTimeZoneConfigurationTest {
     void preservesDateOnlyAndLegacyLabelsAndHandlesEmptyValues() {
         try (var context = startApplicationTime()) {
             assertThat(ApplicationTimestamps.format(null)).isEmpty();
-            assertThat(ApplicationTimestamps.format("2026-09-09")).isEqualTo("2026-09-09");
-            assertThat(ApplicationTimestamps.format("2026-09-09 09:30")).isEqualTo("2026-09-09 09:30");
+            assertThat(ApplicationTimestamps.format("2026-09-09")).isEqualTo("09/09/2026");
+            assertThat(ApplicationTimestamps.format("2026-09-09 09:30")).isEqualTo("09/09/2026 09:30");
             assertThat(ApplicationTimestamps.format("-")).isEqualTo("-");
         }
+    }
+
+    @Test void calendarDatesAndReportGroupsUseDayMonthYearWithoutShiftingTheDate(){
+        assertThat(ApplicationTimestamps.date(java.time.LocalDate.of(2024,2,29))).isEqualTo("29/02/2024");
+        assertThat(ApplicationTimestamps.display("2026-10-19 | @loan")).isEqualTo("19/10/2026 | @loan");
+        assertThat(ApplicationTimestamps.date(null)).isEmpty();assertThat(ApplicationTimestamps.display("Unavailable")).isEqualTo("Unavailable");
+        assertThat(ApplicationTimestamps.display("CL-2026-10-19")).isEqualTo("CL-2026-10-19");
+        assertThat(ApplicationTimestamps.date("2026-02-30")).isEqualTo("2026-02-30");
     }
 
     private AnnotationConfigApplicationContext startApplicationTime() {

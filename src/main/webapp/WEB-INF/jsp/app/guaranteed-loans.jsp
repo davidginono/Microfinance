@@ -70,7 +70,7 @@
                     </td>
                     <td class="whitespace-nowrap">
                         <c:choose>
-                            <c:when test="${row.finalDueDate ne null}"><c:out value="${row.finalDueDate}" /></c:when>
+                            <c:when test="${row.finalDueDate ne null}"><c:out value="${appTime:display(row.finalDueDate)}" /></c:when>
                             <c:otherwise><spring:message code="loan.repayment.notScheduled" text="Not scheduled" /></c:otherwise>
                         </c:choose>
                     </td>

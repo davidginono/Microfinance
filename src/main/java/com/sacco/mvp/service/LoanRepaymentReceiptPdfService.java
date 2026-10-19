@@ -44,7 +44,7 @@ public class LoanRepaymentReceiptPdfService {
                 label("voucher.date",locale)+": "+r.paymentDate(),label("recording.principal",locale)+": TZS "+money(r.principal(),locale),label("recording.dueInterest",locale)+": TZS "+money(r.interest(),locale),
                 label("recording.topUp.internal",locale),Objects.toString(r.reason(),""))));
         String status=label(r.reversedBy()!=null?"repayment.reversed":"repayment.kind."+r.kind(),locale);
-        String date=r.paymentDate().format(DateTimeFormatter.ofPattern("dd / MM / uuuu"));
+        String date=r.paymentDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu"));
         String reference=label("loan.loanId",locale)+": "+r.loanId()+"\n"+r.channelReference();
         var rows=List.of(List.of("1",label("repayment.principal",locale),reference,money(r.principal(),locale)),
             List.of("2",label("repayment.interest",locale),reference,money(r.interest(),locale)));

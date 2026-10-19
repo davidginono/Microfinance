@@ -1,3 +1,4 @@
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <c:set var="staffRepaymentRows" value="${calculatedRepaymentRows}" />
 <c:if test="${actualRepaymentScheduleEnabled}">
@@ -88,7 +89,7 @@
                                     <c:forEach items="${staffRepaymentRows}" var="row">
                                         <tr>
                                             <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
-                                            <td class="px-3 py-2">${not empty row.month ? row.month : row.dueDate}</td>
+                                            <td class="px-3 py-2">${appTime:display(not empty row.month ? row.month : row.dueDate)}</td>
                                             <td class="px-3 py-2">${row.beginningBalance}</td>
                                             <td class="px-3 py-2">${not empty row.payment ? row.payment : row.amount}</td>
                                             <td class="px-3 py-2">${not empty row.loanAmount ? row.loanAmount : row.principal}</td>

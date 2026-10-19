@@ -182,6 +182,10 @@ public class VoucherWorkflowService {
         var d=details(a,id);require(d.actions().contains("EDIT"),"transition");return vouchers.accounts(a,d.workflow().type(),search,page);
     }
     @Transactional(readOnly=true)
+    public List<Client> clients(AppUserPrincipal a,UUID id,String search,int page){var d=details(a,id);require(d.actions().contains("EDIT"),"transition");return vouchers.clients(a,d.workflow().type(),search,page);}
+    @Transactional(readOnly=true)
+    public Client selectedClient(AppUserPrincipal a,UUID id,Form f){var d=details(a,id);return vouchers.reviewClient(a,d.workflow().type(),f.getClientId()).orElse(null);}
+    @Transactional(readOnly=true)
     public Map<String,Account> selectedAccounts(AppUserPrincipal a,UUID id,Form f) {
         var d=details(a,id);return vouchers.reviewAccounts(a,d.workflow().type(),f);
     }

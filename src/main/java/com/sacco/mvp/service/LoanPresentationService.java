@@ -1653,7 +1653,7 @@ public class LoanPresentationService {
         for (String key : keys) {
             Object value = row.get(key);
             if (value != null && !String.valueOf(value).isBlank() && !"null".equalsIgnoreCase(String.valueOf(value))) {
-                return String.valueOf(value);
+                return ApplicationTimestamps.display(value);
             }
         }
         return "-";
@@ -2129,7 +2129,7 @@ public class LoanPresentationService {
             float titleX = logoBounds == null ? MARGIN : logoBounds.right() + BRAND_TITLE_GAP;
             writeText(saccoLabel.toUpperCase(Locale.ROOT), titleX, titleBaselineY, bold, BRAND_TITLE_SIZE, TEXT_COLOR);
             writeText("Official Loan Application document", titleX, subtitleBaselineY, regular, META_SIZE, MUTED_COLOR);
-            writeRightAligned("Generated: " + LocalDate.now(), pageWidth - MARGIN, titleBaselineY, regular, META_SIZE, MUTED_COLOR);
+            writeRightAligned("Generated: " + ApplicationTimestamps.date(LocalDate.now()), pageWidth - MARGIN, titleBaselineY, regular, META_SIZE, MUTED_COLOR);
             drawApplicantProfileImage(profileX, profileY, profileSize);
 
             stream.setStrokingColor(BORDER_COLOR);
@@ -2336,7 +2336,7 @@ public class LoanPresentationService {
                     "REPAYMENT ARRANGEMENT",
                     "Frequency: " + humanizedOrDash(app.getRepaymentFrequency()),
                     "Installment: " + formatNullableMoney(app.getInstallmentAmount()),
-                    "First repayment: " + sanitizePdfText(String.valueOf(app.getFirstRepaymentDate()))
+                    "First repayment: " + sanitizePdfText(ApplicationTimestamps.date(app.getFirstRepaymentDate()))
                 },
                 new String[]{
                     "SUPPORTING RECORDS",
@@ -3215,7 +3215,7 @@ public class LoanPresentationService {
             stream.stroke();
             writeText("Prepared for printing", MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
             writeCentered(applicationReferenceFooterText(), page.getMediaBox().getWidth() / 2f, footerY, regular, 7.4f, MUTED_COLOR);
-            writeRightAligned("Date: " + LocalDate.now(), page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
+            writeRightAligned("Date: " + ApplicationTimestamps.date(LocalDate.now()), page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
         }
 
         private String applicationReferenceFooterText() {

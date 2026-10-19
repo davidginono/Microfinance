@@ -8,4 +8,14 @@
         <function-class>com.sacco.mvp.service.ApplicationTimestamps</function-class>
         <function-signature>java.lang.String format(java.lang.Object)</function-signature>
     </function>
+    <function>
+        <name>date</name>
+        <function-class>com.sacco.mvp.service.ApplicationTimestamps</function-class>
+        <function-signature>java.lang.String date(java.lang.Object)</function-signature>
+    </function>
+    <function>
+        <name>display</name>
+        <function-class>com.sacco.mvp.service.ApplicationTimestamps</function-class>
+        <function-signature>java.lang.String display(java.lang.Object)</function-signature>
+    </function>
 </taglib>

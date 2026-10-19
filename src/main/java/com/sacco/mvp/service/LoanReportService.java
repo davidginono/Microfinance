@@ -109,8 +109,8 @@ public class LoanReportService {
         LoanStatus.PAR,
         LoanStatus.DEFAULTED
     );
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final DateTimeFormatter HUMAN_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/uuuu");
+    private static final DateTimeFormatter HUMAN_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/uuuu", Locale.ENGLISH);
 
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
@@ -3119,7 +3119,7 @@ public class LoanReportService {
     }
 
     private String formatTimestamp(OffsetDateTime dateTime) {
-        return dateTime == null ? "-" : applicationClock.zoned(dateTime).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        return dateTime == null ? "-" : applicationClock.zoned(dateTime).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm"));
     }
 
     private static String sanitizePdfText(String text) {

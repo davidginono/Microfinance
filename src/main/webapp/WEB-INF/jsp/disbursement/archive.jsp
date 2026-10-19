@@ -91,7 +91,7 @@
                 <td><c:out value="${row.loanProductName}" /></td>
                 <td>${row.applicantName}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
-                <td>${row.disbursedAt}</td>
+                <td>${appTime:display(row.disbursedAt)}</td>
                 <td>${row.currentStatusLabel}</td>
                 <td>
                     <div class="flex flex-row items-center gap-2 flex-nowrap">

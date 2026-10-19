@@ -33,7 +33,7 @@ import java.util.UUID;
 @Builder
 public class AuditLog {
     private static final DateTimeFormatter DISPLAY_TIMESTAMP =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm");
     private static final ZoneId DISPLAY_ZONE = ZoneId.of("Africa/Nairobi");
 
     @Id

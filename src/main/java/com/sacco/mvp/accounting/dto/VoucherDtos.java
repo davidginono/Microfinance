@@ -26,13 +26,20 @@ public final class VoucherDtos {
         private BigDecimal amount;
     }
     public record Account(UUID id,String code,String name,String purpose) {}
+    public record Client(UUID id,String number,String name) {}
     public record Mapping(UUID transactionId,UUID templateKey,String transactionName,String component,Account debit,Account credit) {}
     public record Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,
                               String description,BigDecimal amount,Account debit,Account credit) {}
     public record Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
                           String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
                           String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
-                          String branchName,List<Transaction> transactions) {
+                          String branchName,List<Transaction> transactions,UUID clientId,String clientNumber) {
+        public Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
+                       String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
+                       String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
+                       String branchName,List<Transaction> transactions) {
+            this(id,number,type,effectiveDate,party,reference,description,evidence,moneyAccountId,total,transactionCount,journalId,postedBy,postedByName,postedAt,reversesId,reversedBy,institutionName,branchName,transactions,null,null);
+        }
         public String status(){return reversesId!=null?"REVERSAL":reversedBy!=null?"REVERSED":"POSTED";}
     }
     public record Filter(String search,LocalDate from,LocalDate through,String status,String sort,int page,int size) {

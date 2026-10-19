@@ -67,7 +67,7 @@
             <td class="px-3 py-2"><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
             <td class="px-3 py-2">
                 <c:choose>
-                    <c:when test="${not empty app.disbursementDate}">${app.disbursementDate}</c:when>
+                    <c:when test="${not empty app.disbursementDate}">${appTime:display(app.disbursementDate)}</c:when>
                     <c:otherwise><c:out value="${appTime:format(app.createdAt)}" /></c:otherwise>
                 </c:choose>
             </td>

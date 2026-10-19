@@ -328,7 +328,7 @@
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.firstRepayment" text="First Repayment" /></div>
                     <div class="loan-repayment-card-value" data-repayment-summary-value="First Repayment Date">
-                        <c:out value="${repaymentSummary['First Repayment Date']}" default="Pending update" />
+                        <c:out value="${appTime:display(repaymentSummary['First Repayment Date'])}" default="Pending update" />
                     </div>
                 </div>
                 <div class="loan-repayment-card">
@@ -344,7 +344,7 @@
                                 <c:out value="${repaymentSummary['Paid At']}" default="${repaymentSummary['Final Due Date']}" />
                             </c:when>
                             <c:otherwise>
-                                <c:out value="${repaymentSummary['Final Due Date']}" default="Pending update" />
+                                <c:out value="${appTime:display(repaymentSummary['Final Due Date'])}" default="Pending update" />
                             </c:otherwise>
                         </c:choose>
                     </div>
@@ -360,7 +360,7 @@
                 <c:if test="${not empty repaymentSummary['Disbursement Date']}">
                     <div class="loan-repayment-note">
                         <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.disbursementDate" text="Disbursement Date" /></div>
-                        <div class="loan-repayment-note-value">${repaymentSummary['Disbursement Date']}</div>
+                        <div class="loan-repayment-note-value">${appTime:display(repaymentSummary['Disbursement Date'])}</div>
                         </div>
                 </c:if>
                 <c:if test="${not empty repaymentSummary['Disbursement Reference']}">
@@ -398,7 +398,7 @@
                 <c:if test="${app.status eq 'PAID' and not empty repaymentSummary['Final Due Date']}">
                     <div class="loan-repayment-note">
                         <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.originalFinalDueDate" text="Original Final Due Date" /></div>
-                        <div class="loan-repayment-note-value">${repaymentSummary['Final Due Date']}</div>
+                        <div class="loan-repayment-note-value">${appTime:display(repaymentSummary['Final Due Date'])}</div>
         </div>
                 </c:if>
                 <c:if test="${not empty repaymentSummary['Manager Notes']}">
@@ -447,7 +447,7 @@
                                 <c:forEach items="${repaymentRows}" var="row">
                                     <tr>
                                         <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
-                                        <td class="px-3 py-2">${not empty row.month ? row.month : row.dueDate}</td>
+                                        <td class="px-3 py-2">${appTime:display(not empty row.month ? row.month : row.dueDate)}</td>
                                         <td class="px-3 py-2">${row.beginningBalance}</td>
                                         <td class="px-3 py-2">${not empty row.payment ? row.payment : row.amount}</td>
                                         <td class="px-3 py-2">${not empty row.loanAmount ? row.loanAmount : row.principal}</td>
