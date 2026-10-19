@@ -251,7 +251,7 @@ Also check:
 - `V41__local_repayment_ledger.sql` opens no legacy balances. New ordinary disbursements initialize their ledger within the disbursement transaction. Legacy and top-up loans require separately verified opening/settlement work.
 - Repayment history, allocations, and journal entries are append-only. Corrections use linked reversals by a different authorized staff member. Never bypass their database protections or assign repayment claims automatically.
 - Do not delete ledger-backed loans, institutions, or referenced accounts. Deactivate access instead; repayment audit events are excluded from routine operational cleanup pending an approved financial-record lifecycle.
-- The current posting command accepts only verified TZS payments against instalments due on the effective payment date. It does not implement new fees, advances, early settlement, channel reconciliation, or complete general-ledger accounting.
+- The user's 2026-10-19 instruction permits verified TZS repayments of arbitrary positive amounts up to remaining principal, interest due and supported outstanding charges. Preserve due-interest/charge priority, then allocate excess to future principal. Full early repayment records future-interest exclusions separately through V79, without changing contractual interest or recording excluded interest as cash; linked independent reversals restore them. Overpayments/unapplied credit, new fees and channel reconciliation remain separate capabilities. See `docs/repayment-ledger-increment.md`.
 - For affordability or guarantor changes, inspect `EligibilityService` and `LoanQualificationPolicyService` before modifying application or review pages.
 
 ## Safe Defaults

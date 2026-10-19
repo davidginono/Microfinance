@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_RECORDING_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_recording_test")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_RECORDING_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_(recording|flexible_repayment_[a-f0-9]{8})_test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class LoanRecordingPostgresTest {
     static final LocalDate TODAY=LocalDate.of(2026,10,8);
@@ -611,6 +611,65 @@ class LoanRecordingPostgresTest {
         configurePolicy(false);var loan=disbursed("D-STALE-BATCH");var batch=batches().create(actor,"Stale preview");batchItem(batch,receiptForm(loan));processBatch(batch,false);
         receiptService().post(actor,receiptForm(loan));processBatch(batch,true);assertThat(batches().get(actor,batch).batch().state()).isEqualTo("PARTIAL");assertThat(batches().get(actor,batch).posted()).isZero();
         assertThat(batches().items(actor,batch,0,"").rows().getFirst().failureKey()).isEqualTo("batch.error.changed");processBatch(batch,false);processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
+    }
+    UUID futureLoan(String reference){
+        var form=form();form.setApplicationDate(TODAY);form.setFirstPaymentDate(null);var id=service.save(actor,form);
+        var funding=post(id,"1000.00",reference);funding.setEffectiveDate(TODAY);funding.setFirstPaymentDate(TODAY.plusMonths(1));service.disburse(actor,funding);return id;
+    }
+    @Test void arbitraryEarlyReceiptAllocatesPrincipalAndReversalRestoresFutureInstalments(){
+        var loan=futureLoan("D-FUTURE-RECEIPT");var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal("237.19"));
+        var preview=receiptService().preview(actor,form).getFirst();assertThat(preview.principal()).isEqualByComparingTo("237.19");assertThat(preview.interest()).isZero();
+        var receipt=receiptService().post(actor,form);assertThat(receipt.rows().getFirst().principalBalance()).isEqualByComparingTo("762.81");
+        assertThat(receiptService().post(actor,form).header().id()).isEqualTo(receipt.header().id());
+        assertThat(jdbc.queryForObject("select sum(interest_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
+        assertThat(jdbc.queryForObject("select sum(principal_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("237.19");
+        receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Synthetic correction of early principal");
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select sum(principal_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
+    }
+    @Test void successiveBatchReceiptsCanPayFuturePrincipalWithoutNegativeDueBalances(){
+        configurePolicy(false);var loan=futureLoan("D-FUTURE-BATCH");var batch=batches().create(actor,"Synthetic early principal collections");
+        for(String amount:List.of("237.19","400.00")){var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal(amount));batchItem(batch,form);}
+        processBatch(batch,false);var items=batches().items(actor,batch,0,"").rows();assertThat(items).allMatch(i->i.state().equals("READY"));
+        assertThat(items.getLast().preview().lines().getFirst().duePrincipal()).isZero();assertThat(items.getLast().preview().lines().getFirst().principalBalance()).isEqualByComparingTo("362.81");
+        processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(2);
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("362.81");
+        assertThat(jdbc.queryForObject("select sum(interest_amount) from loan_repayment_transactions where loan_application_id=?",BigDecimal.class,loan)).isZero();
+        assertThat(jdbc.queryForObject("select sum(credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,principal)).isEqualByComparingTo("637.19");
+    }
+    @Test void batchValidationRejectsCombinedReceiptsAboveRemainingDebtBeforePosting(){
+        configurePolicy(false);var loan=futureLoan("D-FUTURE-OVERPAY");var batch=batches().create(actor,"Synthetic overpayment guard");
+        for(String amount:List.of("600.00","400.01")){var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal(amount));batchItem(batch,form);}
+        processBatch(batch,false);assertThat(batches().get(actor,batch).ready()).isEqualTo(1);assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
+        assertThat(batches().items(actor,batch,0,"").rows().getLast().failureKey()).isEqualTo("repayment.error.advance");
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,loan)).isZero();
+    }
+    @Test void fullEarlyReceiptExcludesFutureInterestAndIndependentReversalRestoresIt(){
+        var loan=futureLoan("D-EARLY-FULL");var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal("1000.00"));
+        var receipt=receiptService().post(actor,form);var detail=service.detail(actor,loan).loan();
+        assertThat(detail.status()).isEqualTo("PAID");assertThat(detail.futureInterest()).isZero();assertThat(detail.interestPaid()).isZero();
+        assertThat(jdbc.queryForObject("select sum(interest) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("20.00");
+        assertThat(jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("20.00");
+        assertThat(jdbc.queryForObject("select future_interest_excluded from loan_repayment_transactions where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("20.00");
+        assertThat(ledger.riskBalance(loan,TODAY.plusYears(1)).orElseThrow().currentOutstanding()).isZero();
+        var reports=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(institution,"B1",false);
+        var later=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(TODAY,TODAY.plusYears(1),OffsetDateTime.now(),0);
+        assertThat(reports.rows(scope,later)).singleElement().satisfies(row->{assertThat(row.complete()).isTrue();assertThat(row.overdueInterest()).isZero();});
+        assertThatThrownBy(()->jdbc.update("update loan_ledger_installments set interest_excluded=0 where loan_application_id=?",loan)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Synthetic full early repayment correction");
+        detail=service.detail(actor,loan).loan();assertThat(detail.status()).isEqualTo("DISBURSED");assertThat(detail.outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(detail.futureInterest()).isEqualByComparingTo("20.00");assertThat(jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and future_interest_excluded=20",Integer.class,loan)).isEqualTo(2);
+        assertThat(reports.rows(scope,later)).singleElement().satisfies(row->assertThat(row.overdueInterest()).isEqualByComparingTo("20.00"));
+    }
+    @Test void batchDoesNotPlanASecondCollectionOfInterestExcludedByAnEarlierFullRepayment(){
+        configurePolicy(false);var loan=disbursed("D-BATCH-FULL-EARLY");var batch=batches().create(actor,"Synthetic settlement cutoff");
+        var early=receiptForm(loan);early.setEffectiveDate(LocalDate.of(2026,9,15));early.getRows().getFirst().setAmount(new BigDecimal("1000.00"));batchItem(batch,early);
+        var later=receiptForm(loan);later.getRows().getFirst().setAmount(new BigDecimal("20.00"));batchItem(batch,later);
+        processBatch(batch,false);assertThat(batches().get(actor,batch).ready()).isEqualTo(1);assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
+        assertThat(batches().items(actor,batch,0,"").rows().getLast().failureKey()).isEqualTo("repayment.error.advance");
     }
     @Test void batchReceiptAuditFailureRollsBackEveryTransactionAndRetryKeepsSuccessfulReceipts(){
         configurePolicy(false);var first=disbursed("D-ATOMIC-1");var second=disbursed("D-ATOMIC-2");var batch=batches().create(actor,"Atomic receipts");batchItem(batch,receiptForm(first,second));processBatch(batch,false);

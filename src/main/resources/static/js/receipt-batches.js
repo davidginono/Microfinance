@@ -74,8 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
         try {let cents = 0n;for(const row of item.form.rows){if(!row.amount)continue;if(!/^\d+(\.\d{1,2})?$/.test(String(row.amount)))return '—';const [a,b = ''] = String(row.amount).split('.');cents += BigInt(a)*100n + BigInt(b.padEnd(2,'0'));}return money((cents/100n).toString()+'.'+(cents%100n).toString().padStart(2,'0'));}catch{return '—';}
     };
     function saveStatus(){const node = editor.querySelector('[data-save-status]');node.textContent = pending.size?t('saving'):dirty.size?t('unsaved'):t('savedStatus');}
+    function showIssue(item,message,checking = false){
+        if(!item.issue)return;item.issue.textContent = message;item.issue.hidden = !message;
+        item.issue.parentElement.dataset.state = checking?'checking':'error';
+        item.issueLabel.textContent = [item.clientLabel || item.labels?.[item.form.clientId] || t('client'),item.form.reference].filter(Boolean).join(' · ');
+    }
     function mark(item) {
         item.generation = (item.generation || 0) + 1;dirty.add(item.id);item.state = 'DRAFT';item.preview = null;item.failureKey = null;
+        showIssue(item,'');
         item.allocation?.replaceChildren();if(item.mapping)item.mapping.textContent = '';item.estimated = false;
         for(const other of rows.values())if(other !== item && other.state !== 'POSTED'){other.state = 'DRAFT';other.preview = null;other.allocation?.replaceChildren();if(other.mapping)other.mapping.textContent = '';paintStatus(other);}
         clearTimeout(item.timer);item.timer = setTimeout(()=>save(item),800);paintStatus(item);saveStatus();controls();
@@ -86,20 +92,21 @@ document.addEventListener('DOMContentLoaded', () => {
         item.saving = (async()=>{
             try {
                 const saved = await api(url + '/items/' + item.id,'PUT',{expectedVersion:item.version,form:snapshot});item.version = saved.version;item.labels = saved.labels;item.persisted = true;
-                if(generation === item.generation){dirty.delete(item.id);item.failureKey = null;item.issue.hidden = true;item.issue.textContent = "";}
+                if(generation === item.generation){dirty.delete(item.id);item.failureKey = null;showIssue(item,'');}
                 await refreshSummary();
                 if(generation === item.generation && snapshot.clientId && snapshot.moneyAccountId && snapshot.effectiveDate && snapshot.reference && snapshot.rows.every(r=>r.loanId && r.amount)){
-                    try {const estimate = await api(url + '/items/' + item.id + '/estimate','POST');if(generation === item.generation){item.preview = estimate;item.estimated = true;paintPreview(item);}}
-                    catch(error){if(generation === item.generation){item.issue.textContent = error.message;item.issue.hidden = false;}}
+                    showIssue(item,t('checking'),true);
+                    try {const estimate = await api(url + '/items/' + item.id + '/estimate','POST');if(generation === item.generation){item.preview = estimate;item.estimated = true;showIssue(item,'');paintPreview(item);}}
+                    catch(error){if(generation === item.generation)showIssue(item,error.message);}
                 }
                 paintStatus(item);
-            }catch(error){dirty.add(item.id);item.issue.textContent = error.message;item.issue.hidden = false;globalError(t('saveFailed'));}
+            }catch(error){dirty.add(item.id);showIssue(item,error.message);globalError(t('saveFailed'));}
             finally {pending.delete(item.id);item.saving = null;saveStatus();controls();}
         })();await item.saving;
         if(dirty.has(item.id) && item.generation !== generation)return save(item);
     }
     async function flush(){for(const item of rows.values())if(dirty.has(item.id) || item.saving)await save(item);if(dirty.size)throw new Error(t('saveFailed'));}
-    function paintStatus(item){if(!item.status)return;item.status.replaceChildren(el('span',t('state.' + item.state)));if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}if(item.issue)item.status.append(item.issue);}
+    function paintStatus(item){if(!item.status)return;item.status.replaceChildren(el('span',t('state.' + item.state)));if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}}
     function paintPreview(item){
         const plan = item.preview;item.amountTotal && (item.amountTotal.textContent = total(item));
         if(!plan)return;
@@ -113,27 +120,28 @@ document.addEventListener('DOMContentLoaded', () => {
     async function context(item, loan, target){
         if(!loan.loanId || !item.form.effectiveDate)return;const generation = item.generation;
         try {const data = await api(base + '/loan-context?' + new URLSearchParams({loanId:loan.loanId,date:item.form.effectiveDate}));if(generation !== item.generation || !target.isConnected)return;const b = data[0];target.textContent = t('recordedBalances') + ' · ' + t('principalOutstanding') + ' ' + money(b.outstandingPrincipal) + ' · ' + t('principalDue') + ' ' + money(b.duePrincipal) + ' · ' + t('interestDue') + ' ' + money(b.dueInterest) + ' · ' + t('charges') + ' ' + money(b.charges || '0.00');}
-        catch(error){if(target.isConnected)target.textContent = error.message;}
+        catch(error){if(generation === item.generation && target.isConnected)showIssue(item,error.message);}
     }
     function renderItem(item) {
         const tr = el('tr',null,'batch-row'), details = el('tr',null,'batch-detail-row');tr.dataset.item = item.id;details.hidden = !item.expanded;
         const issue = el('span',null,'batch-issue');issue.id = 'receipt-issue-' + item.id;tr.setAttribute('aria-describedby',issue.id);issue.hidden = !item.failureKey;issue.setAttribute('role','status');item.issue = issue;
-        if(item.failureKey)issue.textContent = item.failureMessage || t('error.failed');
+        const issueRow = el('div',null,'batch-validation-entry');item.issueLabel = el('strong');issueRow.append(item.issueLabel,issue);editor.querySelector('[data-batch-validation]').append(issueRow);
+        showIssue(item,item.failureKey?item.failureMessage || t('error.failed'):'');
         const cells = ['client','date','loan','balances','amount','reference','status'].map(label=>{const td = el('td');td.dataset.label = t(label);tr.append(td);return td;});
         const expand = button(item.expanded?'−':'+',()=>{item.expanded = !item.expanded;details.hidden = !item.expanded;expand.textContent = item.expanded?'−':'+';expand.setAttribute('aria-expanded',String(item.expanded));},'app-btn btn-neutral batch-expand');
         expand.setAttribute('aria-label',t('details'));expand.setAttribute('aria-expanded',String(!!item.expanded));details.id = 'receipt-details-' + item.id;expand.setAttribute('aria-controls',details.id);
         const wrapper = el('div',null,'batch-client');wrapper.append(expand);
-        const client = selectControl({id:item.form.clientId,label:item.clientLabel || item.labels?.[item.form.clientId]},t('client'),'clients',()=>null,()=>{item.form.clientId = client.value || null;item.form.rows = [{loanId:null,amount:null,description:''}];const moneyLabel = item.labels?.[item.form.moneyAccountId];item.labels = moneyLabel?{[item.form.moneyAccountId]:moneyLabel}:{};item.clientLabel = client.selectedOptions[0]?.textContent;mark(item);rerender();focusReceipt(item,true);},message=>{issue.hidden = false;issue.textContent = message;});wrapper.append(client);cells[0].append(wrapper);
+        const client = selectControl({id:item.form.clientId,label:item.clientLabel || item.labels?.[item.form.clientId]},t('client'),'clients',()=>null,()=>{item.form.clientId = client.value || null;item.form.rows = [{loanId:null,amount:null,description:''}];const moneyLabel = item.labels?.[item.form.moneyAccountId];item.labels = moneyLabel?{[item.form.moneyAccountId]:moneyLabel}:{};item.clientLabel = client.selectedOptions[0]?.textContent;mark(item);rerender();focusReceipt(item,true);},message=>showIssue(item,message));wrapper.append(client);cells[0].append(wrapper);
         const date = input('date',item.form.effectiveDate,t('date'),()=>{item.form.effectiveDate = date.value || null;mark(item);item.balance.textContent = '';item.allocation.textContent = '';item.form.rows.forEach(r=>context(item,r,item.balance));});date.max = editor.dataset.today;cells[1].append(date);
         const balance = el('div',null,'batch-balance'), allocation = el('div',null,'batch-allocation');item.balance = balance;item.allocation = allocation;cells[3].append(balance,allocation);
-        const loanPicker = (row,where,balanceTarget) => {const select = selectControl({id:row.loanId,label:item.labels?.[row.loanId]},t('loan'),'loans',()=>item.form.clientId,()=>{row.loanId = select.value || null;item.labels ||= {};item.labels[row.loanId] = select.selectedOptions[0]?.textContent;mark(item);balanceTarget.textContent = '';allocation.textContent = '';context(item,row,balanceTarget);},message=>{issue.hidden = false;issue.textContent = message;},!!item.form.clientId && !row.loanId);select.disabled = !item.form.clientId || !editable() || item.state === 'POSTED';where.append(select);if(row.loanId && !item.preview)context(item,row,balanceTarget);};
+        const loanPicker = (row,where,balanceTarget) => {const select = selectControl({id:row.loanId,label:item.labels?.[row.loanId]},t('loan'),'loans',()=>item.form.clientId,()=>{row.loanId = select.value || null;item.labels ||= {};item.labels[row.loanId] = select.selectedOptions[0]?.textContent;mark(item);balanceTarget.textContent = '';allocation.textContent = '';context(item,row,balanceTarget);},message=>showIssue(item,message),!!item.form.clientId && !row.loanId);select.disabled = !item.form.clientId || !editable() || item.state === 'POSTED';where.append(select);if(row.loanId && !item.preview)context(item,row,balanceTarget);};
         const amountInput = (row,where) => {const n = input('number',row.amount,t('amount'),()=>{row.amount = n.value || null;mark(item);if(item.amountTotal)item.amountTotal.textContent = total(item);});n.min = '.01';n.step = '.01';where.append(n);};
         if(item.form.rows.length === 1){loanPicker(item.form.rows[0],cells[2],balance);amountInput(item.form.rows[0],cells[4]);}
         else {cells[2].append(el('span',item.form.rows.length + ' ' + t('transactions')));item.amountTotal = el('strong',total(item));cells[4].append(item.amountTotal);}
         const reference = input('text',item.form.reference,t('reference'),()=>{item.form.reference = reference.value;mark(item);});reference.maxLength = 80;cells[5].append(reference);
-        item.status = cells[6];paintStatus(item);cells[6].append(issue);
+        item.status = cells[6];paintStatus(item);
         const detailCell = el('td',null,'batch-detail-cell');detailCell.colSpan = 7;details.append(detailCell);const fields = el('div',null,'batch-detail-fields');detailCell.append(fields);
-        const moneyLabel = el('label',t('receivingAccount'));const receiving = selectControl({id:item.form.moneyAccountId,label:item.labels?.[item.form.moneyAccountId]},t('receivingAccount'),'money',()=>null,()=>{item.form.moneyAccountId = receiving.value || null;item.labels ||= {};item.labels[receiving.value] = receiving.selectedOptions[0]?.textContent;mark(item);},message=>{issue.hidden = false;issue.textContent = message;});moneyLabel.append(receiving);fields.append(moneyLabel);
+        const moneyLabel = el('label',t('receivingAccount'));const receiving = selectControl({id:item.form.moneyAccountId,label:item.labels?.[item.form.moneyAccountId]},t('receivingAccount'),'money',()=>null,()=>{item.form.moneyAccountId = receiving.value || null;item.labels ||= {};item.labels[receiving.value] = receiving.selectedOptions[0]?.textContent;mark(item);},message=>showIssue(item,message));moneyLabel.append(receiving);fields.append(moneyLabel);
         const evidenceLabel = el('label',t('evidence')), evidence = input('text',item.form.evidence,t('evidence'),()=>{item.form.evidence = evidence.value;mark(item);});evidence.maxLength = 500;evidenceLabel.append(evidence);fields.append(evidenceLabel);
         const mapping = el('p',null,'batch-mapping');item.mapping = mapping;detailCell.append(mapping);
         if(item.form.rows.length>1){const table = el('table',null,'erp-table batch-transactions'), head = el('thead'), hr = el('tr'), tb = el('tbody');for(const label of ['loan','balances','amount','transaction'])hr.append(el('th',t(label)));head.append(hr);table.append(head,tb);detailCell.append(table);
@@ -143,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!editable() || item.state === 'POSTED'){tr.querySelectorAll('input,select').forEach(n=>n.disabled = true);details.querySelectorAll('input,select,button').forEach(n=>n.disabled = true);}
         tr.querySelectorAll('input,select').forEach(n=>n.setAttribute('aria-describedby',issue.id));details.querySelectorAll('input,select').forEach(n=>n.setAttribute('aria-describedby',issue.id));paintPreview(item);body.append(tr,details);
     }
-    function rerender(){cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',t('empty'));td.colSpan = 7;tr.append(td);body.append(tr);}}
+    function rerender(){cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();editor.querySelector('[data-batch-validation]').replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',t('empty'));td.colSpan = 7;tr.append(td);body.append(tr);}}
     function controls(){
         editor.querySelector('[data-batch-add]').disabled = !editable();
         editor.querySelector('[data-batch-save]').disabled = !editable() || (!dirty.size && !pending.size);
@@ -152,8 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const stop = editor.querySelector('[data-batch-stop]');stop.hidden = !busy() || !canEdit;stop.disabled = !!summary?.batch.cancelRequested;
         window.ResourceTable.setPage(tableRegion,{page,hasNext,loading});
     }
-    async function refreshSummary(){summary = await api(url + '/summary');canEdit = editor.dataset.canEdit === 'true';document.querySelector('[data-batch-state]').textContent = t('state.' + summary.batch.state);
-        const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['receipts',summary.receipts],['total',money(summary.total)+' TZS'],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed],['remaining',summary.receipts-summary.posted]]){const s = el('span',t(label));s.append(el('strong',String(value)));area.append(s);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
+    async function refreshSummary(){summary = await api(url + '/summary');canEdit = editor.dataset.canEdit === 'true';
+        const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)+' TZS'],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed],['remaining',summary.receipts-summary.posted]]){const fact = el('div');fact.append(el('dt',t(label)),el('dd',String(value)));area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
     async function load(){if(loading)return;loading = true;controls();try{await flush();await refreshSummary();const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){globalError(error.message);}finally{loading = false;controls();}}
     editor.querySelector('[data-batch-add]').addEventListener('click',async()=>{try{await flush();if(filter || hasNext || rows.size>=25){filter = '';editor.querySelector('[data-batch-filter]').value = '';page = Math.floor(summary.receipts/25);await load();}const account = editor.querySelector('[data-default-account]'), item = {id:crypto.randomUUID(),version:0,state:'DRAFT',labels:{},form:{clientId:null,effectiveDate:editor.querySelector('[data-default-date]').value,moneyAccountId:account.value || null,reference:'',description:'',evidence:'',rows:[{loanId:null,amount:null,description:''}]}};item.expanded = !account.value;if(account.value)item.labels[account.value] = account.selectedOptions[0].textContent;rows.set(item.id,item);mark(item);rerender();focusReceipt(item);await save(item);}catch(error){globalError(error.message);}});
     editor.querySelector('[data-batch-save]').addEventListener('click',()=>flush().catch(error=>globalError(error.message)));

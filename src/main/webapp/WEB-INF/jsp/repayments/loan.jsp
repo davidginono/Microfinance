@@ -19,7 +19,7 @@
         <div><dt><spring:message code="repayment.futureInterest" /></dt><dd>TZS <fmt:formatNumber value="${ledger.futureInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
     </dl>
     <sec:authorize access="@access.has(principal, 'LOAN_REPAYMENTS_CREATE')">
-        <c:if test="${ledger.duePrincipal + ledger.dueInterest > 0 and ledger.financialState!='WRITTEN_OFF' and ledger.financialState!='DISBURSEMENT_REVERSED'}">
+        <c:if test="${ledger.outstandingPrincipal + ledger.dueInterest > 0 and ledger.financialState!='WRITTEN_OFF' and ledger.financialState!='DISBURSEMENT_REVERSED'}">
             <section class="repayment-section"><h2><spring:message code="repayment.post" /></h2>
                 <c:url var="postUrl" value="/repayments/loans/${ledger.id}/payments" />
                 <form:form method="post" action="${postUrl}" modelAttribute="paymentForm" cssClass="repayment-form" data-repayment-form="true">

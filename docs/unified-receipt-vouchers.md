@@ -30,7 +30,7 @@ Registers use scoped 25-row pages with a 26th sentinel, bounded search/date/stat
 
 Details and A4 embedded-font PDFs show client number, each Loan ID, principal/interest allocation, balance after posting, receiving/clearing/control account snapshots, exact total and amount in words, narration and real posting identity. Repeated headings/page numbers preserve multi-page receipts. No Details column, approval block, CSV or Excel output is added. PDF rendering runs after posting behind the shared export limiter and may be retried independently.
 
-Only TZS due-instalment payments are supported. Advances, future interest, early settlement, new fees, historical openings and bank-channel reconciliation remain outside scope.
+TZS repayments accept arbitrary positive amounts up to remaining principal, interest due and outstanding charges. The 2026-10-19 instruction permits excess over due instalments to reduce future principal. Future interest is not collected in advance; full early repayment records a separate exclusion of remaining future interest, with an independent linked reversal. Contract terms and original payment history remain immutable. Overpayments/unapplied credit, new fees, historical openings and bank-channel reconciliation remain outside scope.
 
 ## Verification
 

@@ -63,11 +63,11 @@ public class ReceiptBatchService {
     // Used by both synchronous estimates and the durable validator; no balances come from the browser.
     public Plan plan(AppUserPrincipal a,Item item,List<Plan> prior){
         Form f=item.form();var policy=policies.effective(a,f.getEffectiveDate(),true);f.setInterestAccountId(null);receipts.preview(a,f);
-        var staged=new HashMap<UUID,BigDecimal[]>();for(var p:prior)for(var l:p.lines()){var sum=staged.computeIfAbsent(l.loanId(),key->new BigDecimal[]{BigDecimal.ZERO,BigDecimal.ZERO});sum[0]=sum[0].add(l.principal());sum[1]=sum[1].add(l.interest());}
+        var staged=new HashMap<UUID,BigDecimal[]>();var settled=new HashSet<UUID>();for(var p:prior)for(var l:p.lines()){var sum=staged.computeIfAbsent(l.loanId(),key->new BigDecimal[]{BigDecimal.ZERO,BigDecimal.ZERO});sum[0]=sum[0].add(l.principal());sum[1]=sum[1].add(l.interest());if(l.principalBalance().signum()==0 && l.interest().compareTo(l.dueInterest())>=0)settled.add(l.loanId());}
         var contexts=loans.receiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).toList(),f.getEffectiveDate());var lines=new ArrayList<PlanLine>();BigDecimal principal=BigDecimal.ZERO,interest=BigDecimal.ZERO;
         for(var row:f.getRows()){
             var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();var previous=staged.getOrDefault(loan.id(),new BigDecimal[]{BigDecimal.ZERO,BigDecimal.ZERO});
-            if(loan.charges().signum()>0)throw new IllegalArgumentException("charges.error.batch");var duePrincipal=loan.duePrincipal().subtract(previous[0]);var dueInterest=loan.dueInterest().subtract(previous[1]);var outstanding=loan.outstandingPrincipal().subtract(previous[0]);
+            if(loan.charges().signum()>0)throw new IllegalArgumentException("charges.error.batch");var duePrincipal=loan.duePrincipal().subtract(previous[0]).max(BigDecimal.ZERO);var dueInterest=settled.contains(loan.id())?BigDecimal.ZERO:loan.dueInterest().subtract(previous[1]);var outstanding=loan.outstandingPrincipal().subtract(previous[0]);
             var split=RepaymentAllocationCalculator.allocate(row.getAmount(),duePrincipal,dueInterest,outstanding,policy.allocationOrder());
             lines.add(new PlanLine(loan.id(),loan.number(),row.getAmount(),outstanding,duePrincipal,dueInterest,split.principal(),split.interest(),split.principalBalance(),loan.principalAccount(),loan.principalAccountId(),loan.interestAccountId(),loan.interestAccount(),loan.product()));principal=principal.add(split.principal());interest=interest.add(split.interest());
         }

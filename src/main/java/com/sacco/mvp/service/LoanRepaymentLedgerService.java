@@ -184,40 +184,55 @@ public class LoanRepaymentLedgerService {
         require(Set.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED).contains(loan.getStatus()), "state");
         List<LoanLedgerInstallment> rows = rows(loanId);
         Totals due = totals(rows, date);
-        require(amount.compareTo(due.duePrincipal().add(due.dueInterest())) <= 0, "advance");
 
         UUID id = UUID.randomUUID();
         Map<UUID, BigDecimal[]> parts = new LinkedHashMap<>();
         BigDecimal left = amount;
-        // Component order is policy-owned; instalment order and due-date boundaries remain unchanged.
+        // Settle due components in policy order, then apply excess to future principal only.
         require(!command.principalFirst() || command.policyId()!=null,"request");
         var expected=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(amount,due.duePrincipal(),due.dueInterest(),ledger.getPrincipal().subtract(ledger.getPrincipalPaid()),command.principalFirst()?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST);
         for (boolean principalComponent : command.principalFirst()?new boolean[]{true,false}:new boolean[]{false,true}) {
             for (LoanLedgerInstallment row : rows) {
                 if (row.getDueDate().isAfter(date)) continue;
-                BigDecimal remaining=principalComponent?row.getPrincipal().subtract(row.getPrincipalPaid()):row.getInterest().subtract(row.getInterestPaid());
+                BigDecimal remaining=principalComponent?row.getPrincipal().subtract(row.getPrincipalPaid()):row.getInterest().subtract(row.getInterestPaid()).subtract(row.getInterestExcluded());
                 BigDecimal take=left.min(remaining);
                 if(take.signum()>0){
-                    parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO})[principalComponent?0:1]=take;
+                    parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO,ZERO})[principalComponent?0:1]=take;
                     if(principalComponent)row.setPrincipalPaid(row.getPrincipalPaid().add(take));else row.setInterestPaid(row.getInterestPaid().add(take));
                     left=left.subtract(take);
                 }
+            }
+        }
+        for(LoanLedgerInstallment row:rows){
+            if(!row.getDueDate().isAfter(date) || left.signum()==0)continue;
+            BigDecimal take=left.min(row.getPrincipal().subtract(row.getPrincipalPaid()));
+            if(take.signum()>0){
+                parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO,ZERO})[0]=take;
+                row.setPrincipalPaid(row.getPrincipalPaid().add(take));left=left.subtract(take);
             }
         }
         require(left.signum() == 0, "schedule");
         BigDecimal principal = parts.values().stream().map(p -> p[0]).reduce(ZERO, BigDecimal::add);
         BigDecimal interest = amount.subtract(principal);
         require(principal.compareTo(expected.principal())==0 && interest.compareTo(expected.interest())==0,"schedule");
+        BigDecimal excluded=ZERO;
+        if(expected.principalBalance().signum()==0 && totals(rows,date).dueInterest().signum()==0){
+            for(var row:rows)if(row.getDueDate().isAfter(date)){
+                BigDecimal remainder=row.getInterest().subtract(row.getInterestPaid()).subtract(row.getInterestExcluded());
+                if(remainder.signum()>0){parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO,ZERO})[2]=remainder;
+                    row.setInterestExcluded(row.getInterestExcluded().add(remainder));excluded=excluded.add(remainder);}
+            }
+        }
         LoanRepaymentTransaction transaction = LoanRepaymentTransaction.builder().id(id).loanApplicationId(loanId)
             .saccoId(ledger.getSaccoId()).stationId(ledger.getStationId()).sequence(ledger.getNextSequence())
             .receiptReference("RP-" + id).requestKey(command.requestKey()).kind(LoanRepaymentTransaction.Kind.PAYMENT)
             .channel(command.channel()).channelReference(reference).paymentDate(date).amount(amount)
-            .principalAmount(principal).interestAmount(interest).actorMemberId(actor.getMemberId())
+            .principalAmount(principal).interestAmount(interest).futureInterestExcluded(excluded).actorMemberId(actor.getMemberId())
             .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).allocationPolicyId(command.policyId()).build();
         // The UUID references are deliberately not JPA associations, so flush the parent before child inserts.
         transactions.saveAndFlush(transaction);
         allocations.saveAll(parts.entrySet().stream().map(p -> LoanRepaymentAllocation.builder().id(UUID.randomUUID())
-            .transactionId(id).installmentId(p.getKey()).principalAmount(p.getValue()[0]).interestAmount(p.getValue()[1]).build()).toList());
+            .transactionId(id).installmentId(p.getKey()).principalAmount(p.getValue()[0]).interestAmount(p.getValue()[1]).interestExcluded(p.getValue()[2]).build()).toList());
         installments.saveAll(rows);
         ledger.setPrincipalPaid(ledger.getPrincipalPaid().add(principal));
         ledger.setInterestPaid(ledger.getInterestPaid().add(interest));
@@ -287,7 +302,7 @@ public class LoanRepaymentLedgerService {
             .saccoId(ledger.getSaccoId()).stationId(ledger.getStationId()).sequence(ledger.getNextSequence())
             .receiptReference("RV-" + id).requestKey(requestKey).kind(LoanRepaymentTransaction.Kind.REVERSAL)
             .channel(original.getChannel()).channelReference(original.getChannelReference()).paymentDate(correctionDate)
-            .amount(original.getAmount()).principalAmount(original.getPrincipalAmount()).interestAmount(original.getInterestAmount())
+            .amount(original.getAmount()).principalAmount(original.getPrincipalAmount()).interestAmount(original.getInterestAmount()).futureInterestExcluded(original.getFutureInterestExcluded())
             .actorMemberId(actor.getMemberId()).reversesTransactionId(paymentId).reason(explanation)
             .loanStatusBefore(loan.getStatus()).postedAt(clock.now()).allocationPolicyId(original.getAllocationPolicyId()).build();
         List<LoanLedgerInstallment> rows = rows(loanId);
@@ -299,13 +314,14 @@ public class LoanRepaymentLedgerService {
         originalParts.forEach(p -> {
             LoanLedgerInstallment row = byId.get(p.getInstallmentId());
             require(row != null && row.getPrincipalPaid().compareTo(p.getPrincipalAmount()) >= 0
-                && row.getInterestPaid().compareTo(p.getInterestAmount()) >= 0, "schedule");
+                && row.getInterestPaid().compareTo(p.getInterestAmount()) >= 0 && row.getInterestExcluded().compareTo(p.getInterestExcluded())>=0, "schedule");
             row.setPrincipalPaid(row.getPrincipalPaid().subtract(p.getPrincipalAmount()));
             row.setInterestPaid(row.getInterestPaid().subtract(p.getInterestAmount()));
+            row.setInterestExcluded(row.getInterestExcluded().subtract(p.getInterestExcluded()));
         });
         transactions.saveAndFlush(reversal);
         allocations.saveAll(originalParts.stream().map(p -> LoanRepaymentAllocation.builder().id(UUID.randomUUID())
-            .transactionId(id).installmentId(p.getInstallmentId()).principalAmount(p.getPrincipalAmount()).interestAmount(p.getInterestAmount()).build()).toList());
+            .transactionId(id).installmentId(p.getInstallmentId()).principalAmount(p.getPrincipalAmount()).interestAmount(p.getInterestAmount()).interestExcluded(p.getInterestExcluded()).build()).toList());
         installments.saveAll(rows);
         ledger.setPrincipalPaid(ledger.getPrincipalPaid().subtract(original.getPrincipalAmount()));
         ledger.setInterestPaid(ledger.getInterestPaid().subtract(original.getInterestAmount()));
@@ -415,7 +431,7 @@ public class LoanRepaymentLedgerService {
         LocalDate oldest = null;
         for (LoanLedgerInstallment r : rows) {
             BigDecimal p = r.getPrincipal().subtract(r.getPrincipalPaid());
-            BigDecimal i = r.getInterest().subtract(r.getInterestPaid());
+            BigDecimal i = r.getInterest().subtract(r.getInterestPaid()).subtract(r.getInterestExcluded());
             remaining = remaining.add(p).add(i);
             if (!r.getDueDate().isAfter(asOf)) {
                 principal = principal.add(p);
@@ -442,6 +458,7 @@ public class LoanRepaymentLedgerService {
             snapshot.put(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_LAST_PAYMENT_DATE, ledger.getLastPaymentDate());
             snapshot.put(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_FETCHED_AT, clock.now());
             snapshot.put("ledgerFutureScheduledInterest", due.futureInterest());
+            snapshot.put("ledgerExcludedFutureInterest",rows.stream().map(LoanLedgerInstallment::getInterestExcluded).reduce(ZERO,BigDecimal::add));
             snapshot.put("balanceSource", "LOCAL_REPAYMENT_LEDGER");
             loan.setFinancialSnapshot(mapper.writeValueAsString(snapshot));
             loan.setUpdatedAt(clock.now());
@@ -477,7 +494,7 @@ public class LoanRepaymentLedgerService {
     private void audit(LoanRepaymentTransaction t) {
         audit.logEvent("LOAN_REPAYMENT", t.getId(), "LOAN_REPAYMENT_" + t.getKind(), t.getActorMemberId(), AuditEventStatus.SUCCESS,
             "Loan repayment " + t.getKind().name().toLowerCase(Locale.ROOT), "RECEIPT", t.getReceiptReference(), t.getSaccoId(), t.getStationId(),
-            Map.of("loanApplicationId", t.getLoanApplicationId(), "amount", t.getAmount(), "paymentDate", t.getPaymentDate()));
+            Map.of("loanApplicationId", t.getLoanApplicationId(), "amount", t.getAmount(), "paymentDate", t.getPaymentDate(),"futureInterestExcluded",t.getFutureInterestExcluded()));
     }
 
     private Receipt receipt(LoanRepaymentTransaction t, String loanNumber, UUID reversedBy) {

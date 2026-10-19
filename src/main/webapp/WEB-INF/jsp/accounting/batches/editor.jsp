@@ -5,9 +5,9 @@
 <meta name="_csrf" content="${_csrf.token}" /><meta name="_csrf_header" content="${_csrf.headerName}" />
 <sec:authorize access="@access.has(principal,'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal,'LOAN_RECORDING_POST')" var="canPostBatch" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/batches/receipts' />"><spring:message code="batch.receipts" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><c:out value="${summary.batch.title}" /></span></nav>
-<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${summary.batch.title}" /></h1><span data-batch-state></span></div>
+<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${summary.batch.title}" /></h1></div>
 <div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
-<div class="batch-summary" data-batch-summary aria-live="polite"></div>
+<section class="erp-resource-section"><h2><spring:message code="batch.batchDetails" /></h2><dl class="erp-detail-facts" data-batch-summary aria-live="polite"></dl></section>
 <div class="batch-alert" role="alert" tabindex="-1" data-batch-error hidden></div>
 <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2><spring:message code="batch.receiptRows" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-batch-refresh data-aws-table-refresh><spring:message code="common.refresh" /></button>
@@ -16,6 +16,7 @@
 <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label><spring:message code="batch.defaultDate" /><input type="date" class="aws-control" data-default-date value="${today}" max="${today}" /></label><label><spring:message code="batch.defaultAccount" /><select class="aws-control" data-default-account data-batch-choice="money" data-searchable="true"><option value=""><spring:message code="batch.choose" /></option></select></label>
 <label><spring:message code="batch.show" /><select class="aws-control" data-batch-filter><option value=""><spring:message code="voucher.all" /></option><c:forEach items="${['DRAFT','READY','FAILED','POSTED']}" var="state"><option value="${state}"><spring:message code="batch.state.${state}" /></option></c:forEach></select></label>
 <span role="status" aria-live="polite" data-save-status></span></div>
+<section class="batch-validation" aria-labelledby="batch-validation-title"><h3 id="batch-validation-title"><spring:message code="batch.validationMessages" /></h3><div data-batch-validation></div></section>
 <div class="erp-table-scroll batch-grid-scroll"><table class="erp-table batch-grid"><caption class="sr-only"><spring:message code="batch.receiptRows" /></caption><thead><tr><c:forEach items="${['client','date','loan','balances','amount','reference','status']}" var="column"><th data-table-identifier><spring:message code="batch.${column}" /><c:if test="${column=='amount'}"> (TZS)</c:if></th></c:forEach></tr></thead><tbody data-batch-rows></tbody></table></div>
 </section>
 <div class="batch-footer"><span data-batch-progress role="status" aria-live="polite"></span><div class="accounting-actions"><button type="button" class="app-btn btn-neutral" data-batch-stop hidden><spring:message code="batch.stop" /></button><button type="button" class="app-btn btn-neutral" data-batch-validate><spring:message code="batch.validate" /></button><button type="button" class="app-btn btn-launch" data-aws-action-pin="true" data-batch-post disabled><spring:message code="batch.post" /></button></div></div>

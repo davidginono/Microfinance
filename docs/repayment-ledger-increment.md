@@ -4,7 +4,7 @@
 
 1. Disburse a new ordinary loan through the existing approval/disbursement workflow. The same database transaction verifies its stored schedule and opens the local ledger.
 2. An authorized branch officer opens **Repayments**, selects the loan, and enters a verified received amount, actual payment date, channel, and collection reference.
-3. Posting pays all due interest first, then due principal, commits the receipt/allocations/journal/audit together, and updates the loan's balance projection.
+3. Posting pays due interest first, then principal, including future principal when the received amount exceeds due instalments. It commits the receipt/allocations/journal/audit together and updates the loan's balance projection.
 4. Staff and the owning client can read the receipt and loan-specific history. Clients reach the record from their loan detail page; they cannot post repayments or see the staff journal.
 5. A different authorized officer corrects the latest unreversed payment with a reason. The original remains visible with a linked reversal; its allocations and financial entries are reversed once.
 
@@ -28,7 +28,7 @@ This is a controlled implementation increment, not a production-readiness or com
 
 - Existing loans are not backfilled from snapshots, status flags, or schedules. Opening balances and known historical receipts require a reviewed cutover procedure. Unknown is not zero.
 - Top-up loans do not receive an invented ledger opening. The later [recorded-loan top-up increment](loan-topup-recording.md) opens a replacement ledger only alongside its verified internal settlement and owning GL posting. Borrower and legacy top-up paths retain their safeguards and cutover gates.
-- Only scheduled instalments due on the payment date may be paid. Excess/advance payments and full or partial early settlement are rejected with a clear message; unmatched funds/refunds require a separate approved workflow. Staff must not treat rejection as a receipt for money already received.
+- The user's 2026-10-19 instruction permits arbitrary positive TZS amounts, with cents, up to outstanding principal plus interest due and supported outstanding charges. Amounts above due instalments pay future principal in instalment order; future interest is not collected in advance. Partial advances retain the contract schedule. Full early repayment excludes the remaining future interest and marks the loan paid. V79 records those exclusions separately on the immutable transaction and allocations, with a constrained instalment projection; neither contractual interest nor cash interest paid is overwritten. An independent linked reversal restores the original exclusion and balances. Unapplied credit, overpayments and refunds remain unsupported.
 - No new fee/penalty obligations are assessed or collected by this command. Product fees, permitted costs, and their accrual/financing treatment still need approval and accounting work.
 - Receipt entries debit cash/bank/mobile-money **clearing** and credit principal or interest-collections clearing. Disbursement entries debit principal and credit disbursement clearing. These are balanced operational entries, not mapped bank accounts, an interest-accrual model, a general ledger, or channel reconciliation.
 - Pricing, weekly date/rate conventions, decimal annuity calculation, agreement versions, and lawful early settlement remain release gates. Stored schedule validation checks cents, dates, positive amounts, and principal conservation; it does not certify the pricing formula.

@@ -27,6 +27,7 @@ public class LoanRepaymentTransaction {
     @Column(nullable = false, precision = 18, scale = 2) private BigDecimal amount;
     @Column(name = "principal_amount", nullable = false, precision = 18, scale = 2) private BigDecimal principalAmount;
     @Column(name = "interest_amount", nullable = false, precision = 18, scale = 2) private BigDecimal interestAmount;
+    @Builder.Default @Column(name = "future_interest_excluded", nullable = false, precision = 18, scale = 2) private BigDecimal futureInterestExcluded = BigDecimal.ZERO;
     @Column(name = "actor_member_id", nullable = false) private UUID actorMemberId;
     @Column(name = "reverses_transaction_id") private UUID reversesTransactionId;
     @Column(length = 500) private String reason;

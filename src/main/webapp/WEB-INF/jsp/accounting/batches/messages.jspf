@@ -4,3 +4,5 @@
 <div hidden data-batch-messages><c:forEach items="${['recordedBalances','projectedBalances','beforePosting']}" var="key"><span data-message="${key}"><spring:message code="batch.${key}" /></span></c:forEach></div>
 
 <div hidden data-batch-messages><span data-message="charges"><spring:message code="charges.outstanding" /></span></div>
+
+<div hidden data-batch-messages><span data-message="checking"><spring:message code="batch.checking" /></span></div>

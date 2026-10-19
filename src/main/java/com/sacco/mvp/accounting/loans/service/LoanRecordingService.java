@@ -76,7 +76,7 @@ public class LoanRecordingService {
             check(loan.principalAccountId()!=null && loan.interestAccountId()!=null,"loanAccountsMissing");check(loan.principalAccount()!=null && loan.interestAccount()!=null,"productAccountsInvalid");
             check(loan.clientId().equals(f.getClientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
             check(loan.disbursed()!=null && !f.getEffectiveDate().isBefore(loan.disbursed()) && (loan.lastPayment()==null || !f.getEffectiveDate().isBefore(loan.lastPayment())),"date");
-            result.add(chargeAllocation(row.getAmount(),loan.duePrincipal(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
+            result.add(chargeAllocation(row.getAmount(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
         }
         return result;
     }
@@ -135,8 +135,8 @@ public class LoanRecordingService {
     public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges) {
         public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance){this(principal,interest,balance,ZERO);}
     }
-    private AllocationPreview chargeAllocation(BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,BigDecimal fees){
-        if(amount.compareTo(principal.add(interest).add(fees))>0)throw new IllegalArgumentException("repayment.error.advance");var i=amount.min(interest);var fee=amount.subtract(i).min(fees);var p=amount.subtract(i).subtract(fee);return new AllocationPreview(p,i,balance.subtract(p),fee);
+    private AllocationPreview chargeAllocation(BigDecimal amount,BigDecimal interest,BigDecimal balance,BigDecimal fees){
+        if(amount.compareTo(balance.add(interest).add(fees))>0)throw new IllegalArgumentException("repayment.error.advance");var i=amount.min(interest);var fee=amount.subtract(i).min(fees);var p=amount.subtract(i).subtract(fee);return new AllocationPreview(p,i,balance.subtract(p),fee);
     }
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan chargeQuote(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");return charges.quote(a,f,product(a,f),false);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary chargeSummary(AppUserPrincipal a,UUID loan,int page){authorize(a,"VIEW");records.record(a,loan,false);return charges.summary(a,loan,page);}
@@ -150,7 +150,7 @@ public class LoanRecordingService {
         if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.RECORDED,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
         check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
-        var linked=productAccounts.required(a,f.getLoanId());records.account(a,linked.principalId(),"PRINCIPAL",false);records.account(a,linked.interestId(),"INTEREST",false);return chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());
+        var linked=productAccounts.required(a,f.getLoanId());records.account(a,linked.principalId(),"PRINCIPAL",false);records.account(a,linked.interestId(),"INTEREST",false);return chargeAllocation(f.getAmount(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());
     }
     @Transactional(readOnly=true)
     public Quote interestQuote(AppUserPrincipal a,RecordForm f){
@@ -281,7 +281,7 @@ public class LoanRecordingService {
         var interest=records.account(a,linked.interestId(),"INTEREST");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());var feeBalance=charges.balance(a,f.getLoanId(),LocalDate.MAX);
         check(feeBalance.lastDate()==null || !f.getEffectiveDate().isBefore(feeBalance.lastDate()),"date");
-        var allocation=chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),feeBalance.outstanding());
+        var allocation=chargeAllocation(f.getAmount(),balance.dueInterest(),balance.outstandingPrincipal(),feeBalance.outstanding());
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();records.journal(a,journal,id,f,hash,period,allocation.charges().signum()>0?"LOAN_CHARGE_RECEIPT":"PAYMENT",null,now);
         records.ticket(a,id,"PAYMENT",f,hash,journal,null,money,principal,interest,now);
         var feeLines=charges.collect(a,f.getLoanId(),"COLLECT",allocation.charges(),f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes());

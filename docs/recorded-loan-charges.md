@@ -22,7 +22,7 @@ Frozen charge terms, calculation basis, amounts, timing, policy/agreement refere
 
 ## Collection treatments
 
-- **Separate:** charges are assessed once against the signed agreement, normally atomically at funding, and collected separately after disbursement through the explicit Loan repayment receipt purpose. Allocation is due interest, outstanding charges, then due principal. Partial charge collections and charge-only receipts are supported. A charge-only receipt creates no fictitious principal/interest repayment transaction.
+- **Separate:** charges are assessed once against the signed agreement, normally atomically at funding, and collected separately after disbursement through the explicit Loan repayment receipt purpose. Allocation is due interest, outstanding charges, then principal (including future principal for the user's 2026-10-19 advance-payment instruction). Partial charge collections and charge-only receipts are supported. A charge-only receipt creates no fictitious principal/interest repayment transaction.
 - **Deduct:** the same funding transaction assesses the charges, collects exactly the frozen deductions internally, opens the original contractual principal and pays only net cash. Principal, deductions, separately payable charges and net cash are distinct. Deductions leaving no positive cash are rejected.
 - **Financed:** visibly unavailable. Capitalization, affordability, effective-interest and accounting policy must be approved and implemented before fees can be added to principal.
 

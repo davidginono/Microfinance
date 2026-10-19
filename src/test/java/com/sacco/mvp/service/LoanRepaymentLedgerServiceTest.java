@@ -120,12 +120,36 @@ class LoanRepaymentLedgerServiceTest {
         assertThat(rows.getLast().getInterestPaid()).isZero();
     }
 
-    @Test void earlyOrExcessPaymentDoesNotMutateBalances() {
-        assertThatThrownBy(() -> service.post(loanId, poster(), command("111", today.minusMonths(1))))
+    @Test void paymentAboveCurrentDebtDoesNotMutateBalances() {
+        assertThatThrownBy(() -> service.post(loanId, poster(), command("210.01", today.minusMonths(1))))
             .hasMessage("repayment.error.advance");
         verify(transactions, never()).saveAndFlush(any());
         assertThat(ledger.getPrincipalPaid()).isZero();
         assertThat(rows.getFirst().getInterestPaid()).isZero();
+    }
+
+    @Test void arbitraryPaymentAboveDueInstalmentsReducesFuturePrincipalOnly() {
+        var receipt=service.post(loanId,poster(),command("111.03",today.minusMonths(1)));
+        assertThat(receipt.interest()).isEqualByComparingTo("10.00");assertThat(receipt.principal()).isEqualByComparingTo("101.03");
+        assertThat(rows.getFirst().getPrincipalPaid()).isEqualByComparingTo("100.00");assertThat(rows.getLast().getPrincipalPaid()).isEqualByComparingTo("1.03");
+        assertThat(rows.getLast().getInterestPaid()).isZero();assertThat(rows.getLast().getPrincipal()).isEqualByComparingTo("100.00");
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+    }
+
+    @Test void paymentBeforeFirstInstalmentIsEntirelyPrincipalAndDoesNotChargeFutureInterest() {
+        var receipt=service.post(loanId,poster(),command("37.19",today.minusMonths(1).minusDays(1)));
+        assertThat(receipt.principal()).isEqualByComparingTo("37.19");assertThat(receipt.interest()).isZero();
+        assertThat(rows.getFirst().getPrincipalPaid()).isEqualByComparingTo("37.19");assertThat(rows).allMatch(r->r.getInterestPaid().signum()==0);
+    }
+
+    @Test void fullEarlyRepaymentExcludesFutureInterestWithoutRecordingItAsCashOrChangingTheContract() {
+        service.post(loanId,poster(),command("210.00",today.minusMonths(1)));
+        assertThat(ledger.getPrincipalPaid()).isEqualByComparingTo("200.00");assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAID);
+        assertThat(rows.getLast().getInterestPaid()).isZero();
+        assertThat(rows.getLast().getInterest()).isEqualByComparingTo("8.00");assertThat(rows.getLast().getInterestExcluded()).isEqualByComparingTo("8.00");
+        assertThat(ledger.getInterestPaid()).isEqualByComparingTo("10.00");
+        ArgumentCaptor<LoanRepaymentTransaction> transaction=ArgumentCaptor.forClass(LoanRepaymentTransaction.class);verify(transactions).saveAndFlush(transaction.capture());
+        assertThat(transaction.getValue().getFutureInterestExcluded()).isEqualByComparingTo("8.00");
     }
 
     @Test void fullContractPaymentMarksPaidOnlyAfterAllComponentsAreSettled() {
