@@ -21,9 +21,9 @@ public class LoanRecordingRepository {
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id join members m on m.id=a.applicant_member_id
         left join loan_charge_balance c on c.loan_id=a.id and c.sacco_id=r.sacco_id and c.station_id=r.station_id
         left join loan_ledgers l on l.loan_application_id=a.id
-        left join lateral (select sum(case when due_date<=? then interest-interest_paid-interest_excluded else 0 end) interest,
-        sum(case when due_date<? then principal-principal_paid+interest-interest_paid-interest_excluded else 0 end) arrears,
-        sum(case when due_date>? then interest-interest_paid-interest_excluded else 0 end) future
+        left join lateral (select sum(loan_interest_due(id,?)) interest,
+        sum(case when due_date<? then principal-principal_paid+interest-interest_paid-interest_excluded-interest_waived else 0 end) arrears,
+        sum(greatest(0,interest-interest_paid-interest_excluded-interest_waived-loan_interest_due(id,?))) future
         from loan_ledger_installments where loan_application_id=a.id) d on true
         """;
     private static final String POST_FROM="""
@@ -46,9 +46,9 @@ public class LoanRecordingRepository {
         return jdbc.query("select r.loan_id from accountant_loan_record r join loan_applications l on l.id=r.loan_id where r.sacco_id=? and r.station_id=? and (?::uuid is null or l.applicant_member_id=?::uuid) and r.loan_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by r.loan_id for update of r",(r,n)->r.getObject(1,UUID.class),args.toArray());
     }
     public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){
-        var args=new ArrayList<Object>();args.add(date);args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(ids);
+        var args=new ArrayList<Object>();args.add(date);args.add(date);args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(ids);
         return jdbc.query("""
-            select l.id,l.applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,greatest(b.last_payment_date,c.last_date) last_payment_date,
+            select l.id,l.applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,greatest(b.last_payment_date,c.last_date,(select max(effective_date) from loan_interest_waiver where loan_id=l.id)) last_payment_date,
             b.principal-b.principal_paid outstanding,coalesce(d.principal,0) due_principal,coalesce(d.interest,0) due_interest,coalesce(c.outstanding,0) charges,
             r.product_name,ab.principal_account_id,ab.interest_account_id,pa.code||' - '||pa.name principal_account,ia.code||' - '||ia.name interest_account
             from accountant_loan_record r join loan_applications l on l.id=r.loan_id join members m on m.id=l.applicant_member_id
@@ -57,8 +57,8 @@ public class LoanRecordingRepository {
             left join loan_product_account_binding ab on ab.loan_id=l.id and ab.sacco_id=r.sacco_id and ab.station_id=r.station_id
             left join gl_account pa on pa.id=ab.principal_account_id and pa.sacco_id=r.sacco_id and pa.active and pa.kind='CONTROL' and pa.type='ASSET' and pa.normal_balance='DEBIT' and pa.purpose='LOAN_PRINCIPAL'
             left join gl_account ia on ia.id=ab.interest_account_id and ia.sacco_id=r.sacco_id and ia.active and ia.kind='POSTING' and (ia.purpose='CLEARING' or (ia.type='INCOME' and ia.normal_balance='CREDIT' and ia.purpose='INCOME'))
-            left join lateral(select sum(principal-principal_paid) principal,sum(interest-interest_paid-interest_excluded) interest
-              from loan_ledger_installments where loan_application_id=l.id and due_date<=?) d on true
+            left join lateral(select sum(case when due_date<=? then principal-principal_paid else 0 end) principal,sum(loan_interest_due(id,?)) interest
+              from loan_ledger_installments where loan_application_id=l.id) d on true
             where r.sacco_id=? and r.station_id=? and l.id in (
             """+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by l.id",(r,n)->new ReceiptLoan(r.getObject("id",UUID.class),r.getObject("applicant_member_id",UUID.class),r.getString("loan_id"),r.getString("full_name"),r.getString("member_no"),r.getBigDecimal("due_principal"),r.getBigDecimal("due_interest"),r.getBigDecimal("outstanding"),r.getObject("disbursement_date",LocalDate.class),r.getObject("last_payment_date",LocalDate.class),r.getString("status"),r.getBigDecimal("charges"),r.getString("product_name"),r.getObject("principal_account_id",UUID.class),r.getString("principal_account"),r.getObject("interest_account_id",UUID.class),r.getString("interest_account")),args.toArray());
     }
@@ -216,8 +216,8 @@ public class LoanRecordingRepository {
     public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date) {
         return jdbc.query("""
             select l.loan_application_id,l.loan_id,l.applicant_member_id,m.full_name,l.principal-l.principal_paid principal,l.next_sequence,
-              coalesce(sum(case when i.due_date<=? then i.interest-i.interest_paid-i.interest_excluded else 0 end),0) interest,
-              coalesce(sum(case when i.due_date>? then i.interest-i.interest_paid-i.interest_excluded else 0 end),0) excluded
+              coalesce(sum(loan_interest_due(i.id,?)),0) interest,
+              coalesce(sum(greatest(0,i.interest-i.interest_paid-i.interest_excluded-i.interest_waived-loan_interest_due(i.id,?))),0) excluded
             from accountant_loan_record r join loan_applications b on b.id=r.loan_id
             join loan_ledgers l on l.loan_application_id=b.id join members m on m.id=b.applicant_member_id
             join loan_ledger_installments i on i.loan_application_id=b.id

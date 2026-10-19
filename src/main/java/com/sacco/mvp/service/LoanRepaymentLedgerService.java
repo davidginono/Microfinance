@@ -32,6 +32,7 @@ public class LoanRepaymentLedgerService {
     private final AccessControlService access;
     private final AuditService audit;
     private final com.sacco.mvp.accounting.loans.service.LoanPostingGuard accountingGuard;
+    private final com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService prepayments;
 
     // Called only by the actual disbursement transaction; never infer an opening balance for an old loan.
     @Transactional(propagation = Propagation.MANDATORY)
@@ -64,6 +65,8 @@ public class LoanRepaymentLedgerService {
             .interestPaid(ZERO).nextSequence(1).createdAt(clock.now()).build();
         ledgers.saveAndFlush(ledger);
         installments.saveAll(rows);
+        installments.flush();
+        prepayments.bind(ledger,mapper.readValue(loan.getFinancialSnapshot(),new TypeReference<Map<String,Object>>() {}));
         UUID voucher = UUID.randomUUID();
         journal.saveAll(List.of(entry(ledger, null, voucher, "LOAN_PRINCIPAL", principal, ZERO, loan.getDisbursementDate()),
             entry(ledger, null, voucher, "DISBURSEMENT_CLEARING", ZERO, principal, loan.getDisbursementDate())));
@@ -83,6 +86,80 @@ public class LoanRepaymentLedgerService {
         Totals t = totals(rows(id), effectiveDate);
         if(transactions.settledThroughTopUp(id))return new PaymentBalance(ZERO,ZERO,ZERO);
         return new PaymentBalance(t.duePrincipal(), t.dueInterest(), ledger.getPrincipal().subtract(ledger.getPrincipalPaid()));
+    }
+
+    public record SettlementQuote(UUID loanId,String loanNumber,LocalDate date,long sequence,BigDecimal principal,
+        BigDecimal interest,BigDecimal futureInterest,BigDecimal charges,BigDecimal total,LoanPrepaymentTerms terms,boolean legacy) {}
+    @Transactional(readOnly=true)
+    public SettlementQuote settlementQuote(UUID id,AppUserPrincipal actor,LocalDate date){
+        LoanLedger l=readableLedger(id,actor);
+        require(date!=null && !date.isBefore(clock.today()) && !date.isAfter(clock.today().plusYears(1)),"date");
+        require(!transactions.settledThroughTopUp(id),"state");
+        var status=loans.findById(id).orElseThrow().getStatus();require(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(status),"state");
+        var due=totals(rows(id),date);var principal=l.getPrincipal().subtract(l.getPrincipalPaid());var policy=prepayments.terms(id);
+        var fees=prepayments.charges(l);
+        return new SettlementQuote(id,l.getLoanId(),date,l.getNextSequence(),principal,due.dueInterest(),due.futureInterest(),fees,principal.add(due.dueInterest()).add(fees),policy.map(p->p.rules()).orElse(null),policy.isEmpty());
+    }
+    @Transactional
+    public void adoptPrepaymentTerms(UUID id,AppUserPrincipal actor,String reason){
+        requireStaff(actor,UserClaim.LOAN_INTEREST_WAIVE);LoanLedger l=lockedLedger(id,actor);readableLedger(id,actor);
+        require(l.getNextSequence()==1 && l.getPrincipalPaid().signum()==0 && l.getInterestPaid().signum()==0,"state");
+        require(ledgers.latestAdjustmentDate(id,l.getSaccoId(),l.getStationId())==null,"state");
+        var loan=loans.findById(id).orElseThrow();require(loan.getStatus()==LoanStatus.DISBURSED,"state");
+        var snapshot=mapper.readValue(loan.getFinancialSnapshot(),new TypeReference<Map<String,Object>>() {});
+        prepayments.adopt(l,actor,InterestMethod.valueOf(String.valueOf(snapshot.get("interestMethod"))),reason);
+    }
+    @Transactional(readOnly=true)
+    public List<com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository.Waiver> interestWaivers(UUID id,AppUserPrincipal actor,int page){
+        return prepayments.history(readableLedger(id,actor),page);
+    }
+    @Transactional
+    public UUID waiveInterest(UUID id,AppUserPrincipal actor,UUID key,LocalDate date,BigDecimal amount,String reason,UUID reverses){
+        requireStaff(actor,UserClaim.LOAN_INTEREST_WAIVE);
+        if(reverses!=null)requireStaff(actor,accountingGuard.recordedLoan(id)?UserClaim.LOAN_RECORDING_REVERSE:UserClaim.LOAN_REPAYMENTS_REVERSE);
+        LoanLedger l=lockedLedger(id,actor);readableLedger(id,actor);
+        var loan=loans.findById(id).orElseThrow();require(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
+        require(date!=null,"date");requireAfterAdjustment(l,date);var rows=rows(id);
+        UUID result=prepayments.waive(l,rows,actor,key,date,money(amount),reason,reverses);installments.saveAll(rows);installments.flush();
+        updateProjection(l,loan,rows);return result;
+    }
+
+    public record PreviewAllocation(UUID installmentId,BigDecimal principal,BigDecimal interest,BigDecimal excluded) {}
+    public record StagedPayment(LocalDate date,List<PreviewAllocation> allocations) {}
+    public record PaymentPreview(PaymentBalance before,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,List<PreviewAllocation> allocations) {}
+    @Transactional(readOnly=true)
+    public PaymentPreview previewPayment(UUID id,AppUserPrincipal actor,LocalDate date,BigDecimal amount,List<StagedPayment> prior){
+        var l=readableLedger(id,actor);require(date!=null && !date.isBefore(l.getDisbursementDate()) && !date.isAfter(clock.today()),"date");
+        var rows=rows(id).stream().map(r->new LoanLedgerInstallment(r.getId(),r.getLoanApplicationId(),r.getInstallmentNumber(),r.getDueDate(),r.getPrincipal(),r.getInterest(),r.getPrincipalPaid(),r.getInterestPaid(),r.getInterestExcluded(),r.getInterestWaived())).toList();
+        var earned=new HashMap<>(prepayments.earned(id,date));var policy=prepayments.terms(id);
+        for(var p:prior){require(p.date()!=null && !p.date().isAfter(date) && p.allocations()!=null,"date");
+            var stagedParts=new HashMap<UUID,PreviewAllocation>();p.allocations().forEach(a->stagedParts.put(a.installmentId(),a));
+            LocalDate start=l.getDisbursementDate();for(var row:rows){
+                var part=stagedParts.get(row.getId());
+                if(part!=null){row.setPrincipalPaid(row.getPrincipalPaid().add(part.principal()));row.setInterestPaid(row.getInterestPaid().add(part.interest()));row.setInterestExcluded(row.getInterestExcluded().add(part.excluded()));
+                    if(policy.isPresent() && part.excluded().signum()>0){var from=p.date().isAfter(start)?p.date():start;
+                        var accruedReduction=part.excluded().multiply(LoanAmortizationCalculator.periodFraction(from,row.getDueDate(),date,policy.get().rules().dayBasis()));
+                        earned.put(row.getId(),earned.getOrDefault(row.getId(),ZERO).subtract(accruedReduction).max(ZERO));}}
+                start=row.getDueDate();
+            }
+        }
+        return calculatePayment(l,rows,date,amount,earned,policy,false);
+    }
+
+    private PaymentPreview calculatePayment(LoanLedger l,List<LoanLedgerInstallment> rows,LocalDate date,BigDecimal amount,
+        Map<UUID,BigDecimal> earned,Optional<com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository.Terms> policy,boolean principalFirst){
+        var duePrincipal=ZERO;var dueInterest=ZERO;var outstanding=ZERO;
+        for(var row:rows){var p=row.getPrincipal().subtract(row.getPrincipalPaid());outstanding=outstanding.add(p);if(!row.getDueDate().isAfter(date))duePrincipal=duePrincipal.add(p);dueInterest=dueInterest.add(earnedInterest(row,date,earned).subtract(row.getInterestPaid()).max(ZERO));}
+        var split=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(money(amount),duePrincipal,dueInterest,outstanding,principalFirst?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST);
+        var parts=new LinkedHashMap<UUID,BigDecimal[]>();BigDecimal interestLeft=split.interest(),principalLeft=split.principal();
+        for(var row:rows){var take=interestLeft.min(earnedInterest(row,date,earned).subtract(row.getInterestPaid()).max(ZERO));if(take.signum()>0){parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[1]=take;row.setInterestPaid(row.getInterestPaid().add(take));interestLeft=interestLeft.subtract(take);}
+            if(!row.getDueDate().isAfter(date)){take=principalLeft.min(row.getPrincipal().subtract(row.getPrincipalPaid()));if(take.signum()>0){parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[0]=take;row.setPrincipalPaid(row.getPrincipalPaid().add(take));principalLeft=principalLeft.subtract(take);}}}
+        var future=rows.stream().filter(r->r.getDueDate().isAfter(date)).toList();var advances=LoanAmortizationCalculator.allocateAdvance(principalLeft,future.stream().map(r->r.getPrincipal().subtract(r.getPrincipalPaid())).toList(),policy.map(p->p.rules().schedule()).orElse(LoanPrepaymentTerms.Schedule.NEXT_INSTALMENTS));var prepaid=new HashMap<UUID,BigDecimal>();
+        for(int n=0;n<future.size();n++){var row=future.get(n);var take=advances.get(n);if(take.signum()>0){parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[0]=take;prepaid.put(row.getId(),take);row.setPrincipalPaid(row.getPrincipalPaid().add(take));}}
+        boolean full=split.principalBalance().signum()==0 && split.interest().compareTo(dueInterest)==0;
+        var reductions=prepayments.reductions(l,rows,date,prepaid,earned,full);
+        for(var row:rows){var reduction=reductions.getOrDefault(row.getId(),ZERO);if(policy.isEmpty() && full && row.getDueDate().isAfter(date))reduction=row.getInterest().subtract(row.getInterestPaid()).subtract(row.getInterestExcluded()).subtract(row.getInterestWaived());if(reduction.signum()>0)parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[2]=reduction;}
+        return new PaymentPreview(new PaymentBalance(duePrincipal,dueInterest,outstanding),split.principal(),split.interest(),split.principalBalance(),parts.entrySet().stream().map(e->new PreviewAllocation(e.getKey(),e.getValue()[0],e.getValue()[1],e.getValue()[2])).toList());
     }
 
     @Transactional(readOnly = true)
@@ -183,45 +260,15 @@ public class LoanRepaymentLedgerService {
         LoanApplication loan = loans.findById(loanId).orElseThrow(() -> new IllegalArgumentException("repayment.error.unavailable"));
         require(Set.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED).contains(loan.getStatus()), "state");
         List<LoanLedgerInstallment> rows = rows(loanId);
-        Totals due = totals(rows, date);
-
+        require(!command.principalFirst() || command.policyId()!=null,"request");
+        var preview=calculatePayment(ledger,rows,date,amount,prepayments.earned(loanId,date),prepayments.terms(loanId),command.principalFirst());
         UUID id = UUID.randomUUID();
         Map<UUID, BigDecimal[]> parts = new LinkedHashMap<>();
-        BigDecimal left = amount;
-        // Settle due components in policy order, then apply excess to future principal only.
-        require(!command.principalFirst() || command.policyId()!=null,"request");
-        var expected=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(amount,due.duePrincipal(),due.dueInterest(),ledger.getPrincipal().subtract(ledger.getPrincipalPaid()),command.principalFirst()?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST);
-        for (boolean principalComponent : command.principalFirst()?new boolean[]{true,false}:new boolean[]{false,true}) {
-            for (LoanLedgerInstallment row : rows) {
-                if (row.getDueDate().isAfter(date)) continue;
-                BigDecimal remaining=principalComponent?row.getPrincipal().subtract(row.getPrincipalPaid()):row.getInterest().subtract(row.getInterestPaid()).subtract(row.getInterestExcluded());
-                BigDecimal take=left.min(remaining);
-                if(take.signum()>0){
-                    parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO,ZERO})[principalComponent?0:1]=take;
-                    if(principalComponent)row.setPrincipalPaid(row.getPrincipalPaid().add(take));else row.setInterestPaid(row.getInterestPaid().add(take));
-                    left=left.subtract(take);
-                }
-            }
-        }
-        for(LoanLedgerInstallment row:rows){
-            if(!row.getDueDate().isAfter(date) || left.signum()==0)continue;
-            BigDecimal take=left.min(row.getPrincipal().subtract(row.getPrincipalPaid()));
-            if(take.signum()>0){
-                parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO,ZERO})[0]=take;
-                row.setPrincipalPaid(row.getPrincipalPaid().add(take));left=left.subtract(take);
-            }
-        }
-        require(left.signum() == 0, "schedule");
-        BigDecimal principal = parts.values().stream().map(p -> p[0]).reduce(ZERO, BigDecimal::add);
-        BigDecimal interest = amount.subtract(principal);
-        require(principal.compareTo(expected.principal())==0 && interest.compareTo(expected.interest())==0,"schedule");
-        BigDecimal excluded=ZERO;
-        if(expected.principalBalance().signum()==0 && totals(rows,date).dueInterest().signum()==0){
-            for(var row:rows)if(row.getDueDate().isAfter(date)){
-                BigDecimal remainder=row.getInterest().subtract(row.getInterestPaid()).subtract(row.getInterestExcluded());
-                if(remainder.signum()>0){parts.computeIfAbsent(row.getId(),ignored->new BigDecimal[]{ZERO,ZERO,ZERO})[2]=remainder;
-                    row.setInterestExcluded(row.getInterestExcluded().add(remainder));excluded=excluded.add(remainder);}
-            }
+        BigDecimal principal=preview.principal(),interest=preview.interest(),excluded=ZERO;
+        var byId=new HashMap<UUID,LoanLedgerInstallment>();rows.forEach(r->byId.put(r.getId(),r));
+        for(var part:preview.allocations()){
+            parts.put(part.installmentId(),new BigDecimal[]{part.principal(),part.interest(),part.excluded()});
+            var row=byId.get(part.installmentId());row.setInterestExcluded(row.getInterestExcluded().add(part.excluded()));excluded=excluded.add(part.excluded());
         }
         LoanRepaymentTransaction transaction = LoanRepaymentTransaction.builder().id(id).loanApplicationId(loanId)
             .saccoId(ledger.getSaccoId()).stationId(ledger.getStationId()).sequence(ledger.getNextSequence())
@@ -239,6 +286,7 @@ public class LoanRepaymentLedgerService {
         ledger.setLastPaymentDate(date);
         ledger.setNextSequence(ledger.getNextSequence() + 1);
         writePaymentJournal(ledger, transaction, false);
+        allocations.flush();installments.flush();
         if (totals(rows, LocalDate.MAX).remaining().signum() == 0) {
             loan.setStatus(LoanStatus.PAID);
             loan.setPaidAt(clock.now());
@@ -252,6 +300,8 @@ public class LoanRepaymentLedgerService {
     private void requireAfterAdjustment(LoanLedger ledger,LocalDate date) {
         LocalDate latest=ledgers.latestAdjustmentDate(ledger.getLoanApplicationId(),ledger.getSaccoId(),ledger.getStationId());
         require(latest==null || !date.isBefore(latest),"adjustmentDate");
+        var waiverDate=prepayments.latestWaiverDate(ledger.getLoanApplicationId());
+        require(waiverDate==null || !date.isBefore(waiverDate),"adjustmentDate");
     }
 
     @Transactional
@@ -290,6 +340,7 @@ public class LoanRepaymentLedgerService {
         LoanRepaymentTransaction original = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
             .findFirst().filter(t -> t.getId().equals(paymentId)).orElseThrow(() -> new IllegalArgumentException("repayment.error.latest"));
         require(original.getKind()==LoanRepaymentTransaction.Kind.PAYMENT,"state");
+        prepayments.checkReversal(loanId,original.getSequence());
         require(!original.getActorMemberId().equals(actor.getMemberId()), "checker");
         LocalDate correctionDate=effectiveDate==null?original.getPaymentDate():effectiveDate;
         require(!correctionDate.isBefore(original.getPaymentDate()) && !correctionDate.isAfter(clock.today()),"date");
@@ -329,6 +380,7 @@ public class LoanRepaymentLedgerService {
             .map(LoanRepaymentTransaction::getPaymentDate).findFirst().orElse(null));
         ledger.setNextSequence(ledger.getNextSequence() + 1);
         writePaymentJournal(ledger, reversal, true);
+        allocations.flush();installments.flush();
         if (loan.getStatus() == LoanStatus.PAID) {
             loan.setStatus(original.getLoanStatusBefore());
             loan.setPaidAt(null);
@@ -426,18 +478,23 @@ public class LoanRepaymentLedgerService {
         }
     }
 
+    private BigDecimal earnedInterest(LoanLedgerInstallment r,LocalDate date,Map<UUID,BigDecimal> earned){
+        return earned.getOrDefault(r.getId(),r.getDueDate().isAfter(date)?ZERO:r.getInterest().subtract(r.getInterestExcluded()).subtract(r.getInterestWaived())).setScale(2,RoundingMode.HALF_UP);
+    }
     private Totals totals(List<LoanLedgerInstallment> rows, LocalDate asOf) {
         BigDecimal principal = ZERO, interest = ZERO, future = ZERO, remaining = ZERO;
         LocalDate oldest = null;
+        var earned=rows.isEmpty() || asOf.equals(LocalDate.MAX)?Map.<UUID,BigDecimal>of():prepayments.earned(rows.getFirst().getLoanApplicationId(),asOf);
         for (LoanLedgerInstallment r : rows) {
             BigDecimal p = r.getPrincipal().subtract(r.getPrincipalPaid());
-            BigDecimal i = r.getInterest().subtract(r.getInterestPaid()).subtract(r.getInterestExcluded());
+            BigDecimal i = r.getInterest().subtract(r.getInterestPaid()).subtract(r.getInterestExcluded()).subtract(r.getInterestWaived());
             remaining = remaining.add(p).add(i);
+            BigDecimal due=asOf.equals(LocalDate.MAX)?i:earnedInterest(r,asOf,earned).subtract(r.getInterestPaid()).max(ZERO);
+            interest=interest.add(due);future=future.add(i.subtract(due).max(ZERO));
             if (!r.getDueDate().isAfter(asOf)) {
                 principal = principal.add(p);
-                interest = interest.add(i);
                 if (r.getDueDate().isBefore(asOf) && p.add(i).signum() > 0 && (oldest == null || r.getDueDate().isBefore(oldest))) oldest = r.getDueDate();
-            } else future = future.add(i);
+            }
         }
         return new Totals(principal, interest, future, remaining, oldest);
     }
@@ -459,6 +516,7 @@ public class LoanRepaymentLedgerService {
             snapshot.put(LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_FETCHED_AT, clock.now());
             snapshot.put("ledgerFutureScheduledInterest", due.futureInterest());
             snapshot.put("ledgerExcludedFutureInterest",rows.stream().map(LoanLedgerInstallment::getInterestExcluded).reduce(ZERO,BigDecimal::add));
+            snapshot.put("ledgerWaivedInterest",rows.stream().map(LoanLedgerInstallment::getInterestWaived).reduce(ZERO,BigDecimal::add));
             snapshot.put("balanceSource", "LOCAL_REPAYMENT_LEDGER");
             loan.setFinancialSnapshot(mapper.writeValueAsString(snapshot));
             loan.setUpdatedAt(clock.now());
@@ -528,7 +586,8 @@ public class LoanRepaymentLedgerService {
             .actorMemberId(actor.getMemberId()).loanStatusBefore(loan.getStatus()).postedAt(clock.now()).build();
         transactions.saveAndFlush(transaction);
         var parts=new ArrayList<LoanRepaymentAllocation>();
-        for(var row:rows){var p=row.getPrincipal().subtract(row.getPrincipalPaid());var i=row.getDueDate().isAfter(date)?ZERO:row.getInterest().subtract(row.getInterestPaid());
+        var earned=prepayments.earned(source,date);
+        for(var row:rows){var p=row.getPrincipal().subtract(row.getPrincipalPaid());var i=earnedInterest(row,date,earned).subtract(row.getInterestPaid()).max(ZERO);
             if(p.add(i).signum()>0)parts.add(LoanRepaymentAllocation.builder().id(UUID.randomUUID()).transactionId(id).installmentId(row.getId()).principalAmount(p).interestAmount(i).build());
             row.setPrincipalPaid(row.getPrincipal());row.setInterestPaid(row.getInterestPaid().add(i));}
         allocations.saveAll(parts);installments.saveAll(rows);ledger.setPrincipalPaid(ledger.getPrincipal());ledger.setInterestPaid(ledger.getInterestPaid().add(interest));
@@ -580,11 +639,20 @@ public class LoanRepaymentLedgerService {
     public record LedgerListRow(UUID id, String loanId, LocalDate disbursementDate, BigDecimal outstandingPrincipal, BigDecimal principalPaid, BigDecimal interestPaid) {}
     private List<InstallmentRow> scheduleRows(List<LoanLedgerInstallment> rows,BigDecimal beginning){
         var result=new ArrayList<InstallmentRow>(rows.size());var balance=beginning;
-        for(var row:rows){var ending=balance.subtract(row.getPrincipal()).subtract(row.getInterest());result.add(new InstallmentRow(row.getInstallmentNumber(),row.getDueDate(),row.getPrincipal(),row.getInterest(),row.getPrincipalPaid(),row.getInterestPaid(),balance,ending));balance=ending;}
+        for(var row:rows){var ending=balance.subtract(row.getPrincipal()).subtract(row.getInterest());result.add(new InstallmentRow(row.getInstallmentNumber(),row.getDueDate(),row.getPrincipal(),row.getInterest(),row.getPrincipalPaid(),row.getInterestPaid(),balance,ending,row.getInterestExcluded(),row.getInterestWaived()));balance=ending;}
         return result;
     }
-    public record InstallmentRow(int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest, BigDecimal principalPaid, BigDecimal interestPaid,BigDecimal beginningBalance,BigDecimal endingBalance) {
-        public BigDecimal getScheduledPayment(){return principal.add(interest);}
+    public record InstallmentRow(int number, LocalDate dueDate, BigDecimal principal, BigDecimal interest, BigDecimal principalPaid, BigDecimal interestPaid,BigDecimal beginningBalance,BigDecimal endingBalance,BigDecimal interestExcluded,BigDecimal interestWaived) {
+        public BigDecimal scheduledPayment(){return principal.add(interest);}
+        public BigDecimal getScheduledPayment(){return scheduledPayment();}
+        public BigDecimal remainingPrincipal(){return principal.subtract(principalPaid);}
+        public BigDecimal getRemainingPrincipal(){return remainingPrincipal();}
+        public BigDecimal remainingInterest(){return interest.subtract(interestPaid).subtract(interestExcluded).subtract(interestWaived);}
+        public BigDecimal getRemainingInterest(){return remainingInterest();}
+        public BigDecimal remainingPayment(){return remainingPrincipal().add(remainingInterest());}
+        public BigDecimal getRemainingPayment(){return remainingPayment();}
+        public InstallmentRow(int number,LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal principalPaid,BigDecimal interestPaid,BigDecimal beginning,BigDecimal ending){this(number,date,principal,interest,principalPaid,interestPaid,beginning,ending,ZERO,ZERO);}
+
         public InstallmentRow(int number,LocalDate dueDate,BigDecimal principal,BigDecimal interest,BigDecimal principalPaid,BigDecimal interestPaid){this(number,dueDate,principal,interest,principalPaid,interestPaid,null,null);}
     }
     public record JournalRow(UUID voucher, LocalDate date, String account, BigDecimal debit, BigDecimal credit) {}

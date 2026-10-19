@@ -30,6 +30,10 @@ public class VoucherService {
         ledger.requireActor(actor,(type==Type.JOURNAL?"ACCOUNTING_JOURNALS_":"ACCOUNTING_BUSINESS_")+action);
     }
     public void requireExport(AppUserPrincipal actor){ledger.requireActor(actor,"FINANCIAL_REPORTS_EXPORT");}
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void requireInterestWaiverPeriod(AppUserPrincipal actor,LocalDate date){
+        ledger.requireActor(actor,"LOAN_INTEREST_WAIVE");vouchers.period(actor.getSaccoId(),date,actor.getMemberId(),clock.now());
+    }
     @Transactional(readOnly=true)
     public Page list(AppUserPrincipal actor,Type type,Filter filter){
         authorize(actor,type,"VIEW");validateFilter(filter);

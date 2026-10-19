@@ -115,7 +115,7 @@ public class ManagementReportRepository {
         String band="case when e.dpd<=30 then 0 when e.dpd<=90 then 1 when e.dpd<=180 then 2 when e.dpd<=365 then 3 else 4 end";
         var values=new LinkedHashMap<String,String>();
         values.put("disbursed","e.original_principal");values.put("contractTotal","e.original_principal+e.scheduled_interest");values.put("instalment","e.periodic_payment");
-        values.put("principalBalance","e.principal");values.put("interestBalance","e.scheduled_interest-e.paid_interest-e.excluded_interest");values.put("totalPrincipal","e.original_principal");
+        values.put("principalBalance","e.principal");values.put("interestBalance","e.scheduled_interest-e.paid_interest-e.excluded_interest-e.waived_interest");values.put("totalPrincipal","e.original_principal");
         values.put("principalPaid","e.paid_principal");values.put("principalArrears","e.overdue_principal");values.put("totalInterest","e.scheduled_interest");values.put("interestPaid","e.paid_interest");values.put("interestArrears","e.overdue_interest");
         for(int i=0;i<5;i++)values.put("band"+i,"case when "+band+"="+i+" then e.principal else 0 end");
         values.put("overdue","e.overdue_principal+e.overdue_interest");

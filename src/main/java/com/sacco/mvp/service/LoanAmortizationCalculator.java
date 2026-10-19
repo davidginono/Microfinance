@@ -19,6 +19,43 @@ public final class LoanAmortizationCalculator {
 
     private LoanAmortizationCalculator() {}
 
+    /** Earned fraction of a fixed contractual period; the effective payment day is excluded. */
+    public static BigDecimal periodFraction(java.time.LocalDate start, java.time.LocalDate end,
+                                           java.time.LocalDate asOf, com.sacco.mvp.domain.LoanPrepaymentTerms.DayBasis basis) {
+        if(start==null || end==null || asOf==null || !end.isAfter(start)) throw new IllegalArgumentException("prepayment.error.schedule");
+        if(!asOf.isAfter(start)) return BigDecimal.ZERO;
+        if(!asOf.isBefore(end)) return BigDecimal.ONE;
+        long denominator=Math.max(1,periodDays(start,end,basis)), numerator=periodDays(start,asOf,basis);
+        return BigDecimal.valueOf(numerator).divide(BigDecimal.valueOf(denominator),PRECISION).min(BigDecimal.ONE).max(BigDecimal.ZERO);
+    }
+    private static long periodDays(java.time.LocalDate a,java.time.LocalDate b,com.sacco.mvp.domain.LoanPrepaymentTerms.DayBasis basis) {
+        if(basis==com.sacco.mvp.domain.LoanPrepaymentTerms.DayBasis.ACTUAL_PERIOD) return java.time.temporal.ChronoUnit.DAYS.between(a,b);
+        int from=Math.min(a.getDayOfMonth(),30),to=Math.min(b.getDayOfMonth(),30);
+        return Math.max(0,(b.getYear()-a.getYear())*360L+(b.getMonthValue()-a.getMonthValue())*30L+to-from);
+    }
+    /** Pro-rata cents are assigned deterministically; the last positive row receives the residual. */
+    public static List<BigDecimal> allocateAdvance(BigDecimal amount,List<BigDecimal> remaining,
+                              com.sacco.mvp.domain.LoanPrepaymentTerms.Schedule order) {
+        amount=exactMoney(amount,"Prepaid principal");
+        if(amount.signum()<0 || amount.compareTo(remaining.stream().reduce(ZERO,BigDecimal::add))>0)throw new IllegalArgumentException("repayment.error.advance");
+        var result=new ArrayList<BigDecimal>(java.util.Collections.nCopies(remaining.size(),ZERO));
+        BigDecimal left=amount,total=remaining.stream().reduce(ZERO,BigDecimal::add);
+        for(int n=0;n<remaining.size();n++){
+            int i=order==com.sacco.mvp.domain.LoanPrepaymentTerms.Schedule.LAST_INSTALMENTS?remaining.size()-1-n:n;
+            BigDecimal take=order==com.sacco.mvp.domain.LoanPrepaymentTerms.Schedule.PRO_RATA && total.signum()>0
+                ?amount.multiply(remaining.get(i)).divide(total,2,RoundingMode.DOWN):left.min(remaining.get(i));
+            result.set(i,take);left=left.subtract(take);
+        }
+        for(int i=result.size()-1;i>=0 && left.signum()>0;i--){var take=left.min(remaining.get(i).subtract(result.get(i)));result.set(i,result.get(i).add(take));left=left.subtract(take);}
+        return List.copyOf(result);
+    }
+    public static BigDecimal prepaidInterestReduction(BigDecimal contractualInterest,BigDecimal principalPrepaid,
+                                                      BigDecimal principalBasis,BigDecimal unusedFraction,BigDecimal limit) {
+        if(principalBasis.signum()<=0 || principalPrepaid.signum()<=0) return ZERO;
+        return contractualInterest.multiply(principalPrepaid).divide(principalBasis,PRECISION)
+            .multiply(unusedFraction).setScale(2,RoundingMode.HALF_UP).min(limit).max(ZERO);
+    }
+
     public static Result estimate(BigDecimal principal, int months, Map<String, Object> snapshot) {
         boolean current = VERSION.equals(snapshot.get("calculationVersion"));
         RepaymentFrequency frequency = current

@@ -120,6 +120,7 @@ public class FinancialDetailsService {
         snapshot.put("tenorMonths", safeTenor);
         snapshot.put("numberOfPayments", payments);
         snapshot.put("interestMethod", method.name());
+        snapshot.put("prepaymentTerms",com.sacco.mvp.domain.LoanPrepaymentTerms.product(product).snapshot());
         snapshot.put("topUpSourceLoanId", topUpSourceLoanId == null ? "" : topUpSourceLoanId.toString());
         if (topUpSourceLoanId != null) {
             snapshot.put("topUpRequestedAmount", safeAmount);

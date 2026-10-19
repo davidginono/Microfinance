@@ -1,5 +1,7 @@
 # Repayment Ledger Increment
 
+2026-10-19 servicing increment: new contracts retain product prepayment rules, dated earned-interest calculations, partial rebates and separate auditable interest waivers. Legacy loans retain their original rules. See [early repayment servicing](early-repayment-servicing.md), including defaults, formulas and compatibility boundaries; older due-date-only descriptions below apply to loans without these retained terms.
+
 ## Simple Workflow
 
 1. Disburse a new ordinary loan through the existing approval/disbursement workflow. The same database transaction verifies its stored schedule and opens the local ledger.

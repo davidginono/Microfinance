@@ -80,6 +80,7 @@ public enum UserClaim {
     PAYMENT_DETAILS_UPDATE(AccessFeature.PAYMENT_DETAILS, AccessAction.UPDATE),
 
     LOAN_REPAYMENTS_VIEW(AccessFeature.LOAN_REPAYMENTS, AccessAction.VIEW),
+    LOAN_INTEREST_WAIVE(AccessFeature.LOAN_REPAYMENTS, AccessAction.WAIVE),
     LOAN_RECORDING_VIEW(AccessFeature.LOAN_RECORDING, AccessAction.VIEW),
     LOAN_RECORDING_CREATE(AccessFeature.LOAN_RECORDING, AccessAction.CREATE),
     LOAN_RECORDING_DISBURSE(AccessFeature.LOAN_RECORDING, AccessAction.DISBURSE),

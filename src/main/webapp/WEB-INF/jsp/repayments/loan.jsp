@@ -10,6 +10,7 @@
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="loan.loanId" /> <c:out value="${ledger.loanId}" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
     <c:if test="${not empty repaymentError}"><div class="repayment-error" role="alert"><spring:message code="${repaymentError}" /></div></c:if>
     <c:if test="${ledger.financialState=='WRITTEN_OFF' or ledger.financialState=='DISBURSEMENT_REVERSED'}"><p role="status"><spring:message code="recording.status.${ledger.financialState}" />. <spring:message code="adjustment.historicalSchedule" /></p></c:if>
+    <sec:authorize access="@access.hasAny(principal,'LOAN_REPAYMENTS_VIEW','LOAN_RECORDING_VIEW')"><c:if test="${ledger.financialState=='DISBURSED' or ledger.financialState=='PAR' or ledger.financialState=='DEFAULTED'}"><p><a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${ledger.id}/settlement' />"><spring:message code="prepayment.settlement" /></a></p></c:if></sec:authorize>
     <dl class="repayment-facts">
         <div><dt><spring:message code="repayment.principalOutstanding" /></dt><dd>TZS <fmt:formatNumber value="${ledger.outstandingPrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.principalDue" /></dt><dd>TZS <fmt:formatNumber value="${ledger.duePrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>

@@ -79,6 +79,13 @@ public class AdminService {
     private final NameSignatureService nameSignatureService;
     private final ApplicationClock applicationClock;
     private final com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
+    private final com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService prepaymentService;
+
+    @Transactional
+    public void configurePrepayment(String institution,com.sacco.mvp.security.AppUserPrincipal actor,UUID productId,LoanPrepaymentTerms terms,String reason){
+        var product=loanProductSettingRepository.findByIdAndSaccoId(productId,institution).orElseThrow(()->new IllegalArgumentException("prepayment.error.unavailable"));
+        prepaymentService.configure(product,actor,terms,reason);
+    }
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
         return dashboard(saccoId, null, adminId);

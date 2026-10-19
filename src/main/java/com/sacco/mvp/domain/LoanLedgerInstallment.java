@@ -19,4 +19,5 @@ public class LoanLedgerInstallment {
     @Column(name = "principal_paid", nullable = false, precision = 18, scale = 2) private BigDecimal principalPaid;
     @Column(name = "interest_paid", nullable = false, precision = 18, scale = 2) private BigDecimal interestPaid;
     @Builder.Default @Column(name = "interest_excluded", nullable = false, precision = 18, scale = 2) private BigDecimal interestExcluded = BigDecimal.ZERO;
+    @Builder.Default @Column(name = "interest_waived", nullable = false, precision = 18, scale = 2) private BigDecimal interestWaived = BigDecimal.ZERO;
 }

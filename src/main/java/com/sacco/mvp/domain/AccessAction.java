@@ -7,6 +7,7 @@ public enum AccessAction {
     CREATE("Create"),
     UPDATE("Update"),
     APPROVE("Approve"),
+    WAIVE("Waive interest"),
     REJECT("Reject"),
     ASSIGN("Assign"),
     CONFIGURE("Configure"),

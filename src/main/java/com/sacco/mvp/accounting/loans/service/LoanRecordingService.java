@@ -81,6 +81,10 @@ public class LoanRecordingService {
         return result;
     }
     @Transactional(readOnly=true)
+    public LoanRepaymentLedgerService.PaymentPreview stagedReceiptPreview(AppUserPrincipal a,UUID loan,LocalDate date,BigDecimal amount,List<LoanRepaymentLedgerService.StagedPayment> prior){
+        authorize(a,"POST");records.record(a,loan,false);return repayments.previewPayment(loan,a,date,amount,prior);
+    }
+    @Transactional(readOnly=true)
     public Page<LoanRow> list(AppUserPrincipal a,Filter f){authorize(a,"VIEW");filter(f,false);var rows=records.loans(a,f,clock.today(),26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
     @Transactional(readOnly=true)
     public Page<Posting> register(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);var rows=records.posts(a,kind,f,26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
@@ -185,6 +189,7 @@ public class LoanRecordingService {
         tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
+        snapshot.put("prepaymentTerms",LoanPrepaymentTerms.product(selectedProduct).snapshot());
         if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
         snapshot.put("recordedCharges",chargePlan);snapshot.put("recordedChargeTotal",chargePlan.total());snapshot.put("recordedChargeDeductions",chargePlan.deductions());snapshot.put("recordedNetCashEstimate",f.getPrincipal().subtract(settlement==null?ZERO:settlement.total()).subtract(chargePlan.deductions()));snapshot.put("recordedTotalPayable",f.getPrincipal().add(calculation.totalInterest()).add(chargePlan.total()));policy.put("recordedChargePolicy",Objects.toString(chargePlan.policyId(),""));

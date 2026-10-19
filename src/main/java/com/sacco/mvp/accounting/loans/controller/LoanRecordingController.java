@@ -307,7 +307,7 @@ public class LoanRecordingController {
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
     private String kind(jakarta.servlet.http.HttpServletRequest r){return r.getRequestURI().contains("loan-disbursements")?"DISBURSEMENT":r.getRequestURI().contains("loan-repayments")?"PAYMENT":"LOAN";}
     private void context(String kind,Model model){model.addAttribute("kind",kind);model.addAttribute("createClaim",kind.equals("LOAN")?"LOAN_RECORDING_CREATE":kind.equals("DISBURSEMENT")?"LOAN_RECORDING_DISBURSE":"LOAN_RECORDING_POST");model.addAttribute("base",kind.equals("LOAN")?"/finance/loan-records":kind.equals("DISBURSEMENT")?"/finance/loan-disbursements":"/finance/loan-repayments");}
-    private String error(IllegalArgumentException e){return e.getMessage()!=null && (e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error.") || e.getMessage().startsWith("charges.error."))?e.getMessage():"recording.error.terms";}
+    private String error(IllegalArgumentException e){return e.getMessage()!=null && (e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error.") || e.getMessage().startsWith("charges.error.") || e.getMessage().startsWith("prepayment.error."))?e.getMessage():"recording.error.terms";}
 
     @PostMapping("/loan-records/{id}/submit-for-review")
     public String submitForReview(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash) {

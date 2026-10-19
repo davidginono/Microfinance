@@ -1,6 +1,10 @@
 .accounting-workspace{min-width:0;display:grid;gap:1rem}.accounting-form{min-width:0;background:white;border:1px solid #d7dde3;border-radius:4px;padding:1rem}.accounting-form form{display:grid;gap:.8rem}.accounting-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:.8rem}.accounting-form label{display:grid;gap:.35rem;min-width:0}.accounting-form .aws-control{width:100%;min-width:0}.accounting-actions{display:flex;gap:.5rem;flex-wrap:wrap;padding:.5rem 0}.accounting-money{text-align:right;font-variant-numeric:tabular-nums}.accounting-workspace p{overflow-wrap:anywhere}.accounting-form .app-btn{justify-self:start}
 
 /* Chart onboarding follows the shared compact ERP shell. */
+.accounting-servicing-workspace .erp-page-title{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.accounting-servicing-workspace .app-btn{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.accounting-servicing-workspace .accounting-servicing-confirm{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:.5rem}
+.accounting-servicing-workspace .accounting-servicing-confirm input{width:auto;justify-self:start;margin-top:.2rem}
 .aws-console .accounting-form {border-color:#d5dbdb;border-radius:0;box-shadow:0 1px 1px #879596;}
 .aws-console .accounting-create-card>h2 {background:#fafafa;border-bottom:1px solid #eaeded;padding:16px 20px;font-size:16px;line-height:24px;}
 .aws-console .accounting-create-card>form {padding:20px;gap:24px;}

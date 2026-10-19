@@ -73,6 +73,11 @@ public class LoanPortfolioReportRepository {
         ), installment_allocations AS (
           SELECT a.installment_id,sum(t.sign*a.principal_amount) principal,sum(t.sign*a.interest_amount) interest,sum(t.sign*a.interest_excluded) excluded
           FROM loan_repayment_allocations a JOIN transactions t ON t.id=a.transaction_id GROUP BY a.installment_id
+        ), waiver_allocations AS (
+          SELECT a.installment_id,sum(CASE WHEN w.kind='WAIVER' THEN a.amount ELSE -a.amount END) waived
+          FROM loan_interest_waiver w JOIN cohort c ON c.loan_application_id=w.loan_id AND c.sacco_id=w.sacco_id AND c.station_id=w.station_id
+          JOIN loan_interest_waiver_part a ON a.waiver_id=w.id
+          WHERE w.created_at<=:cutoff AND w.effective_date<=:through GROUP BY a.installment_id
         ), contract_terms AS (
           SELECT c.loan_application_id,n.number,n.item->>'dueDate' due_date,
             CASE WHEN n.item->>'principalComponent' ~ '^[0-9]{1,16}([.][0-9]{1,8})?$' THEN (n.item->>'principalComponent')::numeric END principal,
@@ -84,17 +89,18 @@ public class LoanPortfolioReportRepository {
           SELECT loan_application_id,count(*) total FROM contract_terms GROUP BY loan_application_id
         ), terms AS (
           SELECT c.loan_application_id,count(i.id) installments,sum(i.principal) scheduled_principal,
-            sum(i.interest) scheduled_interest,coalesce(sum(a.excluded),0) excluded_interest,max(i.principal+i.interest) periodic_payment,max(i.due_date) maturity,
+            sum(i.interest) scheduled_interest,coalesce(sum(a.excluded),0) excluded_interest,coalesce(sum(w.waived),0) waived_interest,max(i.principal+i.interest) periodic_payment,max(i.due_date) maturity,
             coalesce(bool_and(coalesce(a.principal,0)>=0 AND coalesce(a.principal,0)<=i.principal
-              AND coalesce(a.interest,0)>=0 AND coalesce(a.excluded,0)>=0 AND coalesce(a.interest,0)+coalesce(a.excluded,0)<=i.interest
+              AND coalesce(a.interest,0)>=0 AND coalesce(a.excluded,0)>=0 AND coalesce(a.interest,0)+coalesce(a.excluded,0)+coalesce(w.waived,0)<=i.interest
               AND ct.number IS NOT NULL AND ct.principal IS NOT NULL AND ct.interest IS NOT NULL
               AND ct.due_date=i.due_date::text AND ct.principal=i.principal AND ct.interest=i.interest),false) valid,
             coalesce(cc.total,0) contract_count,
             coalesce(sum(CASE WHEN i.due_date<:through THEN i.principal-coalesce(a.principal,0) ELSE 0 END),0) overdue_principal,
-            coalesce(sum(CASE WHEN i.due_date<:through THEN i.interest-coalesce(a.interest,0)-coalesce(a.excluded,0) ELSE 0 END),0) overdue_interest,
-            min(i.due_date) FILTER(WHERE i.due_date<:through AND (i.principal>coalesce(a.principal,0) OR i.interest>coalesce(a.interest,0)+coalesce(a.excluded,0))) oldest
+            coalesce(sum(CASE WHEN i.due_date<:through THEN i.interest-coalesce(a.interest,0)-coalesce(a.excluded,0)-coalesce(w.waived,0) ELSE 0 END),0) overdue_interest,
+            min(i.due_date) FILTER(WHERE i.due_date<:through AND (i.principal>coalesce(a.principal,0) OR i.interest>coalesce(a.interest,0)+coalesce(a.excluded,0)+coalesce(w.waived,0))) oldest
           FROM cohort c LEFT JOIN loan_ledger_installments i ON i.loan_application_id=c.loan_application_id
           LEFT JOIN installment_allocations a ON a.installment_id=i.id
+          LEFT JOIN waiver_allocations w ON w.installment_id=i.id
           LEFT JOIN contract_terms ct ON ct.loan_application_id=c.loan_application_id AND ct.number=i.installment_number
           LEFT JOIN contract_counts cc ON cc.loan_application_id=c.loan_application_id GROUP BY c.loan_application_id,cc.total
         ), lifecycle AS (
@@ -112,7 +118,7 @@ public class LoanPortfolioReportRepository {
             CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE t.overdue_interest END overdue_interest,
             CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN null ELSE t.oldest END oldest,
             CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE coalesce(:through-t.oldest,0) END dpd,p.collected_principal,p.collected_interest,
-            p.principal paid_principal,p.interest paid_interest,t.scheduled_interest,t.excluded_interest,t.periodic_payment,t.maturity,t.installments,
+            p.principal paid_principal,p.interest paid_interest,t.scheduled_interest,t.excluded_interest,t.waived_interest,t.periodic_payment,t.maturity,t.installments,
             coalesce(c.application_branch=c.station_id AND c.application_institution=c.sacco_id
               AND c.application_client=c.applicant_member_id AND c.top_up_source_loan_id IS NULL
               AND o.lines=2 AND o.vouchers=1 AND o.net=0 AND o.principal=c.principal AND o.cleared=c.principal AND o.dates

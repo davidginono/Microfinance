@@ -45,6 +45,13 @@ public class LoanProductSetting {
     @Column(name = "interest_gl_account_id")
     private UUID interestGlAccountId;
 
+    @Enumerated(EnumType.STRING) @Column(name="prepayment_schedule", nullable=false, length=32)
+    @Builder.Default private LoanPrepaymentTerms.Schedule prepaymentSchedule=LoanPrepaymentTerms.defaults().schedule();
+    @Enumerated(EnumType.STRING) @Column(name="partial_prepayment_interest", nullable=false, length=32)
+    @Builder.Default private LoanPrepaymentTerms.PartialInterest partialPrepaymentInterest=LoanPrepaymentTerms.defaults().partialInterest();
+    @Enumerated(EnumType.STRING) @Column(name="settlement_day_basis", nullable=false, length=32)
+    @Builder.Default private LoanPrepaymentTerms.DayBasis settlementDayBasis=LoanPrepaymentTerms.defaults().dayBasis();
+
     @Column(name = "product_description", length = 500)
     private String productDescription;
 

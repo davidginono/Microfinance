@@ -24,7 +24,9 @@ public final class ReceiptBatchDtos {
     public record PlanLine(UUID loanId,String loanNumber,@JsonFormat(shape=STRING) BigDecimal amount,
                            @JsonFormat(shape=STRING) BigDecimal outstandingPrincipal,@JsonFormat(shape=STRING) BigDecimal duePrincipal,
                            @JsonFormat(shape=STRING) BigDecimal dueInterest,@JsonFormat(shape=STRING) BigDecimal principal,
-                           @JsonFormat(shape=STRING) BigDecimal interest,@JsonFormat(shape=STRING) BigDecimal principalBalance,String principalAccount,UUID principalAccountId,UUID interestAccountId,String interestAccount,String product) {
+                           @JsonFormat(shape=STRING) BigDecimal interest,@JsonFormat(shape=STRING) BigDecimal principalBalance,String principalAccount,UUID principalAccountId,UUID interestAccountId,String interestAccount,String product,
+                           LocalDate paymentDate,List<com.sacco.mvp.service.LoanRepaymentLedgerService.PreviewAllocation> servicingAllocations) {
+        public PlanLine(UUID id,String number,BigDecimal amount,BigDecimal outstanding,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal principal,BigDecimal interest,BigDecimal balance,String account,UUID principalId,UUID interestId,String interestAccount,String product){this(id,number,amount,outstanding,duePrincipal,dueInterest,principal,interest,balance,account,principalId,interestId,interestAccount,product,null,null);}
         public PlanLine(UUID id,String number,BigDecimal amount,BigDecimal outstanding,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal principal,BigDecimal interest,BigDecimal balance,String account){this(id,number,amount,outstanding,duePrincipal,dueInterest,principal,interest,balance,account,null,null,null,null);}
     }
     public record Summary(Batch batch,int receipts,int posted,int ready,int failed,@JsonFormat(shape=STRING) BigDecimal total,

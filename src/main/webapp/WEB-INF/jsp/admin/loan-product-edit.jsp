@@ -25,6 +25,7 @@
     </form>
 </div>
 
+<p><a class="resource-table-id-link" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.title" /></a></p>
 <div class="product-config-workspace"
      data-product-config-workspace
      data-product-config-stage="Step 2 of 2 &middot; focused product"
