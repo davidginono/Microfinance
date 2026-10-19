@@ -25,7 +25,7 @@
     <c:otherwise><c:forEach items="${row.cells}" var="cell"><td class="${not empty cell.amount?'fs-print-number':''}"><c:out value="${cell.text}" /></td></c:forEach></c:otherwise>
    </c:choose></tr></c:forEach></tbody>
   </table>
-  <footer><p><spring:message code="fs.outputNotice" /></p></footer>
+  <footer><p><spring:message code="fs.provisional" /></p></footer>
  </section>
 </c:forEach>
 </body></html>

@@ -14,8 +14,6 @@
     <label><spring:message code="fs.scope" /><select class="aws-control" name="institutionWide"><option value="false" ${not institutionWide?'selected':''}><spring:message code="fs.branchScope" /></option><sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_INSTITUTION')"><option value="true" ${institutionWide?'selected':''}><spring:message code="fs.institutionScope" /></option></sec:authorize></select></label>
    </div>
   </section>
-  <p class="fs-help"><spring:message code="fs.comparisonHelp" /></p>
-  <p class="fs-coverage"><spring:message code="fs.coverageStart" /></p>
   <div class="accounting-actions accounting-form-actions"><button class="app-btn btn-launch" type="submit"><spring:message code="fs.generate" /></button></div>
  </form>
 </div>
