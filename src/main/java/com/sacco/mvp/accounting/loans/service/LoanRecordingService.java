@@ -85,6 +85,8 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public Choice filterProduct(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.filter"));}
     @Transactional(readOnly=true)
+    public Choice recordProduct(AppUserPrincipal a,UUID id){authorize(a,"CREATE");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.product"));}
+    @Transactional(readOnly=true)
     public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date,UUID excluded){
         authorize(a,"VIEW");check(date!=null && !date.isAfter(clock.today()),"date");check(records.topUpEnabled(a.getSaccoId()),"topUpDisabled");
         var quote=records.topUpQuote(a,source,date);check(quote.principal().signum()>0,"topUpUnavailable");check(!records.pendingTopUp(source,excluded),"topUpPending");var b=charges.balance(a,source,LocalDate.MAX);check(b.lastDate()==null || !b.lastDate().isAfter(date),"date");return new TopUpQuote(quote.sourceId(),quote.sourceNumber(),quote.clientId(),quote.client(),date,quote.principal(),quote.interest(),quote.excludedInterest(),quote.sequence(),b.outstanding(),b.sequence());

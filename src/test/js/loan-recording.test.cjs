@@ -42,9 +42,9 @@ test('staff posting lookups use the scoped review endpoint and preserve the chos
 function fixture() {
   const dom = new JSDOM(`<html lang="en"><form data-loan-form>
     <input name="_csrf" value="token"><select id="loanMode" name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>
-    <div data-configured-product><select id="productId" name="productId"><option value="product" data-tenure-unit="MONTHS">Business loan</option><option value="daily-product" data-tenure-unit="DAYS">Day loan</option><option value="yearly-product" data-tenure-unit="YEARS">Year loan</option></select></div>
-    <input id="principal" name="principal"><label data-tenure-type><select id="tenureUnit" name="tenureUnit"><option value=""></option><option>DAYS</option><option>MONTHS</option><option>YEARS</option></select></label>
-    <label data-tenure-number><span data-tenure-label data-empty="Number of" data-days="Number of days" data-months="Number of months" data-years="Number of years"></span><input id="tenureValue" name="tenureValue"></label>
+    <div data-configured-product><select id="productId" name="productId"><option value="product" data-tenure-unit="MONTHS" data-minimum-amount="1000.00" data-maximum-amount="9007199254740991.01" data-minimum-tenure="3" data-maximum-tenure="24">Business loan</option><option value="daily-product" data-tenure-unit="DAYS" data-minimum-amount="500.00" data-maximum-amount="5000.00" data-minimum-tenure="7" data-maximum-tenure="30">Day loan</option><option value="yearly-product" data-tenure-unit="YEARS">Year loan</option></select></div>
+    <input id="principal" name="principal"><small data-product-amount-limits data-unavailable="Unavailable" hidden><span data-limit-min></span> to <span data-limit-max></span></small><label data-tenure-type><select id="tenureUnit" name="tenureUnit"><option value=""></option><option>DAYS</option><option>MONTHS</option><option>YEARS</option></select></label>
+    <label data-tenure-number><span data-tenure-label data-empty="Number of" data-days="Number of days" data-months="Number of months" data-years="Number of years"></span><input id="tenureValue" name="tenureValue"><small data-product-tenure-limits hidden><span data-limit-min></span> to <span data-limit-max></span> <span data-limit-unit></span></small></label>
     <div data-custom-terms><select id="customMethod" name="customMethod"><option value="FLAT_RATE">Flat rate</option><option value="REDUCING_BALANCE">Reducing balance</option></select><select id="interestEntry" name="interestEntry"><option value="PERCENTAGE">PERCENTAGE</option><option value="AMOUNT">AMOUNT</option></select>
     <label data-custom-percentage><input id="interestPercent" name="interestPercent"></label>
     <label data-custom-percentage><select id="interestBasis" name="interestBasis"><option value="WHOLE_LOAN">For the whole loan</option><option value="ANNUAL">Annual rate</option></select><small data-reducing-terms-note hidden>Reducing balance uses an annual percentage. For whole-loan interest, select Flat rate.</small></label>
@@ -168,5 +168,34 @@ test('configured products supply hidden tenure units while customised loans keep
   set('tenureUnit','YEARS');assert.equal(d.querySelector('[data-tenure-label]').textContent,'Number of years');
   set('loanMode','CONFIGURED');assert.equal(box.hidden,true);assert.equal(unit.value,'DAYS');
   set('productId','');assert.equal(unit.value,'');assert.equal(d.querySelector('[data-tenure-number]').hidden,true);
+  dom.window.close();
+});
+
+
+test('configured amount and tenure limits follow product selection and hide for customised or empty selections',()=>{
+  const {w,set,dom}=fixture(),d=w.document;
+  const amount=d.querySelector('[data-product-amount-limits]'),tenure=d.querySelector('[data-product-tenure-limits]');
+  assert.equal(amount.hidden,false);assert.equal(amount.textContent,'1,000.00 to 9,007,199,254,740,991.01');
+  assert.equal(tenure.textContent,'3 to 24 Months');
+  set('productId','daily-product');
+  assert.equal(amount.textContent,'500.00 to 5,000.00');assert.equal(tenure.textContent,'7 to 30 Days');
+  d.querySelector('[data-interest-preview]').dataset.days='Siku';set('tenureValue','10');
+  assert.equal(tenure.textContent,'7 to 30 Siku');
+  set('loanMode','CUSTOM');assert.equal(amount.hidden,true);assert.equal(tenure.hidden,true);
+  set('loanMode','CONFIGURED');assert.equal(amount.hidden,false);assert.equal(tenure.hidden,false);
+  set('productId','');assert.equal(amount.hidden,true);assert.equal(tenure.hidden,true);
+  dom.window.close();
+});
+
+test('product lookup preserves exact decimal limits and updates a retained selection with the same tenure unit',async()=>{
+  const dom=new JSDOM(`<div data-loan-choice data-category="products"><select data-choice-select><option value="product" data-tenure-unit="MONTHS" selected>Selected product</option></select><span data-choice-error data-search-label="Search products" data-error="Lookup failed"></span></div>`,{runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
+  const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button'),select=w.document.querySelector('select');let changes=0;
+  select.addEventListener('change',()=>changes++);
+  w.NeoSelect={search:()=>({input,more,setLoading:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
+  w.fetch=async()=>({ok:true,redirected:false,json:async()=>[{id:'product',label:'Business loan',tenureUnit:'MONTHS',minimumAmount:'1000.00',maximumAmount:'9007199254740991.01',minimumTenure:3,maximumTenure:24}]});
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(select.value,'product');assert.equal(select.selectedOptions[0].dataset.maximumAmount,'9007199254740991.01');
+  assert.equal(select.selectedOptions[0].dataset.minimumTenure,'3');assert.equal(changes,1);
   dom.window.close();
 });

@@ -62,7 +62,9 @@ public final class LoanRecordingDtos {
         private String evidence = "";
         private String notes = "";
     }
-    public record Choice(UUID id, String label, String purpose, String tenureUnit) {
+    public record Choice(UUID id, String label, String purpose, String tenureUnit,
+        String minimumAmount, String maximumAmount, Integer minimumTenure, Integer maximumTenure) {
+        public Choice(UUID id,String label,String purpose,String tenureUnit){this(id,label,purpose,tenureUnit,null,null,null,null);}
         public Choice(UUID id,String label,String purpose){this(id,label,purpose,null);}
     }
     public record ReceiptLoan(UUID id,UUID clientId,String number,String client,String clientNumber,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal outstandingPrincipal,LocalDate disbursed,LocalDate lastPayment,String status,BigDecimal charges) {

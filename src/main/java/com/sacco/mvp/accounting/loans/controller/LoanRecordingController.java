@@ -51,11 +51,16 @@ public class LoanRecordingController {
         model.addAttribute("recordForm",f);return "accounting/loans/record-form";}
     @PostMapping("/loan-records") public String save(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute RecordForm recordForm,BindingResult errors,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,@RequestParam(defaultValue="save") String action,Model model,RedirectAttributes flash){
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
-            if(action.equals("preview")){model.addAttribute("quote",service.preview(a,recordForm));return "accounting/loans/record-form";}
+            if(action.equals("preview")){model.addAttribute("quote",service.preview(a,recordForm));recordProductContext(a,recordForm,model);return "accounting/loans/record-form";}
             if(!action.equals("save"))throw new IllegalArgumentException("recording.error.request");UUID id=service.save(a,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
         }catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
         if(recordForm.getTopUpSourceLoanId()!=null)try{model.addAttribute("topUpQuote",service.topUpQuote(a,recordForm.getTopUpSourceLoanId(),recordForm.getApplicationDate(),null));}catch(IllegalArgumentException ex){model.addAttribute("topUpError",error(ex));}
+        recordProductContext(a,recordForm,model);
         return "accounting/loans/record-form";
+    }
+    private void recordProductContext(AppUserPrincipal a,RecordForm form,Model model){
+        if("CONFIGURED".equals(form.getLoanMode()) && form.getProductId()!=null)
+            try{model.addAttribute("selectedProduct",service.recordProduct(a,form.getProductId()));}catch(IllegalArgumentException ignored){/* Keep the original validation error for an unavailable product. */}
     }
     @GetMapping("/loan-recording/top-up-quote") @ResponseBody
     public ResponseEntity<?> topUpQuote(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam UUID source,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,@RequestParam(required=false) BigDecimal principal,Locale locale){

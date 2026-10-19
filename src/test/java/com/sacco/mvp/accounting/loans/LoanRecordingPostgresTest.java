@@ -297,12 +297,21 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->service.repay(actor,dated)).isInstanceOfAny(IllegalArgumentException.class,org.springframework.dao.DataAccessException.class);
         assertThat(adjustments().context(actor,loan).outstanding()).isEqualByComparingTo("900.00");
     }
-    @Test void configuredProductChoicesIncludeTheirTenureUnitAndLegacyMonthDefault(){
-        jdbc.update("update loan_product_settings set tenure_unit='DAYS' where id=?",product);
-        var choices=service.choices(actor,"products","",0);
-        assertThat(choices).filteredOn(c->c.id().equals(product)).singleElement().extracting(Choice::tenureUnit).isEqualTo("DAYS");
-        jdbc.update("update loan_product_settings set tenure_unit=null where id=?",product);
-        assertThat(service.choices(actor,"products","",0)).filteredOn(c->c.id().equals(product)).singleElement().extracting(Choice::tenureUnit).isEqualTo("MONTHS");
+    @Test void configuredProductChoicesIncludeExactAmountLimitsAndResolvedTenureLimits(){
+        jdbc.update("update loan_product_settings set tenure_unit='DAYS',minimum_amount=1000,maximum_amount=9007199254740991.01,min_tenure=7,max_tenure=30 where id=?",product);
+        var choice=service.choices(actor,"products","",0).stream().filter(c->c.id().equals(product)).findFirst().orElseThrow();
+        assertThat(choice.tenureUnit()).isEqualTo("DAYS");
+        assertThat(choice.minimumAmount()).isEqualTo("1000.00");assertThat(choice.maximumAmount()).isEqualTo("9007199254740991.01");
+        assertThat(choice.minimumTenure()).isEqualTo(7);assertThat(choice.maximumTenure()).isEqualTo(30);
+        assertThat(service.filterProduct(actor,product)).isEqualTo(choice);
+        assertThat(service.recordProduct(actor,product)).isEqualTo(choice);
+        jdbc.update("update loan_product_settings set tenure_unit=null,min_tenure=null,max_tenure=null,min_repayment_months=2,max_repayment_months=18 where id=?",product);
+        var legacy=service.choices(actor,"products","",0).stream().filter(c->c.id().equals(product)).findFirst().orElseThrow();
+        assertThat(legacy.tenureUnit()).isEqualTo("MONTHS");assertThat(legacy.minimumTenure()).isEqualTo(2);assertThat(legacy.maximumTenure()).isEqualTo(18);
+        jdbc.update("update loan_product_settings set min_repayment_months=0,max_repayment_months=null,minimum_amount=null,maximum_amount=null where id=?",product);
+        var defaults=service.filterProduct(actor,product);
+        assertThat(defaults.minimumTenure()).isEqualTo(1);assertThat(defaults.maximumTenure()).isEqualTo(600);
+        assertThat(defaults.minimumAmount()).isNull();assertThat(defaults.maximumAmount()).isNull();
     }
     @Test void pagedScheduleBalancesCarryForwardPrincipalAndInterestAcrossPages(){
         var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setTenureUnit("MONTHS");f.setTenureValue(12);

@@ -19,11 +19,12 @@
         const blank = [...select.options].find(option => option.value === '')?.cloneNode(true) || new Option('', '');
         const previous = targetPage ? [...select.options].filter(option => option.value && option.dataset.searchQuery === normalized) : [];
         const options = new Map(previous.map(option => [option.value, option]));
-        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized;if(choice.tenureUnit)option.dataset.tenureUnit=choice.tenureUnit; options.set(choice.id, option);});
+        const productFields = ['tenureUnit','minimumAmount','maximumAmount','minimumTenure','maximumTenure'];
+        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized;productFields.forEach(key=>{if(choice[key]!=null)option.dataset[key]=choice[key];}); options.set(choice.id, option);});
         const visible = [...options.values()].slice(-100); select.replaceChildren(blank, ...visible);
         if (value && !visible.some(option => option.value === value) && selected) select.add(selected);
         select.value = value; page = targetPage; loadedSearch = query;
-        if(box.dataset.category === 'products' && selected?.dataset.tenureUnit !== select.selectedOptions[0]?.dataset.tenureUnit)
+        if(box.dataset.category === 'products' && productFields.some(key=>selected?.dataset[key] !== select.selectedOptions[0]?.dataset[key]))
           select.dispatchEvent(new Event('change', {bubbles:true}));
         more.hidden = choices.length <= 25; error.textContent = '';
       } catch (failure) { if (version === request && failure.name !== 'AbortError') {error.textContent = error.dataset.error; more.hidden = true; binding.cancel();} }
@@ -77,6 +78,20 @@
       const tenureLabel = recordForm.querySelector('[data-tenure-label]');
       tenureLabel.textContent = tenureLabel.dataset[unit.value.toLowerCase()] || tenureLabel.dataset.empty;
       recordForm.querySelector('#tenureValue').max = unit.value === 'DAYS' ? '18250' : unit.value === 'YEARS' ? '50' : '600';
+      const selected = !custom && product.value ? product.selectedOptions[0]?.dataset : null;
+      const amountLimits = recordForm.querySelector('[data-product-amount-limits]'), tenureLimits = recordForm.querySelector('[data-product-tenure-limits]');
+      if(amountLimits){
+        const minimum = selected?.minimumAmount, maximum = selected?.maximumAmount;
+        amountLimits.hidden = !minimum && !maximum;
+        amountLimits.querySelector('[data-limit-min]').textContent = minimum ? money(minimum) : amountLimits.dataset.unavailable;
+        amountLimits.querySelector('[data-limit-max]').textContent = maximum ? money(maximum) : amountLimits.dataset.unavailable;
+      }
+      if(tenureLimits){
+        tenureLimits.hidden = !selected?.minimumTenure || !selected?.maximumTenure || !unit.value;
+        tenureLimits.querySelector('[data-limit-min]').textContent = selected?.minimumTenure || '';
+        tenureLimits.querySelector('[data-limit-max]').textContent = selected?.maximumTenure || '';
+        tenureLimits.querySelector('[data-limit-unit]').textContent = region.dataset[unit.value.toLowerCase()] || '';
+      }
       clearTimeout(timer); controller?.abort(); ++version;
       recordForm.dispatchEvent(new CustomEvent('loan:quote-pending'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
       if(schedule){schedule.hidden = true;rows.replaceChildren();summary.textContent = '';}

@@ -52,12 +52,21 @@ class LoanRecordingMvcTest {
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf()).param("principal","invalid").param("purpose","Business stock"))
             .andExpect(view().name("accounting/loans/record-form")).andExpect(model().attributeHasFieldErrors("recordForm","principal"));
     }
-    @Test void productChoicesReturnTenureUnitWithoutAnotherLookup() throws Exception {
+    @Test void productChoicesReturnExactLimitsAndTenureUnitWithoutAnotherLookup() throws Exception {
         var id=UUID.randomUUID();
-        when(service.choices(actor,"products","",0)).thenReturn(List.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice(id,"Day loan","","DAYS")));
+        when(service.choices(actor,"products","",0)).thenReturn(List.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice(id,"Day loan","","DAYS","1000.00","9007199254740991.01",7,30)));
         mvc.perform(get("/finance/loan-recording/choices/products").with(user(actor)))
             .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(id.toString()))
-            .andExpect(jsonPath("$[0].tenureUnit").value("DAYS"));
+            .andExpect(jsonPath("$[0].tenureUnit").value("DAYS"))
+            .andExpect(jsonPath("$[0].minimumAmount").value("1000.00")).andExpect(jsonPath("$[0].maximumAmount").value("9007199254740991.01"))
+            .andExpect(jsonPath("$[0].minimumTenure").value(7)).andExpect(jsonPath("$[0].maximumTenure").value(30));
+    }
+    @Test void invalidRecordingRetainsSelectedProductLimitsOutsideTheFirstLookupPage() throws Exception {
+        var id=UUID.randomUUID();var product=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice(id,"Day loan","","DAYS","500.00","5000.00",7,30);
+        when(service.recordProduct(actor,id)).thenReturn(product);
+        mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf()).param("loanMode","CONFIGURED").param("productId",id.toString()).param("principal","invalid"))
+            .andExpect(view().name("accounting/loans/record-form")).andExpect(model().attributeHasFieldErrors("recordForm","principal"))
+            .andExpect(model().attribute("selectedProduct",product));
     }
     @Test void documentDownloadChecksScopeThroughServiceAndPreventsSniffing() throws Exception {
         var id=UUID.randomUUID();when(service.attachment(eq(actor),eq(id),eq("proof"))).thenReturn(new LoanAttachmentService.AttachmentResource("%PDF synthetic".getBytes(),"proof.pdf","application/pdf"));

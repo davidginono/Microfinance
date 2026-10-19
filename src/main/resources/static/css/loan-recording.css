@@ -16,3 +16,4 @@
 .aws-console .accounting-create-workspace .loan-form-grid label{font-size:14px;font-weight:400;}
 .aws-console .accounting-create-workspace .accounting-section > label:has(.aws-control){display:grid;gap:5px;max-width:728px;}
 .aws-console .accounting-create-workspace .loan-form-actions{margin:0;}
+.aws-console :is([data-product-amount-limits],[data-product-tenure-limits]){font-size:14px;line-height:20px;}
