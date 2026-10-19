@@ -5,4 +5,42 @@
 
 <div hidden data-batch-messages><span data-message="charges"><spring:message code="charges.outstanding" /></span></div>
 
-<div hidden data-batch-messages><span data-message="checking"><spring:message code="batch.checking" /></span></div>
+<div hidden data-batch-messages>
+    <span data-message="field.client"><spring:message code="batch.field.client" text="Client unavailable in this branch." /></span>
+    <span data-message="field.date"><spring:message code="batch.field.date" text="Before disbursement or last payment." /></span>
+    <span data-message="field.account"><spring:message code="batch.field.account" text="Account is inactive or not allowed." /></span>
+    <span data-message="field.reference"><spring:message code="batch.field.reference" text="Reference has an invalid format." /></span>
+    <span data-message="field.loan"><spring:message code="batch.field.loan" text="Loan is not eligible for repayment." /></span>
+    <span data-message="field.amount"><spring:message code="batch.field.amount" text="Use a positive TZS amount, up to 2 decimals." /></span>
+    <span data-message="field.accounts"><spring:message code="batch.field.accounts" text="Loan product accounts are not linked." /></span>
+    <span data-message="field.charges"><spring:message code="batch.field.charges" text="Pay fees via loan receipt." /></span>
+    <span data-message="field.policy"><spring:message code="batch.field.policy" text="No repayment rules for this date." /></span>
+    <span data-message="field.debt"><spring:message code="batch.field.debt" text="Amount exceeds unpaid loan debt." /></span>
+    <span data-message="field.duplicate"><spring:message code="batch.field.duplicate" text="Collection reference already used." /></span>
+    <span data-message="field.evidence"><spring:message code="batch.field.evidence" text="Use 500 characters or fewer." /></span>
+    <span data-message="field.receipt"><spring:message code="batch.field.receipt" text="Receipt check failed. Retry validation." /></span>
+    <span data-message="field.lookup"><spring:message code="batch.field.lookup" text="Unable to load choices." /></span>
+    <span data-message="field.checking"><spring:message code="batch.field.checking" text="Checking..." /></span>
+    <span data-message="field.refresh"><spring:message code="batch.field.refresh" text="Refresh and validate again." /></span>
+    <span data-message="field.permission"><spring:message code="batch.field.permission" text="Posting access unavailable." /></span>
+    <span data-message="field.clientRequired"><spring:message code="batch.field.clientRequired" text="Select a client." /></span>
+    <span data-message="field.dateRequired"><spring:message code="batch.field.dateRequired" text="Enter payment date." /></span>
+    <span data-message="field.dateFormat"><spring:message code="batch.field.dateFormat" text="Enter a real DD/MM/YYYY date." /></span>
+    <span data-message="field.dateFuture"><spring:message code="batch.field.dateFuture" text="Payment date is in the future." /></span>
+    <span data-message="field.accountRequired"><spring:message code="batch.field.accountRequired" text="Select receiving account." /></span>
+    <span data-message="field.referenceRequired"><spring:message code="batch.field.referenceRequired" text="Enter collection reference." /></span>
+    <span data-message="field.loanRequired"><spring:message code="batch.field.loanRequired" text="Select a loan." /></span>
+    <span data-message="field.amountRequired"><spring:message code="batch.field.amountRequired" text="Enter payment amount." /></span>
+    <span data-message="field.amountPositive"><spring:message code="batch.field.amountPositive" text="Amount must be above zero." /></span>
+    <span data-message="field.amountFormat"><spring:message code="batch.field.amountFormat" text="Use digits and up to 2 decimals." /></span>
+    <span data-message="field.principalAccount"><spring:message code="batch.field.principalAccount" text="Principal account differs from disbursement." /></span>
+    <span data-message="field.productAccounts"><spring:message code="batch.field.productAccounts" text="Product needs principal and interest accounts." /></span>
+    <span data-message="field.inactiveAccounts"><spring:message code="batch.field.inactiveAccounts" text="Loan accounts are inactive or invalid." /></span>
+    <span data-message="field.closedPeriod"><spring:message code="batch.field.closedPeriod" text="Payment period is closed." /></span>
+    <span data-message="field.adjustmentDate"><spring:message code="batch.field.adjustmentDate" text="Before the latest loan adjustment." /></span>
+    <span data-message="field.loanClient"><spring:message code="batch.field.loanClient" text="Client does not own this loan." /></span>
+    <span data-message="field.opening"><spring:message code="batch.field.opening" text="Loan opening balance is unverified." /></span>
+    <span data-message="field.schedule"><spring:message code="batch.field.schedule" text="Loan schedule cannot be verified." /></span>
+    <span data-message="field.duplicateLoan"><spring:message code="batch.field.duplicateLoan" text="Loan already used in this receipt." /></span>
+    <span data-message="field.referenceLength"><spring:message code="batch.field.referenceLength" text="Reference exceeds 80 characters." /></span>
+</div>
