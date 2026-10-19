@@ -1,13 +1,16 @@
 /* Shared AWS resource surfaces for member and staff JSP workspaces. */
 .aws-console .erp-panel,
 .aws-console .erp-form-wrap:not(.aws-filter-toolbar):not(.erp-filter-form),
-.aws-console .loan-flow-panel {
+.aws-console .loan-flow-panel,
+.aws-console .erp-resource-section,
+.aws-console .accounting-section,
+.aws-console .erp-detail-card {
     min-width:0;max-width:100%;border:1px solid #d5dbdb;border-radius:0!important;
     background:#fff;box-shadow:0 1px 1px #879596;
 }
 .aws-console .erp-panel-header,
 .aws-console .loan-flow-panel-heading {
-    background:#fafafa;border-bottom:1px solid #eaeded;padding:16px 20px;
+    background:#fafafa!important;border-bottom:1px solid #eaeded!important;padding:16px 20px!important;
 }
 .aws-console :is(.erp-panel-title,.loan-flow-panel-heading h2) {
     font-size:16px!important;line-height:24px;letter-spacing:normal!important;text-transform:none!important;
@@ -17,6 +20,36 @@
 }
 .aws-console .loan-application-create-page {background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;}
 .aws-console .loan-flow-panel-body {padding:20px;}
+.aws-console .erp-resource-heading {
+    margin:0;padding:16px 20px;background:#fafafa;border-bottom:1px solid #eaeded;
+    font-size:16px;line-height:24px;font-weight:700;
+}
+.aws-console .loan-staff-review-template[data-staff-review-page] .loan-staff-review-overview {padding:20px;}
+.aws-console .loan-view-hero-summary > .erp-panel-body {padding:20px!important;background:#fff!important;}
+/* Forms and record facts belong on white sections, never directly on the workspace canvas.
+   accounting-section is the existing finance alias; new workspaces use erp-resource-section. */
+.aws-console :is(.erp-resource-section,.accounting-section,.erp-detail-card) {
+    --resource-section-padding:20px;
+    padding:var(--resource-section-padding);overflow-wrap:anywhere;
+}
+.aws-console :is(.erp-resource-section,.accounting-section,.erp-detail-card) > :is(h2,summary) {
+    margin:calc(-1 * var(--resource-section-padding)) calc(-1 * var(--resource-section-padding)) var(--resource-section-padding);
+    padding:16px var(--resource-section-padding);border-bottom:1px solid #eaeded;
+    background:#fafafa;color:#16191f;font-size:16px;line-height:24px;font-weight:700;
+}
+.aws-console details:is(.erp-resource-section,.accounting-section,.erp-detail-card) > summary {cursor:pointer;}
+.aws-console details:is(.erp-resource-section,.accounting-section,.erp-detail-card):not([open]) > summary {
+    margin-bottom:calc(-1 * var(--resource-section-padding));border-bottom:0;
+}
+.aws-console :is(.erp-resource-section,.accounting-section,.erp-detail-card) > p {margin:12px 0;}
+.aws-console :is(.erp-resource-section,.accounting-section,.erp-detail-card) > :last-child:not(summary) {margin-bottom:0;}
+.aws-console .erp-detail-facts {
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 0;margin:0;
+}
+.aws-console .erp-detail-facts > div {min-width:0;padding:0 20px;border:0;border-left:1px solid #eaeded;}
+.aws-console .erp-detail-facts > div:nth-child(3n+1) {padding-left:0;border-left:0;}
+.aws-console .erp-detail-facts dt {margin:0 0 6px;font-size:13px;line-height:20px;color:#545b64;}
+.aws-console .erp-detail-facts dd {margin:0;font-size:14px;line-height:20px;font-weight:400;overflow-wrap:anywhere;white-space:pre-wrap;font-variant-numeric:tabular-nums;}
 .aws-console :is(.erp-form-wrap,.erp-panel-body,.loan-flow-panel-body) label {font-size:14px;line-height:20px;letter-spacing:normal;text-transform:none;}
 .aws-console .erp-table {font-family:"Open Sans",Helvetica,Arial,sans-serif;font-size:14px!important;line-height:20px;}
 .aws-console .erp-table th {background:#fafafa!important;color:#545b64!important;font-size:13px!important;line-height:18px!important;text-transform:none;letter-spacing:normal;position:sticky;}
@@ -58,6 +91,19 @@
 @media(max-width:767px) {
     .aws-console .erp-form-wrap:not(.aws-filter-toolbar):not(.erp-filter-form),
     .aws-console .loan-flow-panel-body {padding:16px;}
-    .aws-console .erp-panel-header,.aws-console .loan-flow-panel-heading {padding:12px 16px;}
+    .aws-console .erp-panel-header,.aws-console .loan-flow-panel-heading {padding:12px 16px!important;}
+    .aws-console .erp-resource-heading {padding:12px 16px;}
+    .aws-console .loan-staff-review-template[data-staff-review-page] .loan-staff-review-overview {padding:16px;}
+    .aws-console .loan-view-hero-summary > .erp-panel-body {padding:16px!important;}
+    .aws-console :is(.erp-resource-section,.accounting-section,.erp-detail-card) {--resource-section-padding:16px;}
     .aws-console .resource-table-tools > .resource-table-filters > :is(label,[class*=field]) {flex:1 1 100%;}
+}
+@media(min-width:641px) and (max-width:1100px) {
+    .aws-console .erp-detail-facts {grid-template-columns:repeat(2,minmax(0,1fr));}
+    .aws-console .erp-detail-facts > div:nth-child(n) {padding:0 16px;border-left:1px solid #eaeded;}
+    .aws-console .erp-detail-facts > div:nth-child(2n+1) {padding-left:0;border-left:0;}
+}
+@media(max-width:640px) {
+    .aws-console .erp-detail-facts {grid-template-columns:minmax(0,1fr);gap:16px;}
+    .aws-console .erp-detail-facts > div:nth-child(n) {padding:0;border:0;}
 }

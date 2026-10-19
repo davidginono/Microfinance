@@ -6048,24 +6048,6 @@ html.session-timeout-active,
         align-items: stretch;
         gap: 10px;
     }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-facts {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        min-width: 0;
-        margin: 0;
-        border-top: 1px solid #d5dbdb;
-        border-left: 1px solid #d5dbdb;
-    }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-hero-inline-fact {
-        display: block;
-        min-width: 0;
-        margin: 0;
-        border-right: 1px solid #d5dbdb;
-        border-bottom: 1px solid #d5dbdb;
-        padding: 7px 9px;
-        background: #ffffff;
-    }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-hero-inline-label,
     .loan-staff-review-template[data-staff-review-page="true"] .loan-stat-label {
         display: block;
         margin: 0;
@@ -6076,7 +6058,6 @@ html.session-timeout-active,
         line-height: 16px;
         text-transform: uppercase;
     }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-hero-inline-value,
     .loan-staff-review-template[data-staff-review-page="true"] .loan-stat-value {
         display: block;
         min-width: 0;
@@ -6087,9 +6068,6 @@ html.session-timeout-active,
         letter-spacing: 0;
         line-height: 18px;
         overflow-wrap: break-word;
-    }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-fact--wide {
-        grid-column: span 2;
     }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-status-badge {
         border-radius: 2px !important;
@@ -6187,7 +6165,6 @@ html.session-timeout-active,
         box-shadow: none;
     }
     @media (max-width: 1023px) {
-        .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-facts,
         .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -6199,12 +6176,8 @@ html.session-timeout-active,
         .loan-staff-review-template[data-staff-review-page="true"] .loan-applicant-photo-card {
             justify-content: flex-start;
         }
-        .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-facts,
         .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-grid {
             grid-template-columns: minmax(0, 1fr);
-        }
-        .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-fact--wide {
-            grid-column: auto;
         }
     }
     .loan-simple-progress {
@@ -6405,42 +6378,6 @@ html.session-timeout-active,
             margin-top: 6px;
             transform: none;
         }
-    }
-    .loan-hero-primary-grid {
-        display: grid;
-        gap: 0.9rem 1.35rem;
-        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    }
-    .loan-hero-inline-fact {
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-        flex-wrap: wrap;
-        min-width: 0;
-    }
-    .loan-hero-inline-label {
-        flex: 0 0 auto;
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: #64748b;
-    }
-    .loan-hero-inline-value {
-        min-width: 0;
-        font-size: 1rem;
-        font-weight: 600;
-        line-height: 1.35;
-        color: #1f3755;
-        word-break: break-word;
-    }
-    .loan-hero-inline-value--id {
-        color: #0f172a;
-        font-weight: 600;
-    }
-    .loan-hero-facts-grid {
-        display: grid;
-        gap: 0.9rem 1.35rem;
     }
     .loan-hero-with-photo {
         display: grid;
@@ -6776,25 +6713,8 @@ html.session-timeout-active,
         padding: 10px !important;
     }
 
-    .loan-application-detail-page .loan-hero-primary-grid,
-    .loan-application-detail-page .loan-hero-facts-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-        gap: 0;
-        margin: 0 !important;
-        border-top: 1px solid #d5dbdb;
-        border-left: 1px solid #d5dbdb;
-    }
 
-    .loan-application-detail-page .loan-hero-inline-fact {
-        display: block;
-        min-width: 0;
-        border-right: 1px solid #d5dbdb;
-        border-bottom: 1px solid #d5dbdb;
-        padding: 7px 9px;
-    }
 
-    .loan-application-detail-page .loan-hero-inline-label,
     .loan-application-detail-page .loan-stat-label,
     .loan-application-detail-page .loan-repayment-card > div:first-child,
     .loan-application-detail-page .loan-repayment-note > div:first-child {
@@ -6806,13 +6726,6 @@ html.session-timeout-active,
         text-transform: uppercase;
     }
 
-    .loan-application-detail-page .loan-hero-inline-value {
-        margin-top: 2px;
-        color: #16191f;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 18px;
-    }
 
     .loan-status-badge {
         display: inline-flex;
@@ -6972,8 +6885,6 @@ html.session-timeout-active,
     }
 
     @media (max-width: 640px) {
-        .loan-application-detail-page .loan-hero-primary-grid,
-        .loan-application-detail-page .loan-hero-facts-grid,
         .loan-application-detail-page .loan-staff-kpi-grid,
         .loan-application-detail-page .loan-repayment-grid,
         .loan-application-detail-page .loan-repayment-meta-grid {

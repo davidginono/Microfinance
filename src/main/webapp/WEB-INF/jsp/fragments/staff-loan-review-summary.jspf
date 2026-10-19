@@ -32,40 +32,41 @@
 </c:choose>
 
 <section class="loan-view-hero-summary loan-staff-review-template" data-staff-review-page="true">
+    <h2 class="erp-resource-heading"><spring:message code="loan.detail" /></h2>
     <div class="loan-staff-review-overview">
         <div class="loan-hero-with-photo">
-            <dl class="loan-staff-review-facts">
-                <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="loan.applicationId" text="Loan Application ID" /></dt>
-                    <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${reviewApplicationId}" /></dd>
+            <dl class="erp-detail-facts">
+                <div>
+                    <dt><spring:message code="loan.applicationId" text="Loan Application ID" /></dt>
+                    <dd><c:out value="${reviewApplicationId}" /></dd>
                 </div>
-                <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="Member.memberNo" text="Client No" /></dt>
-                    <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${empty reviewApplicantMemberNo ? '-' : reviewApplicantMemberNo}" /></dd>
+                <div>
+                    <dt><spring:message code="Member.memberNo" text="Client No" /></dt>
+                    <dd><c:out value="${empty reviewApplicantMemberNo ? '-' : reviewApplicantMemberNo}" /></dd>
                 </div>
-                <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></dt>
-                    <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${empty reviewDisbursedLoanId ? '-' : reviewDisbursedLoanId}" /></dd>
+                <div>
+                    <dt><spring:message code="loan.loanId" text="Loan ID" /></dt>
+                    <dd><c:out value="${empty reviewDisbursedLoanId ? '-' : reviewDisbursedLoanId}" /></dd>
                 </div>
-                <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="common.status" text="Status" /></dt>
-                    <dd class="loan-hero-inline-value">
+                <div>
+                    <dt><spring:message code="common.status" text="Status" /></dt>
+                    <dd>
                         <span class="loan-status-badge ${reviewStatusBadgeClass}">
                             <spring:message code="loan.status.${reviewLoanStatus}" text="${reviewLoanStatus}" />
                         </span>
                     </dd>
                 </div>
-                <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="loan.applicantName" text="Applicant Name" /></dt>
-                    <dd class="loan-hero-inline-value"><c:out value="${reviewApplicantName}" /></dd>
+                <div>
+                    <dt><spring:message code="loan.applicantName" text="Applicant Name" /></dt>
+                    <dd><c:out value="${reviewApplicantName}" /></dd>
                 </div>
-                <div class="loan-hero-inline-fact">
-                    <dt class="loan-hero-inline-label"><spring:message code="reports.loanProduct" text="Loan Product" /></dt>
-                    <dd class="loan-hero-inline-value"><c:out value="${reviewLoanProductName}" /></dd>
+                <div>
+                    <dt><spring:message code="reports.loanProduct" text="Loan Product" /></dt>
+                    <dd><c:out value="${reviewLoanProductName}" /></dd>
                 </div>
-                <div class="loan-hero-inline-fact loan-staff-review-fact--wide">
-                    <dt class="loan-hero-inline-label"><spring:message code="loan.purpose" text="Loan Purpose" /></dt>
-                    <dd class="loan-hero-inline-value"><c:out value="${empty reviewLoanPurpose ? '-' : reviewLoanPurpose}" /></dd>
+                <div>
+                    <dt><spring:message code="loan.purpose" text="Loan Purpose" /></dt>
+                    <dd><c:out value="${empty reviewLoanPurpose ? '-' : reviewLoanPurpose}" /></dd>
                 </div>
             </dl>
             <div class="loan-applicant-photo-card">
@@ -126,13 +127,13 @@
     <c:set var="topUpReviewSummary" value="${processedLoanDetail ? loan.repaymentSummary : repaymentSummary}" />
     <spring:message code="newloan.calculation.topUpSource" var="topUpSourceLabel" />
     <c:if test="${not empty topUpReviewSummary[topUpSourceLabel]}">
-    <div class="loan-staff-review-financials"><h2 class="loan-staff-review-section-title"><spring:message code="recording.topUp.breakdown" /></h2><dl class="loan-staff-review-facts">
-        <c:forEach items="${['topUpSource','topUpSettlement','topUpCash','topUpQuoteDate']}" var="topUpField"><spring:message code="newloan.calculation.${topUpField}" var="topUpFieldLabel" /><div class="loan-hero-inline-fact"><dt class="loan-hero-inline-label"><c:out value="${topUpFieldLabel}" /></dt><dd class="loan-hero-inline-value"><c:out value="${topUpReviewSummary[topUpFieldLabel]}" /></dd></div></c:forEach>
+    <div class="loan-staff-review-financials"><h2 class="loan-staff-review-section-title"><spring:message code="recording.topUp.breakdown" /></h2><dl class="erp-detail-facts">
+        <c:forEach items="${['topUpSource','topUpSettlement','topUpCash','topUpQuoteDate']}" var="topUpField"><spring:message code="newloan.calculation.${topUpField}" var="topUpFieldLabel" /><div><dt><c:out value="${topUpFieldLabel}" /></dt><dd><c:out value="${topUpReviewSummary[topUpFieldLabel]}" /></dd></div></c:forEach>
     </dl></div>
     </c:if>
     <spring:message code="charges.policyReference" var="chargePolicyLabel" />
-    <c:if test="${not empty topUpReviewSummary[chargePolicyLabel]}"><div class="loan-staff-review-financials"><h2 class="loan-staff-review-section-title"><spring:message code="charges.title" /></h2><dl class="loan-staff-review-facts">
-    <c:forEach items="${['policyReference','agreementReference','kind.APPLICATION','kind.PROCESSING','kind.INSURANCE','provider','total','contractTotal','sourceSettlement','deductions']}" var="chargeKey"><spring:message code="charges.${chargeKey}" var="chargeLabel" /><c:if test="${not empty topUpReviewSummary[chargeLabel]}"><div class="loan-hero-inline-fact"><dt class="loan-hero-inline-label"><c:out value="${chargeLabel}" /></dt><dd class="loan-hero-inline-value"><c:out value="${topUpReviewSummary[chargeLabel]}" /></dd></div></c:if></c:forEach>
+    <c:if test="${not empty topUpReviewSummary[chargePolicyLabel]}"><div class="loan-staff-review-financials"><h2 class="loan-staff-review-section-title"><spring:message code="charges.title" /></h2><dl class="erp-detail-facts">
+    <c:forEach items="${['policyReference','agreementReference','kind.APPLICATION','kind.PROCESSING','kind.INSURANCE','provider','total','contractTotal','sourceSettlement','deductions']}" var="chargeKey"><spring:message code="charges.${chargeKey}" var="chargeLabel" /><c:if test="${not empty topUpReviewSummary[chargeLabel]}"><div><dt><c:out value="${chargeLabel}" /></dt><dd><c:out value="${topUpReviewSummary[chargeLabel]}" /></dd></div></c:if></c:forEach>
     </dl><p><spring:message code="charges.notPaid" /></p></div></c:if>
     <div class="loan-staff-review-progress">
         <%@ include file="loan-application-progress.jspf" %>

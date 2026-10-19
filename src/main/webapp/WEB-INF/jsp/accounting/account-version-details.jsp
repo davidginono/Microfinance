@@ -3,9 +3,9 @@
 <c:set var="v" value="${details.version}" />
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${v.proposed.code}" /> · <spring:message code="coav.versionNumber" arguments="${v.number}" /></h1></div>
 <div class="accounting-workspace accounting-resource-workspace coav-details">
- <section class="accounting-form">
+ <section class="accounting-form erp-resource-section">
   <h2><c:out value="${v.proposed.name}" /></h2>
-  <dl class="accounting-context">
+  <dl class="erp-detail-facts">
    <div><dt><spring:message code="accounting.type" /></dt><dd><spring:message code="accounting.option.${v.proposed.type}" /></dd></div>
    <div><dt><spring:message code="accounting.kind" /></dt><dd><c:choose><c:when test="${v.proposed.kind=='HEADING'}"><spring:message code="coa.group" /></c:when><c:otherwise><spring:message code="accounting.option.${v.proposed.kind}" /></c:otherwise></c:choose></dd></div>
    <div><dt><spring:message code="accounting.normalBalance" /></dt><dd><spring:message code="${v.proposed.normalBalance=='DEBIT'?'accounting.debit':'accounting.credit'}" /></dd></div>

@@ -89,41 +89,19 @@
     </div>
 </c:if>
 <div class="loan-view-hero-summary loan-staff-review-template">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
-        <div class="min-w-0">
-            <div class="loan-hero-primary-grid">
-                <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label"><spring:message code="loan.applicationId" text="Loan Application ID" /></div>
-                    <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
-                </div>
-                <c:if test="${not empty disbursedLoanId}">
-                    <div class="loan-hero-inline-fact">
-                        <div class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></div>
-                        <div class="loan-hero-inline-value loan-hero-inline-value--id">${disbursedLoanId}</div>
-                    </div>
-                </c:if>
-                <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label"><spring:message code="loan.status" text="Status" /></div>
-                    <div class="loan-hero-inline-value">
-                        <span class="app-badge loan-status-badge ${loanStatusBadgeClass}">
-                            <spring:message code="loan.status.${app.status}" text="${app.status}" />
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-4 loan-hero-facts-grid sm:grid-cols-2">
-                <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label"><spring:message code="reports.loanProduct" text="Loan Product" /></div>
-                    <div class="loan-hero-inline-value"><c:out value="${loanProductName}" /></div>
-                </div>
-                <c:if test="${not empty formFields['Loan Purpose']}">
-                    <div class="loan-hero-inline-fact">
-                        <div class="loan-hero-inline-label"><spring:message code="loan.purpose" text="Loan Purpose" /></div>
-                        <div class="loan-hero-inline-value">${formFields['Loan Purpose']}</div>
-                    </div>
-                </c:if>
-            </div>
-        </div>
+    <h2 class="erp-resource-heading"><spring:message code="loan.detail" /></h2>
+    <div class="erp-panel-body">
+        <dl class="erp-detail-facts">
+            <div><dt><spring:message code="loan.applicationId" text="Loan Application ID" /></dt><dd>${loanIdShort}</dd></div>
+            <c:if test="${not empty disbursedLoanId}">
+                <div><dt><spring:message code="loan.loanId" text="Loan ID" /></dt><dd>${disbursedLoanId}</dd></div>
+            </c:if>
+            <div><dt><spring:message code="loan.status" text="Status" /></dt><dd><span class="app-badge loan-status-badge ${loanStatusBadgeClass}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span></dd></div>
+            <div><dt><spring:message code="reports.loanProduct" text="Loan Product" /></dt><dd><c:out value="${loanProductName}" /></dd></div>
+            <c:if test="${not empty formFields['Loan Purpose']}">
+                <div><dt><spring:message code="loan.purpose" text="Loan Purpose" /></dt><dd>${formFields['Loan Purpose']}</dd></div>
+            </c:if>
+        </dl>
     </div>
 
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
