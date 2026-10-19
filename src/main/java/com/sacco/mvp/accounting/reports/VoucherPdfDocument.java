@@ -40,10 +40,10 @@ public final class VoucherPdfDocument implements AutoCloseable {
         y=Math.min(top-130,Math.min(partyEnd,detailsEnd)-18);
         tableHeader();
         for(var row:source.rows())row(row);
-        // Numbered empty writing slots are stationery, never additional posted transactions.
+        // Preserve stationery spacing without numbering empty writing slots.
         float required=tailHeight();
         for(int n=source.rows().size();n<10 && y-20>=required;n++){
-            text(Integer.toString(n+1),35,y-12,9,false);y-=20;
+            y-=20;
         }
         if(y<210)page(false);
         y-=24;

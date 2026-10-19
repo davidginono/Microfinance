@@ -52,6 +52,12 @@ class VoucherPdfTest {
    try(var doc=Loader.loadPDF(output.bytes())){
     assertThat(doc.getNumberOfPages()).isEqualTo(1);String text=new PDFTextStripper().getText(doc);
     assertThat(text).contains("AMOUNT IN WORDS","REMARKS / NARRATION","POSTING RECORD","30,000.75","thirty thousand").doesNotContain("APPROVALS","CHECKED BY","APPROVED BY","Details");
+    if(type!=Type.JOURNAL){
+     var numberColumn=new org.apache.pdfbox.text.PDFTextStripperByArea();
+     numberColumn.addRegion("numbers",new java.awt.geom.Rectangle2D.Float(22,0,30,800));numberColumn.extractRegions(doc.getPage(0));
+     var numbers=numberColumn.getTextForRegion("numbers").lines().map(String::strip).filter(value->value.matches("[0-9]+")).toList();
+     assertThat(numbers).as("Only populated %s rows are numbered",type).containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(1,type==Type.RECEIPT?3:6).mapToObj(Integer::toString).toList());
+    }
     Files.write(Path.of("target/"+type.name().toLowerCase()+"-format.pdf"),output.bytes());
     javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(0,120),"png",Path.of("target/"+type.name().toLowerCase()+"-format.png").toFile());
    }
