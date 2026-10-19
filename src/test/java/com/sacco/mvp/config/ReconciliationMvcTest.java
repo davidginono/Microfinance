@@ -51,6 +51,36 @@ class ReconciliationMvcTest {
         mvc.perform(get(URL).with(user(actor)).param("run","true").param("from","invalid")).andExpect(status().isBadRequest()).andExpect(model().attribute("formError","reconciliation.error.parameters"));
         mvc.perform(get(URL).with(user(actor)).param("run","true").param("page","invalid")).andExpect(status().isBadRequest());verify(service,never()).report(any(),any(),anyBoolean());
     }
+    @Test void configuredActivityChoicesUseTheReportScopeAndLocalizedNames()throws Exception {
+        var activity=new Activity(UUID.randomUUID(),"Configured operations","Shughuli zilizosanidiwa",null);
+        when(service.activities(actor,"configured",1)).thenReturn(List.of(activity));
+        mvc.perform(get(URL+"/activities").with(user(actor)).locale(Locale.forLanguageTag("sw")).param("search","configured").param("page","1"))
+            .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+            .andExpect(jsonPath("$[0].id").value(activity.id().toString())).andExpect(jsonPath("$[0].label").value(activity.nameSw()));
+        verify(service).activities(actor,"configured",1);
+    }
+    @Test void selectedActivityReachesPreviewPrintAndPdfAndSurvivesOutsideTheFirstOptionsPage()throws Exception {
+        var activity=new Activity(UUID.randomUUID(),"Older configured activity",null,null);
+        when(service.activity(actor,activity.id())).thenReturn(activity);
+        when(service.report(eq(actor),any(),anyBoolean())).thenAnswer(i->result(i.getArgument(1)));
+        when(pdf.build(any(),any())).thenReturn("%PDF-test".getBytes());
+        mvc.perform(get(URL).with(user(actor)).param("run","true").param("activityId",activity.id().toString()))
+            .andExpect(status().isOk()).andExpect(model().attribute("selectedActivity",activity));
+        mvc.perform(get(URL+"/print").with(user(actor)).param("activityId",activity.id().toString())).andExpect(status().isOk());
+        mvc.perform(get(URL+"/pdf").with(user(actor)).param("activityId",activity.id().toString())).andExpect(status().isOk());
+        verify(service,times(3)).report(eq(actor),argThat(p->activity.id().equals(p.activityId()) && "ALL".equals(p.component())),anyBoolean());
+        mvc.perform(get(URL).with(user(actor)).param("activityId","not-an-id")).andExpect(status().isBadRequest());
+    }
+    @Test void manualSelectionReachesPreviewAndBothExports()throws Exception {
+        when(service.report(eq(actor),any(),anyBoolean())).thenAnswer(i->result(i.getArgument(1)));
+        when(pdf.build(any(),any())).thenReturn("%PDF-test".getBytes());
+        var response=mvc.perform(get(URL).with(user(actor)).param("run","true").param("activityId","UNASSIGNED"))
+            .andExpect(status().isOk()).andReturn();
+        org.assertj.core.api.Assertions.assertThat(((ReconciliationController.Filter)response.getModelAndView().getModel().get("filter")).getActivityFilter()).isEqualTo("UNASSIGNED");
+        mvc.perform(get(URL+"/print").with(user(actor)).param("activityId","UNASSIGNED")).andExpect(status().isOk());
+        mvc.perform(get(URL+"/pdf").with(user(actor)).param("activityId","UNASSIGNED")).andExpect(status().isOk());
+        verify(service,times(3)).report(eq(actor),argThat(p->p.unassigned() && p.activityId()==null && "ALL".equals(p.component())),anyBoolean());
+    }
     @Test void printAndPdfRequireExportAuthorizationAndUseTheWholeReport()throws Exception {
         when(service.report(eq(actor),any(),eq(true))).thenAnswer(i->result(i.getArgument(1)));when(pdf.build(any(),any())).thenReturn("%PDF-test".getBytes());
         mvc.perform(get(URL+"/print").with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/reconciliation/print"));

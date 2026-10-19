@@ -23,6 +23,21 @@ class ReconciliationTest {
     final ReconciliationService service=new ReconciliationService(repository,guard,clock,new ReportExportLimiter(1));
     final AppUserPrincipal actor=mock(AppUserPrincipal.class);
     Parameters p(){return new Parameters(LocalDate.of(2026,10,1),LocalDate.of(2026,10,8),OffsetDateTime.parse("2026-10-08T12:00:00+03:00"),"PRINCIPAL",0);}
+    @Test void activityLookupIsBoundedAndUsesCurrentReportPermissions() {
+        var activity=new Activity(UUID.randomUUID(),"Configured activity","Shughuli iliyosanidiwa",null);
+        when(repository.activities(actor,"configured",2)).thenReturn(List.of(activity));
+        assertThat(service.activities(actor," Configured ",2)).containsExactly(activity);
+        verify(guard).requireActor(actor,"ACCOUNTING_RECONCILIATION_VIEW");
+        for(int page:List.of(-1,10001))assertThatThrownBy(()->service.activities(actor,"",page)).hasMessage("reconciliation.error.parameters");
+        assertThatThrownBy(()->service.activities(actor,"x".repeat(101),0)).hasMessage("reconciliation.error.parameters");
+        verify(repository,never()).activities(any(),any(),eq(-1));verify(repository,never()).activities(any(),any(),eq(10001));
+    }
+    @Test void foreignActivityCannotReachTheFinancialComparison() {
+        UUID foreign=UUID.randomUUID();when(repository.activity(actor,foreign)).thenReturn(Optional.empty());
+        var selected=new Parameters(p().from(),p().through(),p().cutoff(),"ALL",0,foreign);
+        assertThatThrownBy(()->service.report(actor,selected,false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(repository,never()).groups(any(),any());verify(repository,never()).rows(any(),any(),anyBoolean());
+    }
     @Test void onlyReadPermissionReturnsToTheAccessMatrixWithoutDefaultGrants() {
         assertThat(UserClaim.ACCOUNTING_RECONCILIATION_VIEW.isAvailable()).isTrue();
         assertThat(UserClaim.ACCOUNTING_RECONCILIATION_CREATE.isAvailable()).isFalse();assertThat(UserClaim.ACCOUNTING_RECONCILIATION_APPROVE.isAvailable()).isFalse();
@@ -59,6 +74,19 @@ class ReconciliationTest {
             }
         }
         assertThatThrownBy(()->pdf.build(new Result(p(),"I","B",List.of(),result.groups(),1,false),Locale.ENGLISH)).hasMessage("reconciliation.error.large");
+    }
+    @Test void pdfIdentifiesConfiguredAndManualSelectionsInBothLanguages() throws Exception {
+        var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+        var pdf=new ReconciliationPdf(messages,new ReportExportLimiter(1));var base=p();
+        var activity=new Activity(UUID.randomUUID(),"Configured operations","Shughuli zilizosanidiwa",null);
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
+            var configured=new Result(new Parameters(base.from(),base.through(),base.cutoff(),"ALL",0,activity.id()),"Institution","Branch",List.of(),List.of(),0,false,activity);
+            var manual=new Result(new Parameters(base.from(),base.through(),base.cutoff(),"ALL",0,null,true),"Institution","Branch",List.of(),List.of(),0,false);
+            for(var result:List.of(configured,manual))try(var document=org.apache.pdfbox.Loader.loadPDF(pdf.build(result,locale))){
+                var text=new org.apache.pdfbox.text.PDFTextStripper().getText(document).replaceAll("\\s+"," ");
+                assertThat(text).contains(result.parameters().unassigned()?messages.getMessage("reconciliation.unassigned",null,locale):activity.label(locale));
+            }
+        }
     }
     @Test void multiPagePdfKeepsAllExceptionsAndRepeatsColumnHeadings() throws Exception {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");

@@ -17,12 +17,13 @@
         const choices = await response.json(); if (version !== request || controller.signal.aborted || !select.isConnected) return;
         const value = select.value, selected = select.selectedOptions[0]?.cloneNode(true);
         const blank = [...select.options].find(option => option.value === '')?.cloneNode(true) || new Option('', '');
-        const previous = targetPage ? [...select.options].filter(option => option.value && option.dataset.searchQuery === normalized) : [];
+        const pinned = [...select.options].filter(option => option.dataset.choicePinned === 'true').map(option => option.cloneNode(true));
+        const previous = targetPage ? [...select.options].filter(option => option.value && option.dataset.choicePinned !== 'true' && option.dataset.searchQuery === normalized) : [];
         const options = new Map(previous.map(option => [option.value, option]));
         const productFields = ['tenureUnit','minimumAmount','maximumAmount','minimumTenure','maximumTenure'];
         choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized;productFields.forEach(key=>{if(choice[key]!=null)option.dataset[key]=choice[key];}); options.set(choice.id, option);});
-        const visible = [...options.values()].slice(-100); select.replaceChildren(blank, ...visible);
-        if (value && !visible.some(option => option.value === value) && selected) select.add(selected);
+        const visible = [...options.values()].filter(option => !pinned.some(fixed => fixed.value === option.value)).slice(-100); select.replaceChildren(blank, ...pinned, ...visible);
+        if (value && ![...select.options].some(option => option.value === value) && selected) select.add(selected);
         select.value = value; page = targetPage; loadedSearch = query;
         if(box.dataset.category === 'products' && productFields.some(key=>selected?.dataset[key] !== select.selectedOptions[0]?.dataset[key]))
           select.dispatchEvent(new Event('change', {bubbles:true}));

@@ -26,8 +26,10 @@ public class ReconciliationPdf {
     private byte[] render(Result r,Locale locale) {
         try(var document=new PDDocument();var out=new ByteArrayOutputStream();var input=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream()) {
             var font=PDType0Font.load(document,input);
-            var context=List.of(r.institution()+" | "+r.branch(),com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().from())+" — "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().through())+" | TZS",
-                msg("cutoff",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().cutoff()),msg("exceptionsOnly",locale));
+            var context=new ArrayList<>(List.of(r.institution()+" | "+r.branch(),com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().from())+" — "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().through())+" | TZS",
+                msg("cutoff",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().cutoff()),msg("exceptionsOnly",locale)));
+            if(r.selectedActivity()!=null){context.add(msg("activity",locale)+": "+r.selectedActivity().label(locale));context.add(msg("activityScope",locale));}
+            if(r.parameters().unassigned()){context.add(msg("activity",locale)+": "+msg("unassigned",locale));context.add(msg("manualScope",locale));}
             try(var page=new AccountingPdfDocument(document,font,true,msg("title",locale),context,null,AccountingPdfDocument.Style.REFERENCE)) {
                 var labels=List.of("client","account","reference","date","transaction","description","slDebit","slCredit","glDebit","glCredit","debitVariance","creditVariance")
                     .stream().map(k->msg("column."+k,locale)).toList();
@@ -36,7 +38,7 @@ public class ReconciliationPdf {
                 float sum=0;for(float width:widths)sum+=width;for(int n=0;n<widths.length;n++)widths[n]/=sum;
                 boolean[] numeric={false,false,false,false,false,false,true,true,true,true,true,true};
                 for(var group:r.groups()) {
-                    page.endTable();page.section(msg("activity",locale)+": "+msg("component."+group.component(),locale)+" | "+msg("section."+group.section(),locale));
+                    page.endTable();page.section(msg("componentLabel",locale)+": "+msg("component."+group.component(),locale)+" | "+msg("section."+group.section(),locale));
                     page.columns(labels,widths,numeric);
                     for(var row:r.rows())if(row.getGroup().equals(group.getKey())) {
                         var cells=new ArrayList<>(List.of(row.client(),row.loan().isBlank()?row.account():row.loan()+" / "+row.account(),row.reference(),

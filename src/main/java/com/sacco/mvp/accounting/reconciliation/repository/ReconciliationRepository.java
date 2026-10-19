@@ -15,7 +15,7 @@ public class ReconciliationRepository {
     private final NamedParameterJdbcTemplate jdbc;
     private static final String SOURCE = source();
     private static final String ORDER = """
-        ORDER BY CASE component WHEN 'PRINCIPAL' THEN 0 WHEN 'ALLOWANCE' THEN 1 WHEN 'INTEREST_COLLECTIONS' THEN 2 ELSE 3 END,
+        ORDER BY CASE component WHEN 'PRINCIPAL' THEN 0 WHEN 'ALLOWANCE' THEN 1 WHEN 'INTEREST_COLLECTIONS' THEN 2 WHEN 'INTEREST_RECEIVABLE' THEN 3 ELSE 4 END,
           CASE section WHEN 'MOVEMENT' THEN 0 WHEN 'OPENING' THEN 1 WHEN 'CLOSING' THEN 2 ELSE 3 END
         """;
     private static String source() {
@@ -25,7 +25,22 @@ public class ReconciliationRepository {
     private MapSqlParameterSource parameters(AppUserPrincipal a, Parameters p) {
         return new MapSqlParameterSource().addValue("institution",a.getSaccoId()).addValue("branch",a.getStationId())
             .addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.cutoff())
-            .addValue("component",p.component()).addValue("offset",Math.multiplyExact(p.page(),25));
+            .addValue("component",p.component()).addValue("activityId",p.activityId(),java.sql.Types.OTHER)
+            .addValue("unassigned",p.unassigned()).addValue("allActivities",p.activityId()==null && !p.unassigned())
+            .addValue("offset",Math.multiplyExact(p.page(),25));
+    }
+    public List<Activity> activities(AppUserPrincipal actor,String search,int page) {
+        return jdbc.query("""
+            SELECT id,name,name_sw,system_key FROM gl_activity WHERE sacco_id=:institution
+              AND (strpos(lower(name),:search)>0 OR strpos(lower(coalesce(name_sw,'')),:search)>0 OR strpos(lower(code),:search)>0)
+            ORDER BY name,id LIMIT 26 OFFSET :offset
+            """,new MapSqlParameterSource("institution",actor.getSaccoId()).addValue("search",search).addValue("offset",page*25),
+            (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw"),r.getString("system_key")));
+    }
+    public Optional<Activity> activity(AppUserPrincipal actor,UUID id) {
+        return jdbc.query("SELECT id,name,name_sw,system_key FROM gl_activity WHERE sacco_id=:institution AND id=:id",
+            new MapSqlParameterSource("institution",actor.getSaccoId()).addValue("id",id),
+            (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw"),r.getString("system_key"))).stream().findFirst();
     }
     public List<Row> rows(AppUserPrincipal a, Parameters p, boolean export) {
         return jdbc.query(SOURCE+"SELECT * FROM exceptions "+ORDER+",date NULLS LAST,identity,account LIMIT :limit OFFSET :offset",

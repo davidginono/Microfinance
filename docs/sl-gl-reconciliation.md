@@ -4,7 +4,7 @@ New user-authorized scope: 2026-10-16. This restores a focused read-only report 
 
 ## Operation and layout
 
-Open **Accountant Office → Reports → SL GL Reconciliation**, `/reports/financial/sl-gl-reconciliation`. Select an effective-date period and activity. Principal is the default; allowances, collected-interest clearing, accrued-interest coverage and all activities are available separately.
+Open **Accountant Office → Reports → SL GL Reconciliation**, `/reports/financial/sl-gl-reconciliation`. Select an effective-date period and activity. All is the default. The searchable activity choices come from the institution's configured activity library, including inactive historical activities. Search and Load more use bounded server pages. **Unassigned / manual** selects ordinary voucher transactions recorded without a configured transaction code. All includes these vouchers as well as configured activities and existing loan sources. Selection survives paging, Refresh, PDF and print.
 
 The supplied report is the presentation reference: centered title, institution/branch/period and recorded cutoff, activity headings, Client No., Loan ID / Account No., Document Ref. No., Document Date, Transaction, Description, SL Debits, SL Credits, GL Debits, GL Credits, Debits Variance and Credits Variance. Microfinance lending terminology replaces the reference's shares activity.
 
@@ -23,6 +23,8 @@ Report-wide criteria and Refresh navigate together with the heading, cutoff and 
 
 Each side is aggregated by source journal, component, exact posting account and effective date before a full outer join. Unmapped SL vouchers retain their own identities. Duplicate bridge identities and duplicate journal source references are exceptions. Matching never uses a human reference alone, net totals alone or only an inner join. Debit variance is SL debit minus GL debit; credit variance is SL credit minus GL credit. Original and reversal entries remain separate at their effective dates.
 
+Activity filtering follows the immutable transaction code on each ordinary voucher row. It does not infer ownership from shared GL accounts or the current posting template. Manual rows have no transaction code. Existing dedicated repayment sources belong to the configured `LOAN_REPAYMENT` system activity; unclassified loan disbursements and adjustments remain in All. Ordinary vouchers have no independent supported subledger, so their SL and variance amounts remain unavailable. If selected and other activity/manual rows share an aggregated journal/account, or voucher totals do not agree with its GL lines, the selected allocation is unavailable rather than including another activity's amounts. All can show the complete journal/account total while still flagging missing independent SL coverage.
+
 All queries use institution and selected branch scope. Loan ownership uses `LoanApplication.stationId`, including when a client later moves. Out-of-scope source links do not expose foreign client identifiers. The report deliberately does not provide cross-branch registry access.
 
 ## Integrity and limits
@@ -36,6 +38,8 @@ All queries use institution and selected branch scope. Loan ownership uses `Loan
 ## Verification
 
 The dedicated PostgreSQL suite uses actual owning disbursement, repayment, reversal and adjustment services for valid financial cases. Corruption scenarios use transaction-local shadow copies with an explicit temporary search path; financial triggers and retained source records are never disabled or changed. Tests cover missing counterparts, duplicate links, amount/allocation differences, partial collections, reversals, adjustments, effective-date differences, cutoff handling, unavailable openings, branch scope, moved clients, current permissions, consistent concurrent reads and all-page totals/exports. MVC tests cover session boundaries, binding, malformed criteria, output routing and absence of write/spreadsheet endpoints. PDF checks exercise English and Kiswahili.
+
+The 2026-10-19 activity-filter increment also covers configured activities sharing accounts, manual vouchers, mixed activity/manual journal rows, linked reversals, unmatched GL amounts, inactive catalog choices and tenant isolation. Browser-control tests preserve All/manual choices through remote searching and retain activity selection when regenerating or refreshing the report.
 
 Verification on 2026-10-17:
 

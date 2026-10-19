@@ -7,7 +7,14 @@ import java.util.*;
 /** Discrepancy projections only. Null money means unavailable, never an assumed zero opening. */
 public final class ReconciliationReport {
     private ReconciliationReport() {}
-    public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, String component, int page) {}
+    public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, String component, int page, UUID activityId, boolean unassigned) {
+        public Parameters(LocalDate from,LocalDate through,OffsetDateTime cutoff,String component,int page,UUID activityId) {this(from,through,cutoff,component,page,activityId,false);}
+        public Parameters(LocalDate from,LocalDate through,OffsetDateTime cutoff,String component,int page) {this(from,through,cutoff,component,page,null);}
+    }
+    public record Activity(UUID id,String name,String nameSw,String systemKey) {
+        public String label(Locale locale) {return "sw".equals(locale.getLanguage()) && nameSw!=null && !nameSw.isBlank()?nameSw:name;}
+    }
+    public record ActivityChoice(UUID id,String label) {}
     public record Row(String component, String section, String client, String loan, String account,
             String reference, LocalDate date, String activity, String issue, BigDecimal slDebit, BigDecimal slCredit,
             BigDecimal glDebit, BigDecimal glCredit, BigDecimal debitVariance, BigDecimal creditVariance, String identity) {
@@ -21,5 +28,9 @@ public final class ReconciliationReport {
         public String getKey() { return key(); }
     }
     public record Result(Parameters parameters, String institution, String branch, List<Row> rows,
-            List<Group> groups, long count, boolean hasNext) {}
+            List<Group> groups, long count, boolean hasNext,Activity selectedActivity) {
+        public Result(Parameters parameters,String institution,String branch,List<Row> rows,List<Group> groups,long count,boolean hasNext) {
+            this(parameters,institution,branch,rows,groups,count,hasNext,null);
+        }
+    }
 }

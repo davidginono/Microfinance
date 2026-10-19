@@ -23,22 +23,40 @@ public class ReconciliationController {
     private final ApplicationClock clock;
     private final AuditService audit;
     @Data public static class Filter {
-        private String from,through,cutoff,component="PRINCIPAL";
+        private String from,through,cutoff,component="ALL";
+        private UUID activityId;
+        private boolean unassigned;
         private int page;
         private boolean run;
+        public String getActivityFilter() {return unassigned?"UNASSIGNED":Objects.toString(activityId,"");}
     }
-    @InitBinder("filter") void bind(WebDataBinder binder) { binder.setAllowedFields("from","through","cutoff","component","page","run"); }
+    @InitBinder("filter") void bind(WebDataBinder binder) {
+        binder.setAllowedFields("from","through","cutoff","component","activityId","page","run");
+        binder.registerCustomEditor(UUID.class,"activityId",new java.beans.PropertyEditorSupport(){
+            @Override public void setAsText(String text) {
+                boolean manual="UNASSIGNED".equals(text);((Filter)binder.getTarget()).setUnassigned(manual);
+                setValue(manual || text==null || text.isBlank()?null:UUID.fromString(text));
+            }
+        });
+    }
     @ModelAttribute void headers(HttpServletResponse response) { response.setHeader("Cache-Control","no-store"); }
     @GetMapping public String screen(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("filter") Filter f,
             org.springframework.validation.BindingResult binding,Model model,HttpServletResponse response) {
         service.authorize(actor,false);defaults(f);model.addAttribute("today",clock.today());
+        model.addAttribute("activities",service.activities(actor,"",0));
         try {
             if(binding.hasErrors())throw new IllegalArgumentException("reconciliation.error.parameters");
+            if(f.getActivityId()!=null)model.addAttribute("selectedActivity",service.activity(actor,f.getActivityId()));
             if(f.isRun())model.addAttribute("report",read(actor,f,false,"PREVIEW"));
         } catch(IllegalArgumentException|DateTimeException e) {
             response.setStatus(400);model.addAttribute("formError",safe(e));
         }
         return "accounting/reconciliation/report";
+    }
+    @GetMapping(value="/activities",produces="application/json") @ResponseBody
+    public List<ActivityChoice> activities(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,
+            @RequestParam(defaultValue="0") int page,Locale locale) {
+        return service.activities(actor,search,page).stream().map(a->new ActivityChoice(a.id(),a.label(locale))).toList();
     }
     @GetMapping("/pdf") @ResponseBody public ResponseEntity<byte[]> pdf(@AuthenticationPrincipal AppUserPrincipal actor,
             @ModelAttribute("filter") Filter f,Locale locale) {
@@ -50,9 +68,9 @@ public class ReconciliationController {
         defaults(f);model.addAttribute("report",read(actor,f,true,"PRINT"));return "accounting/reconciliation/print";
     }
     private Result read(AppUserPrincipal actor,Filter f,boolean export,String action) {
-        var result=service.report(actor,new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),f.getComponent(),f.getPage()),export);
+        var result=service.report(actor,new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),f.getComponent(),f.getPage(),f.getActivityId(),f.isUnassigned()),export);
         audit.log("SL_GL_RECONCILIATION",null,action,actor.getMemberId(),null,Map.of("saccoId",actor.getSaccoId(),"stationId",actor.getStationId(),
-            "from",result.parameters().from(),"through",result.parameters().through(),"cutoff",result.parameters().cutoff(),"component",result.parameters().component(),"exceptions",result.count()));
+            "from",result.parameters().from(),"through",result.parameters().through(),"cutoff",result.parameters().cutoff(),"component",result.parameters().component(),"activityId",f.getActivityFilter(),"exceptions",result.count()));
         return result;
     }
     private void defaults(Filter f) {

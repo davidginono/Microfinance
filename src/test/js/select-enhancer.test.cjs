@@ -61,6 +61,20 @@ test('large static lists acquire search automatically, while small enums and nat
     dom.window.close();
 });
 
+test('an explicit All choice remains selectable after remote activity loading and restores an empty filter',async()=>{
+    const markup=loan.replace('data-category="clients"','data-category="activities" data-choice-url="/reports/financial/sl-gl-reconciliation/activities"')
+        .replace('<option value="">Select an option</option>','<option value="" data-empty-option="true">All activities</option>');
+    const {dom,d}=await setup(markup,async()=>response([{id:'C1',label:'Configured activity One'},{id:'C2',label:'Configured activity Two'}]));
+    try{
+        const select=d.querySelector('select');d.querySelector('.neo-select-button').click();await tick();
+        [...d.querySelectorAll('.neo-select-option')].find(option=>option.textContent.includes('Configured activity Two')).click();
+        assert.equal(select.value,'C2');d.querySelector('.neo-select-button').click();
+        [...d.querySelectorAll('.neo-select-option')].find(option=>option.textContent.includes('All activities')).click();
+        assert.equal(select.value,'');assert.equal(d.querySelector('.neo-select-button').classList.contains('is-placeholder'),false);
+        assert.equal(d.querySelector('[name="purpose"]').value,'Working capital');
+    }finally{dom.window.close();}
+});
+
 test('remote selects show immediate cached matches and issue one request after rapid typing stops',async()=>{
     const calls=[];const {dom,w,d,advance}=await setup(loan,async url=>{calls.push(url);return response([{id:'C1',label:'Client One'},{id:'C2',label:'Client Two'},{id:'C3',label:'Client Three'}]);});
     d.querySelector('.neo-select-button').click();const search=d.querySelector('.neo-select-search input');
@@ -99,4 +113,17 @@ test('product lookups retain tenure metadata when the saved selection returns in
     assert.equal(d.querySelector('select').value,'C1');
     assert.equal(d.querySelector('select').selectedOptions[0].dataset.tenureUnit,'DAYS');
     dom.window.close();
+});
+
+test('manual activity choice survives remote searching and remains selectable alongside All',async()=>{
+ const markup=loan.replace('<option value="">Select an option</option>','<option value="" data-empty-option="true">All activities</option><option value="UNASSIGNED" data-choice-pinned="true">Unassigned / manual</option>');
+ const {dom,w,d,advance}=await setup(markup,async()=>response([{id:'C1',label:'Configured activity'}]));
+ try{
+  const select=d.querySelector('select');d.querySelector('.neo-select-button').click();
+  [...d.querySelectorAll('.neo-select-option')].find(o=>o.textContent.includes('Unassigned / manual')).click();assert.equal(select.value,'UNASSIGNED');
+  d.querySelector('.neo-select-button').click();const search=d.querySelector('.neo-select-search input');search.value='configured';search.dispatchEvent(new w.Event('input'));advance(350);await tick();
+  assert.equal(select.value,'UNASSIGNED');assert.equal([...select.options].filter(o=>o.value==='UNASSIGNED').length,1);
+  search.value='';search.dispatchEvent(new w.Event('input'));advance(350);await tick();
+  [...d.querySelectorAll('.neo-select-option')].find(o=>o.textContent.includes('All activities')).click();assert.equal(select.value,'');
+ }finally{dom.window.close();}
 });

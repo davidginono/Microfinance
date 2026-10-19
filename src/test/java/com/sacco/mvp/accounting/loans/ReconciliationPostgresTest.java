@@ -21,7 +21,7 @@ import static org.mockito.ArgumentMatchers.*;
 
 /** Valid sources use the real owning services and PostgreSQL constraints. Damage scenarios use
  * transaction-local shadow copies, never disable a financial protection or alter retained rows. */
-@EnabledIfEnvironmentVariable(named="MICROFINANCE_RECORDING_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_recording_test")
+@EnabledIfEnvironmentVariable(named="MICROFINANCE_RECORDING_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_(recording|reconciliation_activity_[a-f0-9]{8})_test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReconciliationPostgresTest {
     final LoanRecordingPostgresTest f=new LoanRecordingPostgresTest();
@@ -51,6 +51,20 @@ class ReconciliationPostgresTest {
         var id=loan();var receipt=repay(id);assertThat(report().count()).isZero();
         f.service.reverse(f.operator("B1"),receipt,UUID.randomUUID(),LoanRecordingPostgresTest.TODAY,"Correction");
         assertThat(report().rows()).isEmpty();assertThat(report().count()).isZero();
+    }
+    @Test void repaymentActivityUsesItsRecordedSourcesAndExcludesManualVouchersAndDisbursements() {
+        var id=loan();var payment=repay(id);
+        UUID activity=f.jdbc.queryForObject("select id from gl_activity where sacco_id=? and system_key='LOAN_REPAYMENT'",UUID.class,f.institution);
+        var all=p("ALL");var selected=new Parameters(all.from(),all.through(),all.cutoff(),"ALL",0,activity);
+        assertThat(service.report(f.actor,selected,false).count()).isZero();
+        tx().executeWithoutResult(t->{shadow("gl_journal_line");
+            f.jdbc.update("delete from gl_journal_line where account_id=? and credit>0",f.principal);
+            assertThat(service.report(f.actor,selected,false).rows()).anySatisfy(row->{assertThat(row.section()).isEqualTo("MOVEMENT");assertThat(row.issue()).isEqualTo("SL_ONLY");});
+            var manual=new Parameters(all.from(),all.through(),all.cutoff(),"ALL",0,null,true);
+            assertThat(service.report(f.actor,manual,false).count()).isZero();
+        });
+        f.service.reverse(f.operator("B1"),payment,UUID.randomUUID(),LoanRecordingPostgresTest.TODAY,"Synthetic linked correction");
+        assertThat(service.report(f.actor,selected,false).count()).isZero();
     }
     @Test void provisionsWriteOffWriteBackAndDisbursementCorrectionsCompareIndependently() {
         var id=loan();repay(id);f.provide(id,"900.00");
