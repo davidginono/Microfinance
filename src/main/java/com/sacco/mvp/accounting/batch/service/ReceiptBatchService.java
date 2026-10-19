@@ -62,20 +62,20 @@ public class ReceiptBatchService {
     public Plan estimate(AppUserPrincipal a,UUID batch,UUID item){authorize(a,true);var b=find(a,batch,false);owner(a,b);var i=repository.item(batch,item).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));return plan(a,i,List.of());}
     // Used by both synchronous estimates and the durable validator; no balances come from the browser.
     public Plan plan(AppUserPrincipal a,Item item,List<Plan> prior){
-        Form f=item.form();var policy=policies.effective(a,f.getEffectiveDate(),true);f.setInterestAccountId(policy.interestAccountId());receipts.preview(a,f);
+        Form f=item.form();var policy=policies.effective(a,f.getEffectiveDate(),true);f.setInterestAccountId(null);receipts.preview(a,f);
         var staged=new HashMap<UUID,BigDecimal[]>();for(var p:prior)for(var l:p.lines()){var sum=staged.computeIfAbsent(l.loanId(),key->new BigDecimal[]{BigDecimal.ZERO,BigDecimal.ZERO});sum[0]=sum[0].add(l.principal());sum[1]=sum[1].add(l.interest());}
         var contexts=loans.receiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).toList(),f.getEffectiveDate());var lines=new ArrayList<PlanLine>();BigDecimal principal=BigDecimal.ZERO,interest=BigDecimal.ZERO;
         for(var row:f.getRows()){
             var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();var previous=staged.getOrDefault(loan.id(),new BigDecimal[]{BigDecimal.ZERO,BigDecimal.ZERO});
             if(loan.charges().signum()>0)throw new IllegalArgumentException("charges.error.batch");var duePrincipal=loan.duePrincipal().subtract(previous[0]);var dueInterest=loan.dueInterest().subtract(previous[1]);var outstanding=loan.outstandingPrincipal().subtract(previous[0]);
-            var split=RepaymentAllocationCalculator.allocate(row.getAmount(),duePrincipal,dueInterest,outstanding,policy.allocationOrder());var account=loans.receiptPrincipalAccount(a,loan.id());
-            lines.add(new PlanLine(loan.id(),loan.number(),row.getAmount(),outstanding,duePrincipal,dueInterest,split.principal(),split.interest(),split.principalBalance(),account.label()));principal=principal.add(split.principal());interest=interest.add(split.interest());
+            var split=RepaymentAllocationCalculator.allocate(row.getAmount(),duePrincipal,dueInterest,outstanding,policy.allocationOrder());
+            lines.add(new PlanLine(loan.id(),loan.number(),row.getAmount(),outstanding,duePrincipal,dueInterest,split.principal(),split.interest(),split.principalBalance(),loan.principalAccount(),loan.principalAccountId(),loan.interestAccountId(),loan.interestAccount(),loan.product()));principal=principal.add(split.principal());interest=interest.add(split.interest());
         }
-        loans.receiptInterestAccount(a,policy.interestAccountId());return new Plan(policy.id(),policy.version(),policy.allocationOrder(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label(),policy.interestAccount(),lines,principal.add(interest),principal,interest);
+        return new Plan(policy.id(),policy.version(),policy.allocationOrder(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label(),"",lines,principal.add(interest),principal,interest);
     }
     public static boolean samePlan(Plan expected,Plan actual){
         if(expected==null || !Objects.equals(expected.policyId(),actual.policyId()) || !expected.moneyAccount().equals(actual.moneyAccount()) || !expected.interestAccount().equals(actual.interestAccount()) || expected.lines().size()!=actual.lines().size())return false;
-        for(int n=0;n<actual.lines().size();n++){var e=expected.lines().get(n);var a=actual.lines().get(n);if(!e.loanId().equals(a.loanId()) || !e.principalAccount().equals(a.principalAccount()) || e.amount().compareTo(a.amount())!=0 || e.principal().compareTo(a.principal())!=0 || e.interest().compareTo(a.interest())!=0 || e.principalBalance().compareTo(a.principalBalance())!=0 || e.duePrincipal().compareTo(a.duePrincipal())!=0 || e.dueInterest().compareTo(a.dueInterest())!=0)return false;}return true;
+        for(int n=0;n<actual.lines().size();n++){var e=expected.lines().get(n);var a=actual.lines().get(n);if(!e.loanId().equals(a.loanId()) || !Objects.equals(e.principalAccountId(),a.principalAccountId()) || !Objects.equals(e.interestAccountId(),a.interestAccountId()) || e.principalAccountId()==null || e.interestAccountId()==null || !Objects.equals(e.principalAccount(),a.principalAccount()) || e.amount().compareTo(a.amount())!=0 || e.principal().compareTo(a.principal())!=0 || e.interest().compareTo(a.interest())!=0 || e.principalBalance().compareTo(a.principalBalance())!=0 || e.duePrincipal().compareTo(a.duePrincipal())!=0 || e.dueInterest().compareTo(a.dueInterest())!=0)return false;}return true;
     }
     Batch find(AppUserPrincipal a,UUID id,boolean lock){return repository.find(a,id,lock).orElseThrow(()->new AccessDeniedException("Batch unavailable"));}
     private Batch editable(AppUserPrincipal a,UUID id){var b=find(a,id,true);owner(a,b);require(!Set.of("VALIDATING","POSTING","COMPLETED").contains(b.state()),"busy");return b;}

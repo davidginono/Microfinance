@@ -38,7 +38,7 @@ function update(){
 form.querySelector('[data-receipt-purpose]')?.addEventListener('change',()=>{
  rows.querySelectorAll('input').forEach(input=>{if(/\.(loanId|transactionId|templateKey|debitAccountId|creditAccountId)$/.test(input.name))input.value='';});
  rows.querySelectorAll('[data-account-label],[data-mapping-label]').forEach(el=>el.textContent='');
- if(!loanMode())form.elements.interestAccountId.value='';
+ if(form.elements.interestAccountId)form.elements.interestAccountId.value='';
  update();form.dispatchEvent(new Event('input',{bubbles:true}));
 });
 form.addEventListener('input',()=>{const preview=form.querySelector('[data-voucher-preview]');if(preview)preview.hidden=true;update();});

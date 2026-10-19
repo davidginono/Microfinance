@@ -32,13 +32,13 @@ public class RepaymentPolicyService {
     @Transactional
     public UUID save(AppUserPrincipal a,PolicyForm f){
         accounting.requireActor(a,"ACCOUNTING_ACCOUNTS_UPDATE");
-        if(f==null || f.requestKey()==null || f.effectiveFrom()==null || f.allocationOrder()==null || f.interestAccountId()==null || f.reason()==null || f.reason().isBlank() || f.reason().length()>500 || f.reason().chars().anyMatch(c->c<32))throw new IllegalArgumentException("batch.error.policyInput");
+        if(f==null || f.requestKey()==null || f.effectiveFrom()==null || f.allocationOrder()==null || f.reason()==null || f.reason().isBlank() || f.reason().length()>500 || f.reason().chars().anyMatch(c->c<32))throw new IllegalArgumentException("batch.error.policyInput");
         if(f.allocationOrder()!=AllocationOrder.INTEREST_FIRST)throw new IllegalArgumentException("batch.error.policyOrder");
         repository.lock(a.getSaccoId(),true);var retry=repository.retry(a.getSaccoId(),a.getMemberId(),f);if(retry.isPresent())return retry.get();var prior=repository.latest(a.getSaccoId());
         if(!Objects.equals(prior.map(Policy::id).orElse(null),f.expectedVersion()))throw new IllegalArgumentException("batch.error.stale");
         LocalDate last=repository.lastPayment(a.getSaccoId());
         if((prior.isPresent() && !f.effectiveFrom().isAfter(prior.get().effectiveFrom())) || (last!=null && !f.effectiveFrom().isAfter(last) && (prior.isPresent() || f.allocationOrder()!=AllocationOrder.INTEREST_FIRST)))throw new IllegalArgumentException("batch.error.policyDate");
-        if(!repository.account(a.getSaccoId(),f.interestAccountId()))throw new IllegalArgumentException("recording.error.account");
+        if(f.interestAccountId()!=null && !repository.account(a.getSaccoId(),f.interestAccountId()))throw new IllegalArgumentException("recording.error.account");
         UUID id=repository.insert(a.getSaccoId(),a.getMemberId(),f,prior.map(p->p.version()+1).orElse(1),clock.now());
         audit.logEvent("ACCOUNTING",id,"REPAYMENT_POLICY_CONFIGURED",a.getMemberId(),AuditEventStatus.SUCCESS,"Repayment settings","REPAYMENT_POLICY",id.toString(),a.getSaccoId(),a.getStationId(),Map.of("allocationOrder",f.allocationOrder().name(),"effectiveFrom",f.effectiveFrom().toString()));return id;
     }

@@ -212,7 +212,8 @@ class AdminServiceTest {
             minorAdminInvitationService,
             objectMapper,
             nameSignatureService,
-            applicationClock
+            applicationClock,
+            org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanProductAccountService.class)
         );
     }
 

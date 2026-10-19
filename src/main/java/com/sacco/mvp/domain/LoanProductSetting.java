@@ -39,6 +39,12 @@ public class LoanProductSetting {
     @Column(name = "product_name", length = 120)
     private String productName;
 
+    @Column(name = "principal_gl_account_id")
+    private UUID principalGlAccountId;
+
+    @Column(name = "interest_gl_account_id")
+    private UUID interestGlAccountId;
+
     @Column(name = "product_description", length = 500)
     private String productDescription;
 

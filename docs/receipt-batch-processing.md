@@ -1,5 +1,7 @@
 # Receipt batch processing
 
+2026-10-19: principal and interest routing now uses immutable loan bindings from product account links; batch entry shows the loan product without its GL mapping. The shared interest-account setup described in the historical increment below is superseded. Existing loans require explicit linking before collection. See [loan product account links](loan-product-account-links.md).
+
 The staff sidebar provides **Batch Processing → Receipt Batch Processing** at `/finance/batches/receipts`. This increment covers verified TZS repayments for directly recorded, disbursed loans with an existing ledger opening. It does not import Excel or enable new voucher export formats.
 
 ## Entry and review

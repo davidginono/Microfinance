@@ -734,6 +734,7 @@
                                     <option value="REDUCING_BALANCE"><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                                 </select>
                             </label>
+<c:set var="accountProduct" value="${null}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %>
                         </div>
                     </section>
 
@@ -1146,6 +1147,7 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
+<c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %>
                     </div>
                 </section>
 
@@ -1496,4 +1498,4 @@
 <spring:message code="admin.settings.validation.processingFeePercent" text="Loan processing fee percentage cannot be negative." var="validationProcessingFeePercent" />
 <%@ include file="../fragments/loan-product-workflow-script.jspf" %>
 
-<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>

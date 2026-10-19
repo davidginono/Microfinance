@@ -67,8 +67,8 @@ public final class LoanRecordingDtos {
         public Choice(UUID id,String label,String purpose,String tenureUnit){this(id,label,purpose,tenureUnit,null,null,null,null);}
         public Choice(UUID id,String label,String purpose){this(id,label,purpose,null);}
     }
-    public record ReceiptLoan(UUID id,UUID clientId,String number,String client,String clientNumber,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal outstandingPrincipal,LocalDate disbursed,LocalDate lastPayment,String status,BigDecimal charges) {
-        public ReceiptLoan(UUID id,UUID client,String number,String name,String clientNo,BigDecimal principal,BigDecimal interest,BigDecimal balance,LocalDate disbursed,LocalDate last,String status){this(id,client,number,name,clientNo,principal,interest,balance,disbursed,last,status,new BigDecimal("0.00"));}
+    public record ReceiptLoan(UUID id,UUID clientId,String number,String client,String clientNumber,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal outstandingPrincipal,LocalDate disbursed,LocalDate lastPayment,String status,BigDecimal charges,String product,UUID principalAccountId,String principalAccount,UUID interestAccountId,String interestAccount) {
+        public ReceiptLoan(UUID id,UUID client,String number,String name,String clientNo,BigDecimal principal,BigDecimal interest,BigDecimal balance,LocalDate disbursed,LocalDate last,String status){this(id,client,number,name,clientNo,principal,interest,balance,disbursed,last,status,new BigDecimal("0.00"),"",null,null,null,null);}
     }
     public record TopUpQuote(UUID sourceId,String sourceNumber,UUID clientId,String client,LocalDate date,
         BigDecimal principal,BigDecimal interest,BigDecimal excludedInterest,long sequence,BigDecimal charges,long chargeSequence) {

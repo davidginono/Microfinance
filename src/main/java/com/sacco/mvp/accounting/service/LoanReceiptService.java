@@ -49,7 +49,7 @@ public class LoanReceiptService {
         if(f.getClientId()!=null)labels.put(f.getClientId(),loans.receiptClient(a,f.getClientId()).label());
         if(f.getInterestAccountId()!=null)labels.put(f.getInterestAccountId(),loans.receiptInterestAccount(a,f.getInterestAccountId()).label());
         var ids=f.getRows().stream().filter(Objects::nonNull).map(RowForm::getLoanId).filter(Objects::nonNull).distinct().toList();
-        for(var loan:loans.receiptLoans(a,ids,f.getEffectiveDate()==null?clock.today():f.getEffectiveDate()))labels.put(loan.id(),loan.number());return labels;}
+        for(var loan:loans.receiptLoans(a,ids,f.getEffectiveDate()==null?clock.today():f.getEffectiveDate()))labels.put(loan.id(),loan.number()+" - "+loan.product());return labels;}
     @Transactional(readOnly=true)
     public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);var rows=new ArrayList<LoanReceiptRow>();var allocations=loans.receiptPreview(a,f);var names=selected(a,f);int n=0;
         for(var row:f.getRows()){var p=allocations.get(n++);rows.add(new LoanReceiptRow(n,null,row.getLoanId(),names.get(row.getLoanId()),row.getDescription(),row.getAmount(),p.principal(),p.interest(),p.principalBalance(),"","","",reference(f,n)));}return rows;}

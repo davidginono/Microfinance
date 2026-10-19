@@ -107,8 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         item.balance.replaceChildren();item.allocation.replaceChildren();
         item.balance.append(el('small',t(item.state === 'POSTED'?'beforePosting':item.estimated?'recordedBalances':'projectedBalances')));
         for(const line of plan.lines){const b = el('span',line.loanNumber + ': ' + t('principalOutstanding') + ' ' + money(line.outstandingPrincipal) + ' · ' + t('principalDue') + ' ' + money(line.duePrincipal) + ' · ' + t('interestDue') + ' ' + money(line.dueInterest),'batch-balance');item.balance.append(b);
-            item.allocation.append(el('span',line.loanNumber + ': ' + t('principal') + ' ' + money(line.principal) + ' · ' + t('interest') + ' ' + money(line.interest) + ' · ' + t('after') + ' ' + money(line.principalBalance),'batch-allocation'));
-            item.mapping.append(el('span',line.loanNumber + ': ' + t('principal') + ' → ' + line.principalAccount + ' · ' + t('interest') + ' → ' + plan.interestAccount,'batch-mapping'));
+            item.allocation.append(el('span',line.loanNumber + (line.product ? ' - ' + line.product : '') + ': ' + t('principal') + ' ' + money(line.principal) + ' · ' + t('interest') + ' ' + money(line.interest) + ' · ' + t('after') + ' ' + money(line.principalBalance),'batch-allocation'));
         }item.allocation.append(el('small',t(item.estimated?'recordedPreview':'batchPreview')));
     }
     async function context(item, loan, target){

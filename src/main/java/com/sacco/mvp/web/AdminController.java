@@ -92,6 +92,7 @@ public class AdminController {
     private final AppUsageAnalyticsService appUsageAnalyticsService;
     private final NotificationInboxService notificationInboxService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
+    private final com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
     private final SmsUsageManagementService smsUsageManagementService;
     private final StationOtpSettingsService stationOtpSettingsService;
     private final SaccoDataDeletionService saccoDataDeletionService;
@@ -100,6 +101,7 @@ public class AdminController {
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
     private final PlatformEmailSettingsService platformEmailSettingsService;
     private final PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
+    private final org.springframework.context.MessageSource messages;
 
     @GetMapping("/scope/select")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_VIEW')")
@@ -1044,6 +1046,14 @@ public class AdminController {
         return "admin/settings-controls";
     }
 
+    @GetMapping("/settings-controls/loan-product-accounts/{category}")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and (@access.has(principal, 'LOAN_PRODUCTS_CREATE') or @access.has(principal, 'LOAN_PRODUCTS_UPDATE'))")
+    @ResponseBody
+    public Object loanProductAccounts(@AuthenticationPrincipal AppUserPrincipal principal,
+        @PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,@RequestParam(required=false) UUID selected) {
+        return productAccounts.choices(adminScopeService.currentSaccoId(principal),category,search,page,selected);
+    }
+
     @PostMapping({"/loan-products/{id}", "/settings-controls/{id}"})
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_UPDATE')")
     public String updateLoanProduct(@PathVariable UUID id,
@@ -1092,6 +1102,8 @@ public class AdminController {
                                     @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
                                     @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                     @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
+                                    @RequestParam(required = false) UUID principalGlAccountId,
+                                    @RequestParam(required = false) UUID interestGlAccountId,
                                     @RequestParam(required = false) String modalKey,
                                     HttpServletRequest request,
                                     RedirectAttributes ra) {
@@ -1116,7 +1128,7 @@ public class AdminController {
                 boardReviewRequired, boardPriority, boardReviewerIds,
                 committeeReviewRequired, committeePriority, committeeMinimumVotes,
                 committeeApprovalThreshold, creditCommitteeReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
-                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit);
+                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -1243,6 +1255,8 @@ public class AdminController {
                                               @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
                                               @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                               @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
+                                    @RequestParam(required = false) UUID principalGlAccountId,
+                                    @RequestParam(required = false) UUID interestGlAccountId,
                                               @RequestParam(required = false) String modalKey,
                                               HttpServletRequest request,
                                               RedirectAttributes ra) {
@@ -1300,7 +1314,7 @@ public class AdminController {
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus,
-                maximumActiveLoans, tenureUnit
+                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Loan product created successfully.");
@@ -1493,7 +1507,7 @@ public class AdminController {
     private void attachLoanSettingsValidationFeedback(RedirectAttributes ra, String message) {
         Map<String, String> fieldErrors = resolveLoanSettingsFieldErrors(message);
         if (fieldErrors.isEmpty()) {
-            ra.addFlashAttribute("error", message);
+            ra.addFlashAttribute("error",message!=null && message.startsWith("recording.error.") ? messages.getMessage(message,null,message,org.springframework.context.i18n.LocaleContextHolder.getLocale()) : message);
             return;
         }
         ra.addFlashAttribute("error", "Please correct the highlighted fields below.");
@@ -2645,7 +2659,7 @@ public class AdminController {
 
     @org.springframework.web.bind.annotation.InitBinder("customisedWorkflowForm")
     public void customWorkflowBinder(org.springframework.web.bind.WebDataBinder binder) {
-        binder.setAllowedFields("managerReviewRequired","managerPriority","loanOfficerReviewRequired","loanOfficerPriority","chairpersonReviewRequired","chairpersonPriority","boardReviewRequired","boardPriority","boardReviewerIds","committeeReviewRequired","committeePriority","creditCommitteeReviewerIds","accountantReviewRequired","accountantPriority","disbursementOfficerIds","disbursementProofRequired");
+        binder.setAllowedFields("managerReviewRequired","managerPriority","loanOfficerReviewRequired","loanOfficerPriority","chairpersonReviewRequired","chairpersonPriority","boardReviewRequired","boardPriority","boardReviewerIds","committeeReviewRequired","committeePriority","creditCommitteeReviewerIds","accountantReviewRequired","accountantPriority","disbursementOfficerIds","disbursementProofRequired","principalGlAccountId","interestGlAccountId");
     }
     @GetMapping("/settings-controls/customised-loan")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.hasAny(principal, 'LOAN_PRODUCTS_VIEW','LOAN_PRODUCTS_CREATE','LOAN_PRODUCTS_UPDATE')")

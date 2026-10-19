@@ -12,7 +12,7 @@ public class RepaymentPolicyRepository {
     private final JdbcTemplate jdbc;
     public void lock(String institution,boolean exclusive){jdbc.queryForList("select "+(exclusive?"pg_advisory_xact_lock":"pg_advisory_xact_lock_shared")+"(hashtextextended(?,0))","REPAYMENT_POLICY/"+institution);}
     public Optional<Policy> effective(String institution,LocalDate date){
-        return jdbc.query("select p.*,a.code||' - '||a.name account from repayment_accounting_policy p join gl_account a on a.id=p.interest_account_id and a.sacco_id=p.sacco_id where p.sacco_id=? and p.effective_from<=? order by p.effective_from desc limit 1",
+        return jdbc.query("select p.*,coalesce(a.code||' - '||a.name,'') account from repayment_accounting_policy p left join gl_account a on a.id=p.interest_account_id and a.sacco_id=p.sacco_id where p.sacco_id=? and p.effective_from<=? order by p.effective_from desc limit 1",
             (r,n)->new Policy(r.getObject("id",UUID.class),r.getInt("version"),r.getObject("effective_from",LocalDate.class),AllocationOrder.valueOf(r.getString("allocation_order")),r.getObject("interest_account_id",UUID.class),r.getString("account"),r.getString("reason"),r.getObject("created_at",OffsetDateTime.class)),institution,date).stream().findFirst();
     }
     public Optional<Policy> latest(String institution){return effective(institution,LocalDate.of(9999,12,31));}
@@ -26,7 +26,7 @@ public class RepaymentPolicyRepository {
     public Optional<UUID> retry(String institution,UUID actor,PolicyForm f){
         var rows=jdbc.queryForList("select * from repayment_accounting_policy where sacco_id=? and request_key=?",institution,f.requestKey());
         if(rows.isEmpty())return Optional.empty();var r=rows.getFirst();
-        if(!actor.equals(r.get("created_by")) || !f.effectiveFrom().equals(((java.sql.Date)r.get("effective_from")).toLocalDate()) || !f.allocationOrder().name().equals(r.get("allocation_order")) || !f.interestAccountId().equals(r.get("interest_account_id")) || !f.reason().strip().equals(r.get("reason")))throw new IllegalArgumentException("batch.error.changed");
+        if(!actor.equals(r.get("created_by")) || !f.effectiveFrom().equals(((java.sql.Date)r.get("effective_from")).toLocalDate()) || !f.allocationOrder().name().equals(r.get("allocation_order")) || !Objects.equals(f.interestAccountId(),r.get("interest_account_id")) || !f.reason().strip().equals(r.get("reason")))throw new IllegalArgumentException("batch.error.changed");
         return Optional.of((UUID)r.get("id"));
     }
 }

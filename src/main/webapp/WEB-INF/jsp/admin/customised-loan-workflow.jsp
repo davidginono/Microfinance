@@ -51,7 +51,9 @@
     <label class="flex items-center gap-2"><form:checkbox path="disbursementProofRequired" /><spring:message code="customised.workflow.proof" /></label>
         </div>
     </section>
+<section class="erp-resource-section"><h2><spring:message code="productAccounts.title" /></h2><div class="grid grid-cols-1 gap-4 md:grid-cols-2"><c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${customisedWorkflowForm}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %><c:set var="productAccountSection" value="${false}" /></div></section>
     <div class="app-modal-actions"><a href="<c:url value='/admin/settings-controls?section=loan' />" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="common.save" /></button></div>
+
 </form:form>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
-<%@ include file="../fragments/footer.jspf" %>
+<script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>

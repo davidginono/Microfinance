@@ -98,6 +98,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminControllerUserAccessSecurityTest {
     @Autowired private WebApplicationContext context;
     @Autowired private AdminService adminService;
+    @Autowired private com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
     @Autowired private AdminScopeService adminScopeService;
     @Autowired private SaccoStationRepository saccoStationRepository;
     @Autowired private SaccoRegistryService saccoRegistryService;
@@ -111,7 +112,7 @@ class AdminControllerUserAccessSecurityTest {
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
+        Mockito.reset(productAccounts,adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
             platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService,
             stationOtpSettingsService);
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
@@ -119,6 +120,16 @@ class AdminControllerUserAccessSecurityTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
+    }
+
+    @Test void productAccountLookupRequiresProductConfigurationClaimsAndUsesSelectedInstitution() throws Exception {
+        var actor=principal(Set.of(UserClaim.LOAN_PRODUCTS_UPDATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any())).thenReturn("SACCO-01");
+        mockMvc.perform(get("/admin/settings-controls/loan-product-accounts/INTEREST").param("search","Maendeleo").param("saccoId","FOREIGN").with(authentication(authenticationFor(actor)))).andExpect(status().isOk());
+        verify(productAccounts).choices("SACCO-01","INTEREST","Maendeleo",0,null);
+        mockMvc.perform(get("/admin/settings-controls/loan-product-accounts/INTEREST").with(authentication(authenticationFor(principal(Set.of(UserClaim.LOAN_PRODUCTS_VIEW)))))).andExpect(status().isForbidden());
+        Mockito.verifyNoMoreInteractions(productAccounts);
     }
 
     @Test
@@ -366,13 +377,13 @@ class AdminControllerUserAccessSecurityTest {
         LoanProductSetting createdProduct = LoanProductSetting.builder().id(productId).build();
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
-        when(adminService.createLoanProduct(
+        when(adminService.createLoanProductTenure(
             "SACCO-01", principal.getMemberId(), null, "School Fees Booster", "Created product", 5,
             new BigDecimal("0"), new BigDecimal("500000"), 2, new BigDecimal("3.000000"), false,
             new BigDecimal("15000"), new BigDecimal("0.015000"), new BigDecimal("0.000000"),
             new BigDecimal("0.100000"), InterestMethod.FLAT_RATE, 1, 12, true, false, true, false,
             ApprovalWorkflowStage.MANAGER, 1, 2, false, null, null, false, null, null, false, null,
-            null, null, null, false, null, false, false, false, false, null, LoanProductStatus.ACTIVE, 2
+            null, null, null, false, null, false, false, false, false, null, LoanProductStatus.ACTIVE, 2, "MONTHS", null, null
         )).thenReturn(createdProduct);
 
         mockMvc.perform(post("/admin/settings-controls/loan-products")
@@ -722,6 +733,7 @@ class AdminControllerUserAccessSecurityTest {
     @EnableWebSecurity
     @Import(SecurityConfig.class)
     static class TestConfig {
+        @Bean com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts(){return Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanProductAccountService.class);}
         @Bean
         AdminController adminController(AdminService adminService,
                                         AdminScopeService adminScopeService,
@@ -731,6 +743,7 @@ class AdminControllerUserAccessSecurityTest {
                                         AppUsageAnalyticsService appUsageAnalyticsService,
                                         NotificationInboxService notificationInboxService,
                                         LoanProductRequiredAttachmentService requiredAttachmentService,
+                                        com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts,
                                         SmsUsageManagementService smsUsageManagementService,
                                         StationOtpSettingsService stationOtpSettingsService,
                                         SaccoDataDeletionService saccoDataDeletionService,
@@ -749,6 +762,7 @@ class AdminControllerUserAccessSecurityTest {
                 appUsageAnalyticsService,
                 notificationInboxService,
                 requiredAttachmentService,
+                productAccounts,
                 smsUsageManagementService,
                 stationOtpSettingsService,
                 saccoDataDeletionService,
@@ -756,7 +770,8 @@ class AdminControllerUserAccessSecurityTest {
                 platformSessionSettingsService,
                 platformSupportContactSettingsService,
                 platformEmailSettingsService,
-                platformSmsGatewaySettingsService
+                platformSmsGatewaySettingsService,
+                new org.springframework.context.support.ResourceBundleMessageSource() {{setBasename("messages");setDefaultEncoding("UTF-8");}}
             );
         }
 

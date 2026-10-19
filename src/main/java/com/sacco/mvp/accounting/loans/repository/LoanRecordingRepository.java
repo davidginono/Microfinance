@@ -49,14 +49,18 @@ public class LoanRecordingRepository {
         var args=new ArrayList<Object>();args.add(date);args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(ids);
         return jdbc.query("""
             select l.id,l.applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,greatest(b.last_payment_date,c.last_date) last_payment_date,
-            b.principal-b.principal_paid outstanding,coalesce(d.principal,0) due_principal,coalesce(d.interest,0) due_interest,coalesce(c.outstanding,0) charges
+            b.principal-b.principal_paid outstanding,coalesce(d.principal,0) due_principal,coalesce(d.interest,0) due_interest,coalesce(c.outstanding,0) charges,
+            r.product_name,ab.principal_account_id,ab.interest_account_id,pa.code||' - '||pa.name principal_account,ia.code||' - '||ia.name interest_account
             from accountant_loan_record r join loan_applications l on l.id=r.loan_id join members m on m.id=l.applicant_member_id
             left join loan_ledgers b on b.loan_application_id=l.id
             left join loan_charge_balance c on c.loan_id=l.id
+            left join loan_product_account_binding ab on ab.loan_id=l.id and ab.sacco_id=r.sacco_id and ab.station_id=r.station_id
+            left join gl_account pa on pa.id=ab.principal_account_id and pa.sacco_id=r.sacco_id and pa.active and pa.kind='CONTROL' and pa.type='ASSET' and pa.normal_balance='DEBIT' and pa.purpose='LOAN_PRINCIPAL'
+            left join gl_account ia on ia.id=ab.interest_account_id and ia.sacco_id=r.sacco_id and ia.active and ia.kind='POSTING' and (ia.purpose='CLEARING' or (ia.type='INCOME' and ia.normal_balance='CREDIT' and ia.purpose='INCOME'))
             left join lateral(select sum(principal-principal_paid) principal,sum(interest-interest_paid) interest
               from loan_ledger_installments where loan_application_id=l.id and due_date<=?) d on true
             where r.sacco_id=? and r.station_id=? and l.id in (
-            """+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by l.id",(r,n)->new ReceiptLoan(r.getObject("id",UUID.class),r.getObject("applicant_member_id",UUID.class),r.getString("loan_id"),r.getString("full_name"),r.getString("member_no"),r.getBigDecimal("due_principal"),r.getBigDecimal("due_interest"),r.getBigDecimal("outstanding"),r.getObject("disbursement_date",LocalDate.class),r.getObject("last_payment_date",LocalDate.class),r.getString("status"),r.getBigDecimal("charges")),args.toArray());
+            """+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by l.id",(r,n)->new ReceiptLoan(r.getObject("id",UUID.class),r.getObject("applicant_member_id",UUID.class),r.getString("loan_id"),r.getString("full_name"),r.getString("member_no"),r.getBigDecimal("due_principal"),r.getBigDecimal("due_interest"),r.getBigDecimal("outstanding"),r.getObject("disbursement_date",LocalDate.class),r.getObject("last_payment_date",LocalDate.class),r.getString("status"),r.getBigDecimal("charges"),r.getString("product_name"),r.getObject("principal_account_id",UUID.class),r.getString("principal_account"),r.getObject("interest_account_id",UUID.class),r.getString("interest_account")),args.toArray());
     }
     public Optional<UUID> recordRequest(AppUserPrincipal a,UUID key,String hash){
         var rows=jdbc.queryForList("select loan_id,payload_hash,actor_id from accountant_loan_record where sacco_id=? and station_id=? and request_key=?",a.getSaccoId(),a.getStationId(),key);
@@ -139,7 +143,7 @@ public class LoanRecordingRepository {
         select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and
         ((?='MONEY' and kind='POSTING' and purpose in ('CASH','BANK','MOBILE_MONEY') and type='ASSET')
         or (?='PRINCIPAL' and kind='CONTROL' and purpose='LOAN_PRINCIPAL' and type='ASSET')
-        or (?='INTEREST' and kind='POSTING' and purpose='CLEARING'))
+        or (?='INTEREST' and kind='POSTING' and (purpose='CLEARING' or (type='INCOME' and normal_balance='CREDIT' and purpose='INCOME'))))
         and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
     public Choice account(AppUserPrincipal a,UUID id,String category){
@@ -150,7 +154,7 @@ public class LoanRecordingRepository {
         if(rows.isEmpty())throw new IllegalArgumentException("recording.error.account");var r=rows.getFirst();String purpose=(String)r.get("purpose");
         boolean valid=switch(category){case "MONEY"->"POSTING".equals(r.get("kind")) && "ASSET".equals(r.get("type")) && Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);
             case "PRINCIPAL"->"CONTROL".equals(r.get("kind")) && "LOAN_PRINCIPAL".equals(purpose) && "ASSET".equals(r.get("type")) && "DEBIT".equals(r.get("normal_balance"));
-            default->"POSTING".equals(r.get("kind")) && "CLEARING".equals(purpose);};
+            default->"POSTING".equals(r.get("kind")) && ("CLEARING".equals(purpose) || ("INCOME".equals(r.get("type")) && "CREDIT".equals(r.get("normal_balance")) && "INCOME".equals(purpose)));};
         if(!valid)throw new IllegalArgumentException("recording.error.account");return new Choice(id,r.get("code")+" - "+r.get("name"),purpose);
     }
     public Optional<Posting> postRequest(AppUserPrincipal a,UUID key,String hash){

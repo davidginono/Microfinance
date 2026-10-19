@@ -40,21 +40,30 @@ public class LoanRecordingService {
     private final ManagerReviewRepository reviews;
     private final com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicies;
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
+    private final LoanProductAccountService productAccounts;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
     public List<Choice> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page){
         authorize(a,"VIEW");authorize(a,"POST");check(client!=null && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
-        return records.repaymentLoans(a,client,search,page,clock.today()).stream().map(l->new Choice(l.id(),l.number()+" - "+l.client(),l.status())).toList();
+        return records.repaymentLoans(a,client,search,page,clock.today()).stream().map(l->new Choice(l.id(),l.number()+" - "+l.product(),l.status())).toList();
     }
     @Transactional(readOnly=true) public LoanRow receiptLoan(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.loan(a,id,clock.today());}
+    @Transactional(readOnly=true)
+    public Optional<LoanProductAccountService.Accounts> linkedAccounts(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.record(a,loan,false);return productAccounts.find(a,loan);}
+    @Transactional
+    public void linkExistingProductAccounts(AppUserPrincipal a,UUID loan){
+        authorize(a,"POST");records.record(a,loan,true);var application=loans.findById(loan).orElseThrow();
+        check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(application.getStatus()),"state");
+        productAccounts.bind(a,loan,application.getLoanProductSettingId(),records.principalAccount(loan),"EXISTING_LOAN");
+    }
     @Transactional(readOnly=true) public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.receiptForPosting(a,id);}
     @Transactional(readOnly=true) public Choice receiptClient(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.ledgerClient(a,id).orElseThrow(()->new AccessDeniedException("Client unavailable"));}
     @Transactional(readOnly=true) public Choice receiptInterestAccount(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.account(a,id,"INTEREST",false);}
     @Transactional(readOnly=true) public Choice receiptPrincipalAccount(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.loan(a,loan,clock.today());return records.account(a,records.principalAccount(loan),"PRINCIPAL",false);}
     @Transactional(readOnly=true) public Choice receiptMoneyAccount(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.account(a,id,"MONEY",false);}
     @Transactional(readOnly=true)
-    public com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.Policy receiptDefaults(AppUserPrincipal a,com.sacco.mvp.accounting.dto.VoucherDtos.Form form){authorize(a,"POST");var policy=repaymentPolicies.effective(a,form.getEffectiveDate()==null?clock.today():form.getEffectiveDate(),false);if(policy.id()!=null)form.setInterestAccountId(policy.interestAccountId());return policy;}
+    public com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.Policy receiptDefaults(AppUserPrincipal a,com.sacco.mvp.accounting.dto.VoucherDtos.Form form){authorize(a,"POST");var policy=repaymentPolicies.effective(a,form.getEffectiveDate()==null?clock.today():form.getEffectiveDate(),false);form.setInterestAccountId(null);return policy;}
     @Transactional(propagation=Propagation.MANDATORY)
     public void lockReceiptLoans(AppUserPrincipal a,List<UUID> ids,UUID client){authorize(a,"VIEW");check(ids!=null && !ids.isEmpty() && ids.size()<=50 && new HashSet<>(ids).size()==ids.size(),"request");check(records.lockReceiptLoans(a,ids,client).size()==ids.size(),"client");}
     @Transactional(readOnly=true)
@@ -64,11 +73,12 @@ public class LoanRecordingService {
         authorize(a,"POST");var contexts=receiptLoans(a,f.getRows().stream().map(r->r.getLoanId()).toList(),f.getEffectiveDate());
         records.account(a,f.getMoneyAccountId(),"MONEY",false);var result=new ArrayList<AllocationPreview>();var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);
         for(var row:f.getRows()){var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();
+            check(loan.principalAccountId()!=null && loan.interestAccountId()!=null,"loanAccountsMissing");check(loan.principalAccount()!=null && loan.interestAccount()!=null,"productAccountsInvalid");
             check(loan.clientId().equals(f.getClientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
             check(loan.disbursed()!=null && !f.getEffectiveDate().isBefore(loan.disbursed()) && (loan.lastPayment()==null || !f.getEffectiveDate().isBefore(loan.lastPayment())),"date");
             result.add(chargeAllocation(row.getAmount(),loan.duePrincipal(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
         }
-        if(result.stream().anyMatch(p->p.interest().signum()>0))records.account(a,policy.id()==null?f.getInterestAccountId():policy.interestAccountId(),"INTEREST",false);return result;
+        return result;
     }
     @Transactional(readOnly=true)
     public Page<LoanRow> list(AppUserPrincipal a,Filter f){authorize(a,"VIEW");filter(f,false);var rows=records.loans(a,f,clock.today(),26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
@@ -80,7 +90,7 @@ public class LoanRecordingService {
         case "filter-products"->records.filterProducts(a,search,page);
         case "money"->records.accounts(a,"MONEY",search,page);case "principal"->records.accounts(a,"PRINCIPAL",search,page);case "interest"->records.accounts(a,"INTEREST",search,page);
         case "disbursement-clients"->records.loans(a,new Filter(search,null,null,"RECORDED","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.clientNumber()+" - "+l.client()+" ("+l.number()+")",l.status())).toList();
-        case "loans"->records.loans(a,new Filter(search,null,null,"","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.number()+" - "+l.client(),l.status())).toList();
+        case "loans"->records.loans(a,new Filter(search,null,null,"","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.number()+" - "+l.product(),l.status())).toList();
         default->throw new IllegalArgumentException("recording.error.filter");};}
     @Transactional(readOnly=true)
     public Choice filterProduct(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.filter"));}
@@ -140,7 +150,7 @@ public class LoanRecordingService {
         if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.RECORDED,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
         check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
-        var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);var split=chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());if(split.interest().signum()>0)records.account(a,policy.id()==null?f.getInterestAccountId():policy.interestAccountId(),"INTEREST",false);return split;
+        var linked=productAccounts.required(a,f.getLoanId());records.account(a,linked.principalId(),"PRINCIPAL",false);records.account(a,linked.interestId(),"INTEREST",false);return chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());
     }
     @Transactional(readOnly=true)
     public Quote interestQuote(AppUserPrincipal a,RecordForm f){
@@ -220,7 +230,9 @@ public class LoanRecordingService {
         UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
         var chargePlan=charges.frozen(a,loan.getId());charges.assessAtFunding(a,loan.getId(),f.getEffectiveDate(),f.getEvidence());
         BigDecimal deductions=chargePlan.deductions();
-        var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,f.getPrincipalAccountId(),"PRINCIPAL");
+        var linked=productAccounts.bind(a,loan.getId(),loan.getLoanProductSettingId(),null,"DISBURSEMENT");
+        check(f.getPrincipalAccountId()==null || f.getPrincipalAccountId().equals(linked.principalId()),"account");
+        var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,linked.principalId(),"PRINCIPAL");
         TopUpQuote settlement=source.isPresent()?topUpQuote(a,source.get(),f.getEffectiveDate(),loan.getId()):null;
         Choice settlementInterest=null;
         if(settlement!=null){
@@ -230,7 +242,7 @@ public class LoanRecordingService {
             check((settlement.charges().signum()==0 && f.getSettlementCharges()==null || f.getSettlementCharges()!=null && f.getSettlementCharges().compareTo(settlement.charges())==0)
                 && (settlement.chargeSequence()==0 && f.getSettlementChargeSequence()==null || f.getSettlementChargeSequence()!=null && f.getSettlementChargeSequence()==settlement.chargeSequence()),"topUpChanged");
             check(f.getAmount().subtract(deductions).compareTo(settlement.total())>0,"topUpCash");text(f.getEvidence(),500,true);
-            if(settlement.interest().signum()>0)settlementInterest=records.account(a,f.getInterestAccountId(),"INTEREST");
+            if(settlement.interest().signum()>0){var sourceAccounts=productAccounts.required(a,source.get());check(f.getInterestAccountId()==null || f.getInterestAccountId().equals(sourceAccounts.interestId()),"account");settlementInterest=records.account(a,sourceAccounts.interestId(),"INTEREST");}
         }else check(f.getInterestAccountId()==null,"account");
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
         if(settlement==null)records.journal(a,journal,id,f,hash,period,deductions.signum()>0?"LOAN_CHARGE_FUNDING":"DISBURSEMENT",null,now);
@@ -261,11 +273,12 @@ public class LoanRecordingService {
     }
     @Transactional
     public Posting repay(AppUserPrincipal a,PostForm f){
-        authorize(a,"POST");validatePost(f);var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);if(policy.id()!=null)f.setInterestAccountId(policy.interestAccountId());String hash=hash(f);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
+        authorize(a,"POST");validatePost(f);var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);String hash=hash(f);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
         records.record(a,f.getLoanId(),true);UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
-        UUID principalId=records.principalAccount(f.getLoanId());check(f.getPrincipalAccountId()==null || principalId.equals(f.getPrincipalAccountId()),"account");
+        var linked=productAccounts.required(a,f.getLoanId());UUID principalId=records.principalAccount(f.getLoanId());check(principalId.equals(linked.principalId()),"productPrincipalMismatch");check(f.getPrincipalAccountId()==null || principalId.equals(f.getPrincipalAccountId()),"account");
+        check(f.getInterestAccountId()==null || linked.interestId().equals(f.getInterestAccountId()),"account");
         var principal=records.account(a,principalId,"PRINCIPAL");var money=records.account(a,f.getMoneyAccountId(),"MONEY");
-        var interest=f.getInterestAccountId()==null?null:records.account(a,f.getInterestAccountId(),"INTEREST");
+        var interest=records.account(a,linked.interestId(),"INTEREST");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());var feeBalance=charges.balance(a,f.getLoanId(),LocalDate.MAX);
         check(feeBalance.lastDate()==null || !f.getEffectiveDate().isBefore(feeBalance.lastDate()),"date");
         var allocation=chargeAllocation(f.getAmount(),balance.duePrincipal(),balance.dueInterest(),balance.outstandingPrincipal(),feeBalance.outstanding());

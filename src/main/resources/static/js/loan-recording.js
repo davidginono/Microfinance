@@ -35,6 +35,13 @@
     select.addEventListener('neo-select:close', () => {binding.cancel(); ++request; controller?.abort(); loading = false; picker.setLoading(false);});
     select.addEventListener('neo-select:open', () => {if (!loading && (loadedSearch !== search.value || error.textContent)) {binding.cancel(); load();}});
     window.addEventListener('pagehide', () => {binding.cancel(); ++request; controller?.abort();});
+    if(box.hasAttribute('data-hydrate-selection') && select.value){
+      const value=select.value;
+      fetch(box.dataset.choiceUrl+'?'+new URLSearchParams({selected:value}),{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'})
+        .then(response=>{if(!response.ok || response.redirected)throw new Error('Lookup failed');return response.json();})
+        .then(choices=>{if(select.value===value && select.isConnected){const choice=choices.find(c=>c.id===value);if(choice){select.selectedOptions[0].textContent=choice.label;window.refreshEnhancedSelects?.(box);}else error.textContent=error.dataset.error;}})
+        .catch(()=>{if(select.isConnected)error.textContent=error.dataset.error;});
+    }
     load();
   });
   const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');

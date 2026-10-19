@@ -1,0 +1,25 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:set var="selectedProductPrincipal" value="${not empty loanProductFormDraft['principalGlAccountId'] ? loanProductFormDraft['principalGlAccountId'][0] : accountProduct.principalGlAccountId}" />
+<c:set var="selectedProductInterest" value="${not empty loanProductFormDraft['interestGlAccountId'] ? loanProductFormDraft['interestGlAccountId'][0] : accountProduct.interestGlAccountId}" />
+<div class="md:col-span-2">
+    <c:if test="${not productAccountSection}"><h3><spring:message code="productAccounts.title" /></h3></c:if>
+    <p class="text-sm"><spring:message code="productAccounts.help" /></p>
+</div>
+<div class="min-w-0" data-loan-choice data-category="PRINCIPAL" data-choice-url="<c:url value='/admin/settings-controls/loan-product-accounts/PRINCIPAL' />" data-hydrate-selection>
+    <label class="block min-w-0"><spring:message code="productAccounts.principal" />
+        <select name="principalGlAccountId" class="aws-control min-w-0 max-w-full" data-choice-select data-searchable="true">
+            <option value=""><spring:message code="recording.choose" /></option>
+            <c:if test="${not empty selectedProductPrincipal}"><option value="${selectedProductPrincipal}" selected><spring:message code="productAccounts.linked" /></option></c:if>
+        </select>
+    </label>
+    <%@ include file="../accounting/loans/choice-search.jspf" %>
+</div>
+<div class="min-w-0" data-loan-choice data-category="INTEREST" data-choice-url="<c:url value='/admin/settings-controls/loan-product-accounts/INTEREST' />" data-hydrate-selection>
+    <label class="block min-w-0"><spring:message code="productAccounts.interest" />
+        <select name="interestGlAccountId" class="aws-control min-w-0 max-w-full" data-choice-select data-searchable="true">
+            <option value=""><spring:message code="recording.choose" /></option>
+            <c:if test="${not empty selectedProductInterest}"><option value="${selectedProductInterest}" selected><spring:message code="productAccounts.linked" /></option></c:if>
+        </select>
+    </label>
+    <%@ include file="../accounting/loans/choice-search.jspf" %>
+</div>

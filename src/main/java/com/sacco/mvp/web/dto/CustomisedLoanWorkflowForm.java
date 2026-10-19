@@ -8,6 +8,8 @@ import java.util.UUID;
 
 @Getter @Setter
 public class CustomisedLoanWorkflowForm {
+    private UUID principalGlAccountId;
+    private UUID interestGlAccountId;
     private boolean managerReviewRequired;
     private int managerPriority=1;
     private boolean loanOfficerReviewRequired;
@@ -33,6 +35,6 @@ public class CustomisedLoanWorkflowForm {
         f.boardReviewRequired=product.isBoardReviewRequired();f.boardPriority=product.getResolvedBoardPriority();
         f.committeeReviewRequired=product.isCommitteeReviewRequired();f.committeePriority=product.getResolvedCommitteePriority();
         f.accountantReviewRequired=product.isAccountantReviewRequired();f.accountantPriority=product.getResolvedAccountantPriority();
-        f.disbursementProofRequired=product.isDisbursementProofRequired();return f;
+        f.disbursementProofRequired=product.isDisbursementProofRequired();f.principalGlAccountId=product.getPrincipalGlAccountId();f.interestGlAccountId=product.getInterestGlAccountId();return f;
     }
 }

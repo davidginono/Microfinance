@@ -93,6 +93,7 @@ class LoanRecordingPostgresTest {
             """,otherProduct,product);
         jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",otherProduct);
         UUID secondPrincipal=account("SECOND-LOANS","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where id=?",secondPrincipal,interest,otherProduct);
         var first=disbursed("D-FIRST-PRODUCT");var secondForm=form();secondForm.setProductId(otherProduct);var second=service.save(actor,secondForm);
         var funding=post(second,"1000.00","D-SECOND-PRODUCT");funding.setPrincipalAccountId(secondPrincipal);service.disburse(actor,funding);
         for(var id:List.of(first,second)){var payment=post(id,"120.00","PRODUCT-COLLECTION-"+id);payment.setPrincipalAccountId(id.equals(first)?principal:secondPrincipal);payment.setInterestAccountId(interest);service.repay(actor,payment);}
@@ -537,6 +538,55 @@ class LoanRecordingPostgresTest {
     void configurePolicy(boolean principalFirst){policies().save(actor,new com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.PolicyForm(UUID.randomUUID(),null,LocalDate.of(2026,9,1),principalFirst?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST,interest,"Synthetic approved collection terms"));}
     UUID batchItem(UUID batch,com.sacco.mvp.accounting.dto.VoucherDtos.Form form){UUID id=UUID.randomUUID();batches().save(actor,batch,id,new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.SaveItem(0,form));return id;}
     void processBatch(UUID id,boolean post){var summary=batches().get(actor,id);batches().start(actor,id,summary.batch().version(),post);var runner=new com.sacco.mvp.accounting.batch.service.ReceiptBatchWorker(context.getBean(com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService.class),new io.micrometer.core.instrument.simple.SimpleMeterRegistry());for(int n=0;n<30 && Set.of("VALIDATING","POSTING").contains(batches().get(actor,id).batch().state());n++)runner.tick();}
+    @Test void batchRoutesMixedProductPrincipalAndInterestToTheirFrozenAccounts(){
+        policies().save(actor,new com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.PolicyForm(UUID.randomUUID(),null,LocalDate.of(2026,9,1),com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST,null,"Product account routing"));
+        UUID first=disbursed("D-MAPPED-FIRST");
+        UUID secondPrincipal=account("PRODUCT2-PRINCIPAL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        UUID secondInterest=account("PRODUCT2-INTEREST","INCOME","CREDIT","POSTING","INCOME");
+        UUID secondProduct=UUID.randomUUID();
+        jdbc.update("insert into loan_product_settings select (jsonb_populate_record(null::loan_product_settings,to_jsonb(p)||jsonb_build_object('id',?::text,'product_code','SECOND-MAPPED','product_name','Second mapped product','principal_gl_account_id',?::text,'interest_gl_account_id',?::text))).* from loan_product_settings p where id=?",secondProduct,secondPrincipal,secondInterest,product);
+        var secondForm=form();secondForm.setProductId(secondProduct);UUID second=service.save(actor,secondForm);var funding=post(second,"1000.00","D-MAPPED-SECOND");funding.setPrincipalAccountId(null);service.disburse(actor,funding);
+        var batch=batches().create(actor,"Mixed product collections");var input=receiptForm(first,second);input.setInterestAccountId(null);batchItem(batch,input);processBatch(batch,false);
+        var preview=batches().items(actor,batch,0,"").rows().getFirst().preview();
+        assertThat(preview.lines()).extracting(com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.PlanLine::interestAccountId).containsExactly(interest,secondInterest);
+        assertThat(preview.lines()).extracting(com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.PlanLine::principalAccountId).containsExactly(principal,secondPrincipal);
+        assertThat(preview.lines()).extracting(com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.PlanLine::product).containsExactly("Synthetic business loan","Second mapped product");
+        processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
+        var saved=batches().items(actor,batch,0,"").rows().getFirst();var receipt=receiptService().find(actor,saved.receiptId()).orElseThrow();
+        for(int n=0;n<2;n++){var row=receipt.rows().get(n);UUID expectedPrincipal=n==0?principal:secondPrincipal,expectedInterest=n==0?interest:secondInterest;
+            var posting=service.posting(actor,row.postingId());assertThat(jdbc.queryForObject("select credit from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,posting.journalId(),expectedPrincipal)).isEqualByComparingTo("100.00");
+            assertThat(jdbc.queryForObject("select credit from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,posting.journalId(),expectedInterest)).isEqualByComparingTo("20.00");}
+        var corrected=receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Correct mixed product receipt");
+        assertThat(corrected.rows()).hasSize(2);assertThat(service.detail(actor,first).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(service.detail(actor,second).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+    }
+    @Test void productEditsApplyToLaterDisbursementsAndCannotRedirectExistingLoanPayments(){
+        UUID loan=disbursed("D-FROZEN-ACCOUNTS");UUID nextPrincipal=account("NEXT-PRINCIPAL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL"),nextInterest=account("NEXT-INTEREST","INCOME","CREDIT","POSTING","INCOME");
+        jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where id=?",nextPrincipal,nextInterest,product);
+        var input=post(loan,"120.00","FROZEN-PAYMENT");input.setPrincipalAccountId(null);input.setInterestAccountId(null);var paid=service.repay(actor,input);
+        assertThat(jdbc.queryForObject("select interest_account_id from accountant_loan_post where id=?",UUID.class,paid.id())).isEqualTo(interest);
+        assertThat(service.repay(actor,input).id()).isEqualTo(paid.id());
+        var second=service.save(actor,form());var funding=post(second,"1000.00","D-NEXT-FUNDING");funding.setPrincipalAccountId(null);var funded=service.disburse(actor,funding);
+        assertThat(jdbc.queryForObject("select principal_account_id from accountant_loan_post where id=?",UUID.class,funded.id())).isEqualTo(nextPrincipal);
+        service.linkExistingProductAccounts(actor,loan);assertThat(service.linkedAccounts(actor,loan).orElseThrow().interestId()).isEqualTo(interest);
+        assertThatThrownBy(()->jdbc.update("update loan_product_account_binding set interest_account_id=? where loan_id=?",nextInterest,loan)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->jdbc.update("delete from loan_product_account_binding where loan_id=?",loan)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->service.linkExistingProductAccounts(operator("B2"),loan)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void missingProductMappingBlocksFundingAndForgedAccountOverridesCannotPost(){
+        UUID loan=service.save(actor,form());jdbc.update("update loan_product_settings set principal_gl_account_id=null,interest_gl_account_id=null where id=?",product);
+        assertThatThrownBy(()->service.disburse(actor,post(loan,"1000.00","D-UNMAPPED"))).hasMessage("recording.error.productAccountsMissing");
+        assertThat(jdbc.queryForObject("select count(*) from accountant_loan_post where loan_id=?",Integer.class,loan)).isZero();
+        jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where id=?",principal,interest,product);service.disburse(actor,post(loan,"1000.00","D-MAPPED"));
+        var payment=post(loan,"120.00","FORGED");payment.setInterestAccountId(cash);assertThatThrownBy(()->service.repay(actor,payment)).hasMessage("recording.error.account");
+        assertThat(jdbc.queryForObject("select count(*) from accountant_loan_post where loan_id=? and kind='PAYMENT'",Integer.class,loan)).isZero();
+    }
+    @Test void inactiveFrozenAccountsFailBatchRevalidationWithoutReceivingMoney(){
+        configurePolicy(false);UUID loan=disbursed("D-INACTIVE-MAPPING");UUID batch=batches().create(actor,"Inactive account guard");batchItem(batch,receiptForm(loan));processBatch(batch,false);
+        context.getBean(GeneralLedgerService.class).deactivateAccount(actor,interest);
+        assertThat(jdbc.queryForObject("select active from gl_account where id=?",Boolean.class,interest)).isFalse();processBatch(batch,true);
+        assertThat(batches().get(actor,batch).posted()).isZero();assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+    }
     @Test void receiptBatchStagesRepeatedLoansAndPostsEachReceiptExactlyOnce(){
         configurePolicy(false);var first=disbursed("D-BATCH-1");var second=disbursed("D-BATCH-2");var batch=batches().create(actor,"Daily collections");
         batchItem(batch,receiptForm(first,second));batchItem(batch,receiptForm(first));processBatch(batch,false);
@@ -607,6 +657,7 @@ class LoanRecordingPostgresTest {
         jdbc.update("insert into loan_product_board_reviewers(id,loan_product_setting_id,sacco_id,review_stage,board_member_id,created_at) values(?,?,?,'DISBURSEMENT_OFFICER',?,now())",UUID.randomUUID(),customConfiguration,institution,actor.getMemberId());
 
         cash=account("CASH","ASSET","DEBIT","POSTING","CASH");principal=account("LOANS","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");interest=account("INTEREST","LIABILITY","CREDIT","POSTING","CLEARING");
+        jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where sacco_id=?",principal,interest,institution);
         var institutions=context.getBean(SaccoRegistryService.class);when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().active(true).accessStatus(SaccoAccessStatus.ACTIVE).saccoId(institution).stationId(i.getArgument(1)).build()));
         when(context.getBean(UserClaimService.class).effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
     }
@@ -682,6 +733,7 @@ class LoanRecordingPostgresTest {
             from loan_product_settings where id=?
             """,other,product);
         jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",other);
+        jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where sacco_id=?",principal,interest,institution);
         var first=service.save(actor,form());var secondForm=form();secondForm.setProductId(other);var second=service.save(actor,secondForm);
         service.disburse(actor,post(first,"1000.00","D-PRODUCT-1"));service.disburse(actor,post(second,"1000.00","D-PRODUCT-2"));
         var payment=post(first,"120.00","PRODUCT-R1");payment.setInterestAccountId(interest);service.repay(actor,payment);
@@ -893,7 +945,7 @@ class LoanRecordingPostgresTest {
         @Bean LoanRepaymentLedgerService repayments(LoanLedgerRepository ledgers,LoanLedgerInstallmentRepository installments,LoanRepaymentTransactionRepository transactions,LoanRepaymentAllocationRepository allocations,LoanJournalEntryRepository journal,LoanApplicationRepository loans,ObjectMapper mapper,ApplicationClock clock,AuditService audit,LoanPostingGuard guard){return new LoanRepaymentLedgerService(ledgers,installments,transactions,allocations,journal,loans,mapper,clock,new AccessControlService(),audit,guard);}
         LoanProductWorkflowService contextWorkflows(ObjectMapper mapper,LoanProductSettingRepository products){return new LoanProductWorkflowService(mapper,products,mock(com.sacco.mvp.repository.SaccoSettingsRepository.class));}
         @Bean WorkflowRoutingService routing(ObjectMapper mapper,LoanProductSettingRepository products,com.sacco.mvp.repository.SaccoSettingsRepository settings,com.sacco.mvp.repository.BoardReviewRepository board,com.sacco.mvp.repository.LoanProductBoardReviewerRepository assigned){return new WorkflowRoutingService(settings,new ApprovalFlowService(),board,assigned,products,mock(RoleDirectoryService.class),contextWorkflows(mapper,products),mock(OutboxService.class));}
-        @Bean LoanRecordingService recording(JdbcTemplate j,LoanApplicationRepository loans,LoanProductSettingRepository products,LoanRepaymentLedgerService repayments,GeneralLedgerService accounting,ObjectMapper mapper,ApplicationClock clock,AuditService audit,com.sacco.mvp.repository.StoredUploadRepository uploadRepository,WorkflowRoutingService routing,com.sacco.mvp.repository.LoanProductBoardReviewerRepository contextReviewers,com.sacco.mvp.repository.ManagerReviewRepository contextReviews){var storage=new StoredUploadStorageService(uploadRepository);org.springframework.test.util.ReflectionTestUtils.setField(storage,"uploadsRoot","target/request-upload-fixture");var numbers=mock(ApplicationNumberService.class);var next=new AtomicLong(1000000000);when(numbers.nextFor(anyString())).thenAnswer(i->next.incrementAndGet());return new LoanRecordingService(new LoanRecordingRepository(j),loans,products,numbers,new RepaymentScheduleService(mapper,products),repayments,accounting,new VoucherRepository(j),mapper,clock,audit,new LoanAttachmentService(mapper,mock(AdminAlertService.class),storage),new com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService(new com.sacco.mvp.accounting.loans.repository.LoanNumberRepository(j),new VoucherRepository(j),clock),contextWorkflows(mapper,products),routing,contextReviewers,contextReviews,repaymentPolicy(j,accounting,clock,audit),chargeService(j,accounting,clock,audit,mapper));}
+        @Bean LoanRecordingService recording(JdbcTemplate j,LoanApplicationRepository loans,LoanProductSettingRepository products,LoanRepaymentLedgerService repayments,GeneralLedgerService accounting,ObjectMapper mapper,ApplicationClock clock,AuditService audit,com.sacco.mvp.repository.StoredUploadRepository uploadRepository,WorkflowRoutingService routing,com.sacco.mvp.repository.LoanProductBoardReviewerRepository contextReviewers,com.sacco.mvp.repository.ManagerReviewRepository contextReviews){var storage=new StoredUploadStorageService(uploadRepository);org.springframework.test.util.ReflectionTestUtils.setField(storage,"uploadsRoot","target/request-upload-fixture");var numbers=mock(ApplicationNumberService.class);var next=new AtomicLong(1000000000);when(numbers.nextFor(anyString())).thenAnswer(i->next.incrementAndGet());return new LoanRecordingService(new LoanRecordingRepository(j),loans,products,numbers,new RepaymentScheduleService(mapper,products),repayments,accounting,new VoucherRepository(j),mapper,clock,audit,new LoanAttachmentService(mapper,mock(AdminAlertService.class),storage),new com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService(new com.sacco.mvp.accounting.loans.repository.LoanNumberRepository(j),new VoucherRepository(j),clock),contextWorkflows(mapper,products),routing,contextReviewers,contextReviews,repaymentPolicy(j,accounting,clock,audit),chargeService(j,accounting,clock,audit,mapper),new com.sacco.mvp.accounting.loans.service.LoanProductAccountService(new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(j),clock,audit));}
         @Bean com.sacco.mvp.accounting.service.VoucherService vouchers(JdbcTemplate j,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit,ObjectMapper json){return new com.sacco.mvp.accounting.service.VoucherService(new VoucherRepository(j),accounting,clock,audit,(JsonMapper)json,new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(j,json),accounting));}
         @Bean com.sacco.mvp.accounting.service.LoanReceiptService receipts(JdbcTemplate j,com.sacco.mvp.accounting.service.VoucherService ordinary,LoanRecordingService loans,ApplicationClock clock,AuditService audit,ObjectMapper json){return new com.sacco.mvp.accounting.service.LoanReceiptService(new LoanReceiptRepository(j),new VoucherRepository(j),ordinary,loans,clock,audit,json);}
     }

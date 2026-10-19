@@ -179,6 +179,7 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
+<c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %>
                     </div>
                 </section>
 
@@ -520,4 +521,4 @@
 
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
-<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>

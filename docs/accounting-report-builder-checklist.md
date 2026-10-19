@@ -1,5 +1,7 @@
 # Accounting Package And Report Customization Goal
 
+2026-10-19 product-account increment: loan products link principal and interest GL accounts; new disbursements retain immutable per-loan routing, and existing directly recorded loans have an explicit linking action. Individual and batch receipts use these accounts automatically. Historical postings are unchanged. See [setup, scope and safeguards](loan-product-account-links.md). This does not complete the broader accounting backlog.
+
 2026-10-18 user-requested increment: configurable individual and batch voucher approvals, with independent validation/approval/posting states and explicit claims. See [scope and verification](voucher-approval-workspaces.md). This does not restore removed accounting workspaces or complete the broader backlog.
 
 2026-10-18 recorded-charge increment: product-derived management/insurance terms, separate collections, deductions, specialized charge accounting and linked corrections are implemented for supported recorded loans/top-ups. See [behavior, verification and policy gates](recorded-loan-charges.md). This does not complete financed fees, recognition, insurer remittance or the broader accounting backlog.

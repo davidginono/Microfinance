@@ -1,5 +1,7 @@
 # Unified receipt vouchers
 
+2026-10-19: receipt entry resolves principal and interest accounts per loan from its retained product-account binding; no shared interest-account input is required. See [product links and existing-loan setup](loan-product-account-links.md).
+
 2026-10-18: supported recorded-loan receipts now allocate due interest, assessed charges and principal, including partial and charge-only collections, through the same loan-owned services. Receipt envelopes still create no second journal. See [recorded loan charges](recorded-loan-charges.md).
 
 Implemented 13 October 2026: one receipt creation flow and receipt register, with the specialized repayment engine retained for directly recorded loans.
