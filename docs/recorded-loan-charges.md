@@ -2,6 +2,14 @@
 
 This increment extends the linked top-up implementation committed as `ed4a254f`. It covers ordinary accountant-recorded loans and their supported top-ups. It does not certify an institution's pricing, insurer, agreement or regulatory approval.
 
+## Customised loan fee entry (2026-10-19)
+
+For new customised loans, the recorder explicitly enters application, processing and actual insurance amounts in TZS, including zero where no fee applies. These amounts do not inherit the hidden customised product's application or processing defaults. Entry requires the existing `LOAN_CHARGES_CUSTOM` claim; no claims are assigned automatically. Positive management components still require the effective policy's custom-fee permission, combined limit and supporting evidence. Actual insurance must remain within the configured product insurance amount and retain licensed-insurer, verification, premium-evidence and duplicate-reference checks. Configured-product calculations remain unchanged.
+
+The recording form has fee entry and agreed totals, with no deduction controls or net-cash preview in customised mode. Saving freezes agreed fees but creates no assessment, collection or journal. Existing policy timing, disbursement-officer review/funding, linked corrections and top-up safeguards remain authoritative. Existing loans retain their frozen terms.
+
+Verification: 85 selected Java checks passed across focused runs (64 PostgreSQL recording scenarios, 12 MVC checks, five custom-fee checks, two calculator checks, one presentation check and JSP compilation of three affected pages). All 21 recording/charge/top-up JavaScript checks passed. Browser connection failures prevented a live rendered check; the running application needs a restart to load the new backend rules and translations.
+
 ## Supported recording and disclosures
 
 The recording form calculates the existing product's fixed application component, processing percentage and insurance percentage on the server, using contractual principal and decimal, component-by-component HALF_UP rounding to TZS cents. Application and processing are components of one management fee, with a disclosed subtotal. They are not additional top-up fees. The new agreement's management components must be zero for a top-up.

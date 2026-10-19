@@ -43,11 +43,17 @@ public class LoanChargeService {
         var id=repository.insertPolicy(a,f,hash,clock.now());event(a,id,"LOAN_CHARGE_POLICY_RECORDED");return id;
     }
     @Transactional(readOnly=true) public Plan quote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean strict){
-        var application=amount(product.getApplicationFee());var processing=percent(f.getPrincipal(),product.getProcessingFeeRate());var insurance=percent(f.getPrincipal(),product.getInsuranceRate());
+        boolean manual="CUSTOM".equals(f.getLoanMode());
+        if(manual)accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");
+        var application=amount(manual?f.getCustomApplicationCharge():product.getApplicationFee());
+        var processing=manual?amount(f.getCustomProcessingCharge()):percent(f.getPrincipal(),product.getProcessingFeeRate());
+        var insuranceLimit=percent(f.getPrincipal(),product.getInsuranceRate());
+        var insurance=manual?amount(f.getInsurancePremium()):insuranceLimit;
         var policy=repository.policy(a.getSaccoId(),product.getId(),f.getApplicationDate()==null?clock.today():f.getApplicationDate()).orElse(null);
-        boolean custom=f.getCustomApplicationCharge()!=null || f.getCustomProcessingCharge()!=null;
-        String failure="";
-        if(custom){accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");require(policy!=null && policy.enabled() && policy.allowCustom(),"custom");if(f.getCustomApplicationCharge()!=null)application=amount(f.getCustomApplicationCharge());if(f.getCustomProcessingCharge()!=null)processing=amount(f.getCustomProcessingCharge());require(application.add(processing).compareTo(policy.customManagementLimit())<=0,"custom");}
+        boolean custom=manual?application.add(processing).signum()>0:f.getCustomApplicationCharge()!=null || f.getCustomProcessingCharge()!=null;
+        String failure=manual && (f.getCustomApplicationCharge()==null || f.getCustomProcessingCharge()==null || f.getInsurancePremium()==null)?"charges.error.enterFees":"";
+        if(manual && insurance.compareTo(insuranceLimit)>0)failure="charges.error.insuranceLimit";
+        if(custom){if(!manual)accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");require(policy!=null && policy.enabled() && policy.allowCustom(),"custom");if(f.getCustomApplicationCharge()!=null)application=amount(f.getCustomApplicationCharge());if(f.getCustomProcessingCharge()!=null)processing=amount(f.getCustomProcessingCharge());require(application.add(processing).compareTo(policy.customManagementLimit())<=0,"custom");}
         if(f.getTopUpSourceLoanId()!=null && application.add(processing).signum()>0)failure="charges.error.topUpFee";
         if(application.add(processing).add(insurance).signum()>0 && (policy==null || !policy.enabled()))failure="charges.error.policy";
         var terms=new ArrayList<Term>();
@@ -58,7 +64,7 @@ public class LoanChargeService {
         }
         if(application.signum()>0)terms.add(term("APPLICATION",custom?"CUSTOM_AMOUNT":"FIXED",application,application,policy,false,custom?f.getEvidence():""));
         if(processing.signum()>0)terms.add(term("PROCESSING",custom?"CUSTOM_AMOUNT":"PRINCIPAL_RATE",custom?processing:product.getProcessingFeeRate(),processing,policy,false,custom?f.getEvidence():""));
-        if(insurance.signum()>0)terms.add(term("INSURANCE","PRINCIPAL_RATE",product.getInsuranceRate(),insurance,policy,true,Objects.toString(f.getInsuranceEvidence(),"")));
+        if(insurance.signum()>0)terms.add(term("INSURANCE",manual?"CUSTOM_AMOUNT":"PRINCIPAL_RATE",manual?insurance:product.getInsuranceRate(),insurance,policy,true,Objects.toString(f.getInsuranceEvidence(),"")));
         if(f.getTopUpSourceLoanId()!=null && application.add(processing).signum()>0)failure="charges.error.topUpFee";
         if(terms.stream().filter(t->t.timing()==Timing.DEDUCT).map(Term::amount).reduce(ZERO,BigDecimal::add).compareTo(f.getPrincipal())>=0)failure="charges.error.amount";
         if(strict && policy!=null && insurance.signum()>0)require(!repository.insuranceUsed(a.getSaccoId(),policy.insurer(),Objects.toString(f.getInsuranceEvidence(),"")),"insuranceDuplicate");
