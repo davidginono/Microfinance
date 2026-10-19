@@ -1,6 +1,6 @@
 /* The text field fixes day/month order; the native date remains the ISO/calendar authority. */
 .erp-date-control {display:inline-flex;position:relative;align-items:stretch;min-width:0;max-width:100%;width:100%;vertical-align:middle}
-.erp-date-control > input[data-date-display] {min-width:0;width:100%;padding-right:32px;box-sizing:border-box}
+.erp-date-control > input[data-date-display] {min-width:0;width:100%;padding-right:36px!important;box-sizing:border-box}
 .erp-date-control > .erp-date-native {position:absolute!important;right:0!important;top:0!important;width:30px!important;height:100%!important;margin:0!important;padding:0!important;opacity:0;pointer-events:none}
 .erp-date-calendar {position:absolute;right:1px;top:1px;bottom:1px;display:flex;align-items:center;justify-content:center;width:30px;padding:0;border:0;background:transparent;color:#414d5c;cursor:pointer}
 .erp-date-calendar:focus-visible {outline:2px solid #0972d3;outline-offset:-2px}
