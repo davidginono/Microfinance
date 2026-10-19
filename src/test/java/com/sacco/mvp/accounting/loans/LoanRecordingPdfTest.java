@@ -25,7 +25,7 @@ import java.time.*;
 import java.util.*;
 
 class LoanRecordingPdfTest {
-    @Test void loanPaymentAndReceiptExportsSeparateAccountsAndPreserveCorrectionSides()throws Exception {
+    @Test void loanPaymentsRetainAccountSidesWhileReceiptExportsShowTransactionsOnly()throws Exception {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
         var service=mock(LoanRecordingService.class);var logos=mock(SaccoLogoStorageService.class);var actor=mock(AppUserPrincipal.class);
         when(actor.getSaccoId()).thenReturn("QA-INSTITUTION");
@@ -41,9 +41,12 @@ class LoanRecordingPdfTest {
                 var response=(ResponseEntity<?>)controller.postingExport(actor,id,new MockHttpServletRequest("GET","/finance/loan-postings/"+id+"/"+format),Locale.ENGLISH,null);
                 try(var pdf=Loader.loadPDF((byte[])response.getBody())){
                     boolean moneyDebit=!payment && !reversal;
+                    if(payment){
                     assertRow(pdf,"111001",1,moneyDebit?"120.01":"",moneyDebit?"":payment?"1,000.00":"120.01",payment);
                     assertRow(pdf,"111002",2,moneyDebit?"":payment?"1,000.00":"100.00",moneyDebit?"100.00":"",payment);
-                    if(!payment)assertRow(pdf,"210001",3,reversal?"20.01":"",reversal?"":"20.01");
+
+                    }else{String text=new PDFTextStripper().getText(pdf);assertThat(text).contains("LN-1","120.01").doesNotContain("111001","111002","210001","QA Cash","QA Loan Principal","DEBIT","CREDIT","ACCOUNT / LEDGER");}
+
                     assertThat(pdf.getNumberOfPages()).isEqualTo(1);
                     if(format.equals("pdf")){
                         Files.write(Path.of("target/loan-"+kind.toLowerCase()+"-rows.pdf"),(byte[])response.getBody());

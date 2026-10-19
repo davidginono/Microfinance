@@ -240,21 +240,22 @@ public class LoanRecordingController {
             rows.add(List.of(Integer.toString(rows.size()+1),label("recording.interest",locale),Objects.toString(p.interestAccount(),""),moneyDebit?"":interest,moneyDebit?interest:"",interest));}
         if(!actualLines.isEmpty()){rows.clear();for(var line:actualLines)rows.add(List.of(Integer.toString(rows.size()+1),reference,line.account(),line.debit().signum()==0?"":statementMoney(line.debit(),locale),line.credit().signum()==0?"":statementMoney(line.credit(),locale),statementMoney(line.debit().add(line.credit()),locale)));}
         if(payment)rows.replaceAll(row->row.subList(0,5));
+        else {rows.clear();rows.add(List.of("1",label("recording.document."+p.kind(),locale)+"\n"+reference,amount));}
         var totals=new ArrayList<Field>();
-        totals.add(printField("voucher.print.totalDebit",statementMoney(actualLines.isEmpty()?p.amount():actualLines.stream().map(JournalLine::debit).reduce(BigDecimal.ZERO,BigDecimal::add),locale),locale));totals.add(printField("voucher.print.totalCredit",statementMoney(actualLines.isEmpty()?p.amount():actualLines.stream().map(JournalLine::credit).reduce(BigDecimal.ZERO,BigDecimal::add),locale),locale));
+        if(payment){totals.add(printField("voucher.print.totalDebit",statementMoney(actualLines.isEmpty()?p.amount():actualLines.stream().map(JournalLine::debit).reduce(BigDecimal.ZERO,BigDecimal::add),locale),locale));totals.add(printField("voucher.print.totalCredit",statementMoney(actualLines.isEmpty()?p.amount():actualLines.stream().map(JournalLine::credit).reduce(BigDecimal.ZERO,BigDecimal::add),locale),locale));}
         totals.add(printField("voucher.print.totalAmount",statementMoney(p.amount(),locale),locale));
         var posting=new ArrayList<Field>(List.of(printField("voucher.postedBy",p.actor(),locale),printField("voucher.postedAt",
             p.recordedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),locale),printField("voucher.status",status,locale)));
         if(p.reversesId()!=null)posting.add(printField("voucher.reversal",p.reversesId().toString(),locale));
         if(p.reversedBy()!=null)posting.add(printField("voucher.reversal",p.reversedBy().toString(),locale));
-        var details=List.of(printField("voucher.print.moneyAccount",p.moneyAccount(),locale),printField("voucher.print.reference",p.reference(),locale),printField("voucher.date",date,locale));
+        var details=new ArrayList<Field>();if(payment)details.add(printField("voucher.print.moneyAccount",p.moneyAccount(),locale));details.add(printField("voucher.print.reference",p.reference(),locale));details.add(printField("voucher.date",date,locale));
         return new VoucherPdfDocument.Source(label(payment?"voucher.title.PAYMENT":"voucher.title.RECEIPT",locale),d.institution(),d.branch(),p.reference(),status,
             List.of(printField("voucher.print.number",p.reference(),locale),printField(payment?"voucher.print.paymentDate":"voucher.print.receiptDate",date,locale),printField("voucher.print.branch",d.branch(),locale)),
             label(payment?"voucher.print.payeeDetails":"voucher.print.payerDetails",locale),
             List.of(printField("voucher.print.name",p.client(),locale),printField("voucher.print.clientNumber",p.clientNumber(),locale),printField("loan.loanId",p.loanNumber(),locale),printField("voucher.print.phone","",locale),printField("voucher.print.email","",locale)),
             label(payment?"voucher.print.paymentHeading":"voucher.print.receiptDetails",locale),details,
-            List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)",label("voucher.amount",locale)+" (TZS)").subList(0,payment?5:6),
-            payment?new float[]{.055f,.26f,.325f,.18f,.18f}:new float[]{.055f,.26f,.265f,.14f,.14f,.14f},rows,
+            payment?List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.print.ledger",locale),label("accounting.debit",locale)+" (TZS)",label("accounting.credit",locale)+" (TZS)"):List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.amount",locale)+" (TZS)"),
+            payment?new float[]{.055f,.26f,.325f,.18f,.18f}:new float[]{.06f,.74f,.20f},rows,
             label("voucher.print.amountWords",locale),VoucherPdfService.amountInWords(p.amount(),locale),totals,label("voucher.print.narration",locale),label("recording.document."+p.kind(),locale)+"\n"+Objects.toString(p.notes(),"")+"\n"+label("voucher.evidence",locale)+": "+Objects.toString(p.evidence(),"")+"\n"+label("recording.balanceAfter",locale)+": "+statementMoney(p.principalBalance(),locale)+" TZS",
             label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,
             label("voucher.print.method",locale),List.of(printField("voucher.print.method.CASH","false",locale),printField("voucher.print.method.BANK","false",locale),printField("voucher.print.method.CHEQUE","false",locale),printField("voucher.print.method.MOBILE_MONEY","false",locale)));

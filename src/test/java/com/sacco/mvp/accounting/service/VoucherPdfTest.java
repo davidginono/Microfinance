@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.*;
 import static com.sacco.mvp.accounting.reports.VoucherPdfRows.assertRow;
 
 class VoucherPdfTest {
- @Test void paymentAndReceiptAccountRowsRetainPostedSidesIncludingReversals()throws Exception {
+ @Test void paymentsRetainPostedSidesWhileReceiptsShowTransactionsOnceIncludingReversals()throws Exception {
   var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
   var cash=new Account(UUID.randomUUID(),"111001","QA Cash","CASH");var other=new Account(UUID.randomUUID(),"111002","QA Loan Principal","OTHER");
   var exporter=new VoucherPdfService(messages,new ReportExportLimiter(1));
@@ -23,8 +23,9 @@ class VoucherPdfTest {
    var transaction=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Synthetic account allocation",new BigDecimal("1000.00"),cashDebit?cash:other,cashDebit?other:cash);
    var voucher=new Voucher(UUID.randomUUID(),type+"-ROWS",type,LocalDate.of(2026,10,16),"Synthetic client","REF-ROWS","Synthetic demonstration only.","Reference",cash.id(),transaction.amount(),1,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-16T10:30:00+03:00"),reversal?UUID.randomUUID():null,null,"Example Microfinance Limited","Main branch",List.of(transaction));
    try(var doc=Loader.loadPDF(exporter.render(voucher,Locale.ENGLISH).bytes())){
-    assertRow(doc,"111001",1,cashDebit?"1,000.00":"",cashDebit?"":"1,000.00",type==Type.PAYMENT);
-    assertRow(doc,"111002",2,cashDebit?"":"1,000.00",cashDebit?"1,000.00":"",type==Type.PAYMENT);
+    if(type==Type.RECEIPT){String text=new PDFTextStripper().getText(doc);assertThat(text).contains("Synthetic account allocation","1,000.00").doesNotContain("111001","111002","QA Cash","QA Loan Principal","DEBIT","CREDIT","ACCOUNT / LEDGER");assertThat(text.split("Synthetic account allocation",-1)).hasSize(2);}
+    else {assertRow(doc,"111001",1,cashDebit?"1,000.00":"",cashDebit?"":"1,000.00",type==Type.PAYMENT);
+    assertRow(doc,"111002",2,cashDebit?"":"1,000.00",cashDebit?"1,000.00":"",type==Type.PAYMENT);}
    }
   }
  }
@@ -56,8 +57,9 @@ class VoucherPdfTest {
    var v=new Voucher(UUID.randomUUID(),"RV-2026-00000001",type,LocalDate.of(2026,10,8),"Synthetic customer — sample only","BANK-REF-1001","Multiple transactions posted together. Synthetic preview, not a live receipt.","INV-2026-012",type==Type.JOURNAL?null:debit.id(),new BigDecimal("500000.50"),50,UUID.randomUUID(),UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-08T10:30:00+03:00"),null,null,"Synthetic Microfinance Ltd","Dar es Salaam — Main branch",rows,UUID.randomUUID(),"CL-000045");
    var result=exporter.render(v,locale);
    try(var doc=Loader.loadPDF(result.bytes())){
-    assertThat(doc.getNumberOfPages()).isGreaterThan(3);
-    String text=new PDFTextStripper().getText(doc);assertThat(text).contains("CL-000045");assertThat(text).contains("last-marker","RV-2026-00000001","111001","411001",type==Type.JOURNAL?messages.getMessage("voucher.title."+type,null,locale):messages.getMessage("voucher.title."+type,null,locale).toUpperCase(locale));
+    assertThat(doc.getNumberOfPages()).isGreaterThan(type==Type.RECEIPT?1:3);
+    String text=new PDFTextStripper().getText(doc);assertThat(text).contains("CL-000045");assertThat(text).contains("last-marker","RV-2026-00000001",type==Type.JOURNAL?messages.getMessage("voucher.title."+type,null,locale):messages.getMessage("voucher.title."+type,null,locale).toUpperCase(locale));
+    if(type==Type.RECEIPT)assertThat(text).doesNotContain("111001","411001",messages.getMessage("accounting.debit",null,locale).toUpperCase(locale),messages.getMessage("accounting.credit",null,locale).toUpperCase(locale));else assertThat(text).contains("111001","411001");
     assertThat(text.replaceAll("\\s+","")).contains("500,000.50");
     if(type==Type.RECEIPT && locale.equals(Locale.ENGLISH)){
      Files.write(Path.of("target/voucher-preview.pdf"),result.bytes());

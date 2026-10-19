@@ -82,6 +82,46 @@ class LoanRecordingPostgresTest {
         var provisionAccount=jdbc.queryForObject("select debit_account_id from loan_adjustment_request where id=?",UUID.class,adjustment);
         assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);});
     }
+    @Test void outstandingLoansDrillDownIncludesProductAccountsAndProvisionsAndReconcilesLoanIds(){
+        UUID otherProduct=UUID.randomUUID();
+        jdbc.update("""
+            insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,
+            guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at)
+            select ?,sacco_id,loan_type,active,product_status,'SECOND','Second business loan',form_schema,
+            guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,now(),now()
+            from loan_product_settings where id=?
+            """,otherProduct,product);
+        jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",otherProduct);
+        UUID secondPrincipal=account("SECOND-LOANS","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        var first=disbursed("D-FIRST-PRODUCT");var secondForm=form();secondForm.setProductId(otherProduct);var second=service.save(actor,secondForm);
+        var funding=post(second,"1000.00","D-SECOND-PRODUCT");funding.setPrincipalAccountId(secondPrincipal);service.disburse(actor,funding);
+        for(var id:List.of(first,second)){var payment=post(id,"120.00","PRODUCT-COLLECTION-"+id);payment.setPrincipalAccountId(id.equals(first)?principal:secondPrincipal);payment.setInterestAccountId(interest);service.repay(actor,payment);}
+        UUID adjustment=provide(first,"100.00");UUID allowance=jdbc.queryForObject("select credit_account_id from loan_adjustment_request where id=?",UUID.class,adjustment);
+        var repository=new com.sacco.mvp.accounting.statements.repository.StatementRepository(jdbc);
+        var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(LocalDate.of(2026,9,1),TODAY,false);
+        var now=OffsetDateTime.now();String group="Outstanding clients' loans";
+        for(UUID account:List.of(principal,secondPrincipal,allowance))repository.map(actor,new com.sacco.mvp.accounting.statements.dto.StatementModels.Mapping(account,group,"CURRENT_ASSETS","OPERATING","",4,""),null,now);
+        UUID run=UUID.randomUUID();repository.create(run,actor,period,now,UUID.randomUUID());repository.capture(run,actor,period,now);
+        var balances=repository.balances(run,institution,period);var calculated=com.sacco.mvp.accounting.statements.service.StatementCalculator.calculate(balances,repository.cash(run,period),period);
+        var snapshot=new com.sacco.mvp.accounting.statements.dto.StatementModels.Snapshot(1,run,period,now,institution,"B1","Synthetic institution","Branch",balances,calculated.position(),calculated.income(),calculated.cash(),calculated.equityColumns(),calculated.equity(),calculated.checks());
+        var selectedLine=snapshot.position().stream().filter(r->r.label().equals(group)).findFirst().orElseThrow();
+        var statements=new com.sacco.mvp.accounting.statements.service.StatementService(null,null,null,null,null,null,null);
+        var selected=statements.selected(snapshot,com.sacco.mvp.accounting.statements.dto.StatementModels.Kind.POSITION,selectedLine.key());
+        assertThat(selected).extracting(com.sacco.mvp.accounting.statements.dto.StatementModels.Balance::id).containsExactlyInAnyOrder(principal,secondPrincipal,allowance);
+        assertThat(selected.stream().map(com.sacco.mvp.accounting.statements.dto.StatementModels.Balance::closing).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(selectedLine.current());
+        var messages=new org.springframework.context.support.ResourceBundleMessageSource();messages.setBasename("messages");
+        var presentation=new com.sacco.mvp.accounting.statements.service.StatementPresentation(messages);
+        var trial=presentation.document(snapshot,com.sacco.mvp.accounting.statements.dto.StatementModels.Kind.TRIAL,selected,Locale.ENGLISH);
+        assertThat(trial.rows()).filteredOn(r->r.details()!=null).hasSize(3);
+        for(var balance:selected){
+            var activity=repository.activity(run,balance.id(),period,0,5001);
+            String expected=service.detail(actor,balance.id().equals(secondPrincipal)?second:first).loan().number();
+            assertThat(activity).isNotEmpty().allSatisfy(row->assertThat(row.accountNumber()).isEqualTo(expected));
+            assertThat(activity.stream().map(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::debit).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(balance.debit());
+            assertThat(activity.stream().map(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::credit).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(balance.credit());
+            assertThat(trial.rows()).anySatisfy(row->assertThat(row.details()).isEqualTo("/reports/financial/statements/"+run+"/ledger/"+balance.id()));
+        }
+    }
     @Test void statementTopUpListsBothLoanIdsWithoutDuplicatingJournalAmounts(){
         var source=topUpSource();var loan=recordTopUp(source);var posting=service.disburse(actor,topUpPost(loan));
         var numbers=java.util.stream.Stream.of(service.detail(actor,source).loan().number(),service.detail(actor,loan).loan().number()).sorted().toList();
