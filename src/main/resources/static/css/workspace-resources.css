@@ -85,8 +85,8 @@
 .aws-console [data-resource-table] .resource-table-record-actions > .resource-table-action-menu {order:-1;}
 .aws-console [data-resource-table] .resource-table-filters {background:transparent!important;box-shadow:none!important;}
 .aws-console [data-resource-table] .resource-table-actions .btn-launch {order:10;}
-.aws-console :is([data-resource-table],.aws-filter-toolbar,.erp-table-toolbar,[data-table-toolbar-for],[data-table-filter-for],.resource-table-preferences) .app-btn:not(.btn-launch):not(:disabled):not([aria-disabled=true]) {background:#fff!important;border-color:#545b64!important;color:#545b64!important;}
-.aws-console :is([data-resource-table],.aws-filter-toolbar,.erp-table-toolbar,[data-table-toolbar-for],[data-table-filter-for],.resource-table-preferences) .app-btn:not(.btn-launch):is(:hover,:focus-visible) {background:#f2f3f3!important;}
+.aws-console :is([data-resource-table],.aws-filter-toolbar,.erp-table-toolbar,[data-table-toolbar-for],[data-table-filter-for],.resource-table-preferences) .app-btn:not(.btn-launch):not([role=menuitem]):not([aria-haspopup=menu]):not(:disabled):not([aria-disabled=true]) {background:#fff!important;border-color:#545b64!important;color:#545b64!important;}
+.aws-console :is([data-resource-table],.aws-filter-toolbar,.erp-table-toolbar,[data-table-toolbar-for],[data-table-filter-for],.resource-table-preferences) .app-btn:not(.btn-launch):not([role=menuitem]):not([aria-haspopup=menu]):is(:hover,:focus-visible) {background:#f2f3f3!important;}
 .aws-console [data-resource-table] .erp-table :is(.text-xs,.text-sm) {font-size:12px!important;line-height:16px!important;}
 .aws-console .admin-users-register .erp-table :is(td,th) {vertical-align:middle;}
 .aws-console .admin-users-register .erp-table td .inline-flex {padding:2px 6px;}

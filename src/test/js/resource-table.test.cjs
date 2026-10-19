@@ -510,6 +510,27 @@ test('Actions toggles closed when pointer focus returns from a menu item to its 
     dom.window.close();
 });
 
+test('Actions skips restricted and hidden options and blocks their handlers until eligible', async () => {
+    const markup=table('conditions',row).replace('<a class="app-btn btn-primary"','<button type="button" data-table-command id="view">View</button><button type="button" data-table-command id="restricted" disabled>Top up</button><a class="app-btn" data-table-command id="restricted-link" href="/decision" aria-disabled="true">Review</a><div data-table-command hidden id="hidden-command"><button type="button" id="hidden-option">Hidden action</button></div><a class="app-btn btn-primary"');
+    const {dom,window:w,document:d}=await setup(markup);
+    const trigger=d.querySelector('[aria-haspopup=menu]'),menu=d.querySelector('[role=menu]'),view=d.querySelector('#view'),restricted=d.querySelector('#restricted'),link=d.querySelector('#restricted-link'),hidden=d.querySelector('#hidden-command');
+    let activations=0;[restricted,link,d.querySelector('#hidden-option')].forEach(control=>control.addEventListener('click',event=>{event.preventDefault();activations++;}));
+    trigger.click();assert.equal(d.activeElement,view);
+    view.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(d.activeElement,view);
+    restricted.dispatchEvent(new w.MouseEvent('click',{bubbles:true,cancelable:true}));link.click();d.querySelector('#hidden-option').click();
+    assert.equal(activations,0);assert.equal(menu.hidden,false);assert.equal(restricted.disabled,true);assert.equal(link.getAttribute('aria-disabled'),'true');
+    restricted.disabled=false;await settle();
+    view.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(d.activeElement,restricted);
+    restricted.click();await settle();assert.equal(activations,1);assert.equal(menu.hidden,true);
+    restricted.disabled=true;link.setAttribute('aria-disabled','false');hidden.hidden=false;await settle();trigger.click();
+    view.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(d.activeElement,link);
+    link.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(d.activeElement,d.querySelector('#hidden-option'));
+    hidden.hidden=true;await settle();assert.equal(d.activeElement,view);
+    view.disabled=true;link.setAttribute('aria-disabled','true');await settle();
+    assert.equal(trigger.disabled,true);assert.equal(menu.hidden,true);
+    dom.window.close();
+});
+
 test('sort links preserve server queries, expose direction and clear selected rows', async () => {
     const markup=table('sorting','<tr><td><input type="checkbox" checked></td><td>Alice</td><td>Active</td></tr>','data-table-selection="single"').replace('<th>Amount</th>','<th aria-sort="descending"><a data-table-sort href="?search=Alice&state=ACTIVE&activityId=parent&size=50&sort=name&direction=asc">Name</a></th>');
     const {dom,document:d}=await setup(markup);const link=d.querySelector('.resource-table-sort');

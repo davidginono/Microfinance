@@ -149,9 +149,12 @@
 .resource-table-action-menu>button {display:inline-flex;align-items:center;gap:16px;}
 .resource-table-action-menu>button svg {width:16px;height:16px;flex:none;}
 .resource-table-action-menu>button[aria-expanded="true"] svg {transform:rotate(180deg);}
+.aws-console [data-resource-table] .resource-table-actions .resource-table-action-menu>button:not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible,[aria-expanded="true"]) {background:#f1faff!important;border-color:#0073bb!important;color:#0073bb!important;}
 .resource-table-menu {position:absolute;top:calc(100% + 2px);right:0;z-index:50;min-width:180px;background:#fff;border:1px solid #879596;box-shadow:0 2px 4px #0003;padding:4px 0;}
-.resource-table-menu[hidden] {display:none!important;}
+.resource-table-menu[hidden],.resource-table-menu [hidden] {display:none!important;}
 .aws-console [data-resource-table] .resource-table-menu form {display:block;padding:0;}
-.aws-console [data-resource-table] .resource-table-menu :is(button,a.app-btn) {display:flex;width:100%;justify-content:flex-start;border:0!important;border-radius:0!important;background:#fff;padding:6px 16px;font-size:14px!important;font-weight:400!important;white-space:nowrap;}
-.aws-console [data-resource-table] .resource-table-menu :is(button,a.app-btn):hover:not(:disabled),.aws-console [data-resource-table] .resource-table-menu :is(button,a.app-btn):focus-visible {background:#f1faff;color:#0073bb;}
+.aws-console [data-resource-table] .resource-table-actions .resource-table-menu :is(button,a.app-btn) {display:flex;width:100%;justify-content:flex-start;border:1px solid transparent!important;border-radius:0!important;background:#fff!important;color:#16191f!important;padding:5px 15px;font-size:14px!important;font-weight:400!important;white-space:normal;overflow-wrap:anywhere;text-align:left;box-shadow:none!important;transform:none!important;cursor:pointer;}
+.aws-console [data-resource-table] .resource-table-actions .resource-table-menu :is(button,a.app-btn):not(:disabled):not([aria-disabled="true"]):is(:hover,:focus-visible) {background:#f1faff!important;border-color:#0073bb!important;color:#0073bb!important;}
+.aws-console [data-resource-table] .resource-table-actions .resource-table-menu :is(button,a.app-btn):focus-visible {outline:2px solid #0073bb!important;outline-offset:-2px;}
+.aws-console [data-resource-table] .resource-table-actions .resource-table-menu :is(button,a.app-btn):is(:disabled,[aria-disabled="true"]) {background:#fff!important;border-color:transparent!important;color:#aab7b8!important;cursor:default;}
 @media(max-width:600px){.resource-table-dialog-body{grid-template-columns:minmax(0,1fr);gap:12px}.resource-table-dialog-body .resource-table-column-options{border-left:0;border-top:1px solid #d5dbdb;padding:16px 0 0}.aws-console [data-resource-table]>.app-table-titlebar{padding:12px}.aws-console .resource-table-tools{padding:0 12px 12px}}

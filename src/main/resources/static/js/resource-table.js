@@ -39,14 +39,24 @@
         trigger.type='button'; trigger.setAttribute('aria-haspopup','menu'); trigger.setAttribute('aria-expanded','false');
         const menu = node('div','resource-table-menu'); menu.id=key+'-actions'; menu.hidden=true; menu.setAttribute('role','menu');
         trigger.setAttribute('aria-controls',menu.id); trigger.append(icon('caret')); menu.append(...initial); group.append(trigger,menu); container.append(group);
-        const items = () => [...menu.querySelectorAll('button,a[href]')].filter(item=>!item.disabled && item.getAttribute('aria-disabled')!=='true');
-        menu.querySelectorAll('button,a[href]').forEach(item=>item.setAttribute('role','menuitem'));
-        const close = restore => {menu.hidden=true;trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();};
-        const sync = () => {trigger.disabled=!items().length;if(trigger.disabled)close(false);};
+        const controls = () => [...menu.querySelectorAll('button,a[href]')];
+        const unavailable = item => {
+            const hidden = item.closest('[hidden],[inert],[aria-hidden="true"]');
+            return item.matches(':disabled') || !!item.closest('[aria-disabled="true"]') || !!hidden && hidden !== menu;
+        };
+        const items = () => controls().filter(item=>!unavailable(item));
+        const close = restore => {if(!menu.hidden)menu.hidden=true;trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();};
+        const sync = () => {
+            controls().forEach(item=>item.setAttribute('role','menuitem'));
+            const choices=items();trigger.disabled=!choices.length;
+            if(trigger.disabled)close(false);
+            else if(!menu.hidden && menu.contains(document.activeElement) && !choices.includes(document.activeElement))choices[0].focus();
+        };
         const open = last => {if(trigger.disabled)return;menu.hidden=false;trigger.setAttribute('aria-expanded','true');(last?items().at(-1):items()[0])?.focus();};
         trigger.addEventListener('click',()=>menu.hidden?open(false):close(false));
         trigger.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();open(event.key==='ArrowUp');}});
         menu.addEventListener('keydown',event=>{
+            if(['Enter',' '].includes(event.key) && event.target.closest('[role=menuitem]') && unavailable(event.target.closest('[role=menuitem]'))){event.preventDefault();event.stopImmediatePropagation();return;}
             if(event.key==='Escape'){event.preventDefault();close(true);}
             else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
                 event.preventDefault();const choices=items(),index=choices.indexOf(document.activeElement);
@@ -54,11 +64,16 @@
                 choices[next]?.focus();
             }
         });
+        // ARIA-disabled links and dynamically restricted commands must not reach page handlers.
+        ['click','auxclick'].forEach(type=>menu.addEventListener(type,event=>{
+            const item=event.target.closest('[role=menuitem]');
+            if(item && unavailable(item)){event.preventDefault();event.stopImmediatePropagation();}
+        },true));
         // Let the native click/submit complete before restoring focus.
         menu.addEventListener('click',event=>{if(event.target.closest('[role=menuitem]:not(:disabled)'))queueMicrotask(()=>{if(region.isConnected)close(group.contains(document.activeElement));});});
         document.addEventListener('click',event=>{if(!group.contains(event.target))close(false);},{signal});
         group.addEventListener('focusout',event=>{if(!group.contains(event.relatedTarget))close(false);});
-        const observer = new MutationObserver(sync); observer.observe(menu,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','aria-disabled']});
+        const observer = new MutationObserver(sync); observer.observe(menu,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','aria-disabled','hidden','inert','aria-hidden']});
         lifetimes.get(region).observers.push(observer);
         region.addEventListener('resource-table:reset',()=>{close(false);sync();}); sync();
         return {menu,trigger,sync,close};
