@@ -4,7 +4,7 @@
 <template data-resource-details-page></template>
 <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" />
 <div class="accounting-workspace client-statement-workspace">
-    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/finance/client-ledgers' />"><spring:message code="recording.clientLedgers" /></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><c:out value="${statement.client}" /></span></nav>
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/finance/client-ledgers' />"><spring:message code="recording.clientLedgers" /></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="recording.statement" /></span></nav>
     <div class="erp-page-header erp-detail-header" data-aws-page-header>
         <h1 class="erp-page-title"><spring:message code="recording.statement" /></h1>
         <sec:authorize access="@access.has(principal,'LOAN_RECORDING_EXPORT')">
@@ -15,9 +15,10 @@
         </sec:authorize>
     </div>
     <section class="erp-panel">
-        <div class="erp-panel-header"><h2 class="erp-panel-title"><c:out value="${statement.client}" /></h2></div>
+        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="resource.details.summary" /></h2></div>
         <div class="erp-panel-body">
         <dl class="erp-detail-facts">
+            <div><dt><spring:message code="recording.client" /></dt><dd><c:out value="${statement.client}" /></dd></div>
             <div><dt><spring:message code="recording.outstandingPrincipal" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.principal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
             <div><dt><spring:message code="recording.dueInterest" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.interest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
             <div><dt><spring:message code="charges.outstanding" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.charges}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.arrears" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.arrears}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>

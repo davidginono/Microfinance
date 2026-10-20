@@ -534,12 +534,10 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->receiptService().post(actor,receiptForm(id))).isInstanceOf(AccessDeniedException.class);
     }
     com.sacco.mvp.accounting.batch.service.ReceiptBatchService batches(){return context.getBean(com.sacco.mvp.accounting.batch.service.ReceiptBatchService.class);}
-    com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService policies(){return context.getBean(com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService.class);}
-    void configurePolicy(boolean principalFirst){policies().save(actor,new com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.PolicyForm(UUID.randomUUID(),null,LocalDate.of(2026,9,1),principalFirst?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST,interest,"Synthetic approved collection terms"));}
+    void seedHistoricalPolicy(){jdbc.update("insert into repayment_accounting_policy(id,sacco_id,version,effective_from,allocation_order,interest_account_id,reason,request_key,created_by,created_at) values(?,?,1,?,'INTEREST_FIRST',?,'Historical test policy',?,?,?)",UUID.randomUUID(),institution,LocalDate.of(2026,9,1),interest,UUID.randomUUID(),actor.getMemberId(),context.getBean(ApplicationClock.class).now());}
     UUID batchItem(UUID batch,com.sacco.mvp.accounting.dto.VoucherDtos.Form form){UUID id=UUID.randomUUID();batches().save(actor,batch,id,new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.SaveItem(0,form));return id;}
     void processBatch(UUID id,boolean post){var summary=batches().get(actor,id);batches().start(actor,id,summary.batch().version(),post);var runner=new com.sacco.mvp.accounting.batch.service.ReceiptBatchWorker(context.getBean(com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService.class),new io.micrometer.core.instrument.simple.SimpleMeterRegistry());for(int n=0;n<30 && Set.of("VALIDATING","POSTING").contains(batches().get(actor,id).batch().state());n++)runner.tick();}
-    @Test void batchRoutesMixedProductPrincipalAndInterestToTheirFrozenAccounts(){
-        policies().save(actor,new com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.PolicyForm(UUID.randomUUID(),null,LocalDate.of(2026,9,1),com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST,null,"Product account routing"));
+    @Test void batchWithoutSettingsRoutesMixedProductPrincipalAndInterestToTheirFrozenAccounts(){
         UUID first=disbursed("D-MAPPED-FIRST");
         UUID secondPrincipal=account("PRODUCT2-PRINCIPAL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
         UUID secondInterest=account("PRODUCT2-INTEREST","INCOME","CREDIT","POSTING","INCOME");
@@ -581,14 +579,14 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from accountant_loan_post where loan_id=? and kind='PAYMENT'",Integer.class,loan)).isZero();
     }
     @Test void inactiveFrozenAccountsFailBatchRevalidationWithoutReceivingMoney(){
-        configurePolicy(false);UUID loan=disbursed("D-INACTIVE-MAPPING");UUID batch=batches().create(actor,"Inactive account guard");batchItem(batch,receiptForm(loan));processBatch(batch,false);
+        seedHistoricalPolicy();UUID loan=disbursed("D-INACTIVE-MAPPING");UUID batch=batches().create(actor,"Inactive account guard");batchItem(batch,receiptForm(loan));processBatch(batch,false);
         context.getBean(GeneralLedgerService.class).deactivateAccount(actor,interest);
         assertThat(jdbc.queryForObject("select active from gl_account where id=?",Boolean.class,interest)).isFalse();processBatch(batch,true);
         assertThat(batches().get(actor,batch).posted()).isZero();assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
     }
     @Test void receiptBatchStagesRepeatedLoansAndPostsEachReceiptExactlyOnce(){
-        configurePolicy(false);var first=disbursed("D-BATCH-1");var second=disbursed("D-BATCH-2");var batch=batches().create(actor,"Daily collections");
+        seedHistoricalPolicy();var first=disbursed("D-BATCH-1");var second=disbursed("D-BATCH-2");var batch=batches().create(actor,"Daily collections");
         batchItem(batch,receiptForm(first,second));batchItem(batch,receiptForm(first));processBatch(batch,false);
         var validated=batches().items(actor,batch,0,"").rows();assertThat(validated).allMatch(i->i.state().equals("READY"));
         assertThat(validated.getFirst().preview().interest()).isEqualByComparingTo("40.00");assertThat(validated.getLast().preview().interest()).isZero();assertThat(validated.getLast().preview().principal()).isEqualByComparingTo("120.00");
@@ -600,7 +598,7 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->jdbc.update("update receipt_batch_item set receipt_id=null where id=?",saved.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
     @Test void statutoryPolicyIsAppliedByPreviewAndLedgerAndRetainedOnCorrection(){
-        assertThatThrownBy(()->configurePolicy(true)).isInstanceOf(IllegalArgumentException.class).hasMessage("batch.error.policyOrder");configurePolicy(false);var loan=disbursed("D-PFIRST");var f=receiptForm(loan);var preview=receiptService().preview(actor,f).getFirst();assertThat(preview.principal()).isEqualByComparingTo("100.00");assertThat(preview.interest()).isEqualByComparingTo("20.00");
+        seedHistoricalPolicy();var loan=disbursed("D-PFIRST");var f=receiptForm(loan);var preview=receiptService().preview(actor,f).getFirst();assertThat(preview.principal()).isEqualByComparingTo("100.00");assertThat(preview.interest()).isEqualByComparingTo("20.00");
         assertThatThrownBy(()->jdbc.update("insert into repayment_accounting_policy(id,sacco_id,version,effective_from,allocation_order,interest_account_id,reason,request_key,created_by,created_at) select ?,sacco_id,version+1,effective_from+1,'PRINCIPAL_FIRST',interest_account_id,reason,?,created_by,created_at from repayment_accounting_policy where sacco_id=?",UUID.randomUUID(),UUID.randomUUID(),institution)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         var receipt=receiptService().post(actor,f);assertThat(receipt.rows().getFirst().principal()).isEqualByComparingTo("100.00");assertThat(receipt.rows().getFirst().interest()).isEqualByComparingTo("20.00");
         var correction=receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Synthetic correction");
@@ -608,7 +606,7 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select count(distinct allocation_policy_id) from loan_repayment_transactions where loan_application_id=?",Integer.class,loan)).isEqualTo(1);
     }
     @Test void staleBatchPreviewFailsWithoutPostingAndCanBeRevalidated(){
-        configurePolicy(false);var loan=disbursed("D-STALE-BATCH");var batch=batches().create(actor,"Stale preview");batchItem(batch,receiptForm(loan));processBatch(batch,false);
+        seedHistoricalPolicy();var loan=disbursed("D-STALE-BATCH");var batch=batches().create(actor,"Stale preview");batchItem(batch,receiptForm(loan));processBatch(batch,false);
         receiptService().post(actor,receiptForm(loan));processBatch(batch,true);assertThat(batches().get(actor,batch).batch().state()).isEqualTo("PARTIAL");assertThat(batches().get(actor,batch).posted()).isZero();
         assertThat(batches().items(actor,batch,0,"").rows().getFirst().failureKey()).isEqualTo("batch.error.changed");processBatch(batch,false);processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
     }
@@ -628,7 +626,7 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(principal_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
     }
     @Test void successiveBatchReceiptsCanPayFuturePrincipalWithoutNegativeDueBalances(){
-        configurePolicy(false);var loan=futureLoan("D-FUTURE-BATCH");var batch=batches().create(actor,"Synthetic early principal collections");
+        seedHistoricalPolicy();var loan=futureLoan("D-FUTURE-BATCH");var batch=batches().create(actor,"Synthetic early principal collections");
         for(String amount:List.of("237.19","400.00")){var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal(amount));batchItem(batch,form);}
         processBatch(batch,false);var items=batches().items(actor,batch,0,"").rows();assertThat(items).allMatch(i->i.state().equals("READY"));
         assertThat(items.getLast().preview().lines().getFirst().duePrincipal()).isZero();assertThat(items.getLast().preview().lines().getFirst().principalBalance()).isEqualByComparingTo("362.81");
@@ -638,7 +636,7 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,institution,principal)).isEqualByComparingTo("637.19");
     }
     @Test void batchValidationRejectsCombinedReceiptsAboveRemainingDebtBeforePosting(){
-        configurePolicy(false);var loan=futureLoan("D-FUTURE-OVERPAY");var batch=batches().create(actor,"Synthetic overpayment guard");
+        seedHistoricalPolicy();var loan=futureLoan("D-FUTURE-OVERPAY");var batch=batches().create(actor,"Synthetic overpayment guard");
         for(String amount:List.of("600.00","400.01")){var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal(amount));batchItem(batch,form);}
         processBatch(batch,false);assertThat(batches().get(actor,batch).ready()).isEqualTo(1);assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
         assertThat(batches().items(actor,batch,0,"").rows().getLast().failureKey()).isEqualTo("repayment.error.advance");
@@ -665,20 +663,20 @@ class LoanRecordingPostgresTest {
         assertThat(reports.rows(scope,later)).singleElement().satisfies(row->assertThat(row.overdueInterest()).isEqualByComparingTo("20.00"));
     }
     @Test void batchDoesNotPlanASecondCollectionOfInterestExcludedByAnEarlierFullRepayment(){
-        configurePolicy(false);var loan=disbursed("D-BATCH-FULL-EARLY");var batch=batches().create(actor,"Synthetic settlement cutoff");
+        seedHistoricalPolicy();var loan=disbursed("D-BATCH-FULL-EARLY");var batch=batches().create(actor,"Synthetic settlement cutoff");
         var early=receiptForm(loan);early.setEffectiveDate(LocalDate.of(2026,9,15));early.getRows().getFirst().setAmount(new BigDecimal("1000.00"));batchItem(batch,early);
         var later=receiptForm(loan);later.getRows().getFirst().setAmount(new BigDecimal("20.00"));batchItem(batch,later);
         processBatch(batch,false);assertThat(batches().get(actor,batch).ready()).isEqualTo(1);assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
         assertThat(batches().items(actor,batch,0,"").rows().getLast().failureKey()).isEqualTo("repayment.error.advance");
     }
     @Test void batchReceiptAuditFailureRollsBackEveryTransactionAndRetryKeepsSuccessfulReceipts(){
-        configurePolicy(false);var first=disbursed("D-ATOMIC-1");var second=disbursed("D-ATOMIC-2");var batch=batches().create(actor,"Atomic receipts");batchItem(batch,receiptForm(first,second));processBatch(batch,false);
+        seedHistoricalPolicy();var first=disbursed("D-ATOMIC-1");var second=disbursed("D-ATOMIC-2");var batch=batches().create(actor,"Atomic receipts");batchItem(batch,receiptForm(first,second));processBatch(batch,false);
         doThrow(new IllegalStateException("Synthetic failure")).when(context.getBean(AuditService.class)).logEvent(eq("ACCOUNTING"),any(),eq("LOAN_RECEIPT_POSTED"),any(),any(),any(),any(),any(),any(),any(),any());processBatch(batch,true);
         assertThat(batches().get(actor,batch).posted()).isZero();assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=?",Integer.class,institution)).isZero();
         reset(context.getBean(AuditService.class));processBatch(batch,false);processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
     }
     @Test void batchScopeOwnershipAndCurrentPermissionAreRechecked(){
-        configurePolicy(false);var loan=disbursed("D-BATCH-SCOPE");var batch=batches().create(actor,"Scoped batch");var item=batchItem(batch,receiptForm(loan));
+        seedHistoricalPolicy();var loan=disbursed("D-BATCH-SCOPE");var batch=batches().create(actor,"Scoped batch");var item=batchItem(batch,receiptForm(loan));
         assertThatThrownBy(()->batches().get(operator("B2"),batch)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->batches().save(operator("B1"),batch,item,new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.SaveItem(0,receiptForm(loan)))).isInstanceOf(AccessDeniedException.class);
         processBatch(batch,false);batches().start(actor,batch,batches().get(actor,batch).batch().version(),true);
@@ -686,7 +684,7 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select state from receipt_batch where id=?",String.class,batch)).isEqualTo("PARTIAL");assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isZero();
     }
     @Test void expiredWorkerIsFencedAndStopPreservesPostedReceiptsForResume(){
-        configurePolicy(false);var loan=disbursed("D-FENCING");var batch=batches().create(actor,"Worker recovery");batchItem(batch,receiptForm(loan));batchItem(batch,receiptForm(loan));processBatch(batch,false);
+        seedHistoricalPolicy();var loan=disbursed("D-FENCING");var batch=batches().create(actor,"Worker recovery");batchItem(batch,receiptForm(loan));batchItem(batch,receiptForm(loan));processBatch(batch,false);
         batches().start(actor,batch,batches().get(actor,batch).batch().version(),true);var worker=context.getBean(com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService.class);var expired=worker.claim().orElseThrow();assertThat(expired.id()).isEqualTo(batch);
         jdbc.update("update receipt_batch set lease_until=? where id=?",OffsetDateTime.of(TODAY.minusDays(1),LocalTime.MIDNIGHT,ZoneOffset.UTC),batch);
         var recovered=worker.claim().orElseThrow();assertThat(recovered.workerToken()).isNotEqualTo(expired.workerToken());worker.step(expired);assertThat(batches().get(actor,batch).posted()).isZero();worker.step(recovered);assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
@@ -694,7 +692,7 @@ class LoanRecordingPostgresTest {
         processBatch(batch,false);processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(2);assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isEqualTo(2);
     }
     @Test void duplicateCollectionReferencesFailBatchValidationBeforeMoneyIsPosted(){
-        configurePolicy(false);var loan=disbursed("D-BATCH-DUP");var batch=batches().create(actor,"Duplicate reference");var first=receiptForm(loan);var second=receiptForm(loan);second.setReference(first.getReference());batchItem(batch,first);batchItem(batch,second);processBatch(batch,false);
+        seedHistoricalPolicy();var loan=disbursed("D-BATCH-DUP");var batch=batches().create(actor,"Duplicate reference");var first=receiptForm(loan);var second=receiptForm(loan);second.setReference(first.getReference());batchItem(batch,first);batchItem(batch,second);processBatch(batch,false);
         assertThat(batches().get(actor,batch).failed()).isEqualTo(2);assertThat(batches().items(actor,batch,0,"").rows()).allMatch(i->i.failureKey().equals("batch.error.duplicate"));assertThat(batches().get(actor,batch).posted()).isZero();
     }
     @Test void systemActivityAndTransactionsCannotBeModifiedOrUsedAsOrdinaryTemplates(){
@@ -997,7 +995,7 @@ class LoanRecordingPostgresTest {
         @Bean GeneralLedgerService accounting(JdbcTemplate j,AuditService audit,ApplicationClock clock,UserClaimService claims,MemberDirectoryService directory,SaccoRegistryService institutions){return new GeneralLedgerService(new GeneralLedgerRepository(j),new AccessControlService(),audit,clock,claims,directory,institutions);}
         @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService chargeService(JdbcTemplate j,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit,ObjectMapper mapper){return new com.sacco.mvp.accounting.charges.service.LoanChargeService(new com.sacco.mvp.accounting.charges.repository.LoanChargeRepository(j),accounting,new VoucherRepository(j),clock,audit,mapper);}
         @Bean LoanPostingGuard guard(JdbcTemplate j,ObjectMapper mapper){return new LoanPostingGuard(new LoanPostingAuthorizationRepository(j));}
-        @Bean com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicy(JdbcTemplate j,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit){return new com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService(new com.sacco.mvp.accounting.repayment.repository.RepaymentPolicyRepository(j),accounting,clock,audit);}
+        @Bean com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicy(JdbcTemplate j,GeneralLedgerService accounting,ApplicationClock clock,AuditService audit){return new com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService(new com.sacco.mvp.accounting.repayment.repository.RepaymentPolicyRepository(j));}
         @Bean com.sacco.mvp.accounting.batch.repository.ReceiptBatchRepository batchRepository(JdbcTemplate j,ObjectMapper mapper){return new com.sacco.mvp.accounting.batch.repository.ReceiptBatchRepository(j,mapper);}
         @Bean com.sacco.mvp.accounting.batch.service.ReceiptBatchService batches(com.sacco.mvp.accounting.batch.repository.ReceiptBatchRepository repository,com.sacco.mvp.accounting.service.LoanReceiptService receipts,LoanRecordingService loans,com.sacco.mvp.accounting.service.VoucherService vouchers,com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService policies,AuditService audit,ApplicationClock clock){return new com.sacco.mvp.accounting.batch.service.ReceiptBatchService(repository,receipts,loans,vouchers,policies,audit,clock);}
         @Bean com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService batchWorker(com.sacco.mvp.accounting.batch.repository.ReceiptBatchRepository repository,com.sacco.mvp.accounting.batch.service.ReceiptBatchService batches,com.sacco.mvp.accounting.service.LoanReceiptService receipts,LoanRecordingService loans,MemberDirectoryService members,UserClaimService claims,ApplicationClock clock){return new com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService(repository,batches,receipts,loans,members,claims,clock);}

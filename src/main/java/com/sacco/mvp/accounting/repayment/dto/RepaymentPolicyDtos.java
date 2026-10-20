@@ -9,7 +9,5 @@ public final class RepaymentPolicyDtos {
     public enum AllocationOrder { INTEREST_FIRST, PRINCIPAL_FIRST }
     public record Policy(UUID id,int version,LocalDate effectiveFrom,AllocationOrder allocationOrder,
                          UUID interestAccountId,String interestAccount,String reason,OffsetDateTime createdAt) {}
-    public record PolicyForm(UUID requestKey,UUID expectedVersion,LocalDate effectiveFrom,
-                             AllocationOrder allocationOrder,UUID interestAccountId,String reason) {}
     public record Split(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance) {}
 }

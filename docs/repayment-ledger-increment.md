@@ -59,3 +59,7 @@ Rendered JSP checks and the final verification results are recorded in the conve
 Five icons use a 4.4 KB local bundle generated from Lucide 1.49.0. Source: `tools/ui/repayment-icons.js`; output and upstream ISC/MIT notices: `src/main/resources/static/js/vendor/lucide-repayments.*`. No icon CDN is required at runtime.
 
 To regenerate, install exact `lucide@1.49.0` and `esbuild@0.28.2` in a temporary tools directory. Bundle the source with esbuild's `bundle`, `minify`, `format: 'iife'`, `platform: 'browser'`, `target: 'es2020'`, and `legalComments: 'eof'` options, resolving `lucide` to that installed package. Retain the upstream `LICENSE` alongside the generated bundle. The package source and API are documented at [Lucide's vanilla JavaScript guide](https://lucide.dev/guide/lucide/getting-started).
+
+## Built-in repayment allocation (2026-10-20)
+
+The user removed the Repayment settings workspace and configuration endpoints. Interest-first allocation remains built in for individual receipts and receipt batches; a missing historical settings version no longer blocks batch repayment. Existing product-linked principal/interest accounts, system-definition checks, authorization, ledger allocation, closed-period checks and independent linked reversals remain unchanged. Historical policy rows and payment/reversal references are retained without rewriting or deleting evidence.

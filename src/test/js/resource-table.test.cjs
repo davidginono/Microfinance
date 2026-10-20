@@ -399,7 +399,8 @@ test('desktop split starts empty, follows selection, stays closed after dismissa
     assert.equal(panel.querySelectorAll('dd').length,0);
     d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
     assert.equal(panel.hidden,false);
-    assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'A001');
+    assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'Details');
+    assert.equal(panel.querySelector('dd').textContent,'A001');
     assert.equal(panel.querySelectorAll('dd').length,2);assert.equal(panel.querySelector('.resource-split-content a'),null);
     assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/record/1');
     panel.querySelector('[aria-label="Close"]').click();

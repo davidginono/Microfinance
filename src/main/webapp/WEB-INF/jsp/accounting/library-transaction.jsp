@@ -33,7 +33,7 @@
     <c:if test="${not empty transaction}">
     <c:if test="${not empty transaction.description}"><p><c:out value="${transaction.description}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
-    <c:if test="${transaction.systemManaged()}"><p class="accounting-definition-note"><spring:message code="batch.systemHelp" /></p><a class="app-btn btn-neutral" href="<c:url value='/finance/batches/receipts/settings' />"><spring:message code="batch.settings" /></a></c:if>
+    <c:if test="${transaction.systemManaged()}"><p class="accounting-definition-note"><spring:message code="batch.systemHelp" /></p></c:if>
     <c:if test="${not transaction.systemManaged()}">
     <p class="accounting-definition-note"><spring:message code="library.definitionOnly" /></p>
     <section data-resource-table="accounting-library-transaction-2" class="erp-table-wrap" data-aws-table-region>

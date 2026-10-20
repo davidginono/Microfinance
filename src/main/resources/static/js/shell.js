@@ -727,9 +727,11 @@
             if (!shellMain?.classList.contains('shell-main')) {
                 return;
             }
-            const path = header.previousElementSibling?.classList.contains('erp-page-path')
-                ? header.previousElementSibling
-                : null;
+            // Templates, notices and resource wrappers may separate an authored path from its header.
+            const path = [...contentFrame.querySelectorAll('.erp-page-path')].filter(function (candidate) {
+                return candidate.closest('section,form,dialog,[role="dialog"]') === header.closest('section,form,dialog,[role="dialog"]')
+                    && (candidate.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING);
+            }).at(-1);
             if (path) {
                 shellMain.insertBefore(path, contentFrame);
             }

@@ -50,6 +50,12 @@ class ReceiptBatchMvcTest {
         doThrow(new IllegalArgumentException("batch.error.changed")).when(batches).start(actor,batch,0,true);
         mvc.perform(post("/finance/batches/receipts/"+batch+"/post?version=0").with(user(actor)).with(csrf()).locale(Locale.forLanguageTag("sw"))).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("batch.error.changed")).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("imebadilika")));
     }
+    @Test void repaymentSettingsCannotBeOpenedOrChanged()throws Exception{
+        mvc.perform(get("/finance/batches/receipts/settings").with(user(actor))).andExpect(status().is4xxClientError());
+        mvc.perform(get("/finance/batches/receipts/settings/accounts").with(user(actor))).andExpect(status().isNotFound());
+        mvc.perform(post("/finance/batches/receipts/settings").with(user(actor)).with(csrf())).andExpect(status().is4xxClientError());
+        verifyNoInteractions(context.getBean(RepaymentPolicyService.class));
+    }
     @Test void oversizedChunkedAndDeclaredBodiesAreRejectedBeforeBinding()throws Exception{
         var filter=new com.sacco.mvp.accounting.batch.controller.ReceiptBatchBodyLimit();
         for(boolean chunked:List.of(false,true)){

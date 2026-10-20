@@ -79,7 +79,7 @@ class LoanPrepaymentPostgresTest {
         assertThat(f.jdbc.queryForObject("select sum(interest_waived) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("5.00");
     }
     @Test void repeatedBatchPaymentsOnDifferentDatesMatchPostingAfterAnEarlierRebate(){
-        f.configurePolicy(false);var loan=loan(InterestMethod.FLAT_RATE);var batch=f.batches().create(f.actor,"Dated partial prepayments");
+        f.seedHistoricalPolicy();var loan=loan(InterestMethod.FLAT_RATE);var batch=f.batches().create(f.actor,"Dated partial prepayments");
         var first=f.receiptForm(loan);first.setEffectiveDate(PAYMENT);first.getRows().getFirst().setAmount(m("410.00"));f.batchItem(batch,first);
         var second=f.receiptForm(loan);second.setEffectiveDate(PAYMENT.plusDays(4));second.getRows().getFirst().setAmount(m("100.00"));f.batchItem(batch,second);
         f.processBatch(batch,false);assertThat(f.batches().items(f.actor,batch,0,"").rows()).allMatch(i->i.state().equals("READY"));

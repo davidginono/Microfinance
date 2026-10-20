@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.setLoading(true);ui.more.disabled = true;
             try {
                 const params = new URLSearchParams({search:query,page:next});if(category === 'loans')params.set('clientId',client());
-                const choiceUrl = category === 'settings-interest'?base + '/settings/accounts':base + '/choices/' + category;
+                const choiceUrl = base + '/choices/' + category;
                 const response = await fetch(choiceUrl + '?' + params,{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store',signal:controller.signal});
                 if(!response.ok || response.redirected)throw new Error(t('lookupFailed'));const data = await response.json();
                 if(current !== sequence || !select.isConnected)return;
@@ -49,12 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(autoSelect)load();return dispose;
     }
     const editor = document.querySelector('[data-receipt-batch]');
-    const normal = document.querySelector('[data-normal-repayment]');
-    if(normal){let sequence = 0;const form = normal.closest('form'), purpose = form.querySelector('[name="receiptPurpose"]'), date = form.querySelector('[name="effectiveDate"]');
-        const updatePolicy = async()=>{const current = ++sequence;if(purpose.value !== 'LOAN_REPAYMENT' || !date.value)return;try{const policy = await api(base + '/effective-policy?' + new URLSearchParams({date:date.value}));if(current !== sequence)return;normal.querySelector('[data-loan-choice]').hidden = !!policy.id;normal.querySelector('[data-policy-order]').textContent = t('order.' + policy.allocationOrder);if(policy.id){normal.querySelector('[name="interestAccountId"]').value = policy.interestAccountId;normal.querySelector('[data-account-label]').textContent = policy.interestAccount;normal.querySelector('[data-policy-order]').textContent = t('order.' + policy.allocationOrder);}}catch{if(current === sequence)normal.querySelector('[data-policy-order]').textContent = t('lookupFailed');}};
-        purpose.addEventListener('change',updatePolicy);date.addEventListener('change',updatePolicy);updatePolicy();
-    }
-    const globalError = message => {const target = document.querySelector('[data-batch-error]');if(target){target.hidden = !message;target.textContent = message;}else if(message){let p = document.querySelector('[data-picker-error]');if(!p){p = el('p',null,'coa-error');p.dataset.pickerError = '';p.setAttribute('role','alert');document.querySelector('[data-batch-settings]')?.prepend(p);}p.textContent = message;}};
+    const globalError = message => {const target = document.querySelector('[data-batch-error]');if(target){target.hidden = !message;target.textContent = message;}};
     document.querySelectorAll('[data-batch-choice]').forEach(select => picker(select,select.dataset.batchChoice,()=>null,()=>{},globalError));
     if(!editor)return;
     const id = editor.dataset.receiptBatch, url = base + '/' + id, body = editor.querySelector('[data-batch-rows]'), tableRegion = editor.querySelector('[data-resource-table]');

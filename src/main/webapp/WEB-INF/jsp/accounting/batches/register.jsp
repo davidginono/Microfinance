@@ -7,7 +7,6 @@
 <section class="erp-table-wrap" data-resource-table="receipt-batches" data-table-selection="single">
 <div class="app-table-titlebar"><h2><spring:message code="batch.saved" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="details" disabled><spring:message code="common.view" /></button>
-<sec:authorize access="@access.has(principal,'ACCOUNTING_ACCOUNTS_VIEW')"><a class="app-btn btn-neutral" href="<c:url value='/finance/batches/receipts/settings' />"><spring:message code="batch.settings" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal,'LOAN_RECORDING_POST')"><a class="app-btn btn-launch" href="<c:url value='/finance/batches/receipts/new' />"><spring:message code="batch.create" /></a></sec:authorize>
 </div></div>
 <form method="get" class="erp-table-toolbar voucher-filters"><label><spring:message code="common.search" /><input type="search" name="search" maxlength="100" class="aws-control" value="<c:out value='${search}' />" /></label><button class="app-btn btn-neutral"><spring:message code="voucher.filter" /></button></form>

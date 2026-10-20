@@ -31,7 +31,7 @@ class PayrollFeedbackPostingPostgresTest {
     @BeforeAll void start(){context=new AnnotationConfigApplicationContext(LoanRecordingPostgresTest.Config.class,Config.class);f=new LoanRecordingPostgresTest();f.context=context;f.jdbc=context.getBean(JdbcTemplate.class);f.service=context.getBean(LoanRecordingService.class);f.ledger=context.getBean(LoanRepaymentLedgerService.class);payroll=context.getBean(PayrollService.class);feedback=context.getBean(PayrollFeedbackService.class);}
     @AfterAll void close(){if(context!=null)context.close();}
     @BeforeEach void fixture(){
-        f.fixture();f.configurePolicy(false);when(context.getBean(ApplicationClock.class).currentYearMonth()).thenReturn(YearMonth.of(2026,10));
+        f.fixture();f.seedHistoricalPolicy();when(context.getBean(ApplicationClock.class).currentYearMonth()).thenReturn(YearMonth.of(2026,10));
         loan=f.disbursed("D-PAYROLL-"+UUID.randomUUID());f.jdbc.update("update members set employee_number='00007' where id=?",f.client);
         var employer=new EmployerForm();employer.setName("Synthetic payroll employer");employer.setAgreementReference("Synthetic agreement");employerId=payroll.createEmployer(f.actor,employer);
         instruction(loan,employerId);var form=new BatchForm();form.setEmployerId(employerId);form.setMonth("2026-10");form.setDeductionDate(LoanRecordingPostgresTest.TODAY);form.setPreviewHash(payroll.preview(f.actor,form).hash());batch=payroll.freeze(f.actor,form);payroll.changeState(f.actor,batch,"SENT","Synthetic actual employer delivery",false);

@@ -96,3 +96,7 @@ For COA or activity/transaction configuration, read [the accounting architecture
 ## Verification
 
 For changed flows, exercise valid and invalid actions, wrong-role and wrong-branch access, client ownership, empty/missing data, loading/error states, and English/Kiswahili text. Use the style skill for rendered responsiveness checks and the table skill for operational lists.
+
+## Detail identity and breadcrumb placement
+
+Use stable task/resource titles on detail pages and section headings. Keep client numbers, client IDs, loan IDs and combined ID/name labels in labeled detail fields only, including client statements, loan postings, repayment ledgers and review pages. Breadcrumb current labels match the task title; place the breadcrumb above the page title even when templates, notices or wrappers separate them in the JSP. Repayment allocation is a built-in interest-first rule, not a configurable Repayment settings workspace; retain historical allocation evidence and existing product-account routing.

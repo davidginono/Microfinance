@@ -8,6 +8,6 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/account-versions.css' />" />
-<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="coav.title" /></span></nav>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="${accountVersionDetailPage ? 'coav.details' : 'coav.title'}" /></span></nav>
 <c:if test="${not empty accountingError}"><p class="coa-error" role="alert"><spring:message code="${accountingError}" /></p></c:if>
 <c:if test="${not empty accountingSuccess}"><p class="coa-success" role="status"><spring:message code="${accountingSuccess}" /></p></c:if>

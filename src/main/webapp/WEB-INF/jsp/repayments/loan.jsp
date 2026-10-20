@@ -8,17 +8,18 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/loan-repayments.css' />" /><link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <div class="repayment-workspace">
-    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="loan.loanId" /> <c:out value="${ledger.loanId}" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="repayment.title" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
     <c:if test="${not empty repaymentError}"><div class="repayment-error" role="alert"><spring:message code="${repaymentError}" /></div></c:if>
     <c:if test="${ledger.financialState=='WRITTEN_OFF' or ledger.financialState=='DISBURSEMENT_REVERSED'}"><p role="status"><span data-resource-status="${ledger.financialState}"><spring:message code="recording.status.${ledger.financialState}" /></span>. <spring:message code="adjustment.historicalSchedule" /></p></c:if>
-    <dl class="repayment-facts">
+    <section class="repayment-section"><h2><spring:message code="recording.loanDetails" /></h2><dl class="repayment-facts erp-detail-facts">
+        <div><dt><spring:message code="loan.loanId" /></dt><dd><c:out value="${ledger.loanId}" /></dd></div>
         <div><dt><spring:message code="repayment.principalOutstanding" /></dt><dd>TZS <fmt:formatNumber value="${ledger.outstandingPrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.principalDue" /></dt><dd>TZS <fmt:formatNumber value="${ledger.duePrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.interestDue" /></dt><dd>TZS <fmt:formatNumber value="${ledger.dueInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.principalPaid" /></dt><dd>TZS <fmt:formatNumber value="${ledger.principalPaid}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.interestPaid" /></dt><dd>TZS <fmt:formatNumber value="${ledger.interestPaid}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.futureInterest" /></dt><dd>TZS <fmt:formatNumber value="${ledger.futureInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
-    </dl>
+    </dl></section>
     <sec:authorize access="@access.has(principal, 'LOAN_REPAYMENTS_CREATE')">
         <c:if test="${ledger.outstandingPrincipal + ledger.dueInterest > 0 and ledger.financialState!='WRITTEN_OFF' and ledger.financialState!='DISBURSEMENT_REVERSED'}">
             <section class="repayment-section"><h2><spring:message code="repayment.post" /></h2>

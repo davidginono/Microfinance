@@ -50,9 +50,7 @@
             const row=selected();
             content.replaceChildren(); title.textContent=l.details;
             if(!row){title.textContent=l.selectRecord;return;}
-            const cells=originalCells(row), identifier=cells[1]?.cloneNode(true);
-            identifier?.querySelectorAll('button,input,select,textarea').forEach(n=>n.remove());
-            title.textContent=identifier?.textContent.trim() || l.details;
+            const cells=originalCells(row);
             const list=el('dl','resource-split-values');
             headers.forEach((header,index)=>{
                 if(index===0 || !cells[index])return;

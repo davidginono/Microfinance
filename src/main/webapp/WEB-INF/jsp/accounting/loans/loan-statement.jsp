@@ -6,7 +6,7 @@
 <div class="accounting-workspace loan-statement-workspace">
  <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />">
  <a href="<c:url value='/finance/client-ledgers' />"><spring:message code="recording.clientLedgers" /></a><span aria-hidden="true">&#8250;</span>
- <a href="<c:url value='/finance/client-ledgers/${statementPage.source.loans[0].clientId}' />"><c:out value="${statementPage.source.client}" /></a><span aria-hidden="true">&#8250;</span>
+ <a href="<c:url value='/finance/client-ledgers/${statementPage.source.loans[0].clientId}' />"><spring:message code="recording.client" /></a><span aria-hidden="true">&#8250;</span>
  <span aria-current="page"><spring:message code="recording.statement" /></span>
  </nav>
  <div class="erp-page-header erp-detail-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="recording.statement" /></h1>

@@ -9,7 +9,7 @@
 <label><spring:message code="adjustment.column.kind" /><select class="aws-control" name="kind"><c:forEach items="${kinds}" var="k"><option value="${k}" ${adjustmentForm.kind==k?'selected':''}><spring:message code="adjustment.kind.${k}" /></option></c:forEach></select></label></div></section>
 <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-adjustments' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch"><spring:message code="adjustment.continue" /></button></div></form></section>
 </c:when><c:otherwise>
-<section class="accounting-section erp-detail-card"><h2><c:out value="${loan.number}" /> · <c:out value="${loan.client}" /></h2><%@ include file="summary.jspf" %></section>
+<section class="accounting-section erp-detail-card"><h2><spring:message code="recording.loanDetails" /></h2><dl class="erp-detail-facts"><div><dt><spring:message code="loan.loanId" /></dt><dd><c:out value="${loan.number}" /></dd></div><div><dt><spring:message code="recording.client" /></dt><dd><c:out value="${loan.client}" /></dd></div></dl><%@ include file="summary.jspf" %></section>
 <section class="accounting-create-card erp-panel"><div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="adjustment.kind.${adjustmentForm.kind}" /></h2></div>
 <c:url value="/finance/loan-adjustments" var="saveUrl" /><form:form modelAttribute="adjustmentForm" method="post" action="${saveUrl}" cssClass="accounting-create-form" data-loan-form="true">
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><form:hidden path="requestKey" /><form:hidden path="loanId" /><form:hidden path="kind" />

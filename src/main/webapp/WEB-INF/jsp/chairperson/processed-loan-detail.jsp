@@ -10,7 +10,7 @@
 <spring:message code="chairperson.processedLoans" text="Processed Loans" var="processedLoansLabel" />
 <spring:message code="chairperson.processedLoanDetail" text="Reviewed Loan Application" var="processedLoanTitle" />
 <sec:authorize access="@access.has(principal, 'LOAN_DOCUMENTS_EXPORT')" var="canExportProcessedLoan" />
-<c:set var="reviewPanelBreadcrumb" value="${processedLoansLabel} > ${loan.applicationId}" />
+<c:set var="reviewPanelBreadcrumb" value="${processedLoansLabel} > ${processedLoanTitle}" />
 <c:set var="reviewPanelTitle" value="${processedLoanTitle}" />
 <c:set var="showLoanExportAction" value="${canExportProcessedLoan}" />
 <c:set var="reviewDocumentLoanId" value="${loan.id}" />
