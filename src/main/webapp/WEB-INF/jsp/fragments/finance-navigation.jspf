@@ -1,21 +1,28 @@
 <c:if test="${staffWorkspace}">
-    <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW')">
-        <c:forEach items="${['batches','employers','instructions']}" var="payrollNav">
-            <c:set var="payrollPath" value="/finance/payroll${payrollNav=='batches'?'':payrollNav=='employers'?'/employers':'/instructions'}" />
-            <a href="<c:url value='${payrollPath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri==payrollPath?'shell-nav-active':''}"><spring:message code="payroll.nav.${payrollNav}" /></a>
-        </c:forEach>
-    </sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_VIEW')">
         <a href="<c:url value='/finance/loan-adjustments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-adjustments')?'shell-nav-active':''}"><spring:message code="adjustment.title" /></a>
     </sec:authorize>
-    <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW')">
+    <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW') or (@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW'))">
         <c:set var="receiptBatchActive" value="${fn:startsWith(requestUri, '/finance/batches/receipts')}" />
+        <c:set var="payrollActive" value="${fn:startsWith(requestUri, '/finance/payroll')}" />
+        <c:set var="batchProcessingActive" value="${receiptBatchActive or payrollActive}" />
         <div class="shell-sidebar-group space-y-1">
-            <button type="button" id="batchProcessingToggle" aria-controls="batchProcessingPanel" aria-expanded="${receiptBatchActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${receiptBatchActive?'shell-nav-active':''}">
+            <button type="button" id="batchProcessingToggle" aria-controls="batchProcessingPanel" aria-expanded="${batchProcessingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${batchProcessingActive?'shell-nav-active':''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h16v4H4z" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="batch.navigation" /></span><svg id="batchProcessingChevron" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
-            <div id="batchProcessingPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner"><a href="<c:url value='/finance/batches/receipts' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${receiptBatchActive?'shell-nav-active':''}"><spring:message code="batch.receipts" /></a></div>
+            <div id="batchProcessingPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW')">
+                    <c:forEach items="${['batches','employers','instructions']}" var="payrollNav">
+                        <c:set var="payrollPath" value="/finance/payroll${payrollNav=='batches'?'':payrollNav=='employers'?'/employers':'/instructions'}" />
+                        <c:set var="payrollItemActive" value="${payrollNav=='batches' ? payrollActive and not fn:startsWith(requestUri, '/finance/payroll/employers') and not fn:startsWith(requestUri, '/finance/payroll/instructions') : fn:startsWith(requestUri, payrollPath)}" />
+                        <a href="<c:url value='${payrollPath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${payrollItemActive?'shell-nav-active':''}"><spring:message code="payroll.nav.${payrollNav}" /></a>
+                    </c:forEach>
+                </sec:authorize>
+                <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW')">
+                    <a href="<c:url value='/finance/batches/receipts' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${receiptBatchActive?'shell-nav-active':''}"><spring:message code="batch.receipts" /></a>
+                </sec:authorize>
+            </div>
         </div>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
