@@ -29,8 +29,8 @@
         <div class="erp-table-scroll" tabindex="0" role="region" aria-label="<spring:message code='recording.register.LOAN' />">
             <table class="erp-table">
                 <thead><tr>
-                    <th scope="col"><spring:message code="recording.loan" /></th><th scope="col"><spring:message code="recording.product" /></th><th scope="col"><spring:message code="voucher.status" /></th>
-                    <th scope="col"><spring:message code="recording.outstandingPrincipal" /></th><th scope="col"><spring:message code="recording.dueInterest" /></th><th scope="col"><spring:message code="charges.outstanding" /></th><th scope="col"><spring:message code="recording.arrears" /></th>
+                    <th scope="col" data-table-order="loan"><spring:message code="recording.loan" /></th><th scope="col" data-table-order="product"><spring:message code="recording.product" /></th><th scope="col" data-table-order="status"><spring:message code="voucher.status" /></th>
+                    <th scope="col" data-table-order="principal"><spring:message code="recording.outstandingPrincipal" /></th><th scope="col" data-table-order="interest"><spring:message code="recording.dueInterest" /></th><th scope="col" data-table-order="charges"><spring:message code="charges.outstanding" /></th><th scope="col" data-table-order="arrears"><spring:message code="recording.arrears" /></th>
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${statement.page.rows}" var="l"><tr>
@@ -48,13 +48,13 @@
             </div>
         </div>
     </section>
-    <section class="erp-table-wrap statement-movements" data-resource-table="client-statement-movements" data-aws-table-region>
+    <section class="erp-table-wrap statement-movements" data-resource-table="client-statement-movements" data-table-page-param="movementPage" data-aws-table-region>
         <div class="app-table-titlebar"><h2><spring:message code="recording.history" /></h2></div>
         <div class="erp-table-scroll" tabindex="0" role="region" aria-label="<spring:message code='recording.history' />">
             <table class="erp-table">
                 <thead><tr>
-                    <th scope="col"><spring:message code="voucher.date" /></th><th scope="col"><spring:message code="recording.loan" /></th><th scope="col"><spring:message code="recording.product" /></th><th scope="col"><spring:message code="voucher.reference" /></th><th scope="col"><spring:message code="voucher.type" /></th>
-                    <th scope="col"><spring:message code="voucher.amount" /> (TZS)</th><th scope="col"><spring:message code="recording.principal" /></th><th scope="col"><spring:message code="recording.interest" /></th><th scope="col"><spring:message code="recording.balanceAfter" /></th>
+                    <th scope="col" data-table-order="date"><spring:message code="voucher.date" /></th><th scope="col" data-table-order="loan"><spring:message code="recording.loan" /></th><th scope="col" data-table-order="product"><spring:message code="recording.product" /></th><th scope="col" data-table-order="reference"><spring:message code="voucher.reference" /></th><th scope="col" data-table-order="kind"><spring:message code="voucher.type" /></th>
+                    <th scope="col" data-table-order="amount"><spring:message code="voucher.amount" /> (TZS)</th><th scope="col" data-table-order="principal"><spring:message code="recording.principal" /></th><th scope="col" data-table-order="interest"><spring:message code="recording.interest" /></th><th scope="col" data-table-order="balance"><spring:message code="recording.balanceAfter" /></th>
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${movements.rows}" var="p"><tr>

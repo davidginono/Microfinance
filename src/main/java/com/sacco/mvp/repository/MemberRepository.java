@@ -357,24 +357,24 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                 or cast(m.id as text) ilike concat(cast(:query as text), '%')
               )
             """,
-        nativeQuery = true
-    )
+        nativeQuery = true,
+        queryRewriter = com.sacco.mvp.support.ResourceTableSort.UsersNative.class)
     Page<Member> findUserAccessPageByUserId(@Param("saccoId") String saccoId,
                                             @Param("stationId") String stationId,
                                             @Param("query") String query,
                                             Pageable pageable);
 
-    @Query("""
-        select m
-        from Member m
-        where m.saccoId = :saccoId
-          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
+    @Query(value = """
+        select m.*
+        from members m
+        where m.sacco_id = :saccoId
+          and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
           and (
             :query = ''
-            or lower(coalesce(m.fullName, '')) like concat('%', :query, '%')
+            or lower(coalesce(m.full_name, '')) like concat('%', :query, '%')
           )
-        order by m.fullName asc
-        """)
+        order by m.full_name asc
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.UsersNative.class)
     Page<Member> findUserAccessPageByName(@Param("saccoId") String saccoId,
                                           @Param("stationId") String stationId,
                                           @Param("query") String query,
@@ -419,8 +419,8 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                 or lower(coalesce(m.full_name, '')) like concat('%', cast(:query as text), '%')
               )
             """,
-        nativeQuery = true
-    )
+        nativeQuery = true,
+        queryRewriter = com.sacco.mvp.support.ResourceTableSort.Members.class)
     Page<Member> findSaccoDetailMemberPage(@Param("saccoId") String saccoId,
                                            @Param("stationId") String stationId,
                                            @Param("query") String query,

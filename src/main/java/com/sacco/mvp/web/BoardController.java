@@ -130,9 +130,8 @@ public class BoardController {
                         @RequestParam(required = false) String searchId,
                         Model model) {
         applyBoardUi(model, principal);
-        List<BoardReview> myReviews = assignedReviews(principal).stream()
-            .filter(review -> review.getDecision() == BoardDecision.PENDING)
-            .toList();
+        List<BoardReview> myReviews = boardService.queue(principal.getMemberId(), reviewerStages(principal),
+            principal.getSaccoId(), principal.getStationId(), normalizeBoardSearch(searchId));
         return populateListing(
             principal,
             model,
@@ -599,16 +598,6 @@ public class BoardController {
             stages.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
         }
         return stages;
-    }
-
-    private List<BoardReview> assignedReviews(AppUserPrincipal principal) {
-        return reviewerStages(principal).stream()
-            .flatMap(stage -> boardService.assignedAll(principal.getMemberId(), stage).stream())
-            .sorted(java.util.Comparator.comparing(
-                BoardReview::getCreatedAt,
-                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
-            ))
-            .toList();
     }
 
     private ApprovalWorkflowStage primaryReviewStage(AppUserPrincipal principal) {

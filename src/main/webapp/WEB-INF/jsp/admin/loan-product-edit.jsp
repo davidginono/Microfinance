@@ -191,7 +191,7 @@
                             <div class="product-config-subsection-body">
                             <div class="erp-table-wrap" data-aws-no-titlebar="true" data-resource-table="admin-loan-product-edit-1">
                                 <div class="erp-table-scroll erp-table-scroll-sm" data-aws-table-region data-loading-label="Loading workflow stages...">
-                                    <table class="erp-table">
+                                    <table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table">
                                         <thead>
                                         <tr>
                                             <th><spring:message code="admin.settings.workflow.stage" text="Stage" /></th>
@@ -262,7 +262,7 @@
                                 </div>
                                 <c:set var="assignedBoardReviewerTokens" value="${productBoardReviewerIdTokens[product.id]}" />
                                 <div class="erp-table-scroll erp-table-scroll-sm">
-                                    <table class="erp-table">
+                                    <table data-table-sort-mode="none" data-table-sort-reason="picker" class="erp-table">
                                         <thead><tr><th class="whitespace-nowrap">Assign</th><th>Committee Member</th><th class="whitespace-nowrap">Staff Number</th></tr></thead>
                                         <tbody>
                                         <c:forEach items="${boardReviewerOptions}" var="reviewer">
@@ -293,7 +293,7 @@
                                 </div>
                                 <c:set var="assignedCreditCommitteeReviewerTokens" value="${productCreditCommitteeReviewerIdTokens[product.id]}" />
                                 <div class="erp-table-scroll erp-table-scroll-sm">
-                                    <table class="erp-table">
+                                    <table data-table-sort-mode="none" data-table-sort-reason="picker" class="erp-table">
                                         <thead><tr><th class="whitespace-nowrap">Assign</th><th>Credit Committee Member</th><th class="whitespace-nowrap">Staff Number</th></tr></thead>
                                         <tbody>
                                         <c:forEach items="${creditCommitteeReviewerOptions}" var="reviewer">
@@ -346,7 +346,7 @@
                                 </div>
                                 <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading clients..." data-resource-table="admin-loan-product-edit-4" data-resource-split data-table-title-id="admin-loan-product-edit-title">
                                     <div class="erp-table-scroll erp-table-scroll-sm">
-                                    <table class="erp-table min-w-[620px]">
+                                    <table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table min-w-[620px]">
                                         <thead>
                                         <tr>
                                             <th class="px-3 py-2 text-left">Name</th>

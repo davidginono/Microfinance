@@ -66,15 +66,15 @@
         <table class="erp-table">
         <thead>
         <tr>
-            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
-            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
-            <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-            <th><spring:message code="common.applicant" text="Applicant" /></th>
-            <th><spring:message code="common.amount" text="Amount" /></th>
-            <th><spring:message code="review.managerDecision" text="Manager Decision" /></th>
-            <th><spring:message code="review.reason" text="Reason" /></th>
-            <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
-            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
+            <th data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th data-table-order="loan"><spring:message code="loan.loanId" text="Loan ID" /></th>
+            <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+            <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
+            <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
+            <th data-table-order="decision"><spring:message code="review.managerDecision" text="Manager Decision" /></th>
+            <th data-table-order="reason"><spring:message code="review.reason" text="Reason" /></th>
+            <th data-table-order="date"><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
+            <th data-table-order="status"><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>

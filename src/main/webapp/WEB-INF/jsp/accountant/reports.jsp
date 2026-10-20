@@ -42,7 +42,7 @@
 
 <div data-resource-table="accountant-reports-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
     <div class="erp-table-scroll">
-    <table class="erp-table">
+    <table class="erp-table" data-table-sort-mode="local">
         <thead>
         <tr>
             <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>

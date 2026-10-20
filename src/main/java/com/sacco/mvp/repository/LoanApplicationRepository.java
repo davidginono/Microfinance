@@ -47,16 +47,16 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     long countBySaccoIdAndApplicantMemberIdAndStatusIn(String saccoId, UUID applicantMemberId,
                                                      Collection<LoanStatus> statuses);
 
-    @Query("""
+    @Query(value = """
         select l
-        from LoanApplication l
+        from LoanApplication l left join LoanProductSetting p on p.id=l.loanProductSettingId
         where l.applicantMemberId = :applicantMemberId
           and l.status in :statuses
           and (cast(:loanIdQuery as string) is null or lower(coalesce(l.loanId, '')) like concat('%', cast(:loanIdQuery as string), '%'))
           and (cast(:updatedFrom as timestamp) is null or l.updatedAt >= :updatedFrom)
           and (cast(:updatedToExclusive as timestamp) is null or l.updatedAt < :updatedToExclusive)
         order by l.updatedAt desc, l.createdAt desc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.MemberArchives.class)
     Page<LoanApplication> findMemberArchivePage(@Param("applicantMemberId") UUID applicantMemberId,
                                                 @Param("statuses") Collection<LoanStatus> statuses,
                                                 @Param("loanIdQuery") String loanIdQuery,
@@ -580,7 +580,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     Optional<SaccoLoanStatsProjection> summarizeLoansForScope(@Param("saccoId") String saccoId,
                                                               @Param("stationId") String stationId);
 
-    @Query("""
+    @Query(value = """
         select l.id as id,
                l.applicationNumber as applicationNumber,
                l.loanId as loanId,
@@ -595,17 +595,19 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                l.saccoId as saccoId,
                l.stationId as stationId
         from LoanApplication l
+        left join LoanProductSetting p on p.id = l.loanProductSettingId
+        left join Member m on m.id = l.applicantMemberId
         where l.saccoId = :saccoId
           and l.status in :statuses
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         order by l.createdAt asc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.LoanQueue.class)
     Page<QueueLoanRow> findQueuePageForScope(@Param("saccoId") String saccoId,
                                              @Param("stationId") String stationId,
                                              @Param("statuses") Collection<LoanStatus> statuses,
                                              Pageable pageable);
 
-    @Query("""
+    @Query(value = """
         select l.id as id,
                l.applicationNumber as applicationNumber,
                l.loanId as loanId,
@@ -620,6 +622,8 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                l.saccoId as saccoId,
                l.stationId as stationId
         from LoanApplication l
+        left join LoanProductSetting p on p.id = l.loanProductSettingId
+        left join Member m on m.id = l.applicantMemberId
         where l.saccoId = :saccoId
           and l.status in :statuses
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
@@ -629,7 +633,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
             or (:searchByLoanId = false and str(l.applicationNumber) like concat('%', cast(:searchTerm as string), '%'))
           )
         order by l.createdAt asc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.LoanQueue.class)
     Page<QueueLoanRow> findQueuePage(@Param("saccoId") String saccoId,
                                      @Param("stationId") String stationId,
                                      @Param("statuses") Collection<LoanStatus> statuses,
@@ -637,26 +641,26 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                      @Param("searchByLoanId") boolean searchByLoanId,
                                      Pageable pageable);
 
-    @Query("""
-        select l from LoanApplication l
-        where l.saccoId = :saccoId
-          and lower(l.stationId) = lower(:stationId)
+    @Query(value = """
+        select l.* from loan_applications l left join members m on m.id=l.applicant_member_id left join loan_product_settings p on p.id=l.loan_product_setting_id
+        where l.sacco_id = :saccoId
+          and lower(l.station_id) = lower(:stationId)
           and l.status in :statuses
           and (:search = ''
-            or lower(coalesce(l.loanId, '')) like concat(:search, '%')
-            or str(l.applicationNumber) like concat(:search, '%'))
-          and (cast(:updatedFrom as timestamp) is null or l.updatedAt >= :updatedFrom)
-          and (cast(:updatedToExclusive as timestamp) is null or l.updatedAt < :updatedToExclusive)
-          and (cast(:status as string) is null or l.status = :status)
-        order by l.updatedAt desc, l.id desc
-        """)
+            or lower(coalesce(l.loan_id, '')) like concat(:search, '%')
+            or cast(l.application_number as text) like concat(:search, '%'))
+          and (cast(:updatedFrom as timestamptz) is null or l.updated_at >= :updatedFrom)
+          and (cast(:updatedToExclusive as timestamptz) is null or l.updated_at < :updatedToExclusive)
+          and (cast(:status as text) is null or l.status = :status)
+        order by l.updated_at desc, l.id desc
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.ProcessedLoans.class)
     Page<LoanApplication> findProcessedLoansPage(@Param("saccoId") String saccoId,
                                                   @Param("stationId") String stationId,
-                                                  @Param("statuses") Collection<LoanStatus> statuses,
+                                                  @Param("statuses") Collection<String> statuses,
                                                   @Param("search") String search,
                                                   @Param("updatedFrom") OffsetDateTime updatedFrom,
                                                   @Param("updatedToExclusive") OffsetDateTime updatedToExclusive,
-                                                  @Param("status") LoanStatus status,
+                                                  @Param("status") String status,
                                                   Pageable pageable);
 
     @Query("""

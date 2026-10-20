@@ -1,5 +1,5 @@
-<div class="erp-table-scroll"><table class="erp-table"><thead><tr>
-    <c:forEach items="${['employee','client','loan','principal','interest','requested','issue']}" var="column"><th><spring:message code="payroll.column.${column}" /></th></c:forEach>
+<div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="${empty batch?'local':'server'}"><thead><tr>
+    <c:forEach items="${['employee','client','loan','principal','interest','requested','issue']}" var="column"><th data-table-order="${empty batch?'':column}"><spring:message code="payroll.column.${column}" /></th></c:forEach>
 </tr></thead><tbody>
 <c:forEach items="${payrollLines}" var="line"><tr><td><c:out value="${line.employeeNumber}" /></td><td><c:out value="${line.clientName}" /></td><td><c:out value="${line.loanNumber}" /></td><td><fmt:formatNumber value="${line.principal}" minFractionDigits="2" maxFractionDigits="2" /></td><td><fmt:formatNumber value="${line.interest}" minFractionDigits="2" maxFractionDigits="2" /></td><td><fmt:formatNumber value="${line.amount}" minFractionDigits="2" maxFractionDigits="2" /></td><td><spring:message code="payroll.issue.${empty line.issue?'included':line.issue}" /></td></tr></c:forEach>
 <c:if test="${empty payrollLines}"><tr><td colspan="7"><spring:message code="payroll.empty" /></td></tr></c:if>

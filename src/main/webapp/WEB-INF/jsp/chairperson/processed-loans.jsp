@@ -49,14 +49,14 @@
         <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead><tr>
-                    <th class="whitespace-nowrap"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
-                    <th class="whitespace-nowrap"><spring:message code="loan.loanId" text="Loan ID" /></th>
-                    <th><spring:message code="common.applicant" text="Applicant" /></th>
-                    <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-                    <th><spring:message code="common.amount" text="Amount" /></th>
-                    <th><spring:message code="common.status" text="Status" /></th>
-                    <th><spring:message code="chairperson.latestDecision" text="Latest Staff Decision" /></th>
-                    <th><spring:message code="chairperson.decisionCount" text="Decisions" /></th>
+                    <th class="whitespace-nowrap" data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                    <th class="whitespace-nowrap" data-table-order="loan"><spring:message code="loan.loanId" text="Loan ID" /></th>
+                    <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
+                    <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+                    <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
+                    <th data-table-order="status"><spring:message code="common.status" text="Status" /></th>
+                    <th data-table-order="decision"><spring:message code="chairperson.latestDecision" text="Latest Staff Decision" /></th>
+                    <th data-table-order="decisions"><spring:message code="chairperson.decisionCount" text="Decisions" /></th>
                     <th data-table-actions-header></th>
                 </tr></thead>
                 <tbody>

@@ -79,7 +79,7 @@
                     <p class="font-semibold text-slate-900">Top Pages</p>
                 </div>
                 <div class="admin-usage-scroll admin-usage-table-scroll erp-table-scroll min-h-0 flex-1">
-                    <table class="erp-table min-w-full table-fixed">
+                    <table class="erp-table min-w-full table-fixed" data-table-sort-mode="local">
                         <colgroup>
                             <c:choose>
                                 <c:when test="${usageShowSaccoColumn}">
@@ -111,7 +111,7 @@
                     <p class="font-semibold text-slate-900">Active Users</p>
                 </div>
                 <div class="admin-usage-scroll admin-usage-table-scroll erp-table-scroll min-h-0 flex-1">
-                    <table class="erp-table min-w-full table-fixed">
+                    <table class="erp-table min-w-full table-fixed" data-table-sort-mode="local">
                         <colgroup>
                             <c:choose>
                                 <c:when test="${usageShowSaccoColumn}">

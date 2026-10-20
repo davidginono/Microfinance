@@ -2,6 +2,8 @@
 <spring:message code="financial.networkError" var="tableLoadErrorFallback" />
 <template id="resource-table-labels"
     data-actions="<spring:message code='common.actions' />"
+    data-sort-ascending="<spring:message code='table.sortAscending' />"
+    data-sort-descending="<spring:message code='table.sortDescending' />"
     data-records="<spring:message code='table.records' />"
     data-search-page="<spring:message code='table.searchPage' />"
     data-no-matches="<spring:message code='table.noMatches' />"

@@ -36,7 +36,7 @@
   </form>
   <div class="reconciliation-canvas">
     <c:choose><c:when test="${not empty report}"><%@ include file="document.jspf" %></c:when><c:otherwise>
-      <div class="erp-table-scroll"><table class="erp-table reconciliation-table"><thead><tr><c:forEach items="${['client','account','reference','date','transaction','description','slDebit','slCredit','glDebit','glCredit','debitVariance','creditVariance']}" var="column"><th scope="col" data-table-identifier><spring:message code="reconciliation.column.${column}" /></th></c:forEach></tr></thead><tbody><tr><td colspan="12" class="reconciliation-empty"><spring:message code="reconciliation.choosePeriod" /></td></tr></tbody></table></div>
+      <div class="erp-table-scroll"><table data-table-sort-mode="none" data-table-sort-reason="retired-report" class="erp-table reconciliation-table"><thead><tr><c:forEach items="${['client','account','reference','date','transaction','description','slDebit','slCredit','glDebit','glCredit','debitVariance','creditVariance']}" var="column"><th scope="col" data-table-identifier><spring:message code="reconciliation.column.${column}" /></th></c:forEach></tr></thead><tbody><tr><td colspan="12" class="reconciliation-empty"><spring:message code="reconciliation.choosePeriod" /></td></tr></tbody></table></div>
     </c:otherwise></c:choose>
   </div>
   <div data-table-pagination data-page="${filter.page}" data-table-for="sl-gl-reconciliation">

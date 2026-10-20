@@ -9,7 +9,9 @@ import java.util.*;
 public interface LoanRepaymentTransactionRepository extends JpaRepository<LoanRepaymentTransaction, UUID> {
     Optional<LoanRepaymentTransaction> findBySaccoIdAndStationIdAndRequestKey(String institution, String branch, UUID key);
     List<LoanRepaymentTransaction> findByLoanApplicationIdAndReversesTransactionIdIn(UUID loanId, Collection<UUID> ids);
-    Page<LoanRepaymentTransaction> findByLoanApplicationIdOrderBySequenceDesc(UUID id, Pageable pageable);
+    @Query(value = "select t from LoanRepaymentTransaction t where t.loanApplicationId=:id order by t.sequence desc",
+        queryRewriter = com.sacco.mvp.support.ResourceTableSort.ReceiptHistory.class)
+    Page<LoanRepaymentTransaction> findByLoanApplicationIdOrderBySequenceDesc(@Param("id") UUID id, Pageable pageable);
     boolean existsBySaccoIdAndStationIdAndChannelAndChannelReferenceAndKind(String institution, String branch,
         LoanRepaymentTransaction.Channel channel, String reference, LoanRepaymentTransaction.Kind kind);
 

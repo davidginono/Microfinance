@@ -52,6 +52,12 @@ public class BoardService {
         return apps;
     }
 
+    public List<BoardReview> queue(UUID reviewer, List<ApprovalWorkflowStage> stages, String institution, String branch, String search) {
+        if (stages.isEmpty()) return List.of();
+        return boardReviewRepository.findAssignedQueue(reviewer, stages, institution, branch, search,
+            org.springframework.data.domain.PageRequest.of(0, 100));
+    }
+
     public List<BoardReview> assignedAll(UUID boardMemberId) {
         return assignedAll(boardMemberId, ApprovalWorkflowStage.BOARD);
     }

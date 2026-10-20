@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -137,7 +138,7 @@ public class GeneralLedgerRepository {
             a.name(),a.nameSw(),a.description(),a.active(),v.id(),institution,a.id());
     }
     public List<Version> accountVersions(String institution,UUID account,int page,UUID owner,String branch,boolean all) {
-        return jdbc.query(VERSION_SELECT+" where v.sacco_id=? and v.account_id=? and (? or v.state in ('BASELINE','APPROVED') or (v.creator_id=? and v.station_id=?)) order by v.number desc limit 26 offset ?",this::version,institution,account,all,owner,branch,page*25);
+        return jdbc.query(VERSION_SELECT+" where v.sacco_id=? and v.account_id=? and (? or v.state in ('BASELINE','APPROVED') or (v.creator_id=? and v.station_id=?)) order by "+com.sacco.mvp.support.ResourceTableSort.order("account-version-history",Map.of("number","v.number","state","v.state","name","v.snapshot->>'name'","creator","m.full_name"),"v.id","v.number desc")+" limit 26 offset ?",this::version,institution,account,all,owner,branch,page*25);
     }
     public List<Version> versionRegister(String institution,String branch,UUID owner,boolean all,String state,String search,String sort,String direction,int page,int size) {
         String column=switch(sort){case "code"->"v.snapshot->>'code'";case "name"->"v.snapshot->>'name'";case "number"->"v.number";case "operation"->"v.operation";case "state"->"v.state";case "creator"->"m.full_name";case "created"->"v.created_at";default->throw new IllegalArgumentException("accounting.error.versionInput");};
@@ -148,7 +149,7 @@ public class GeneralLedgerRepository {
         jdbc.update("insert into gl_account_version_event values(?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?)",UUID.randomUUID(),v.id(),institution,action,actor,branch,reason,v.state(),v.policyVersion(),v.mode(),v.revision(),json(v.before()),json(v.proposed()),now);
     }
     public List<Event> accountVersionEvents(String institution,UUID id,int page) {
-        return jdbc.query("select e.*,m.full_name from gl_account_version_event e join members m on m.id=e.actor_id where e.sacco_id=? and e.version_id=? order by e.revision,e.id limit 26 offset ?",
+        return jdbc.query("select e.*,m.full_name from gl_account_version_event e join members m on m.id=e.actor_id where e.sacco_id=? and e.version_id=? order by "+com.sacco.mvp.support.ResourceTableSort.order("account-version-events",Map.of("event","e.action","actor","m.full_name","date","e.recorded_at","reason","e.reason"),"e.id","e.revision,e.id")+" limit 26 offset ?",
             (r,n)->new Event(r.getObject("id",UUID.class),r.getString("action"),r.getString("full_name"),r.getString("reason"),r.getString("state"),r.getInt("policy_version"),r.getString("mode"),r.getObject("recorded_at",OffsetDateTime.class)),institution,id,page*25);
     }
     public static String json(Object value) {return value==null?null:JSON.writeValueAsString(value);}

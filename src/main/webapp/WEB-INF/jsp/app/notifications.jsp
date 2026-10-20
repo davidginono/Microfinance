@@ -20,11 +20,11 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th class="px-3 py-2 text-left"><spring:message code="common.subject" text="Subject" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="common.message" text="Message" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="notifications.source" text="Source" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="notifications.type" text="Type" /></th>
-            <th class="min-w-[11rem] whitespace-nowrap px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
+            <th class="px-3 py-2 text-left" data-table-order="subject"><spring:message code="common.subject" text="Subject" /></th>
+            <th class="px-3 py-2 text-left" data-table-order="message"><spring:message code="common.message" text="Message" /></th>
+            <th class="px-3 py-2 text-left" data-table-order="source"><spring:message code="notifications.source" text="Source" /></th>
+            <th class="px-3 py-2 text-left" data-table-order="type"><spring:message code="notifications.type" text="Type" /></th>
+            <th class="min-w-[11rem] whitespace-nowrap px-3 py-2 text-left" data-table-order="date"><spring:message code="loan.date" text="Date" /></th>
         </tr>
         </thead>
         <tbody>
@@ -66,13 +66,13 @@
 
 <script>
     (() => {
-        document.querySelectorAll("[data-notification-href]").forEach((row) => {
-            row.addEventListener("click", (event) => {
+        document.addEventListener("click", (event) => {
+                const row=event.target.closest("[data-notification-href]");
+                if (!row) return;
                 if (event.target.closest("a, button, input, select, textarea")) {
                     return;
                 }
                 window.location.href = row.dataset.notificationHref;
-            });
         });
     })();
 </script>

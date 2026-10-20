@@ -11,7 +11,7 @@
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th>Action</th><th>Entity</th><th>Entity ID</th><th>Actor</th><th>Date</th></tr>
+        <tr><th data-table-order="action">Action</th><th data-table-order="entity">Entity</th><th data-table-order="reference">Entity ID</th><th data-table-order="actor">Actor</th><th data-table-order="date">Date</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${entries}" var="entry">

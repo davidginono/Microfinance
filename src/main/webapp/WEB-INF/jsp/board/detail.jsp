@@ -81,7 +81,7 @@
     </div>
     <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading active loans..." data-resource-table="board-detail-1" data-resource-split>
         <div class="erp-table-scroll">
-            <table class="erp-table">
+            <table class="erp-table" data-table-sort-mode="local">
                 <thead>
                 <tr>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.single" text="Loan" /></th>
@@ -159,7 +159,7 @@
     </div>
 <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-2">
         <div class="erp-table-scroll">
-        <table class="erp-table">
+        <table class="erp-table" data-table-sort-mode="local">
             <thead>
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="review.assessor" text="Assessor" /></th>
@@ -220,7 +220,7 @@
     <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-3" data-table-tools="none" data-resource-split data-resource-header-source>
         <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-3"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h2>
         <div class="erp-table-scroll">
-        <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
+        <table class="erp-table min-w-full divide-y divide-slate-200 text-sm" data-table-sort-mode="local">
             <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
@@ -255,7 +255,7 @@
 <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-4" data-table-tools="none" data-resource-split data-resource-header-source>
     <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-4"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h2>
     <div class="erp-table-scroll">
-    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
+    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm" data-table-sort-mode="local">
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
@@ -284,7 +284,7 @@
 <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-detail-5" data-table-tools="none" data-resource-header-source data-resource-split>
     <h2 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500" data-table-heading-for="board-detail-5"><spring:message code="loan.guarantors" text="Guarantors" /></h2>
     <div class="erp-table-scroll">
-    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
+    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm" data-table-sort-mode="local">
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>

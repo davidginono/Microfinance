@@ -58,12 +58,12 @@
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th><spring:message code="archives.loanReference" text="Loan Reference" /></th>
-                        <th><spring:message code="common.applicant" text="Applicant" /></th>
-                        <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-                        <th><spring:message code="common.amount" text="Amount" /></th>
-                        <th><spring:message code="review.decision" text="Decision" /></th>
-                        <th><spring:message code="loan.date" text="Date" /></th>
+                        <th data-table-order="reference"><spring:message code="archives.loanReference" text="Loan Reference" /></th>
+                        <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
+                        <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+                        <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
+                        <th data-table-order="status"><spring:message code="review.decision" text="Decision" /></th>
+                        <th data-table-order="date"><spring:message code="loan.date" text="Date" /></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -144,12 +144,12 @@
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
-                        <th><spring:message code="loan.loanId" text="Loan ID" /></th>
-                        <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-                        <th><spring:message code="common.amount" text="Amount" /></th>
-                        <th><spring:message code="common.status" text="Status" /></th>
-                        <th><spring:message code="loan.date" text="Date" /></th>
+                        <th data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                        <th data-table-order="loan"><spring:message code="loan.loanId" text="Loan ID" /></th>
+                        <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+                        <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
+                        <th data-table-order="status"><spring:message code="common.status" text="Status" /></th>
+                        <th data-table-order="date"><spring:message code="loan.date" text="Date" /></th>
                         <th scope="col" class="erp-table-action-column" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
                     </tr>
                     </thead>

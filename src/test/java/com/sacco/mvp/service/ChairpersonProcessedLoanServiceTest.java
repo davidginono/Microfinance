@@ -167,7 +167,7 @@ class ChairpersonProcessedLoanServiceTest {
     @Test
     void listingPassesInclusiveDateRangeAndExactStatusToScopedPageQuery() {
         when(loanApplicationRepository.findProcessedLoansPage(eq("SACCO-1"), eq("ST-1"), anyCollection(),
-            eq(""), any(OffsetDateTime.class), any(OffsetDateTime.class), eq(LoanStatus.DISBURSED),
+            eq(""), any(OffsetDateTime.class), any(OffsetDateTime.class), eq(LoanStatus.DISBURSED.name()),
             any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
         var page = service.list(principal(), null, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31),
@@ -175,7 +175,7 @@ class ChairpersonProcessedLoanServiceTest {
 
         verify(loanApplicationRepository).findProcessedLoansPage(eq("SACCO-1"), eq("ST-1"), anyCollection(),
             eq(""), eq(OffsetDateTime.parse("2026-07-01T00:00:00+03:00")),
-            eq(OffsetDateTime.parse("2026-08-01T00:00:00+03:00")), eq(LoanStatus.DISBURSED),
+            eq(OffsetDateTime.parse("2026-08-01T00:00:00+03:00")), eq(LoanStatus.DISBURSED.name()),
             any(Pageable.class));
         assertThat(page.fromDate()).isEqualTo(LocalDate.of(2026, 7, 1));
         assertThat(page.toDate()).isEqualTo(LocalDate.of(2026, 7, 31));

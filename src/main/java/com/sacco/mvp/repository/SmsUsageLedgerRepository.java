@@ -44,7 +44,9 @@ public interface SmsUsageLedgerRepository extends JpaRepository<SmsUsageLedger, 
 
     Optional<SmsUsageLedger> findByIdAndAccountId(UUID id, UUID accountId);
 
-    Page<SmsUsageLedger> findByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
+    @Query(value = "select s from SmsUsageLedger s where s.accountId=:accountId order by s.createdAt desc,s.id",
+        queryRewriter = com.sacco.mvp.support.ResourceTableSort.SmsHistory.class)
+    Page<SmsUsageLedger> findByAccountIdOrderByCreatedAtDesc(@Param("accountId") UUID accountId, Pageable pageable);
 
     @Query(
         value = """
@@ -104,7 +106,7 @@ public interface SmsUsageLedgerRepository extends JpaRepository<SmsUsageLedger, 
               and (cast(:saccoId as string) is null or ledger.saccoId = :saccoId)
               and (cast(:stationId as string) is null or lower(ledger.stationId) = lower(cast(:stationId as string)))
             """
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.LoanSms.class)
     Page<LoanSmsUsageProjection> summarizeLoanSmsUsage(@Param("saccoId") String saccoId,
                                                        @Param("stationId") String stationId,
                                                        @Param("fromAt") OffsetDateTime fromAt,

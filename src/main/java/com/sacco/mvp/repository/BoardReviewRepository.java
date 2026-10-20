@@ -16,6 +16,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> {
+    @Query(value = """
+        select r from BoardReview r join LoanApplication l on l.id=r.loanApplicationId
+        left join Member m on m.id=l.applicantMemberId
+        left join LoanProductSetting p on p.id=l.loanProductSettingId
+        where r.boardMemberId=:reviewer and r.reviewStage in :stages and r.decision='PENDING'
+          and l.saccoId=:institution and lower(l.stationId)=lower(:branch)
+          and (:search='' or str(l.applicationNumber) like concat('%',:search,'%'))
+          and ((r.reviewStage='BOARD' and l.status='AWAITING_BOARD')
+            or (r.reviewStage='CHAIRPERSON' and l.status='AWAITING_CHAIRPERSON')
+            or (r.reviewStage='CREDIT_COMMITTEE' and l.status='AWAITING_CREDIT_COMMITTEE'))
+        order by r.createdAt desc,r.id
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.BoardQueue.class)
+    List<BoardReview> findAssignedQueue(@Param("reviewer") UUID reviewer,
+        @Param("stages") Collection<ApprovalWorkflowStage> stages,@Param("institution") String institution,
+        @Param("branch") String branch,@Param("search") String search,Pageable page);
+
     List<BoardReview> findByLoanApplicationId(UUID loanApplicationId);
 
     List<BoardReview> findByLoanApplicationIdIn(Collection<UUID> loanApplicationIds);
@@ -59,6 +75,8 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
             select r.*
             from board_reviews r
             join loan_applications l on l.id = r.loan_application_id
+            left join members m on m.id=l.applicant_member_id
+            left join loan_product_settings p on p.id=l.loan_product_setting_id
             where r.board_member_id = :reviewerId
               and r.review_stage in (:reviewStages)
               and r.decision <> 'PENDING'
@@ -95,7 +113,7 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
               )
             """,
         nativeQuery = true
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.BoardArchives.class)
     Page<BoardReview> findArchivePage(@Param("reviewerId") UUID reviewerId,
                                       @Param("reviewStages") Collection<String> reviewStages,
                                       @Param("saccoId") String saccoId,

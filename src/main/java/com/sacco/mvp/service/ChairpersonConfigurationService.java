@@ -62,7 +62,7 @@ public class ChairpersonConfigurationService {
             .findBySaccoIdAndStationId(scope.saccoId(), scope.stationId()).orElse(null);
         String normalizedSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
         Page<LoanProductSetting> products = loanProductSettingRepository.findConfigurationPage(
-            scope.saccoId(), Set.of(LoanProductStatus.DRAFT, LoanProductStatus.RETIRED), normalizedSearch,
+            scope.saccoId(), Set.of(LoanProductStatus.DRAFT.name(), LoanProductStatus.RETIRED.name()), normalizedSearch,
             PageRequest.of(Math.max(0, requestedPage), PAGE_SIZE));
 
         List<ProductRow> productRows = products.getContent().stream().map(product -> new ProductRow(

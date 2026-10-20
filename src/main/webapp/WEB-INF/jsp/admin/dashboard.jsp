@@ -159,7 +159,7 @@
     <div class="erp-panel-body">
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
             <div class="erp-table-scroll erp-table-scroll-sm">
-            <table class="erp-table">
+            <table class="erp-table" data-table-sort-mode="local">
                 <thead>
                 <tr><th><spring:message code="admin.dashboard.event" text="Event" /></th><th><spring:message code="admin.dashboard.aggregate" text="Aggregate" /></th><th><spring:message code="admin.dashboard.created" text="Created" /></th></tr>
                 </thead>

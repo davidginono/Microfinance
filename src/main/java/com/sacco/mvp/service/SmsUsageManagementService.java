@@ -15,8 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -52,24 +50,8 @@ public class SmsUsageManagementService {
     private int exportMaxRows;
 
     public Page<StationSmsAccount> accounts(String saccoId, String stationId, SmsUnitStatus status, Pageable pageable) {
-        String normalizedSaccoId = blankToNull(saccoId);
-        String normalizedStationId = blankToNull(stationId);
-        Specification<StationSmsAccount> filters = Specification.allOf();
-        if (normalizedSaccoId != null) {
-            filters = filters.and((root, query, builder) -> builder.equal(root.get("saccoId"), normalizedSaccoId));
-        }
-        if (normalizedStationId != null) {
-            filters = filters.and((root, query, builder) -> builder.equal(root.get("stationId"), normalizedStationId));
-        }
-        if (status != null) {
-            filters = filters.and((root, query, builder) -> builder.equal(root.get("status"), status));
-        }
-        Pageable orderedPage = PageRequest.of(
-            pageable.getPageNumber(),
-            pageable.getPageSize(),
-            Sort.by("saccoId").ascending().and(Sort.by("stationId").ascending())
-        );
-        return accountRepository.findAll(filters, orderedPage);
+        return accountRepository.findWorkspaceAccounts(blankToNull(saccoId),blankToNull(stationId),
+            status == null ? null : status.name(),PageRequest.of(pageable.getPageNumber(),pageable.getPageSize()));
     }
 
     public StationSmsAccount account(String saccoId, String stationId) {

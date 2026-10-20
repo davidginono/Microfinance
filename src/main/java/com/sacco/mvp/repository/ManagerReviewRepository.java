@@ -101,6 +101,8 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
             select r.*
             from manager_reviews r
             join loan_applications l on l.id = r.loan_application_id
+            left join members m on m.id=l.applicant_member_id
+            left join loan_product_settings p on p.id=l.loan_product_setting_id
             where r.manager_member_id = :reviewerId
               and r.review_stage = :reviewStage
               and l.sacco_id = :saccoId
@@ -153,7 +155,7 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
               )
             """,
         nativeQuery = true
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.StaffArchives.class)
     Page<ManagerReview> findLatestArchivePage(@Param("reviewerId") UUID reviewerId,
                                               @Param("reviewStage") String reviewStage,
                                               @Param("saccoId") String saccoId,

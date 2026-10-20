@@ -188,7 +188,7 @@ public class AdminController {
                 PageRequest.of(safeLoanUsagePage, 25)
             ));
             populateLoanSmsUsageFilters(model, loanUsageCriteria);
-            model.addAttribute("registeredSaccos", registeredSaccos);
+            model.addAttribute("registeredSaccos", sortInstitutions(registeredSaccos));
             model.addAttribute("selectedSaccoId", selectedSaccoId);
             model.addAttribute("selectedStationId", selectedStationId);
             model.addAttribute("selectedSmsStatus", status == null ? "" : status.name());
@@ -284,7 +284,7 @@ public class AdminController {
         model.addAttribute("emailDeliveryStatus", platformEmailSettingsService.resolvedConfig());
         model.addAttribute("platformSmsGatewaySettings", platformSmsGatewaySettingsService.settings());
         model.addAttribute("smsGatewayStatus", platformSmsGatewaySettingsService.resolvedConfig());
-        model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccosFresh());
+        model.addAttribute("registeredSaccos", sortInstitutions(saccoRegistryService.listRegisteredSaccosFresh()));
         return "admin/platform-settings";
     }
 
@@ -1858,7 +1858,7 @@ public class AdminController {
             .filter(sacco -> sacco.saccoId().equals(adminScopeService.currentSaccoId(principal)))
             .toList();
         model.addAttribute("superAdmin", false);
-        model.addAttribute("registeredSaccos", registeredSaccos);
+        model.addAttribute("registeredSaccos", sortInstitutions(registeredSaccos));
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
         return "admin/sacco-registry";
     }
@@ -1866,7 +1866,7 @@ public class AdminController {
     @GetMapping("/saccos/registry")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_VIEW')")
     public String saccoRegistry(Model model) {
-        model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
+        model.addAttribute("registeredSaccos", sortInstitutions(saccoRegistryService.listRegisteredSaccos()));
         model.addAttribute("superAdmin", true);
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
         return "admin/sacco-registry";
@@ -1960,9 +1960,19 @@ public class AdminController {
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_VIEW')")
     public String minorAdmins(Model model) {
         List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccosFresh();
-        model.addAttribute("registeredSaccos", registeredSaccos);
+        model.addAttribute("registeredSaccos", sortInstitutions(registeredSaccos));
         model.addAttribute("registeredSaccoNamesById", registeredSaccoNamesById(registeredSaccos));
-        model.addAttribute("minorAdmins", adminService.minorAdmins());
+        var names=registeredSaccoNamesById(registeredSaccos);
+        var text=java.util.Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER);
+        model.addAttribute("minorAdmins",com.sacco.mvp.support.ResourceTableSort.rows("admin-minor-admins-1",adminService.minorAdmins(),
+            Map.<String,java.util.Comparator<AdminService.MinorAdminAccessView>>of(
+                "name",java.util.Comparator.comparing(AdminService.MinorAdminAccessView::getFullName,text),
+                "email",java.util.Comparator.comparing(AdminService.MinorAdminAccessView::getEmail,text),
+                "phone",java.util.Comparator.comparing(AdminService.MinorAdminAccessView::getPhone,text),
+                "institution",java.util.Comparator.comparing((AdminService.MinorAdminAccessView row)->names.getOrDefault(row.getSaccoId(),row.getSaccoId()),text),
+                "branch",java.util.Comparator.comparing(AdminService.MinorAdminAccessView::getStationId,text),
+                "activation",java.util.Comparator.comparing(AdminService.MinorAdminAccessView::getInvitationState,text)
+            ),java.util.Comparator.comparing(AdminService.MinorAdminAccessView::getAccountId)));
         model.addAttribute("registrationForm", new MinorAdminRegistrationForm());
         model.addAttribute("superAdmin", true);
         return "admin/minor-admins";
@@ -2686,5 +2696,17 @@ public class AdminController {
         model.addAttribute("boardReviewerOptions",adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions",adminService.activeCreditCommitteeReviewerOptions(saccoId));
         model.addAttribute("disbursementReviewerOptions",adminService.activeDisbursementReviewerOptions(saccoId));
+    }
+    private List<SaccoRegistryService.RegisteredSaccoView> sortInstitutions(List<SaccoRegistryService.RegisteredSaccoView> records) {
+        var columns=Map.<String,java.util.Comparator<SaccoRegistryService.RegisteredSaccoView>>of(
+            "logo",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::isHasLogo),
+            "id",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::getSaccoId),
+            "name",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::getSaccoName,String.CASE_INSENSITIVE_ORDER),
+            "status",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::getAccessStatusLabel),
+            "branches",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::getStationListLabel),
+            "topup",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::isLoanTopUpEnabled));
+        for(String table:List.of("admin-sacco-registry-1","admin-platform-settings-1"))
+            records=com.sacco.mvp.support.ResourceTableSort.rows(table,records,columns,java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::getSaccoId));
+        return records;
     }
 }

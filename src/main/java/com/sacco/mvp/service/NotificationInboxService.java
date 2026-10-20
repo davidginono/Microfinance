@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -104,7 +105,12 @@ public class NotificationInboxService {
             return Collections.emptyList();
         }
         return notificationViewService.toViews(
-            notificationRepository.findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(memberId, type)
+            com.sacco.mvp.support.ResourceTableSort.forTables(
+                switch(type) {
+                    case "ADMIN_REPLY" -> Set.of("app-support-replies-1","admin-support-replies-1");
+                    case "ADMIN_BROADCAST" -> Set.of("app-support-replies-2","admin-support-replies-2");
+                    default -> Set.of();
+                },()->notificationRepository.findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(memberId, type))
         );
     }
 

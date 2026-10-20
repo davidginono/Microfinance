@@ -137,14 +137,16 @@
 .resource-table-drag:disabled {visibility:hidden;}
 .resource-table-display-options>.resource-table-option {margin:10px 0;}
 .resource-table-display-options>fieldset:last-child {margin-top:20px;}
-.aws-console [data-resource-table] .resource-table-sort {display:flex;align-items:center;justify-content:space-between;gap:20px;min-width:0;color:inherit;text-decoration:none;}
+.aws-console .resource-table-sort {display:flex;align-items:center;justify-content:space-between;gap:20px;min-width:0;color:inherit;text-decoration:none;}
 .resource-table-sort>span {min-width:0;}
+.aws-console button.resource-table-sort {width:100%;border:0;background:transparent;padding:0;font:inherit;text-align:left;cursor:pointer;}
 .resource-table-sort svg {display:block;width:16px;height:16px;flex:none;color:#879596;overflow:visible;}
-.aws-console [data-resource-table] th:is([aria-sort=ascending],[aria-sort=descending]) {color:#16191f!important;}
-.aws-console [data-resource-table] .resource-table-sort:hover {color:#16191f;}
-.aws-console [data-resource-table] .resource-table-sort:focus-visible {outline:2px solid #0073bb;outline-offset:4px;}
+.aws-console .erp-table th:is([aria-sort=ascending],[aria-sort=descending]) {color:#16191f!important;}
+.aws-console .resource-table-sort:hover {color:#16191f;}
+.aws-console .resource-table-sort:focus-visible {outline:2px solid #0073bb;outline-offset:4px;}
 .erp-table th:is([aria-sort=ascending],[aria-sort=descending]) .resource-table-sort svg {fill:currentColor;color:#16191f;}
 .erp-table th[aria-sort=ascending] .resource-table-sort svg {transform:rotate(180deg);}
+@media print {.resource-table-sort svg {display:none;}}
 .resource-table-action-menu {position:relative;order:-1;}
 .resource-table-action-menu>button {display:inline-flex;align-items:center;gap:16px;}
 .resource-table-action-menu>button svg {width:16px;height:16px;flex:none;}

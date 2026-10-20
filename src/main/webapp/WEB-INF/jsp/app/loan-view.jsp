@@ -164,7 +164,7 @@
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
                     <div class="erp-table-scroll erp-table-scroll-sm">
-                    <table class="erp-table">
+                    <table class="erp-table" data-table-sort-mode="local">
                         <thead>
                         <tr>
                             <th><spring:message code="newloan.table.section" text="Section" /></th>
@@ -191,7 +191,7 @@
                 <div class="app-table-heading"><h2><spring:message code="loan.details" text="Loan Details" /></h2></div>
         </div>
             <div class="erp-table-scroll">
-            <table class="erp-table">
+            <table class="erp-table" data-table-sort-mode="local">
                 <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="newloan.table.section" text="Section" /></th>
@@ -234,7 +234,7 @@
             </div>
             </div>
         <div class="erp-table-scroll">
-        <table class="erp-table loan-repayment-schedule-table">
+        <table class="erp-table loan-repayment-schedule-table" data-table-sort-mode="local">
             <thead>
                 <tr>
                     <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
@@ -429,7 +429,7 @@
             </summary>
             <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true" data-resource-table="app-loan-view-4" data-table-tools="none">
                 <div class="erp-table-scroll">
-                <table class="erp-table loan-repayment-schedule-table">
+                <table class="erp-table loan-repayment-schedule-table" data-table-sort-mode="local">
                     <thead>
                         <tr>
                             <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
@@ -478,7 +478,7 @@
             <div class="app-table-heading"><h2><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></h2></div>
 </div>
         <div class="erp-table-scroll">
-        <table class="erp-table">
+        <table class="erp-table" data-table-sort-mode="local">
             <thead class="bg-slate-50">
                 <tr>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
@@ -517,7 +517,7 @@
         <div class="app-table-heading"><h2><spring:message code="loan.attachments.applicationAttachments" text="Application Attachments" /></h2></div>
 </div>
     <div class="erp-table-scroll">
-    <table class="erp-table">
+    <table class="erp-table" data-table-sort-mode="local">
         <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
@@ -551,7 +551,7 @@
         <div class="app-table-heading"><h2><spring:message code="loan.guarantors" /></h2></div>
             </div>
     <div class="erp-table-scroll">
-    <table class="erp-table">
+    <table class="erp-table" data-table-sort-mode="local">
         <thead class="bg-slate-50">
             <tr>
                 <th class="w-[18%] px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>

@@ -117,7 +117,7 @@
             <spring:message code="access.matrix.loading" var="accessMatrixLoading" />
             <div class="erp-table-wrap" data-resource-table="admin-user-edit-1">
 <div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="${accessMatrixLoading}">
-                <table class="erp-table">
+                <table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table">
                     <thead>
                     <tr>
                         <th class="admin-matrix-feature-cell"><spring:message code="access.matrix.feature" /></th>

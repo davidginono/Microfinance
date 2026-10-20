@@ -14,7 +14,7 @@
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-guarantee-requests-1" data-resource-split data-table-title-id="app-guarantee-requests-title">
 <div class="erp-table-scroll">
 <table class="erp-table">
-    <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="reports.loanProduct" text="Loan Product" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th data-table-actions-header><spring:message code="common.actions" text="Actions" /></th></tr></thead>
+    <thead><tr><th data-table-order="reference"><spring:message code="archives.loanReference" text="Loan Reference" /></th><th data-table-order="applicant"><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th><th data-table-order="amount"><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th data-table-order="status"><spring:message code="common.status" text="Status" /></th><th data-table-order="date"><spring:message code="loan.date" text="Date" /></th><th data-table-actions-header><spring:message code="common.actions" text="Actions" /></th></tr></thead>
     <tbody>
     <c:forEach items="${requests}" var="req">
         <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
@@ -336,8 +336,9 @@
             body.classList.remove("overflow-hidden");
         }
 
-        document.querySelectorAll("[data-guarantee-modal-open]").forEach((button) => {
-            button.addEventListener("click", () => {
+        document.addEventListener("click", (event) => {
+            const button=event.target.closest("[data-guarantee-modal-open]");
+            if (!button || button.disabled) return;
                 const key = button.getAttribute("data-guarantee-modal-open");
                 closeAllGuaranteeModals();
                 const modal = document.querySelector('[data-guarantee-modal="' + key + '"]');
@@ -347,7 +348,6 @@
                     modal.setAttribute("aria-hidden", "false");
                     body.classList.add("overflow-hidden");
                 }
-            });
         });
 
         document.querySelectorAll("[data-guarantee-modal-close]").forEach((button) => {

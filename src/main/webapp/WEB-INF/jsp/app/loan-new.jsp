@@ -214,7 +214,7 @@
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
                     <div class="erp-table-scroll erp-table-scroll-sm">
-                    <table class="erp-table">
+                    <table class="erp-table" data-table-sort-mode="local">
                         <thead>
                         <tr>
                             <th><spring:message code="newloan.table.section" /></th>
@@ -244,7 +244,7 @@
         </div>
 <div class="erp-table-wrap" aria-label="<spring:message code='repayment.scheduler' text='Repayment Scheduler' />" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results..." data-resource-table="app-loan-new-2" data-table-title-id="app-loan-new-title">
             <div class="erp-table-scroll erp-table-scroll-sm">
-            <table class="erp-table">
+            <table class="erp-table" data-table-sort-mode="local">
                 <thead>
                 <tr>
                     <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
@@ -444,7 +444,7 @@
                     <div class="app-table-heading"><h2><spring:message code="loan.attachments.existing" text="Existing Attachments" /></h2></div>
                 </div>
                 <div class="erp-table-scroll">
-                    <table class="erp-table">
+                    <table class="erp-table" data-table-sort-mode="local">
                         <thead>
                         <tr>
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
@@ -1022,7 +1022,7 @@
                     +"<div class='app-table-titlebar'>"
                     +"<div class='app-table-heading'><h3></h3></div>"
                     + "</div>"
-                    +"<div class='erp-table-scroll erp-table-scroll-sm'><table class='erp-table'>"
+                    +"<div class='erp-table-scroll erp-table-scroll-sm'><table data-table-sort-mode="none" data-table-sort-reason="property-layout" class='erp-table'>"
                     + "<thead><tr><th></th><th></th></tr></thead>"
                     + "<tbody></tbody>"
                     +"</table></div>";

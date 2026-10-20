@@ -22,7 +22,7 @@
             <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
-                <tr><th><spring:message code="support.subject" text="Subject" /></th><th><spring:message code="support.message" text="Message" /></th><th><spring:message code="support.source" text="Source" /></th><th><spring:message code="loan.date" text="Date" /></th></tr>
+                <tr><th data-table-order="subject"><spring:message code="support.subject" text="Subject" /></th><th data-table-order="message"><spring:message code="support.message" text="Message" /></th><th data-table-order="source"><spring:message code="support.source" text="Source" /></th><th data-table-order="date"><spring:message code="loan.date" text="Date" /></th></tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${replies}" var="item">
@@ -57,7 +57,7 @@
             <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
-                <tr><th>Subject</th><th>Message</th><th>Source</th><th>Date</th></tr>
+                <tr><th data-table-order="subject">Subject</th><th data-table-order="message">Message</th><th data-table-order="source">Source</th><th data-table-order="date">Date</th></tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${broadcasts}" var="item">

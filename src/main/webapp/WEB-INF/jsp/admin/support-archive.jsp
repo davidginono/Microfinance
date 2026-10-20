@@ -27,7 +27,7 @@
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th><spring:message code="support.subject" text="Subject" /></th><th><spring:message code="support.message" text="Message" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="support.superAdminRead" text="Super Admin Read" /></th><th><spring:message code="support.sent" text="Sent" /></th></tr>
+        <tr><th data-table-order="subject"><spring:message code="support.subject" text="Subject" /></th><th data-table-order="message"><spring:message code="support.message" text="Message" /></th><th data-table-order="status"><spring:message code="common.status" text="Status" /></th><th data-table-order="read"><spring:message code="support.superAdminRead" text="Super Admin Read" /></th><th data-table-order="date"><spring:message code="support.sent" text="Sent" /></th></tr>
         </thead>
         <tbody>
         <c:forEach items="${supportArchive}" var="item">

@@ -58,9 +58,11 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
 
     List<GuarantorRequest> findByGuarantorMemberIdOrderByCreatedAtDesc(UUID guarantorMemberId);
 
-    @Query("""
+    @Query(value = """
         select g
-        from GuarantorRequest g, LoanApplication l
+        from GuarantorRequest g join LoanApplication l on l.id=g.loanApplicationId
+        left join Member m on m.id=l.applicantMemberId
+        left join LoanProductSetting p on p.id=l.loanProductSettingId
         where g.loanApplicationId = l.id
           and g.guarantorMemberId = :guarantorMemberId
           and not exists (
@@ -81,13 +83,15 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
             )
           )
         order by g.createdAt desc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.Guarantees.class)
     List<GuarantorRequest> findActiveVisibleByGuarantorMemberId(@Param("guarantorMemberId") UUID guarantorMemberId,
                                                                 @Param("removalCutoff") OffsetDateTime removalCutoff);
 
-    @Query("""
+    @Query(value = """
         select g
-        from GuarantorRequest g, LoanApplication l
+        from GuarantorRequest g join LoanApplication l on l.id=g.loanApplicationId
+        left join Member m on m.id=l.applicantMemberId
+        left join LoanProductSetting p on p.id=l.loanProductSettingId
         where g.loanApplicationId = l.id
           and g.guarantorMemberId = :guarantorMemberId
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
@@ -109,12 +113,14 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
               and superseding.status <> com.sacco.mvp.domain.LoanStatus.DRAFT
           )
         order by g.createdAt desc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.GuaranteedLoans.class)
     List<GuarantorRequest> findActiveGuaranteedLoansByGuarantorMemberId(@Param("guarantorMemberId") UUID guarantorMemberId);
 
-    @Query("""
+    @Query(value = """
         select g
-        from GuarantorRequest g, LoanApplication l
+        from GuarantorRequest g join LoanApplication l on l.id=g.loanApplicationId
+        left join Member m on m.id=l.applicantMemberId
+        left join LoanProductSetting p on p.id=l.loanProductSettingId
         where g.loanApplicationId = l.id
           and g.guarantorMemberId = :guarantorMemberId
           and not exists (
@@ -144,7 +150,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and (cast(:reviewedFrom as timestamp) is null or coalesce(g.decidedAt, g.createdAt) >= :reviewedFrom)
           and (cast(:reviewedToExclusive as timestamp) is null or coalesce(g.decidedAt, g.createdAt) < :reviewedToExclusive)
         order by coalesce(g.decidedAt, g.createdAt) desc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.Guarantees.class)
     Page<GuarantorRequest> findArchivePageByGuarantorMemberId(@Param("guarantorMemberId") UUID guarantorMemberId,
                                                               @Param("removalCutoff") OffsetDateTime removalCutoff,
                                                               @Param("status") GuarantorRequestStatus status,

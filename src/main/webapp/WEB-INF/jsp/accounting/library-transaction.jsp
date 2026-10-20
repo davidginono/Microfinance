@@ -37,7 +37,7 @@
     <p class="accounting-definition-note"><spring:message code="library.definitionOnly" /></p>
     <section data-resource-table="accounting-library-transaction-2" class="erp-table-wrap" data-aws-table-region>
         <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${transaction.active}"><a class="app-btn ${empty template?'btn-launch':'btn-neutral'}" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="${empty template?'library.addTemplate':'library.editTemplate'}" /></a></c:if></sec:authorize></div>
-        <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="library-template"><table class="erp-table">
+        <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="library-template"><table class="erp-table" data-table-sort-mode="local">
             <thead><tr><th><spring:message code="library.component" /></th><th><spring:message code="library.debitAccount" /></th><th><spring:message code="library.creditAccount" /></th></tr></thead>
             <tbody><c:forEach items="${template.rules}" var="rule"><tr><td><spring:message code="library.component.${rule.component}" /></td><td><c:out value="${rule.debitCode}" /> · <c:out value="${rule.debitName}" /></td><td><c:out value="${rule.creditCode}" /> · <c:out value="${rule.creditName}" /></td></tr></c:forEach><c:if test="${empty template}"><tr><td colspan="3"><spring:message code="library.noTemplate" /></td></tr></c:if></tbody>
         </table></div>

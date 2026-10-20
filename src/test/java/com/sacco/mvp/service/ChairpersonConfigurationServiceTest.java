@@ -77,7 +77,7 @@ class ChairpersonConfigurationServiceTest {
         when(stationRepository.findBySaccoIdAndStationId("SACCO-1", "ST-1")).thenReturn(Optional.of(station));
         when(policyRepository.findBySaccoIdAndStationId("SACCO-1", "ST-1")).thenReturn(Optional.of(policy));
         when(productRepository.findConfigurationPage(eq("SACCO-1"),
-            eq(Set.of(LoanProductStatus.DRAFT, LoanProductStatus.RETIRED)), eq("edu"), any(Pageable.class)))
+            eq(Set.of(LoanProductStatus.DRAFT.name(), LoanProductStatus.RETIRED.name())), eq("edu"), any(Pageable.class)))
             .thenReturn(Page.empty());
 
         var configuration = service.overview(principal(), " EDU ", 0);
@@ -102,7 +102,7 @@ class ChairpersonConfigurationServiceTest {
         when(stationRepository.findBySaccoIdAndStationId("SACCO-1", "ST-1")).thenReturn(Optional.of(station));
         when(policyRepository.findBySaccoIdAndStationId("SACCO-1", "ST-1")).thenReturn(Optional.empty());
         when(productRepository.findConfigurationPage(eq("SACCO-1"),
-            eq(Set.of(LoanProductStatus.DRAFT, LoanProductStatus.RETIRED)), eq(""), any(Pageable.class)))
+            eq(Set.of(LoanProductStatus.DRAFT.name(), LoanProductStatus.RETIRED.name())), eq(""), any(Pageable.class)))
             .thenReturn(Page.empty());
 
         var configuration = service.overview(principal(), "", 0);

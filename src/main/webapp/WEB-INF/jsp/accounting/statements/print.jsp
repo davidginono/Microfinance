@@ -17,7 +17,7 @@
    <p><spring:message code="fs.previous" />: ${appTime:display(snapshot.parameters.previousFrom())} — ${appTime:display(snapshot.parameters.previousThrough())}</p>
    <p><spring:message code="fs.generated" />: <c:out value="${generatedLabel}" /></p>
   </header>
-  <table>
+  <table data-table-sort-mode="none" data-table-sort-reason="document">
    <colgroup><c:forEach items="${document.columns}" var="column"><col width="${column.weight*100}%" /></c:forEach></colgroup>
    <thead><tr><c:forEach items="${document.columns}" var="column"><th class="${column.numeric?'fs-print-number':''}"><c:out value="${column.label}" /></th></c:forEach></tr></thead>
    <tbody><c:forEach items="${document.rows}" var="row"><tr class="${row.heading?'fs-print-section':''} ${row.total?'fs-print-total':''}"><c:choose>

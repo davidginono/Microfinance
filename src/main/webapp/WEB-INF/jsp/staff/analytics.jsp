@@ -228,7 +228,7 @@
                     <c:if test="${empty loanType}">
                         <div class="erp-table-wrap staff-financial-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Loan product financial breakdown" data-resource-table="staff-analytics-1">
                             <div class="erp-table-scroll" data-view-position-key="staff-analytics-financial-breakdown">
-                            <table class="erp-table staff-financial-table">
+                            <table class="erp-table staff-financial-table" data-table-sort-mode="local">
                                 <thead>
                                     <tr>
                                         <th><spring:message code="reports.loanProductName" text="Loan Product" /></th>

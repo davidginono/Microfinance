@@ -584,3 +584,79 @@ test('separate direction headers retain scoped filters and size and toggle ascen
     for(const url of [active,other]){assert.equal(url.searchParams.get('size'),'50');assert.equal(url.searchParams.get('parentId'),'group');assert.equal(url.searchParams.get('search'),'Bank');assert.equal(url.searchParams.get('page'),'0');}
     dom.window.close();
 });
+
+
+test('server column arrows toggle, retain filters and ordering through pagination and filter submission', async () => {
+    const markup=table('columns',row).replace('<th>Reference</th>','<th data-table-order="number">Reference</th>')
+        .replace('<input name="search">','<input name="search" value="cash"><input name="state" value="ACTIVE">')
+        + '<div data-table-pagination data-page="0" data-table-for="columns"><a data-page-direction="next" href="?page=1&search=cash&state=ACTIVE">Next</a></div>';
+    const {dom,window:w,document:d}=await setup(markup,loadingSource);
+    const requests=[];w.fetch=async url=>{requests.push(new URL(url));return {ok:true,redirected:false,text:async()=>markup};};
+    const header=d.querySelector('th'),link=header.querySelector('a');
+    assert.equal(header.getAttribute('aria-sort'),'none');assert.equal(header.querySelectorAll('svg').length,1);
+    link.click();await settle();await settle();
+    assert.equal(requests[0].searchParams.get('tableSort[columns]'),'number');
+    assert.equal(requests[0].searchParams.get('tableDirection[columns]'),'asc');
+    assert.equal(requests[0].searchParams.get('page'),'0');assert.equal(requests[0].searchParams.get('state'),'ACTIVE');
+    assert.equal(header.getAttribute('aria-sort'),'ascending');
+    assert.equal(new URL(d.querySelector('[aria-label="Next page"]').href).searchParams.get('tableSort[columns]'),'number');
+    link.click();await settle();await settle();
+    assert.equal(requests[1].searchParams.get('tableDirection[columns]'),'desc');assert.equal(header.getAttribute('aria-sort'),'descending');
+    d.querySelector('[name=search]').value='bank';d.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+    await settle();await settle();
+    assert.equal(requests[2].searchParams.get('tableSort[columns]'),'number');
+    assert.equal(requests[2].searchParams.get('tableDirection[columns]'),'desc');assert.equal(requests[2].searchParams.get('search'),'bank');
+    assert.equal(header.querySelectorAll('svg').length,1);dom.window.close();
+});
+
+
+test('complete detail tables sort exact amounts and displayed dates while retaining native row nodes', async () => {
+    const rows=[['A','9,000.00','02/01/2026'],['B','-10.50','31/12/2025'],['C','9007199254740992.01','01/02/2026'],['D','9007199254740992.00','01/01/2026']]
+        .map(([id,amount,date])=>`<tr><td><a href="/${id}">${id}</a></td><td>${amount}</td><td>${date}</td></tr>`).join('');
+    const markup=table('complete-detail',rows).replace('<table class="erp-table">','<table class="erp-table" data-table-sort-mode="local">');
+    const {dom,window:w,document:d}=await setup(markup);
+    const body=d.querySelector('tbody'),first=body.rows[0],link=first.querySelector('a');let activations=0;
+    link.addEventListener('click',event=>{event.preventDefault();activations++;});
+    const buttons=[...d.querySelectorAll('[data-table-local-sort]')];assert.equal(buttons.length,3);
+    const order=()=>[...body.rows].map(row=>row.cells[0].textContent);
+    buttons[1].click();assert.deepEqual(order(),['B','A','D','C']);
+    buttons[1].click();assert.deepEqual(order(),['C','D','A','B']);
+    buttons[2].click();assert.deepEqual(order(),['B','D','A','C']);
+    assert.equal(first.querySelector('a'),link);link.click();assert.equal(activations,1);
+    body.insertAdjacentHTML('beforeend','<tr><td>E</td><td>0.00</td><td>01/01/2025</td></tr>');await settle();
+    assert.deepEqual(order(),['E','B','D','A','C']);assert.equal(d.querySelector('th:nth-child(3)').getAttribute('aria-sort'),'ascending');
+    w.ResourceTable.init();assert.equal(d.querySelectorAll('[data-table-local-sort]').length,3);dom.window.close();
+});
+
+test('ordinary registers and editable tables never acquire page-only sorting controls',async()=>{
+    const {dom,document:d}=await setup(table('register',row)+table('editor','<tr><td><input value="draft"></td><td>10</td><td>Draft</td></tr>','data-table-pagination-mode="external"'));
+    assert.equal(d.querySelector('[data-table-local-sort]'),null);dom.window.close();
+});
+
+test('two tables retain independent sorts and reset their own page counters',async()=>{
+    const markup=table('history',row).replace('<th>Reference</th>','<th data-table-order="reference">Reference</th>')
+        +table('schedule',row,'data-table-page-param="schedulePage"').replace('<th>Reference</th>','<th data-table-order="number">Number</th>');
+    const {dom,window:w,document:d}=await setup(markup,loadingSource);
+    const requests=[];w.fetch=async url=>{requests.push(new URL(url));return {ok:true,redirected:false,text:async()=>markup};};
+    d.querySelector('[data-resource-table="history"] [data-table-sort]').click();await settle();await settle();
+    d.querySelector('[data-resource-table="schedule"] [data-table-sort]').click();await settle();await settle();
+    assert.equal(requests[1].searchParams.get('tableSort[history]'),'reference');
+    assert.equal(requests[1].searchParams.get('tableSort[schedule]'),'number');
+    assert.equal(requests[1].searchParams.get('schedulePage'),'0');
+    assert.equal(d.querySelectorAll('th[aria-sort="ascending"]').length,2);
+    d.querySelector('[data-resource-table="history"] [data-table-sort]').click();await settle();await settle();
+    assert.equal(requests[2].searchParams.get('tableDirection[history]'),'desc');
+    assert.equal(requests[2].searchParams.get('tableSort[schedule]'),'number');
+    dom.window.close();
+});
+
+test('a server response can change a conditional reference heading without leaving its old sort key',async()=>{
+    const markup=table('conditional',row).replace('<th>Reference</th>','<th data-table-order="number">Application number</th>');
+    const {dom,window:w,document:d}=await setup(markup,loadingSource);
+    const requests=[];w.fetch=async url=>{requests.push(new URL(url));return {ok:true,redirected:false,text:async()=>markup.replace('data-table-order="number"','data-table-order="loan"').replace('Application number','Loan ID')};};
+    const header=d.querySelector('th');header.querySelector('a').click();await settle();await settle();
+    assert.equal(header.dataset.tableOrder,'loan');assert.equal(header.textContent,'Loan ID');assert.equal(header.getAttribute('aria-sort'),'none');
+    header.querySelector('a').click();await settle();await settle();
+    assert.equal(requests[1].searchParams.get('tableSort[conditional]'),'loan');
+    assert.equal(header.querySelectorAll('svg').length,1);dom.window.close();
+});

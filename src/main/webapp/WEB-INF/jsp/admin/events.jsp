@@ -79,16 +79,16 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Action</th>
+            <th data-table-order="action">Action</th>
             <c:if test="${superAdminScopeFilters}">
-                <th>Institution</th>
+                <th data-table-order="institution">Institution</th>
             </c:if>
-            <th>Status</th>
-            <th>Entity</th>
-            <th>Reference</th>
-            <th>Actor ID</th>
-            <th>Name</th>
-            <th>Date</th>
+            <th data-table-order="status">Status</th>
+            <th data-table-order="entity">Entity</th>
+            <th data-table-order="reference">Reference</th>
+            <th data-table-order="actor">Actor ID</th>
+            <th data-table-order="name">Name</th>
+            <th data-table-order="date">Date</th>
         </tr>
         </thead>
         <tbody>

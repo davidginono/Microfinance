@@ -9,7 +9,7 @@
             <dl class="statement-facts"><c:forEach items="${document.client}" var="field"><div><dt><c:out value="${field.label}" /></dt><dd><c:out value="${field.value}" /></dd></div></c:forEach></dl>
             <dl class="statement-facts"><c:forEach items="${section.fields}" var="field"><div><dt><c:out value="${field.label}" /></dt><dd><c:out value="${field.value}" /></dd></div></c:forEach></dl>
             <div class="statement-transactions">
-                <table>
+                <table data-table-sort-mode="none" data-table-sort-reason="document">
                     <colgroup><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /></colgroup>
                     <thead><tr><c:forEach items="${section.columns}" var="column"><th scope="col"><c:out value="${column}" /></th></c:forEach></tr></thead>
                     <tbody>

@@ -119,7 +119,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
               and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanApplicationId as text), '%'), '%')
             """,
         nativeQuery = true
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.Outbox.class)
     Page<OutboxEvent> searchMonitorView(@Param("status") String status,
                                         @Param("dateFrom") OffsetDateTime dateFrom,
                                         @Param("dateTo") OffsetDateTime dateTo,
@@ -195,7 +195,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
               )
             """,
         nativeQuery = true
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.Outbox.class)
     Page<OutboxEvent> searchMonitorViewScoped(@Param("status") String status,
                                               @Param("dateFrom") OffsetDateTime dateFrom,
                                               @Param("dateTo") OffsetDateTime dateTo,

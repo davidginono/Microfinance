@@ -9,7 +9,7 @@
   <c:if test="${report.parameters.unassigned}"><p><spring:message code="reconciliation.activity" />: <spring:message code="reconciliation.unassigned" /></p><p><spring:message code="reconciliation.manualScope" /></p></c:if>
   <p><spring:message code="reconciliation.exceptionsOnly" /></p>
 </div>
-<div class="erp-table-scroll reconciliation-document-table"><table class="erp-table reconciliation-table">
+<div class="erp-table-scroll reconciliation-document-table"><table data-table-sort-mode="none" data-table-sort-reason="document" class="erp-table reconciliation-table">
   <thead><tr><c:forEach items="${['client','account','reference','date','transaction','description','slDebit','slCredit','glDebit','glCredit','debitVariance','creditVariance']}" var="column"><th scope="col" data-table-identifier><spring:message code="reconciliation.column.${column}" /></th></c:forEach></tr></thead>
   <tbody>
     <c:if test="${report.count==0}"><tr><td colspan="12" class="reconciliation-empty"><spring:message code="reconciliation.empty" /></td></tr></c:if>

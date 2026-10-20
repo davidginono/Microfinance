@@ -15,7 +15,7 @@
     </div>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-reports-1">
         <div class="erp-table-scroll">
-        <table class="erp-table">
+        <table class="erp-table" data-table-sort-mode="local">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                     <th class="px-4 py-3">Category</th>
@@ -97,7 +97,7 @@
             </div>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-reports-2">
                 <div class="erp-table-scroll">
-                <table class="erp-table">
+                <table class="erp-table" data-table-sort-mode="local">
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <tr>
                             <th class="px-4 py-3">Column</th>

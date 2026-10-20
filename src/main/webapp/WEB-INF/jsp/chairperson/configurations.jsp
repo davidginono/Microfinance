@@ -100,11 +100,11 @@
     <div class="erp-table-scroll">
         <table class="erp-table erp-table--left-headings chairperson-products-table">
             <thead><tr>
-                <th scope="col"><spring:message code="common.code" text="Code" /></th>
-                <th scope="col"><spring:message code="common.name" text="Name" /></th>
-                <th scope="col"><spring:message code="common.status" text="Status" /></th>
-                <th scope="col"><spring:message code="chairperson.amountRange" text="Amount Range" /></th>
-                <th scope="col"><spring:message code="admin.settings.approvalFlow" text="Approval Flow" /></th>
+                <th scope="col" data-table-order="code"><spring:message code="common.code" text="Code" /></th>
+                <th scope="col" data-table-order="name"><spring:message code="common.name" text="Name" /></th>
+                <th scope="col" data-table-order="status"><spring:message code="common.status" text="Status" /></th>
+                <th scope="col" data-table-order="amount"><spring:message code="chairperson.amountRange" text="Amount Range" /></th>
+                <th scope="col" data-table-order="workflow"><spring:message code="admin.settings.approvalFlow" text="Approval Flow" /></th>
                 <th scope="col" class="erp-table-action-column" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr></thead>
             <tbody>

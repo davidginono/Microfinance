@@ -25,18 +25,18 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
 
     List<LoanProductSetting> findBySaccoIdAndIdIn(String saccoId, java.util.Collection<UUID> ids);
 
-    @Query("""
-        select p from LoanProductSetting p
-        where p.saccoId = :saccoId
-          and p.customRecordingConfiguration = false
-          and (p.productStatus is null or p.productStatus not in :excludedStatuses)
+    @Query(value = """
+        select p.* from loan_product_settings p
+        where p.sacco_id = :saccoId
+          and p.custom_recording_configuration = false
+          and (p.product_status is null or p.product_status not in :excludedStatuses)
           and (:search = ''
-            or lower(coalesce(p.productCode, '')) like concat(:search, '%')
-            or lower(coalesce(p.productName, '')) like concat(:search, '%'))
-        order by coalesce(p.displayOrder, 2147483647), lower(coalesce(p.productName, '')), p.id
-        """)
+            or lower(coalesce(p.product_code, '')) like concat(:search, '%')
+            or lower(coalesce(p.product_name, '')) like concat(:search, '%'))
+        order by coalesce(p.display_order, 2147483647), lower(coalesce(p.product_name, '')), p.id
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.ProductConfiguration.class)
     Page<LoanProductSetting> findConfigurationPage(@Param("saccoId") String saccoId,
-                                                    @Param("excludedStatuses") java.util.Collection<LoanProductStatus> excludedStatuses,
+                                                    @Param("excludedStatuses") java.util.Collection<String> excludedStatuses,
                                                     @Param("search") String search,
                                                     Pageable pageable);
 

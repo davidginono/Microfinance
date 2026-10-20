@@ -76,7 +76,7 @@
     <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
-        <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Actor ID</th><th>Name</th></tr>
+        <tr><th data-table-order="event">Event Type</th><th data-table-order="aggregate">Aggregate</th><th data-table-order="status">Status</th><th data-table-order="date">Created</th><th data-table-order="actor">Actor ID</th><th data-table-order="name">Name</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${events}" var="event">

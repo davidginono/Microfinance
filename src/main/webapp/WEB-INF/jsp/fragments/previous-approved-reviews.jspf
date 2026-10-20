@@ -2,7 +2,7 @@
     <div class="erp-table-wrap mt-5" data-resource-table="previous-approved-reviews">
         <div class="app-table-titlebar"><h2><spring:message code="review.previousApprovals" text="Previous Review Decisions" /></h2></div>
             <div class="erp-table-scroll">
-            <table class="erp-table">
+            <table class="erp-table" data-table-sort-mode="local">
                 <thead>
                 <tr>
                     <th class="px-3 py-2 text-left"><spring:message code="review.stage" text="Stage" /></th>

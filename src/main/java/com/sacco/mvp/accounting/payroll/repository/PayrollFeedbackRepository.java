@@ -29,13 +29,13 @@ public class PayrollFeedbackRepository {
         return jdbc.query(HEADER+"where f.batch_id=? and f.sacco_id=? and f.station_id=? order by "+columns.get(sort)+" "+direction+",f.id limit 26 offset ?",this::header,batch,a.getSaccoId(),a.getStationId(),page*25);
     }
     public List<Result> rows(UUID feedback,int offset,int limit) {
-        return jdbc.query("""
+        return jdbc.query("select q.* from ("+"""
             select r.*,i.state item_state,i.receipt_id,
               exists(select 1 from accountant_loan_receipt c where c.reverses_id=i.receipt_id) reversed
             from payroll_feedback_row r left join payroll_feedback_receipt l using(feedback_id,line_number)
             left join receipt_batch_item i on i.id=l.item_id
-            where r.feedback_id=? order by r.line_number limit ? offset ?
-            """,(r,n)->new Result(r.getInt("line_number"),r.getObject("client_id",UUID.class),r.getString("client_name"),r.getString("employee_number"),r.getObject("deduction_reference",UUID.class).toString().toUpperCase(Locale.ROOT),r.getString("status"),r.getBigDecimal("amount"),r.getBigDecimal("requested"),r.getObject("deduction_date",LocalDate.class),r.getString("employer_reference"),r.getBoolean("reversed")?"REVERSED":r.getString("item_state")==null?"UNPOSTED":r.getString("item_state"),r.getObject("receipt_id",UUID.class)),feedback,limit,offset);
+            where r.feedback_id=?
+            """+") q order by "+com.sacco.mvp.support.ResourceTableSort.order("payroll-results",Map.of("employee","q.employee_number","client","q.client_name","status","q.status","requested","q.requested","deducted","q.amount","date","q.deduction_date","employerReference","q.employer_reference","posting","case when q.reversed then 'REVERSED' else coalesce(q.item_state,'UNPOSTED') end"),"q.line_number","q.line_number")+" limit ? offset ?",(r,n)->new Result(r.getInt("line_number"),r.getObject("client_id",UUID.class),r.getString("client_name"),r.getString("employee_number"),r.getObject("deduction_reference",UUID.class).toString().toUpperCase(Locale.ROOT),r.getString("status"),r.getBigDecimal("amount"),r.getBigDecimal("requested"),r.getObject("deduction_date",LocalDate.class),r.getString("employer_reference"),r.getBoolean("reversed")?"REVERSED":r.getString("item_state")==null?"UNPOSTED":r.getString("item_state"),r.getObject("receipt_id",UUID.class)),feedback,limit,offset);
     }
     public void link(UUID feedback,int line,UUID item){jdbc.update("insert into payroll_feedback_receipt(feedback_id,line_number,item_id) values(?,?,?)",feedback,line,item);}
     public Optional<Remittance> remittance(UUID id){return jdbc.query("select m.*,(select i.loan_labels->>(m.money_account_id::text) from receipt_batch_item i where i.batch_id=m.receipt_batch_id order by i.line_no limit 1) account_name from payroll_remittance m where m.feedback_id=?",(r,n)->new Remittance(r.getString("account_name"),r.getObject("received_date",LocalDate.class),r.getBigDecimal("received_amount"),r.getString("reference"),r.getString("evidence")),id).stream().findFirst();}

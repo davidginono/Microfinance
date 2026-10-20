@@ -58,6 +58,8 @@ class LoanRepaymentLedgerPostgresTest {
     @AfterAll
     void stop() { if (context != null) context.close(); }
 
+    @AfterEach void clearSortRequest() { org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
+
     @BeforeEach
     void fixture() {
         reset(context.getBean(AuditService.class));
@@ -111,6 +113,21 @@ class LoanRepaymentLedgerPostgresTest {
         assertThat(service.receipt(loan.getId(), receipt.id(), poster).reversedBy()).isEqualTo(reversal.id());
         assertThat(jdbc.queryForObject("SELECT amount FROM loan_repayment_transactions WHERE id = ?", BigDecimal.class, receipt.id()))
             .isEqualByComparingTo("100.00");
+        assertBalanced();
+    }
+
+    @Test void displaySortingPreservesContractBalancesAndTheLatestCorrectionTarget() {
+        service.post(loan.getId(),poster,command("20.00","SORT-1-"+UUID.randomUUID(),UUID.randomUUID()));
+        var latest=service.post(loan.getId(),poster,command("30.00","SORT-2-"+UUID.randomUUID(),UUID.randomUUID()));
+        var request=new org.springframework.mock.web.MockHttpServletRequest();request.setMethod("GET");
+        request.setParameter("tableSort[repayments-loan-2]","interest");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+        var view=service.view(loan.getId(),poster,1,0);
+        assertThat(view.installments().getContent()).extracting(LoanRepaymentLedgerService.InstallmentRow::number).containsExactly(2,1);
+        assertThat(view.installments().getContent().getFirst().beginningBalance()).isEqualByComparingTo("108.00");
+        assertThat(view.history().getContent()).isEmpty();
+        assertThat(view.latestPaymentId()).isEqualTo(latest.id());
+        assertThat(view.latestReceipt().id()).isEqualTo(latest.id());
         assertBalanced();
     }
 
@@ -236,6 +253,7 @@ class LoanRepaymentLedgerPostgresTest {
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = "com.sacco.mvp.repository")
     static class TestConfig {
+        @Bean JdbcTemplate jdbcTemplate(DataSource source) { return new JdbcTemplate(source); }
         @Bean(destroyMethod = "close") DataSource dataSource() {
             var source = new HikariDataSource();
             source.setJdbcUrl(System.getenv("MICROFINANCE_TEST_DATABASE_URL"));

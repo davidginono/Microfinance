@@ -69,13 +69,13 @@
         <table class="erp-table">
         <thead>
         <tr>
-            <th>${archivePrimaryColumnLabel}</th>
-            <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-            <th><spring:message code="common.applicant" text="Applicant" /></th>
-            <th><spring:message code="common.amount" text="Amount" /></th>
-            <th><spring:message code="review.decision" text="Decision" /></th>
-            <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
-            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
+            <th data-table-order="${archiveLoanIdMode?'loan':'number'}">${archivePrimaryColumnLabel}</th>
+            <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+            <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
+            <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
+            <th data-table-order="decision"><spring:message code="review.decision" text="Decision" /></th>
+            <th data-table-order="date"><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
+            <th data-table-order="status"><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th data-table-actions-header><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>

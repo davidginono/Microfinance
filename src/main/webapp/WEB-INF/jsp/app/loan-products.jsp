@@ -166,7 +166,7 @@
                 </div>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-products-1" data-table-title-id="app-loan-products-title">
                     <div class="erp-table-scroll erp-table-scroll-sm">
-                    <table class="erp-table">
+                    <table class="erp-table" data-table-sort-mode="local">
                         <thead>
                         <tr>
                             <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
@@ -222,12 +222,12 @@
     <table class="erp-table">
         <thead>
             <tr>
-                <th><spring:message code="loan.type" /></th>
-                <th><spring:message code="products.table.amountRules" /></th>
-                <th><spring:message code="products.table.guarantors" /></th>
-                <th><spring:message code="products.table.annualInterest" /></th>
-                <th><spring:message code="products.table.repaymentMethod" text="Repayment Method" /></th>
-                <th><spring:message code="products.table.tenure" /></th>
+                <th data-table-order="name"><spring:message code="loan.type" /></th>
+                <th data-table-order="amount"><spring:message code="products.table.amountRules" /></th>
+                <th data-table-order="guarantors"><spring:message code="products.table.guarantors" /></th>
+                <th data-table-order="interest"><spring:message code="products.table.annualInterest" /></th>
+                <th data-table-order="method"><spring:message code="products.table.repaymentMethod" text="Repayment Method" /></th>
+                <th data-table-order="tenure"><spring:message code="products.table.tenure" /></th>
                 <th data-table-actions-header><spring:message code="products.table.action" /></th>
             </tr>
         </thead>
@@ -589,7 +589,7 @@
                     +"<div class='app-table-titlebar'>"
                     +"<div class='app-table-heading'><h3></h3></div>"
                     + "</div>"
-                    +"<div class='erp-table-scroll erp-table-scroll-sm loan-calculator-detail-scroll'><table class='erp-table loan-calculator-detail-table'>"
+                    +"<div class='erp-table-scroll erp-table-scroll-sm loan-calculator-detail-scroll'><table data-table-sort-mode="none" data-table-sort-reason="property-layout" class='erp-table loan-calculator-detail-table'>"
                     + "<thead><tr><th></th><th></th></tr></thead>"
                     + "<tbody></tbody>"
                     +"</table></div>";

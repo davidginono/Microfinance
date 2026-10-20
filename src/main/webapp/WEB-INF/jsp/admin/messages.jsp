@@ -28,7 +28,7 @@
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th>Subject</th><th>Category</th><th>Status</th><th>Created</th><th data-table-actions-header>Action</th></tr>
+        <tr><th data-table-order="subject">Subject</th><th data-table-order="category">Category</th><th data-table-order="status">Status</th><th data-table-order="date">Created</th><th data-table-actions-header>Action</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${messages}" var="item">

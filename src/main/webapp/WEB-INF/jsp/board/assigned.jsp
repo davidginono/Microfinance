@@ -83,16 +83,16 @@
         <table class="erp-table">
             <thead>
             <tr>
-                <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
-                <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-                <th><spring:message code="common.applicant" text="Applicant" /></th>
-                <th><spring:message code="common.amount" text="Amount" /></th>
-                <th><spring:message code="common.applicationStatus" text="Application Status" /></th>
-                <th><spring:message code="board.myReview" text="My Review" /></th>
+                <th data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+                <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
+                <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
+                <th data-table-order="status"><spring:message code="common.applicationStatus" text="Application Status" /></th>
+                <th data-table-order="decision"><spring:message code="board.myReview" text="My Review" /></th>
                 <c:if test="${archiveView}">
-                    <th><spring:message code="review.reason" text="Reason" /></th>
+                    <th data-table-order="reason"><spring:message code="review.reason" text="Reason" /></th>
                 </c:if>
-                <th><spring:message code="loan.date" text="Date" /></th>
+                <th data-table-order="date"><spring:message code="loan.date" text="Date" /></th>
                 <th data-table-actions-header></th>
             </tr>
             </thead>

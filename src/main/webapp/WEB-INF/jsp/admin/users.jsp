@@ -71,15 +71,15 @@
     <table class="erp-table min-w-[1100px]">
         <thead>
         <tr>
-            <th class="px-3 py-2 text-left whitespace-nowrap">User ID</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Client Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Staff Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Names</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Email</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Phone Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Current Roles</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Membership</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Current Status</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="id">User ID</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="client">Client Number</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="staff">Staff Number</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="name">Names</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="email">Email</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="phone">Phone Number</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="roles">Current Roles</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="membership">Membership</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="status">Current Status</th>
             <th class="px-3 py-2 text-left whitespace-nowrap" data-table-actions-header>Update</th>
         </tr>
         </thead>

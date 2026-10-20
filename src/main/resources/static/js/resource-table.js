@@ -3,6 +3,7 @@
     'use strict';
     const labels = () => document.getElementById('resource-table-labels')?.dataset || {};
     const lifetimes = new Map();
+    const localSorts = new Map();
     const node = (tag, className, text) => {
         const element = document.createElement(tag);
         if (className) element.className = className;
@@ -33,6 +34,56 @@
         button.type = 'button'; button.title = label; button.setAttribute('aria-label', label); button.append(icon(name));
         return button;
     };
+    // Only complete, read-only detail/report datasets opt in. Registers keep server sorting.
+    function localSort(table) {
+        if (localSorts.has(table) || !table.tHead) return;
+        const headers=[...table.tHead.rows[0].cells], l=labels();
+        const collator=new Intl.Collator(document.documentElement.lang || 'en',{numeric:true,sensitivity:'base'});
+        let active, descending=false;
+        const value=cell=>cell?.dataset.tableSortValue ?? cell?.textContent.trim() ?? '';
+        const compare=(a,b)=>{
+            const missing=value=>!value || /^[-–—]$/.test(value);
+            if (missing(a) || missing(b)) return missing(a)===missing(b)?0:missing(a)?1:-1;
+            const date=value=>{
+                const match=/^(\d{2})\/(\d{2})\/(\d{4})(?:[ ,T]+(\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(value);
+                return match ? Date.UTC(+match[3],+match[2]-1,+match[1],+(match[4]||0),+(match[5]||0),+(match[6]||0)) : null;
+            };
+            const ad=date(a),bd=date(b);
+            if(ad!==null && bd!==null)return (ad-bd)*(descending?-1:1);
+            const decimal=value=>/^[-+]?\d+(?:\.\d+)?$/.test(value.replace(/[,\s]|TZS|%/g,''))?value.replace(/[,\s]|TZS|%/g,''):null;
+            const an=decimal(a),bn=decimal(b);
+            if(an!==null && bn!==null){
+                const scale=Math.max(an.split('.')[1]?.length||0,bn.split('.')[1]?.length||0);
+                const integer=value=>{const [whole,fraction='']=value.split('.');return BigInt(whole+fraction.padEnd(scale,'0'));};
+                const av=integer(an),bv=integer(bn);
+                return (av<bv?-1:av>bv?1:0)*(descending?-1:1);
+            }
+            return collator.compare(a,b)*(descending?-1:1);
+        };
+        const apply=()=>{
+            if(active===undefined)return;
+            for(const body of table.tBodies){
+                const rows=[...body.rows].filter(row=>row.cells.length===headers.length && [...row.cells].every(cell=>cell.colSpan===1) && !row.matches('.app-loading-row,.resource-table-load-error,.resource-table-no-matches'));
+                const sorted=[...rows].sort((a,b)=>compare(value(a.cells[headers[active].cellIndex]),value(b.cells[headers[active].cellIndex])));
+                if(sorted.some((row,index)=>row!==rows[index]))body.append(...sorted);
+            }
+        };
+        headers.forEach((header,index)=>{
+            if(header.colSpan!==1 || header.classList.contains('resource-table-selection') || header.querySelector('input,button,a') || header.hasAttribute('data-table-actions-header') || header.hasAttribute('data-table-sort-disabled') || !header.textContent.trim())return;
+            const button=node('button','resource-table-sort');button.type='button';button.dataset.tableLocalSort='';
+            const label=node('span');label.append(...header.childNodes);button.append(label,icon('sort'));header.append(button);header.scope='col';header.setAttribute('aria-sort','none');
+            button.addEventListener('click',()=>{
+                const region=table.closest('[data-resource-table]'), clear=lifetimes.get(region)?.clearSelection;
+                if(clear)clear();else region?.dispatchEvent(new Event('resource-table:reset'));
+                descending=active===index?!descending:false;active=index;
+                headers.forEach((heading,i)=>{if(heading.querySelector('[data-table-local-sort]'))heading.setAttribute('aria-sort',i===active?descending?'descending':'ascending':'none');});
+                apply();
+                headers.forEach(heading=>{const control=heading.querySelector('[data-table-local-sort]');const action=heading.getAttribute('aria-sort')==='ascending'?l.sortDescending:l.sortAscending;if(control && action)control.setAttribute('aria-label',heading.textContent.trim()+': '+action);});
+            });
+            if(l.sortAscending)button.setAttribute('aria-label',header.textContent.trim()+': '+l.sortAscending);
+        });
+        const observer=new MutationObserver(apply);observer.observe(table,{childList:true,subtree:true});localSorts.set(table,observer);
+    }
     function actionMenu(container, initial, key, region, l) {
         const signal = lifetimes.get(region).controller.signal;
         const group = node('div','resource-table-action-menu'), trigger = node('button','app-btn btn-neutral',l.actions);
@@ -86,6 +137,16 @@
         const signal = lifetime.controller.signal;
         region.dataset.resourceTableReady = 'true';
         const l = labels();
+        const pageParam = region.dataset.tablePageParam || 'page';
+        const sortParam = 'tableSort['+region.dataset.resourceTable+']', directionParam = 'tableDirection['+region.dataset.resourceTable+']';
+        const isOrder = name => /^(tableSort|tableDirection)\[.+\]$/.test(name);
+        let queryUrl = new URL(location.href), request, version = 0;
+        const retainOrder = url => {
+            queryUrl.searchParams.forEach((value,name) => {
+                if (isOrder(name)) url.searchParams.set(name,value);
+            });
+            return url;
+        };
         let scroller = table.closest('.erp-table-scroll');
         if (!scroller || scroller === region) {
             scroller = node('div', 'erp-table-scroll'); table.before(scroller); scroller.append(table);
@@ -162,6 +223,7 @@
             if (region.dataset.tablePageSize && control.hasAttribute('href')) {
                 const url = new URL(control.href, location.href);url.searchParams.set('size',region.dataset.tablePageSize);control.href=url.href;
             }
+            if (control.hasAttribute('href') && [...queryUrl.searchParams.keys()].some(isOrder)) control.href=retainOrder(new URL(control.href,location.href)).href;
             if (direction === 'next') { const current = node('span', 'resource-table-page-number', String(page)); current.setAttribute('aria-current', 'page'); current.setAttribute('aria-label', l.page + ' ' + page); navigation.append(current); }
             navigation.append(control);
         });
@@ -250,6 +312,7 @@
             rowInputs().filter(input => input.checked).forEach(input => input.click());
             region.dispatchEvent(new CustomEvent('resource-table:reset',{bubbles:true})); syncSelection();
         };
+        lifetime.clearSelection=clearSelection;
         if (selectable) {
             selectHeader = node('input'); selectHeader.type = 'checkbox'; selectHeader.className = 'resource-table-select';
             head.cells[0].replaceChildren(selectHeader); head.cells[0].classList.add('resource-table-selection');
@@ -269,6 +332,21 @@
         const syncSortHeaders = () => headers.forEach(header => {
             header.scope = 'col';
             let link = header.querySelector('a[data-table-sort]');
+            if (header.dataset.tableOrder) {
+                const key = header.dataset.tableOrder;
+                const active = queryUrl.searchParams.get(sortParam) === key;
+                const ascending = active && queryUrl.searchParams.get(directionParam) !== 'desc';
+                header.setAttribute('aria-sort', active ? ascending ? 'ascending' : 'descending' : 'none');
+                const url = new URL(queryUrl);
+                if (filters instanceof HTMLFormElement) new FormData(filters).forEach((value,name) => {
+                    if (typeof value === 'string') url.searchParams.set(name,value);
+                });
+                url.searchParams.set(sortParam,key);
+                url.searchParams.set(directionParam,ascending ? 'desc' : 'asc');
+                url.searchParams.set(pageParam,'0');
+                if (!link) {link=node('a');link.dataset.tableSort='';link.append(...header.childNodes);header.append(link);}
+                link.href=url.href;
+            }
             // Explicit server sort values; never infer ordering from translated labels.
             if (header.dataset.tableSortAsc || header.dataset.tableSortDesc) {
                 const sort = filters?.querySelector('[name=sort]');
@@ -282,19 +360,25 @@
                     new FormData(filters).forEach((value,key) => { if (typeof value === 'string') url.searchParams.set(key,value); });
                     url.searchParams.set('sort', direction ? header.dataset.tableSortKey : ascending ? desc || asc : asc || desc);
                     if (direction) url.searchParams.set('direction', ascending ? 'desc' : 'asc');
-                    url.searchParams.set('page','0');
+                    url.searchParams.set(pageParam,'0');
                     if (!link) {link = node('a');link.dataset.tableSort = '';link.append(...header.childNodes);header.append(link);}
                     link.href = url.href;
                 }
             }
             if (!link) return;
+            const ascending = header.getAttribute('aria-sort') !== 'ascending';
+            const sortLabel = ascending ? l.sortAscending : l.sortDescending;
+            if (sortLabel) link.setAttribute('aria-label',header.textContent.trim()+': '+sortLabel);
             if (link.classList.contains('resource-table-sort')) return;
             link.classList.add('resource-table-sort');
             const label = node('span'); label.append(...link.childNodes); link.append(label,icon('sort'));
             link.addEventListener('click', clearSelection);
         });
         syncSortHeaders();
-        let queryUrl = new URL(location.href), request, version = 0;
+        document.addEventListener('resource-table:query',()=>{
+            queryUrl=new URL(location.href);syncSortHeaders();
+            navigation.querySelectorAll('a[href]').forEach(link=>{link.href=retainOrder(new URL(link.href,location.href)).href;});
+        },{signal});
         const errorRow = node('tr','resource-table-load-error'), errorCell = node('td','',l.loadError);
         errorCell.colSpan = headers.length; errorCell.setAttribute('role','alert'); errorRow.append(errorCell);
         const updateTable = async (target, changeHistory = true) => {
@@ -347,12 +431,20 @@
                 }
                 headers.forEach((header,index)=>{
                     const source = freshHeaders[index], link = header.querySelector('[data-table-sort]'), freshLink = source?.querySelector('[data-table-sort]');
+                    if(header.hasAttribute('data-table-order') && source?.hasAttribute('data-table-order')) {
+                        header.dataset.tableOrder=source.dataset.tableOrder;
+                        link?.querySelector(':scope > span')?.replaceChildren(...[...source.childNodes].map(child=>document.importNode(child,true)));
+                    }
                     if (link && freshLink) {link.href=new URL(freshLink.getAttribute('href'),url).href;header.setAttribute('aria-sort',source.getAttribute('aria-sort') || 'none');}
                 });
+                new URL(location.href).searchParams.forEach((value,name)=>{
+                    if(isOrder(name) && name!==sortParam && name!==directionParam)url.searchParams.set(name,value);
+                });
+                queryUrl=url;
                 syncSortHeaders();
                 const freshPager = fresh.querySelector('[data-table-pagination]') || [...page.querySelectorAll('[data-table-pagination][data-table-for]')].find(item=>item.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
                 renderPager(freshPager);
-                queryUrl=url;if(changeHistory)history.replaceState(history.state,'',url.href);
+                if(changeHistory){history.replaceState(history.state,'',url.href);document.dispatchEvent(new Event('resource-table:query'));}
                 region.dispatchEvent(new CustomEvent('resource-table:updated',{bubbles:true}));
                 queueMicrotask(()=>{apply();applySearch();syncSelection();});
             } catch (error) {
@@ -375,7 +467,7 @@
                 const url=new URL(queryUrl);
                 if(filters?.tagName==='FORM')new FormData(filters).forEach((value,name)=>{if(typeof value==='string')url.searchParams.set(name,value);});
                 url.searchParams.set(parameter,target.searchParams.get(parameter)||'');
-                url.searchParams.set('page','0');void updateTable(url);
+                url.searchParams.set(pageParam,'0');void updateTable(url);
             }else void updateTable(target);
         },{signal});
         region.addEventListener('resource-table:refresh',event=>{if(!event.defaultPrevented && !externalPaging)void updateTable(queryUrl);},{signal});
@@ -390,9 +482,9 @@
         if(filters?.tagName==='FORM')filters.addEventListener('submit',event=>{
             if(event.defaultPrevented || filters.method==='post')return;
             event.preventDefault();event.stopImmediatePropagation();
-            const url=new URL(filters.action || queryUrl,location.href);
+            const url=retainOrder(new URL(filters.action || queryUrl,location.href));
             new FormData(filters).forEach((value,name)=>{if(typeof value==='string')url.searchParams.set(name,value);});
-            url.searchParams.set('page','0');void updateTable(url);
+            url.searchParams.set(pageParam,'0');void updateTable(url);
         },{capture:true,signal});
         // Original forms and listeners remain attached when commands move into the menu.
         const menuCommands = [...actions.querySelectorAll(':scope > [data-table-command]')];
@@ -551,7 +643,7 @@
                 clearSelection(); apply(); try { localStorage.setItem(key, JSON.stringify(settings)); } catch { /* Preferences still apply for this view. */ }
                 dialog.close();
                 const size = pageSize.find(input => input.checked)?.value;
-                if (size && size !== region.dataset.tablePageSize) { const url = new URL(queryUrl); url.searchParams.set('size',size); url.searchParams.set('page','0'); void updateTable(url); }
+                if (size && size !== region.dataset.tablePageSize) { const url = new URL(queryUrl); url.searchParams.set('size',size); url.searchParams.set(pageParam,'0'); void updateTable(url); }
             });
             dialog.showModal(); close.focus();
         });
@@ -565,10 +657,12 @@
         const region=control.closest('[data-resource-table]');if(!region)return false;
         region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));return true;
     }, init: root => {
+        for (const [table,observer] of localSorts) if (!table.isConnected) {observer.disconnect();localSorts.delete(table);}
         for (const [region,lifetime] of lifetimes) if (!region.isConnected) {
             lifetime.controller.abort(); lifetime.observers.forEach(observer=>observer.disconnect()); lifetimes.delete(region);
         }
         (root || document).querySelectorAll('[data-resource-table]').forEach(init);
+        (root || document).querySelectorAll('table[data-table-sort-mode="local"]').forEach(localSort);
         document.querySelectorAll('[data-table-pagination-used]').forEach(pager => pager.remove());
         document.querySelectorAll('[data-table-pagination-shell]').forEach(shell => {
             if (!shell.querySelector('[data-table-pagination]')) shell.remove();

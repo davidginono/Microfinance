@@ -71,8 +71,8 @@ public class ChairpersonProcessedLoanService {
         OffsetDateTime updatedFrom = applicationClock.startOfDay(fromDate);
         OffsetDateTime updatedToExclusive = applicationClock.dayAfter(toDate);
         Page<LoanApplication> applications = loanApplicationRepository.findProcessedLoansPage(
-            scope.saccoId(), scope.stationId(), PROCESSED_STATUSES, normalizedSearch,
-            updatedFrom, updatedToExclusive, status,
+            scope.saccoId(), scope.stationId(), PROCESSED_STATUSES.stream().map(Enum::name).toList(), normalizedSearch,
+            updatedFrom, updatedToExclusive, status == null ? null : status.name(),
             PageRequest.of(pageNumber, PAGE_SIZE, Sort.unsorted()));
 
         Set<UUID> loanIds = applications.getContent().stream().map(LoanApplication::getId)

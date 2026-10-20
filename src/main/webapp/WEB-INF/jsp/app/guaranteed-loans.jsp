@@ -40,13 +40,13 @@
         <table class="erp-table">
             <thead>
             <tr>
-                <th class="whitespace-nowrap"><spring:message code="loan.id" text="Loan ID" /></th>
-                <th><spring:message code="common.applicant" text="Applicant" /></th>
-                <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
-                <th><spring:message code="common.status" text="Status" /></th>
-                <th class="text-right whitespace-nowrap"><spring:message code="common.amount" text="Amount" /> (TZS)</th>
-                <th class="whitespace-nowrap"><spring:message code="loan.repayment.finalDueDate" text="Final Due Date" /></th>
-                <th class="whitespace-nowrap"><spring:message code="loan.repayment.timeLeft" text="Time Left" /></th>
+                <th class="whitespace-nowrap" data-table-order="reference"><spring:message code="loan.id" text="Loan ID" /></th>
+                <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
+                <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
+                <th data-table-order="status"><spring:message code="common.status" text="Status" /></th>
+                <th class="text-right whitespace-nowrap" data-table-order="amount"><spring:message code="common.amount" text="Amount" /> (TZS)</th>
+                <th class="whitespace-nowrap" data-table-order="due"><spring:message code="loan.repayment.finalDueDate" text="Final Due Date" /></th>
+                <th class="whitespace-nowrap" data-table-order="remaining"><spring:message code="loan.repayment.timeLeft" text="Time Left" /></th>
             </tr>
             </thead>
             <tbody>

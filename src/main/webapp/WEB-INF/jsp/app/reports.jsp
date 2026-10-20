@@ -152,7 +152,7 @@
     </div>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-reports-1">
         <div class="erp-table-scroll">
-        <table class="erp-table loan-active-detail-table">
+        <table class="erp-table loan-active-detail-table" data-table-sort-mode="local">
             <thead>
                 <tr>
                     <th><spring:message code="reports.loanId" text="Loan ID" /></th>

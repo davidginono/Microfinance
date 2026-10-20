@@ -42,11 +42,23 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     long countByStatus(com.sacco.mvp.domain.NotificationStatus status);
 
-    List<Notification> findTop50ByRecipientMemberIdOrderByCreatedAtDesc(UUID recipientMemberId);
+    @Query(value = """
+        select n.* from notifications n where n.recipient_member_id=:recipientId
+        order by n.created_at desc limit 50
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.Notifications.class)
+    List<Notification> findTop50ByRecipientMemberIdOrderByCreatedAtDesc(@Param("recipientId") UUID recipientMemberId);
     List<Notification> findTop5ByRecipientMemberIdOrderByCreatedAtDesc(UUID recipientMemberId);
     List<Notification> findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(UUID recipientMemberId);
-    List<Notification> findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
-    List<Notification> findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
+    @Query(value = """
+        select n.* from notifications n where n.recipient_member_id=:recipientId and n.type=:type
+        order by n.created_at desc limit 100
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.Notifications.class)
+    List<Notification> findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(@Param("recipientId") UUID recipientMemberId, @Param("type") String type);
+    @Query(value = """
+        select n.* from notifications n where n.recipient_member_id=:recipientId and n.type=:type
+        order by n.created_at desc limit 200
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.Notifications.class)
+    List<Notification> findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(@Param("recipientId") UUID recipientMemberId, @Param("type") String type);
 
 
     @Query(

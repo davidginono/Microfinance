@@ -40,11 +40,11 @@
             <table class="erp-table min-w-[680px]">
                 <thead>
                 <tr>
-                    <th><spring:message code="admin.saccoRegistry.logo" text="Logo" /></th>
-                    <th data-table-identifier>Institution ID</th>
-                    <th><spring:message code="admin.saccoRegistry.saccoName" text="Institution Name" /></th>
-                    <th><spring:message code="admin.saccoRegistry.access" text="Access" /></th>
-                    <th><spring:message code="admin.saccoRegistry.stations" text="Branches" /></th>
+                    <th data-table-order="logo"><spring:message code="admin.saccoRegistry.logo" text="Logo" /></th>
+                    <th data-table-identifier data-table-order="id">Institution ID</th>
+                    <th data-table-order="name"><spring:message code="admin.saccoRegistry.saccoName" text="Institution Name" /></th>
+                    <th data-table-order="status"><spring:message code="admin.saccoRegistry.access" text="Access" /></th>
+                    <th data-table-order="branches"><spring:message code="admin.saccoRegistry.stations" text="Branches" /></th>
                     <c:if test="${superAdmin}">
                         <th data-table-actions-header><spring:message code="admin.saccoRegistry.details" text="Details" /></th>
                     </c:if>
@@ -490,8 +490,9 @@
             document.body.classList.remove('overflow-hidden');
         }
 
-        document.querySelectorAll('[data-sacco-modal-open]').forEach((button) => {
-            button.addEventListener('click', function () {
+        document.addEventListener("click", (event) => {
+            const button=event.target.closest("[data-sacco-modal-open]");
+            if (!button || button.disabled) return;
                 const key = button.getAttribute('data-sacco-modal-open');
                 const modal = document.querySelector('[data-sacco-modal="' + key + '"]');
                 if (modal) {
@@ -499,7 +500,6 @@
                     modal.classList.add('is-open');
                     document.body.classList.add('overflow-hidden');
                 }
-            });
         });
 
         document.querySelectorAll('[data-sacco-modal-close]').forEach((button) => {

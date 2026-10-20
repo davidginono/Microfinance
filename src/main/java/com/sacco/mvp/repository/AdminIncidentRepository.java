@@ -18,29 +18,29 @@ public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UU
 
     List<AdminIncident> findTop250BySaccoIdOrderByCreatedAtDesc(String saccoId);
 
-    @Query("""
+    @Query(value = """
         select i
         from AdminIncident i
         where (cast(:saccoId as string) is null or i.saccoId = :saccoId)
           and (cast(:status as string) is null or i.status = :status)
           and (cast(:severity as string) is null or i.severity = :severity)
         order by i.createdAt desc
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.Incidents.class)
     List<AdminIncident> findRecentForReview(@Param("saccoId") String saccoId,
                                             @Param("status") IncidentStatus status,
                                             @Param("severity") IncidentSeverity severity,
                                             Pageable pageable);
 
-    @Query("""
-        select i
-        from AdminIncident i
-        where i.reportedByMemberId = :reporterId
+    @Query(value = """
+        select i.*
+        from admin_incidents i
+        where i.reported_by_member_id = :reporterId
           and i.category = 'SUPPORT_MESSAGE'
           and i.source = :source
-          and (cast(:sentFrom as timestamp) is null or i.createdAt >= :sentFrom)
-          and (cast(:sentToExclusive as timestamp) is null or i.createdAt < :sentToExclusive)
-        order by i.createdAt desc
-        """)
+          and (cast(:sentFrom as timestamptz) is null or i.created_at >= :sentFrom)
+          and (cast(:sentToExclusive as timestamptz) is null or i.created_at < :sentToExclusive)
+        order by i.created_at desc
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.SupportArchives.class)
     Page<AdminIncident> findSupportArchivePage(@Param("reporterId") UUID reporterId,
                                                @Param("source") String source,
                                                @Param("sentFrom") OffsetDateTime sentFrom,

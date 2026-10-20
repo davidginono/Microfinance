@@ -196,21 +196,23 @@ public class LoanRepaymentLedgerService {
             PageRequest.of(Math.max(0, Math.min(page, 10000)), 25));
         Map<UUID, UUID> reversed = reversalIds(loanId, transactionPage.getContent().stream().map(LoanRepaymentTransaction::getId).toList());
         Page<Receipt> history = transactionPage.map(t -> receipt(t, ledger.getLoanId(), reversed.get(t.getId())));
-        UUID latest = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
+        LoanRepaymentTransaction latest = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
             .filter(t->t.getKind()==LoanRepaymentTransaction.Kind.PAYMENT)
-            .map(LoanRepaymentTransaction::getId).findFirst().orElse(null);
+            .findFirst().orElse(null);
         List<JournalRow> entries = !actor.isStaffSession() ? List.of() : journal.findByLoanApplicationIdOrderByPostedAtDescId(loanId,
             PageRequest.of(0, 30)).stream().map(e -> new JournalRow(e.getVoucherId(), e.getEffectiveDate(),
                 e.getAccountCode(), e.getDebit(), e.getCredit())).toList();
         PageRequest scheduleRequest = PageRequest.of(Math.max(0, Math.min(schedulePage, 10000)), 25);
         int from = (int) Math.min(scheduleRequest.getOffset(), rows.size());
         var displayRows=scheduleRows(rows,rows.stream().map(row->row.getPrincipal().add(row.getInterest())).reduce(BigDecimal.ZERO,BigDecimal::add));
+        displayRows=com.sacco.mvp.support.ResourceTableSort.rows("repayments-loan-2",displayRows,Map.<String,java.util.Comparator<InstallmentRow>>of("number",java.util.Comparator.comparing(InstallmentRow::number),"due",java.util.Comparator.comparing(InstallmentRow::dueDate),"beginning",java.util.Comparator.comparing(InstallmentRow::beginningBalance),"payment",java.util.Comparator.comparing(InstallmentRow::scheduledPayment),"principal",java.util.Comparator.comparing(InstallmentRow::principal),"interest",java.util.Comparator.comparing(InstallmentRow::interest),"ending",java.util.Comparator.comparing(InstallmentRow::endingBalance),"principalPaid",java.util.Comparator.comparing(InstallmentRow::principalPaid),"interestPaid",java.util.Comparator.comparing(InstallmentRow::interestPaid)),java.util.Comparator.comparing(InstallmentRow::number));
         Page<InstallmentRow> schedule = new PageImpl<>(displayRows.subList(from, Math.min(from + 25, rows.size())), scheduleRequest, rows.size());
         return new LedgerView(loanId, ledger.getLoanId(), ledger.getStationId(), clock.today(),
             cancelled?ZERO:ledger.getPrincipal().subtract(ledger.getPrincipalPaid()), ledger.getPrincipalPaid(), ledger.getInterestPaid(),
             totals.duePrincipal(), totals.dueInterest(), totals.futureInterest(), totals.oldestOverdue(),
-            schedule, history, latest,
-            actor.isStaffSession() ? entries : List.of(),financialState);
+            schedule, history, latest == null ? null : latest.getId(),
+            actor.isStaffSession() ? entries : List.of(),financialState,
+            latest == null ? null : receipt(latest,ledger.getLoanId(),null));
     }
 
     @Transactional(readOnly = true)
@@ -662,5 +664,5 @@ public class LoanRepaymentLedgerService {
     public record LedgerView(UUID id, String loanId, String branch, LocalDate asOf, BigDecimal outstandingPrincipal,
         BigDecimal principalPaid, BigDecimal interestPaid, BigDecimal duePrincipal, BigDecimal dueInterest,
         BigDecimal futureInterest, LocalDate oldestOverdue, Page<InstallmentRow> installments, Page<Receipt> history,
-        UUID latestPaymentId, List<JournalRow> journal,String financialState) {}
+        UUID latestPaymentId, List<JournalRow> journal,String financialState, Receipt latestReceipt) {}
 }

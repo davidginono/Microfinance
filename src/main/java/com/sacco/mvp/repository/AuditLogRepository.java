@@ -46,7 +46,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
               and (cast(:actorId as text) is null or cast(al.actor_member_id as text) ilike concat('%', cast(:actorId as text), '%'))
             """,
         nativeQuery = true
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.Audit.class)
     Page<AuditLog> searchEventLogView(@Param("dateFrom") OffsetDateTime dateFrom,
                                       @Param("dateTo") OffsetDateTime dateTo,
                                       @Param("actorId") String actorId,
@@ -143,7 +143,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
               )
             """,
         nativeQuery = true
-    )
+    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.Audit.class)
     Page<AuditLog> searchEventLogViewScoped(@Param("dateFrom") OffsetDateTime dateFrom,
                                             @Param("dateTo") OffsetDateTime dateTo,
                                             @Param("actorId") String actorId,

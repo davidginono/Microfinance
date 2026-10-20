@@ -28,18 +28,18 @@
     <table class="erp-table">
         <thead>
             <tr>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
-                <th class="px-3 py-2 text-left">
+                <th class="px-3 py-2 text-left" data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                <th class="px-3 py-2 text-left" data-table-order="product">
                     <spring:message code="reports.loanProduct" text="Loan Product" />
                 </th>
-                <th class="px-3 py-2 text-left">
+                <th class="px-3 py-2 text-left" data-table-order="amount">
                     <spring:message code="loan.amount" />
                 </th>
-                <th class="px-3 py-2 text-left">
+                <th class="px-3 py-2 text-left" data-table-order="status">
                     <spring:message code="loan.status" />
                 </th>
-                <th class="px-3 py-2 text-left"><spring:message code="common.reason" text="Reason" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
+                <th class="px-3 py-2 text-left" data-table-order="reason"><spring:message code="common.reason" text="Reason" /></th>
+                <th class="px-3 py-2 text-left" data-table-order="date"><spring:message code="loan.date" text="Date" /></th>
                 <th scope="col" class="erp-table-action-column" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr>
         </thead>

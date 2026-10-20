@@ -301,7 +301,14 @@ public class AppController {
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE')")
     public String products(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<LoanProductSetting> products = loanWorkflowService.listProducts(principal.getSaccoId());
-        model.addAttribute("products", products);
+        model.addAttribute("products", com.sacco.mvp.support.ResourceTableSort.rows("app-loan-products-2",products,Map.<String,Comparator<LoanProductSetting>>of(
+            "name", Comparator.comparing(LoanProductSetting::getDisplayName),
+            "amount", Comparator.comparing(LoanProductSetting::getMinimumAmount,Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(LoanProductSetting::getMaximumAmount,Comparator.nullsLast(Comparator.naturalOrder())),
+            "guarantors", Comparator.comparing(LoanProductSetting::getGuarantorsRequired),
+            "interest", Comparator.comparing(LoanProductSetting::getInterestRate),
+            "method", Comparator.comparing((LoanProductSetting product)->message("interestMethod."+product.getInterestMethod())),
+            "tenure", Comparator.comparing(LoanProductSetting::getMinimumRepaymentMonths).thenComparing(LoanProductSetting::getMaxRepaymentMonths)
+        ),Comparator.comparing(LoanProductSetting::getId)));
         Optional<String> applicantPolicyReason = loanQualificationPolicyService.applicantFailureReason(
             principal.getSaccoId(),
             principal.getMemberId()
@@ -325,14 +332,24 @@ public class AppController {
         LoanWorkflowService.MemberApplicationListData applications = loanWorkflowService.memberApplicationList(principal.getMemberId());
         List<LoanApplication> apps = applications.currentApplications();
         LoanApplication currentWorkflowApplication = applications.latestCurrentApplication();
-        model.addAttribute("apps", apps);
-        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
-        model.addAttribute("loanProductNamesById", loanProductNamesById(principal.getSaccoId()));
+        Map<LoanType,String> tableProducts=loanProductDisplayService.namesForSacco(principal.getSaccoId());
+        Map<UUID,String> tableProductNames=loanProductNamesById(principal.getSaccoId());
+        Map<UUID,String> tableReasons=loanPresentationService.rejectionFeedbackReasons(apps);
+        model.addAttribute("apps", com.sacco.mvp.support.ResourceTableSort.rows("app-loan-applications-1", apps, Map.<String,Comparator<LoanApplication>>of(
+            "number", Comparator.comparing(LoanApplication::getApplicationNumber),
+            "product", Comparator.comparing((LoanApplication loan)->loan.getLoanProductSettingId()==null?tableProducts.getOrDefault(loan.getLoanType(),loan.getLoanType().getDisplayLabel()):tableProductNames.getOrDefault(loan.getLoanProductSettingId(),tableProducts.getOrDefault(loan.getLoanType(),loan.getLoanType().getDisplayLabel()))),
+            "amount", Comparator.comparing(LoanApplication::getAmount),
+            "status", Comparator.comparing((LoanApplication loan)->message("loan.status."+loan.getStatus())),
+            "reason", Comparator.comparing((LoanApplication loan)->tableReasons.getOrDefault(loan.getId(),"-")),
+            "date", Comparator.comparing(LoanApplication::getCreatedAt)
+        ), Comparator.comparing(LoanApplication::getId)));
+        model.addAttribute("loanProductNames", tableProducts);
+        model.addAttribute("loanProductNamesById", tableProductNames);
         model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
         model.addAttribute("currentWorkflowSteps", currentWorkflowApplication == null
             ? List.of()
             : buildDashboardWorkflowSteps(currentWorkflowApplication));
-        model.addAttribute("managerReasons", loanPresentationService.rejectionFeedbackReasons(apps));
+        model.addAttribute("managerReasons", tableReasons);
         model.addAttribute("rejectionAcknowledgementRequiredById", rejectionAcknowledgementRequiredById(apps));
         model.addAttribute("archiveCount", applications.archiveCount());
         return "app/loan-applications";

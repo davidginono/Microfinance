@@ -84,7 +84,7 @@
         <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
     </c:url>
 
-    <section class="erp-table-wrap mt-3" aria-label="Branch SMS balances" data-resource-table="admin-sms-usage-1">
+    <section class="erp-table-wrap mt-3" aria-label="Branch SMS balances" data-resource-table="admin-sms-usage-1" data-table-page-param="page">
         <div class="app-table-titlebar">
             <div class="app-table-heading"><h2>Branch SMS Balances</h2><span>Showing ${accountStart}-${accountEnd} of ${accountTotal}</span></div>
             <div class="app-table-toolbar">
@@ -107,7 +107,7 @@
         </form>
         <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading Branch SMS balances...">
             <table class="erp-table">
-                <thead><tr><th>Institution</th><th>Branch</th><th>Available</th><th>Alert Reserve</th><th>Baseline</th><th>Depleted Alerts</th><th>Status</th></tr></thead>
+                <thead><tr><th data-table-order="institution">Institution</th><th data-table-order="branch">Branch</th><th data-table-order="available">Available</th><th data-table-order="reserve">Alert Reserve</th><th data-table-order="baseline">Baseline</th><th data-table-order="alerts">Depleted Alerts</th><th data-table-order="status">Status</th></tr></thead>
                 <tbody>
                 <c:forEach items="${accounts.content}" var="account">
                     <tr>
@@ -165,7 +165,7 @@
     <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
-<section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage" data-resource-table="admin-sms-usage-2">
+<section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage" data-resource-table="admin-sms-usage-2" data-table-page-param="loanUsagePage">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2>Loan Application SMS Usage</h2>
@@ -223,7 +223,7 @@
     </form>
     <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading loan application SMS usage...">
         <table class="erp-table">
-            <thead><tr><th>Applicant</th><th>Client No.</th><th>Loan ID</th><th>Application No.</th><th>Status</th><th>Institution</th><th>Branch</th><th>SMS Events</th><th>Units Used</th><th>Last SMS</th></tr></thead>
+            <thead><tr><th data-table-order="applicant">Applicant</th><th data-table-order="client">Client No.</th><th data-table-order="loan">Loan ID</th><th data-table-order="number">Application No.</th><th data-table-order="status">Status</th><th data-table-order="institution">Institution</th><th data-table-order="branch">Branch</th><th data-table-order="events">SMS Events</th><th data-table-order="units">Units Used</th><th data-table-order="date">Last SMS</th></tr></thead>
             <tbody>
             <c:forEach items="${loanSmsUsage.content}" var="entry">
                 <tr>

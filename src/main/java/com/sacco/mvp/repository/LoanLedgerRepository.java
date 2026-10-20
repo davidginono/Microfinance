@@ -13,13 +13,13 @@ public interface LoanLedgerRepository extends JpaRepository<LoanLedger, UUID> {
         UUID getLoanApplicationId();String getLoanId();java.time.LocalDate getDisbursementDate();
         java.math.BigDecimal getOutstandingPrincipal();java.math.BigDecimal getPrincipalPaid();java.math.BigDecimal getInterestPaid();
     }
-    @Query("""
+    @Query(value = """
         select l.loanApplicationId as loanApplicationId,l.loanId as loanId,l.disbursementDate as disbursementDate,
         case when a.status=com.sacco.mvp.domain.LoanStatus.DISBURSEMENT_REVERSED then 0 else l.principal-l.principalPaid end as outstandingPrincipal,
         l.principalPaid as principalPaid,l.interestPaid as interestPaid
         from LoanLedger l join LoanApplication a on a.id=l.loanApplicationId
         where l.saccoId=:institution and l.stationId=:branch and (:number is null or l.loanId=:number)
-        """)
+        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.LedgerLoans.class)
     Page<BalanceRow> balancesScoped(@Param("institution") String institution,@Param("branch") String branch,@Param("number") String number,Pageable pageable);
     @Query(value="""
         select max(event_date) from (select q.effective_date event_date from loan_adjustment_request q

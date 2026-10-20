@@ -177,7 +177,7 @@
                         <div class="app-table-heading"><h2>Loan Applications by Status</h2></div>
                     </div>
                     <div class="erp-table-scroll">
-                        <table class="erp-table min-w-[420px]">
+                        <table class="erp-table min-w-[420px]" data-table-sort-mode="local">
                             <thead>
                             <tr>
                                 <th>Status</th>
@@ -262,17 +262,17 @@
                 </div>
                     </form>
                 </div>
-                <div class="erp-table-wrap" data-resource-table="admin-sacco-detail-2">
+                <div class="erp-table-wrap" data-resource-table="admin-sacco-detail-2" data-table-page-param="memberPage">
                     <div class="erp-table-scroll">
                     <table class="erp-table min-w-[1120px]">
                         <thead>
                         <tr>
-                            <th class="whitespace-nowrap">User ID</th>
-                            <th class="whitespace-nowrap">Client Number</th>
-                            <th class="whitespace-nowrap">Name</th>
-                            <th class="whitespace-nowrap">Account Type</th>
-                            <th class="whitespace-nowrap">Staff Roles</th>
-                            <th class="whitespace-nowrap">Current Status</th>
+                            <th class="whitespace-nowrap" data-table-order="id">User ID</th>
+                            <th class="whitespace-nowrap" data-table-order="client">Client Number</th>
+                            <th class="whitespace-nowrap" data-table-order="name">Name</th>
+                            <th class="whitespace-nowrap" data-table-order="membership">Account Type</th>
+                            <th class="whitespace-nowrap" data-table-order="roles">Staff Roles</th>
+                            <th class="whitespace-nowrap" data-table-order="status">Current Status</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -408,7 +408,7 @@
                             </div>
                 </section>
 
-                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-3">
+                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-3" data-table-page-param="smsHistoryPage">
                     <div class="app-table-titlebar">
                         <div class="app-table-heading"><h2>Recent SMS Usage</h2></div>
                     </div>
@@ -416,12 +416,12 @@
                         <table class="erp-table min-w-[760px]">
                             <thead>
                             <tr>
-                                <th>Time</th>
-                                <th>Event</th>
-                                <th>Outcome</th>
-                                <th>Unit Change</th>
-                                <th>Provider Reference</th>
-                                <th>Note</th>
+                                <th data-table-order="date">Time</th>
+                                <th data-table-order="event">Event</th>
+                                <th data-table-order="outcome">Outcome</th>
+                                <th data-table-order="units">Unit Change</th>
+                                <th data-table-order="reference">Provider Reference</th>
+                                <th data-table-order="note">Note</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -450,7 +450,7 @@
                 </section>
             </c:when>
             <c:otherwise>
-                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-4" data-resource-split>
+                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-4" data-table-page-param="smsPage" data-resource-split>
                     <div class="app-table-titlebar">
                         <div class="app-table-heading"><h2>Branch SMS Balances</h2></div>
                         <div class="app-table-toolbar">
@@ -461,11 +461,11 @@
                         <table class="erp-table min-w-[680px]">
                             <thead>
                             <tr>
-                                <th>Branch</th>
-                                <th>Available Units</th>
-                                <th>Alert Reserve</th>
-                                <th>Warning Baseline</th>
-                                <th>Status</th>
+                                <th data-table-order="branch">Branch</th>
+                                <th data-table-order="available">Available Units</th>
+                                <th data-table-order="reserve">Alert Reserve</th>
+                                <th data-table-order="baseline">Warning Baseline</th>
+                                <th data-table-order="status">Status</th>
                                 <th data-table-actions-header></th>
                             </tr>
                             </thead>

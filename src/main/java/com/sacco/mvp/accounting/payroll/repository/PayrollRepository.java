@@ -171,14 +171,14 @@ public class PayrollRepository {
             (RowMapper<Batch>)this::batch,a.getSaccoId(),a.getStationId(),search,search.toLowerCase(Locale.ROOT),state,state,month,month,page*25);
     }
     public List<Line> lines(AppUserPrincipal a,UUID id,int page,int limit) {
-        return jdbc.query("select x.* from payroll_batch_line x join payroll_batch b on b.id=x.batch_id where b.id=? and b.sacco_id=? and b.station_id=? order by x.line_number limit ? offset ?",
+        return jdbc.query("select x.* from payroll_batch_line x join payroll_batch b on b.id=x.batch_id where b.id=? and b.sacco_id=? and b.station_id=? order by "+com.sacco.mvp.support.ResourceTableSort.order("payroll-lines",Map.of("employee","x.employee_number","client","x.client_name","loan","x.loan_number","principal","x.principal","interest","x.interest","requested","x.amount","issue","x.issue"),"x.line_number","x.line_number")+" limit ? offset ?",
             (r,n)->new Line(r.getObject("instruction_id",UUID.class),r.getObject("loan_id",UUID.class),r.getObject("client_id",UUID.class),r.getString("employee_number"),r.getString("client_name"),r.getString("client_number"),r.getString("loan_number"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("amount"),r.getString("issue")),id,a.getSaccoId(),a.getStationId(),limit,page*25);
     }
     public void event(AppUserPrincipal a,UUID id,String kind,String evidence,OffsetDateTime now) {
         jdbc.update("insert into payroll_batch_event(id,batch_id,kind,actor_id,evidence,created_at) values(?,?,?,?,?,?)",UUID.randomUUID(),id,kind,a.getMemberId(),evidence,now);
     }
     public List<Event> events(AppUserPrincipal a,UUID id,int page) {
-        return jdbc.query("select e.kind,m.full_name,e.evidence,e.created_at from payroll_batch_event e join payroll_batch b on b.id=e.batch_id join members m on m.id=e.actor_id where b.id=? and b.sacco_id=? and b.station_id=? order by e.created_at desc,e.id limit 26 offset ?",
+        return jdbc.query("select e.kind,m.full_name,e.evidence,e.created_at from payroll_batch_event e join payroll_batch b on b.id=e.batch_id join members m on m.id=e.actor_id where b.id=? and b.sacco_id=? and b.station_id=? order by "+com.sacco.mvp.support.ResourceTableSort.order("payroll-history",Map.of("event","e.kind","actor","m.full_name","evidence","e.evidence","date","e.created_at"),"e.id","e.created_at desc,e.id")+" limit 26 offset ?",
             (r,n)->new Event(r.getString(1),r.getString(2),r.getString(3),r.getObject(4,OffsetDateTime.class)),id,a.getSaccoId(),a.getStationId(),page*25);
     }
     public Optional<Document> document(AppUserPrincipal a,UUID id,String language) {

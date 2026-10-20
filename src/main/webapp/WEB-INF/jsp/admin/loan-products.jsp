@@ -11,7 +11,7 @@
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th>Loan Type</th><th>Current Guarantors</th><th>Current Ratio</th><th>Active</th><th>Update</th></tr>
+        <tr><th data-table-order="type">Loan Type</th><th data-table-order="guarantors">Current Guarantors</th><th data-table-order="ratio">Current Ratio</th><th data-table-order="active">Active</th><th data-table-sort-disabled>Update</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${products}" var="product">

@@ -111,12 +111,12 @@
         <table class="erp-table min-w-[1120px]">
             <thead>
             <tr>
-                <th><spring:message code="admin.users.user" text="User" /></th>
-                <th><spring:message code="register.member.email" text="Email" /></th>
-                <th><spring:message code="register.member.phone" text="Phone" /></th>
-                <th><spring:message code="common.sacco" text="Institution" /></th>
-                <th><spring:message code="admin.saccoRegistry.station" text="Branch" /></th>
-                <th><spring:message code="admin.minorAdmins.activation" text="Activation" /></th>
+                <th data-table-order="name"><spring:message code="admin.users.user" text="User" /></th>
+                <th data-table-order="email"><spring:message code="register.member.email" text="Email" /></th>
+                <th data-table-order="phone"><spring:message code="register.member.phone" text="Phone" /></th>
+                <th data-table-order="institution"><spring:message code="common.sacco" text="Institution" /></th>
+                <th data-table-order="branch"><spring:message code="admin.saccoRegistry.station" text="Branch" /></th>
+                <th data-table-order="activation"><spring:message code="admin.minorAdmins.activation" text="Activation" /></th>
                 <th class="text-right" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr>
             </thead>
@@ -392,8 +392,9 @@
             document.body.classList.remove('overflow-hidden');
         }
 
-        document.querySelectorAll('[data-minor-admin-modal-open]').forEach((button) => {
-            button.addEventListener('click', function () {
+        document.addEventListener("click", (event) => {
+            const button=event.target.closest("[data-minor-admin-modal-open]");
+            if (!button || button.disabled) return;
                 const key = button.getAttribute('data-minor-admin-modal-open');
                 const modal = document.querySelector('[data-minor-admin-modal="' + key + '"]');
                 if (modal) {
@@ -401,7 +402,6 @@
                     modal.classList.add('is-open');
                     document.body.classList.add('overflow-hidden');
                 }
-            });
         });
 
         document.querySelectorAll('[data-minor-admin-modal-close]').forEach((button) => {

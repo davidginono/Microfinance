@@ -15,7 +15,7 @@
             </div>
             <div class="erp-table-scroll erp-table-scroll-sm"
                  data-view-position-key="loan-financial-section-${sectionLoop.index}">
-                <table class="erp-table">
+                <table class="erp-table" data-table-sort-mode="local">
                     <thead>
                     <tr>
                         <th><spring:message code="common.attribute" text="Attribute" /></th>

@@ -632,9 +632,15 @@ public class AdminService {
 
     public List<LoanProductSetting> loanProducts(String saccoId) {
         // getResolvedDisplayOrder falls back to the loan type order, so the final sort stays in Java.
-        return loanProductSettingRepository.findBySaccoIdAndProductStatusNot(saccoId, LoanProductStatus.RETIRED).stream()
+        var rows=loanProductSettingRepository.findBySaccoIdAndProductStatusNot(saccoId, LoanProductStatus.RETIRED).stream()
             .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .toList();
+        return com.sacco.mvp.support.ResourceTableSort.rows("admin-loan-products-1",rows,Map.<String,Comparator<LoanProductSetting>>of(
+            "type",Comparator.comparing((LoanProductSetting p)->p.getLoanType().name()),
+            "guarantors",Comparator.comparing(LoanProductSetting::getGuarantorsRequired),
+            "ratio",Comparator.comparing(LoanProductSetting::getMaxLoanSavingsRatio,Comparator.nullsLast(Comparator.naturalOrder())),
+            "active",Comparator.comparing(LoanProductSetting::getActive,Comparator.nullsLast(Comparator.naturalOrder()))
+        ),Comparator.comparing(LoanProductSetting::getId));
     }
 
     public LoanProductSetting loanProduct(String saccoId, UUID productId) {

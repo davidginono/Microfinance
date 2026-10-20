@@ -333,7 +333,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
         <h2 id="recentDisbursementsTitle" class="erp-panel-title"><spring:message code="manager.dashboard.recentDisbursements" /></h2>
     </div>
     <div class="erp-table-scroll erp-table-scroll-sm staff-recent-disbursements-scroll" tabindex="0" role="region" aria-labelledby="recentDisbursementsTitle">
-        <table class="erp-table staff-recent-disbursements-table">
+        <table class="erp-table staff-recent-disbursements-table" data-table-sort-mode="local">
             <thead><tr>
                 <th scope="col"><spring:message code="loan.applicationId" /></th>
                 <th scope="col"><spring:message code="loan.loanId" /></th>

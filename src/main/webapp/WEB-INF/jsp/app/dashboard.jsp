@@ -539,7 +539,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 </div>
                             </div>
                             <div class="erp-table-scroll member-dashboard-active-loans-scroll">
-                            <table class="erp-table member-dashboard-active-loans-table" data-active-loans-table data-page-size="5">
+                            <table class="erp-table member-dashboard-active-loans-table" data-active-loans-table data-page-size="5" data-table-sort-mode="local">
                                 <thead>
                                     <tr>
                                         <th class="px-3 py-3 text-left">Date of Disbursement</th>
@@ -551,7 +551,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                         <th class="px-3 py-3 text-left">Loan Amount</th>
                                         <th class="px-3 py-3 text-left">Paid Amount</th>
                                         <th class="px-3 py-3 text-left">Outstanding Balance</th>
-                                        <th class="px-3 py-3 text-left">Repayment Schedule</th>
+                                        <th class="px-3 py-3 text-left" data-table-sort-disabled>Repayment Schedule</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100" data-active-loans-body>

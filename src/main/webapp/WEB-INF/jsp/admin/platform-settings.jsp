@@ -295,10 +295,10 @@
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th>Institution</th>
-                        <th>Branches</th>
-                        <th>Status</th>
-                        <th>Loan Top-Up</th>
+                        <th data-table-order="name">Institution</th>
+                        <th data-table-order="branches">Branches</th>
+                        <th data-table-order="status">Status</th>
+                        <th data-table-order="topup">Loan Top-Up</th>
                         <th class="text-right">Action</th>
                     </tr>
                     </thead>

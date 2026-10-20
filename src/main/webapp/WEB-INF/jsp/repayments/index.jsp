@@ -17,7 +17,7 @@
         </form>
         <div class="erp-table-scroll" data-view-position-key="repayment-loans">
             <table class="erp-table">
-                <thead><tr><th><spring:message code="loan.loanId" /></th><th><spring:message code="repayment.disbursed" /></th><th class="money"><spring:message code="repayment.principalOutstanding" /> (TZS)</th><th class="money"><spring:message code="repayment.principalPaid" /> (TZS)</th><th class="money"><spring:message code="repayment.interestPaid" /> (TZS)</th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead>
+                <thead><tr><th data-table-order="loan"><spring:message code="loan.loanId" /></th><th data-table-order="date"><spring:message code="repayment.disbursed" /></th><th class="money" data-table-order="outstanding"><spring:message code="repayment.principalOutstanding" /> (TZS)</th><th class="money" data-table-order="principal"><spring:message code="repayment.principalPaid" /> (TZS)</th><th class="money" data-table-order="interest"><spring:message code="repayment.interestPaid" /> (TZS)</th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead>
                 <tbody>
                 <c:forEach items="${loans.content}" var="row"><tr>
                     <td><a class="resource-table-id-link" href="<c:url value='/repayments/loans/${row.id}' />"><c:out value="${row.loanId}" /></a></td><td><c:out value="${appTime:display(row.disbursementDate)}" /></td>

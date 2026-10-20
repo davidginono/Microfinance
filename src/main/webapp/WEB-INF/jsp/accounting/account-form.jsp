@@ -19,7 +19,7 @@
                 <label class="erp-table-toolbar__search"><spring:message code="coa.searchGroups" /><input class="aws-control" name="parentSearch" value="<c:out value='${parentSearch}' />" maxlength="100" /></label>
                 <button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button>
             </form>
-            <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="coa-parent-picker"><table class="erp-table">
+            <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="coa-parent-picker"><table data-table-sort-mode="none" data-table-sort-reason="picker" class="erp-table">
                 <thead><tr><th><spring:message code="accounting.code" /></th><th><spring:message code="accounting.name" /></th><th><spring:message code="common.actions" /></th></tr></thead>
                 <tbody><c:forEach items="${parents.rows}" var="p"><tr><td><c:out value="${p.code}" /></td><td><c:out value="${pageContext.response.locale.language=='sw' and not empty p.nameSw?p.nameSw:p.name}" /></td><td><c:url value="${formBase}/new" var="selectParent"><c:param name="parentId" value="${p.id}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${selectParent}' />"><spring:message code="coa.select" /></a></td></tr></c:forEach><c:if test="${empty parents.rows}"><tr><td colspan="3"><spring:message code="${groupMode?'coa.noGroupParents':'coa.noAccountParents'}" /></td></tr></c:if></tbody>
             </table></div>

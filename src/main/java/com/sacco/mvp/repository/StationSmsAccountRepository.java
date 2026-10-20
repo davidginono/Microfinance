@@ -14,6 +14,16 @@ import java.util.UUID;
 
 public interface StationSmsAccountRepository extends JpaRepository<StationSmsAccount, UUID>,
     JpaSpecificationExecutor<StationSmsAccount> {
+    @Query(value = """
+        select a.* from station_sms_accounts a left join registered_saccos i on i.sacco_id=a.sacco_id
+        where (cast(:institution as text) is null or a.sacco_id=:institution)
+          and (cast(:branch as text) is null or a.station_id=:branch)
+          and (cast(:status as text) is null or a.status=:status)
+        order by a.sacco_id,a.station_id,a.id
+        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.SmsAccounts.class)
+    org.springframework.data.domain.Page<StationSmsAccount> findWorkspaceAccounts(@Param("institution") String institution,
+        @Param("branch") String branch,@Param("status") String status,org.springframework.data.domain.Pageable page);
+
     Optional<StationSmsAccount> findBySaccoIdAndStationId(String saccoId, String stationId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
