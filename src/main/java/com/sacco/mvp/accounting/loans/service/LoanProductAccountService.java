@@ -19,7 +19,7 @@ public class LoanProductAccountService {
     @Transactional(readOnly=true)
     public List<Choice> choices(String institution,String category,String search,int page,UUID selected){
         require(Set.of("PRINCIPAL","INTEREST").contains(category) && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
-        return repository.choices(institution,category,search,page,selected);
+        return repository.choices(institution,search,page,selected);
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void configure(LoanProductSetting product,UUID actor,UUID principal,UUID interest){
@@ -47,6 +47,6 @@ public class LoanProductAccountService {
         repository.bind(a,loan,product,accounts.principalId(),accounts.interestId(),source,clock.now());
         audit.logEvent("ACCOUNTING",loan,"LOAN_PRODUCT_ACCOUNTS_LINKED",a.getMemberId(),AuditEventStatus.SUCCESS,"Loan accounts","LOAN",loan.toString(),a.getSaccoId(),a.getStationId(),Map.of("product",product,"principal",accounts.principalId(),"interest",accounts.interestId(),"source",source));return accounts;
     }
-    private void validate(String institution,Accounts accounts){require(repository.valid(institution,accounts.principalId(),"PRINCIPAL") && repository.valid(institution,accounts.interestId(),"INTEREST"),"productAccountsInvalid");}
+    private void validate(String institution,Accounts accounts){require(repository.valid(institution,accounts.principalId()) && repository.valid(institution,accounts.interestId()),"productAccountsInvalid");}
     private static void require(boolean ok,String key){if(!ok)throw new IllegalArgumentException("recording.error."+key);}
 }

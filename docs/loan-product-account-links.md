@@ -4,7 +4,7 @@ Implemented increment: 19 October 2026. Loan product creation and editing, inclu
 
 ## Setup and use
 
-- Product configuration uses the existing product create/update claims and selected institution. Lookups are searched and paged (25 choices plus lookahead), with no institution-wide account loading. Principal requires an active debit-normal asset control account with `LOAN_PRINCIPAL` purpose. Interest accepts an active credit-normal income posting account with `INCOME` purpose, or the existing clearing posting-account classification for compatibility. New mappings must contain both accounts or neither.
+- Product configuration uses the existing product create/update claims and selected institution. Both selectors search the same active chart by code/name, without principal/interest account-type, normal-balance or purpose presets. Lookups remain paged (25 choices plus lookahead), including exact selected-account hydration, with no institution-wide account loading. Saving either mapping accepts any active `POSTING` or `CONTROL` account from that institution; heading groups cannot receive postings. New mappings must contain both accounts or neither. Account selection and reporting classification remain institution decisions.
 - An unconfigured product can be saved, but cannot fund a directly recorded loan. Disbursement resolves both links from the product and retains an immutable, institution/branch-scoped loan account binding in the same transaction as the disbursement. The principal debit uses that binding. Subsequent product edits apply to subsequent disbursements.
 - Before collecting an existing directly recorded, disbursed loan without a binding, an authorized recorder opens its loan details and selects **Link product accounts**. The product's principal account must equal the original disbursement account. A mismatch blocks linking and needs a separate accounting correction. Linking retains the product's configured interest account for subsequent receipts; earlier payments, journals and reversals are unchanged. Repeating a completed link is harmless.
 - Receipt and batch recorders choose the client and Loan ID. Loan choices include the product name. They do not choose the product's GL accounts. Each repayment resolves its own immutable principal/interest mapping; a multi-loan receipt or batch can therefore credit different product accounts. The receiving cash/bank/mobile-money account remains an input.
@@ -13,13 +13,19 @@ Implemented increment: 19 October 2026. Loan product creation and editing, inclu
 
 ## Integrity and scope
 
-Migration `V77__loan_product_account_links.sql` adds nullable paired product links and immutable loan bindings, with tenant/account foreign keys, source classification checks and deferred confirmation against the committed disbursement. New original loan postings must use the frozen accounts. Existing rows are not backfilled or rewritten, and historical receipt corrections keep their original accounts. Mapping configuration and explicit linking emit accounting audit events.
+Migration `V77__loan_product_account_links.sql` adds nullable paired product links and immutable loan bindings, with tenant/account foreign keys and deferred confirmation against the committed disbursement. The 20 October 2026 selection change in V83 removes the fixed principal/interest classifications from binding, disbursement, charged-receipt and top-up validation. Active posting/control eligibility, exact frozen account IDs, source/scope checks, balanced journals and independent linked corrections remain enforced. Top-up interest follows the source loan's frozen account. Existing rows are not backfilled or rewritten, and historical receipt corrections keep their original accounts. Mapping configuration and explicit linking emit accounting audit events.
 
 The existing transaction, deterministic loan locking, idempotency, receipt envelope, independent linked reversal and batch worker lease controls remain. Top-up due-interest settlement uses the source loan's retained interest account; the replacement loan retains its own product accounts. No extra journal, approval step, role claim assignment, export format, pricing change or background worker is introduced.
 
 This increment covers the existing directly recorded loan accounting and receipt-batch paths. It does not migrate legacy borrower-workflow loans into that accounting path, move historical balances, implement interest accrual, or complete reconciliation or the accounting/report-builder backlog. Income recognition and the institution's selected accounts remain institution decisions.
 
 ## Verification
+
+Verification of the 20 October 2026 account selection change:
+
+- 129 distinct focused checks have passing results across the product-account service, fresh-database migration, loan PostgreSQL, receipt/batch MVC and admin access suites. The initial broad run encountered a stale compiled charged-loan fixture; the corrected fixture and all five new integration scenarios passed after recompilation (11 final checks, no skips). This is not a full-suite success claim.
+- A disposable loopback PostgreSQL instance applied and validated all 104 migrations through V83. New scenarios cover scoped searches across account classifications and heading groups, pagination and selected-account hydration, saved mappings, rejection of headings/inactive/foreign accounts, disbursements, charged receipts, batch receipts, duplicate submissions, independent reversals and top-ups retaining the source interest account. Existing financial and scope safeguards remain exercised by the broader loan suite.
+- No operational data was changed. Apply V83 through normal Flyway startup when restarting the application. Existing loan bindings and financial history remain unchanged; this does not establish accounting policy suitability for the selected accounts or measured throughput.
 
 Verification on 19 October 2026:
 

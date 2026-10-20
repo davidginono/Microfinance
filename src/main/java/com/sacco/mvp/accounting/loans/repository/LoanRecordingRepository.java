@@ -55,8 +55,8 @@ public class LoanRecordingRepository {
             left join loan_ledgers b on b.loan_application_id=l.id
             left join loan_charge_balance c on c.loan_id=l.id
             left join loan_product_account_binding ab on ab.loan_id=l.id and ab.sacco_id=r.sacco_id and ab.station_id=r.station_id
-            left join gl_account pa on pa.id=ab.principal_account_id and pa.sacco_id=r.sacco_id and pa.active and pa.kind='CONTROL' and pa.type='ASSET' and pa.normal_balance='DEBIT' and pa.purpose='LOAN_PRINCIPAL'
-            left join gl_account ia on ia.id=ab.interest_account_id and ia.sacco_id=r.sacco_id and ia.active and ia.kind='POSTING' and (ia.purpose='CLEARING' or (ia.type='INCOME' and ia.normal_balance='CREDIT' and ia.purpose='INCOME'))
+            left join gl_account pa on pa.id=ab.principal_account_id and pa.sacco_id=r.sacco_id and pa.active and pa.kind in ('POSTING','CONTROL')
+            left join gl_account ia on ia.id=ab.interest_account_id and ia.sacco_id=r.sacco_id and ia.active and ia.kind in ('POSTING','CONTROL')
             left join lateral(select sum(case when due_date<=? then principal-principal_paid else 0 end) principal,sum(loan_interest_due(id,?)) interest
               from loan_ledger_installments where loan_application_id=l.id) d on true
             where r.sacco_id=? and r.station_id=? and l.id in (
@@ -143,8 +143,8 @@ public class LoanRecordingRepository {
     public List<Choice> accounts(AppUserPrincipal a,String purpose,String search,int page){return jdbc.query("""
         select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and
         ((?='MONEY' and kind='POSTING' and purpose in ('CASH','BANK','MOBILE_MONEY') and type='ASSET')
-        or (?='PRINCIPAL' and kind='CONTROL' and purpose='LOAN_PRINCIPAL' and type='ASSET')
-        or (?='INTEREST' and kind='POSTING' and (purpose='CLEARING' or (type='INCOME' and normal_balance='CREDIT' and purpose='INCOME'))))
+        or (?='PRINCIPAL' and kind in ('POSTING','CONTROL'))
+        or (?='INTEREST' and kind in ('POSTING','CONTROL')))
         and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
     public Choice account(AppUserPrincipal a,UUID id,String category){
@@ -154,8 +154,8 @@ public class LoanRecordingRepository {
         var rows=jdbc.queryForList("select id,code,name,purpose,kind,type,normal_balance from gl_account where sacco_id=? and id=? and active"+(lock?" for share":""),a.getSaccoId(),id);
         if(rows.isEmpty())throw new IllegalArgumentException("recording.error.account");var r=rows.getFirst();String purpose=(String)r.get("purpose");
         boolean valid=switch(category){case "MONEY"->"POSTING".equals(r.get("kind")) && "ASSET".equals(r.get("type")) && Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);
-            case "PRINCIPAL"->"CONTROL".equals(r.get("kind")) && "LOAN_PRINCIPAL".equals(purpose) && "ASSET".equals(r.get("type")) && "DEBIT".equals(r.get("normal_balance"));
-            default->"POSTING".equals(r.get("kind")) && ("CLEARING".equals(purpose) || ("INCOME".equals(r.get("type")) && "CREDIT".equals(r.get("normal_balance")) && "INCOME".equals(purpose)));};
+            case "PRINCIPAL","INTEREST"->Set.of("POSTING","CONTROL").contains(r.get("kind"));
+            default->false;};
         if(!valid)throw new IllegalArgumentException("recording.error.account");return new Choice(id,r.get("code")+" - "+r.get("name"),purpose);
     }
     public Optional<Posting> postRequest(AppUserPrincipal a,UUID key,String hash){

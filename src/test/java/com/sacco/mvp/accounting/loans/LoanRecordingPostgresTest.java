@@ -557,6 +557,81 @@ class LoanRecordingPostgresTest {
         var corrected=receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Correct mixed product receipt");
         assertThat(corrected.rows()).hasSize(2);assertThat(service.detail(actor,first).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(service.detail(actor,second).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
     }
+    com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccountService(){
+        return new com.sacco.mvp.accounting.loans.service.LoanProductAccountService(new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc),context.getBean(ApplicationClock.class),context.getBean(AuditService.class));
+    }
+    void configureProductAccounts(UUID principalAccount,UUID interestAccount){
+        new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class)).executeWithoutResult(tx->{
+            var selected=context.getBean(LoanProductSettingRepository.class).findById(product).orElseThrow();
+            productAccountService().configure(selected,actor.getMemberId(),principalAccount,interestAccount);
+        });
+    }
+    @Test void productAccountSearchIncludesEveryClassificationAndHeadingsWithScopedPagination(){
+        var expected=new ArrayList<UUID>();
+        String[] types={"ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"};
+        for(int n=0;n<28;n++)expected.add(account("MAPPING-"+String.format("%03d",n),types[n%5],"DEBIT","POSTING","OTHER"));
+        UUID heading=account("MAPPING-GROUP","ASSET","DEBIT","HEADING","OTHER");expected.add(heading);
+        var service=productAccountService();
+        for(String category:List.of("PRINCIPAL","INTEREST")){
+            var first=service.choices(institution,category,"mapping",0,null);var last=service.choices(institution,category,"mapping",1,null);
+            assertThat(first).extracting(Choice::id).containsExactlyElementsOf(expected.subList(0,26));
+            assertThat(last).extracting(Choice::id).containsExactlyElementsOf(expected.subList(25,29));
+            assertThat(service.choices(institution,category,"mapping-001",0,expected.get(1))).extracting(Choice::id).containsExactly(expected.get(1));
+            assertThat(service.choices(institution+"-foreign",category,"mapping",0,expected.get(1))).isEmpty();
+            assertThat(service.choices(institution,category,"%' OR '1'='1",0,null)).isEmpty();
+        }
+    }
+    @Test void productMappingsSaveAnyClassificationButRejectHeadingsInactiveAndForeignAccounts(){
+        var repository=new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc);
+        for(String type:List.of("ASSET","LIABILITY","EQUITY","EXPENSE","INCOME")){
+            UUID first=account("ANY-"+type,type,"CREDIT","POSTING","OTHER"),second=account("OTHER-"+type,type,"DEBIT","POSTING","OTHER");
+            configureProductAccounts(first,second);
+            assertThat(jdbc.queryForMap("select principal_gl_account_id,interest_gl_account_id from loan_product_settings where id=?",product))
+                .containsEntry("principal_gl_account_id",first).containsEntry("interest_gl_account_id",second);
+            assertThat(repository.valid(institution+"-foreign",first)).isFalse();
+        }
+        UUID heading=account("HEADING","ASSET","DEBIT","HEADING","OTHER"),inactive=account("INACTIVE","EXPENSE","DEBIT","POSTING","OTHER");
+        context.getBean(GeneralLedgerService.class).deactivateAccount(actor,inactive);
+        assertThatThrownBy(()->configureProductAccounts(heading,interest)).hasMessage("recording.error.productAccountsInvalid");
+        assertThatThrownBy(()->configureProductAccounts(principal,inactive)).hasMessage("recording.error.productAccountsInvalid");
+    }
+    @Test void arbitraryProductAccountTypesSupportFundingReceiptsAndIndependentReversal(){
+        principal=account("CUSTOM-PRINCIPAL","LIABILITY","CREDIT","POSTING","OTHER");interest=account("CUSTOM-INTEREST","EXPENSE","DEBIT","POSTING","OTHER");
+        configureProductAccounts(principal,interest);
+        UUID loan=disbursed("D-CUSTOM-ACCOUNTS");var input=receiptForm(loan);var receipt=receiptService().post(actor,input);
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("900.00");
+        var posting=service.posting(actor,receipt.rows().getFirst().postingId());
+        assertThat(jdbc.queryForObject("select credit from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,posting.journalId(),interest)).isEqualByComparingTo("20.00");
+        assertThat(receiptService().post(actor,input).header().id()).isEqualTo(receipt.header().id());
+        receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Correct custom-account receipt");
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThatThrownBy(()->service.postingPreview(operator("B2"),post(loan,"120.00","WRONG-BRANCH"),"PAYMENT")).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void arbitraryProductAccountTypesSupportChargedLoansAndBatchReceipts(){
+        principal=account("CUSTOM-PRINCIPAL","EQUITY","CREDIT","POSTING","OTHER");interest=account("CUSTOM-INTEREST","ASSET","DEBIT","CONTROL","INTEREST_RECEIVABLE");
+        configureProductAccounts(principal,interest);chargePolicy("SEPARATE");
+        UUID loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
+        var collected=receiptService().post(actor,receiptForm(loan));
+        receiptService().reverse(operator("B1"),collected.header().id(),UUID.randomUUID(),TODAY,"Correct charged receipt");
+        assertThat(service.chargeSummary(actor,loan,0).balance().outstanding()).isEqualByComparingTo("30.00");
+        receiptService().post(actor,receiptForm(loan));
+        assertThat(service.chargeSummary(actor,loan,0).balance().outstanding()).isZero();
+        UUID batch=batches().create(actor,"Configured account types");batchItem(batch,receiptForm(loan));processBatch(batch,false);processBatch(batch,true);
+        assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("810.00");
+        assertThat(service.chargeSummary(actor,loan,0).balance().outstanding()).isZero();
+    }
+    @Test void arbitraryTopUpAccountsRetainSourceInterestAndReverseExactly(){
+        principal=account("SOURCE-PRINCIPAL","LIABILITY","CREDIT","POSTING","OTHER");interest=account("SOURCE-INTEREST","EXPENSE","DEBIT","POSTING","OTHER");
+        configureProductAccounts(principal,interest);UUID source=topUpSource(),sourceInterest=interest;
+        principal=account("NEXT-PRINCIPAL","EQUITY","CREDIT","POSTING","OTHER");interest=account("NEXT-INTEREST","ASSET","DEBIT","POSTING","OTHER");
+        configureProductAccounts(principal,interest);UUID loan=recordTopUp(source);var input=topUpPost(loan);input.setInterestAccountId(sourceInterest);
+        var posting=service.disburse(actor,input);var topUp=service.topUp(actor,loan).orElseThrow();
+        assertThat(jdbc.queryForObject("select credit from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,posting.journalId(),sourceInterest)).isEqualByComparingTo(topUp.interest());
+        var correction=service.reverseTopUp(operator("B1"),loan,UUID.randomUUID(),TODAY,"Correct configured-account transfer","Synthetic returned funds evidence");
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,posting.journalId(),correction.journalId())).isZero();
+        assertThat(status(source)).isEqualTo("DISBURSED");assertThat(status(loan)).isEqualTo("DISBURSEMENT_REVERSED");
+    }
     @Test void productEditsApplyToLaterDisbursementsAndCannotRedirectExistingLoanPayments(){
         UUID loan=disbursed("D-FROZEN-ACCOUNTS");UUID nextPrincipal=account("NEXT-PRINCIPAL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL"),nextInterest=account("NEXT-INTEREST","INCOME","CREDIT","POSTING","INCOME");
         jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where id=?",nextPrincipal,nextInterest,product);

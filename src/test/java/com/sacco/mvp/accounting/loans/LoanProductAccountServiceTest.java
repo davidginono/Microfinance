@@ -17,12 +17,12 @@ class LoanProductAccountServiceTest {
     final LoanProductAccountService service=new LoanProductAccountService(repository,new ApplicationClock("Africa/Nairobi"),audit);
     final UUID principal=UUID.randomUUID(),interest=UUID.randomUUID(),productId=UUID.randomUUID();
     final LoanProductSetting product=LoanProductSetting.builder().id(productId).saccoId("I1").loanType(LoanType.DEVELOPMENT_LOAN).build();
-    @Test void mappingsRequireACompletePairAndEligibleAccountsFromTheSameInstitution(){
+    @Test void mappingsRequireACompletePairAndActivePostableAccountsFromTheSameInstitution(){
         assertThatThrownBy(()->service.configure(product,UUID.randomUUID(),principal,null)).hasMessage("recording.error.productAccountsPair");
-        when(repository.valid("I1",principal,"PRINCIPAL")).thenReturn(true);
+        when(repository.valid("I1",principal)).thenReturn(true);
         assertThatThrownBy(()->service.configure(product,UUID.randomUUID(),principal,interest)).hasMessage("recording.error.productAccountsInvalid");
         assertThat(product.getPrincipalGlAccountId()).isNull();verifyNoInteractions(audit);
-        when(repository.valid("I1",interest,"INTEREST")).thenReturn(true);
+        when(repository.valid("I1",interest)).thenReturn(true);
         service.configure(product,UUID.randomUUID(),principal,interest);
         assertThat(product.getPrincipalGlAccountId()).isEqualTo(principal);assertThat(product.getInterestGlAccountId()).isEqualTo(interest);
         service.configure(product,UUID.randomUUID(),principal,interest);
@@ -32,7 +32,7 @@ class LoanProductAccountServiceTest {
         var actor=mock(AppUserPrincipal.class);when(actor.getSaccoId()).thenReturn("I1");
         when(repository.binding(actor,productId)).thenReturn(Optional.empty());
         when(repository.product("I1",productId)).thenReturn(Optional.of(Map.of("principal_gl_account_id",principal,"interest_gl_account_id",interest)));
-        when(repository.valid(eq("I1"),any(),anyString())).thenReturn(true);
+        when(repository.valid(eq("I1"),any())).thenReturn(true);
         assertThatThrownBy(()->service.bind(actor,productId,productId,UUID.randomUUID(),"EXISTING_LOAN")).hasMessage("recording.error.productPrincipalMismatch");
         verify(repository,never()).bind(any(),any(),any(),any(),any(),any(),any());verifyNoInteractions(audit);
     }
@@ -46,5 +46,10 @@ class LoanProductAccountServiceTest {
     @Test void lookupRejectsUnboundedPagesAndUnrecognisedCategories(){
         assertThatThrownBy(()->service.choices("I1","PRINCIPAL","",10001,null)).hasMessage("recording.error.filter");
         assertThatThrownBy(()->service.choices("I1","MONEY","",0,null)).hasMessage("recording.error.filter");verifyNoInteractions(repository);
+    }
+    @Test void principalAndInterestSearchTheSameScopedChartWithoutCategoryPresets(){
+        service.choices("I1","PRINCIPAL","Revenue",2,principal);
+        service.choices("I1","INTEREST","Revenue",2,principal);
+        verify(repository,times(2)).choices("I1","Revenue",2,principal);
     }
 }

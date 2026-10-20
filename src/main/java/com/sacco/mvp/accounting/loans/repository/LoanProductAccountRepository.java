@@ -11,17 +11,13 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class LoanProductAccountRepository {
     private final JdbcTemplate jdbc;
-    private static final String ELIGIBLE = """
-        ((?='PRINCIPAL' and kind='CONTROL' and type='ASSET' and normal_balance='DEBIT' and purpose='LOAN_PRINCIPAL')
-         or (?='INTEREST' and kind='POSTING' and ((type='INCOME' and normal_balance='CREDIT' and purpose='INCOME') or purpose='CLEARING')))
-        """;
-    public List<Choice> choices(String institution,String category,String search,int page,UUID selected){
-        return jdbc.query("select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and "+ELIGIBLE+
+    public List<Choice> choices(String institution,String search,int page,UUID selected){
+        return jdbc.query("select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active"+
             " and (?::uuid is null or id=?) and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?",
-            (r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),institution,category,category,selected,selected,search.toLowerCase(Locale.ROOT),page*25);
+            (r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),institution,selected,selected,search.toLowerCase(Locale.ROOT),page*25);
     }
-    public boolean valid(String institution,UUID id,String category){
-        return !jdbc.queryForList("select id from gl_account where sacco_id=? and id=? and active and "+ELIGIBLE+" for share",institution,id,category,category).isEmpty();
+    public boolean valid(String institution,UUID id){
+        return !jdbc.queryForList("select id from gl_account where sacco_id=? and id=? and active and kind in ('POSTING','CONTROL') for share",institution,id).isEmpty();
     }
     public Optional<Map<String,Object>> product(String institution,UUID product){
         return jdbc.queryForList("select id,principal_gl_account_id,interest_gl_account_id from loan_product_settings where sacco_id=? and id=? for share",institution,product).stream().findFirst();
