@@ -4,6 +4,7 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 
 <spring:message code="chairperson.processedLoans" text="Processed Loans" var="processedLoansLabel" />
@@ -61,7 +62,7 @@
 <section class="erp-panel mt-4 overflow-hidden" data-aws-table-region data-resource-table="chairperson-processed-loan-detail-1" data-table-tools="none">
     <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold text-slate-900" data-table-heading-for="chairperson-processed-loan-detail-1"><spring:message code="review.guarantors" text="Guarantors" /></h2></div>
     <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr><th><spring:message code="common.name" text="Name" /></th><th><spring:message code="Member.memberNo" text="Client No" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="common.amount" text="Amount" /></th><th><spring:message code="review.reason" text="Reason" /></th></tr></thead><tbody>
-        <c:forEach items="${loan.guarantors}" var="guarantor"><tr><td><c:out value="${guarantor.name}" /></td><td><c:out value="${guarantor.memberNo}" /></td><td><c:out value="${guarantor.status}" /></td><td><fmt:formatNumber value="${guarantor.committedAmount}" maxFractionDigits="2" /></td><td><c:out value="${guarantor.reason}" /></td></tr></c:forEach>
+        <c:forEach items="${loan.guarantors}" var="guarantor"><tr><td><c:out value="${guarantor.name}" /></td><td><c:out value="${guarantor.memberNo}" /></td><td><span data-resource-status="${guarantor.status}"><c:out value="${guarantor.status}" /></span></td><td><fmt:formatNumber value="${guarantor.committedAmount}" maxFractionDigits="2" /></td><td><c:out value="${guarantor.reason}" /></td></tr></c:forEach>
         <c:if test="${empty loan.guarantors}"><tr><td colspan="5" class="py-5 text-center text-sm text-slate-500"><spring:message code="review.noGuarantors" text="No guarantor records." /></td></tr></c:if>
     </tbody></table></div>
 </section>
@@ -79,7 +80,7 @@
 <section class="erp-panel mt-4 overflow-hidden" data-resource-table="chairperson-processed-loan-detail-3">
     <div class="border-b border-slate-200 px-5 py-4" data-resource-header-source><h2 class="font-semibold text-slate-900" data-table-heading-for="chairperson-processed-loan-detail-3"><spring:message code="chairperson.staffDecisions" text="Staff Decision History" /></h2></div>
     <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr><th><spring:message code="common.stage" text="Stage" /></th><th><spring:message code="common.decision" text="Decision" /></th><th><spring:message code="common.reviewer" text="Reviewer" /></th><th><spring:message code="review.reason" text="Comment / Reason" /></th><th><spring:message code="loan.date" text="Date" /></th></tr></thead><tbody>
-        <c:forEach items="${loan.decisions}" var="decision"><tr><td><c:out value="${decision.stageLabel}" /></td><td><span class="font-semibold"><spring:message code="chairperson.decision.${decision.decision}" text="${decision.decision}" /></span></td><td><c:out value="${decision.reviewerName}" /><div class="text-xs text-slate-500"><c:out value="${decision.reviewerNumber}" /></div></td><td><c:out value="${decision.note}" /></td><td><c:out value="${appTime:format(decision.decidedAt)}" /></td></tr></c:forEach>
+        <c:forEach items="${loan.decisions}" var="decision"><tr><td><c:out value="${decision.stageLabel}" /></td><td><span class="font-semibold"><span data-resource-status="${decision.decision}"><spring:message code="chairperson.decision.${decision.decision}" text="${decision.decision}" /></span></span></td><td><c:out value="${decision.reviewerName}" /><div class="text-xs text-slate-500"><c:out value="${decision.reviewerNumber}" /></div></td><td><c:out value="${decision.note}" /></td><td><c:out value="${appTime:format(decision.decidedAt)}" /></td></tr></c:forEach>
         <c:if test="${empty loan.decisions}"><tr><td colspan="5" class="py-5 text-center text-sm text-slate-500"><spring:message code="chairperson.awaitingDecision" text="Awaiting staff decision" /></td></tr></c:if>
     </tbody></table></div>
 </section>

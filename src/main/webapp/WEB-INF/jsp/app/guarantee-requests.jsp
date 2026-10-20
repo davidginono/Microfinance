@@ -31,7 +31,7 @@
                 </c:if>
             </td>
             <td>${guaranteeLoanAmountLabels[req.loanApplicationId]}</td>
-            <td>${req.status}</td>
+            <td><span data-resource-status="${req.status}">${req.status}</span></td>
             <td>
                 <c:choose>
                     <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>
@@ -287,7 +287,7 @@
                 <form action="/app/guarantee-requests/${req.id}/undo" method="post" class="app-modal-body space-y-5">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <div class="app-modal-section text-sm text-slate-700">
-                        <spring:message code="guaranteeRequests.currentDecision" text="Current decision:" /> <strong>${req.status}</strong>. <spring:message code="guaranteeRequests.removalReviewNotice" text="The applicant will review this request before your guarantor record is removed from the loan." />
+                        <spring:message code="guaranteeRequests.currentDecision" text="Current decision:" /> <strong><span data-resource-status="${req.status}">${req.status}</span></strong>. <spring:message code="guaranteeRequests.removalReviewNotice" text="The applicant will review this request before your guarantor record is removed from the loan." />
                     </div>
                     <div class="flex flex-wrap justify-end gap-3">
                         <button type="button"

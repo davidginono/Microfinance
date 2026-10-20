@@ -11,14 +11,15 @@
     <meta name="google" content="notranslate" />
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-mark-light-green.png?v=20260826-clean' />" />
-    <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-400.woff2' />" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="<c:url value='/css/open-sans.css' />" />
+    <link rel="preload" href="<c:url value='/fonts/amazon-ember/AmazonEmber_W_Rg.woff2' />" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="<c:url value='/fonts/amazon-ember/AmazonEmber_W_Bd.woff2' />" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="<c:url value='/css/amazon-ember.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/resource-table.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/workspace-resources.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/ui-loading.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/date-controls.css' />" />
     <script src="<c:url value='/js/date-controls.js' />" defer></script>
@@ -310,5 +311,7 @@
 <script src="<c:url value='/js/live-search.js' />"></script>
 <script src="<c:url value='/js/shell.js' />" defer></script>
 <%@ include file="resource-table-labels.jspf" %>
+<template id="console-resource-labels" data-copy="<spring:message code='common.copy' />" data-copied="<spring:message code='common.copied' />" data-opens-new-tab="<spring:message code='common.opensNewTab' text='opens in a new tab' />" data-copy-failed="<spring:message code='common.copyFailed' />" data-breadcrumb="<spring:message code='common.breadcrumb' />" data-sections="<spring:message code='common.detailSections' />"></template>
+<script src="<c:url value='/js/console-resource-details.js' />" defer></script>
 <script src="<c:url value='/js/resource-split-view.js' />" defer></script>
 <script src="<c:url value='/js/resource-table.js' />" defer></script>

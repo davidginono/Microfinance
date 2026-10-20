@@ -312,8 +312,7 @@
                             ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
                             ${product.status eq 'DRAFT' ? 'bg-amber-50 text-amber-700' : ''}
                             ${product.status eq 'SUSPENDED' ? 'bg-slate-100 text-slate-600' : ''}
-                            ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}">
-                            ${product.status}
+                            ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}"><span data-resource-status="${product.status}">${product.status}</span>
                         </span>
                     </div>
                 </div>

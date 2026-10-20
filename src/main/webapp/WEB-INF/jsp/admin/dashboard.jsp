@@ -40,7 +40,7 @@
             </div>
             <span class="erp-stat-icon">U</span>
         </div>
-        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.smsBalance" text="SMS balance" /></span><span>${dashboard.smsBalance.statusLabel}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.smsBalance" text="SMS balance" /></span><span><span data-resource-status='<c:out value="${dashboard.smsBalance.statusLabel}" />'>${dashboard.smsBalance.statusLabel}</span></span></div>
     </div>
     <div class="erp-stat-card erp-stat-red">
         <div class="erp-stat-main">
@@ -140,7 +140,7 @@
                     <div class="flex items-center justify-between gap-3">
                         <p class="font-semibold text-slate-900">${incident.subject}</p>
                         <div class="flex gap-2 text-xs font-semibold">
-                            <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">${incident.status}</span>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700"><span data-resource-status="${incident.status}">${incident.status}</span></span>
                         </div>
                     </div>
                     <p class="mt-1 text-sm text-slate-600">${incident.source}</p>
@@ -219,7 +219,7 @@
 
             if (!history.length) {
                 ctx.fillStyle = '#64748b';
-                ctx.font = '14px "Open Sans", Helvetica, Arial, sans-serif';
+                ctx.font = '14px "Amazon Ember", Helvetica, Arial, sans-serif';
                 ctx.fillText('No database utilization samples yet.', 18, 32);
                 return;
             }
@@ -279,7 +279,7 @@
             ctx.stroke();
 
             ctx.fillStyle = '#64748b';
-            ctx.font = '12px "Open Sans", Helvetica, Arial, sans-serif';
+            ctx.font = '12px "Amazon Ember", Helvetica, Arial, sans-serif';
             ctx.textAlign = 'right';
             for (let i = 0; i <= 4; i++) {
                 const ratio = 1 - (i / 4);
@@ -328,7 +328,7 @@
 
             ctx.textAlign = 'center';
             ctx.fillStyle = '#64748b';
-            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
+            ctx.font = '11px "Amazon Ember", Helvetica, Arial, sans-serif';
             const labelStep = Math.max(1, Math.ceil(history.length / 6));
             history.forEach(function (item, index) {
                 if (index % labelStep !== 0 && index !== history.length - 1) {
@@ -338,7 +338,7 @@
             });
 
             ctx.textAlign = 'left';
-            ctx.font = '12px "Open Sans", Helvetica, Arial, sans-serif';
+            ctx.font = '12px "Amazon Ember", Helvetica, Arial, sans-serif';
             ctx.fillStyle = '#0f766e';
             ctx.fillRect(padding.left, 10, 12, 12);
             ctx.fillStyle = '#334155';
@@ -369,7 +369,7 @@
                 .catch(function () {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = '#64748b';
-                    ctx.font = '14px "Open Sans", Helvetica, Arial, sans-serif';
+                    ctx.font = '14px "Amazon Ember", Helvetica, Arial, sans-serif';
                     ctx.fillText('${unableLoadDatabaseMetricsLabel}', 18, 32);
                 });
         }

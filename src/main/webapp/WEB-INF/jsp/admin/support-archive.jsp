@@ -34,7 +34,7 @@
             <tr>
                 <td class="px-3 py-2 font-semibold text-slate-900"><c:out value="${item.subject}" /></td>
                 <td class="px-3 py-2 text-slate-700"><c:out value="${item.message}" /></td>
-                <td class="px-3 py-2">${item.status}</td>
+                <td class="px-3 py-2"><span data-resource-status="${item.status}">${item.status}</span></td>
                 <td class="px-3 py-2">
                     <span class="${item.readBySuperAdmin ? 'rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700' : 'rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600'}">${item.readLabel}</span>
                 </td>

@@ -61,7 +61,7 @@
                     </td>
                     <td><c:out value="${row.applicantName}" /></td>
                     <td><c:out value="${row.loanProductName}" /></td>
-                    <td><span class="app-badge loan-status-badge"><c:out value="${row.statusLabel}" /></span></td>
+                    <td><span class="app-badge loan-status-badge"><span data-resource-status='<c:out value="${row.statusLabel}" />'><c:out value="${row.statusLabel}" /></span></span></td>
                     <td class="text-right whitespace-nowrap">
                         <c:choose>
                             <c:when test="${row.amount ne null}"><fmt:formatNumber value="${row.amount}" minFractionDigits="2" maxFractionDigits="2" /></c:when>

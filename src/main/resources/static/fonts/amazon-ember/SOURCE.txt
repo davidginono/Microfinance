@@ -1,0 +1,5 @@
+Amazon Ember, Copyright Amazon.com, Inc. or its affiliates.
+Official source: https://developer.amazon.com/en-US/alexa/branding/echo-guidelines/identity-guidelines/typography
+Font archive: https://m.media-amazon.com/images/G/01/mobile-apps/dex/alexa/branding/Amazon_Typefaces_Complete_Font_Set_Mar2020.zip
+Unmodified WOFF2 files from the archive's amazon_typography_webfonts.zip.
+Included usage guidance: Amazon Ember Licensing Guidelines.pdf.

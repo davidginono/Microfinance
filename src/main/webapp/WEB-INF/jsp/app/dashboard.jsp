@@ -568,8 +568,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                                     </td>
                                                     <td class="px-3 py-3 text-sm font-bold text-blue-600">${loanRow.loanId}</td>
                                                     <td class="px-3 py-3">
-                                                        <span class="inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}">
-                                                            ${loanRow.repaymentStateLabel}
+                                                        <span class="inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}"><span data-resource-status='<c:out value="${loanRow.repaymentStateLabel}" />'>${loanRow.repaymentStateLabel}</span>
                                                         </span>
                                                     </td>
                                                     <td class="px-3 py-3 text-sm font-semibold text-sacco-ink">${loanRow.loanProductName}</td>

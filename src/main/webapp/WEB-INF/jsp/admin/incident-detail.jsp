@@ -1,5 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
@@ -17,7 +18,7 @@
                 <p class="mt-2 text-sm text-slate-600">${incident.message}</p>
             </div>
             <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">${incident.status}</span>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700"><span data-resource-status="${incident.status}">${incident.status}</span></span>
             </div>
         </div>
         <dl class="mt-5 grid gap-3 md:grid-cols-2">

@@ -1,6 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %><%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
-<%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
+<%@ include file="../../fragments/header.jspf" %>
+<template data-resource-details-page></template><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/payroll/${kind}' />"><spring:message code="payroll.nav.${kind}" /></a><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="payroll.details" /></span></nav>
 <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="payroll.details" /></h1></div>

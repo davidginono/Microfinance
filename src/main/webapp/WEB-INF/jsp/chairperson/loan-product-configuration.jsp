@@ -18,7 +18,7 @@
         </div>
         <div class="chairperson-product-summary-item">
             <div class="chairperson-product-summary-label"><spring:message code="common.status" text="Status" /></div>
-            <div class="chairperson-product-summary-value"><span class="erp-status-badge"><spring:message code="status.${fn:toLowerCase(product.status)}" text="${product.status}" /></span></div>
+            <div class="chairperson-product-summary-value"><span class="erp-status-badge"><span data-resource-status="${fn:toLowerCase(product.status)}"><spring:message code="status.${fn:toLowerCase(product.status)}" text="${product.status}" /></span></span></div>
         </div>
         <div class="chairperson-product-summary-item">
             <div class="chairperson-product-summary-label"><spring:message code="loan.type" text="Loan Type" /></div>

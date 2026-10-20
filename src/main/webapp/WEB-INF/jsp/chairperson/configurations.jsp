@@ -112,7 +112,7 @@
                     <tr>
                         <td class="chairperson-table-code"><a class="resource-table-id-link" href="<c:url value='/chairperson/configurations/loan-products/${row.id}' />"><c:out value="${row.code}" /></a></td>
                         <td><c:out value="${row.name}" /></td>
-                        <td><span class="erp-status-badge"><spring:message code="status.${fn:toLowerCase(row.status)}" text="${row.status}" /></span></td>
+                        <td><span class="erp-status-badge"><span data-resource-status="${fn:toLowerCase(row.status)}"><spring:message code="status.${fn:toLowerCase(row.status)}" text="${row.status}" /></span></span></td>
                         <td>
                             <c:choose>
                                 <c:when test="${empty row.minimumAmount or empty row.maximumAmount}"><spring:message code="chairperson.amountRangeNotSet" text="Amount range not set" /></c:when>

@@ -1,5 +1,6 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
+<template data-resource-details-page></template>
 <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/statement-reference.css' />" />
 <div class="accounting-workspace loan-statement-workspace">

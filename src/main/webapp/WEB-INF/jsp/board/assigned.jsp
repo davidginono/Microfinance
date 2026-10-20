@@ -110,7 +110,7 @@
                         </c:choose>
                     </td>
                     <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
-                    <td class="px-3 py-2"><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
+                    <td class="px-3 py-2"><span data-resource-status="${app.status}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span></td>
                     <td class="px-3 py-2">${myDecisions[app.id]}</td>
                     <c:if test="${archiveView}">
                         <td class="px-3 py-2"><c:out value="${myDecisionReasons[app.id]}" /></td>

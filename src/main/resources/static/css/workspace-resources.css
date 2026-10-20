@@ -64,7 +64,7 @@
 .aws-console .erp-detail-facts dt {margin:0 0 6px;font-size:13px;line-height:20px;color:#545b64;}
 .aws-console .erp-detail-facts dd {margin:0;font-size:14px;line-height:20px;font-weight:400;overflow-wrap:anywhere;white-space:pre-wrap;font-variant-numeric:tabular-nums;}
 .aws-console :is(.erp-form-wrap,.erp-panel-body,.loan-flow-panel-body) label {font-size:14px;line-height:20px;letter-spacing:normal;text-transform:none;}
-.aws-console .erp-table {font-family:"Open Sans",Helvetica,Arial,sans-serif;font-size:14px!important;line-height:20px;}
+.aws-console .erp-table {font-family:"Amazon Ember",Helvetica,Arial,sans-serif;font-size:14px!important;line-height:20px;}
 .aws-console .erp-table th {background:#fafafa!important;color:#545b64!important;font-size:13px!important;line-height:18px!important;text-transform:none;letter-spacing:normal;position:sticky;}
 .aws-console .erp-table th:not(:last-child)::after {content:"";position:absolute;right:0;top:25%;height:50%;border-right:1px solid #eaeded;pointer-events:none;}
 .aws-console :is(.erp-form-wrap,.erp-panel-body,.loan-flow-panel-body) :is(label,fieldset,.neo-select) {min-width:0;max-width:100%;}

@@ -4,12 +4,13 @@
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/loan-repayments.css' />" /><link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <div class="repayment-workspace">
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="loan.loanId" /> <c:out value="${ledger.loanId}" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
     <c:if test="${not empty repaymentError}"><div class="repayment-error" role="alert"><spring:message code="${repaymentError}" /></div></c:if>
-    <c:if test="${ledger.financialState=='WRITTEN_OFF' or ledger.financialState=='DISBURSEMENT_REVERSED'}"><p role="status"><spring:message code="recording.status.${ledger.financialState}" />. <spring:message code="adjustment.historicalSchedule" /></p></c:if>
+    <c:if test="${ledger.financialState=='WRITTEN_OFF' or ledger.financialState=='DISBURSEMENT_REVERSED'}"><p role="status"><span data-resource-status="${ledger.financialState}"><spring:message code="recording.status.${ledger.financialState}" /></span>. <spring:message code="adjustment.historicalSchedule" /></p></c:if>
     <dl class="repayment-facts">
         <div><dt><spring:message code="repayment.principalOutstanding" /></dt><dd>TZS <fmt:formatNumber value="${ledger.outstandingPrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.principalDue" /></dt><dd>TZS <fmt:formatNumber value="${ledger.duePrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
@@ -41,7 +42,7 @@
             <table class="erp-table"><thead><tr><th data-table-order="reference"><spring:message code="repayment.receipt" /></th><th data-table-order="date"><spring:message code="repayment.paymentDate" /></th><th data-table-order="status"><spring:message code="common.status" /></th><th class="money" data-table-order="amount"><spring:message code="common.amount" /> (TZS)</th><th class="money" data-table-order="principal"><spring:message code="repayment.principal" /> (TZS)</th><th class="money" data-table-order="interest"><spring:message code="repayment.interest" /> (TZS)</th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead><tbody>
                 <c:forEach items="${ledger.history.content}" var="row"><tr>
                     <td class="repayment-reference"><c:out value="${row.reference}" /></td><td><c:out value="${appTime:display(row.paymentDate)}" /></td>
-                    <td><c:choose><c:when test="${not empty row.reversedBy}"><spring:message code="repayment.reversed" /></c:when><c:otherwise><spring:message code="repayment.kind.${row.kind}" /></c:otherwise></c:choose></td>
+                    <td><c:choose><c:when test="${not empty row.reversedBy}"><span data-resource-status="REVERSED"><spring:message code="repayment.reversed" /></span></c:when><c:otherwise><span data-resource-status="${row.kind=='PAYMENT'?'POSTED':row.kind}"><spring:message code="repayment.kind.${row.kind}" /></span></c:otherwise></c:choose></td>
                     <td class="money"><fmt:formatNumber value="${row.amount}" minFractionDigits="2" maxFractionDigits="2" /></td><td class="money"><fmt:formatNumber value="${row.principal}" minFractionDigits="2" maxFractionDigits="2" /></td><td class="money"><fmt:formatNumber value="${row.interest}" minFractionDigits="2" maxFractionDigits="2" /></td>
                     <td><a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${ledger.id}/receipts/${row.id}' />"><spring:message code="repayment.receipt" /></a></td>
                 </tr></c:forEach>

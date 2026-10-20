@@ -105,7 +105,7 @@
                     </td>
                 </c:if>
                 <td class="px-3 py-2">
-                    <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.statusBadgeClass}">${entry.displayStatus}</span>
+                    <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.statusBadgeClass}"><span data-resource-status="${entry.status}">${entry.displayStatus}</span></span>
                 </td>
                 <td class="px-3 py-2">${entry.displayEntityType}</td>
                 <td class="px-3 py-2">${entry.shortEntityReference}</td>

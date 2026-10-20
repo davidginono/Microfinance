@@ -1,5 +1,5 @@
 <dl class="erp-detail-facts">
-<div><dt><spring:message code="voucher.status" /></dt><dd><spring:message code="recording.status.${loan.status}" /></dd></div>
+<div><dt><spring:message code="voucher.status" /></dt><dd><span data-resource-status="${loan.status}"><spring:message code="recording.status.${loan.status}" /></span></dd></div>
 <div><dt><spring:message code="adjustment.contractDebt" /> (TZS)</dt><dd><fmt:formatNumber value="${loan.status=='DISBURSEMENT_REVERSED'?0:loan.outstanding}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
 <div><dt><spring:message code="adjustment.bookPrincipal" /> (TZS)</dt><dd><fmt:formatNumber value="${loan.bookPrincipal()}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
 <div><dt><spring:message code="adjustment.allowance" /> (TZS)</dt><dd><fmt:formatNumber value="${loan.allowance}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>

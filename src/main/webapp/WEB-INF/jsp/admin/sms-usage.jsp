@@ -117,7 +117,7 @@
                         <td class="whitespace-nowrap"><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td>
                         <td class="whitespace-nowrap"><fmt:formatNumber value="${account.warningBaseline}" /></td>
                         <td class="whitespace-nowrap"><fmt:formatNumber value="${account.depletedAlertSmsSentCount}" /></td>
-                        <td><span class="rounded-sm border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
+                        <td><span class="rounded-sm border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}"><span data-resource-status="${account.status}">${account.status}</span></span></td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty accounts.content}"><tr><td colspan="7" class="text-center text-slate-500">No Branch SMS accounts match the filters.</td></tr></c:if>
@@ -231,7 +231,7 @@
                     <td class="whitespace-nowrap"><c:out value="${entry.applicantMemberNo}" /></td>
                     <td class="whitespace-nowrap"><c:out value="${entry.loanId}" /></td>
                     <td class="whitespace-nowrap"><c:out value="${empty entry.applicationNumber ? '-' : entry.applicationNumber}" /></td>
-                    <td><span class="rounded-sm border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700"><c:out value="${entry.loanStatusLabel}" /></span></td>
+                    <td><span class="rounded-sm border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700"><span data-resource-status='<c:out value="${entry.loanStatusLabel}" />'><c:out value="${entry.loanStatusLabel}" /></span></span></td>
                     <td class="whitespace-nowrap"><c:out value="${entry.saccoId}" /></td>
                     <td class="whitespace-nowrap"><c:out value="${entry.stationId}" /></td>
                     <td><fmt:formatNumber value="${entry.smsEventCount}" /></td>

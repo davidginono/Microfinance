@@ -1,6 +1,7 @@
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
+<template data-resource-details-page></template>
 <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" />
 <div class="accounting-workspace client-statement-workspace">
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/finance/client-ledgers' />"><spring:message code="recording.clientLedgers" /></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><c:out value="${statement.client}" /></span></nav>
@@ -34,7 +35,7 @@
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${statement.page.rows}" var="l"><tr>
-                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><spring:message code="recording.status.${l.status}" /></td>
+                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><span data-resource-status="${l.status}"><spring:message code="recording.status.${l.status}" /></span></td>
                         <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.charges}" pattern="#,##0.00;(#,##0.00)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.00;(#,##0.00)" /></td>
                     </tr></c:forEach>
                 </tbody>

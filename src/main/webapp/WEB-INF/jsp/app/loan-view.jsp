@@ -3,6 +3,7 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
@@ -96,7 +97,7 @@
             <c:if test="${not empty disbursedLoanId}">
                 <div><dt><spring:message code="loan.loanId" text="Loan ID" /></dt><dd>${disbursedLoanId}</dd></div>
             </c:if>
-            <div><dt><spring:message code="loan.status" text="Status" /></dt><dd><span class="app-badge loan-status-badge ${loanStatusBadgeClass}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span></dd></div>
+            <div><dt><spring:message code="loan.status" text="Status" /></dt><dd><span class="app-badge loan-status-badge ${loanStatusBadgeClass}"><span data-resource-status="${app.status}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span></span></dd></div>
             <div><dt><spring:message code="reports.loanProduct" text="Loan Product" /></dt><dd><c:out value="${loanProductName}" /></dd></div>
             <c:if test="${not empty formFields['Loan Purpose']}">
                 <div><dt><spring:message code="loan.purpose" text="Loan Purpose" /></dt><dd>${formFields['Loan Purpose']}</dd></div>
@@ -581,7 +582,7 @@
                             <c:otherwise>-</c:otherwise>
                         </c:choose>
                     </td>
-                    <td class="px-3 py-2 align-top">${req.status}</td>
+                    <td class="px-3 py-2 align-top"><span data-resource-status="${req.status}">${req.status}</span></td>
                     <td class="px-3 py-2 align-top">
                         <c:choose>
                             <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>

@@ -318,7 +318,7 @@
                                     </td>
                                     <td><c:out value="${sacco.stationListLabel}" /></td>
                                     <td>
-                                        <span class="app-badge ${sacco.accessBadgeClass}"><c:out value="${sacco.accessStatusLabel}" /></span>
+                                        <span class="app-badge ${sacco.accessBadgeClass}"><span data-resource-status="${sacco.accessStatus}"><c:out value="${sacco.accessStatusLabel}" /></span></span>
                                     </td>
                                     <td>
                                         <span class="app-badge ${sacco.loanTopUpEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-700'}">

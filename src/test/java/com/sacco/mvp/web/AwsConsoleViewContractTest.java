@@ -350,7 +350,7 @@ class AwsConsoleViewContractTest {
         String footer = read(JSP_ROOT.resolve("fragments/footer.jspf"));
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String registration = read(JSP_ROOT.resolve("register-member.jsp"));
-        String fontCss = read(Path.of("src/main/resources/static/css/open-sans.css"));
+        String fontCss = read(Path.of("src/main/resources/static/css/amazon-ember.css"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
         String authCss = read(Path.of("src/main/resources/static/css/aws-auth.css"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
@@ -358,9 +358,9 @@ class AwsConsoleViewContractTest {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
 
         assertThat(header)
-            .contains("open-sans-400.woff2")
-            .contains("open-sans-700.woff2")
-            .contains("open-sans.css' />")
+            .contains("AmazonEmber_W_Rg.woff2")
+            .contains("AmazonEmber_W_Bd.woff2")
+            .contains("amazon-ember.css' />")
             .contains("console-components.css' />")
             .contains("shell.css' />")
             .contains("shell.js' />")
@@ -391,18 +391,18 @@ class AwsConsoleViewContractTest {
             .contains("autocomplete=\"username\"")
             .doesNotContain("item.setAttribute(\"title\", label)");
         assertThat(fontCss)
-            .contains("font-family: \"Open Sans\"")
-            .contains("open-sans-300.woff2")
-            .contains("open-sans-400.woff2")
-            .contains("open-sans-700.woff2")
-            .contains("open-sans-800.woff2")
+            .contains("font-family: \"Amazon Ember\"")
+            .contains("AmazonEmber_W_RgIt.woff2")
+            .contains("AmazonEmber_W_Rg.woff2")
+            .contains("AmazonEmber_W_Bd.woff2")
+            .contains("AmazonEmber_W_SBd.woff2")
             .contains("font-display: swap");
         assertThat(securityConfig)
             .contains("\"/fonts/**\"")
             .contains(".permitAll()");
         assertThat(shellCss)
             .contains("--sacco-topbar: #3A756B")
-            .contains("--sacco-font-family: \"Open Sans\", Helvetica, Arial, sans-serif")
+            .contains("--sacco-font-family: \"Amazon Ember\", Helvetica, Arial, sans-serif")
             .contains("--sacco-sidebar: #183038")
             .contains("--sacco-canvas: #F2F3F3")
             .contains("--sacco-control-height: 32px")
@@ -474,7 +474,7 @@ class AwsConsoleViewContractTest {
             .contains(".app-global-brand > div")
             .contains(".shell-nav-active")
             .contains("border-left: 3px solid var(--aws-orange) !important")
-            .doesNotContain("Amazon Ember")
+            .doesNotContain("Open Sans")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(authCss)
@@ -483,12 +483,12 @@ class AwsConsoleViewContractTest {
             .contains("background: transparent !important")
             .contains("width: 24px !important")
             .contains("transform: translateY(-50%) !important")
-            .doesNotContain("Amazon Ember")
+            .doesNotContain("Open Sans")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(consoleCss)
-            .contains("font-family: \"Open Sans\", Helvetica, Arial, sans-serif")
-            .doesNotContain("Amazon Ember")
+            .contains("font-family: \"Amazon Ember\", Helvetica, Arial, sans-serif")
+            .doesNotContain("Open Sans")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(login)

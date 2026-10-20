@@ -59,9 +59,9 @@
                 if(index===0 || !cells[index])return;
                 const group=el('div'), term=el('dt','',header.textContent.trim()), value=el('dd');
                 // Commands and controls never move or duplicate into the preview.
-                const copy=cells[index].cloneNode(true); copy.querySelectorAll('button,input,select,textarea,script').forEach(n=>n.remove());
-                value.textContent=copy.textContent.trim() || '—'; group.append(term,value);list.append(group);
-            }); content.append(list);
+                const copy=cells[index].cloneNode(true); copy.querySelectorAll('button,input,select,textarea,script,style').forEach(n=>n.remove());
+                if(copy.textContent.trim())value.append(...copy.childNodes);else value.textContent='—'; group.append(term,value);list.append(group);
+            }); content.append(list);window.ConsoleResourceDetails?.init(content);
         };
         const open=()=>{panel.hidden=false;layout.classList.add('resource-split-open');show.setAttribute('aria-expanded','true');render();apply();};
         const sync=()=>{if(!panel.hidden)render();};

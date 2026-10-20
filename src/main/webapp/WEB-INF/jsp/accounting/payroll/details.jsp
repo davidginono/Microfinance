@@ -1,6 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %><%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
-<%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
+<%@ include file="../../fragments/header.jspf" %>
+<template data-resource-details-page></template><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/payroll' />"><spring:message code="payroll.title" /></a><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="payroll.details" /></span></nav>
 <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="payroll.details" /></h1><div class="accounting-actions">
@@ -13,7 +14,7 @@
 <c:if test="${batch.state=='CANCELLED'}"><p role="status"><spring:message code="payroll.cancelledNotice" /></p></c:if>
 <section class="erp-resource-section"><h2 class="break-words"><c:out value="${batch.reference}" /></h2><dl class="erp-detail-facts">
     <div><dt><spring:message code="payroll.employer" /></dt><dd><c:out value="${batch.employer}" /></dd></div><div><dt><spring:message code="payroll.month" /></dt><dd><c:out value="${batch.month.toString().substring(0,7)}" /></dd></div><div><dt><spring:message code="payroll.deductionDate" /></dt><dd><c:out value="${appTime:date(batch.deductionDate)}" /></dd></div>
-    <div><dt><spring:message code="payroll.state" /></dt><dd><spring:message code="payroll.state.${batch.state}" /></dd></div><div><dt><spring:message code="payroll.total" /></dt><dd>TZS <fmt:formatNumber value="${batch.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="payroll.employees" /></dt><dd><c:out value="${batch.employees}" /></dd></div>
+    <div><dt><spring:message code="payroll.state" /></dt><dd><span data-resource-status="${batch.state}"><spring:message code="payroll.state.${batch.state}" /></span></dd></div><div><dt><spring:message code="payroll.total" /></dt><dd>TZS <fmt:formatNumber value="${batch.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="payroll.employees" /></dt><dd><c:out value="${batch.employees}" /></dd></div>
     <div><dt><spring:message code="payroll.cutoff" /></dt><dd><c:out value="${appTime:display(batch.cutoff)}" /></dd></div><div><dt><spring:message code="payroll.createdBy" /></dt><dd><c:out value="${batch.actor}" /></dd></div><div><dt><spring:message code="payroll.includeArrears" /></dt><dd><spring:message code="payroll.${batch.includeArrears?'yes':'no'}" /></dd></div>
     <div><dt><spring:message code="payroll.exceptions" /></dt><dd><c:out value="${batch.exceptions}" /></dd></div><c:if test="${batch.replacesId!=null}"><div><dt><spring:message code="payroll.replaces" /></dt><dd><a class="resource-table-id-link" href="<c:url value='/finance/payroll/${batch.replacesId}' />"><c:out value="PAY-${batch.replacesId}" /></a></dd></div></c:if>
 </dl><p><spring:message code="payroll.requestOnly" /></p></section>

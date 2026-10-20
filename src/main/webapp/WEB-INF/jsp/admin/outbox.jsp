@@ -83,7 +83,7 @@
             <tr>
                 <td class="px-3 py-2 font-semibold text-slate-900">${event.eventType}</td>
                 <td class="px-3 py-2">${event.aggregateType}<div class="text-xs text-slate-500">${event.aggregateId}</div></td>
-                <td class="px-3 py-2">${event.status}</td>
+                <td class="px-3 py-2"><span data-resource-status="${event.status}">${event.status}</span></td>
                 <td class="px-3 py-2"><c:out value="${appTime:format(event.createdAt)}" /></td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">
                     <c:set var="actorPrefix" value="${outboxActorPrefixes[event.id]}" />

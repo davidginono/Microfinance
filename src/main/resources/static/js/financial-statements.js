@@ -29,7 +29,7 @@
   current.setAttribute('aria-busy','true');status.hidden=false;status.textContent=current.dataset.tabLoading;
   try{
    const response=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:AbortSignal.any([request.signal,AbortSignal.timeout(20000)])});
-   if(response.redirected){location.assign(response.url);return;}
+   if(response.redirected)throw new Error('Statement unavailable');
    if(!response.ok)throw new Error('Statement unavailable');
    const parsed=new DOMParser().parseFromString(await response.text(),'text/html');
    const next=parsed.querySelector('.fs-workspace');
@@ -44,7 +44,6 @@
    next.querySelector('.fs-tabs [aria-current="page"]')?.focus({preventScroll:true});
   }catch(error){
    if(request.signal.aborted)return;
-   if(!push){location.reload();return;}
    status.textContent=current.dataset.tabError;
   }finally{
    if(pending===request){document.querySelector('.fs-workspace')?.removeAttribute('aria-busy');pending=null;}

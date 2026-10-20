@@ -1,11 +1,12 @@
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../loans/support.jspf" %>
+<template data-resource-details-page></template>
 <nav class="erp-page-path"><a href="<c:url value='/finance/loan-adjustments' />"><spring:message code="adjustment.title" /></a><span>›</span><span aria-current="page"><spring:message code="adjustment.kind.${adjustment.kind}" /></span></nav>
 <div class="accounting-workspace"><div class="erp-page-header erp-detail-header"><h1 class="erp-page-title"><spring:message code="adjustment.kind.${adjustment.kind}" /> · <c:out value="${adjustment.number}" /></h1><div class="accounting-actions"><sec:authorize access="@access.has(principal,'LOAN_ADJUSTMENTS_EXPORT')"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-adjustments/${adjustment.id}/pdf' />"><spring:message code="voucher.pdf" /></a><a class="app-btn btn-neutral" data-print-action href="<c:url value='/finance/loan-adjustments/${adjustment.id}/print' />"><spring:message code="voucher.print" /></a></sec:authorize></div></div>
 <c:if test="${not empty formError}"><div class="loan-error-summary" role="alert" tabindex="-1"><spring:message code="${formError}" /></div></c:if>
 <section class="accounting-section erp-detail-card"><h2><c:out value="${adjustment.client}" /></h2><dl class="erp-detail-facts">
-<div><dt><spring:message code="voucher.status" /></dt><dd><spring:message code="adjustment.state.${adjustment.state}" /></dd></div>
+<div><dt><spring:message code="voucher.status" /></dt><dd><span data-resource-status="${adjustment.state}"><spring:message code="adjustment.state.${adjustment.state}" /></span></dd></div>
 <div><dt><spring:message code="voucher.date" /></dt><dd>${appTime:display(adjustment.date)}</dd></div>
 <div><dt><spring:message code="voucher.amount" /> (TZS)</dt><dd><fmt:formatNumber value="${adjustment.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
 <div><dt><spring:message code="accounting.debit" /></dt><dd><c:out value="${adjustment.debitName}" /></dd></div><div><dt><spring:message code="accounting.credit" /></dt><dd><c:out value="${adjustment.creditName}" /></dd></div>

@@ -67,10 +67,10 @@
                         <td><c:out value="${row.applicantName}" /><div class="text-xs text-slate-500"><c:out value="${row.memberNo}" /></div></td>
                         <td><c:out value="${row.productName}" /></td>
                         <td>TSh <fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
-                        <td><span class="erp-status-badge"><spring:message code="loan.status.${row.status}" text="${fn:replace(row.status, '_', ' ')}" /></span></td>
+                        <td><span class="erp-status-badge"><span data-resource-status="${row.status}"><spring:message code="loan.status.${row.status}" text="${fn:replace(row.status, '_', ' ')}" /></span></span></td>
                         <td>
                             <c:choose><c:when test="${not empty row.latestDecision}">
-                                <span class="font-semibold"><spring:message code="chairperson.decision.${row.latestDecision.decision}" text="${row.latestDecision.decision}" /></span>
+                                <span class="font-semibold"><span data-resource-status="${row.latestDecision.decision}"><spring:message code="chairperson.decision.${row.latestDecision.decision}" text="${row.latestDecision.decision}" /></span></span>
                                 <div class="text-xs text-slate-500"><c:out value="${row.latestDecision.stageLabel}" /> &middot; <c:out value="${row.latestDecision.reviewerName}" /></div>
                                 <div class="text-xs text-slate-500"><c:out value="${appTime:format(row.latestDecision.decidedAt)}" /></div>
                             </c:when><c:otherwise><span class="text-slate-500"><spring:message code="chairperson.awaitingDecision" text="Awaiting staff decision" /></span></c:otherwise></c:choose>

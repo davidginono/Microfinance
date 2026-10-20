@@ -3,6 +3,7 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
@@ -315,7 +316,7 @@
                         <c:otherwise>-</c:otherwise>
                     </c:choose>
                 </td>
-                <td class="px-3 py-2">${g.status}</td>
+                <td class="px-3 py-2"><span data-resource-status="${g.status}">${g.status}</span></td>
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty g.decidedAt}"><c:out value="${appTime:format(g.decidedAt)}" /></c:when>

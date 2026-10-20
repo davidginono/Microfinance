@@ -21,7 +21,7 @@
         <div class="erp-filter-row aws-current-filter-tabs">
             <a href="/accountant/loan-applications?filter=AWAITING_ACCOUNTANT"
                class="erp-filter-tab ${currentFilterKey eq 'AWAITING_ACCOUNTANT' ? 'is-active' : ''}">
-                <spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" />
+                <span data-resource-status="AWAITING_ACCOUNTANT"><spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" /></span>
             </a>
         </div>
         <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-queue-1">
@@ -71,7 +71,7 @@
                     </c:choose>
                 </td>
                 <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
-                <td class="px-3 py-2"><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
+                <td class="px-3 py-2"><span data-resource-status="${app.status}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span></td>
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty app.disbursementDate}">${appTime:display(app.disbursementDate)}</c:when>

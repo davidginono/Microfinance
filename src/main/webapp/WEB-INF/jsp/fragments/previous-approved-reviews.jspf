@@ -20,8 +20,7 @@
                         <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.reviewerName}" /></td>
                         <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.reviewerMemberNo}" /></td>
                         <td class="px-3 py-2">
-                            <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                <c:out value="${previousReview.decisionLabel}" />
+                            <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"><span data-resource-status='<c:out value="${previousReview.decisionLabel}" />'><c:out value="${previousReview.decisionLabel}" /></span>
                             </span>
                         </td>
                         <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.note}" /></td>

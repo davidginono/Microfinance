@@ -56,7 +56,7 @@
                     </td>
                     <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                     <td class="px-3 py-2">
-                        <spring:message code="loan.status.${app.status}" text="${app.status}" />
+                        <span data-resource-status="${app.status}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span>
                         <c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
                             <div class="mt-1 text-xs font-semibold text-emerald-700"><spring:message code="loan.disbursement.awaitingAcknowledgement" text="Awaiting your acknowledgement" /></div>
                         </c:if>

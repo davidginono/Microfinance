@@ -499,7 +499,7 @@ button:active {
 .shell-page-title-rail__text {
     margin: 0;
     color: var(--text-main);
-    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
     font-size: 1.32rem;
     font-weight: 700;
     line-height: 1.15;
@@ -515,7 +515,7 @@ button:active {
 .erp-page-title {
     margin-top: 0.25rem;
     color: var(--text-main);
-    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
     font-size: 1.42rem;
     font-weight: 700;
     line-height: 1.2;
@@ -523,7 +523,7 @@ button:active {
 .erp-page-heading {
     margin-top: 0.35rem;
     color: var(--text-main);
-    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
     font-size: 1.9rem;
     font-weight: 700;
     line-height: 1.18;
@@ -589,7 +589,7 @@ button:active {
 }
 .erp-widget-heading {
     color: var(--text-main);
-    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
     font-size: 1.15rem;
     font-weight: 700;
     line-height: 1.25;
@@ -1731,7 +1731,7 @@ button:active {
     --shell-content-max: none;
     --shell-nav-height: 44px;
     --shell-topbar-control-height: 28px;
-    --sacco-font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    --sacco-font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
 }
 
 html {
@@ -1744,7 +1744,7 @@ body.aws-console {
     overflow-x: clip;
     background: var(--aws-bg) !important;
     color: var(--aws-ink);
-    font-family: var(--sacco-font-family, "Open Sans", Helvetica, Arial, sans-serif) !important;
+    font-family: var(--sacco-font-family, "Amazon Ember", Helvetica, Arial, sans-serif) !important;
     font-size: 14px;
     line-height: 20px;
 }
@@ -2183,7 +2183,7 @@ body.aws-console {
 .erp-page-header h1 {
     margin: 0 !important;
     color: var(--aws-ink) !important;
-    font-family: var(--sacco-font-family, "Open Sans", Helvetica, Arial, sans-serif) !important;
+    font-family: var(--sacco-font-family, "Amazon Ember", Helvetica, Arial, sans-serif) !important;
     font-size: 22px !important;
     font-weight: 700 !important;
     line-height: 1.25 !important;
@@ -3068,7 +3068,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     overflow: visible;
     margin: 0 !important;
     color: var(--aws-ink) !important;
-    font-family: var(--sacco-font-family, "Open Sans", Helvetica, Arial, sans-serif) !important;
+    font-family: var(--sacco-font-family, "Amazon Ember", Helvetica, Arial, sans-serif) !important;
     font-size: 14px !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;

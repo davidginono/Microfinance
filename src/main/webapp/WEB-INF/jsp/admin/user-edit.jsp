@@ -49,12 +49,10 @@
                 <span class="admin-user-badge ${user.membershipLabel eq 'Staff' ? 'is-neutral' : 'is-info'}">
                     <c:out value="${user.membershipLabel}" />
                 </span>
-                <span class="admin-user-badge ${user.status eq 'INVITED' ? 'is-warning' : user.status eq 'ACTIVE' ? 'is-success' : 'is-neutral'}">
-                    <c:out value="${user.displayStatus}" />
+                <span class="admin-user-badge ${user.status eq 'INVITED' ? 'is-warning' : user.status eq 'ACTIVE' ? 'is-success' : 'is-neutral'}"><span data-resource-status="${user.status}"><c:out value="${user.displayStatus}" /></span>
                 </span>
                 <c:if test="${not empty user.acknowledgementStatus}">
-                    <span class="admin-user-badge ${user.acknowledgementStatus eq 'Pending Acknowledgement' ? 'is-warning' : 'is-neutral'}">
-                        <c:out value="${user.acknowledgementStatus}" />
+                    <span class="admin-user-badge ${user.acknowledgementStatus eq 'Pending Acknowledgement' ? 'is-warning' : 'is-neutral'}"><span data-resource-status='<c:out value="${user.acknowledgementStatus}" />'><c:out value="${user.acknowledgementStatus}" /></span>
                     </span>
                 </c:if>
             </div>

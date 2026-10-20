@@ -1,0 +1,55 @@
+/* Classic AWS reference: shared resource facts, breadcrumb group, statuses and tabs. */
+.aws-console {--sacco-font-family:"Amazon Ember","Helvetica Neue",Arial,sans-serif;--aws-blue:#0073bb;}
+.aws-console :is(.erp-page-path,.erp-breadcrumb) {text-transform:none!important;letter-spacing:normal!important;font-size:14px!important;line-height:20px!important;font-weight:400!important;}
+.aws-console .erp-page-path {position:sticky!important;top:var(--shell-nav-height)!important;min-height:36px;gap:8px 12px;padding:8px 0!important;margin:0!important;background:var(--sacco-canvas,#f2f3f3);z-index:37;}
+.aws-console .erp-page-path [aria-current=page] {color:#687078!important;font-weight:700;}
+.aws-console .erp-page-path__separator {display:inline-flex;align-items:center;color:#687078;flex:none;}
+.aws-console .erp-page-path a[href],.aws-console .erp-page-path a[href]:visited {color:#0073bb!important;font-weight:400;}
+.console-icon {display:inline-block;width:16px;height:16px;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:-3px;}
+.console-icon .stroke-linejoin-round {stroke-linejoin:round;}
+.console-icon .filled {fill:currentColor;}
+.console-icon .no-stroke {stroke:none;}
+.aws-console :is(.erp-detail-facts,.resource-split-values,.voucher-metadata) dt {font-size:14px!important;font-weight:400!important;line-height:20px;color:#545b64!important;margin:0 0 4px;}
+.aws-console :is(.erp-detail-facts,.resource-split-values,.voucher-metadata) dd {font-size:14px!important;line-height:20px;font-weight:400;min-width:0;color:#16191f;white-space:normal;}
+.aws-console :is(.erp-detail-facts,.resource-split-values,.voucher-metadata) dd:has(>.console-copy) {display:flex;align-items:flex-start;gap:8px;}
+.console-detail-value {min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;}
+.aws-console button.console-copy {display:inline-flex;align-items:center;justify-content:center;flex:0 0 16px;width:16px;height:20px;padding:0;border:0;background:transparent;color:#16191f;cursor:pointer;}
+.aws-console button.console-copy:hover {color:#0073bb;}
+.aws-console .console-copy:focus-visible,.aws-console .console-resource-link:focus-visible {outline:2px solid #0073bb;outline-offset:3px;}
+.aws-console :is(.console-resource-link,.erp-detail-facts a[href],.resource-split-values a[href],.accounting-section a.resource-table-id-link) {color:#0073bb!important;text-decoration:none;}
+.aws-console :is(.console-resource-link,.erp-detail-facts a[href],.resource-split-values a[href],.accounting-section a.resource-table-id-link):is(:hover,:focus-visible) {color:#0a4a74!important;text-decoration:underline;}
+.console-resource-link>.console-icon {margin-left:4px;}
+.aws-console .console-status,.aws-console .console-status-host {border:0!important;border-radius:0!important;background:transparent!important;padding:0!important;box-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;font-size:inherit!important;line-height:20px!important;font-weight:400!important;}
+.aws-console .console-status {display:inline-flex!important;align-items:center;gap:4px;max-width:100%;vertical-align:middle;white-space:normal;}
+.aws-console .console-status-host {display:inline!important;}
+.aws-console .console-status[data-status-type=success] {color:#1d8102!important;}
+.aws-console .console-status[data-status-type=error] {color:#d13212!important;}
+.aws-console .console-status[data-status-type=warning] {color:#906806!important;}
+.aws-console .console-status[data-status-type=info] {color:#0073bb!important;}
+.aws-console .console-status:is([data-status-type=pending],[data-status-type=stopped],[data-status-type=in-progress]) {color:#545b64!important;}
+.aws-console .console-detail-tabs {display:flex;align-items:stretch;min-width:0;max-width:100%;overflow-x:auto;border-bottom:1px solid #aab7b8;margin:28px 0 16px;padding:0;background:transparent;scrollbar-width:thin;}
+.aws-console .console-detail-tabs>[role=tab] {position:relative;flex:none;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:12px 20px 14px;color:#545b64;font-family:inherit;font-size:14px;line-height:20px;font-weight:700;white-space:nowrap;cursor:pointer;}
+.aws-console .console-detail-tabs>[role=tab]:not(:last-child)::after {content:"";position:absolute;right:0;top:8px;bottom:10px;border-right:1px solid #d5dbdb;}
+.aws-console .console-detail-tabs>[role=tab][aria-selected=true] {border-bottom-color:#16191f;color:#0073bb;}
+.aws-console .console-detail-tabs>[role=tab]:hover {color:#0073bb;}
+.aws-console .console-detail-tabs>[role=tab]:focus-visible {outline:2px solid #0073bb;outline-offset:-4px;}
+.console-detail-panels {min-width:0;}
+.console-detail-panels>[role=tabpanel][hidden] {display:none!important;}
+.console-detail-panels>[role=tabpanel] {margin-top:0!important;}
+.console-detail-panels>[role=tabpanel]:focus-visible {outline:2px solid #0073bb;outline-offset:3px;}
+.aws-console .console-prerequisite {display:flex;align-items:flex-start;gap:12px;min-width:0;margin:16px 0;padding:16px 20px;border:1px solid #906806;background:#fffce9;border-radius:2px;box-shadow:none;color:#16191f;}
+.console-prerequisite>.console-icon {color:#906806;margin-top:2px;}
+.console-prerequisite-body {flex:1;min-width:0;}
+.console-prerequisite h2 {margin:0 0 4px;font-size:14px;line-height:20px;font-weight:700;}
+.console-prerequisite p {margin:0;font-size:14px;line-height:20px;}
+.console-prerequisite form {flex:none;margin:0;}
+@media(max-width:767px) {.aws-console .console-prerequisite {flex-wrap:wrap;padding:16px;}.console-prerequisite-body {flex-basis:calc(100% - 28px);}.console-prerequisite form {margin-left:28px;}.aws-console .console-detail-tabs>[role=tab] {padding-left:16px;padding-right:16px;}}
+@media print {.console-copy,.console-detail-tabs {display:none!important;}.console-detail-panels>[role=tabpanel][hidden] {display:block!important;}.console-detail-panels>[role=tabpanel] {margin-top:16px!important;}}
+
+.aws-console .resource-split-tabs>span {color:#0073bb;font-size:14px;line-height:20px;padding:12px 20px 14px;}
+.aws-console .resource-split-values {border:0;background:#fff;padding:0;}
+.aws-console .resource-split-values>div:nth-child(3n) {border-right:0;}
+@media(max-width:767px) {.aws-console .resource-split-values>div {border-right:0;padding:0;}}
+
+/* Existing finance workspaces already provide a 16px grid gap. */
+.aws-console :is(.accounting-workspace,.repayment-workspace)>.console-detail-tabs {margin:12px 0 0;}

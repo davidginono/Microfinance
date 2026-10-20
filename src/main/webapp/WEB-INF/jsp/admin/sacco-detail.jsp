@@ -2,6 +2,7 @@
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
@@ -65,8 +66,7 @@
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Branch Access</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${saccoDetail.summary.accessBadgeClass}">
-                            ${saccoDetail.summary.accessStatusLabel}
+                        <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${saccoDetail.summary.accessBadgeClass}"><span data-resource-status="${saccoDetail.summary.accessStatus}">${saccoDetail.summary.accessStatusLabel}</span>
                         </span>
                         <span class="text-sm text-slate-500">Payment due: ${saccoDetail.summary.paymentDueDateLabel}</span>
                     </div>
@@ -187,7 +187,7 @@
                             <tbody>
                             <c:forEach items="${saccoDetail.loanStatusCounts}" var="statusCount">
                                 <tr>
-                                    <td class="font-semibold text-slate-900">${statusCount.statusLabel}</td>
+                                    <td class="font-semibold text-slate-900"><span data-resource-status='<c:out value="${statusCount.statusLabel}" />'>${statusCount.statusLabel}</span></td>
                                     <td class="text-right font-semibold text-slate-900"><fmt:formatNumber value="${statusCount.count}" /></td>
                                 </tr>
                             </c:forEach>
@@ -304,8 +304,7 @@
                                         </td>
                                         <td class="align-top whitespace-nowrap">${empty Member.roleSummary ? '-' : Member.roleSummary}</td>
                                         <td class="align-top whitespace-nowrap">
-                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${Member.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : Member.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
-                                                ${Member.displayStatus}
+                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${Member.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : Member.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}"><span data-resource-status="${Member.status}">${Member.displayStatus}</span>
                                             </span>
                                         </td>
                                     </tr>
@@ -401,7 +400,7 @@
                             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">SMS Status</p>
                                 <p class="mt-3">
-                                    <span class="border px-2 py-1 text-xs font-bold ${smsAccount.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : smsAccount.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : smsAccount.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${smsAccount.status}</span>
+                                    <span class="border px-2 py-1 text-xs font-bold ${smsAccount.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : smsAccount.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : smsAccount.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}"><span data-resource-status="${smsAccount.status}">${smsAccount.status}</span></span>
                                 </p>
                     </div>
                     </div>
@@ -429,7 +428,7 @@
                                 <tr>
                                     <td class="whitespace-nowrap"><c:out value="${appTime:format(entry.createdAt)}" /></td>
                                     <td>${empty entry.eventType ? '-' : entry.eventType}</td>
-                                    <td class="font-semibold text-slate-900">${entry.outcome}</td>
+                                    <td class="font-semibold text-slate-900"><span data-resource-status="${entry.outcome}">${entry.outcome}</span></td>
                                     <td>${entry.unitChange}</td>
                                     <td>${empty entry.providerReference ? '-' : entry.providerReference}</td>
                                     <td>${empty entry.note ? '-' : entry.note}</td>
@@ -476,7 +475,7 @@
                                     <td><fmt:formatNumber value="${account.availableUnits}" /></td>
                                     <td><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td>
                                     <td><fmt:formatNumber value="${account.warningBaseline}" /></td>
-                                    <td><span class="border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
+                                    <td><span class="border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}"><span data-resource-status="${account.status}">${account.status}</span></span></td>
                                     <td class="text-right"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${account.stationId}" class="app-btn btn-neutral">View Details</a></td>
                                 </tr>
                             </c:forEach>

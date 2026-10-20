@@ -71,8 +71,7 @@
                         <td class="font-semibold text-slate-800"><c:choose><c:when test="${superAdmin}"><a class="resource-table-id-link" href="<c:url value='/admin/saccos/${Sacco.saccoId}?section=overview' />">${Sacco.saccoId}</a></c:when><c:otherwise>${Sacco.saccoId}</c:otherwise></c:choose></td>
                         <td>${Sacco.saccoName}</td>
                         <td>
-                            <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${Sacco.accessBadgeClass}">
-                                ${Sacco.accessStatusLabel}
+                            <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${Sacco.accessBadgeClass}"><span data-resource-status="${Sacco.accessStatus}">${Sacco.accessStatusLabel}</span>
                             </span>
                         </td>
                         <td>

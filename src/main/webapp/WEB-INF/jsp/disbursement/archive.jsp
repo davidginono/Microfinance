@@ -92,7 +92,7 @@
                 <td>${row.applicantName}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>${appTime:display(row.disbursedAt)}</td>
-                <td>${row.currentStatusLabel}</td>
+                <td><span data-resource-status='<c:out value="${row.currentStatusLabel}" />'>${row.currentStatusLabel}</span></td>
                 <td>
                     <div class="flex flex-row items-center gap-2 flex-nowrap">
                     <a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary shrink-0"><spring:message code="common.open" text="Open" /></a>

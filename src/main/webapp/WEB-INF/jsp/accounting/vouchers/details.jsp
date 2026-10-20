@@ -4,6 +4,7 @@
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ include file="../../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/accounting-vouchers.css' />" />

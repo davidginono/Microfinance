@@ -10,6 +10,6 @@
                 <td><spring:message code="accounting.option.${a.type}" /></td>
                 <td><c:choose><c:when test="${a.kind=='HEADING'}"><spring:message code="coa.group" /></c:when><c:otherwise><spring:message code="accounting.option.${a.kind}" /></c:otherwise></c:choose></td>
                 <td><spring:message code="${a.normalBalance=='DEBIT'?'accounting.debit':'accounting.credit'}" /></td>
-                <td><spring:message code="accounting.active.${a.active}" /></td>
+                <td><span data-resource-status="${a.active?'ACTIVE':'INACTIVE'}"><spring:message code="accounting.active.${a.active}" /></span></td>
             </tr></c:forEach>
 <c:if test="${childFragment and accounts.hasNext}"><tr data-coa-more="${accounts.page+1}"><td></td><td colspan="7"><button type="button" class="app-btn btn-neutral" data-coa-load-more><spring:message code="coa.loadMore" /></button></td></tr></c:if>

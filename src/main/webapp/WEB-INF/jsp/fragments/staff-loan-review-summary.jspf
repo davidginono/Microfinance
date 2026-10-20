@@ -52,7 +52,7 @@
                     <dt><spring:message code="common.status" text="Status" /></dt>
                     <dd>
                         <span class="loan-status-badge ${reviewStatusBadgeClass}">
-                            <spring:message code="loan.status.${reviewLoanStatus}" text="${reviewLoanStatus}" />
+                            <span data-resource-status="${reviewLoanStatus}"><spring:message code="loan.status.${reviewLoanStatus}" text="${reviewLoanStatus}" /></span>
                         </span>
                     </dd>
                 </div>

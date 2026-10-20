@@ -3,6 +3,7 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
@@ -180,7 +181,7 @@
                         </c:if>
                     </td>
                     <td class="px-3 py-2 text-slate-700">${assessor.memberNo}</td>
-                    <td class="px-3 py-2 text-slate-700">${assessor.decision}</td>
+                    <td class="px-3 py-2 text-slate-700"><span data-resource-status="${assessor.decision}">${assessor.decision}</span></td>
                     <td class="px-3 py-2 text-slate-700">
                         <c:choose>
                             <c:when test="${not empty assessor.comment}">${assessor.comment}</c:when>
@@ -313,7 +314,7 @@
                         <c:otherwise>-</c:otherwise>
                     </c:choose>
                 </td>
-                <td class="px-3 py-2">${req.status}</td>
+                <td class="px-3 py-2"><span data-resource-status="${req.status}">${req.status}</span></td>
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>

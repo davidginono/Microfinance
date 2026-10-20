@@ -18,7 +18,7 @@ body.landing-page {
     overflow-x: hidden;
     background: var(--landing-navy);
     color: #ffffff;
-    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
     font-size: 16px;
     line-height: 1.5;
 }

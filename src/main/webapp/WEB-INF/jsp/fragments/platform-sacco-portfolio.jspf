@@ -37,8 +37,7 @@
                                 ${summary.healthStatus}
                             </span>
                         </div>
-                        <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${summary.accessBadgeClass}">
-                            ${summary.accessStatusLabel}
+                        <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${summary.accessBadgeClass}"><span data-resource-status="${summary.accessStatus}">${summary.accessStatusLabel}</span>
                         </span>
 
                         <dl class="grid grid-cols-2 gap-3 text-sm">

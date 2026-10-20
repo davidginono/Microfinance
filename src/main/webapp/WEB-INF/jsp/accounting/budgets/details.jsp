@@ -4,6 +4,7 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../../fragments/header.jspf" %>
+<template data-resource-details-page></template>
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/finance/budgets' />"><spring:message code="management.budgets" /></a><span aria-hidden="true">/</span><span aria-current="page"><c:out value="${budget.account}" /></span></nav>

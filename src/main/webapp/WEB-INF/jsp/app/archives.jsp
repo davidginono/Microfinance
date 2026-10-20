@@ -77,7 +77,7 @@
                                 </c:if>
                             </td>
                             <td>${guaranteeLoanAmountLabels[req.loanApplicationId]}</td>
-                            <td>${req.status}</td>
+                            <td><span data-resource-status="${req.status}">${req.status}</span></td>
                             <td>
                                 <c:choose>
                                 <c:when test="${not empty req.decidedAt}"><c:out value="${appTime:format(req.decidedAt)}" /></c:when>
@@ -166,7 +166,7 @@
                                 </c:choose>
                             </td>
                             <td><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
-                            <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
+                            <td><span data-resource-status="${app.status}"><spring:message code="loan.status.${app.status}" text="${app.status}" /></span></td>
                             <td>
                                 <c:choose>
                                     <c:when test="${app.status eq 'PAID' and not empty app.paidAt}"><c:out value="${appTime:format(app.paidAt)}" /></c:when>

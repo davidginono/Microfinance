@@ -352,7 +352,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
                     <td><c:out value="${loan.loanTypeLabel}" /></td>
                     <td class="staff-recent-disbursements-number"><c:choose><c:when test="${empty loan.amount or loan.amount eq '-'}"><spring:message code="recording.unavailable" /></c:when><c:otherwise><fmt:formatNumber value="${loan.amount}" minFractionDigits="2" maxFractionDigits="2" /></c:otherwise></c:choose></td>
                     <td class="staff-recent-disbursements-date"><c:out value="${appTime:display(loan.disbursementDate)}" /></td>
-                    <td><span class="staff-recent-disbursements-status"><c:out value="${loan.statusLabel}" /></span></td>
+                    <td><span class="staff-recent-disbursements-status"><span data-resource-status='<c:out value="${loan.statusLabel}" />'><c:out value="${loan.statusLabel}" /></span></span></td>
                 </tr>
             </c:forEach>
             <c:if test="${empty dashboardDisbursementRows}">

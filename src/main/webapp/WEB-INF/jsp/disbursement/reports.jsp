@@ -55,7 +55,7 @@
                 <td>${row.loanTypeLabel}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>${appTime:display(row.disbursedAt)}</td>
-                <td>${row.currentStatusLabel}</td>
+                <td><span data-resource-status='<c:out value="${row.currentStatusLabel}" />'>${row.currentStatusLabel}</span></td>
                 <td><a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
