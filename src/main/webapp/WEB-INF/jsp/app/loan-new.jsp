@@ -607,7 +607,7 @@
                                    placeholder="123456" />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.otp.codeHelp" /></p>
                             <div id="applicantSignatureOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                                <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                                <span data-otp-spinner class="otp-status-spinner"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
                                 </svg>

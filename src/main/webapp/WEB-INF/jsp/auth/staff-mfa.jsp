@@ -55,7 +55,7 @@
             </label>
 
             <div id="staffMfaOtpStatus" class="hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" aria-live="polite">
-                <span id="staffMfaOtpSpinner" class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#14b8c4]"></span>
+                <span id="staffMfaOtpSpinner" class="otp-status-spinner"></span>
                 <svg id="staffMfaOtpTick" class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.2a1 1 0 01-1.41 0L3.296 9.19a1 1 0 111.408-1.42l4.044 4.018 6.548-6.5a1 1 0 011.408.002z" clip-rule="evenodd" />
                 </svg>

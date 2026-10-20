@@ -1,7 +1,7 @@
 /* Keep ready content sharp; pending indicators occupy only their own component. */
 .app-loading-status {display:flex;align-items:center;justify-content:center;min-height:64px;gap:8px;color:#545b64;}
 .app-loading-error {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:8px 12px;border-left:3px solid #d13212;background:#fff3f1;color:#16191f;font-size:14px;line-height:20px;}
-.app-loading-spinner {display:inline-block;flex:none;width:20px;height:20px;box-sizing:border-box;border:2px solid #d5dbdb;border-top-color:#545b64;border-radius:50%;animation:aws-console-spin .7s linear infinite;}
+.app-loading-spinner {display:inline-block;flex:none;width:20px;height:20px;box-sizing:border-box;border:2px solid transparent;border-top-color:#687078;border-right-color:#687078;border-radius:50%;animation:aws-console-spin .7s linear infinite;}
 .app-loading-status[data-loading-size=small] {display:inline-flex;min-height:20px;vertical-align:middle;}
 .app-loading-spinner[data-loading-size=small] {width:16px;height:16px;}
 .app-loading-status[data-loading-size=large] {min-height:180px;}

@@ -395,7 +395,7 @@
                                placeholder="123456" />
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.decisionCodeHelp" text="Enter the 6-digit code sent to your email before approving or rejecting." /></p>
                         <div class="staff-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                            <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                            <span data-otp-spinner class="hidden otp-status-spinner"></span>
                             <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
                             </svg>
@@ -657,7 +657,7 @@
                        placeholder="123456" />
                 <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.disbursement.codeHelp" text="Enter the 6-digit code sent to your email before completing disbursement." /></p>
                 <div class="staff-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                    <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                    <span data-otp-spinner class="hidden otp-status-spinner"></span>
                     <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>

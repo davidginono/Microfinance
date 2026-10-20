@@ -2590,8 +2590,9 @@ body.aws-console {
 .aws-table-loader__spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid var(--aws-line);
-    border-top-color: var(--aws-blue);
+    border: 2px solid transparent;
+    border-top-color: #687078;
+    border-right-color: #687078;
     border-radius: 50%;
     animation: aws-console-spin .65s linear infinite;
 }
@@ -2599,6 +2600,12 @@ body.aws-console {
 @keyframes aws-console-spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .aws-table-loader__spinner {
+        animation: none;
     }
 }
 

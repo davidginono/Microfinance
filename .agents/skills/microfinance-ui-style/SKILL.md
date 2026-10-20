@@ -19,6 +19,8 @@ Use the [observed AWS instance type finder workflow](references/aws-instance-typ
 
 Use unlabeled, request-bound spinners inside pending values, tables, charts and data sections, with localized screen-reader names. Retain visible header/sidebar roots, progressively reveal ready sections, and preserve editable controls. The reference documents the observed canvas-to-component transitions, sizes and recovery lifecycle; a labeled page strip or artificial loading delay does not satisfy this behavior.
 
+All circular loaders use a single rotating open half-circle arc with a transparent remainder, matching the user's reference. Do not render a gray circular track, background ring or nested spinner ring. Keep existing size variants, reduced-motion support and a contrasting light arc on dark buttons.
+
 ## Start With The Shared Shell
 
 Read the relevant definitions before changing individual pages:
