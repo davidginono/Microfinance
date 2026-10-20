@@ -39,3 +39,20 @@ test('recorded manual fees survive quote updates and insurance evidence is requi
   form.dispatchEvent(new w.CustomEvent('loan:quote-pending'));assert.equal(form.elements.customProcessingCharge.value,'6.78');
   dom.window.close();
 });
+
+
+test('charge requests load the table and individual amounts while preserving editable inputs',async()=>{
+ const dom=manualFixture(),w=dom.window,d=w.document,form=d.querySelector('form');try{
+  d.body.dataset.shellLoading='Loading';w.eval(fs.readFileSync('src/main/resources/static/js/ui-loading.js','utf8'));
+  form.elements.loanMode.value='CUSTOM';form.elements.loanMode.dispatchEvent(new w.Event('change',{bubbles:true}));form.elements.customApplicationCharge.value='12.34';
+  form.dispatchEvent(new w.CustomEvent('loan:quote-pending'));
+  assert.equal(d.querySelectorAll('.app-loading-spinner').length,2);assert.ok(d.querySelector('table .app-loading-spinner'));
+  assert.equal(d.querySelector('[data-charge-net] .app-loading-spinner').dataset.loadingSize,'small');
+  d.querySelectorAll('.app-loading-status').forEach(status=>assert.equal(status.textContent,''));
+  assert.equal(form.elements.customApplicationCharge.value,'12.34');
+  form.dispatchEvent(new w.CustomEvent('loan:quote',{detail:{charges:plan}}));
+  assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('[data-charge-net]').textContent,'969.99');
+  form.dispatchEvent(new w.CustomEvent('loan:quote-pending'));w.dispatchEvent(new w.Event('pagehide'));
+  assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(form.elements.customApplicationCharge.value,'12.34');
+ }finally{dom.window.close();}
+});

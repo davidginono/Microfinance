@@ -67,3 +67,18 @@ test('independent section failures clear only their spinner and retry without re
         assert.equal(d.querySelector('.app-loading-spinner'),null);
     }finally{dom.window.close();}
 });
+
+test('value and chart loaders have silent visual labels, distinct sizes and restore ready native content on cancellation',async()=>{
+ const {dom,w,d}=await setup('<section><dd data-ui-loading-region>42</dd><div id="chart" data-ui-loading-region><button>Series</button></div></section>');
+ try{
+  const value=d.querySelector('dd'),chart=d.querySelector('#chart'),button=chart.querySelector('button');
+  w.AppLoading.begin(value,{table:false,replace:true,size:'small',label:'Loading values'});
+  w.AppLoading.begin(chart,{table:false,replace:true,size:'large',label:'Loading chart'});
+  for(const target of [value,chart]){assert.equal(target.querySelector('[role=status]').textContent,'');assert.ok(target.querySelector(':scope > span[hidden]'));}
+  assert.equal(value.querySelector('.app-loading-spinner').dataset.loadingSize,'small');assert.equal(chart.querySelector('.app-loading-spinner').dataset.loadingSize,'large');
+  assert.equal(value.querySelector('[role=status]').getAttribute('aria-label'),'Loading values');
+  value.textContent='73';w.AppLoading.end(value);assert.equal(value.textContent,'73');assert.equal(chart.querySelectorAll('.app-loading-spinner').length,1);
+  w.AppLoading.end(chart);assert.equal(chart.querySelector('button'),button);assert.equal(button.closest('[hidden]'),null);
+  assert.equal(d.querySelector('.app-loading-spinner'),null);
+ }finally{dom.window.close();}
+});

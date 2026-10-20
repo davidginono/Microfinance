@@ -2,6 +2,9 @@
   'use strict';
   const region=document.querySelector('[data-charge-preview]');if(!region)return;
   const form=region.closest('form'), rows=region.querySelector('[data-charge-rows]'), error=region.querySelector('[data-charge-error]');
+  const values=[...region.querySelectorAll('[data-charge-total],[data-charge-deductions],[data-charge-separate],[data-charge-net],[data-charge-management]')];
+  values.forEach(value=>value.setAttribute('data-ui-loading-region',''));
+  const end=()=>{window.AppLoading?.end(rows.closest('table'));values.forEach(value=>window.AppLoading?.end(value));};
   const money=value=>new Intl.NumberFormat(document.documentElement.lang||'en',{minimumFractionDigits:2,maximumFractionDigits:2}).format(String(value));
   const policyLink=region.querySelector('[data-charge-policy-link]');
   const mode=form.querySelector('[name="loanMode"]'), management=region.querySelector('[data-management-charge-inputs]'), insurance=region.querySelector('[data-insurance-fields]');
@@ -28,10 +31,10 @@
   // Run before the quote listener serializes the form on a mode change.
   form.addEventListener('change',event=>{if(event.target===mode)entryMode();},true);
   entryMode();
-  function clear(){if(policyLink)policyLink.hidden=true;rows.replaceChildren();for(const name of ['total','deductions','separate','net','management']){const field=region.querySelector('[data-charge-'+name+']');if(field)field.textContent='—';}error.textContent='';region.querySelector(':scope > [data-ui-loading-error]')?.remove();region.setAttribute('aria-busy','false');}
+  function clear(){end();if(policyLink)policyLink.hidden=true;rows.replaceChildren();for(const name of ['total','deductions','separate','net','management']){const field=region.querySelector('[data-charge-'+name+']');if(field)field.textContent='—';}error.textContent='';region.querySelector(':scope > [data-ui-loading-error]')?.remove();region.setAttribute('aria-busy','false');}
   form.addEventListener('loan:quote-reset',clear);
-  form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');});
-  form.addEventListener('loan:quote-settled',()=>region.setAttribute('aria-busy','false'));
+  form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');window.AppLoading?.begin(rows.closest('table'));values.forEach(value=>window.AppLoading?.begin(value,{table:false,replace:true,size:'small'}));});
+  form.addEventListener('loan:quote-settled',()=>{end();region.setAttribute('aria-busy','false');});
   form.addEventListener('loan:quote-error',event=>{clear();if(window.AppLoading?.fail)window.AppLoading.fail(region,{label:event.detail,retry:()=>form.dispatchEvent(new Event('loan:quote-retry'))});else error.textContent=event.detail;});
   form.addEventListener('loan:quote',event=>{
     const p=event.detail.charges;clear();if(!p)return;

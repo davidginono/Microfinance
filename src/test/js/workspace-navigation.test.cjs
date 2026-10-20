@@ -16,14 +16,14 @@ document.querySelector('#command').onclick=()=>window.commands.push(label);
 `;
 const discard=`<div id="accounting-discard-modal" hidden><div role="dialog" tabindex="-1"><button data-accounting-keep>Keep editing</button><div class="app-modal-actions"><button data-accounting-keep>Keep</button><button data-accounting-discard>Discard</button></div></div></div>`;
 function html(title,guard=false){return `<!doctype html><html lang="en"><head><title>${title}</title><meta name="_csrf" content="${title}-csrf"><script src="/js/workspace-navigation.js" data-workspace-navigation></script><script src="/js/shell.js" defer></script><script src="/js/page.js" defer></script>${guard?'<script src="/js/accounting-form-ux.js" defer></script>':''}</head><body class="aws-console" data-navigation-loading="Loading workspace" data-navigation-error="Could not load" data-navigation-retry="Try again"><nav id="shellTopNav">Header</nav><aside id="appSidebar"><a href="/admin/dashboard">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/settings-controls?section=loan">Products</a></aside><main class="shell-main"><h1 class="erp-page-title">${title}</h1><form class="accounting-create-form"><input name="name" value="Original"><button type="submit">Save</button></form><button id="command">Command</button></main><div id="pageSubmitPreloader" aria-hidden="true"></div>${guard?discard:''}</body></html>`;}
-async function setup({guard=false}={}){
+async function setup({guard=false,holdNavigation=false}={}){
  const requests=[],failures=[],pages=new Map([['/admin/dashboard',html('Dashboard',guard)],['/admin/users',html('Users')],['/admin/settings-controls?section=loan',html('Products')]]);
  const resources={interceptors:[requestInterceptor(request=>{const name=new URL(request.url).pathname.split('/').pop();return new Response(name==='page.js'?init:read(name),{headers:{'Content-Type':'application/javascript'}});})]};
  const console=new VirtualConsole();console.on('jsdomError',error=>failures.push(error));
  const dom=new JSDOM(html('Dashboard',guard),{url:'http://localhost/admin/dashboard',runScripts:'dangerously',resources,pretendToBeVisual:true,virtualConsole:console,beforeParse(w){
    for(const key of ['initialized','commands','ready','loaded','hidden','late'])w[key]=[];
    w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};
-   w.fetch=(url,options={})=>{const target=new URL(url,w.location.href),item={url:target,options};requests.push(item);if(target.pathname.startsWith('/card/'))return new Promise(resolve=>item.resolve=resolve);if(target.pathname==='/pending')return new Promise(()=>{});return Promise.resolve({ok:pages.has(target.pathname+target.search),url:target.href,headers:{get:()=> 'text/html'},text:async()=>pages.get(target.pathname+target.search) || '<h1>Denied</h1>'});};
+   w.fetch=(url,options={})=>{const target=new URL(url,w.location.href),item={url:target,options};requests.push(item);if(target.pathname.startsWith('/card/') || (holdNavigation && target.pathname==='/admin/users'))return new Promise(resolve=>item.resolve=resolve);if(target.pathname==='/pending')return new Promise(()=>{});return Promise.resolve({ok:pages.has(target.pathname+target.search),url:target.href,headers:{get:()=> 'text/html'},text:async()=>pages.get(target.pathname+target.search) || '<h1>Denied</h1>'});};
  }});
  await new Promise(resolve=>dom.window.addEventListener('load',resolve,{once:true}));
  return {dom,w:dom.window,d:dom.window.document,requests,pages,failures};
@@ -137,5 +137,25 @@ test('selecting the current workspace cancels a pending switch and keeps entered
   const pending=w.WorkspaceNavigation.visit('/admin/users');await w.WorkspaceNavigation.visit('/admin/dashboard');await pending;
   assert.equal(requests.find(r=>r.url.pathname==='/admin/users').options.signal.aborted,true);
   assert.equal(d.querySelector('h1').textContent,'Dashboard');assert.equal(d.querySelector('input[name=name]'),input);assert.equal(input.value,'Retain this');assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+ }finally{dom.window.close();}
+});
+
+test('workspace HTML requests use an unlabeled main canvas spinner, recover original inputs on failure and cancel cleanly',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});try{
+  const main=d.querySelector('main'),header=d.querySelector('#shellTopNav'),input=d.querySelector('input');input.value='Keep my entry';
+  const visit=w.WorkspaceNavigation.visit('/admin/users'),pending=requests.find(r=>r.url.pathname==='/admin/users');
+  const status=d.querySelector('#workspace-navigation-feedback');
+  assert.equal(status.textContent,'');assert.equal(status.getAttribute('aria-label'),'Loading workspace');
+  assert.equal(status.querySelector('.app-loading-spinner').dataset.loadingSize,'large');
+  assert.equal(main.classList.contains('is-workspace-pending'),true);assert.equal(main.getAttribute('aria-busy'),'true');
+  assert.equal(d.querySelector('#shellTopNav'),header);assert.equal(d.querySelector('input'),input);
+  pending.resolve({ok:false});await visit;
+  assert.equal(main.classList.contains('is-workspace-pending'),false);assert.equal(main.hasAttribute('aria-busy'),false);
+  assert.equal(input.value,'Keep my entry');assert.equal(d.querySelector('.app-loading-spinner'),null);
+  assert.equal(d.querySelector('[role=alert] button').textContent,'Try again');
+  const cancelled=w.WorkspaceNavigation.visit('/admin/users');const last=requests.at(-1);
+  await w.WorkspaceNavigation.visit('/admin/dashboard');last.resolve({ok:false});await cancelled;
+  assert.equal(last.options.signal.aborted,true);assert.equal(main.classList.contains('is-workspace-pending'),false);
+  assert.equal(d.querySelector('#workspace-navigation-feedback'),null);assert.equal(input.value,'Keep my entry');
  }finally{dom.window.close();}
 });

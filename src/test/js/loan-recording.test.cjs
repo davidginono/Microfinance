@@ -51,7 +51,7 @@ function fixture(withCharges=false) {
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
     <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span class="loan-interest-spinner" hidden></span><output data-interest-value></output><p data-interest-description></p></div>
     <section data-schedule-preview hidden><span data-schedule-summary data-monthly="Monthly" data-weekly="Weekly" data-monthly-period="Month {0}" data-weekly-period="Week {0}"></span><table><tbody data-schedule-rows></tbody></table></section>
-    ${withCharges ? '<section data-ui-loading-region data-charge-preview data-empty-label="No charges"><h2>Charges</h2><table><tbody data-charge-rows><tr><td>Choose loan terms</td></tr></tbody></table><span data-charge-total>—</span><p data-charge-error></p></section>' : ''}
+    ${withCharges ? '<section data-charge-preview data-empty-label="No charges"><h2>Charges</h2><table><tbody data-charge-rows><tr><td>Choose loan terms</td></tr></tbody></table><span data-charge-total>—</span><p data-charge-error></p></section>' : ''}
     <button name="action" value="save">Save</button><button disabled>Restricted</button>
   </form></html>`, {runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
   const w=dom.window, timers=new Map(), requests=[];let next=0;
@@ -212,7 +212,7 @@ test('Charges stays idle for incomplete terms and clears an interrupted quote wi
     assert.equal(requests.length,0);assert.notEqual(region.getAttribute('aria-busy'),'true');assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('principal','1000');await flush();assert.equal(requests.length,0);assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('tenureValue','6');await flush();assert.equal(requests.length,0);assert.equal(region.querySelector('.app-loading-spinner'),null);
-    const calculation=run();await flush();assert.equal(requests.length,1);assert.equal(region.querySelectorAll('.app-loading-spinner').length,1);
+    const calculation=run();await flush();assert.equal(requests.length,1);assert.equal(region.querySelectorAll('.app-loading-spinner').length,2);assert.ok(region.querySelector('table .app-loading-spinner'));assert.equal(region.querySelector('[data-charge-total] .app-loading-spinner').dataset.loadingSize,'small');
     set('principal','');await flush();assert.equal(requests[0].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
     respond(0,'100.00');await calculation;await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
   }finally{dom.window.close();}

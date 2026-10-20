@@ -17,6 +17,8 @@ For dashboard changes and reusable charts, follow the [Cloudscape dashboard and 
 
 Use the [observed AWS instance type finder workflow](references/aws-instance-type-finder.md) for shared shell, focused forms, pending data, links and split-pane behavior. This is the user-selected classic console reference; keep the existing JSP implementation.
 
+Use unlabeled, request-bound spinners inside pending values, tables, charts and data sections, with localized screen-reader names. Retain visible header/sidebar roots, progressively reveal ready sections, and preserve editable controls. The reference documents the observed canvas-to-component transitions, sizes and recovery lifecycle; a labeled page strip or artificial loading delay does not satisfy this behavior.
+
 ## Start With The Shared Shell
 
 Read the relevant definitions before changing individual pages:

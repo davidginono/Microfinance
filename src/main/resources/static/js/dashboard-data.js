@@ -7,10 +7,13 @@
     function init(root){
         if(regions.has(root))return;
         const l=labels(),status=root.querySelector('[data-dashboard-data-status]'),retry=root.querySelector('[data-dashboard-retry]'),range=root.querySelector('[data-dashboard-range]');
+        const targets=[...root.querySelectorAll('[data-dashboard-metric]:not([data-dashboard-metric="updated"]),[data-live-chart]')];
+        targets.forEach(target=>target.setAttribute('data-ui-loading-region',''));
+        const end=()=>targets.forEach(target=>window.AppLoading?.end(target));
         let version=0,request=null,timer=null;
         const visible=()=>root.isConnected && !root.hidden && !document.hidden;
         const text=(key,value)=>root.querySelectorAll('[data-dashboard-metric="'+key+'"]').forEach(n=>n.textContent=value);
-        const stop=()=>{version++;request?.abort();request=null;clearTimeout(timer);timer=null;root.removeAttribute('aria-busy');if(status?.querySelector('.app-loading-status')){status.replaceChildren();status.hidden=true;}};
+        const stop=()=>{version++;request?.abort();request=null;clearTimeout(timer);timer=null;end();root.removeAttribute('aria-busy');};
         const chart=(key,data)=>{window.DashboardCharts?.render(root.querySelector('[data-live-chart="'+key+'"]'),data);};
         const render=payload=>{
             if(root.dataset.dashboardSource==='usage'){
@@ -34,14 +37,15 @@
             if(request && !force)return;
             request?.abort();const current=++version,controller=new AbortController();request=controller;
             const timeout=setTimeout(()=>controller.abort(),20000);
-            root.setAttribute('aria-busy','true');if(status){status.hidden=false;status.classList.remove('dashboard-data-error');status.replaceChildren(window.AppLoading?.status(l.loading,true) || document.createTextNode(l.loading));}if(retry)retry.hidden=true;
+            root.setAttribute('aria-busy','true');if(status){status.hidden=true;status.classList.remove('dashboard-data-error');status.replaceChildren();status.setAttribute('role','status');}if(retry)retry.hidden=true;
+            targets.forEach(target=>window.AppLoading?.begin(target,{table:false,replace:true,label:l.loading,size:target.matches('[data-live-chart]')?'large':'small'}));
             try{
                 const url=new URL(root.dataset.dashboardUrl,location.href);if(url.origin!==location.origin)throw new Error('scope');if(range)url.searchParams.set('range',range.value);
                 const response=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});
                 if(!response.ok || response.redirected)throw new Error('request');const payload=await response.json();
                 if(current!==version || !visible())return;render(payload);if(status){status.hidden=true;status.replaceChildren();}
-            }catch(error){if(current===version && visible()){if(status){status.hidden=false;status.classList.add('dashboard-data-error');status.textContent=l.loadError;}if(retry)retry.hidden=false;}}
-            finally{clearTimeout(timeout);if(current===version){request=null;root.removeAttribute('aria-busy');schedule();}}
+            }catch(error){if(current===version && visible()){if(status){status.hidden=false;status.classList.add('dashboard-data-error');status.setAttribute('role','alert');status.textContent=l.loadError;}if(retry)retry.hidden=false;}}
+            finally{clearTimeout(timeout);if(current===version){end();request=null;root.removeAttribute('aria-busy');schedule();}}
         }
         root.querySelectorAll('[data-dashboard-refresh],[data-dashboard-retry]').forEach(b=>b.addEventListener('click',()=>void load(true)));
         range?.addEventListener('change',()=>void load(true));
