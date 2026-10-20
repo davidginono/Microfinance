@@ -76,17 +76,17 @@
                         <button type="button"
                                 id="memberSettingsToggle"
                                 class="group flex w-full items-center gap-2.5 border px-2.5 py-2 text-left text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${memberSettingsActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                                aria-expanded="false"
+                                aria-expanded="true" data-menu-active="false"
                                 aria-controls="memberSettingsPanel">
                             <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${memberSettingsActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046a1 1 0 00-2.6 0l-.16.59a1 1 0 01-.95.74l-.61.024a1 1 0 00-.82.51l-.3.52a1 1 0 01-1.13.46l-.58-.16a1 1 0 00-1.3 1.3l.16.58a1 1 0 01-.46 1.13l-.52.3a1 1 0 00-.51.82l-.024.61a1 1 0 01-.74.95l-.59.16a1 1 0 000 2.6l.59.16a1 1 0 01.74.95l.024.61a1 1 0 00.51.82l.52.3a1 1 0 01.46 1.13l-.16.58a1 1 0 001.3 1.3l.58-.16a1 1 0 011.13.46l.3.52a1 1 0 00.82.51l.61.024a1 1 0 01.95.74l.16.59a1 1 0 002.6 0l.16-.59a1 1 0 01.95-.74l.61-.024a1 1 0 00.82-.51l.3-.52a1 1 0 011.13-.46l.58.16a1 1 0 001.3-1.3l-.16-.58a1 1 0 01.46-1.13l.52-.3a1 1 0 00.51-.82l.024-.61a1 1 0 01.74-.95l.59-.16a1 1 0 000-2.6l-.59-.16a1 1 0 01-.74-.95l-.024-.61a1 1 0 00-.51-.82l-.52-.3a1 1 0 01-.46-1.13l.16-.58a1 1 0 00-1.3-1.3l-.58.16a1 1 0 01-1.13-.46l-.3-.52a1 1 0 00-.82-.51l-.61-.024a1 1 0 01-.95-.74l-.16-.59zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>
                             </span>
                             <span class="min-w-0 flex-1"><spring:message code="menu.settings" /></span>
-                            <svg id="memberSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${memberSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <svg id="memberSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${memberSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                             </svg>
                         </button>
-                        <div id="memberSettingsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <div id="memberSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                             <a href="/app/settings"
                                class="shell-sidebar-subitem ${requestUri eq '/app/settings' and param.section ne 'payment-details' ? 'shell-nav-active' : ''}"
                                <c:if test="${requestUri eq '/app/settings' and param.section ne 'payment-details'}">aria-current="page"</c:if>>
@@ -110,17 +110,17 @@
                         <button type="button"
                                 id="MemberArchiveToggle"
                                 class="group flex w-full items-center gap-2.5 border px-2.5 py-2 text-left text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${archiveMenuActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                                aria-expanded="false"
+                                aria-expanded="true" data-menu-active="false"
                                 aria-controls="MemberArchivePanel">
                             <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${archiveMenuActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5a2 2 0 012-2h3l1 1h6a2 2 0 012 2v1H3V5zm0 3h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm4 2v2h6v-2H7z"/></svg>
                             </span>
                             <span class="min-w-0 flex-1"><spring:message code="menu.archives" /></span>
-                            <svg id="MemberArchiveChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${archiveMenuActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <svg id="MemberArchiveChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${archiveMenuActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                             </svg>
                         </button>
-                        <div id="MemberArchivePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <div id="MemberArchivePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                             <a href="/app/archives?section=loans" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/archives' and param.section ne 'guarantors' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 <spring:message code="menu.archives.loans" text="Disbursed & Loan Archive" />
                             </a>
@@ -149,17 +149,17 @@
                     <button type="button"
                             id="MembersupportToggle"
                             class="group flex w-full items-center gap-2.5 border px-2.5 py-2 text-left text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${MembersupportActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                            aria-expanded="${MembersupportActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${MembersupportActive ? 'true' : 'false'}"
                             aria-controls="MembersupportPanel">
                         <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${MembersupportActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M18 10c0 3.866-3.582 7-8 7a8.84 8.84 0 01-4.083-.97L2 17l1.338-3.122A6.48 6.48 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7z"/></svg>
                         </span>
                         <span class="flex-1"><spring:message code="menu.support" text="Support" /></span>
-                        <svg id="MembersupportChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${MembersupportActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="MembersupportChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${MembersupportActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="MembersupportPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="MembersupportPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                         <a href="/app/support" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/support' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                             <spring:message code="support.newMessage" text="New Message" />
                         </a>
@@ -196,15 +196,15 @@
                             <button type="button"
                                     id="adminSaccoToggle"
                                     class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${saccoRegistryActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                                    aria-expanded="false"
+                                    aria-expanded="true" data-menu-active="false"
                                     aria-controls="adminSaccoPanel">
                                 <span class="inline-flex h-7 w-7 items-center justify-center border ${saccoRegistryActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 011-1h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3z"/><path d="M6 6h8v1.5H6zm0 3.5h8V11H6zm0 3.5h5V14.5H6z"/></svg></span>
                                 <span class="min-w-0 flex-1"><spring:message code="menu.admin.saccoRegistration" text="Institution Registry" /></span>
-                                <svg id="adminSaccoChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${saccoRegistryActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <svg id="adminSaccoChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${saccoRegistryActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                                 </svg>
                             </button>
-                            <div id="adminSaccoPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                            <div id="adminSaccoPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                                 <a href="/admin/saccos/registry" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/saccos/registry' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                     <spring:message code="admin.saccoRegistry.registration" text="Registration" />
                                 </a>
@@ -260,15 +260,15 @@
                             <button type="button"
                                     id="adminSettingsToggle"
                                     class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${adminSettingsActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                                    aria-expanded="${adminSettingsActive ? 'true' : 'false'}"
+                                    aria-expanded="true" data-menu-active="${adminSettingsActive ? 'true' : 'false'}"
                                     aria-controls="adminSettingsPanel">
                                 <span class="inline-flex h-7 w-7 items-center justify-center border ${adminSettingsActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046a1 1 0 00-2.6 0l-.16.59a1 1 0 01-.95.74l-.61.024a1 1 0 00-.82.51l-.3.52a1 1 0 01-1.13.46l-.58-.16a1 1 0 00-1.3 1.3l.16.58a1 1 0 01-.46 1.13l-.52.3a1 1 0 00-.51.82l-.024.61a1 1 0 01-.74.95l-.59.16a1 1 0 000 2.6l.59.16a1 1 0 01.74.95l.024.61a1 1 0 00.51.82l.52.3a1 1 0 01.46 1.13l-.16.58a1 1 0 001.3 1.3l.58-.16a1 1 0 011.13.46l.3.52a1 1 0 00.82.51l.61.024a1 1 0 01.95.74l.16.59a1 1 0 002.6 0l.16-.59a1 1 0 01.95-.74l.61-.024a1 1 0 00.82-.51l.3-.52a1 1 0 011.13-.46l.58.16a1 1 0 001.3-1.3l-.16-.58a1 1 0 01.46-1.13l.52-.3a1 1 0 00.51-.82l.024-.61a1 1 0 01.74-.95l.59-.16a1 1 0 000-2.6l-.59-.16a1 1 0 01-.74-.95l-.024-.61a1 1 0 00-.51-.82l-.52-.3a1 1 0 01-.46-1.13l.16-.58a1 1 0 00-1.3-1.3l-.58.16a1 1 0 01-1.13-.46l-.3-.52a1 1 0 00-.82-.51l-.61-.024a1 1 0 01-.95-.74l-.16-.59zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg></span>
                                 <span class="min-w-0 flex-1"><spring:message code="menu.admin.settingsControls" text="Settings & Controls" /></span>
-                                <svg id="adminSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${adminSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <svg id="adminSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${adminSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                                 </svg>
                             </button>
-                            <div id="adminSettingsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                            <div id="adminSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                                 <a href="/admin/settings-controls?section=loan" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'language' and param.section ne 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
                                 <a href="/admin/settings-controls/customised-loan" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls/customised-loan' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.customisedLoan" /></a>
                                 <a href="/admin/settings-controls?section=guarantor" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'guarantor' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.applicantGuarantor" text="Applicant & Guarantor Settings" /></a>
@@ -295,15 +295,15 @@
                             <button type="button"
                                     id="adminSupportToggle"
                                     class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${adminSupportActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                                    aria-expanded="false"
+                                    aria-expanded="true" data-menu-active="false"
                                     aria-controls="adminSupportPanel">
                                 <span class="inline-flex h-7 w-7 items-center justify-center border ${adminSupportActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H8l-4 3v-3H4a2 2 0 01-2-2V5z"/></svg></span>
                                 <span class="min-w-0 flex-1"><spring:message code="menu.admin.support" text="Support" /></span>
-                                <svg id="adminSupportChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${adminSupportActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <svg id="adminSupportChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${adminSupportActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                                 </svg>
                             </button>
-                            <div id="adminSupportPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                            <div id="adminSupportPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                                 <a href="/admin/support" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/support' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="support.newMessage" text="New Message" /></a>
                                 <a href="/admin/support/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/support/archive' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="support.sentArchive" text="Sent Archive" /></a>
                                 <a href="/admin/support/replies" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/support/replies' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="support.replies" text="Replies" /></a>
@@ -411,17 +411,17 @@
                     <button type="button"
                             id="staffSettingsToggle"
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffSettingsActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                            aria-expanded="${staffSettingsActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${staffSettingsActive ? 'true' : 'false'}"
                             aria-controls="staffSettingsPanel">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${staffSettingsActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046a1 1 0 00-2.6 0l-.16.59a1 1 0 01-.95.74l-.61.024a1 1 0 00-.82.51l-.3.52a1 1 0 01-1.13.46l-.58-.16a1 1 0 00-1.3 1.3l.16.58a1 1 0 01-.46 1.13l-.52.3a1 1 0 00-.51.82l-.024.61a1 1 0 01-.74.95l-.59.16a1 1 0 000 2.6l.59.16a1 1 0 01.74.95l.024.61a1 1 0 00.51.82l.52.3a1 1 0 01.46 1.13l-.16.58a1 1 0 001.3 1.3l.58-.16a1 1 0 011.13.46l.3.52a1 1 0 00.82.51l.61.024a1 1 0 01.95.74l.16.59a1 1 0 002.6 0l.16-.59a1 1 0 01.95-.74l.61-.024a1 1 0 00.82-.51l.3-.52a1 1 0 011.13-.46l.58.16a1 1 0 001.3-1.3l-.16-.58a1 1 0 01.46-1.13l.52-.3a1 1 0 00.51-.82l.024-.61a1 1 0 01.74-.95l.59-.16a1 1 0 000-2.6l-.59-.16a1 1 0 01-.74-.95l-.024-.61a1 1 0 00-.51-.82l-.52-.3a1 1 0 01-.46-1.13l.16-.58a1 1 0 00-1.3-1.3l-.58.16a1 1 0 01-1.13-.46l-.3-.52a1 1 0 00-.82-.51l-.61-.024a1 1 0 01-.95-.74l-.16-.59zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>
                         </span>
                         <span class="min-w-0 flex-1"><spring:message code="menu.settings" /></span>
-                        <svg id="staffSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${staffSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="staffSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${staffSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="staffSettingsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="staffSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                         <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNT_RULES_VIEW')"><a href="<c:url value='/finance/accounts/approval-configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/finance/accounts/approval-configuration'?'shell-nav-active':''}"><spring:message code="coav.configuration" /></a></sec:authorize>
     <sec:authorize access="@access.has(principal, 'VOUCHER_RULE_VIEW')"><a href="<c:url value='/finance/approval/configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.configuration" /></a></sec:authorize>
                         <a href="/staff/settings"
@@ -446,17 +446,17 @@
                         <button type="button"
                                 id="staffSupportToggle"
                                 class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                                aria-expanded="false"
+                                aria-expanded="true" data-menu-active="false"
                                 aria-controls="staffSupportPanel">
                             <span class="inline-flex h-7 w-7 items-center justify-center border border-slate-200 bg-white text-slate-500">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M18 10c0 3.866-3.582 7-8 7a8.84 8.84 0 01-4.083-.97L2 17l1.338-3.122A6.48 6.48 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7z"/></svg>
                             </span>
                             <span class="min-w-0 flex-1"><spring:message code="menu.support" text="Support" /></span>
-                            <svg id="staffSupportChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <svg id="staffSupportChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                             </svg>
                         </button>
-                        <div id="staffSupportPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <div id="staffSupportPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                             <%@ include file="platform-support-contact-sidebar.jspf" %>
                         </div>
                     </div>
@@ -471,15 +471,15 @@
                     <button type="button"
                             id="managerOfficeToggle"
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${managerOfficeActive ? 'border-blue-200 bg-blue-50 text-sacco-blue shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-blue'}"
-                            aria-expanded="${managerOfficeActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${managerOfficeActive ? 'true' : 'false'}"
                             aria-controls="managerOfficePanel">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${managerOfficeActive ? 'border-blue-200 bg-blue-100 text-sacco-blue' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l2.39 4.84L18 7.64l-4 3.9.94 5.46L10 14.77 5.06 17l.94-5.46-4-3.9 5.61-.8L10 2z"/></svg></span>
                         <span class="min-w-0 flex-1"><spring:message code="menu.managerOffice" text="Manager Office" /></span>
-                        <svg id="managerOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${managerOfficeActive ? 'text-blue-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="managerOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${managerOfficeActive ? 'text-blue-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="managerOfficePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="managerOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                         <a href="/manager/dashboard" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/manager/dashboard' ? 'bg-white text-blue-800 ring-1 ring-blue-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.managerDashboard" text="Manager Dashboard" /></a>
                         <a href="/manager/loan-applications?status=READY_FOR_MANAGER" class="block px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/manager/loan-applications') ? 'bg-white text-blue-800 ring-1 ring-blue-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.managerQueue" text="Manager Queue" /></a>
                         <a href="/manager/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/manager/archive' ? 'bg-white text-blue-800 ring-1 ring-blue-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.managerArchive" text="Manager Archive" /></a>
@@ -521,7 +521,7 @@
                     <button type="button"
                             id="boardOfficeToggle"
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${boardOfficeActive ? 'border-green-200 bg-green-50 text-sacco-green shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-green'}"
-                            aria-expanded="${boardOfficeActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${boardOfficeActive ? 'true' : 'false'}"
                             aria-controls="boardOfficePanel">
                         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border ${boardOfficeActive ? 'border-green-200 bg-green-100 text-sacco-green' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v3H2V4zm0 5h16v7a2 2 0 01-2 2H4a2 2 0 01-2-2V9zm3 2v2h4v-2H5z"/></svg></span>
                         <span class="min-w-0 flex-1 break-words">
@@ -531,11 +531,11 @@
                                 <c:otherwise><spring:message code="menu.boardOffice" text="Board Office" /></c:otherwise>
                             </c:choose>
                         </span>
-                        <svg id="boardOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 transition-transform duration-200 ${boardOfficeActive ? 'text-green-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="boardOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 shrink-0 transition-transform duration-200 ${boardOfficeActive ? 'text-green-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="boardOfficePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="boardOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                         <c:if test="${not chairpersonOfficeActive or chairpersonQueueVisible}">
                         <a href="${reviewDashboardPath}" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq reviewDashboardPath ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                             <c:choose>
@@ -586,15 +586,15 @@
                     <button type="button"
                             id="loanOfficerOfficeToggle"
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${loanOfficerOfficeActive ? 'border-amber-200 bg-amber-50 text-sacco-brown shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-brown'}"
-                            aria-expanded="${loanOfficerOfficeActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${loanOfficerOfficeActive ? 'true' : 'false'}"
                             aria-controls="loanOfficerOfficePanel">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${loanOfficerOfficeActive ? 'border-amber-200 bg-amber-100 text-sacco-brown' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l7 3v5c0 4.25-2.92 8.1-7 9-4.08-.9-7-4.75-7-9V5l7-3z"/></svg></span>
                         <span class="min-w-0 flex-1"><spring:message code="menu.loanOfficerOffice" text="Loan Officer Office" /></span>
-                        <svg id="loanOfficerOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${loanOfficerOfficeActive ? 'text-amber-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="loanOfficerOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${loanOfficerOfficeActive ? 'text-amber-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="loanOfficerOfficePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="loanOfficerOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                         <a href="/loan-officer/dashboard" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/loan-officer/dashboard' ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerDashboard" text="Loan Officer Dashboard" /></a>
                         <a href="/loan-officer/queue" class="block px-3 py-2 text-sm font-semibold transition ${(requestUri eq '/loan-officer/queue' or requestUri eq '/loan-officer/assigned' or fn:startsWith(requestUri, '/loan-officer/loan-applications')) ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerQueue" text="Loan Officer Queue" /></a>
                         <a href="/loan-officer/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/loan-officer/archive' ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerArchive" text="Loan Officer Archive" /></a>
@@ -612,15 +612,15 @@
                     <button type="button"
                             id="accountantOfficeToggle"
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${accountantOfficeActive ? 'border-teal-200 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-teal-800'}"
-                            aria-expanded="${accountantOfficeActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${accountantOfficeActive ? 'true' : 'false'}"
                             aria-controls="accountantOfficePanel">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${accountantOfficeActive ? 'border-teal-200 bg-teal-100 text-teal-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12l-3-1.5L10 16l-3-1.5L4 16V4z"/></svg></span>
                         <span class="min-w-0 flex-1"><spring:message code="menu.accountantOffice" text="Accountant Office" /></span>
-                        <svg id="accountantOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${accountantOfficeActive ? 'text-teal-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="accountantOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${accountantOfficeActive ? 'text-teal-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="accountantOfficePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="accountantOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
     <sec:authorize access="@access.has(principal, 'VOUCHER_WORKSPACE_VIEW')"><a href="<c:url value='/finance/approval' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.workspace" /></a></sec:authorize>
                         <sec:authorize access="@access.canAccessAccountantArea(principal)">
                         <a href="/accountant/dashboard" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/accountant/dashboard' ? 'bg-white text-teal-800 ring-1 ring-teal-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.accountantDashboard" text="Accountant Dashboard" /></a>
@@ -642,15 +642,15 @@
                     <button type="button"
                             id="disbursementOfficeToggle"
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${disbursementOfficeActive ? 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-emerald-800'}"
-                            aria-expanded="${disbursementOfficeActive ? 'true' : 'false'}"
+                            aria-expanded="true" data-menu-active="${disbursementOfficeActive ? 'true' : 'false'}"
                             aria-controls="disbursementOfficePanel">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${disbursementOfficeActive ? 'border-emerald-200 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v3H3V5zm1 5h12v5H4v-5zm2 1.5v2h4v-2H6z"/></svg></span>
                         <span class="min-w-0 flex-1"><spring:message code="menu.disbursementOffice" text="Disbursement Office" /></span>
-                        <svg id="disbursementOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${disbursementOfficeActive ? 'text-emerald-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg id="disbursementOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${disbursementOfficeActive ? 'text-emerald-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                    <div id="disbursementOfficePanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                    <div id="disbursementOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                         <a href="/disbursement/dashboard" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/disbursement/dashboard' ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementDashboard" text="Disbursement Dashboard" /></a>
                         <a href="/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT" class="block px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/disbursement/loan-applications') ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementQueue" text="Disbursement Queue" /></a>
                         <a href="/disbursement/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/disbursement/archive' ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementArchive" text="Disbursement Archive" /></a>

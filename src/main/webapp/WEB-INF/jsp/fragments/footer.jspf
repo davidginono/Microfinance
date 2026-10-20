@@ -401,8 +401,8 @@
                 }
             };
             const stored = window.sessionStorage.getItem(storageKey);
-            const activeState = toggle.getAttribute("aria-expanded") === "true";
-            const storedState = activeState || (stored === null ? false : stored === "true");
+            const activeState = toggle.getAttribute("data-menu-active") === "true";
+            const storedState = activeState || (stored === null ? true : stored === "true");
             applyExpanded(storedState);
             toggle.addEventListener("click", function () {
                 if (isDesktopSidebarCollapsed()) {

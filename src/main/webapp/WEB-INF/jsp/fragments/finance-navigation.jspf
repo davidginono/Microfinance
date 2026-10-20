@@ -7,11 +7,11 @@
         <c:set var="payrollActive" value="${fn:startsWith(requestUri, '/finance/payroll')}" />
         <c:set var="batchProcessingActive" value="${receiptBatchActive or payrollActive}" />
         <div class="shell-sidebar-group space-y-1">
-            <button type="button" id="batchProcessingToggle" aria-controls="batchProcessingPanel" aria-expanded="${batchProcessingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${batchProcessingActive?'shell-nav-active':''}">
+            <button type="button" id="batchProcessingToggle" aria-controls="batchProcessingPanel" aria-expanded="true" data-menu-active="${batchProcessingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${batchProcessingActive?'shell-nav-active':''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h16v4H4z" /></svg></span>
-                <span class="min-w-0 flex-1"><spring:message code="batch.navigation" /></span><svg id="batchProcessingChevron" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+                <span class="min-w-0 flex-1"><spring:message code="batch.navigation" /></span><svg id="batchProcessingChevron" class="rotate-180 h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
-            <div id="batchProcessingPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+            <div id="batchProcessingPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                 <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW')">
                     <c:forEach items="${['batches','employers','instructions']}" var="payrollNav">
                         <c:set var="payrollPath" value="/finance/payroll${payrollNav=='batches'?'':payrollNav=='employers'?'/employers':'/instructions'}" />
@@ -28,12 +28,12 @@
     <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
         <c:set var="loanAccountingActive" value="${fn:startsWith(requestUri, '/finance/loan-records') or fn:startsWith(requestUri, '/finance/loan-disbursements') or fn:startsWith(requestUri, '/finance/loan-repayments') or fn:startsWith(requestUri, '/finance/client-ledgers') or fn:startsWith(requestUri, '/finance/loan-postings') or fn:startsWith(requestUri, '/finance/loan-adjustments')}" />
         <div class="shell-sidebar-group space-y-1">
-            <button type="button" id="loanAccountingToggle" aria-controls="loanAccountingPanel" aria-expanded="${loanAccountingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${loanAccountingActive ? 'shell-nav-active' : ''}">
+            <button type="button" id="loanAccountingToggle" aria-controls="loanAccountingPanel" aria-expanded="true" data-menu-active="${loanAccountingActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${loanAccountingActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.loanAccounting" /></span>
-                <svg id="loanAccountingChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+                <svg id="loanAccountingChevron" class="rotate-180 h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
-            <div id="loanAccountingPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+            <div id="loanAccountingPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                 <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_VIEW')">
                     <a href="<c:url value='/finance/loan-records' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-records') ? 'shell-nav-active' : ''}"><spring:message code="recording.register.LOAN" /></a>
                 </sec:authorize>
@@ -49,12 +49,12 @@
     <sec:authorize access="@access.hasAny(principal, 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_JOURNALS_VIEW')">
         <c:set var="financeVouchersActive" value="${fn:startsWith(requestUri, '/finance/vouchers/receipts') or fn:startsWith(requestUri, '/finance/vouchers/payments') or fn:startsWith(requestUri, '/finance/vouchers/journals')}" />
         <div class="shell-sidebar-group space-y-1">
-            <button type="button" id="financeVouchersToggle" aria-controls="financeVouchersPanel" aria-expanded="${financeVouchersActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeVouchersActive ? 'shell-nav-active' : ''}">
+            <button type="button" id="financeVouchersToggle" aria-controls="financeVouchersPanel" aria-expanded="true" data-menu-active="${financeVouchersActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeVouchersActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.vouchers" /></span>
-                <svg id="financeVouchersChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+                <svg id="financeVouchersChevron" class="rotate-180 h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
-            <div id="financeVouchersPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+            <div id="financeVouchersPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                 <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW')">
                     <a href="<c:url value='/finance/vouchers/receipts' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/vouchers/receipts') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="voucher.register.RECEIPT" /></a>
                 </sec:authorize>
@@ -72,12 +72,12 @@
     <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')">
         <c:set var="accountingSetupActive" value="${fn:startsWith(requestUri, '/finance/accounts') or fn:startsWith(requestUri, '/finance/library') or fn:startsWith(requestUri, '/finance/budgets')}" />
         <div class="shell-sidebar-group space-y-1">
-            <button type="button" id="accountingSetupToggle" aria-controls="accountingSetupPanel" aria-expanded="${accountingSetupActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${accountingSetupActive ? 'shell-nav-active' : ''}">
+            <button type="button" id="accountingSetupToggle" aria-controls="accountingSetupPanel" aria-expanded="true" data-menu-active="${accountingSetupActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${accountingSetupActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.setup" /></span>
-                <svg id="accountingSetupChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+                <svg id="accountingSetupChevron" class="rotate-180 h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
-            <div id="accountingSetupPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+            <div id="accountingSetupPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                 <a href="<c:url value='/finance/budgets' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/budgets')?'shell-nav-active':''}"><spring:message code="management.budgets" /></a>
                 <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')">
                     <a href="<c:url value='/finance/accounts' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/accounts') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
@@ -87,11 +87,11 @@
                 </sec:authorize>
                 <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')">
                     <div class="shell-sidebar-group space-y-1">
-                        <button type="button" id="transactionsConfigToggle" aria-controls="transactionsConfigPanel" aria-expanded="${fn:startsWith(requestUri, '/finance/library')}" class="shell-sidebar-subitem group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${fn:startsWith(requestUri, '/finance/library')?'shell-nav-active':''}">
+                        <button type="button" id="transactionsConfigToggle" aria-controls="transactionsConfigPanel" aria-expanded="true" data-menu-active="${fn:startsWith(requestUri, '/finance/library')}" class="shell-sidebar-subitem group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${fn:startsWith(requestUri, '/finance/library')?'shell-nav-active':''}">
                             <span class="shell-sidebar-subitem-label min-w-0 flex-1"><spring:message code="library.navigation" /></span>
-                            <svg id="transactionsConfigChevron" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+                            <svg id="transactionsConfigChevron" class="rotate-180 h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
                         </button>
-                        <div id="transactionsConfigPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2">
+                        <div id="transactionsConfigPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2">
                             <a href="<c:url value='/finance/library' />" class="block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/library') and not fn:startsWith(requestUri, '/finance/library/transactions') and not isTransactions ? 'shell-nav-active' : ''}"><spring:message code="library.activities" /></a>
                             <a href="<c:url value='/finance/library/transactions' />" class="block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/library/transactions') or isTransactions ? 'shell-nav-active' : ''}"><spring:message code="library.transactions" /></a>
                         </div>
@@ -103,12 +103,12 @@
     <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW')">
         <c:set var="financeReportsActive" value="${fn:startsWith(requestUri, '/reports/financial/')}" />
         <div class="shell-sidebar-group space-y-1">
-            <button type="button" id="financeReportsToggle" aria-controls="financeReportsPanel" aria-expanded="${financeReportsActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeReportsActive ? 'shell-nav-active' : ''}">
+            <button type="button" id="financeReportsToggle" aria-controls="financeReportsPanel" aria-expanded="true" data-menu-active="${financeReportsActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeReportsActive ? 'shell-nav-active' : ''}">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 3v18h18M7 14v3M12 9v8M17 5v12" /></svg></span>
                 <span class="min-w-0 flex-1"><spring:message code="finance.nav.reports" /></span>
-                <svg id="financeReportsChevron" class="h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
+                <svg id="financeReportsChevron" class="rotate-180 h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
-            <div id="financeReportsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+            <div id="financeReportsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                 <sec:authorize access="@access.has(principal, 'LOAN_REPORTS_VIEW') and @access.has(principal, 'ACCOUNTING_RECONCILIATION_VIEW')">
                     <a href="<c:url value='/reports/financial/sl-gl-reconciliation' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/reports/financial/sl-gl-reconciliation')?'shell-nav-active':''}"><spring:message code="reconciliation.title" /></a>
                 </sec:authorize>
