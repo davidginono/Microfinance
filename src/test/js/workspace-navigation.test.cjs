@@ -156,13 +156,14 @@ test('selecting the current workspace cancels a pending switch and keeps entered
  }finally{dom.window.close();}
 });
 
-test('workspace HTML requests use an unlabeled main canvas spinner, recover original inputs on failure and cancel cleanly',async()=>{
+test('a first visit keeps the workspace available with slim request progress and restores inputs on failure or cancellation',async()=>{
  const {dom,w,d,requests}=await setup({holdNavigation:true});try{
   const main=d.querySelector('main'),header=d.querySelector('#shellTopNav'),input=d.querySelector('input');input.value='Keep my entry';
   const visit=w.WorkspaceNavigation.visit('/admin/users'),pending=requests.find(r=>r.url.pathname==='/admin/users');
   const status=d.querySelector('#workspace-navigation-feedback');
   assert.equal(status.textContent,'');assert.equal(status.getAttribute('aria-label'),'Loading workspace');
-  assert.equal(status.querySelector('.app-loading-spinner').dataset.loadingSize,'large');
+  assert.equal(status.querySelector('.app-loading-spinner'),null);assert.equal(status.classList.contains('workspace-navigation-progress'),true);
+  assert.equal(main.classList.contains('is-workspace-preview'),false);
   assert.equal(main.classList.contains('is-workspace-pending'),true);assert.equal(main.getAttribute('aria-busy'),'true');
   assert.equal(d.querySelector('#shellTopNav'),header);assert.equal(d.querySelector('input'),input);
   pending.resolve({ok:false});await visit;
@@ -173,6 +174,78 @@ test('workspace HTML requests use an unlabeled main canvas spinner, recover orig
   await w.WorkspaceNavigation.visit('/admin/dashboard');last.resolve({ok:false});await cancelled;
   assert.equal(last.options.signal.aborted,true);assert.equal(main.classList.contains('is-workspace-pending'),false);
   assert.equal(d.querySelector('#workspace-navigation-feedback'),null);assert.equal(input.value,'Keep my entry');
+ }finally{dom.window.close();}
+});
+
+const rect=(x,y,width,height)=>({x,y,left:x,top:y,right:x+width,bottom:y+height,width,height});
+function layoutFixture(d){
+ const main=d.querySelector('main');main.getBoundingClientRect=()=>rect(200,60,900,900);
+ const title=main.querySelector('h1');title.getBoundingClientRect=()=>rect(224,84,300,32);
+ const cards=[];
+ for(const [x,y,width,height] of [[224,140,420,240],[664,140,412,360],[224,520,852,280]]){
+  const card=d.createElement('section');card.className='erp-panel';card.innerHTML='<div class="erp-panel-header"><h2>Private client name</h2></div><div><input value="Private balance"><a href="/private/loan">Secret</a></div>';
+  card.getBoundingClientRect=()=>rect(x,y,width,height);card.firstElementChild.getBoundingClientRect=()=>rect(x,y,width,52);main.append(card);cards.push(card);
+ }
+ // Nested and hidden regions must not duplicate indicators or leak hidden structure.
+ const nested=d.createElement('div');nested.className='erp-table-wrap';nested.getBoundingClientRect=()=>rect(224,192,420,188);cards[0].append(nested);
+ const hidden=cards[0].cloneNode(true);hidden.hidden=true;hidden.getBoundingClientRect=()=>rect(224,900,852,240);main.append(hidden);
+ return {main,cards};
+}
+
+test('return navigation uses measured destination card positions with one loader per section and no cached content',async()=>{
+ const {dom,w,d,pages,requests}=await setup();try{
+  layoutFixture(d);await w.WorkspaceNavigation.visit('/admin/users');layoutFixture(d);
+  // Hold the HTML body: preview placement cannot depend on the next response.
+  let resolve;pages.set('/admin/dashboard',new Promise(done=>resolve=done));
+  const pending=w.WorkspaceNavigation.visit('/admin/dashboard');
+  const preview=d.querySelector('.workspace-layout-preview');assert.ok(preview);
+  const cards=[...preview.querySelectorAll('.workspace-layout-card')];assert.equal(cards.length,3);
+  assert.deepEqual(cards.map(card=>[card.style.left,card.style.top,card.style.width,card.style.height]),[['24px','80px','420px','240px'],['464px','80px','412px','360px'],['24px','460px','852px','280px']]);
+  assert.equal(preview.querySelectorAll('.app-loading-spinner').length,3);assert.equal(preview.querySelectorAll('.workspace-layout-card-header').length,3);
+  assert.equal(preview.querySelector('input,a,script,[id]'),null);assert.equal(preview.textContent,'');assert.doesNotMatch(preview.outerHTML,/Private|Secret|\/private\/loan/);
+  assert.equal(preview.getAttribute('aria-label'),'Loading workspace');assert.equal(d.querySelector('main').classList.contains('is-workspace-preview'),true);
+  resolve(html('Dashboard'));await pending;assert.equal(d.querySelector('.workspace-layout-preview'),null);assert.equal(d.querySelector('h1').textContent,'Dashboard');
+  assert.equal(requests.filter(r=>r.url.pathname==='/admin/dashboard').length,1);
+ }finally{dom.window.close();}
+});
+
+test('failed warm navigation and resize restore the same original form nodes without replaying requests',async()=>{
+ const {dom,w,d,pages,requests}=await setup();try{
+  layoutFixture(d);await w.WorkspaceNavigation.visit('/admin/users');const {main}=layoutFixture(d);
+  const input=d.querySelector('input');input.value='Retain edited draft';pages.delete('/admin/dashboard');
+  const failed=w.WorkspaceNavigation.visit('/admin/dashboard');assert.ok(d.querySelector('.workspace-layout-preview'));await failed;
+  assert.equal(d.querySelector('.workspace-layout-preview'),null);assert.equal(d.querySelector('input'),input);assert.equal(input.value,'Retain edited draft');assert.ok(d.querySelector('[role=alert]'));
+  let resolve;pages.set('/admin/dashboard',new Promise(done=>resolve=done));const pending=w.WorkspaceNavigation.visit('/admin/dashboard');assert.ok(d.querySelector('.workspace-layout-preview'));
+  Object.defineProperty(w,'innerWidth',{value:360,configurable:true});w.dispatchEvent(new w.Event('resize'));
+  assert.equal(main.classList.contains('is-workspace-preview'),false);assert.ok(d.querySelector('.workspace-navigation-progress'));assert.equal(d.querySelector('input'),input);
+  assert.equal(requests.filter(r=>r.url.pathname==='/admin/dashboard').length,2);
+  await w.WorkspaceNavigation.visit('/admin/users');resolve(html('Dashboard'));await pending;
+  assert.equal(d.querySelector('#workspace-navigation-feedback'),null);assert.equal(input.value,'Retain edited draft');
+ }finally{dom.window.close();}
+});
+
+test('layout memory is bounded and logout clears previews',async()=>{
+ const {dom,w,d,pages}=await setup();try{
+  for(let index=0;index<13;index++){
+   layoutFixture(d);pages.set('/admin/layout-'+index,html('Layout '+index));await w.WorkspaceNavigation.visit('/admin/layout-'+index);
+  }
+  layoutFixture(d);const oldest=w.WorkspaceNavigation.visit('/admin/dashboard');assert.equal(d.querySelector('.workspace-layout-preview'),null);await oldest;
+  layoutFixture(d);d.dispatchEvent(new w.Event('session:logout'));
+  const cleared=w.WorkspaceNavigation.visit('/admin/layout-12');assert.equal(d.querySelector('.workspace-layout-preview'),null);await cleared;
+ }finally{dom.window.close();}
+});
+
+test('layout previews are exact-query and viewport specific and leave pending data indicators under their own owners',async()=>{
+ const {dom,w,d,pages}=await setup();try{
+  layoutFixture(d);await w.WorkspaceNavigation.visit('/admin/users');layoutFixture(d);
+  pages.set('/admin/dashboard?changed=true',html('Other results'));
+  const query=w.WorkspaceNavigation.visit('/admin/dashboard?changed=true');assert.ok(d.querySelector('.workspace-navigation-progress'));assert.equal(d.querySelector('.workspace-layout-preview'),null);await query;
+  layoutFixture(d);d.documentElement.lang='sw';d.body.dataset.navigationLoading='Inapakia ukurasa';
+  const language=w.WorkspaceNavigation.visit('/admin/users');assert.equal(d.querySelector('.workspace-layout-preview'),null);assert.equal(d.querySelector('[role=status]').getAttribute('aria-label'),'Inapakia ukurasa');await language;
+  await w.WorkspaceNavigation.visit('/admin/dashboard?changed=true');
+  layoutFixture(d);Object.defineProperty(w,'innerWidth',{value:360,configurable:true});
+  const mobile=w.WorkspaceNavigation.visit('/admin/users');assert.equal(d.querySelector('.workspace-layout-preview'),null);await mobile;
+  assert.equal(d.querySelector('.app-loading-spinner'),null);
  }finally{dom.window.close();}
 });
 
