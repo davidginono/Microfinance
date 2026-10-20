@@ -16,9 +16,9 @@ document.querySelector('#command').onclick=()=>window.commands.push(label);
 `;
 const discard=`<div id="accounting-discard-modal" hidden><div role="dialog" tabindex="-1"><button data-accounting-keep>Keep editing</button><div class="app-modal-actions"><button data-accounting-keep>Keep</button><button data-accounting-discard>Discard</button></div></div></div>`;
 function html(title,guard=false){return `<!doctype html><html lang="en"><head><title>${title}</title><meta name="_csrf" content="${title}-csrf"><script src="/js/workspace-navigation.js" data-workspace-navigation></script><script src="/js/shell.js" defer></script><script src="/js/page.js" defer></script>${guard?'<script src="/js/accounting-form-ux.js" defer></script>':''}</head><body class="aws-console" data-navigation-loading="Loading workspace" data-navigation-error="Could not load" data-navigation-retry="Try again"><nav id="shellTopNav">Header</nav><aside id="appSidebar"><a href="/admin/dashboard">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/settings-controls?section=loan">Products</a></aside><main class="shell-main"><h1 class="erp-page-title">${title}</h1><form class="accounting-create-form"><input name="name" value="Original"><button type="submit">Save</button></form><button id="command">Command</button></main>${guard?discard:''}</body></html>`;}
-async function setup({guard=false,holdNavigation=false}={}){
+async function setup({guard=false,holdNavigation=false,pageScript=init}={}){
  const requests=[],failures=[],pages=new Map([['/admin/dashboard',html('Dashboard',guard)],['/admin/users',html('Users')],['/admin/settings-controls?section=loan',html('Products')]]);
- const resources={interceptors:[requestInterceptor(request=>{const name=new URL(request.url).pathname.split('/').pop();return new Response(name==='page.js'?init:read(name),{headers:{'Content-Type':'application/javascript'}});})]};
+ const resources={interceptors:[requestInterceptor(request=>{const name=new URL(request.url).pathname.split('/').pop();return new Response(name==='page.js'?pageScript:read(name),{headers:{'Content-Type':'application/javascript'}});})]};
  const console=new VirtualConsole();console.on('jsdomError',error=>failures.push(error));
  const dom=new JSDOM(html('Dashboard',guard),{url:'http://localhost/admin/dashboard',runScripts:'dangerously',resources,pretendToBeVisual:true,virtualConsole:console,beforeParse(w){
    for(const key of ['initialized','commands','ready','loaded','hidden','late'])w[key]=[];
@@ -29,6 +29,22 @@ async function setup({guard=false,holdNavigation=false}={}){
  return {dom,w:dom.window,d:dom.window.document,requests,pages,failures};
 }
 const until=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('Navigation did not settle');};
+
+test('a saved configuration initialized after its guard stays clean on an in-place workspace visit',async()=>{
+ const {dom,w,d,pages}=await setup({pageScript:init+`if(document.querySelector('[data-normalize]'))document.querySelector('[name=name]').value='Saved configuration';`});
+ try{
+  pages.set('/admin/users',html('Users',true).replace('<script src="/js/page.js" defer></script><script src="/js/accounting-form-ux.js" defer></script>',
+   '<script src="/js/accounting-form-ux.js" defer></script><script src="/js/page.js" defer></script>').replace('<main class="shell-main">','<main class="shell-main" data-normalize>'));
+  await w.WorkspaceNavigation.visit('/admin/users');
+  assert.equal(d.querySelector('[name=name]').value,'Saved configuration');
+  await w.WorkspaceNavigation.visit('/admin/settings-controls?section=loan');
+  assert.equal(d.querySelector('h1').textContent,'Products');
+  await w.WorkspaceNavigation.visit('/admin/users');d.querySelector('[name=name]').value='Unsaved edit';
+  await w.WorkspaceNavigation.visit('/admin/settings-controls?section=loan');
+  assert.equal(d.querySelector('#accounting-discard-modal').hidden,false);
+  assert.equal(d.querySelector('[name=name]').value,'Unsaved edit');
+ }finally{dom.window.close();}
+});
 
 test('sidebar switches JSP documents in place, initializes destination controls once and keeps the preloader hidden',async()=>{
  const {dom,w,d,requests,failures}=await setup();
