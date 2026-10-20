@@ -3,6 +3,8 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<%@ include file="../fragments/admin-workspace-support.jspf" %>
+
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users &amp; Roles" /></p>
@@ -23,39 +25,39 @@
 <c:set var="userSliceStart" value="${userTotal == 0 ? 0 : (usersPage.number * usersPage.size) + 1}" />
 <c:set var="userSliceEndRaw" value="${(usersPage.number * usersPage.size) + users.size()}" />
 <c:set var="userSliceEnd" value="${userTotal == 0 ? 0 : userSliceEndRaw}" />
-<section class="erp-table-wrap admin-register-shell admin-users-register" aria-label="Users and roles results" data-resource-table="admin-users-1" data-resource-split data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
+<section class="erp-table-wrap admin-register-shell admin-users-register" aria-label="<spring:message code='admin.users.title' />" data-resource-table="admin-users-1" data-resource-split data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
-            <h2>Users &amp; Roles results</h2>
+            <h2><spring:message code="admin.users.title" /> <span class="app-table-count">(${userTotal})</span></h2>
         </div>
         <div class="app-table-toolbar">
-            <span class="admin-register-count">Showing ${userSliceStart}-${userSliceEnd} of ${userTotal}</span>
-            <button type="button" class="app-btn btn-launch" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
+
+            <button type="button" class="app-btn btn-launch" data-user-modal-open="create-user"><spring:message code="admin.workspace.createStaff" /></button>
         </div>
     </div>
 
     <form method="get" action="/admin/users" class="admin-filter-form aws-filter-toolbar admin-users-filter-form" data-aws-filter-toolbar data-table-filter-for="admin-users-1">
         <label class="admin-users-filter-field admin-users-filter-field--type">
-            <span class="sr-only">Search By</span>
-            <select name="searchBy" class="fcms-control w-full" aria-label="Search by">
-                <option value="userId" ${selectedUserSearchBy eq 'userId' ? 'selected' : ''}>User ID</option>
-                <option value="name" ${selectedUserSearchBy eq 'name' ? 'selected' : ''}>Name</option>
+            <span class="sr-only"><spring:message code="admin.workspace.searchBy" /></span>
+            <select name="searchBy" class="fcms-control w-full" aria-label="<spring:message code='admin.workspace.searchBy' />">
+                <option value="userId" ${selectedUserSearchBy eq 'userId' ? 'selected' : ''}><spring:message code="admin.workspace.userId" /></option>
+                <option value="name" ${selectedUserSearchBy eq 'name' ? 'selected' : ''}><spring:message code="admin.workspace.name" /></option>
             </select>
         </label>
 
         <label class="admin-users-filter-field admin-users-filter-field--query">
-            <span class="sr-only">Search User</span>
+            <span class="sr-only"><spring:message code="common.search" /></span>
             <input type="search"
                    name="query"
                    value="${selectedUserQuery}"
                    class="fcms-control w-full"
-                   placeholder="Enter selected User ID or name"
-                   title="Enter selected User ID or name" />
+                   placeholder="<spring:message code='admin.workspace.searchUsers' />"
+                   title="<spring:message code='admin.workspace.searchUsers' />" />
         </label>
 
         <label class="admin-users-filter-field admin-users-filter-field--rows" data-table-page-size-control>
-            <span class="sr-only">Rows Per Page</span>
-            <select name="size" class="fcms-control w-full" aria-label="Rows per page">
+            <span class="sr-only"><spring:message code="admin.workspace.pageSize" /></span>
+            <select name="size" class="fcms-control w-full" aria-label="<spring:message code='admin.workspace.pageSize' />">
                 <option value="25" ${selectedPageSize == 25 ? 'selected' : ''}>25 rows</option>
                 <option value="50" ${selectedPageSize == 50 ? 'selected' : ''}>50 rows</option>
                 <option value="100" ${selectedPageSize == 100 ? 'selected' : ''}>100 rows</option>
@@ -63,24 +65,24 @@
         </label>
 
         <div class="admin-users-filter-actions">
-            <button type="submit" class="app-btn btn-neutral">Search</button>
-            <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
+            <button type="submit" class="app-btn btn-neutral"><spring:message code="common.search" /></button>
+            <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="common.clear" /></a>
         </div>
     </form>
     <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table min-w-[1100px]">
         <thead>
         <tr>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="id">User ID</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="client">Client Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="staff">Staff Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="name">Names</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="email">Email</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="phone">Phone Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="roles">Current Roles</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="membership">Membership</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="status">Current Status</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-actions-header>Update</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="id"><spring:message code="admin.workspace.userId" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="client"><spring:message code="voucher.print.clientNumber" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="staff"><spring:message code="admin.workspace.staffNumber" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="name"><spring:message code="admin.workspace.fullName" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="email"><spring:message code="admin.workspace.email" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="phone"><spring:message code="admin.workspace.phone" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="roles"><spring:message code="admin.workspace.roles" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="membership"><spring:message code="admin.workspace.accessType" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-order="status"><spring:message code="common.status" /></th>
+            <th class="px-3 py-2 text-left whitespace-nowrap" data-table-actions-header><spring:message code="common.actions" /></th>
         </tr>
         </thead>
         <tbody>
@@ -126,7 +128,7 @@
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <c:choose>
                                 <c:when test="${canEditUsers}">
-                                    <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-neutral">Edit</a>
+                                    <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-neutral"><spring:message code="common.edit" /></a>
                                 </c:when>
                                 <c:otherwise>
                                     <span class="app-btn btn-neutral pointer-events-none opacity-50">View Only</span>
@@ -181,7 +183,7 @@
             <div class="app-modal-header">
                 <div>
                     <p class="erp-widget-title">Add Staff Member</p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Staff Member</h2>
+                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.workspace.createStaff" /></h2>
                 </div>
                 <button type="button" class="app-modal-close" data-user-modal-close="create-user" aria-label="Close modal">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -190,27 +192,27 @@
                 </button>
             </div>
 
-            <form action="/admin/users" method="post" class="app-modal-body grid gap-4 md:grid-cols-2">
+            <form action="/admin/users" method="post" class="app-modal-body admin-staff-create-form grid gap-4 md:grid-cols-2">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Full Name
+                    <spring:message code="admin.workspace.fullName" />
                     <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Email
+                    <spring:message code="admin.workspace.email" />
                     <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Phone
+                    <spring:message code="admin.workspace.phone" />
                     <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                     <span class="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
                 </label>
 
                 <div class="md:col-span-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff Roles</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.workspace.staffRoles" /></p>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${staffPositions}" var="position">
                             <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
@@ -227,7 +229,7 @@
 
                 <div class="app-modal-actions md:col-span-2">
                     <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
-                    <button type="submit" class="app-btn btn-launch">Create Staff Member</button>
+                    <button type="submit" class="app-btn btn-launch"><spring:message code="admin.workspace.createStaff" /></button>
                 </div>
             </form>
         </div>

@@ -1295,6 +1295,7 @@
             const nextButton = workspace.querySelector('[data-product-config-next]');
             const saveState = workspace.querySelector('[data-product-config-save-state]');
             const storageKey = workspace.getAttribute('data-product-config-storage-key');
+            const tabList = workspace.querySelector('[data-product-config-tabs]');
 
             if (!form || !steps.length) {
                 return;
@@ -1353,12 +1354,27 @@
                     const active = index === activeIndex;
                     const panel = step.querySelector('[data-product-config-panel]');
                     step.classList.toggle('is-active', active);
+                    if (tabList) {
+                        step.hidden = !active;
+                        step.setAttribute('role', 'tabpanel');
+                        step.id ||= 'product-section-' + step.getAttribute('data-product-config-step');
+                        step.setAttribute('aria-labelledby', 'product-tab-' + step.getAttribute('data-product-config-step'));
+                    }
                     if (panel) {
                         panel.hidden = !active;
                     }
                 });
 
                 navButtons.forEach((button) => {
+                    if (tabList) {
+                        const key = button.getAttribute('data-product-config-nav');
+                        const selected = key === steps[activeIndex].getAttribute('data-product-config-step');
+                        button.id = 'product-tab-' + key;
+                        button.setAttribute('role', 'tab');
+                        button.setAttribute('aria-controls', 'product-section-' + key);
+                        button.setAttribute('aria-selected', String(selected));
+                        button.tabIndex = selected ? 0 : -1;
+                    }
                     if (button.getAttribute('data-product-config-nav') === steps[activeIndex].getAttribute('data-product-config-step')) {
                         button.setAttribute('aria-current', 'step');
                     } else {
@@ -1401,6 +1417,14 @@
                 button.addEventListener('click', () => {
                     activateStep(button.getAttribute('data-product-config-nav'), { scroll: true, focus: true });
                 });
+                if (tabList) button.addEventListener('keydown', (event) => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                    event.preventDefault();
+                    const index = navButtons.indexOf(button);
+                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? navButtons.length - 1
+                        : (index + (event.key === 'ArrowRight' ? 1 : -1) + navButtons.length) % navButtons.length;
+                    activateStep(navButtons[next].getAttribute('data-product-config-nav'), { focus: true });
+                });
             });
             previousButton?.addEventListener('click', () => moveStep(-1));
             nextButton?.addEventListener('click', () => moveStep(1));
@@ -1418,7 +1442,7 @@
 
             form.addEventListener('input', () => {
                 if (saveState) {
-                    saveState.textContent = 'Unsaved changes';
+                    saveState.textContent = saveState.dataset.unsavedLabel || 'Unsaved changes';
                     saveState.classList.add('is-dirty');
                 }
             });

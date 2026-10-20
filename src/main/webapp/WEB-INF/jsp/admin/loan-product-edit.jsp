@@ -5,14 +5,18 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<%@ include file="../fragments/admin-workspace-support.jspf" %>
+
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb">Admin Tools / Settings & Controls / Loan Products</p>
-    <h1 class="erp-page-title" id="admin-loan-product-edit-title">Configure <c:out value="${product.displayName}" /></h1>
-</div>
+    <div class="admin-page-heading">
+    <p class="erp-breadcrumb"><spring:message code="admin.workspace.productBreadcrumb" /></p>
+    <h1 class="erp-page-title" id="admin-loan-product-edit-title"><spring:message code="admin.workspace.configureProduct" /></h1>
+    </div>
 
 <div class="product-config-page-actions">
-    <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Back to loan products</a>
+    <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral"><spring:message code="admin.workspace.backProducts" /></a>
+    <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.title" /></a>
     <form action="/admin/settings-controls/loan-products/${product.id}/delete"
           method="post"
           data-confirm-eyebrow="Confirm Deletion"
@@ -24,16 +28,16 @@
         <button type="submit" class="app-btn btn-reject">Delete Product</button>
     </form>
 </div>
+</div>
 
-<p><a class="resource-table-id-link" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.title" /></a></p>
 <div class="product-config-workspace"
      data-product-config-workspace
      data-product-config-stage="Step 2 of 2 &middot; focused product"
      data-product-config-storage-key="loan-product-config-${product.id}">
-    <section class="product-config-workspace-nav" aria-label="Loan product configuration sections">
-        <div class="product-config-workspace-summary" data-resource-header-source>
+    <section class="product-config-workspace-nav" aria-label="<spring:message code='admin.workspace.productSections' />">
+        <div class="product-config-workspace-summary" >
             <p class="erp-widget-title">Selected product</p>
-            <h2 data-table-heading-for="admin-loan-product-edit-1"><c:out value="${product.displayName}" /></h2>
+            <h2><spring:message code="resource.details.summary" /></h2><dl class="erp-detail-facts"><div><dt><spring:message code="admin.settings.loanProducts.name" /></dt><dd><c:out value="${product.displayName}" /></dd></div><div><dt><spring:message code="common.description" /></dt><dd><c:out value="${product.displayDescription}" /></dd></div></dl>
             <div class="product-config-workspace-meta">
                 <span class="product-config-status
                     ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
@@ -42,26 +46,21 @@
                     ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}"><span data-resource-status="${product.status}">${product.status}</span></span>
             </div>
         </div>
-        <nav class="product-config-step-nav">
+        <nav class="product-config-step-nav" data-product-config-tabs role="tablist" aria-label="<spring:message code='admin.workspace.productSections' />">
             <button type="button" data-product-config-nav="identity" aria-current="step">
-                <span class="product-config-step-number">1</span>
-                <span><strong>Product identity</strong></span>
+                <span><strong><spring:message code="admin.settings.loanProducts.identity" /></strong></span>
             </button>
             <button type="button" data-product-config-nav="eligibility">
-                <span class="product-config-step-number">2</span>
-                <span><strong>Eligibility</strong></span>
+                <span><strong><spring:message code="admin.settings.loanProducts.eligibility" /></strong></span>
             </button>
             <button type="button" data-product-config-nav="pricing">
-                <span class="product-config-step-number">3</span>
-                <span><strong>Repayment & charges</strong></span>
+                <span><strong><spring:message code="admin.settings.loanProducts.repaymentCharges" /></strong></span>
             </button>
             <button type="button" data-product-config-nav="workflow">
-                <span class="product-config-step-number">4</span>
-                <span><strong>Approval workflow</strong></span>
+                <span><strong><spring:message code="admin.settings.workflow.title" /></strong></span>
             </button>
             <button type="button" data-product-config-nav="preview">
-                <span class="product-config-step-number">5</span>
-                <span><strong>Review flow</strong></span>
+                <span><strong><spring:message code="admin.settings.workflow.resolvedFlow" /></strong></span>
             </button>
         </nav>
     </section>
@@ -69,7 +68,7 @@
     <div class="product-config-workspace-main">
         <form action="/admin/settings-controls/${product.id}"
                    method="post"
-                   class="product-builder-form"
+                   class="product-builder-form accounting-create-form"
                   data-inline-validation-form="loan-settings"
                   data-product-workflow-builder="true"
                   data-product-edit-mode="true"
@@ -105,7 +104,7 @@
                     </div>
                 </c:if>
 
-                <section class="product-builder-section product-config-step is-active" data-product-config-step="identity" aria-label="Product identity">
+                <section class="product-builder-section product-config-step is-active" data-product-config-step="identity" aria-label="Product identity"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.identity" /></h2></div>
                     <div id="product-config-identity" class="product-builder-section-body product-identity-grid" data-product-config-panel>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
@@ -132,7 +131,7 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section product-config-step" data-product-config-step="eligibility" aria-label="Eligibility">
+                <section class="product-builder-section product-config-step" data-product-config-step="eligibility" aria-label="Eligibility"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.eligibility" /></h2></div>
                     <div id="product-config-eligibility" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
@@ -151,7 +150,7 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section product-config-step" data-product-config-step="pricing" aria-label="Repayment and charges">
+                <section class="product-builder-section product-config-step" data-product-config-step="pricing" aria-label="Repayment and charges"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.repaymentCharges" /></h2></div>
                     <div id="product-config-pricing" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
@@ -184,7 +183,7 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section product-config-step" data-product-config-step="workflow" aria-label="Approval workflow">
+                <section class="product-builder-section product-config-step" data-product-config-step="workflow" aria-label="Approval workflow"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
                     <div id="product-config-workflow" class="product-builder-section-body" data-product-config-panel hidden>
                         <details class="workflow-subsection product-config-subsection">
                             <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></summary>
@@ -331,7 +330,7 @@
                                     <button type="button" class="app-btn btn-neutral" data-required-attachment-add>Add Name of Required Attachment</button>
                                 </div>
                                 <div class="hidden border border-slate-200 bg-slate-50 p-3" data-required-attachment-form>
-                                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end" data-table-toolbar-for="admin-loan-product-edit-4" data-resource-header-source>
+                                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end" data-table-toolbar-for="admin-loan-product-edit-4" >
                                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             Attachment Name
                                             <input form="requiredAttachmentCreateForm" name="attachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. Salary slip" />
@@ -423,7 +422,7 @@
                         </div>
                 </section>
 
-                <section class="product-builder-section product-config-step" data-product-config-step="preview" aria-label="Review flow">
+                <section class="product-builder-section product-config-step" data-product-config-step="preview" aria-label="Review flow"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.resolvedFlow" /></h2></div>
                     <div id="product-config-preview" class="product-builder-section-body" data-product-config-panel hidden>
                         <div class="workflow-preview-shell">
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
@@ -433,14 +432,14 @@
                 </section>
 
                 <div class="product-config-actionbar">
-                    <div class="product-config-section-actions" aria-label="Configuration section navigation">
+                    <div class="product-config-section-actions" hidden aria-label="Configuration section navigation">
                         <button type="button" class="app-btn btn-neutral" data-product-config-previous disabled>Previous section</button>
                         <button type="button" class="app-btn btn-neutral" data-product-config-next>Next section</button>
                     </div>
                     <div class="product-config-save-actions">
-                        <span class="product-config-save-state" data-product-config-save-state>Changes save only when you select Save product.</span>
-                        <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
-                        <button type="submit" class="app-btn btn-launch">Save product</button>
+                        <span class="product-config-save-state" data-product-config-save-state data-unsaved-label="<spring:message code='admin.workspace.unsaved' />"><spring:message code="admin.workspace.saveHint" /></span>
+                        <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
+                        <button type="submit" class="app-btn btn-launch"><spring:message code="admin.workspace.saveProduct" /></button>
                 </div>
     </div>
         </form>
@@ -472,7 +471,7 @@
 <spring:message code="admin.settings.workflow.warning.guarantorApproval" text="guarantor approval" var="warningGuarantorApproval" />
 <spring:message code="admin.settings.workflow.warning.guarantorApprovals" text="guarantor approvals" var="warningGuarantorApprovals" />
 <spring:message code="admin.settings.workflow.warning.guarantorSuffix" text="before the review flow starts." var="warningGuarantorSuffix" />
-<spring:message code="admin.settings.workflow.runtime.Member" text="Client" var="runtimeMember" />
+<spring:message code="admin.settings.workflow.runtime.member" text="Client" var="runtimeMember" />
 <spring:message code="admin.settings.workflow.runtime.loadedFinancialData" text="Loaded Financial Data (Credit Assessment Data)" var="runtimeLoadedFinancialData" />
 <spring:message code="admin.settings.workflow.runtime.guarantor" text="Guarantor" var="runtimeGuarantor" />
 <spring:message code="admin.settings.workflow.runtime.guarantors" text="Guarantors" var="runtimeGuarantors" />
@@ -522,4 +521,5 @@
 
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
-<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../accounting/accounting-form-support.jspf" %>
+<%@ include file="../fragments/footer.jspf" %>

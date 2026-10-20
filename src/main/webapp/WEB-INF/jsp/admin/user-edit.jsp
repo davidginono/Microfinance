@@ -3,85 +3,44 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<%@ include file="../fragments/admin-workspace-support.jspf" %>
+
 
 <c:if test="${not empty openUserModalKey}">
     <div hidden data-open-user-modal="${openUserModalKey}"></div>
 </c:if>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb">Admin Tools / Users &amp; Roles / Edit User</p>
-    <h1 class="erp-page-title" id="admin-user-edit-title">Edit User Access</h1>
+    <p class="erp-breadcrumb"><spring:message code="admin.workspace.userBreadcrumb" /></p>
+    <h1 class="erp-page-title" id="admin-user-edit-title"><spring:message code="admin.workspace.editAccess" /></h1>
 </div>
 
-<div class="admin-user-edit-context-bar">
-    <div class="admin-user-edit-context">
-        <span class="admin-user-edit-context__label">User ID</span>
-        <span class="admin-user-edit-context__value"><c:out value="${user.userIdLabel}" /></span>
-    </div>
-    <a href="/admin/users" class="app-btn btn-neutral">Back To Users</a>
-</div>
+<template data-resource-details-page></template>
 
 <form id="user-access-edit-form"
       action="/admin/users/${user.accountId}"
       method="post"
-      class="admin-user-edit-shell"
+      class="admin-user-edit-shell accounting-create-form"
       data-access-edit-form
       data-member-access="${user.memberAccess}">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
-    <section class="erp-panel admin-user-edit-panel admin-user-summary-panel">
-        <div class="admin-user-summary-header">
-            <div class="admin-user-summary-copy">
-                <p class="admin-section-kicker">User Details</p>
-                <h2 class="admin-user-summary-name"><c:out value="${user.fullName}" /></h2>
-                <p class="admin-user-summary-meta">
-                    <c:choose>
-                        <c:when test="${user.memberAccess}">
-                            Client Number <c:out value="${user.memberNumber}" />
-                        </c:when>
-                        <c:otherwise>
-                            Staff Number <c:out value="${user.staffMemberNumber}" />
-                        </c:otherwise>
-                    </c:choose>
-                </p>
-            </div>
-            <div class="admin-user-badge-row" aria-label="User access status">
-                <span class="admin-user-badge ${user.membershipLabel eq 'Staff' ? 'is-neutral' : 'is-info'}">
-                    <c:out value="${user.membershipLabel}" />
-                </span>
-                <span class="admin-user-badge ${user.status eq 'INVITED' ? 'is-warning' : user.status eq 'ACTIVE' ? 'is-success' : 'is-neutral'}"><span data-resource-status="${user.status}"><c:out value="${user.displayStatus}" /></span>
-                </span>
-                <c:if test="${not empty user.acknowledgementStatus}">
-                    <span class="admin-user-badge ${user.acknowledgementStatus eq 'Pending Acknowledgement' ? 'is-warning' : 'is-neutral'}"><span data-resource-status='<c:out value="${user.acknowledgementStatus}" />'><c:out value="${user.acknowledgementStatus}" /></span>
-                    </span>
-                </c:if>
-            </div>
-        </div>
-        <dl class="admin-user-detail-grid">
-            <div class="admin-user-detail-item">
-                <dt>Email</dt>
-                <dd><c:out value="${user.email}" /></dd>
-            </div>
-            <div class="admin-user-detail-item">
-                <dt>Phone Number</dt>
-                <dd><c:out value="${user.phone}" /></dd>
-            </div>
-            <div class="admin-user-detail-item">
-                <dt>Current Roles</dt>
-                <dd><c:out value="${user.roleSummary}" /></dd>
-            </div>
-            <div class="admin-user-detail-item">
-                <dt>Login ID</dt>
-                <dd><c:out value="${user.loginId}" /></dd>
-            </div>
-        </dl>
-    </section>
+    <section class="erp-panel admin-user-edit-panel admin-user-summary-panel"><div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.workspace.userDetails" /></h2></div><div class="erp-panel-body"><dl class="erp-detail-facts">
+<div><dt><spring:message code="admin.workspace.fullName" /></dt><dd><c:out value="${user.fullName}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.userId" /></dt><dd><c:out value="${user.userIdLabel}" /></dd></div>
+<div><dt><spring:message code="voucher.print.clientNumber" /></dt><dd><c:out value="${user.memberNumber}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.staffNumber" /></dt><dd><c:out value="${user.staffMemberNumber}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.email" /></dt><dd><c:out value="${user.email}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.phone" /></dt><dd><c:out value="${user.phone}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.roles" /></dt><dd><c:out value="${user.roleSummary}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.loginId" /></dt><dd><c:out value="${user.loginId}" /></dd></div>
+<div><dt><spring:message code="admin.workspace.accessType" /></dt><dd><c:out value="${user.membershipLabel}" /></dd></div><div><dt><spring:message code="common.status" /></dt><dd><span data-resource-status="${user.status}"><c:out value="${user.displayStatus}" /></span></dd></div><c:if test="${not empty user.acknowledgementStatus}"><div><dt><spring:message code="admin.workspace.acknowledgement" /></dt><dd><c:out value="${user.acknowledgementStatus}" /></dd></div></c:if></dl></div></section>
 
     <section class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header">
-            <h2>Staff Roles</h2>
+            <h2><spring:message code="admin.workspace.staffRoles" /></h2>
             <c:if test="${user.memberAccess}">
-                <p>Clear all staff roles to keep client access only.</p>
+                <p><spring:message code="admin.workspace.clientOnly" /></p>
             </c:if>
         </div>
         <div class="admin-role-grid">
@@ -99,13 +58,13 @@
         </div>
     </section>
 
-    <section class="erp-panel admin-user-edit-panel">
-        <div class="admin-user-section-header admin-user-section-header--actions">
-            <div data-resource-header-source>
-                <h2 data-table-heading-for="admin-user-edit-1"><spring:message code="access.matrix.title" /></h2>
+    <section class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-edit-1" data-table-tools="none" data-aws-no-refresh="true">
+        <div class="app-table-titlebar admin-user-section-header admin-user-section-header--actions">
+            <div>
+                <h2><spring:message code="access.matrix.title" /></h2>
                 <p><spring:message code="access.matrix.unsupported" /></p>
             </div>
-            <div class="admin-user-section-actions">
+            <div class="app-table-toolbar admin-user-section-actions">
                 <button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims>
                     <spring:message code="access.matrix.restore" />
                 </button>
@@ -113,8 +72,7 @@
         </div>
         <div class="admin-user-section-body">
             <spring:message code="access.matrix.loading" var="accessMatrixLoading" />
-            <div class="erp-table-wrap" data-resource-table="admin-user-edit-1">
-<div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="${accessMatrixLoading}">
+            <div class="admin-access-matrix erp-table-scroll" data-aws-table-region data-loading-label="${accessMatrixLoading}">
                 <table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table">
                     <thead>
                     <tr>
@@ -177,13 +135,12 @@
                     </tbody>
                 </table>
             </div>
-</div>
         </div>
     </section>
 
     <section class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header">
-            <h2>Account Status</h2>
+            <h2><spring:message code="admin.workspace.accountStatus" /></h2>
         </div>
         <div class="admin-user-section-body">
             <c:choose>
@@ -228,8 +185,8 @@
                 Delete
             </button>
         </c:if>
-        <a href="/admin/users" class="app-btn btn-neutral">Cancel</a>
-        <button type="submit" class="app-btn btn-launch">Save</button>
+        <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
+        <button type="submit" class="app-btn btn-launch"><spring:message code="common.save" /></button>
     </div>
 </form>
 
@@ -469,4 +426,5 @@
     })();
 </script>
 
+<%@ include file="../accounting/accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

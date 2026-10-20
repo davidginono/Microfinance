@@ -67,3 +67,31 @@ test('closing a dialog reopened by shared navigation removes its background lock
     assert.equal(d.documentElement.style.overflow,'clip');
     dom.window.close();
 });
+
+test('focused product tabs retain native values, support keyboard navigation and reveal invalid sections',()=>{
+    const dom=new JSDOM(`<div data-product-config-workspace><nav data-product-config-tabs role="tablist">
+      <button data-product-config-nav="identity"><strong>Identity</strong></button><button data-product-config-nav="pricing"><strong>Pricing</strong></button></nav>
+      <form data-product-config-form><section data-product-config-step="identity"><div data-product-config-panel><input name="productName" value="Existing product"></div></section>
+      <section data-product-config-step="pricing"><div data-product-config-panel hidden><input name="annualInterestPercent" value="12"></div></section></form></div>`,{runScripts:'outside-only',url:'http://localhost/admin/settings-controls/loan-products/test/edit',pretendToBeVisual:true});
+    try{
+        const w=dom.window,d=w.document;w.scrollTo=()=>{};w.eval(source);
+        const tabs=d.querySelectorAll('[role=tab]'),form=d.querySelector('form'),name=form.elements.productName,rate=form.elements.annualInterestPercent;
+        name.value='Edited product';tabs[0].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));
+        assert.equal(tabs[1].getAttribute('aria-selected'),'true');assert.equal(d.activeElement,tabs[1]);
+        assert.equal(d.querySelector('[data-product-config-step=identity]').hidden,true);assert.equal(rate.closest('section').hidden,false);
+        assert.equal(form.elements.productName,name);assert.equal(name.value,'Edited product');
+        tabs[1].dispatchEvent(new w.KeyboardEvent('keydown',{key:'Home',bubbles:true,cancelable:true}));
+        rate.dispatchEvent(new w.Event('invalid',{bubbles:false,cancelable:true}));assert.equal(rate.closest('section').hidden,false);
+        assert.equal(d.querySelector('form'),form);assert.equal(tabs[1].getAttribute('aria-controls'),rate.closest('section').id);
+    }finally{dom.window.close();}
+});
+
+test('full-page product creation restores submitted fields without opening or locking a modal',()=>{
+    const dom=new JSDOM(`<form class="admin-product-create"><input name="productName" value=""><input type="checkbox" name="boardReviewRequired" value="true">
+      <div hidden data-loan-product-form-draft><span data-loan-product-form-value="productName">Restored business loan</span><span data-loan-product-form-value="boardReviewRequired">true</span></div></form>`,{runScripts:'outside-only',url:'http://localhost/admin/settings-controls?section=loan&task=create'});
+    try{
+        const w=dom.window,d=w.document;w.eval(source);
+        assert.equal(d.querySelector('[name=productName]').value,'Restored business loan');assert.equal(d.querySelector('[name=boardReviewRequired]').checked,true);
+        assert.equal(d.querySelector('[role=dialog]'),null);assert.equal(d.body.style.overflow,'');assert.equal(d.documentElement.style.overflow,'');
+    }finally{dom.window.close();}
+});

@@ -81,7 +81,7 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
-    void createdLoanProductClosesModalShowsToastAndScrollsToItsCard() throws Exception {
+    void createdLoanProductReturnsToCatalogAndFocusesItsRow() throws Exception {
         String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
         String workflowScript = read(JSP_ROOT.resolve("fragments/loan-product-workflow-script.jspf"));
         String controller = read(Path.of("src/main/java/com/sacco/mvp/web/AdminController.java"));
@@ -135,7 +135,8 @@ class AdminConfigurationUiContractTest {
             .contains("id=\"qualification-settings-title\" class=\"aws-settings-title\"")
             .contains("class=\"aws-settings-form aws-qualification-form\"")
             .contains("class=\"aws-settings-commandbar\"")
-            .contains("class=\"app-btn btn-primary aws-settings-save-action\"")
+            .contains("class=\"aws-settings-footer\"")
+            .contains("class=\"app-btn btn-launch aws-settings-save-action\"")
             .contains("class=\"aws-settings-grid aws-qualification-grid\"")
             .contains("class=\"aws-settings-group\"")
             .contains("class=\"aws-settings-group-header\"")
@@ -434,7 +435,7 @@ class AdminConfigurationUiContractTest {
         assertThat(users)
             .containsOnlyOnce("data-user-modal-open=\"create-user\"")
             .contains("data-user-modal=\"create-user\"")
-            .contains("type=\"submit\" class=\"app-btn btn-launch\">Create Staff Member");
+            .contains("type=\"submit\" class=\"app-btn btn-launch\"><spring:message code=\"admin.workspace.createStaff\"");
         assertThat(shellCss)
             .contains(".app-topbar-actions .app-profile-control")
             .contains(".aws-console .app-topbar .profile-icon-btn")

@@ -1,0 +1,70 @@
+/* Institution administration uses the shared console resource and form surfaces. */
+.aws-console:has([data-admin-workspace]) {--admin-surface:#fff;--admin-border:#d5dbdb;}
+.aws-console:has([data-admin-workspace]) :is(.admin-user-edit-shell,.admin-focused-form,.product-config-workspace,.product-config-workspace-main) {min-width:0;max-width:100%;}
+.aws-console:has([data-admin-workspace]) :is(.erp-panel,.product-builder-section,.aws-settings-group,.product-config-workspace-summary) {border:1px solid var(--admin-border);border-radius:0!important;background:#fff;box-shadow:0 1px 1px #879596;overflow:visible;}
+.aws-console:has([data-admin-workspace]) :is(.admin-user-section-header,.aws-settings-header,.aws-settings-group-header,.product-builder-section-header) {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;background:#fafafa;border-bottom:1px solid #eaeded;padding:16px 20px;margin:0;}
+.aws-console:has([data-admin-workspace]) :is(.admin-user-section-header,.aws-settings-header,.aws-settings-group-header,.product-builder-section-header) :is(h2,h3) {font-size:16px;line-height:24px;font-weight:700;letter-spacing:normal;text-transform:none;margin:0;}
+.aws-console:has([data-admin-workspace]) :is(.admin-user-section-header,.aws-settings-header,.product-builder-section-header)>p,
+.aws-console:has([data-admin-workspace]) .product-builder-section-header .erp-widget-title {display:none;}
+.aws-console:has([data-admin-workspace]) :is(.admin-user-section-header,.product-builder-section-header) p:not(.erp-widget-title) {flex-basis:100%;font-size:14px;line-height:20px;margin:0;color:#545b64;}
+.aws-console:has([data-admin-workspace]) :is(.admin-user-section-body,.admin-role-grid,.aws-settings-form,.aws-settings-group-body,.product-builder-section-body) {padding:20px;min-width:0;}
+.aws-console:has([data-admin-workspace]) :is(.admin-role-option,.settings-checkbox-card) {border:0;border-radius:0;background:#fff;box-shadow:none;min-height:32px;padding:6px 0;align-items:flex-start;}
+.aws-console:has([data-admin-workspace]) .admin-role-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px;}
+.aws-console:has([data-admin-workspace]) .admin-role-option input {margin-top:3px;flex:none;}
+.aws-console:has([data-admin-workspace]) .admin-user-detail-grid {padding:20px;}
+.aws-console:has([data-admin-workspace]) .erp-detail-facts {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 0;margin:0;}
+.aws-console:has([data-admin-workspace]) .erp-detail-facts>div {min-width:0;padding:0 20px;border-right:1px solid #eaeded;}
+.aws-console:has([data-admin-workspace]) .erp-detail-facts>div:nth-child(3n+1) {padding-left:0;}
+.aws-console:has([data-admin-workspace]) .erp-detail-facts>div:nth-child(3n) {border-right:0;}
+.aws-console:has([data-admin-workspace]) .erp-detail-facts dd {margin:0;overflow-wrap:anywhere;}
+.aws-console:has([data-admin-workspace]) .admin-user-edit-actions,
+.aws-console:has([data-admin-workspace]) .admin-form-actions {display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;padding:16px 0;background:transparent;border:0;position:static;}
+.aws-console:has([data-admin-workspace]) .admin-user-edit-actions .app-btn {width:auto;flex:none;}
+.aws-console:has([data-admin-workspace]) .admin-user-section-header--actions {flex-wrap:wrap;}
+.aws-console:has([data-admin-workspace]) .admin-user-section-actions {flex:none;margin-left:auto;}
+.aws-console:has([data-admin-workspace]) .admin-user-section-actions .app-btn {width:auto;min-height:32px;}
+.aws-console:has([data-admin-workspace]) .admin-status-callout {padding:12px 16px;border:1px solid #aab7b8;border-radius:0;background:#fff;}
+.aws-console:has([data-admin-workspace]) :is(.admin-focused-form,.admin-product-create) {width:100%;max-width:1100px;margin:0;}
+.aws-console:has([data-admin-workspace]) .product-builder-form {display:grid;gap:20px;padding:0;background:transparent;border:0;box-shadow:none;}
+.aws-console:has([data-admin-workspace]) .product-builder-section {margin:0;padding:0;}
+.aws-console:has([data-admin-workspace]) :is(.product-identity-grid,.product-builder-grid.two-up) {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px;}
+.aws-console:has([data-admin-workspace]) .product-identity-description {grid-column:1/-1;}
+.aws-console:has([data-admin-workspace]) :is(.product-builder-form,.admin-staff-create-form) label {text-transform:none!important;letter-spacing:normal!important;font-size:14px!important;font-weight:600!important;line-height:20px;color:#16191f;min-width:0;}
+.aws-console:has([data-admin-workspace]) :is(.product-builder-form,.admin-staff-create-form) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {box-sizing:border-box;max-width:100%;border:1px solid #879596;border-radius:2px;min-height:32px;font-size:14px;font-weight:400;line-height:20px;margin-top:4px;box-shadow:none;}
+.aws-console:has([data-admin-workspace]) .product-builder-form :is(input:not([type=checkbox]):not([type=radio]),select) {height:32px;padding:4px 8px;}
+.aws-console:has([data-admin-workspace]) .product-builder-form textarea {padding:8px;}
+.aws-console:has([data-admin-workspace]) .product-builder-form .neo-select {min-width:0;max-width:100%;}
+.aws-console:has([data-admin-workspace]) .product-builder-form .neo-select-button {min-height:32px;height:32px;margin-top:4px;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace {display:block;gap:0;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace-nav {position:static!important;width:auto;max-width:none;border:0!important;background:transparent!important;padding:0!important;box-shadow:none!important;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace-summary {padding:0 0 20px;margin-bottom:24px;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace-summary>h2 {padding:16px 20px;margin:0 0 20px;background:#fafafa;border-bottom:1px solid #eaeded;font-size:16px;line-height:24px;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace-summary>.erp-widget-title {display:none;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace-summary .erp-detail-facts {padding:0 20px;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace-meta {margin:16px 20px 0;padding:0;border:0;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav {display:flex;flex-direction:row;align-items:stretch;gap:0;overflow-x:auto;max-width:100%;margin:0 0 16px;border-bottom:1px solid #aab7b8;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav button {position:relative;display:block;flex:none;width:auto!important;min-height:48px;margin:0;padding:12px 20px;border:0!important;border-bottom:2px solid transparent!important;border-radius:0;background:transparent!important;color:#545b64;box-shadow:none!important;text-align:left;font-size:14px;line-height:20px;white-space:nowrap;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav button:not(:last-child)::after {content:"";position:absolute;right:0;top:8px;bottom:10px;border-right:1px solid #d5dbdb;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav button[aria-selected=true] {color:#0073bb;border-bottom-color:#16191f!important;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav button:focus-visible {outline:2px solid #0073bb;outline-offset:-4px;}
+.aws-console:has([data-admin-workspace]) .product-config-workspace.is-enhanced [data-product-config-step]:not(.is-active) {display:none!important;}
+.aws-console:has([data-admin-workspace]) .product-config-actionbar {display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;position:static;background:transparent;border:0;box-shadow:none;padding:16px 0;}
+.aws-console:has([data-admin-workspace]) .product-config-save-actions {display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;}
+.aws-console:has([data-admin-workspace]) .product-config-save-state {font-size:13px;color:#545b64;margin-right:12px;}
+.aws-console:has([data-admin-workspace]) .product-config-page-actions {display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin:0 0 16px;}
+.aws-console:has([data-admin-workspace]) .product-config-page-actions form {margin:0;}
+.aws-console:has([data-admin-workspace]) .erp-page-header:has(.admin-page-heading) {display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+.aws-console:has([data-admin-workspace]) .admin-page-heading {min-width:0;flex:1 1 280px;}
+.aws-console:has([data-admin-workspace]) .erp-page-header .product-config-page-actions {margin:0;flex:0 1 auto;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav {background:transparent;}
+.aws-console:has([data-admin-workspace]) .erp-panel>.border-b {padding:16px 20px;background:#fafafa;}
+.aws-console:has([data-admin-workspace]) .erp-panel>.border-b>h2 {font-size:16px;line-height:24px;}
+.aws-console:has([data-admin-workspace]) .product-config-subsection {border:1px solid #d5dbdb;border-radius:0;background:#fff;}
+.aws-console:has([data-admin-workspace]) .product-config-subsection>summary {padding:12px 16px;background:#fafafa;font-size:14px;}
+.aws-console:has([data-admin-workspace]) .aws-settings-group {margin-bottom:20px;}
+.aws-console:has([data-admin-workspace]) .aws-settings-footer {display:flex;justify-content:flex-end;gap:8px;padding-top:16px;}
+.aws-console:has([data-admin-workspace]) :is(.aws-settings-save-action,.aws-settings-footer .app-btn) {width:auto;flex:none;}
+.aws-console:has([data-admin-workspace]) [hidden] {display:none!important;}
+@media(max-width:1000px){.aws-console:has([data-admin-workspace]) .erp-detail-facts{grid-template-columns:repeat(2,minmax(0,1fr));}.aws-console:has([data-admin-workspace]) .erp-detail-facts>div{padding:0 16px;border-right:1px solid #eaeded;}.aws-console:has([data-admin-workspace]) .erp-detail-facts>div:nth-child(2n+1){padding-left:0;}.aws-console:has([data-admin-workspace]) .erp-detail-facts>div:nth-child(2n){border-right:0;}}
+@media(max-width:640px){.aws-console:has([data-admin-workspace]) :is(.erp-detail-facts,.admin-role-grid,.product-identity-grid,.product-builder-grid.two-up){grid-template-columns:minmax(0,1fr);}.aws-console:has([data-admin-workspace]) .erp-detail-facts>div{padding:0!important;border:0!important;}.aws-console:has([data-admin-workspace]) :is(.admin-user-section-body,.admin-role-grid,.aws-settings-form,.product-builder-section-body){padding:16px;}.aws-console:has([data-admin-workspace]) .product-config-save-state{flex-basis:100%;margin:0;}.aws-console:has([data-admin-workspace]) .product-config-step-nav button{padding-left:16px;padding-right:16px;}}
+@media print{.aws-console:has([data-admin-workspace]) .product-config-step-nav{display:none;}.aws-console:has([data-admin-workspace]) .product-config-workspace.is-enhanced [data-product-config-step]:not(.is-active){display:block!important;}.aws-console:has([data-admin-workspace]) [data-product-config-panel][hidden]{display:block!important;}}

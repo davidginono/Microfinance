@@ -870,7 +870,7 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void adminLoanProductsUseCatalogSelectionAndProgressiveConfiguration() throws Exception {
+    void adminLoanProductsUseResourceTableFocusedCreationAndInPlaceConfiguration() throws Exception {
         String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
         String productEdit = read(JSP_ROOT.resolve("admin/loan-product-edit.jsp"));
         String workflowScript = read(JSP_ROOT.resolve("fragments/loan-product-workflow-script.jspf"));
@@ -878,13 +878,13 @@ class AwsConsoleViewContractTest {
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(settings)
-            .contains("Select a loan product")
-            .contains("product-catalog-grid")
-            .contains("data-product-config-card")
-            .contains("data-product-card-toggle")
-            .contains("See more")
+            .contains("data-resource-table=\"admin-loan-products\"")
+            .contains("data-resource-split")
+            .contains("section=loan&amp;task=create")
+            .contains("product-builder-form accounting-create-form admin-product-create")
+            .doesNotContain("data-product-modal=\"product-${product.id}\"")
             .contains("/admin/settings-controls/loan-products/${product.id}/edit")
-            .contains("Configure product")
+            .contains("code=\"admin.workspace.configureProduct\"")
             .doesNotContain("Step 1 of 2")
             .doesNotContain("loan-products-versions")
             .doesNotContain("data-product-modal-open=\"versions-${product.id}\"")
@@ -907,7 +907,7 @@ class AwsConsoleViewContractTest {
             .contains("data-product-config-previous")
             .contains("data-product-config-next")
             .contains("data-product-config-save-state")
-            .contains("Save product")
+            .contains("code=\"admin.workspace.saveProduct\"")
             .contains("action=\"/admin/settings-controls/${product.id}\"");
         assertThat(workflowScript)
             .contains("activateStep")
@@ -915,7 +915,7 @@ class AwsConsoleViewContractTest {
             .contains("'Continue to ' + stepLabel")
             .contains("form.addEventListener('invalid'")
             .contains("disclosure.open = true")
-            .contains("saveState.textContent = 'Unsaved changes'")
+            .contains("saveState.dataset.unsavedLabel")
             .contains("window.sessionStorage.setItem(storageKey")
             .contains("const workflowScrollTarget = (step) =>")
             .contains("step.querySelector('.product-config-subsection')")
