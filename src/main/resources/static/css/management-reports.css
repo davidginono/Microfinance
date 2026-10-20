@@ -1,5 +1,10 @@
 .management-workspace,.management-preview{min-width:0;max-width:100%}
 .budget-months .aws-control{width:100%;max-width:24rem}.budget-months .erp-table-scroll{max-height:none}
+.budget-create-form{display:grid;gap:20px;min-width:0;max-width:100%}
+.budget-create-form .accounting-grid>label{display:grid;gap:4px;min-width:0;font-size:14px;line-height:20px}
+.budget-create-form .budget-months .erp-table-scroll{max-width:728px}
+.budget-create-form .budget-months .erp-table{width:100%;min-width:0;table-layout:fixed}
+.budget-create-form .budget-months th:first-child{width:40%}
 .management-parameters{padding:0 1rem 1rem}.management-parameters>.erp-panel-header{margin:0 -1rem 1rem}
 .management-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}
 .management-filter-grid label{display:flex;flex-direction:column;gap:.3rem;min-width:0}
