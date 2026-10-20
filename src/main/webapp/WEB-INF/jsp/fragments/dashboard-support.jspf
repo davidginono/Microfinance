@@ -1,0 +1,31 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+<sec:authentication property="name" var="dashboardLayoutUser" />
+<link rel="stylesheet" href="<c:url value='/css/dashboard-board.css' />" />
+<template id="dashboard-labels"
+ data-scope="<c:out value='${dashboardLayoutUser}|${activesaccoId}|${headerStation.stationId}|${currentMember.position}' />"
+ data-icons="<c:url value='/icons/dashboard/' />"
+ data-reset="<spring:message code='dashboard.layout.reset' />" data-add="<spring:message code='dashboard.layout.add' />"
+ data-add-item="<spring:message code='common.add' />" data-added="<spring:message code='dashboard.layout.added' />"
+ data-search="<spring:message code='dashboard.layout.search' />" data-no-matches="<spring:message code='select.noMatches' />"
+ data-close="<spring:message code='common.close' />" data-clear="<spring:message code='common.clear' />" data-empty="<spring:message code='dashboard.layout.empty' />"
+ data-overview="<spring:message code='dashboard.widget.overview' />" data-actions="<spring:message code='common.actions' />"
+ data-move="<spring:message code='dashboard.layout.move' />" data-resize="<spring:message code='dashboard.layout.resize' />"
+ data-move-help="<spring:message code='dashboard.layout.moveHelp' />" data-resize-help="<spring:message code='dashboard.layout.resizeHelp' />"
+ data-preferences="<spring:message code='dashboard.layout.preferences' />" data-remove="<spring:message code='dashboard.layout.remove' />"
+ data-removed="<spring:message code='dashboard.layout.removed' />" data-moved="<spring:message code='dashboard.layout.moved' />"
+ data-move-earlier="<spring:message code='dashboard.layout.earlier' />" data-move-later="<spring:message code='dashboard.layout.later' />"
+ data-width="<spring:message code='dashboard.layout.width' />" data-height="<spring:message code='dashboard.layout.height' />"
+ data-short="<spring:message code='dashboard.layout.short' />" data-medium="<spring:message code='dashboard.layout.medium' />" data-tall="<spring:message code='dashboard.layout.tall' />"
+ data-cancel="<spring:message code='common.cancel' />" data-apply="<spring:message code='common.apply' />" data-restored="<spring:message code='dashboard.layout.restored' />"
+ data-view-data="<spring:message code='dashboard.chart.viewData' />" data-series="<spring:message code='dashboard.chart.series' />"
+ data-category="<spring:message code='dashboard.chart.category' />" data-chart="<spring:message code='dashboard.chart.title' />"
+ data-no-data="<spring:message code='dashboard.chart.noData' />" data-no-activity="<spring:message code='dashboard.chart.noActivity' />" data-no-series="<spring:message code='dashboard.chart.noSeries' />"
+ data-partial-data="<spring:message code='dashboard.chart.partialData' />"
+ data-logins="<spring:message code='dashboard.metric.logins' />" data-period="<spring:message code='dashboard.chart.period' />"
+ data-database-size="<spring:message code='dashboard.metric.databaseSize' />" data-connection-usage="<spring:message code='dashboard.metric.connectionUsage' />"
+ data-loading="<spring:message code='common.loading' />" data-load-error="<spring:message code='dashboard.chart.loadError' />"></template>
+<script src="<c:url value='/js/dashboard-board.js' />" defer></script>
+<script src="<c:url value='/js/dashboard-charts.js' />" defer></script>
+<script src="<c:url value='/js/dashboard-data.js' />" defer></script>

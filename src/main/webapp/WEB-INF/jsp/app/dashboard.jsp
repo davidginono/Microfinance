@@ -6,6 +6,7 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<%@ include file="../fragments/dashboard-support.jspf" %>
 
 <%!
 private static String esc(Object value) {
@@ -223,7 +224,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Borrower Dashboard</h1>
+    <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true"><spring:message code="dashboard.borrower.title" /></h1>
     <p class="mt-1 text-lg font-semibold text-sacco-ink">
         <spring:message code="dashboard.welcome" text="Welcome" />,
         <c:choose>
@@ -261,9 +262,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </c:if>
 
+    <div data-dashboard-board="client">
     <c:choose>
         <c:when test="${dashboardProgressive}">
-            <div class="erp-stat-grid" aria-busy="true">
+            <div class="erp-stat-grid" aria-busy="true" data-dashboard-widget="overview" data-widget-width="4" data-widget-height="360" data-widget-title="<spring:message code='dashboard.widget.overview' />">
                 <div class="erp-stat-card erp-stat-blue">
                     <div class="erp-stat-main">
                         <div>
@@ -302,7 +304,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </div>
             </div>
 
-            <section class="erp-panel" data-live-account-status-url="${pageContext.request.contextPath}/app/dashboard/external-account-status">
+            <section class="erp-panel" data-dashboard-widget="credit-profile" data-widget-width="2" data-widget-height="320" data-live-account-status-url="${pageContext.request.contextPath}/app/dashboard/external-account-status">
                 <div class="erp-panel-header">
                     <p class="erp-panel-title"><spring:message code="dashboard.panel.financialStatus" /></p>
                 </div>
@@ -321,8 +323,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </div>
             </section>
 
-            <div class="grid min-w-0 items-start gap-4 xl:grid-cols-2" aria-busy="true">
-                <section class="erp-panel min-w-0">
+            <div data-dashboard-source-layout class="grid min-w-0 items-start gap-4 xl:grid-cols-2" aria-busy="true">
+                <section class="erp-panel min-w-0" data-dashboard-widget="current-application" data-widget-width="2" data-widget-height="480">
                     <div class="erp-panel-header">
                         <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
                     </div>
@@ -330,7 +332,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <div class="erp-section text-center text-sm text-slate-500"><spring:message code="common.loading" /></div>
                     </div>
                 </section>
-                <section class="erp-panel min-w-0 xl:self-start">
+                <section class="erp-panel min-w-0 xl:self-start" data-dashboard-widget="active-loans" data-widget-width="2" data-widget-height="480">
                     <div class="erp-panel-header">
                         <p class="erp-panel-title"><spring:message code="dashboard.activeLoans.title" text="Active Loans" /></p>
                     </div>
@@ -344,7 +346,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             </div>
         </c:when>
         <c:otherwise>
-    <div class="erp-stat-grid">
+    <div class="erp-stat-grid" data-dashboard-widget="overview" data-widget-width="4" data-widget-height="360" data-widget-title="<spring:message code='dashboard.widget.overview' />">
         <a href="/app/loan-applications" class="erp-stat-card erp-stat-card-interactive erp-stat-blue block no-underline">
             <div class="erp-stat-main">
                 <div>
@@ -356,7 +358,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </span>
             </div>
         </a>
-        <button type="button" class="erp-stat-card erp-stat-card-interactive erp-stat-green block w-full border-0 text-left" data-active-loans-card-trigger>
+        <button type="button" class="erp-stat-card erp-stat-card-interactive erp-stat-green block w-full border-0 text-left" data-dashboard-reveal="active-loans" data-active-loans-card-trigger>
             <div class="erp-stat-main">
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
@@ -391,7 +393,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </a>
     </div>
 
-    <section class="erp-panel" data-live-account-status-url="${pageContext.request.contextPath}/app/dashboard/external-account-status">
+    <section class="erp-panel" data-dashboard-widget="credit-profile" data-widget-width="2" data-widget-height="320" data-live-account-status-url="${pageContext.request.contextPath}/app/dashboard/external-account-status">
         <div class="erp-panel-header">
             <p class="erp-panel-title"><spring:message code="dashboard.panel.financialStatus" /></p>
         </div>
@@ -416,8 +418,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </section>
 
-    <div class="grid min-w-0 items-start gap-4 xl:grid-cols-2">
-        <section class="erp-panel min-w-0">
+    <div data-dashboard-source-layout class="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+        <section class="erp-panel min-w-0" data-dashboard-widget="current-application" data-widget-width="2" data-widget-height="480">
             <div class="erp-panel-header">
                 <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
             </div>
@@ -497,7 +499,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             </div>
         </section>
 
-        <section id="memberActiveLoansPanel" class="erp-panel min-w-0 xl:self-start">
+        <section id="memberActiveLoansPanel" class="erp-panel min-w-0 xl:self-start" data-dashboard-widget="active-loans" data-widget-width="2" data-widget-height="480">
             <div class="erp-panel-header">
                 <p class="erp-panel-title"><spring:message code="dashboard.activeLoans.title" text="Active Loans" /></p>
             </div>
@@ -623,6 +625,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     </div>
         </c:otherwise>
     </c:choose>
+    </div>
 </section>
 
 <script>

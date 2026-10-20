@@ -20,6 +20,10 @@ Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/c
 
 Apply the [observed AWS finder workflow](../microfinance-ui-style/references/aws-instance-type-finder.md) through the existing shared JSP shell. Desktop dashboards and focused workspaces start with navigation collapsed; opening it is local to the current page. Table queries, preview updates, expandable settings and detail tabs retain the current document. Financial submissions retain their existing server commands and safeguards.
 
+## Configurable dashboards
+
+Use the [shared Cloudscape dashboard and visualization contract](../microfinance-ui-style/references/cloudscape-dashboards.md) for administrator, staff and borrower dashboards. Widget customization changes presentation only; retain the authorized institution/branch data, explicit permissions and existing financial commands. Keep registries and full portfolios in their workspaces. Never turn unavailable data into a zero, a health score or a positive credit result.
+
 ## Operational Views
 
 - The sidebar owns global workspace navigation. Body actions operate on the current record or task; do not duplicate sidebar destinations inside panels.

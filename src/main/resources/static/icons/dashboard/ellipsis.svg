@@ -1,0 +1,7 @@
+<!-- Cloudscape icon geometry, Amazon.com, Apache-2.0. See ../../js/vendor/cloudscape-icons.LICENSE. -->
+<svg fill="none" stroke="#545b64" stroke-width="2" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+<style>.filled{fill:#545b64}.no-stroke{stroke:none}.stroke-linejoin-round{stroke-linejoin:round}</style>
+<circle cx="8" cy="2.5" r="1.5" class="filled no-stroke awsui-icon-dot-1"/>
+<circle cx="8" cy="13.5" r="1.5" class="filled no-stroke awsui-icon-dot-3"/>
+<circle cx="8" cy="8" r="1.5" class="filled no-stroke"/>
+</svg>

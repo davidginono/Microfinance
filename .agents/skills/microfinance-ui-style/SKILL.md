@@ -1,6 +1,6 @@
 ---
 name: microfinance-ui-style
-description: Build or restyle Microfinance JSP interfaces using the existing compact ERP shell, shared CSS, forms, controls, and modals. Use for rendered UI changes without introducing a new frontend framework.
+description: Build or restyle Microfinance JSP dashboards, data visualizations, and interfaces using the existing compact ERP shell, shared CSS, forms, controls, and modals. Use for rendered UI changes without introducing a new frontend framework.
 ---
 
 # Microfinance UI Style
@@ -8,6 +8,10 @@ description: Build or restyle Microfinance JSP interfaces using the existing com
 ## Permanent resource-management patterns
 
 Follow Cloudscape [create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/) using existing JSP/shared ERP components. Focused create pages use grouped primary fields, expandable optional information, repeated numbered transaction fieldsets, preserved validation values, dirty-exit confirmation and bottom Cancel/Preview/Post actions. Details show the institution, branch, transaction breakdown, totals, posting identity and linked corrections. Voucher approval follows the branch configuration and explicit claims in `AGENTS.md`; retain direct posting where disabled. Core vouchers remain PDF/print; the financial-statement workspace has its authorized Excel exception; PDF vouchers repeat table headings and page numbers and never clip long descriptions.
+
+## Dashboards and data visuals
+
+For dashboard changes and reusable charts, follow the [Cloudscape dashboard and data visualization contract](references/cloudscape-dashboards.md). Use the shared configurable JSP widgets, scoped layout preferences, accessible charts and real data lifecycle. The supplied Console Home reference controls dashboard layout; resource registries retain their separate table patterns.
 
 ## Workflow animation reference
 

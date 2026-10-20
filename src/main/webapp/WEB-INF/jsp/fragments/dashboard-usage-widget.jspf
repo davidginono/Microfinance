@@ -1,0 +1,11 @@
+<section class="erp-panel" data-dashboard-widget="usage" data-widget-width="3" data-widget-min-width="2" data-widget-height="480"
+ data-dashboard-source="usage" data-dashboard-url="<c:url value='/admin/dashboard/usage-activity' />">
+ <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.widget.usage" /></h2></div>
+ <div class="erp-panel-body">
+  <div class="dashboard-data-tools"><label><spring:message code="dashboard.chart.period" /><select data-dashboard-range><option value="today"><spring:message code="dashboard.period.today" /></option><option value="7d"><spring:message code="dashboard.period.week" /></option><option value="30d"><spring:message code="dashboard.period.month" /></option></select></label><button type="button" class="app-btn btn-neutral" data-dashboard-refresh><spring:message code="common.refresh" /></button></div>
+  <div class="dashboard-usage-content"><div><dl class="dashboard-data-metrics"><div><dt><spring:message code="dashboard.metric.onlineUsers" /></dt><dd data-dashboard-metric="activeUsers">—</dd></div><div><dt><spring:message code="dashboard.metric.sessions" /></dt><dd data-dashboard-metric="activeSessions">—</dd></div><div><dt><spring:message code="dashboard.metric.pageViews" /></dt><dd data-dashboard-metric="pageViews">—</dd></div><div><dt><spring:message code="dashboard.metric.logins" /></dt><dd data-dashboard-metric="logins">—</dd></div></dl><p class="dashboard-data-status"><spring:message code="dashboard.metric.onlineWindow" /></p></div><div>
+  <div class="dashboard-data-status" data-dashboard-data-status role="status"><spring:message code="common.loading" /></div><button type="button" class="app-btn btn-neutral" data-dashboard-retry hidden><spring:message code="common.refresh" /></button>
+  <div class="dashboard-chart" data-live-chart="timeline"></div></div></div>
+  <p class="dashboard-data-updated"><spring:message code="admin.dashboard.updated" />: <span data-dashboard-metric="updated">—</span></p>
+ </div>
+</section>

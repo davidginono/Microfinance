@@ -1,0 +1,6 @@
+<!-- Cloudscape icon geometry, Amazon.com, Apache-2.0. See ../../js/vendor/cloudscape-icons.LICENSE. -->
+<svg fill="none" stroke="#545b64" stroke-width="2" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+<style>.filled{fill:#545b64}.no-stroke{stroke:none}.stroke-linejoin-round{stroke-linejoin:round}</style>
+<path d="M2 1.70996L14 13.71" class="stroke-linejoin-round"/>
+<path d="M2 13.71L14 1.70996" class="stroke-linejoin-round"/>
+</svg>
