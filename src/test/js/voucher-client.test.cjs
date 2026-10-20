@@ -1,19 +1,68 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
-const tick=()=>new Promise(r=>setTimeout(r,0));
-function setup(approval=false){
- const line=approval?`<tr data-editor-line><td><input type="checkbox" data-line-select></td><td data-line-number>1</td><td><input name="rows[0].description"></td><td><span class="approval-account"><input type="hidden" name="rows[0].debitAccountId"><input data-account-label readonly><button type="button" data-account-pick>Choose</button></span></td><td><input name="rows[0].amount" value="1.00"></td></tr>`:`<div data-voucher-row><span data-row-number>1</span>${['transactionId','templateKey','component','loanId','debitAccountId','creditAccountId','description','amount'].map(n=>`<input name="rows[0].${n}" value="${n==='amount'?'1.00':''}">`).join('')}<span data-manual-accounts><button type="button" data-account-for="rows[0].creditAccountId">Choose</button></span><button type="button" data-manual>Manual</button><span data-mapping-label></span><button type="button" data-remove-row>Remove</button></div>`;
- const dialog=approval?`<dialog class="approval-dialog" data-account-dialog><h2 data-client-title="Client" data-account-title="Account">Account</h2><input data-account-search><span data-account-status></span><div data-account-results></div><button data-account-more>More</button><button data-dialog-close>Close</button></dialog>`:`<div id="voucher-picker" hidden><button data-picker-close>Close</button><form data-picker-search><input name="search"></form><span data-picker-status></span><div data-picker-results></div><button data-picker-prev>Previous</button><button data-picker-next>Next</button></div>`;
- const html=approval?`<form data-approval-editor data-client-url="/finance/approval/id/clients" data-account-url="/finance/approval/id/accounts"><span class="approval-account"><input type="hidden" name="clientId"><input data-account-label readonly><button type="button" data-client-pick>Client</button><button type="button" data-client-clear>Clear</button></span><button data-editor-submit>Submit</button><table><tbody data-editor-lines>${line}</tbody></table></form>${dialog}`:`<form data-voucher-form data-base="/finance/vouchers/receipts"><select data-receipt-purpose name="receiptPurpose"><option>OTHER</option><option>LOAN_REPAYMENT</option></select><input name="reference"><input name="interestAccountId"><div class="voucher-account-choice"><input type="hidden" name="clientId"><span data-account-label></span><button type="button" data-voucher-client data-choice-for="clientId">Client</button><button type="button" data-client-clear>Clear</button></div><div data-voucher-rows>${line}</div><span data-row-status></span><button type="button" data-add-row>Add</button><output data-live-total></output></form>${dialog}`;
- const dom=new JSDOM(html,{url:'http://localhost',runScripts:'outside-only'}),w=dom.window,calls=[];
- w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
- w.AppSearch={bind:()=>({cancel(){},run(){}})};w.fetch=async url=>{calls.push(String(url));return {ok:true,json:async()=>[{id:'client-1',name:'Synthetic client',number:'CL-001',label:'Synthetic client · CL-001'}]};};
- w.eval(fs.readFileSync(`src/main/resources/static/js/${approval?'voucher-approval':'accounting-vouchers'}.js`,'utf8'));return {dom,w,d:w.document,calls};
+const read=name=>fs.readFileSync('src/main/resources/static/js/'+name,'utf8');
+const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+const select=(attrs,label='Choose')=>`<select data-voucher-select ${attrs}><option value="">${label}</option></select>`;
+const hidden=(name,value='')=>`<input type="hidden" name="${name}" value="${value}">`;
+const account=(name,attrs,approval=false)=>`<span class="${approval?'approval-account':'voucher-account-choice'}">${hidden(name)}${approval?'<input data-account-label readonly hidden>':'<span data-account-label hidden></span>'}${select(attrs)}</span>`;
+const response=data=>({ok:true,redirected:false,json:async()=>data});
+async function setup(approval=false,fetcher){
+ const row=approval?`<tr data-editor-line><td><input type="checkbox" data-line-select></td><td data-line-number>1${hidden('rows[0].transactionId')}${hidden('rows[0].templateKey')}${hidden('rows[0].component','TOTAL')}</td><td><input name="rows[0].description"></td><td>${account('rows[0].debitAccountId','data-account-pick aria-label="Debit account"',true)}</td><td><input name="rows[0].amount" value="1.00"></td></tr>`:`<fieldset data-voucher-row><legend data-row-number>1</legend>${hidden('rows[0].transactionId')}${hidden('rows[0].templateKey')}${hidden('rows[0].component','TOTAL')}${select('data-mapping data-other-only aria-label="Transaction"','Choose transaction')}<button type="button" data-manual data-other-only>Manual</button><span data-mapping-label></span><div data-loan-only>${account('rows[0].loanId','data-loan-choice="loans" data-choice-for="rows[0].loanId" aria-label="Loan"')}</div><div data-manual-accounts>${account('rows[0].creditAccountId','data-account-for="rows[0].creditAccountId" aria-label="Credit account"')}</div><input name="rows[0].description"><input name="rows[0].amount" value="1.00"><button type="button" data-remove-row>Remove</button></fieldset>`;
+ const html=approval?`<form data-approval-editor data-lookup-error="Lookup failed" data-client-url="/finance/approval/id/clients" data-account-url="/finance/approval/id/accounts">${account('clientId','data-client-pick aria-label="Client"',true)}<button data-editor-submit>Submit</button><button type="button" data-line-add>Add</button><table><tbody data-editor-lines>${row}</tbody></table></form>`:`<form data-voucher-form data-base="/finance/vouchers/receipts" data-lookup-error="Lookup failed"><select data-receipt-purpose name="receiptPurpose"><option>OTHER</option><option>LOAN_REPAYMENT</option></select><input name="reference"><input name="interestAccountId">${account('clientId','data-voucher-client data-choice-for="clientId" aria-label="Client"')}${account('moneyAccountId','data-account-for="moneyAccountId" data-money-only aria-label="Money account"')}<div data-voucher-rows>${row}</div><span data-row-status></span><button type="button" data-add-row>Add</button><output data-live-total></output></form>`;
+ const dom=new JSDOM(`<body data-select-search="Search options" data-select-no-matches="No matches" data-select-load-more="Load more" data-shell-select="Choose" data-shell-no-options="No options" data-shell-loading="Loading">${html}</body>`,{url:'http://localhost',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document,calls=[];
+ const clear=d.createElement('button');clear.type='button';clear.dataset.clientClear='';clear.textContent='Clear';d.querySelector('input[name=clientId]').parentElement.append(clear);
+ w.HTMLElement.prototype.scrollIntoView=function(){};w.fetch=async(url,options)=>{calls.push(String(url));return fetcher?fetcher(new URL(url),options):response([{id:'client-1',name:'Synthetic client',number:'CL-001',label:'Synthetic client'}]);};
+ w.eval(read('live-search.js'));w.eval(read('select-enhancer.js'));
+ if(d.readyState!=='complete')await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));
+ w.eval(read('voucher-selects.js'));w.eval(read(approval?'voucher-approval.js':'accounting-vouchers.js'));await tick();
+ const open=async control=>{control.closest('.neo-select').querySelector('button').click();await tick();};
+ const options=()=>[...d.querySelectorAll('.neo-select--open')].flatMap(wrapper=>{const button=wrapper.querySelector('button');return [...d.querySelectorAll('#'+button.getAttribute('aria-controls')+' .neo-select-option')];});
+ return {dom,w,d,calls,open,options};
 }
-for(const approval of [false,true])test(`${approval?'approval':'ordinary'} client picker uses scoped endpoint, binds selection and clears it`,async()=>{
- const {dom,w,d,calls}=setup(approval);let submits=0;d.querySelector('form').addEventListener('submit',e=>{e.preventDefault();submits++;});
- d.querySelector(approval?'[data-client-pick]':'[data-voucher-client]').click();await tick();assert.match(calls[0],/\/clients\?search=&page=0$/);
- const result=d.querySelector(approval?'[data-account-results] button':'[data-picker-results] button');assert.equal(result.textContent,'Synthetic client · CL-001');result.click();assert.equal(d.querySelector('[name=clientId]').value,'client-1');assert.equal(submits,0);
- if(approval)assert.equal(d.querySelector('[data-editor-submit]').disabled,true);
- else{const purpose=d.querySelector('[data-receipt-purpose]');purpose.value='LOAN_REPAYMENT';purpose.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[name=clientId]').value,'client-1');d.querySelector('[data-voucher-client]').click();await tick();assert.match(calls.at(-1),/\/loan-choices\/clients\?/);purpose.value='OTHER';purpose.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[name=clientId]').value,'client-1');}
- d.querySelector('[data-client-clear]').click();assert.equal(d.querySelector('[name=clientId]').value,'');dom.window.close();
+for(const approval of [false,true])test(`${approval?'approval':'ordinary'} voucher client dropdown searches, binds and clears without submitting`,async()=>{
+ const {dom,w,d,calls,open,options}=await setup(approval);try{
+  let submits=0;d.querySelector('form').addEventListener('submit',event=>{event.preventDefault();submits++;});
+  const control=d.querySelector(approval?'[data-client-pick]':'[data-voucher-client]');assert.ok(control.closest('.neo-select').querySelector('.neo-select-chevron'));
+  await open(control);assert.match(calls[0],/\/clients\?search=&page=0$/);assert.equal(options()[0].textContent,'Synthetic client');options()[0].click();
+  assert.equal(d.querySelector('[name=clientId]').value,'client-1');assert.equal(submits,0);
+  if(approval)assert.equal(d.querySelector('[data-editor-submit]').disabled,true);
+  else{const purpose=d.querySelector('[data-receipt-purpose]');purpose.value='LOAN_REPAYMENT';purpose.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[name=clientId]').value,'client-1');await open(control);assert.match(calls.at(-1),/\/loan-choices\/clients\?/);w.refreshEnhancedSelects();purpose.value='OTHER';purpose.dispatchEvent(new w.Event('change'));}
+  d.querySelector('[data-client-clear]').click();assert.equal(d.querySelector('[name=clientId]').value,'');assert.equal(control.value,'');
+ }finally{dom.window.close();}
+});
+test('client changes invalidate loan choices, and new voucher rows bind their own dropdowns',async()=>{
+ const {dom,w,d,open,options,calls}=await setup(false,url=>response(url.pathname.endsWith('/loans')?[{id:'loan-1',label:'Loan 1'}]:[{id:url.searchParams.get('search')?'client-2':'client-1',name:url.searchParams.get('search')?'Second client':'First client'}]));try{
+  const purpose=d.querySelector('[data-receipt-purpose]');purpose.value='LOAN_REPAYMENT';purpose.dispatchEvent(new w.Event('change'));
+  let loan=d.querySelector('[data-loan-choice]');assert.equal(loan.disabled,true);const client=d.querySelector('[data-voucher-client]');await open(client);options()[0].click();assert.equal(loan.disabled,false);
+  await open(loan);assert.match(calls.at(-1),/clientId=client-1/);options()[0].click();assert.equal(d.querySelector('[name="rows[0].loanId"]').value,'loan-1');
+  await open(client);const search=w.NeoSelect.search(client).input;search.value='Second';search.dispatchEvent(new w.Event('input',{bubbles:true}));search.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await tick();options()[0].click();assert.equal(loan.value,'');assert.equal(d.querySelector('[name="rows[0].loanId"]').value,'');
+  d.querySelector('[data-add-row]').click();loan=d.querySelectorAll('[data-loan-choice]')[1];await open(loan);assert.match(calls.at(-1),/clientId=client-2/);options()[0].click();assert.equal(d.querySelector('[name="rows[1].loanId"]').value,'loan-1');
+ }finally{dom.window.close();}
+});
+test('transaction mappings retain their exact template/component and manual mode restores account selectors',async()=>{
+ const mapping={transactionId:'transaction-1',templateKey:'template-1',transactionName:'Expense',component:'PRINCIPAL',debit:{name:'Expense account'},credit:{name:'Cash'}};
+ const {dom,d,open,options}=await setup(false,url=>response(url.pathname.endsWith('/transactions')?[mapping]:[{id:'account-1',name:'Cash account',purpose:'CASH'},{id:'account-2',name:'Expense',purpose:'ORDINARY'}]));try{
+  await open(d.querySelector('[data-money-only]'));assert.equal(options().length,1);options()[0].click();assert.equal(d.querySelector('[name=moneyAccountId]').value,'account-1');
+  await open(d.querySelector('[data-mapping]'));options()[0].click();assert.equal(d.querySelector('[name="rows[0].transactionId"]').value,'transaction-1');assert.equal(d.querySelector('[name="rows[0].templateKey"]').value,'template-1');assert.equal(d.querySelector('[name="rows[0].component"]').value,'PRINCIPAL');assert.equal(d.querySelector('[data-manual-accounts]').hidden,true);
+  d.querySelector('[data-manual]').click();assert.equal(d.querySelector('[name="rows[0].templateKey"]').value,'');assert.equal(d.querySelector('[name="rows[0].component"]').value,'TOTAL');assert.equal(d.querySelector('[data-manual-accounts]').hidden,false);
+ }finally{dom.window.close();}
+});
+test('approval rows added during editing have independent account dropdowns',async()=>{
+ const {dom,d,open,options}=await setup(true,()=>response([{id:'account-1',name:'Expense account'}]));try{
+  d.querySelector('[data-line-add]').click();await open(d.querySelectorAll('[data-account-pick]')[1]);options()[0].click();assert.equal(d.querySelector('[name="rows[1].debitAccountId"]').value,'account-1');assert.equal(d.querySelector('[name="rows[0].debitAccountId"]').value,'');
+ }finally{dom.window.close();}
+});
+test('voucher dropdowns reject stale searches and retain selection on empty or failed lookups',async()=>{
+ let releaseOld;
+ const {dom,w,d,open,options}=await setup(false,url=>{const query=url.searchParams.get('search');if(query==='old')return new Promise(resolve=>releaseOld=()=>resolve(response([{id:'stale',name:'Old result'}])));if(query==='fail')throw Error();return response(query?[]:[{id:'client-1',name:'First client'}]);});try{
+  const client=d.querySelector('[data-voucher-client]');await open(client);options()[0].click();await open(client);const ui=w.NeoSelect.search(client);
+  const search=async value=>{ui.input.value=value;ui.input.dispatchEvent(new w.Event('input',{bubbles:true}));ui.input.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await tick();};
+  await search('old');await search('new');releaseOld();await tick();assert.equal(options().length,0);assert.equal(client.value,'client-1');assert.equal(d.querySelector('[name=clientId]').value,'client-1');
+  await search('fail');assert.equal(d.querySelector('.neo-select-menu [role=alert]').textContent,'Lookup failed');assert.equal(client.value,'client-1');
+ }finally{dom.window.close();}
+});
+test('Load more uses bounded server pages and caps retained voucher options',async()=>{
+ const {dom,w,d,open,options,calls}=await setup(false,url=>response(Array.from({length:26},(_,i)=>({id:'client-'+(Number(url.searchParams.get('page'))*25+i),name:'Client '+(Number(url.searchParams.get('page'))*25+i)}))));try{
+  const client=d.querySelector('[data-voucher-client]');await open(client);assert.equal(options().length,25);const ui=w.NeoSelect.search(client);assert.equal(ui.more.hidden,false);
+  for(let page=1;page<=5;page++){ui.more.click();await tick();assert.match(calls.at(-1),new RegExp('page='+page+'$'));assert.ok(client.options.length<=101);}
+ }finally{dom.window.close();}
 });

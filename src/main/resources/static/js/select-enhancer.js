@@ -34,7 +34,7 @@
                 state.footer.textContent = document.body.dataset.selectLoadMore; state.footer.hidden = true; state.menu.append(state.footer);
             }
             renderEnhancedSelect(select);
-            return {input:state.search, more:state.footer, setLoading(loading) {state.loading=loading;state.list.setAttribute('aria-busy',String(loading));renderEnhancedSelect(select);}};
+            return {input:state.search, more:state.footer, setLoading(loading) {state.loading=loading;state.list.setAttribute('aria-busy',String(loading));renderEnhancedSelect(select);}, setError(message) {state.lookupError=message;renderEnhancedSelect(select);}};
         }};
 
         function selectOpen(state) {state.select.dispatchEvent(new CustomEvent('neo-select:open'));}
@@ -126,6 +126,12 @@
                 state.list.after(loading);
             }
             select.dispatchEvent(new CustomEvent('neo-select:render', { detail: { menu: state.menu } }));
+
+            if (state.lookupError && !state.loading) {
+                const error = document.createElement('div');error.className = 'neo-select-empty';error.setAttribute('role','alert');error.textContent = state.lookupError;state.list.append(error);
+                if (state.wrapper.classList.contains('neo-select--open')) positionMenu(state);
+                return;
+            }
 
             if (!visibleOptions.length && !state.loading) {
                 const emptyState = document.createElement('div');
