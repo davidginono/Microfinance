@@ -156,13 +156,14 @@ test('selecting the current workspace cancels a pending switch and keeps entered
  }finally{dom.window.close();}
 });
 
-test('a first visit keeps the workspace available with slim request progress and restores inputs on failure or cancellation',async()=>{
+test('a first visit uses the normal workspace spinner and restores inputs on failure or cancellation',async()=>{
  const {dom,w,d,requests}=await setup({holdNavigation:true});try{
   const main=d.querySelector('main'),header=d.querySelector('#shellTopNav'),input=d.querySelector('input');input.value='Keep my entry';
   const visit=w.WorkspaceNavigation.visit('/admin/users'),pending=requests.find(r=>r.url.pathname==='/admin/users');
   const status=d.querySelector('#workspace-navigation-feedback');
   assert.equal(status.textContent,'');assert.equal(status.getAttribute('aria-label'),'Loading workspace');
-  assert.equal(status.querySelector('.app-loading-spinner'),null);assert.equal(status.classList.contains('workspace-navigation-progress'),true);
+  assert.equal(status.querySelector('.app-loading-spinner').dataset.loadingSize,'large');assert.equal(status.classList.contains('workspace-navigation-spinner'),true);
+  assert.equal(status.querySelector('.app-loading-spinner').getAttribute('aria-hidden'),'true');
   assert.equal(main.classList.contains('is-workspace-preview'),false);
   assert.equal(main.classList.contains('is-workspace-pending'),true);assert.equal(main.getAttribute('aria-busy'),'true');
   assert.equal(d.querySelector('#shellTopNav'),header);assert.equal(d.querySelector('input'),input);
@@ -217,7 +218,7 @@ test('failed warm navigation and resize restore the same original form nodes wit
   assert.equal(d.querySelector('.workspace-layout-preview'),null);assert.equal(d.querySelector('input'),input);assert.equal(input.value,'Retain edited draft');assert.ok(d.querySelector('[role=alert]'));
   let resolve;pages.set('/admin/dashboard',new Promise(done=>resolve=done));const pending=w.WorkspaceNavigation.visit('/admin/dashboard');assert.ok(d.querySelector('.workspace-layout-preview'));
   Object.defineProperty(w,'innerWidth',{value:360,configurable:true});w.dispatchEvent(new w.Event('resize'));
-  assert.equal(main.classList.contains('is-workspace-preview'),false);assert.ok(d.querySelector('.workspace-navigation-progress'));assert.equal(d.querySelector('input'),input);
+  assert.equal(main.classList.contains('is-workspace-preview'),false);assert.ok(d.querySelector('.workspace-navigation-spinner .app-loading-spinner'));assert.equal(d.querySelector('input'),input);
   assert.equal(requests.filter(r=>r.url.pathname==='/admin/dashboard').length,2);
   await w.WorkspaceNavigation.visit('/admin/users');resolve(html('Dashboard'));await pending;
   assert.equal(d.querySelector('#workspace-navigation-feedback'),null);assert.equal(input.value,'Retain edited draft');
@@ -239,7 +240,7 @@ test('layout previews are exact-query and viewport specific and leave pending da
  const {dom,w,d,pages}=await setup();try{
   layoutFixture(d);await w.WorkspaceNavigation.visit('/admin/users');layoutFixture(d);
   pages.set('/admin/dashboard?changed=true',html('Other results'));
-  const query=w.WorkspaceNavigation.visit('/admin/dashboard?changed=true');assert.ok(d.querySelector('.workspace-navigation-progress'));assert.equal(d.querySelector('.workspace-layout-preview'),null);await query;
+  const query=w.WorkspaceNavigation.visit('/admin/dashboard?changed=true');assert.ok(d.querySelector('.workspace-navigation-spinner .app-loading-spinner'));assert.equal(d.querySelector('.workspace-layout-preview'),null);await query;
   layoutFixture(d);d.documentElement.lang='sw';d.body.dataset.navigationLoading='Inapakia ukurasa';
   const language=w.WorkspaceNavigation.visit('/admin/users');assert.equal(d.querySelector('.workspace-layout-preview'),null);assert.equal(d.querySelector('[role=status]').getAttribute('aria-label'),'Inapakia ukurasa');await language;
   await w.WorkspaceNavigation.visit('/admin/dashboard?changed=true');

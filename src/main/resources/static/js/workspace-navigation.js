@@ -79,8 +79,8 @@
         if(url.origin===location.origin && /\/print(?:\/|$)/i.test(url.pathname) && window.printExport)return window.printExport(url.href);
         location.assign(url.href);
     }
-    // Geometry only, never cloned page HTML or business data. A first visit keeps the
-    // current workspace available until the authorized destination HTML arrives.
+    // Geometry only, never cloned page HTML or business data. First visits use the
+    // normal workspace spinner until the authorized destination HTML arrives.
     const layouts=new Map();
     const sections='.dashboard-widget,.erp-panel,.erp-resource-section,.erp-detail-card,.accounting-section,.loan-flow-panel,[data-resource-table],.erp-table-wrap,.erp-stat-card';
     function layoutSpace(main){
@@ -141,7 +141,10 @@
         if(!failed){
             main.classList.add('is-workspace-pending');main.setAttribute('aria-busy','true');
             box.classList.add('workspace-navigation-pending');box.setAttribute('aria-label',document.body.dataset.navigationLoading);
-            if(!layoutPreview(main,url,box))box.classList.add('workspace-navigation-progress');
+            if(!layoutPreview(main,url,box)){
+                box.classList.add('workspace-navigation-spinner');
+                const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='large';spinner.setAttribute('aria-hidden','true');box.append(spinner);
+            }
             else if(native.ResizeObserver){
                 const key=layoutKey(url,main);
                 layoutObserver=new native.ResizeObserver(()=>{
