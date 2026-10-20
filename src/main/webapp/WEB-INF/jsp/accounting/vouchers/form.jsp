@@ -19,9 +19,8 @@
 <form:form modelAttribute="voucherForm" method="post" action="${postUrl}" cssClass="accounting-create-form voucher-form" data-voucher-form="true" data-kind="${voucherType}" data-base="${postUrl}" data-limit="${voucherLimit}" data-choose-account="${voucherChooseAccount}">
 <form:hidden path="requestKey" />
 <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" element="p" cssClass="coa-error" /></div>
-<section class="accounting-form accounting-create-card"><h2><spring:message code="voucher.information" /></h2><p class="voucher-help"><span data-other-only><spring:message code="${approvalRequired ? 'approval.individualHelp' : 'voucher.directHelp'}" /></span><span data-loan-only hidden><spring:message code="voucher.directHelp" /></span></p>
+<section class="accounting-form accounting-create-card"><h2><spring:message code="voucher.information" /></h2>
 <div class="accounting-grid">
-<c:if test="${voucherType=='RECEIPT'}"><p class="voucher-help" data-loan-only><spring:message code="batch.activity" /> · <spring:message code="batch.standardTransactions" /></p></c:if>
 <c:if test="${voucherType=='RECEIPT'}"><label><spring:message code="receipt.purpose" /><form:select path="receiptPurpose" cssClass="aws-control" data-receipt-purpose="true"><form:option value="OTHER"><spring:message code="receipt.purpose.OTHER" /></form:option><c:if test="${canLoanReceipt}"><form:option value="LOAN_REPAYMENT"><spring:message code="receipt.purpose.LOAN_REPAYMENT" /></form:option></c:if></form:select></label></c:if>
 <label><spring:message code="voucher.date" /><input name="effectiveDate" type="date" class="aws-control" value="<c:out value='${voucherForm.effectiveDate}' />" required /><form:errors path="effectiveDate" cssClass="coa-error" /></label>
 <c:if test="${voucherType!='JOURNAL'}"><label data-other-only><spring:message code="${voucherType=='RECEIPT'?'voucher.receivedFrom':'voucher.paidTo'}" /><form:input path="party" cssClass="aws-control" maxlength="160" required="required" /><form:errors path="party" cssClass="coa-error" /></label></c:if>

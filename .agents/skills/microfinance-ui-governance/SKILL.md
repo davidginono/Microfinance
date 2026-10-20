@@ -86,7 +86,7 @@ For COA or activity/transaction configuration, read [the accounting architecture
 
 ## Localization And Privacy
 
-- Omit helper explanations when the labels and values already suffice. When help is needed, use one or two short sentences in everyday language that older and non-technical readers can understand. Avoid stacked explanatory paragraphs and technical report footers; keep implementation details in maintained documentation. Preserve essential financial limitations in plain language and retain row-level missing-information warnings.
+- The user's 2026-10-20 instruction is to avoid explanations in forms and workflows. Use clear labels and necessary feedback; omit routine helper paragraphs and internal posting/activity explanations. Keep implementation details in maintained documentation. Preserve required disclosures, essential financial limitations, validation errors and row-level missing-information warnings.
 - Use the existing `messages_en.properties` and `messages_sw.properties` bundles. Check both languages for fit and consistent financial meaning.
 - Treat Kiswahili-default digital lending as a release gate to verify against the current official guidance, not as a reason to silently change every existing user's preference.
 - Do not remove mandatory contract, liability, complaint, or consent text under a generic "minimal copy" rule. Keep other helper text brief and task-specific.
