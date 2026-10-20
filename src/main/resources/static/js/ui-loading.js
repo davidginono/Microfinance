@@ -13,6 +13,7 @@
         if(!region || !region.isConnected || pending.has(region))return;
         const table=options.table===false ? null : region.matches('table') ? region : region.querySelector('table');
         if(!table && !region.hasAttribute('data-ui-loading-region'))return;
+        region.querySelector(':scope > [data-ui-loading-error]')?.remove();
         const state={loader:null,placeholders:[],busy:region.getAttribute('aria-busy')};pending.set(region,state);
         if(table) {
             const body=table.tBodies[0] || table.createTBody(),row=document.createElement('tr'),cell=document.createElement('td');
@@ -38,7 +39,15 @@
         if(state.busy===null)region.removeAttribute('aria-busy');else region.setAttribute('aria-busy',state.busy==='true'?'false':state.busy);
     }
     function clear() {for(const region of [...pending.keys()])end(region);}
-    window.AppLoading={begin,end,status,clear};
+    function fail(region,{label,retry}) {
+        if(!region?.isConnected)return;end(region);
+        region.querySelector(':scope > [data-ui-loading-error]')?.remove();
+        const error=document.createElement('div');error.className='app-loading-error';error.dataset.uiLoadingError='true';error.setAttribute('role','alert');
+        const message=document.createElement('span');message.textContent=label;error.append(message);
+        if(retry){const button=document.createElement('button');button.type='button';button.className='app-btn btn-neutral';button.textContent=document.body.dataset.navigationRetry;button.addEventListener('click',retry);error.append(button);}
+        const heading=region.querySelector(':scope > h2,:scope > h3');if(heading)heading.after(error);else region.prepend(error);
+    }
+    window.AppLoading={begin,end,status,clear,fail};
     const sync=region=>{if(region.getAttribute('aria-busy')==='true')begin(region,{table:region.matches('.erp-table-wrap')});else end(region);};
     function init() {
         document.querySelectorAll('[data-ui-loading-region], .erp-table-wrap[aria-busy="true"]').forEach(sync);

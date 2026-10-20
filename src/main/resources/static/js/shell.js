@@ -1701,6 +1701,7 @@
         if (!link || link.matches('[target], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
             return;
         }
+        if (window.WorkspaceNavigation?.handles(link)) return;
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
             return;

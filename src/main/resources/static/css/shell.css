@@ -6471,3 +6471,5 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
     display: block; margin: 0; padding: 8px 12px; color: #16191f; font-size: 13px; white-space: normal;
 }
 .app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #eaf3fa; color: #0073bb;}
+.workspace-navigation-feedback {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#f2f8fc;color:#414d5c;font-size:14px;line-height:20px;}
+.workspace-navigation-feedback[role=alert] {border-left:3px solid #d13212;background:#fff3f1;}

@@ -138,6 +138,7 @@
     const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod','applicationDate','customApplicationCharge','customProcessingCharge','insurancePremium','insuranceEvidence','evidence']);
     const changed = event => {if(pricing.has(event.target.name))refresh();};
     recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
+    recordForm.addEventListener('loan:quote-retry',refresh);
     window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));});
     window.addEventListener('pageshow', refresh);refresh();
   }

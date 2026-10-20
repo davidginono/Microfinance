@@ -37,13 +37,14 @@
             }
         }
 
-        let desktopCollapsed = true;
+        let desktopCollapsed = window.WorkspaceNavigation?.sidebarCollapsed ?? true;
         const desktopSidebarMedia = window.matchMedia("(min-width: 1024px)");
         let collapsedSidebarTooltip = null;
         let collapsedSidebarFlyout = null;
         let collapsedSidebarFlyoutOwner = null;
 
         function applyDesktopSidebarCollapsed(collapsed) {
+            window.WorkspaceNavigation?.rememberSidebar(collapsed);
             const shouldCollapse = collapsed && desktopSidebarMedia.matches;
             document.documentElement.classList.toggle("shell-sidebar-collapsed", shouldCollapse);
             sidebar.inert = !desktopSidebarMedia.matches && !isSidebarOpen();

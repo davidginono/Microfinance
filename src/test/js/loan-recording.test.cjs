@@ -55,6 +55,7 @@ function fixture(withCharges=false) {
     <button name="action" value="save">Save</button><button disabled>Restricted</button>
   </form></html>`, {runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
   const w=dom.window, timers=new Map(), requests=[];let next=0;
+  w.document.body.dataset.navigationRetry='Retry';
   w.setTimeout=fn=>{timers.set(++next,fn);return next;};w.clearTimeout=id=>timers.delete(id);
   w.fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
   if(withCharges)w.eval(fs.readFileSync('src/main/resources/static/js/ui-loading.js','utf8'));
@@ -225,10 +226,11 @@ test('Charges finishes loading on success, failure and cached-page restoration',
     set('tenureValue','6');set('principal','1000');let calculation=run();await flush();assert.equal(region.getAttribute('aria-busy'),'true');
     requests[0].resolve({ok:true,redirected:false,json:async()=>({interest:'100.00',product:'Business loan',tenureValue:6,tenureUnit:'MONTHS',charges:{total:'10.50',terms:[]}})});
     await calculation;await flush();assert.equal(region.querySelector('[data-charge-total]').textContent,'10.50');assert.equal(region.querySelector('.app-loading-spinner'),null);
-    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(region.querySelector('[data-charge-error]').textContent,'Invalid loan terms');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(region.querySelector('[data-ui-loading-error]').textContent,'Invalid loan termsRetry');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    region.querySelector('[data-ui-loading-error] button').click();calculation=run();assert.equal(requests[2].options.body.get('principal'),'2000');respond(2,'200.00');await calculation;await flush();assert.equal(region.querySelector('[data-ui-loading-error]'),null);
     set('principal','3000');calculation=run();await flush();w.dispatchEvent(new w.Event('pagehide'));await flush();
-    assert.equal(requests[2].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    assert.equal(requests[3].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('principal','');w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);
-    respond(2,'300.00');await calculation;assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
+    respond(3,'300.00');await calculation;assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
   }finally{dom.window.close();}
 });

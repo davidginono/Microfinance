@@ -53,3 +53,17 @@ test('table search cannot hide a pending spinner or announce no matches before t
     assert.equal(d.querySelector('.app-loading-row').hidden,false);assert.equal(d.querySelector('.resource-table-no-matches'),null);
     w.AppLoading.end(region);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(d.querySelector('.resource-table-no-matches').hidden,false);dom.window.close();
 });
+
+test('independent section failures clear only their spinner and retry without replacing entered controls',async()=>{
+    const {dom,w,d}=await setup('<section id="one" data-ui-loading-region><h2>Values</h2><input name="amount" value="12.34"></section><section id="two" data-ui-loading-region><h2>Other values</h2></section>');
+    try{
+        d.body.dataset.navigationRetry='Retry';const one=d.querySelector('#one'),two=d.querySelector('#two'),input=one.querySelector('input');input.value='56.78';
+        w.AppLoading.begin(one,{table:false});w.AppLoading.begin(two,{table:false});
+        w.AppLoading.fail(one,{label:'Unable to load',retry:()=>w.AppLoading.begin(one,{table:false})});
+        assert.equal(one.querySelector('.app-loading-spinner'),null);assert.equal(two.querySelectorAll('.app-loading-spinner').length,1);
+        assert.equal(one.querySelector('[role=alert]').textContent,'Unable to loadRetry');one.querySelector('[role=alert] button').click();
+        assert.equal(one.querySelector('[role=alert]'),null);assert.equal(one.querySelectorAll('.app-loading-spinner').length,1);
+        assert.equal(one.querySelector('input'),input);assert.equal(input.value,'56.78');w.AppLoading.end(one);w.AppLoading.end(two);
+        assert.equal(d.querySelector('.app-loading-spinner'),null);
+    }finally{dom.window.close();}
+});
