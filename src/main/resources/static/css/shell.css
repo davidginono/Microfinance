@@ -2143,7 +2143,8 @@ body.aws-console {
 
 .shell-main {
     min-height: calc(100vh - var(--shell-nav-height));
-    padding: 12px !important;
+    --shell-workspace-inset: 12px;
+    padding: var(--shell-workspace-inset) !important;
 }
 
 .shell-content-frame {
@@ -3684,7 +3685,8 @@ body.aws-console,
     }
 
     .shell-main {
-        padding: 8px !important;
+        --shell-workspace-inset: 8px;
+        padding: var(--shell-workspace-inset) !important;
     }
 
     .erp-page-title,
@@ -5289,7 +5291,7 @@ body.aws-console,
 /* The finder reference reserves a slim rail and a single reveal control. */
 @media (min-width: 1024px) {
     :root { --shell-sidebar-collapsed-width: 28px; }
-    .shell-main, .shell-sidebar-collapsed .shell-main { padding-left:12px!important;padding-right:12px!important; }
+    .shell-main, .shell-sidebar-collapsed .shell-main { --shell-workspace-inset:12px;padding-left:var(--shell-workspace-inset)!important;padding-right:var(--shell-workspace-inset)!important; }
     .shell-sidebar-collapsed .shell-sidebar { background:#fafafa!important;border-color:#d5dbdb!important; }
     .shell-sidebar-collapsed .shell-sidebar-panel { border:0!important;background:#fafafa!important; }
     html.shell-sidebar-collapsed .shell-sidebar-toggle-row { justify-content:center!important;padding:0!important;min-height:32px;background:#fafafa!important; }

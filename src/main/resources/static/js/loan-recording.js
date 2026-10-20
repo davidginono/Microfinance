@@ -101,7 +101,7 @@
         tenureLimits.querySelector('[data-limit-unit]').textContent = region.dataset[unit.value.toLowerCase()] || '';
       }
       clearTimeout(timer); controller?.abort(); ++version;
-      recordForm.dispatchEvent(new CustomEvent('loan:quote-pending'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
+      recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
       if(schedule){schedule.hidden = true;rows.replaceChildren();summary.textContent = '';}
       if (!recordForm.querySelector('#principal').value || !unit.value || !recordForm.querySelector('#tenureValue').value
         || (!custom && !recordForm.querySelector('#productId').value)
@@ -109,6 +109,7 @@
       const current = version;
       timer = setTimeout(async () => {
         controller = new AbortController(); spinner.hidden = false; region.setAttribute('aria-busy','true');
+        recordForm.dispatchEvent(new CustomEvent('loan:quote-pending'));
         const data = new URLSearchParams();new FormData(recordForm).forEach((value,key) => {if(typeof value === 'string')data.append(key,value);});
         try {
           const response = await fetch(root + '/finance/loan-recording/quote', {method:'POST',body:data,headers:{Accept:'application/json'},signal:controller.signal,credentials:'same-origin',cache:'no-store'});
@@ -131,13 +132,13 @@
             schedule.hidden = false;
           }
         } catch(error) {if(current === version && error.name !== 'AbortError'){description.textContent = error.message || region.dataset.error;recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));}}
-        finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');}}
+        finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-settled'));}}
       }, 150);
     }
     const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod','applicationDate','customApplicationCharge','customProcessingCharge','insurancePremium','insuranceEvidence','evidence']);
     const changed = event => {if(pricing.has(event.target.name))refresh();};
     recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
-    window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;});
+    window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));});
     window.addEventListener('pageshow', refresh);refresh();
   }
   document.querySelectorAll('[data-loan-form]').forEach(form => {

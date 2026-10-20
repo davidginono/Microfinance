@@ -39,7 +39,7 @@ test('staff posting lookups use the scoped review endpoint and preserve the chos
   dom.window.close();
 });
 
-function fixture() {
+function fixture(withCharges=false) {
   const dom = new JSDOM(`<html lang="en"><form data-loan-form>
     <input name="_csrf" value="token"><select id="loanMode" name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>
     <div data-configured-product><select id="productId" name="productId"><option value="product" data-tenure-unit="MONTHS" data-minimum-amount="1000.00" data-maximum-amount="9007199254740991.01" data-minimum-tenure="3" data-maximum-tenure="24">Business loan</option><option value="daily-product" data-tenure-unit="DAYS" data-minimum-amount="500.00" data-maximum-amount="5000.00" data-minimum-tenure="7" data-maximum-tenure="30">Day loan</option><option value="yearly-product" data-tenure-unit="YEARS">Year loan</option></select></div>
@@ -51,12 +51,15 @@ function fixture() {
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
     <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span class="loan-interest-spinner" hidden></span><output data-interest-value></output><p data-interest-description></p></div>
     <section data-schedule-preview hidden><span data-schedule-summary data-monthly="Monthly" data-weekly="Weekly" data-monthly-period="Month {0}" data-weekly-period="Week {0}"></span><table><tbody data-schedule-rows></tbody></table></section>
+    ${withCharges ? '<section data-ui-loading-region data-charge-preview data-empty-label="No charges"><h2>Charges</h2><table><tbody data-charge-rows><tr><td>Choose loan terms</td></tr></tbody></table><span data-charge-total>—</span><p data-charge-error></p></section>' : ''}
     <button name="action" value="save">Save</button><button disabled>Restricted</button>
   </form></html>`, {runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
   const w=dom.window, timers=new Map(), requests=[];let next=0;
   w.setTimeout=fn=>{timers.set(++next,fn);return next;};w.clearTimeout=id=>timers.delete(id);
   w.fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
+  if(withCharges)w.eval(fs.readFileSync('src/main/resources/static/js/ui-loading.js','utf8'));
   w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  if(withCharges)w.eval(fs.readFileSync('src/main/resources/static/js/loan-charges.js','utf8'));
   const set=(id,value)=>{w.document.getElementById(id).value=value;w.document.getElementById(id).dispatchEvent(new w.Event('change',{bubbles:true}));};
   const run=()=>{const fn=[...timers.values()].at(-1);timers.clear();return fn();};
   const respond=(index,interest,ok=true,schedule=[],method='FLAT_RATE',frequency='MONTHLY')=>requests[index].resolve({ok,redirected:false,json:async()=>ok?{interest,method,product:'Business loan',tenureUnit:'MONTHS',tenureValue:6,frequency,schedule}:{error:'Invalid loan terms'}});
@@ -198,4 +201,34 @@ test('product lookup preserves exact decimal limits and updates a retained selec
   assert.equal(select.value,'product');assert.equal(select.selectedOptions[0].dataset.maximumAmount,'9007199254740991.01');
   assert.equal(select.selectedOptions[0].dataset.minimumTenure,'3');assert.equal(changes,1);
   dom.window.close();
+});
+
+test('Charges stays idle for incomplete terms and clears an interrupted quote without showing stale results',async()=>{
+  const {w,set,run,respond,requests,dom}=fixture(true),d=w.document,region=d.querySelector('[data-charge-preview]');
+  try{
+    await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));
+    const flush=()=>new Promise(resolve=>setImmediate(resolve));
+    assert.equal(requests.length,0);assert.notEqual(region.getAttribute('aria-busy'),'true');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','1000');await flush();assert.equal(requests.length,0);assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('tenureValue','6');await flush();assert.equal(requests.length,0);assert.equal(region.querySelector('.app-loading-spinner'),null);
+    const calculation=run();await flush();assert.equal(requests.length,1);assert.equal(region.querySelectorAll('.app-loading-spinner').length,1);
+    set('principal','');await flush();assert.equal(requests[0].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    respond(0,'100.00');await calculation;await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
+  }finally{dom.window.close();}
+});
+
+test('Charges finishes loading on success, failure and cached-page restoration',async()=>{
+  const {w,set,run,respond,requests,dom}=fixture(true),d=w.document,region=d.querySelector('[data-charge-preview]');
+  try{
+    await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));
+    const flush=()=>new Promise(resolve=>setImmediate(resolve));
+    set('tenureValue','6');set('principal','1000');let calculation=run();await flush();assert.equal(region.getAttribute('aria-busy'),'true');
+    requests[0].resolve({ok:true,redirected:false,json:async()=>({interest:'100.00',product:'Business loan',tenureValue:6,tenureUnit:'MONTHS',charges:{total:'10.50',terms:[]}})});
+    await calculation;await flush();assert.equal(region.querySelector('[data-charge-total]').textContent,'10.50');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(region.querySelector('[data-charge-error]').textContent,'Invalid loan terms');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','3000');calculation=run();await flush();w.dispatchEvent(new w.Event('pagehide'));await flush();
+    assert.equal(requests[2].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','');w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);
+    respond(2,'300.00');await calculation;assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
+  }finally{dom.window.close();}
 });

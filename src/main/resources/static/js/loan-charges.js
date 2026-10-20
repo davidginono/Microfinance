@@ -28,11 +28,13 @@
   // Run before the quote listener serializes the form on a mode change.
   form.addEventListener('change',event=>{if(event.target===mode)entryMode();},true);
   entryMode();
-  function clear(){if(policyLink)policyLink.hidden=true;rows.replaceChildren();for(const name of ['total','deductions','separate','net','management']){const field=region.querySelector('[data-charge-'+name+']');if(field)field.textContent='—';}error.textContent='';region.setAttribute('aria-busy','true');}
-  form.addEventListener('loan:quote-pending',clear);
-  form.addEventListener('loan:quote-error',event=>{clear();region.setAttribute('aria-busy','false');error.textContent=event.detail;});
+  function clear(){if(policyLink)policyLink.hidden=true;rows.replaceChildren();for(const name of ['total','deductions','separate','net','management']){const field=region.querySelector('[data-charge-'+name+']');if(field)field.textContent='—';}error.textContent='';region.setAttribute('aria-busy','false');}
+  form.addEventListener('loan:quote-reset',clear);
+  form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');});
+  form.addEventListener('loan:quote-settled',()=>region.setAttribute('aria-busy','false'));
+  form.addEventListener('loan:quote-error',event=>{clear();error.textContent=event.detail;});
   form.addEventListener('loan:quote',event=>{
-    const p=event.detail.charges;clear();region.setAttribute('aria-busy','false');if(!p)return;
+    const p=event.detail.charges;clear();if(!p)return;
     insuranceRequired=!!p.insuranceRequired;entryMode();
     if(!p.terms.length){const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=4;cell.textContent=region.dataset.emptyLabel;row.append(cell);rows.append(row);}
     for(const t of p.terms){const row=document.createElement('tr');for(const text of [t.kind,t.basis+' · '+t.basisValue,money(t.amount),t.timing]){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}rows.append(row);}
