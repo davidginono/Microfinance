@@ -1,6 +1,6 @@
 # Configurable dashboards and data visuals
 
-The user's 2026-10-20 Console Home screenshot defines the dashboard layout: a compact dark header, gray canvas, white rectangular widgets, shaded widget headings, drag grips, overflow menus, resize handles and page-level Reset to default layout / Add widgets controls.
+The user's 2026-10-20 Console Home screenshot defines the dashboard layout: a compact header, gray canvas, white rectangular widgets, shaded widget headings, drag grips, overflow menus, resize handles and page-level Reset to default layout / Add widgets controls. The user's later instruction requires the shared green top navigation bar (`#3A756B`) across every workspace, including dashboards; do not override the shell color in dashboard styles.
 
 Authoritative design references:
 
