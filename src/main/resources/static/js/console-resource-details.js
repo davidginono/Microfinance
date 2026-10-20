@@ -65,12 +65,17 @@
                 try {await navigator.clipboard.writeText(text);announce(label().copied || 'Copied');}
                 catch {announce(label().copyFailed || 'Unable to copy');}
             });
-            content.querySelectorAll('a[href]:not(.app-btn)').forEach(link=>{
-                link.classList.add('console-resource-link');
-                if(!link.hasAttribute('download') && /^https?:$/.test(link.protocol) && !link.getAttribute('href').startsWith('#'))link.target='_blank';
-                if(link.target==='_blank'){link.rel='noopener noreferrer';link.setAttribute('aria-label',link.textContent.trim()+' ('+(label().opensNewTab || 'opens in a new tab')+')');link.append(icon('external'));}
-            });
+            content.querySelectorAll('a[href]:not(.app-btn)').forEach(link=>link.classList.add('console-resource-link'));
             value.append(button,content);
+        });
+    }
+    function links(scope) {
+        scope.querySelectorAll('a[href][target="_blank"]').forEach(link=>{
+            if(link.hasAttribute('download') || link.hasAttribute('data-download-action') || link.hasAttribute('data-print-action'))return;
+            link.relList.add('noopener','noreferrer');
+            if(link.querySelector(':scope > .console-external-icon'))return;
+            const artwork=icon('external');artwork.classList.add('console-external-icon');link.append(artwork);
+            const hint=document.createElement('span');hint.className='sr-only';hint.textContent=' ('+(label().opensNewTab || 'opens in a new tab')+')';link.append(hint);
         });
     }
     function announce(text) {
@@ -120,7 +125,7 @@
         scope.querySelectorAll('.loan-status-badge,.voucher-status,.staff-recent-disbursements-status').forEach(node=>{
             if(!node.querySelector('[data-resource-status]') && (!node.hasAttribute('data-resource-status') || node.dataset.statusAuto==='true')){node.dataset.statusAuto='true';node.dataset.resourceStatus=node.textContent.trim();}
         });
-        scope.querySelectorAll('[data-resource-status]').forEach(status);values(scope);breadcrumbs();
+        scope.querySelectorAll('[data-resource-status]').forEach(status);values(scope);links(scope);breadcrumbs();
     }
     window.ConsoleResourceDetails={init,icon,status};
     window.addEventListener('load',()=>{window.ResourceTable?.init();details();init();

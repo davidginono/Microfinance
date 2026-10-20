@@ -7,7 +7,7 @@ description: Design, edit, or review Microfinance JSP navigation, resource creat
 
 ## Core accounting architecture reference
 
-Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/) as permanent behavioral references, translated into this repository's JSP/shared shell. Core receipt/payment/journal vouchers have focused full-page creation, 1–50 repeated transactions, separate registers and record-specific details. Accountants post directly: no submit/verify/approve/checker stage. Retain server accounting checks, idempotency, scope, closed periods and append-only reversals. PDF and print are the only accounting/report outputs; never add CSV/Excel exports. This changes core vouchers, not lending approvals or legacy subledger protections.
+Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/create/), [table view](https://cloudscape.design/patterns/resource-management/view/table-view/), and [details](https://cloudscape.design/patterns/resource-management/details/) as permanent behavioral references, translated into this repository's JSP/shared shell. Core receipt/payment/journal vouchers have focused full-page creation, 1–50 repeated transactions, separate registers and record-specific details. Individual and batch voucher approval follows branch configuration and explicit claims; preserve direct posting when approval is disabled and specialized loan protections. Retain server accounting checks, idempotency, scope, closed periods and append-only reversals. Core vouchers and operational reports remain PDF/print only. The financial-statement workspace has its authorized Excel exception; no CSV exports. This changes core vouchers, not lending approvals or legacy subledger protections.
 
 ## Domain And Compatibility
 
@@ -15,6 +15,10 @@ Use Cloudscape [create](https://cloudscape.design/patterns/resource-management/c
 - Keep existing entity names, routes, permission identifiers, form bindings, and message keys unless the task includes a coordinated migration. Visible wording must not expose their legacy domain names.
 - Do not show savings, share balances, contribution requirements, or instructions to load deposits as loan qualification. Do not introduce Foresight controls or external membership verification.
 - Retain Board and Credit Committee as distinct roles when the configured approval path uses them. Do not relabel one as the other or collapse their quorum rules for branding.
+
+## Reference workflow
+
+Apply the [observed AWS finder workflow](../microfinance-ui-style/references/aws-instance-type-finder.md) through the existing shared JSP shell. Desktop dashboards and focused workspaces start with navigation collapsed; opening it is local to the current page. Table queries, preview updates, expandable settings and detail tabs retain the current document. Financial submissions retain their existing server commands and safeguards.
 
 ## Operational Views
 
@@ -48,7 +52,7 @@ Use Cloudscape's [create](https://cloudscape.design/patterns/resource-management
 
 For COA or activity/transaction configuration, read [the accounting architecture](../../../docs/chart-of-accounts-architecture.md) and [accounting implementation gates](../../../docs/accounting-report-builder-checklist.md). These are configuration flows; saving definitions does not post money.
 
-- The authorized accountant onboards COA groups/accounts and library definitions directly, without an approval queue. Preserve current claims, institution/branch checks, CSRF, and lifecycle protections; this convention does not change lending approvals or financial posting controls.
+- COA account changes use versions and the institution approval configuration described in `docs/account-version-approvals.md`; incomplete drafts do not change the effective account. Library definitions retain their existing authorized onboarding flow. Preserve current claims, institution/branch checks, CSRF, and lifecycle protections; this convention does not change lending approvals or financial posting controls.
 - COA creation selects a valid parent, shows its code/name and derived classification, then captures code, one Name field, accounting settings where applicable, and optional description. Retain stored language metadata; do not reintroduce separate English/Kiswahili name inputs into these forms. Translate UI labels using the existing bundles.
 - COA selection uses the checkbox, row highlight and enabled header commands. A second click on the selected checkbox/row clears selection. Keep the selection announcement screen-reader-only; do not add a visible selection summary or Clear selection button above the table.
 - Finance and report destinations belong inside Accountant Office, with Transactions Config retaining Activities and Transactions children. Use the single shared finance-navigation fragment, preserve each destination's claims and open the office menu for its active finance/report route. COA titles reflect the current view: Chart of accounts at the root, Chart of accounts (Subgroups) for child groups and Chart of accounts (Posting accounts) for an account family, with localized equivalents.

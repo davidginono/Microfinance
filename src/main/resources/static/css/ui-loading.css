@@ -9,5 +9,5 @@
 .aws-console .erp-table-wrap.is-loading .aws-table-loader {display:none!important;}
 .neo-select-loading {display:flex;justify-content:center;align-items:center;min-height:40px;flex:none;border-top:1px solid #eaeded;}
 .neo-select-loading .app-loading-status {min-height:40px;}
-@media(prefers-reduced-motion:reduce){.app-loading-spinner{animation-duration:1.8s;}}
+@media(prefers-reduced-motion:reduce){.app-loading-spinner{animation:none;}}
 @media print{.app-loading-status,.app-loading-row,.neo-select-loading{display:none!important;}}

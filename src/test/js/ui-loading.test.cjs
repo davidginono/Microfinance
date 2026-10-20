@@ -25,10 +25,25 @@ test('initial empty placeholders recover on failure but cannot reappear after re
     assert.equal(d.querySelector('#empty'),null);assert.equal(d.querySelector('tbody').textContent,'L001Ready');assert.equal(region.classList.contains('is-loading'),false);dom.window.close();
 });
 test('sidebar and dashboard regions never acquire component spinners',async()=>{
-    const {dom,w,d}=await setup('<nav id="appSidebar"><a href="/app">Navigation</a></nav><section id="card" data-ui-loading-region aria-busy="true">Summary</section>');
+    const {dom,w,d}=await setup('<nav id="appSidebar"><a href="/app">Navigation</a></nav><section id="card" aria-busy="true">Summary</section>');
     w.AppLoading.begin(d.querySelector('a'),{table:false});w.AppLoading.begin(d.querySelector('#card'),{table:false});
     assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('.app-loading-status'),null);
     assert.equal(w.AppLoading.status('Loading').textContent,'Loading');dom.window.close();
+});
+
+test('opted-in async previews keep native controls and clear local feedback on completion and restoration',async()=>{
+    const {dom,w,d}=await setup('<section data-ui-loading-region><h2>Quote</h2><input value="draft"><p id="value">—</p></section>');
+    const region=d.querySelector('section'),input=d.querySelector('input');input.value='edited';
+    region.setAttribute('aria-busy','true');await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(region.querySelectorAll('.app-loading-spinner').length,1);
+    assert.equal(region.querySelector('h2').nextElementSibling.getAttribute('role'),'status');
+    assert.equal(region.querySelector('input'),input);assert.equal(input.value,'edited');
+    region.setAttribute('aria-busy','false');await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(region.querySelector('[role=status]'),null);
+    region.setAttribute('aria-busy','true');await new Promise(resolve=>setTimeout(resolve,0));
+    w.dispatchEvent(new w.Event('pagehide'));
+    assert.equal(region.querySelector('[role=status]'),null);assert.equal(region.getAttribute('aria-busy'),'false');
+    dom.window.close();
 });
 
 test('table search cannot hide a pending spinner or announce no matches before the request settles',async()=>{

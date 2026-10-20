@@ -39,20 +39,15 @@
 <body data-date-choose="<spring:message code='date.choose' />" data-date-invalid="<spring:message code='date.invalid' />" data-select-search="<c:out value='${selectSearch}' />" data-select-no-matches="<c:out value='${selectNoMatches}' />" data-select-load-more="<c:out value='${selectLoadMore}' />" data-search-unavailable="<c:out value='${searchUnavailable}' />" class="aws-console min-h-screen font-sans text-sacco-ink antialiased" data-shell-results="<c:out value='${shellControlresults}' />" data-shell-refresh="<c:out value='${shellControlrefresh}' />" data-shell-loading="<c:out value='${shellControlloading}' />" data-shell-select="<c:out value='${shellControlselect}' />" data-shell-no-options="<c:out value='${shellControlnoOptions}' />">
 <a class="aws-skip-link" href="#main-content"><spring:message code="common.skipToContent" text="Skip to main content" /></a>
 <script>
-    try {
-        if (window.localStorage.getItem("shell:desktopSidebarCollapsed") === "true"
-            && window.matchMedia("(min-width: 1024px)").matches) {
-            document.documentElement.classList.add("shell-sidebar-collapsed");
-        }
-    } catch (ignored) {
-        // Local storage can be unavailable in strict browser modes.
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+        document.documentElement.classList.add("shell-sidebar-collapsed");
     }
 </script>
 <div class="aws-console-root min-h-screen w-full max-w-full">
 <nav id="shellTopNav" class="app-topbar fixed inset-x-0 top-0 z-50">
     <div class="app-topbar-inner flex items-center justify-between gap-2 px-2.5 py-0 sm:gap-3 sm:px-3 lg:px-4">
         <div class="app-topbar-left flex min-w-0 items-center gap-2 sm:gap-2.5">
-            <button id="sidebarToggle" type="button" class="aws-mobile-menu-button inline-flex h-10 w-10 items-center justify-center rounded border text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden" aria-label="Open menu">
+            <button id="sidebarToggle" type="button" class="aws-mobile-menu-button inline-flex h-10 w-10 items-center justify-center rounded border text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden" aria-controls="appSidebar" aria-expanded="false" aria-label="<spring:message code='shell.navigation.expand' />" data-expand-label="<spring:message code='shell.navigation.expand' />" data-collapse-label="<spring:message code='shell.navigation.collapse' />">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
                     <line x1="3" y1="12" x2="21" y2="12"></line>

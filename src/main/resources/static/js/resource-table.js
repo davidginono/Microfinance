@@ -380,15 +380,20 @@
             navigation.querySelectorAll('a[href]').forEach(link=>{link.href=retainOrder(new URL(link.href,location.href)).href;});
         },{signal});
         const errorRow = node('tr','resource-table-load-error'), errorCell = node('td','',l.loadError);
+        let retryTarget=queryUrl;
+        const retry = node('button','app-btn btn-neutral resource-table-retry',l.refresh);
+        retry.type='button'; retry.addEventListener('click',()=>void updateTable(retryTarget));
+        errorCell.append(retry);
         errorCell.colSpan = headers.length; errorCell.setAttribute('role','alert'); errorRow.append(errorCell);
         const updateTable = async (target, changeHistory = true) => {
             const url = new URL(target || queryUrl, location.href);
             if (url.origin !== location.origin) return;
+            retryTarget=url;
             const current = ++version; request?.abort(); const currentRequest = new AbortController(); request=currentRequest;
             const timeout = setTimeout(()=>currentRequest.abort(),20000);
             clearSelection(); errorRow.remove();window.AppLoading?.begin(region);
             try {
-                const response = await fetch(url.href,{credentials:'same-origin',headers:{Accept:'text/html'},signal:currentRequest.signal});
+                const response = await fetch(url.href,{credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:currentRequest.signal});
                 if (!response.ok || response.redirected) throw new Error('table');
                 const page = new DOMParser().parseFromString(await response.text(),'text/html');
                 if (current !== version || !region.isConnected) return;
@@ -455,6 +460,7 @@
             } finally {clearTimeout(timeout);if(current===version)window.AppLoading?.end(region);}
         };
         signal.addEventListener('abort',()=>{version++;request?.abort();window.AppLoading?.end(region);});
+        window.addEventListener('pagehide',()=>{version++;request?.abort();window.AppLoading?.end(region);clearSelection();},{signal});
         document.addEventListener('click',event=>{
             if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
             const link=event.target.closest('a[data-table-query-for]');

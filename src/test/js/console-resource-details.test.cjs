@@ -9,6 +9,15 @@ async function setup(markup,query=''){
  dom.window.fetch=()=>{throw Error('Tab switching must not fetch or navigate');};dom.window.eval(source);await settle();return {dom,w:dom.window,d:dom.window.document};
 }
 const sections='<section class="accounting-section"><h2>Summary</h2><dl class="erp-detail-facts"><div><dt>Loan</dt><dd>L001</dd></div></dl></section><section id="schedule" class="erp-table-wrap"><h2>Schedule</h2><input value="draft"><form method="post"><input name="_csrf" value="token"></form></section><section id="history" class="erp-table-wrap"><h2>History</h2><a href="/receipt">Receipt</a></section>';
+
+test('resource IDs retain native same-tab navigation and only real new-tab links get an external hint',async()=>{
+ const {dom,w,d}=await setup('<dl class="erp-detail-facts"><div><dt>Loan</dt><dd><a class="resource-table-id-link" href="/loan/1">L001</a></dd></div></dl><a id="policy" href="https://example.org/policy" target="_blank" rel="help">Policy</a><a id="download" href="/receipt/pdf" target="_blank" download>PDF</a>');
+ const loan=d.querySelector('.resource-table-id-link'),policy=d.querySelector('#policy');
+ assert.equal(loan.target,'');assert.equal(loan.querySelector('svg'),null);assert.equal(loan.getAttribute('href'),'/loan/1');
+ assert.equal(policy.querySelectorAll('.console-external-icon').length,1);assert.match(policy.textContent,/opens in a new tab/);assert.equal(policy.relList.contains('help'),true);assert.equal(policy.relList.contains('noopener'),true);
+ w.ConsoleResourceDetails.init();assert.equal(policy.querySelectorAll('.console-external-icon').length,1);assert.equal(policy.querySelectorAll('.sr-only').length,1);
+ assert.equal(d.querySelector('#download svg'),null);dom.window.close();
+});
 test('tabs preserve native forms, edited values, query context and summary without a document request',async()=>{
  const {dom,w,d}=await setup(sections,'?historyPage=3');const input=d.querySelector('#schedule input'),form=d.querySelector('form');input.value='unsaved';let submits=0;form.addEventListener('submit',()=>submits++);
  const queryChanges=[];d.addEventListener('resource-table:query',()=>queryChanges.push(new URL(w.location.href).searchParams.get('detailTab')));const buttons=d.querySelectorAll('[role=tab]');assert.equal(buttons.length,2);buttons[1].click();await settle();assert.equal(d.querySelector('#history').hidden,false);assert.equal(d.querySelector('#schedule').hidden,true);buttons[0].click();

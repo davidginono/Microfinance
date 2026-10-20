@@ -9,6 +9,7 @@
     const error=region.querySelector('[data-topup-error]');
     let version=0,controller,timer;
     function invalidate(){++version;controller?.abort();clearTimeout(timer);
+      region.setAttribute('aria-busy','false');
       for(const field of ['principal','interest','excluded','total','cash','charges']){const node=region.querySelector('[data-topup-'+field+']');if(node)node.textContent='—';}
       if(posting){form.elements.settlementSequence.value='';form.elements.settlementPrincipal.value='';form.elements.settlementInterest.value='';if(form.elements.settlementCharges)form.elements.settlementCharges.value='';if(form.elements.settlementChargeSequence)form.elements.settlementChargeSequence.value='';region.querySelector('[name="settlementConfirmed"]').checked=false;}
     }

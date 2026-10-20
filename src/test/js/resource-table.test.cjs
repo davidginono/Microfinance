@@ -391,12 +391,14 @@ test('grouped financial totals retain their columns and heading order', async ()
     dom.window.close();
 });
 
-test('split details open explicitly, stay closed on selection, clear stale data and support resizing', async () => {
+test('desktop split starts empty, follows selection, stays closed after dismissal and clears stale facts', async () => {
     const markup=table('split','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
     const {dom,window:w,document:d}=await setup(markup);
-    const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,true);
+    const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,false);
+    assert.equal(panel.querySelector('h2').textContent,'Select a record');
+    assert.equal(panel.querySelectorAll('dd').length,0);
     d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
-    assert.equal(panel.hidden,true);d.querySelector('[aria-label="Show details"]').click();
+    assert.equal(panel.hidden,false);
     assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'A001');
     assert.equal(panel.querySelectorAll('dd').length,2);assert.equal(panel.querySelector('.resource-split-content a'),null);
     assert.equal(d.querySelector('.resource-table-record-actions a').getAttribute('href'),'/record/1');
@@ -407,7 +409,7 @@ test('split details open explicitly, stay closed on selection, clear stale data 
     const resize=panel.querySelector('[role=separator]');resize.dispatchEvent(new w.KeyboardEvent('keydown',{key:'End',bubbles:true}));assert.equal(resize.getAttribute('aria-valuenow'),resize.getAttribute('aria-valuemax'));
     const pos=panel.querySelector('select');pos.value='side';pos.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('.resource-split-layout').classList.contains('resource-split-side'),true);
     d.querySelector('.resource-table-filters input').dispatchEvent(new w.Event('input',{bubbles:true}));
-    await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.querySelectorAll('dd').length,0);assert.equal(panel.querySelector('.resource-split-content').textContent,'Select a record');
+    await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.querySelectorAll('dd').length,0);assert.equal(panel.querySelector('h2').textContent,'Select a record');
     dom.window.close();
 });
 
@@ -659,4 +661,39 @@ test('a server response can change a conditional reference heading without leavi
     header.querySelector('a').click();await settle();await settle();
     assert.equal(requests[1].searchParams.get('tableSort[conditional]'),'loan');
     assert.equal(header.querySelectorAll('svg').length,1);dom.window.close();
+});
+
+
+test('mobile split starts closed and its divider only consumes keys for the current orientation',async()=>{
+ const markup=table('mobile-preview','<tr><td>L001</td><td>100</td><td><a class="app-btn" href="/loan/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
+ const {dom,window:w,document:d}=await setup(markup,'window.innerWidth=360;');
+ const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,true);
+ d.querySelector('tbody input').click();await settle();assert.equal(panel.hidden,true);
+ d.querySelector('[aria-label="Show details"]').click();assert.equal(panel.hidden,false);
+ const handle=panel.querySelector('[role=separator]'),before=handle.getAttribute('aria-valuenow');
+ const right=new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true});handle.dispatchEvent(right);
+ assert.equal(right.defaultPrevented,false);assert.equal(handle.getAttribute('aria-valuenow'),before);
+ handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true}));
+ assert.equal(Number(handle.getAttribute('aria-valuenow')),Number(before)+20);dom.window.close();
+});
+
+test('failed table queries retry the attempted filter without replacing native rows or controls',async()=>{
+ const {dom,window:w,document:d}=await setup(table('retry',row),loadingSource);
+ const input=d.querySelector('input[name=search]'),original=d.querySelector('tbody tr');input.value='filtered';
+ const requests=[];w.fetch=async(url,options)=>{requests.push({url,options});if(requests.length===1)throw Error('offline');return {ok:true,redirected:false,text:async()=>table('retry','<tr><td>V002</td><td>200</td><td>Posted</td></tr>')};};
+ d.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ assert.equal(d.querySelector('tbody tr:not(.resource-table-load-error)'),original);assert.equal(original.hidden,false);
+ const retry=d.querySelector('.resource-table-retry');assert.ok(retry);assert.equal(d.querySelector('.app-loading-row'),null);
+ retry.click();await settle();await settle();
+ assert.equal(requests.length,2);assert.equal(new URL(requests[1].url).searchParams.get('search'),'filtered');assert.equal(requests[1].options.cache,'no-store');
+ assert.equal(d.querySelector('input[name=search]'),input);assert.equal(input.value,'filtered');assert.equal(d.querySelector('.resource-table-load-error'),null);assert.match(d.querySelector('tbody').textContent,/V002/);dom.window.close();
+});
+
+test('page exit aborts table requests and discards their late responses',async()=>{
+ const {dom,window:w,document:d}=await setup(table('leave',row),loadingSource);
+ let complete,signal;w.fetch=(_,options)=>{signal=options.signal;return new Promise(resolve=>complete=resolve);};
+ d.querySelector('[data-resource-refresh]').click();assert.equal(d.querySelectorAll('.app-loading-row').length,1);
+ w.dispatchEvent(new w.Event('pagehide'));assert.equal(signal.aborted,true);assert.equal(d.querySelector('.app-loading-row'),null);
+ complete({ok:true,redirected:false,text:async()=>table('leave','<tr><td>STALE</td><td>0</td><td>Posted</td></tr>')});await settle();await settle();
+ assert.match(d.querySelector('tbody').textContent,/V001/);assert.doesNotMatch(d.querySelector('tbody').textContent,/STALE/);assert.equal(d.querySelector('.resource-table-load-error'),null);dom.window.close();
 });

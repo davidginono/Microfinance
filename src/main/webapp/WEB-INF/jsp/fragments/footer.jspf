@@ -19,46 +19,45 @@
         function openSidebar() {
             sidebar.classList.remove("-translate-x-full");
             overlay.classList.remove("hidden");
+            sidebar.inert = false;
+            sidebar.removeAttribute('aria-hidden');
+            openBtn.setAttribute('aria-expanded', 'true');
+            openBtn.setAttribute('aria-label', openBtn.dataset.collapseLabel);
         }
 
         function closeSidebar() {
             sidebar.classList.add("-translate-x-full");
             overlay.classList.add("hidden");
+            openBtn.setAttribute('aria-expanded', 'false');
+            openBtn.setAttribute('aria-label', openBtn.dataset.expandLabel);
+            if (!desktopSidebarMedia.matches) {
+                if (sidebar.contains(document.activeElement)) openBtn.focus();
+                sidebar.inert = true;
+                sidebar.setAttribute('aria-hidden', 'true');
+            }
         }
 
-        const desktopCollapseKey = "shell:desktopSidebarCollapsed";
+        let desktopCollapsed = true;
         const desktopSidebarMedia = window.matchMedia("(min-width: 1024px)");
         let collapsedSidebarTooltip = null;
         let collapsedSidebarFlyout = null;
         let collapsedSidebarFlyoutOwner = null;
 
-        function storedDesktopSidebarCollapsed() {
-            try {
-                return window.localStorage.getItem(desktopCollapseKey) === "true";
-            } catch (ignored) {
-                return false;
-            }
-        }
-
-        function storeDesktopSidebarCollapsed(collapsed) {
-            try {
-                window.localStorage.setItem(desktopCollapseKey, String(collapsed));
-            } catch (ignored) {
-                // Storage can be blocked in private browsing modes.
-            }
-        }
-
         function applyDesktopSidebarCollapsed(collapsed) {
             const shouldCollapse = collapsed && desktopSidebarMedia.matches;
             document.documentElement.classList.toggle("shell-sidebar-collapsed", shouldCollapse);
+            sidebar.inert = !desktopSidebarMedia.matches && !isSidebarOpen();
+            if (sidebar.inert) sidebar.setAttribute('aria-hidden', 'true');
+            else sidebar.removeAttribute('aria-hidden');
             if (!shouldCollapse) {
                 hideCollapsedSidebarTooltip();
                 hideCollapsedSidebarFlyout();
             }
             if (desktopToggle) {
-                desktopToggle.setAttribute("aria-pressed", shouldCollapse ? "true" : "false");
-                desktopToggle.setAttribute("aria-label", shouldCollapse ? "Expand sidebar" : "Collapse sidebar");
-                desktopToggle.setAttribute("title", shouldCollapse ? "Expand sidebar" : "Collapse sidebar");
+                desktopToggle.setAttribute("aria-expanded", String(!shouldCollapse));
+                const label = shouldCollapse ? desktopToggle.dataset.expandLabel : desktopToggle.dataset.collapseLabel;
+                desktopToggle.setAttribute("aria-label", label);
+                desktopToggle.setAttribute("title", label);
             }
             window.requestAnimationFrame(function () {
                 window.dispatchEvent(new Event("resize"));
@@ -77,16 +76,16 @@
         });
         overlay.addEventListener("click", closeSidebar);
 
-        applyDesktopSidebarCollapsed(storedDesktopSidebarCollapsed());
+        applyDesktopSidebarCollapsed(desktopCollapsed);
         if (desktopToggle) {
             desktopToggle.addEventListener("click", function () {
                 const nextCollapsed = !document.documentElement.classList.contains("shell-sidebar-collapsed");
-                storeDesktopSidebarCollapsed(nextCollapsed);
+                desktopCollapsed = nextCollapsed;
                 applyDesktopSidebarCollapsed(nextCollapsed);
             });
         }
         const handleDesktopSidebarMediaChange = function () {
-            applyDesktopSidebarCollapsed(storedDesktopSidebarCollapsed());
+            applyDesktopSidebarCollapsed(desktopCollapsed);
         };
         if (typeof desktopSidebarMedia.addEventListener === "function") {
             desktopSidebarMedia.addEventListener("change", handleDesktopSidebarMediaChange);

@@ -1,4 +1,4 @@
-/* Actual table requests use the canvas; full-page navigation keeps the shell preloader. */
+/* Pending requests stay inside their data region; native navigation keeps its shell feedback. */
 (() => {
     'use strict';
     const pending = new Map();
@@ -12,7 +12,7 @@
     function begin(region, options={}) {
         if(!region || !region.isConnected || pending.has(region))return;
         const table=options.table===false ? null : region.matches('table') ? region : region.querySelector('table');
-        if(!table)return;
+        if(!table && !region.hasAttribute('data-ui-loading-region'))return;
         const state={loader:null,placeholders:[],busy:region.getAttribute('aria-busy')};pending.set(region,state);
         if(table) {
             const body=table.tBodies[0] || table.createTBody(),row=document.createElement('tr'),cell=document.createElement('td');
@@ -23,6 +23,11 @@
             cell.append(status(options.label,true));row.append(cell);
             [...body.rows].filter(item=>!item.hidden).forEach(item=>{item.hidden=true;state.placeholders.push(item);});
             body.prepend(row);state.loader=row;
+        } else {
+            state.loader=status(options.label,true);
+            state.loader.dataset.uiLoadingIndicator='true';
+            const heading=region.querySelector(':scope > h2,:scope > h3');
+            if(heading)heading.after(state.loader);else region.prepend(state.loader);
         }
         region.classList.add('is-loading');region.setAttribute('aria-busy','true');
     }

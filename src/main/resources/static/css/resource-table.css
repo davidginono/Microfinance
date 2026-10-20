@@ -70,28 +70,26 @@
 /* AWS console reference surfaces and controls. */
 .resource-split-layout {min-width:0;max-width:100%;}
 .resource-split-layout>.erp-table-scroll {min-width:0;width:100%;overflow:auto;}
-.resource-split-panel {min-width:0;background:#f2f3f3;border-top:1px solid #879596;position:relative;}
+.resource-split-panel {box-sizing:border-box;display:flex;flex-direction:column;height:var(--split-size,320px);min-width:0;background:#fff;border-top:1px solid #aab7b8;position:relative;}
 .resource-split-panel[hidden],.resource-split-positions[hidden] {display:none!important;}
 .resource-split-open>.erp-table-scroll {min-height:96px;max-height:none;background:#f2f3f3;}
-.resource-split-resize {position:relative;z-index:4;height:16px;cursor:row-resize;touch-action:none;user-select:none;display:flex;justify-content:center;align-items:center;}
+.resource-split-resize {flex:none;position:relative;z-index:4;height:16px;cursor:row-resize;touch-action:none;user-select:none;display:flex;justify-content:center;align-items:center;}
 .resource-split-dragging {user-select:none;}
 .resource-split-resize:hover,.resource-split-resize:focus-visible {background:#e8f3fc;}
 .resource-split-resize::after {content:"";width:20px;height:4px;border-top:1px solid #687078;border-bottom:1px solid #687078;}
-.resource-split-header {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 20px 16px;}
-.resource-split-header h2 {margin:0;font-size:16px;font-weight:700;overflow-wrap:anywhere;}
+.resource-split-header {flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 20px 16px;}
+.resource-split-header h2 {min-width:0;margin:0;font-size:16px;font-weight:700;overflow-wrap:anywhere;}
 .resource-split-commands {display:flex;align-items:center;gap:10px;flex:none;}
 .resource-split-commands button,.resource-table-utilities>button:not(.resource-table-preferences-button) {background:transparent;border:0;padding:5px;color:#545b64;}
 .resource-split-commands svg {width:16px;height:16px;}
-.resource-split-tabs {display:flex;margin:0 20px;border-bottom:1px solid #aab7b8;}
-.resource-split-tabs>span {display:block;padding:10px 20px;color:#ec7211;font-weight:700;border-bottom:2px solid #16191f;}
-.resource-split-content {box-sizing:border-box;height:var(--split-size,320px);overflow:auto;padding:20px;}
-.resource-split-values {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;background:#fff;border:1px solid #eaeded;padding:16px 0;gap:20px 0;}
-.resource-split-values>div {padding:0 20px;border-right:1px solid #eaeded;min-width:0;}
+.resource-split-content {flex:1;min-height:0;min-width:0;overflow:auto;padding:0 20px 20px;}
+.resource-split-values {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;padding:12px 0;gap:20px 0;}
+.resource-split-values>div {padding:0 20px;border-left:1px solid #eaeded;min-width:0;}
+.resource-split-values>div:nth-child(3n+1) {padding-left:0;border-left:0;}
 .resource-split-values dt {color:#545b64;font-size:12px;margin-bottom:6px;}
 .resource-split-values dd {margin:0;overflow-wrap:anywhere;font-size:14px;}
-.resource-split-empty {margin:0;color:#545b64;}
-@media(min-width:1100px){.resource-split-side.resource-split-open{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,var(--split-size,320px));align-items:start}.resource-split-side .resource-split-panel{border-top:0;border-left:1px solid #879596}.resource-split-side .resource-split-resize{position:absolute;left:-6px;width:12px;height:100%;cursor:col-resize}.resource-split-side .resource-split-resize::after{width:4px;height:20px;border:0;border-left:1px solid #687078;border-right:1px solid #687078}.resource-split-side .resource-split-values{grid-template-columns:1fr}.resource-split-side .resource-split-content{height:55vh}.resource-split-side>.erp-table-scroll{height:min(38vh,360px);max-height:70vh}}
-@media(max-width:767px){.resource-split-values{grid-template-columns:1fr}.resource-split-header{padding:8px 12px}.resource-split-content{padding:12px}.resource-split-tabs{margin:0 12px}.resource-split-positions{position:absolute;right:12px;top:48px;background:white;border:1px solid #aab7b8;padding:8px;z-index:3}}
+@media(min-width:1100px){.resource-split-side.resource-split-open{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,var(--split-size,320px));align-items:start}.resource-split-side .resource-split-panel{border-top:0;border-left:1px solid #879596}.resource-split-side .resource-split-resize{position:absolute;left:-6px;width:12px;height:100%;cursor:col-resize}.resource-split-side .resource-split-resize::after{width:4px;height:20px;border:0;border-left:1px solid #687078;border-right:1px solid #687078}.resource-split-side .resource-split-values{grid-template-columns:1fr}.resource-split-side .resource-split-panel{height:55vh;min-height:240px}.resource-split-side .resource-split-values>div{padding-left:0;border-left:0}.resource-split-side>.erp-table-scroll{height:min(38vh,360px);max-height:70vh}}
+@media(max-width:767px){.resource-split-values{grid-template-columns:1fr}.resource-split-values>div{padding-left:0;border-left:0}.resource-split-header{padding:8px 12px}.resource-split-content{padding:0 12px 12px}.resource-split-positions{position:absolute;right:12px;top:48px;background:white;border:1px solid #aab7b8;padding:8px;z-index:3}}
 @media print{.resource-split-panel{display:none!important}.resource-split-layout{display:block!important}}
 .aws-console [data-resource-table] {border:1px solid #d5dbdb;border-radius:0;background:#fff;box-shadow:0 1px 1px #879596;padding:0;}
 .aws-console [data-resource-table] .erp-table {border-collapse:separate;border-spacing:0;margin:0;font-size:13px!important;line-height:18px;}
@@ -160,3 +158,5 @@
 .aws-console [data-resource-table] .resource-table-actions .resource-table-menu :is(button,a.app-btn):focus-visible {outline:2px solid #0073bb!important;outline-offset:-2px;}
 .aws-console [data-resource-table] .resource-table-actions .resource-table-menu :is(button,a.app-btn):is(:disabled,[aria-disabled="true"]) {background:#fff!important;border-color:transparent!important;color:#aab7b8!important;cursor:default;}
 @media(max-width:600px){.resource-table-dialog-body{grid-template-columns:minmax(0,1fr);gap:12px}.resource-table-dialog-body .resource-table-column-options{border-left:0;border-top:1px solid #d5dbdb;padding:16px 0 0}.aws-console [data-resource-table]>.app-table-titlebar{padding:12px}.aws-console .resource-table-tools{padding:0 12px 12px}}
+
+.resource-table-retry {margin-left:12px;}

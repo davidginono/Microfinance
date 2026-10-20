@@ -5286,73 +5286,17 @@ body.aws-console,
     }
 }
 
-/* Collapsed desktop navigation owns a single layout offset. */
+/* The finder reference reserves a slim rail and a single reveal control. */
 @media (min-width: 1024px) {
-    .shell-main {
-        padding-left: 12px !important;
-        padding-right: 12px !important;
-    }
-
-    .shell-sidebar-collapsed .shell-main {
-        padding-left: 12px !important;
-    }
-
-    .shell-sidebar-collapsed .shell-sidebar-nav-heading,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > .px-3.pb-1.pt-3 {
-        display: none !important;
-    }
-
-    .shell-sidebar-collapsed .shell-sidebar-scroll {
-        padding: 8px 0 !important;
-        overflow-x: hidden !important;
-    }
-
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button {
-        width: 32px !important;
-        margin-right: 8px !important;
-        margin-left: 8px !important;
-        justify-content: center !important;
-        gap: 0 !important;
-        padding: 8px !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-        font-size: 0 !important;
-        line-height: 0 !important;
-        white-space: nowrap !important;
-    }
-
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:first-child,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:first-child,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:first-child,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:first-child {
-        display: inline-flex !important;
-        width: 24px !important;
-        height: 24px !important;
-        min-width: 24px !important;
-        flex: 0 0 24px !important;
-        margin: 0 !important;
-        font-size: 16px !important;
-        line-height: 1 !important;
-        visibility: visible !important;
-    }
-
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > svg {
-        display: none !important;
-    }
-
-    .shell-sidebar-collapsed .shell-sidebar-group > div {
-        display: none !important;
-    }
+    :root { --shell-sidebar-collapsed-width: 28px; }
+    .shell-main, .shell-sidebar-collapsed .shell-main { padding-left:12px!important;padding-right:12px!important; }
+    .shell-sidebar-collapsed .shell-sidebar { background:#fafafa!important;border-color:#d5dbdb!important; }
+    .shell-sidebar-collapsed .shell-sidebar-panel { border:0!important;background:#fafafa!important; }
+    html.shell-sidebar-collapsed .shell-sidebar-toggle-row { justify-content:center!important;padding:0!important;min-height:32px;background:#fafafa!important; }
+    html.shell-sidebar-collapsed .shell-sidebar .desktop-sidebar-toggle { width:28px!important;height:32px!important;min-width:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:#545b64!important; }
+    html.shell-sidebar-collapsed .desktop-sidebar-toggle svg { width:16px!important;height:16px!important;flex:none; }
+    .shell-sidebar-collapsed .desktop-sidebar-toggle:is(:hover,:focus-visible) { background:#eaeded;transform:none; }
+    .shell-sidebar-collapsed :is(.shell-sidebar-toggle-label,.shell-sidebar-scroll,.aws-sidebar-footer) { display:none!important; }
 }
 
 /* Sidebar submenu hierarchy: calm teal surface, clear hover, and warm active state. */

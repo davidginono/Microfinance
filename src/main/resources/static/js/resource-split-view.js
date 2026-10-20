@@ -23,8 +23,7 @@
         const positionLabel=el('label','sr-only',l.panelPosition), position=el('select'); position.id=id+'-position'; positionLabel.htmlFor=position.id;
         [['bottom',l.bottom],['side',l.side]].forEach(([value,label])=>{const option=el('option','',label);option.value=value;position.append(option);}); positions.append(positionLabel,position);
         commands.append(gear,positions,close); top.append(title,commands);
-        const tabs=el('div','resource-split-tabs'), tab=el('span','',l.details); tabs.append(tab);
-        const content=el('div','resource-split-content'); panel.append(resize,top,tabs,content);
+        const content=el('div','resource-split-content'); content.setAttribute('aria-live','polite'); panel.append(resize,top,content);
         const key='resource-split:v1:'+region.dataset.resourceTable;
         let state={position:'bottom',size:320};
         const wide=window.matchMedia?.('(min-width:1100px)');
@@ -50,7 +49,7 @@
         const render=()=>{
             const row=selected();
             content.replaceChildren(); title.textContent=l.details;
-            if(!row){content.append(el('p','resource-split-empty',l.selectRecord));return;}
+            if(!row){title.textContent=l.selectRecord;return;}
             const cells=originalCells(row), identifier=cells[1]?.cloneNode(true);
             identifier?.querySelectorAll('button,input,select,textarea').forEach(n=>n.remove());
             title.textContent=identifier?.textContent.trim() || l.details;
@@ -70,7 +69,7 @@
         gear.setAttribute('aria-expanded','false'); gear.addEventListener('click',()=>{positions.hidden=!positions.hidden;gear.setAttribute('aria-expanded',String(!positions.hidden));if(!positions.hidden)position.focus();});
         position.addEventListener('change',()=>{state.position=position.value;apply();save();});
         resize.addEventListener('keydown',event=>{
-            if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+            if(![...(side()?['ArrowLeft','ArrowRight']:['ArrowUp','ArrowDown']),'Home','End'].includes(event.key))return;
             const {min,max}=limits();
             event.preventDefault();state.size=event.key==='Home'?min:event.key==='End'?max:state.size+(['ArrowUp','ArrowLeft'].includes(event.key)?20:-20);apply();save();
         });
@@ -95,6 +94,8 @@
         region.addEventListener('resource-table:reset',()=>queueMicrotask(sync));
         wide?.addEventListener('change',apply);
         window.addEventListener('resize',apply);
-        apply();
+        // The reference keeps an empty preview available on desktop. Closing is deliberate:
+        // selecting another record never reopens it. Mobile starts with the full list visible.
+        if(window.innerWidth>=768)open();else apply();
     }};
 })();
