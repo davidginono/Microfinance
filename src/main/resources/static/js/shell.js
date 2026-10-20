@@ -1,7 +1,6 @@
 (function () {
     const shellTopNav = document.getElementById('shellTopNav');
     const toastContainer = document.getElementById('appToastContainer');
-    const pageSubmitPreloader = document.getElementById('pageSubmitPreloader');
     const pageTitleRail = document.getElementById('shellPageTitleRail');
     const pageTitleRailText = document.getElementById('shellPageTitleRailText');
     const pageBreadcrumbRailText = document.getElementById('shellPageBreadcrumbRailText');
@@ -15,7 +14,6 @@
     };
     const modalToastStates = new WeakMap();
     let titleRailTicking = false;
-    let pageSubmitPreloaderActive = false;
     let exportDownloadActive = false;
     let exportPrintActive = false;
     const exportDownloadTimeoutMs = 60 * 1000;
@@ -237,9 +235,6 @@
     if (toastContainer && toastContainer.parentElement !== document.body) {
         document.body.appendChild(toastContainer);
     }
-    if (pageSubmitPreloader && pageSubmitPreloader.parentElement !== document.body) {
-        document.body.appendChild(pageSubmitPreloader);
-    }
     const syncShellNavHeight = function () {
         if (!shellTopNav) {
             return;
@@ -288,7 +283,7 @@
         };
         const binding = window.AppSearch.bind(search, render, hide);
         search.addEventListener('keydown', event => {
-            if (event.key === 'Enter' && !event.isComposing) {const destination = matches()[0]; if (destination) window.location.assign(destination.href);}
+            if (event.key === 'Enter' && !event.isComposing) {const destination = matches()[0]; if (destination) window.WorkspaceNavigation.navigate(destination.href);}
             if (event.key === 'ArrowDown') {event.preventDefault(); binding.run(true); results.querySelector('a')?.focus();}
         });
         search.parentElement.addEventListener('keydown', event => {
@@ -458,7 +453,7 @@
                         'M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5'
                     ]));
                     refresh.addEventListener('click', function () {
-                        if (!window.ResourceTable?.refresh(refresh)) window.location.reload();
+                        if (!window.ResourceTable?.refresh(refresh)) window.WorkspaceNavigation.navigate(window.location.href,{force:true});
                     });
                     toolbar.appendChild(refresh);
                 }
@@ -530,7 +525,7 @@
             }
             control.dataset.awsRefreshReady = 'true';
             control.addEventListener('click', function () {
-                if (!window.ResourceTable?.refresh(control)) window.location.reload();
+                if (!window.ResourceTable?.refresh(control)) window.WorkspaceNavigation.navigate(window.location.href,{force:true});
             });
         });
 
@@ -657,9 +652,6 @@
             // Async hydration also uses these regions, independently of form navigation.
             if(!window.AppLoading)observeLoadingInteraction(region, region, 'is-loading', '.aws-table-loader');
         });
-        if (pageSubmitPreloader) {
-            observeLoadingInteraction(document.body, pageSubmitPreloader, 'is-active', '#pageSubmitPreloader');
-        }
         window.addEventListener('pagehide', function () {
             clearConsoleTableLoading({ force: true });
         });
@@ -980,29 +972,20 @@
         return { dismiss: dismiss, element: toast };
     };
 
-    const hidePageSubmitPreloader = function () {
-        pageSubmitPreloaderActive = false;
-        document.documentElement.classList.remove('page-submit-preloader-active');
-        document.body.removeAttribute('aria-busy');
-        if (pageSubmitPreloader) {
-            pageSubmitPreloader.classList.remove('is-active');
-            pageSubmitPreloader.setAttribute('aria-hidden', 'true');
+    const submissionLoading = new Map();
+    const clearSubmissionLoading = function () {
+        for (const [form,state] of submissionLoading) {
+            state.finish?.();
+            state.controls.forEach(control => {control.disabled = false;});
+            submissionLoading.delete(form);
         }
     };
-
-    const showPageSubmitPreloader = function (form) {
-        if (!pageSubmitPreloader || pageSubmitPreloaderActive) {
-            return;
-        }
-        if (form) {
-            form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (control) {
-                control.disabled = true;control.setAttribute('aria-disabled','true');control.classList.add('opacity-60','cursor-not-allowed');
-            });
-        }
-        pageSubmitPreloaderActive = true;
-        document.body.setAttribute('aria-busy', 'true');
-        pageSubmitPreloader.classList.add('is-active');
-        pageSubmitPreloader.setAttribute('aria-hidden', 'false');
+    const showSubmissionLoading = function (form,submitter) {
+        if (submissionLoading.has(form)) return;
+        const controls=[...form.querySelectorAll('button[type="submit"],button:not([type]),input[type="submit"]')].filter(control=>!control.disabled);
+        const finish=window.AppLoading?.action(submitter || controls[0]);
+        controls.forEach(control=>control.disabled=true);
+        submissionLoading.set(form,{controls,finish});
     };
 
     const resolveDownloadFilename = function (response, target) {
@@ -1065,7 +1048,6 @@
                     if (blob.type.includes('html')) await frame.contentDocument.fonts.ready;
                     if (signal.aborted) return;
                     frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-                    hidePageSubmitPreloader();
                     frame.contentWindow.focus();
                     frame.contentWindow.print();
                     signal.removeEventListener('abort', abort);
@@ -1098,23 +1080,23 @@
         });
     };
 
-    const downloadWithPagePreloader = async function (url) {
-        if (!pageSubmitPreloader) {
-            window.location.assign(url);
-            return;
-        }
+    const downloadWithLocalLoading = async function (url, control = document.activeElement) {
+        const target = new URL(url, window.location.href);
+        if (target.origin !== window.location.origin) return;
         if (exportDownloadActive) {
             return;
         }
         exportDownloadActive = true;
         clearConsoleTableLoading();
-        showPageSubmitPreloader(null);
+        const finish=window.AppLoading?.action(control?.closest?.('.shell-main,[role="dialog"]') ? control : document.querySelector('.erp-page-title,h1'));
         const controller = new AbortController();
+        let timedOut=false;
+        const cancel=()=>controller.abort();
+        window.addEventListener('pagehide',cancel,{once:true});
         const timeout = window.setTimeout(function () {
-            controller.abort();
+            timedOut=true;controller.abort();
         }, exportDownloadTimeoutMs);
         try {
-            const target = new URL(url, window.location.href);
             const response = await window.fetch(target.toString(), {
                 credentials: 'same-origin',
                 signal: controller.signal
@@ -1126,7 +1108,7 @@
             const blob = await response.blob();
             triggerBrowserDownload(blob, resolveDownloadFilename(response, target));
         } catch (error) {
-            const timedOut = error && error.name === 'AbortError';
+            if(controller.signal.aborted && !timedOut)return;
             if (typeof window.showToast === 'function') {
                 window.showToast('error', timedOut
                     ? 'The export took too long. Please try again.'
@@ -1134,12 +1116,13 @@
             }
         } finally {
             window.clearTimeout(timeout);
+            window.removeEventListener('pagehide',cancel);
             exportDownloadActive = false;
-            hidePageSubmitPreloader();
+            finish?.();
         }
     };
 
-    const printWithPagePreloader = async function (url) {
+    const printWithLocalLoading = async function (url, control = document.activeElement) {
         const target = new URL(url, window.location.href);
         if (target.origin !== window.location.origin) return;
         if (exportPrintActive) {
@@ -1147,10 +1130,13 @@
         }
         exportPrintActive = true;
         clearConsoleTableLoading();
-        showPageSubmitPreloader(null);
+        const finish=window.AppLoading?.action(control?.closest?.('.shell-main,[role="dialog"]') ? control : document.querySelector('.erp-page-title,h1'));
         const controller = new AbortController();
+        let timedOut=false;
+        const cancel=()=>controller.abort();
+        window.addEventListener('pagehide',cancel,{once:true});
         const timeout = window.setTimeout(function () {
-            controller.abort();
+            timedOut=true;controller.abort();
         }, exportDownloadTimeoutMs);
         try {
             const response = await window.fetch(target.toString(), {
@@ -1164,7 +1150,7 @@
             const blob = await response.blob();
             await triggerBrowserPrint(blob, target, controller.signal);
         } catch (error) {
-            const timedOut = error && error.name === 'AbortError';
+            if(controller.signal.aborted && !timedOut)return;
             if (typeof window.showToast === 'function') {
                 window.showToast('error', timedOut
                     ? 'The print file took too long. Please try again.'
@@ -1172,12 +1158,14 @@
             }
         } finally {
             window.clearTimeout(timeout);
+            window.removeEventListener('pagehide',cancel);
             exportPrintActive = false;
-            hidePageSubmitPreloader();
+            finish?.();
         }
     };
 
-    window.printExport = printWithPagePreloader;
+    window.printExport = printWithLocalLoading;
+    window.downloadExport = downloadWithLocalLoading;
 
     const resolvePrintControlUrl = function (control) {
         const url = control?.getAttribute?.('data-print-url') || control?.getAttribute?.('href') || '';
@@ -1666,9 +1654,9 @@
             event.preventDefault();
             reMemberscrollForReload();
             if (isConsolePrintAction(event.submitter)) {
-                void printWithPagePreloader(exportUrl);
+                void printWithLocalLoading(exportUrl,event.submitter);
             } else {
-                void downloadWithPagePreloader(exportUrl);
+                void downloadWithLocalLoading(exportUrl,event.submitter);
             }
             return;
         }
@@ -1678,7 +1666,7 @@
         window.setTimeout(function () {
             if (!event.defaultPrevented) {
                 reMemberscrollForReload();
-                showPageSubmitPreloader(form);
+                showSubmissionLoading(form,event.submitter);
             }
         }, 0);
     });
@@ -1693,7 +1681,7 @@
             if (printUrl) {
                 event.preventDefault();
                 reMemberscrollForReload();
-                void printWithPagePreloader(printUrl);
+                void printWithLocalLoading(printUrl,printControl);
                 return;
             }
         }
@@ -1701,7 +1689,6 @@
         if (!link || link.matches('[target], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
             return;
         }
-        if (window.WorkspaceNavigation?.handles(link)) return;
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
             return;
@@ -1716,15 +1703,10 @@
             || /\.(?:csv|pdf|xlsx?)(?:$|\?)/i.test(target.pathname + target.search)) {
             event.preventDefault();
             reMemberscrollForReload();
-            void downloadWithPagePreloader(target.toString());
+            void downloadWithLocalLoading(target.toString(),link);
             return;
         }
         reMemberscrollForReload();
-        window.setTimeout(function () {
-            if (!event.defaultPrevented) {
-                showPageSubmitPreloader(null);
-            }
-        }, 0);
     });
 
     document.addEventListener('click', reMemberscrollForReload, { capture: true, passive: true });
@@ -1759,7 +1741,8 @@
         }
     });
 
-    window.addEventListener('pageshow', hidePageSubmitPreloader);
+    window.addEventListener('pageshow', clearSubmissionLoading);
+    window.addEventListener('pagehide', clearSubmissionLoading);
 
     window.scrollToFeedback = function (element) {
         if (!element || !element.textContent || !element.textContent.trim()) {

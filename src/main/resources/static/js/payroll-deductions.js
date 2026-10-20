@@ -26,7 +26,7 @@
         });
         buttons.forEach(button => button.addEventListener('click', () => {
             const row = selected();if (!row || button.disabled) return;
-            location.assign(register.dataset.base + '/' + encodeURIComponent(row.dataset.payrollId) + (button.hasAttribute('data-payroll-pdf') ? '/pdf' : ''));
+            window.WorkspaceNavigation.navigate(register.dataset.base + '/' + encodeURIComponent(row.dataset.payrollId) + (button.hasAttribute('data-payroll-pdf') ? '/pdf' : ''));
         }));
         ['resource-table:reset','resource-table:updated'].forEach(name => register.addEventListener(name,reset));
         window.addEventListener('pageshow',reset);reset();

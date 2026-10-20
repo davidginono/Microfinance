@@ -82,3 +82,14 @@ test('value and chart loaders have silent visual labels, distinct sizes and rest
   assert.equal(d.querySelector('.app-loading-spinner'),null);
  }finally{dom.window.close();}
 });
+
+
+test('button request feedback stays local, unlabeled and clears independently on completion or page exit',async()=>{
+ const {dom,w,d}=await setup('<header>Header</header><main><button id="pdf">PDF</button><button id="print" disabled>Print</button><input value="draft"></main>');try{
+  const pdf=d.querySelector('#pdf'),print=d.querySelector('#print'),one=w.AppLoading.action(pdf),two=w.AppLoading.action(print);
+  assert.equal(d.querySelectorAll('[data-ui-action-loading]').length,2);assert.equal(pdf.nextElementSibling.textContent,'');assert.equal(pdf.nextElementSibling.getAttribute('role'),'status');
+  assert.equal(d.body.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('header').inert,undefined);assert.equal(print.disabled,true);
+  one();assert.equal(d.querySelectorAll('[data-ui-action-loading]').length,1);assert.equal(pdf.hasAttribute('aria-busy'),false);
+  w.dispatchEvent(new w.Event('pagehide'));two();assert.equal(d.querySelector('[data-ui-action-loading]'),null);assert.equal(print.disabled,true);assert.equal(d.querySelector('input').value,'draft');
+ }finally{dom.window.close();}
+});

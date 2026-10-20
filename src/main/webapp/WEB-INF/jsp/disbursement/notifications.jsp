@@ -64,7 +64,7 @@
                 if (event.target.closest("a, button, input, select, textarea")) {
                     return;
                 }
-                window.location.href = row.dataset.notificationHref;
+                window.WorkspaceNavigation.navigate(row.dataset.notificationHref);
         });
     })();
 </script>

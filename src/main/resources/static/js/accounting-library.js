@@ -30,7 +30,7 @@
         });
         view.addEventListener('click', () => {
             const row = selected(); if (!row || view.disabled) return;
-            location.assign(row.dataset.url);
+            window.WorkspaceNavigation.navigate(row.dataset.url);
         });
         statusForm?.addEventListener('submit', event => { if (!selected() || status.disabled) event.preventDefault(); else status.disabled = true; });
         const reset = () => { inputs().forEach(input => input.checked = false); update(); };
@@ -60,7 +60,7 @@
             modal.classList.remove('is-open'); modal.hidden = true; document.body.style.overflow = previousOverflow || ''; document.documentElement.style.overflow = previousRootOverflow || '';
             (previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : triggers[0])?.focus();
             const url = new URL(location.href); url.searchParams.delete('create');
-            if (modal.dataset.created === 'true') location.replace(url.href);
+            if (modal.dataset.created === 'true') window.WorkspaceNavigation.navigate(url.href,{replace:true,force:true});
             else history.replaceState(null, '', url.href);
         };
         triggers.forEach(button => button.addEventListener('click', open));

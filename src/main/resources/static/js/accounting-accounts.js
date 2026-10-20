@@ -144,11 +144,11 @@
     });
     create?.addEventListener('click', () => {
         const row = selected(); if (!row || create.disabled) return;
-        const url = new URL(create.dataset.url, location.href); url.searchParams.set('parentId', row.dataset.id); location.assign(url.href);
+        const url = new URL(create.dataset.url, location.href); url.searchParams.set('parentId', row.dataset.id); window.WorkspaceNavigation.navigate(url.href);
     });
     statusForm?.addEventListener('submit', event => { if (!selected() || status.disabled) event.preventDefault(); else status.disabled = true; });
-    history?.addEventListener('click', () => { const row = selected(); if (row) location.assign(history.dataset.url + row.dataset.id + '/history'); });
-    newVersion?.addEventListener('click', () => { const row = selected(); if (row) location.assign(newVersion.dataset.url + row.dataset.id + '/versions/new'); });
+    history?.addEventListener('click', () => { const row = selected(); if (row) window.WorkspaceNavigation.navigate(history.dataset.url + row.dataset.id + '/history'); });
+    newVersion?.addEventListener('click', () => { const row = selected(); if (row) window.WorkspaceNavigation.navigate(newVersion.dataset.url + row.dataset.id + '/versions/new'); });
     window.addEventListener('pageshow', reset);
     register.addEventListener('resource-table:reset',reset);
     register.addEventListener('resource-table:updated',reset);

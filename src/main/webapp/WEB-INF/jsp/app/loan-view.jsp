@@ -35,7 +35,7 @@
         <spring:message code="loan.view.awaitingGuarantors" text="Waiting for guarantor approval. This page auto-refreshes every 1 hour." />
     </div>
     <script>
-        setTimeout(function () { window.location.reload(); }, 3600000);
+        setTimeout(function () { window.WorkspaceNavigation.navigate(window.location.href, {force:true}); }, 3600000);
     </script>
 </c:if>
 <c:if test="${app.status eq 'ALL_GUARANTORS_APPROVED'}">

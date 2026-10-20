@@ -20,7 +20,7 @@
         <spring:message code="loan.view.awaitingGuarantors" text="Waiting for guarantor approval. This page auto-refreshes every 1 hour." />
     </div>
     <script>
-        setTimeout(function () { window.location.reload(); }, 3600000);
+        setTimeout(function () { window.WorkspaceNavigation.navigate(window.location.href, {force:true}); }, 3600000);
     </script>
 </c:if>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="app-loan-applications-1" data-resource-split data-table-title-id="app-loan-applications-title">

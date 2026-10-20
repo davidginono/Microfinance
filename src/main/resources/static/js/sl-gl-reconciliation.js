@@ -8,13 +8,13 @@
         event.preventDefault();event.stopImmediatePropagation();
         const url=new URL(form.action,location.href);
         new FormData(form).forEach((value,name)=>{if(typeof value==='string' && name!=='cutoff')url.searchParams.set(name,value);});
-        location.assign(url.href);
+        window.WorkspaceNavigation.navigate(url.href);
     },true);
     document.addEventListener('resource-table:refresh',event=>{
         if(!event.target.matches('[data-resource-table="sl-gl-reconciliation"]'))return;
         event.preventDefault();event.stopImmediatePropagation();
         const url=new URL(location.href);url.searchParams.delete('cutoff');url.searchParams.set('run','true');url.searchParams.set('page','0');
-        location.assign(url.href);
+        window.WorkspaceNavigation.navigate(url.href);
     },true);
     document.querySelector('[role="alert"][tabindex="-1"]')?.focus();
 })();

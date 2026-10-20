@@ -22,7 +22,7 @@
     });
     view.addEventListener('click', () => {
         const input = inputs().find(input => input.checked);
-        if (input) location.assign(region.dataset.baseUrl + input.closest('tr').dataset.versionId);
+        if (input) window.WorkspaceNavigation.navigate(region.dataset.baseUrl + input.closest('tr').dataset.versionId);
     });
     const reset = () => { inputs().forEach(input => input.checked = false); update(); };
     ['resource-table:reset','resource-table:updated','input'].forEach(name => region.addEventListener(name, event => { if (name !== 'input' || event.target.closest('.coa-filters')) reset(); }));

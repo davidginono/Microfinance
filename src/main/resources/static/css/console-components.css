@@ -7168,7 +7168,7 @@ html.session-timeout-active,
     border: 2px solid rgba(255, 255, 255, 0.55);
     border-top-color: #ffffff;
     border-radius: 50%;
-    animation: page-submit-preloader-spin .72s linear infinite;
+    animation: component-request-spin .72s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

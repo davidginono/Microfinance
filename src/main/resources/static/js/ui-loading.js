@@ -2,6 +2,7 @@
 (() => {
     'use strict';
     const pending = new Map();
+    const actions = new Map();
     const status = (label, animate=false, size='medium') => {
         const element=document.createElement('div');element.className='app-loading-status';
         element.dataset.loadingSize=size;
@@ -44,7 +45,15 @@
         region.classList.remove('is-loading');
         if(state.busy===null)region.removeAttribute('aria-busy');else region.setAttribute('aria-busy',state.busy==='true'?'false':state.busy);
     }
-    function clear() {for(const region of [...pending.keys()])end(region);}
+    function action(control){
+        if(!control?.isConnected)return ()=>{};
+        actions.get(control)?.();
+        const loader=status(null,true,'small'),busy=control.getAttribute('aria-busy');
+        loader.classList.add('app-action-loading');loader.dataset.uiActionLoading='true';control.after(loader);control.setAttribute('aria-busy','true');
+        const finish=()=>{if(actions.get(control)!==finish)return;actions.delete(control);loader.remove();if(busy===null)control.removeAttribute('aria-busy');else control.setAttribute('aria-busy',busy==='true'?'false':busy);};
+        actions.set(control,finish);return finish;
+    }
+    function clear() {for(const region of [...pending.keys()])end(region);for(const finish of [...actions.values()])finish();}
     function fail(region,{label,retry}) {
         if(!region?.isConnected)return;end(region);
         region.querySelector(':scope > [data-ui-loading-error]')?.remove();
@@ -53,7 +62,7 @@
         if(retry){const button=document.createElement('button');button.type='button';button.className='app-btn btn-neutral';button.textContent=document.body.dataset.navigationRetry;button.addEventListener('click',retry);error.append(button);}
         const heading=region.querySelector(':scope > h2,:scope > h3');if(heading)heading.after(error);else region.prepend(error);
     }
-    window.AppLoading={begin,end,status,clear,fail};
+    window.AppLoading={begin,end,status,clear,fail,action};
     const sync=region=>{if(region.getAttribute('aria-busy')==='true')begin(region,{table:region.matches('.erp-table-wrap')});else end(region);};
     function init() {
         document.querySelectorAll('[data-ui-loading-region], .erp-table-wrap[aria-busy="true"]').forEach(sync);

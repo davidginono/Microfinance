@@ -3,7 +3,7 @@
 <div class="accounting-workspace fs-configure">
  <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.workspace" /></h1></div>
  <c:if test="${not empty errorKey}"><div class="accounting-error-summary" role="alert" tabindex="-1"><spring:message code="${errorKey}" /></div></c:if>
- <form method="post" action="<c:url value='/reports/financial/statements' />" class="fs-setup">
+ <form method="post" action="<c:url value='/reports/financial/statements' />" class="fs-setup" data-workspace-submit>
   <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="requestKey" value="${requestKey}" />
   <section class="erp-panel"><div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="fs.reportControls" /></h2></div>
    <div class="erp-panel-body fs-fields">

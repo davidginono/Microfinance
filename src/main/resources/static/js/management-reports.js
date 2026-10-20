@@ -18,7 +18,7 @@
     selected = next; row.classList.add('is-selected'); row.querySelector('input').checked = true;
     view.disabled = false; status.textContent = status.dataset.selected;
   });
-  view.addEventListener('click', () => {if (selected) window.location.assign(view.dataset.url + encodeURIComponent(selected));});
+  view.addEventListener('click', () => {if (selected) window.WorkspaceNavigation.navigate(view.dataset.url + encodeURIComponent(selected));});
   table.querySelector('form')?.addEventListener('input', reset);
   table.addEventListener('resource-table:reset', reset);
   table.addEventListener('resource-table:updated', reset);

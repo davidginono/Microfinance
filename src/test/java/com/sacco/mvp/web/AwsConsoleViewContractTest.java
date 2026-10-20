@@ -397,7 +397,7 @@ class AwsConsoleViewContractTest {
             .contains("app-account-copy")
             .contains("app-profile-control")
             .contains("shellPageBreadcrumbRailText")
-            .contains("pageSubmitPreloader")
+            .doesNotContain("pageSubmitPreloader")
             .contains("app-global-search")
             .contains("id=\"consoleNavigationSearch\"")
             .contains("name=\"console-navigation-search\"")
@@ -532,9 +532,9 @@ class AwsConsoleViewContractTest {
             .doesNotContain("&times;")
             .contains("enhanceConsoleTables")
             .contains("initConsoleTableLoading")
-            .contains("showPageSubmitPreloader(null)")
+            .contains("window.AppLoading?.action(")
             .contains("[data-download-action=\"true\"]")
-            .contains("downloadWithPagePreloader")
+            .contains("downloadWithLocalLoading")
             .contains("syncConsoleFiltersFromUrl")
             .contains("breadcrumbRouteGroups")
             .contains("'admin tools'")
@@ -971,16 +971,16 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void regionalLoadingDoesNotCompeteWithThePagePreloader() throws Exception {
+    void regionalLoadingAndWorkspaceActionsNeverCreateAPageOverlay() throws Exception {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
         String loading = read(Path.of("src/main/resources/static/js/ui-loading.js"));
         assertThat(shellJs)
-            .contains("hidePageSubmitPreloader();")
-            .contains("if (window.WorkspaceNavigation?.handles(link)) return;")
+            .contains("finish?.();")
+            .doesNotContain("showPageSubmitPreloader", "pageSubmitPreloader")
             .contains("if (!event.defaultPrevented)")
             .contains("window.AppLoading?.end(region)");
         assertThat(loading)
-            .contains("window.AppLoading={begin,end,status,clear,fail}")
+            .contains("window.AppLoading={begin,end,status,clear,fail,action}")
             .contains("element.setAttribute('aria-label'")
             .contains("state.loader.remove()");
     }
@@ -999,7 +999,7 @@ class AwsConsoleViewContractTest {
             .contains("data-page-preloader=\"true\"");
         assertThat(shellJs)
             .contains("if (!event.defaultPrevented)")
-            .contains("showPageSubmitPreloader(form)")
+            .contains("showSubmissionLoading(form,event.submitter)")
             .contains("clearConsoleTableLoading();");
     }
 
@@ -1117,7 +1117,7 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void documentDownloadsUseSelfClearingPagePreloader() throws Exception {
+    void documentDownloadsUseSelfClearingLocalActionSpinners() throws Exception {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
         String loanExportModal = read(JSP_ROOT.resolve("fragments/loan-export-modal.jspf"));
@@ -1130,19 +1130,19 @@ class AwsConsoleViewContractTest {
         );
 
         assertThat(shellJs)
-            .contains("downloadWithPagePreloader")
+            .contains("downloadWithLocalLoading")
             .contains("const exportDownloadTimeoutMs = 60 * 1000")
             .contains("const response = await window.fetch")
             .contains("triggerBrowserDownload(blob, resolveDownloadFilename(response, target))")
             .contains("controller.abort()")
             .contains("finally {")
-            .contains("hidePageSubmitPreloader();")
+            .contains("finish?.();")
             .contains("resolveExportFormUrl(form, event.submitter)")
-            .contains("showPageSubmitPreloader(null)")
+            .contains("window.AppLoading?.action(")
             .contains("isConsoleDownloadAction(link)")
             .contains("[data-download-action=\"true\"]")
             .contains("link.matches('[download], [data-download-action=\"true\"]')")
-            .contains("void downloadWithPagePreloader(target.toString())");
+            .contains("void downloadWithLocalLoading(target.toString(),link)");
         assertThat(loanExportModal)
             .contains("data-loan-export-signed data-download-action=\"true\"")
             .contains("data-loan-export-unsigned data-download-action=\"true\"")

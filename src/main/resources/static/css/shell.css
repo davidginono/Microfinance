@@ -907,68 +907,13 @@ button:active {
     gap: 0.6rem;
     grid-template-columns: minmax(7rem, 0.7fr) minmax(0, 1fr);
 }
-.page-submit-preloader {
-    position: fixed;
-    inset: 0;
-    z-index: 10001;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(234, 237, 237, 0.28);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-}
-.page-submit-preloader.is-active {
-    display: flex;
-}
-.page-submit-preloader__panel {
-    display: grid;
-    place-items: center;
-    gap: 0.6rem;
-    color: #16191f;
-}
-.page-submit-preloader__spinner {
-    position: relative;
-    width: 2rem;
-    height: 2rem;
-}
-.page-submit-preloader__ring {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 3px solid #d5dbdb;
-    border-top-color: #0972d3;
-    animation: page-submit-preloader-spin .72s linear infinite;
-}
-.page-submit-preloader__ring:nth-child(1) {
-    border-top-color: #0972d3;
-}
-.page-submit-preloader__ring:nth-child(2) {
-    display: none;
-}
-.page-submit-preloader__ring:nth-child(3) {
-    display: none;
-}
-.page-submit-preloader__text {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0;
-    text-transform: none;
-}
 @media (max-width: 639px) {
     .skeleton-table-row {
         grid-template-columns: minmax(0, 1fr);
     }
-    .page-submit-preloader__spinner {
-        width: 2rem;
-        height: 2rem;
-    }
 }
 @media (prefers-reduced-motion: reduce) {
-    .skeleton,
-    .page-submit-preloader__ring {
-        animation: none;
-    }
+    .skeleton { animation: none; }
 }
 @keyframes skeleton-loading {
     0% {
@@ -978,7 +923,7 @@ button:active {
         background-color: hsl(200, 20%, 94%);
     }
 }
-@keyframes page-submit-preloader-spin {
+@keyframes component-request-spin {
     to {
         transform: rotate(360deg);
     }
@@ -1554,31 +1499,6 @@ button:active {
     color: #414d5c;
     font-weight: 400;
     text-overflow: ellipsis;
-}
-
-.page-submit-preloader__spinner {
-    width: 2.75rem !important;
-    height: 2.75rem !important;
-}
-
-.page-submit-preloader__ring {
-    border-color: transparent !important;
-    border-top-color: var(--aws-blue) !important;
-}
-
-.page-submit-preloader__ring:nth-child(2) {
-    display: block !important;
-    inset: .38rem;
-    border-top-color: var(--aws-orange) !important;
-    animation-duration: .9s;
-    animation-direction: reverse;
-}
-
-.page-submit-preloader__ring:nth-child(3) {
-    display: block !important;
-    inset: .76rem;
-    border-top-color: var(--aws-success) !important;
-    animation-duration: .62s;
 }
 
 .erp-table-wrap.erp-table-scroll,
@@ -3031,14 +2951,6 @@ body.aws-console table.erp-table :is(th, td).text-center {
 .app-badge,
 .aws-console [class*="rounded-full"] {
     border-radius: 2px !important;
-}
-
-.page-submit-preloader__panel {
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 0 !important;
 }
 
 .shell-page-title-rail {

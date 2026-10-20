@@ -9,6 +9,7 @@
     let viewKey=history.state?.workspaceNavigation?.key || ++serial;
     let entry={url:location.href,index:history.state?.workspaceNavigation?.index || 0};
     let reversing=false;
+    const submissions=new WeakSet();
     const timers = {};
     for (const [schedule,cancel] of [['setTimeout','clearTimeout'],['setInterval','clearInterval'],['requestAnimationFrame','cancelAnimationFrame'],['requestIdleCallback','cancelIdleCallback']]) {
         if (!window[schedule]) continue;
@@ -56,19 +57,34 @@
         // These app singletons otherwise retain observers or closures from the previous JSP.
         for(const key of ['__neoSelectEnhancerLoaded','bindAppConfirmModal','SaccosRepaymentSchedule'])delete window[key];
     }
-    function eligible(url){return url.origin===location.origin && !/\/(?:logout|login|auth)(?:\/|$)|\.(?:pdf|xlsx?|csv|zip)$/i.test(url.pathname);}
+    function eligible(url){return url.origin===location.origin && !/\/(?:logout|login|auth|pdf|print|export|download)(?:\/|$)|\.(?:pdf|xlsx?|csv|zip|png|jpe?g|gif|svg)$/i.test(url.pathname);}
     function handles(link){
-        if(!link?.matches('a[href]') || link.matches('[download],[target]:not([target="_self"]),[data-download-action],[data-print-action]'))return false;
+        if(!link?.matches('a[href]') || link.matches('[download],[target]:not([target="_self"]),[data-download-action],[data-print-action],[data-native-navigation]'))return false;
         const href=link.getAttribute('href');if(!href || href.startsWith('#'))return false;
         const url=new URL(link.href,location.href);if(!eligible(url))return false;
-        return !!link.closest('#appSidebar') || [...document.querySelectorAll('#appSidebar a[href]')].some(item=>item.href===url.href);
+        if(url.pathname===location.pathname && url.search===location.search && url.hash)return false;
+        return document.body.matches('.aws-console') && !!document.querySelector('.shell-main');
+    }
+    function handlesForm(form,submitter){
+        if(!form?.matches('form') || !document.body.matches('.aws-console') || !form.closest('.shell-main,[role="dialog"]') || form.matches('[data-native-navigation]'))return false;
+        const method=(submitter?.getAttribute('formmethod') || form.method || 'get').toLowerCase();
+        const target=submitter?.getAttribute('formtarget') || form.target;
+        if((target && target!=='_self') || (method!=='get' && !(method==='post' && form.hasAttribute('data-workspace-submit'))))return false;
+        return eligible(new URL(submitter?.getAttribute('formaction') || form.action || location.href,location.href));
+    }
+    function navigate(destination,options={}){
+        const url=new URL(destination,location.href);
+        if(eligible(url))return visit(url.href,options);
+        if(url.origin===location.origin && /\/(?:pdf|export|download)(?:\/|$)|\.(?:pdf|xlsx?|csv|zip)$/i.test(url.pathname) && window.downloadExport)return window.downloadExport(url.href);
+        if(url.origin===location.origin && /\/print(?:\/|$)/i.test(url.pathname) && window.printExport)return window.printExport(url.href);
+        location.assign(url.href);
     }
     function clearFeedback(){
         document.getElementById('workspace-navigation-feedback')?.remove();
         const main=document.querySelector('.shell-main.is-workspace-pending');
         if(main){main.classList.remove('is-workspace-pending');main.removeAttribute('aria-busy');}
     }
-    const feedback=(failed,url)=>{
+    const feedback=(failed,url,options={})=>{
         clearFeedback();
         const main=document.querySelector('.shell-main');if(!main)return;
         const box=document.createElement('div');box.id='workspace-navigation-feedback';box.className='workspace-navigation-feedback';box.setAttribute('role',failed?'alert':'status');
@@ -77,7 +93,10 @@
             box.classList.add('workspace-navigation-pending');box.setAttribute('aria-label',document.body.dataset.navigationLoading);
             const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='large';spinner.setAttribute('aria-hidden','true');box.append(spinner);
         }else{const label=document.createElement('span');label.textContent=document.body.dataset.navigationError;box.append(label);}
-        if(failed){const retry=document.createElement('button');retry.type='button';retry.className='app-btn btn-neutral';retry.textContent=document.body.dataset.navigationRetry;retry.onclick=()=>visit(url,{force:true});box.append(retry);}
+        if(failed){const retry=document.createElement('button');retry.type='button';retry.className='app-btn btn-neutral';retry.textContent=document.body.dataset.navigationRetry;retry.onclick=()=>{
+            if(!options.submission)return visit(url,{force:true});
+            const {form,submitter}=options.submission;if(submitter)form.requestSubmit(submitter);else form.requestSubmit();
+        };box.append(retry);}
         main.prepend(box);
     };
     const allowed=(url,resume)=>document.dispatchEvent(new CustomEvent('workspace:before-navigate',{cancelable:true,detail:{url,resume}}));
@@ -134,7 +153,7 @@
         let didCommit=false;
         const timeout=timers.setTimeout(()=>controller.abort(),20000);feedback(false,url.href);
         try{
-            const response=await native.fetch(url.href,{credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:controller.signal});
+            const response=await native.fetch(url.href,{...options.submission?.request,credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:controller.signal});
             if(version!==generation)return true;
             const finalUrl=new URL(response.url || url.href,location.href);
             if(finalUrl.origin!==location.origin)throw new Error('Workspace origin');
@@ -159,7 +178,7 @@
             replaceBody(page);
             const main=document.querySelector('.shell-main');main.inert=true;main.dataset.workspaceInitializing='true';
             viewKey=options.pop?.key || ++serial;
-            if(options.pop){entry={url:finalUrl.href,index:options.pop.index};native.replace(state(history.state),'',finalUrl.href);}
+            if(options.pop || options.replace){entry={url:finalUrl.href,index:options.pop?.index ?? entry.index};native.replace(state(history.state),'',finalUrl.href);}
             else{entry={url:finalUrl.href,index:entry.index+1};native.push(state({},viewKey,entry.index),'',finalUrl.href);}
             const deferred=scripts.filter(script=>script.defer || script.type==='module');
             for(const script of scripts.filter(script=>!deferred.includes(script)))await execute(script,version);
@@ -168,10 +187,10 @@
             for(const callback of scope.load.splice(0))callback();
             booting=false;window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
             const title=document.querySelector('.erp-page-title,h1');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
-            if(!options.pop)window.scrollTo({top:0,left:0,behavior:'instant'});
+            if(!options.pop){const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));if(anchor)anchor.scrollIntoView();else window.scrollTo({top:0,left:0,behavior:'instant'});}
             document.dispatchEvent(new CustomEvent('workspace:navigated',{detail:{url:finalUrl.href}}));
         }catch(error){
-            if(version===generation){if(options.pop && !didCommit)undoPop(options.previous,options.pop);feedback(true,url.href);}
+            if(version===generation){if(options.pop && !didCommit)undoPop(options.previous,options.pop);feedback(true,url.href,options);}
         }finally{
             clearTimeout(timeout);
             if(didCommit){booting=false;committing=false;const main=document.querySelector('[data-workspace-initializing]');if(main){main.inert=false;delete main.dataset.workspaceInitializing;}}
@@ -180,11 +199,31 @@
         }
         return true;
     }
-    window.WorkspaceNavigation={visit,handles,rememberSidebar(value){collapsed=value;},get sidebarCollapsed(){return collapsed;},get restoring(){return committing;}};
+    window.WorkspaceNavigation={visit,navigate,handles,handlesForm,rememberSidebar(value){collapsed=value;},get sidebarCollapsed(){return collapsed;},get restoring(){return committing;}};
     native.add.call(window,'click',event=>{
         if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
         const link=event.target.closest?.('a[href]');if(!handles(link))return;
         event.preventDefault();void visit(link.href);
+    });
+    native.add.call(window,'submit',event=>{
+        const form=event.target,submitter=event.submitter;
+        if(event.defaultPrevented || !handlesForm(form,submitter))return;
+        if(submissions.has(form)){event.preventDefault();return;}
+        const url=new URL(submitter?.getAttribute('formaction') || form.action || location.href,location.href);
+        const method=(submitter?.getAttribute('formmethod') || form.method || 'get').toLowerCase();
+        const data=new FormData(form);
+        if(submitter?.name && !data.has(submitter.name))data.append(submitter.name,submitter.value);
+        event.preventDefault();
+        if(method==='get'){
+            url.search='';for(const [name,value] of data)url.searchParams.append(name,typeof value==='string'?value:value.name);
+            void visit(url.href,{force:true});
+        }else{
+            // Explicitly opted-in report generation retains its CSRF token and idempotency key.
+            // Mutation/financial forms keep their existing submit and confirmation controllers.
+            const body=new URLSearchParams();for(const [name,value] of data)if(typeof value==='string')body.append(name,value);
+            submissions.add(form);
+            void visit(url.href,{force:true,submission:{form,submitter,request:{method:'POST',body}}}).finally(()=>submissions.delete(form));
+        }
     });
     native.add.call(window,'popstate',event=>{
         const marker=event.state?.workspaceNavigation,previous={...entry};

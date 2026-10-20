@@ -15,7 +15,7 @@ document.querySelector('#command').onclick=()=>window.commands.push(label);
 })();
 `;
 const discard=`<div id="accounting-discard-modal" hidden><div role="dialog" tabindex="-1"><button data-accounting-keep>Keep editing</button><div class="app-modal-actions"><button data-accounting-keep>Keep</button><button data-accounting-discard>Discard</button></div></div></div>`;
-function html(title,guard=false){return `<!doctype html><html lang="en"><head><title>${title}</title><meta name="_csrf" content="${title}-csrf"><script src="/js/workspace-navigation.js" data-workspace-navigation></script><script src="/js/shell.js" defer></script><script src="/js/page.js" defer></script>${guard?'<script src="/js/accounting-form-ux.js" defer></script>':''}</head><body class="aws-console" data-navigation-loading="Loading workspace" data-navigation-error="Could not load" data-navigation-retry="Try again"><nav id="shellTopNav">Header</nav><aside id="appSidebar"><a href="/admin/dashboard">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/settings-controls?section=loan">Products</a></aside><main class="shell-main"><h1 class="erp-page-title">${title}</h1><form class="accounting-create-form"><input name="name" value="Original"><button type="submit">Save</button></form><button id="command">Command</button></main><div id="pageSubmitPreloader" aria-hidden="true"></div>${guard?discard:''}</body></html>`;}
+function html(title,guard=false){return `<!doctype html><html lang="en"><head><title>${title}</title><meta name="_csrf" content="${title}-csrf"><script src="/js/workspace-navigation.js" data-workspace-navigation></script><script src="/js/shell.js" defer></script><script src="/js/page.js" defer></script>${guard?'<script src="/js/accounting-form-ux.js" defer></script>':''}</head><body class="aws-console" data-navigation-loading="Loading workspace" data-navigation-error="Could not load" data-navigation-retry="Try again"><nav id="shellTopNav">Header</nav><aside id="appSidebar"><a href="/admin/dashboard">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/settings-controls?section=loan">Products</a></aside><main class="shell-main"><h1 class="erp-page-title">${title}</h1><form class="accounting-create-form"><input name="name" value="Original"><button type="submit">Save</button></form><button id="command">Command</button></main>${guard?discard:''}</body></html>`;}
 async function setup({guard=false,holdNavigation=false}={}){
  const requests=[],failures=[],pages=new Map([['/admin/dashboard',html('Dashboard',guard)],['/admin/users',html('Users')],['/admin/settings-controls?section=loan',html('Products')]]);
  const resources={interceptors:[requestInterceptor(request=>{const name=new URL(request.url).pathname.split('/').pop();return new Response(name==='page.js'?init:read(name),{headers:{'Content-Type':'application/javascript'}});})]};
@@ -39,7 +39,7 @@ test('sidebar switches JSP documents in place, initializes destination controls 
   assert.equal(w.document,original);assert.equal(w.location.pathname,'/admin/users');assert.equal(d.title,'Users');
   assert.equal(d.querySelector('#shellTopNav'),header);assert.equal(d.querySelector('#appSidebar'),sidebar);
   assert.equal(w.hostIntegration,integration);
-  assert.equal(d.querySelector('meta[name=_csrf]').content,'Users-csrf');assert.equal(d.querySelector('#pageSubmitPreloader').classList.contains('is-active'),false);
+  assert.equal(d.querySelector('meta[name=_csrf]').content,'Users-csrf');assert.equal(d.querySelector('#pageSubmitPreloader'),null);
   assert.equal(oldPending.options.signal.aborted,true);assert.deepEqual([...w.ready],['Dashboard','Users']);assert.deepEqual([...w.loaded],['Dashboard','Users']);
   d.dispatchEvent(new w.Event('workspace:test'));d.querySelector('#command').click();assert.deepEqual([...w.commands],['Users','Users']);
   await w.WorkspaceNavigation.visit('/admin/dashboard');d.dispatchEvent(new w.Event('workspace:test'));
@@ -157,5 +157,91 @@ test('workspace HTML requests use an unlabeled main canvas spinner, recover orig
   await w.WorkspaceNavigation.visit('/admin/dashboard');last.resolve({ok:false});await cancelled;
   assert.equal(last.options.signal.aborted,true);assert.equal(main.classList.contains('is-workspace-pending'),false);
   assert.equal(d.querySelector('#workspace-navigation-feedback'),null);assert.equal(input.value,'Keep my entry');
+ }finally{dom.window.close();}
+});
+
+
+test('main workspace creation links and programmatic subgroup actions load without replacing the document',async()=>{
+ const {dom,w,d,pages}=await setup();try{
+  pages.set('/finance/loan-records/new',html('Record loan application'));pages.set('/finance/accounts/groups/new?parentId=family',html('Create subgroup'));
+  const header=d.querySelector('#shellTopNav'),sidebar=d.querySelector('#appSidebar'),document=d;
+  const create=d.createElement('a');create.className='app-btn btn-launch';create.href='/finance/loan-records/new';create.textContent='Record loan application';d.querySelector('main').append(create);create.click();
+  await until(()=>d.querySelector('h1').textContent==='Record loan application');assert.equal(w.document,document);assert.equal(d.querySelector('#shellTopNav'),header);
+  await w.WorkspaceNavigation.navigate('/finance/accounts/groups/new?parentId=family');assert.equal(d.querySelector('h1').textContent,'Create subgroup');assert.equal(d.querySelector('#appSidebar'),sidebar);
+  w.history.back();await until(()=>d.querySelector('h1').textContent==='Record loan application');
+ }finally{dom.window.close();}
+});
+
+test('GET report generation serializes repeated criteria and the clicked submitter without a document reload',async()=>{
+ const {dom,w,d,pages,requests}=await setup();try{
+  const destination='/reports/run?branch=one&branch=two&through=2026-10-20&run=true';pages.set(destination,html('Generated report'));
+  const form=d.createElement('form');form.action='/reports/run?stale=discard';form.method='get';form.innerHTML='<input name="branch" value="one"><input name="branch" value="two"><input name="through" value="2026-10-20"><button name="run" value="true">Generate</button>';d.querySelector('main').append(form);
+  form.requestSubmit(form.querySelector('button'));await until(()=>d.querySelector('h1').textContent==='Generated report');
+  assert.equal(requests.find(r=>r.url.pathname==='/reports/run').url.pathname+requests.find(r=>r.url.pathname==='/reports/run').url.search,destination);assert.equal(w.document,d);assert.equal(d.querySelector('#pageSubmitPreloader'),null);
+ }finally{dom.window.close();}
+});
+
+test('existing local form handlers, downloads, print and modified links retain their request ownership',async()=>{
+ const {dom,w,d,requests}=await setup();try{
+  const form=d.createElement('form');form.action='/admin/users';form.addEventListener('submit',e=>e.preventDefault());d.querySelector('main').append(form);form.requestSubmit();
+  assert.equal(requests.some(r=>r.url.pathname==='/admin/users'),false);
+  const link=d.createElement('a');link.href='/finance/loans/id/pdf';assert.equal(w.WorkspaceNavigation.handles(link),false);link.href='/finance/loans/id/print';assert.equal(w.WorkspaceNavigation.handles(link),false);
+  link.href='/admin/users';link.target='_blank';assert.equal(w.WorkspaceNavigation.handles(link),false);
+  link.target='';link.href=d.location.href+'#section';assert.equal(w.WorkspaceNavigation.handles(link),false);
+  form.method='post';form.removeAttribute('data-workspace-submit');assert.equal(w.WorkspaceNavigation.handlesForm(form),false);
+ }finally{dom.window.close();}
+});
+
+test('explicit report POST preserves CSRF and request key, prevents duplicate sends and never replays on Back',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});try{
+  const form=d.createElement('form');form.action='/admin/users';form.method='post';form.dataset.workspaceSubmit='';form.innerHTML='<input name="_csrf" value="csrf-token"><input name="requestKey" value="once"><input name="from" value="2026-10-01"><button>Generate</button>';d.querySelector('main').append(form);
+  form.requestSubmit();form.requestSubmit();const pending=requests.filter(r=>r.url.pathname==='/admin/users');assert.equal(pending.length,1);assert.equal(pending[0].options.method,'POST');assert.equal(pending[0].options.body.get('_csrf'),'csrf-token');assert.equal(pending[0].options.body.get('requestKey'),'once');
+  pending[0].resolve({ok:true,url:'http://localhost/reports/generated/id',headers:{get:()=> 'text/html'},text:async()=>html('Generated report')});await until(()=>d.querySelector('h1').textContent==='Generated report');
+  w.history.back();await until(()=>d.querySelector('h1').textContent==='Dashboard');assert.equal(requests.filter(r=>r.options.method==='POST').length,1);
+ }finally{dom.window.close();}
+});
+
+test('failed report generation restores entered criteria and retries only after an explicit click',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});try{
+  const form=d.createElement('form');form.action='/admin/users';form.method='post';form.dataset.workspaceSubmit='';form.innerHTML='<input name="from" value="2026-10-01"><button>Generate</button>';d.querySelector('main').append(form);
+  form.requestSubmit();requests.find(r=>r.url.pathname==='/admin/users').resolve({ok:false});await until(()=>d.querySelector('[role=alert] button'));
+  assert.equal(form.elements.from.value,'2026-10-01');assert.equal(form.isConnected,true);assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(requests.filter(r=>r.options.method==='POST').length,1);
+  d.querySelector('[role=alert] button').click();assert.equal(requests.filter(r=>r.options.method==='POST').length,2);requests.at(-1).resolve({ok:false});await until(()=>d.querySelector('[role=alert] button'));await new Promise(resolve=>setImmediate(resolve));
+ }finally{dom.window.close();}
+});
+
+
+test('native protected POST feedback stays beside its submitter and restores only controls it disabled',async()=>{
+ const {dom,w,d}=await setup();try{
+  w.eval(read('ui-loading.js'));const form=d.querySelector('form');form.method='post';
+  const button=form.querySelector('button'),restricted=d.createElement('button');restricted.type='submit';restricted.disabled=true;form.append(restricted);
+  form.elements.name.value='Keep this draft';const event=new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:button});form.dispatchEvent(event);await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(event.defaultPrevented,false);assert.ok(button.nextElementSibling.matches('[data-ui-action-loading]'));assert.equal(button.disabled,true);
+  assert.equal(d.body.hasAttribute('aria-busy'),false);assert.notEqual(d.querySelector('#shellTopNav').inert,true);assert.equal(form.elements.name.value,'Keep this draft');
+  w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(button.disabled,false);assert.equal(restricted.disabled,true);
+ }finally{dom.window.close();}
+});
+
+test('downloads use an actual local request spinner and clear it on both success and failure without a body lock',async()=>{
+ const {dom,w,d}=await setup();try{
+  w.eval(read('ui-loading.js'));const button=d.querySelector('#command'),calls=[],errors=[];
+  w.fetch=(url,options)=>new Promise((resolve,reject)=>calls.push({url,options,resolve,reject}));w.URL.createObjectURL=()=> 'blob:fixture';w.URL.revokeObjectURL=()=>{};let downloads=0;w.HTMLAnchorElement.prototype.click=()=>downloads++;w.showToast=(type,message)=>errors.push(message);
+  const ready=w.downloadExport('/report/pdf',button);assert.equal(calls.length,1);assert.equal(calls[0].options.credentials,'same-origin');assert.ok(button.nextElementSibling.matches('[data-ui-action-loading]'));
+  assert.equal(d.body.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('#pageSubmitPreloader'),null);
+  calls[0].resolve({ok:true,headers:{get:()=>null},blob:async()=>new w.Blob(['pdf'],{type:'application/pdf'})});await ready;
+  assert.equal(downloads,1);assert.equal(d.querySelector('.app-loading-spinner'),null);
+  const failed=w.downloadExport('/report/pdf',button);calls[1].reject(Error('offline'));await failed;
+  assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(errors.length,1);assert.equal(d.querySelector('input').value,'Original');
+ }finally{dom.window.close();}
+});
+
+
+test('leaving during export cancels its request and clears feedback without an error toast in the next workspace',async()=>{
+ const {dom,w,d}=await setup();try{
+  w.eval(read('ui-loading.js'));let signal;const errors=[];w.showToast=(type,message)=>errors.push(message);
+  w.fetch=(url,options)=>new Promise((resolve,reject)=>{signal=options.signal;signal.addEventListener('abort',()=>reject(new w.DOMException('Cancelled','AbortError')));});
+  const exporting=w.downloadExport('/report/pdf',d.querySelector('#command'));assert.ok(d.querySelector('[data-ui-action-loading]'));
+  w.dispatchEvent(new w.PageTransitionEvent('pagehide'));await exporting;
+  assert.equal(signal.aborted,true);assert.equal(d.querySelector('[data-ui-action-loading]'),null);assert.equal(errors.length,0);assert.equal(d.body.hasAttribute('aria-busy'),false);
  }finally{dom.window.close();}
 });

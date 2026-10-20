@@ -6,6 +6,7 @@
 .app-loading-spinner[data-loading-size=small] {width:16px;height:16px;}
 .app-loading-status[data-loading-size=large] {min-height:180px;}
 .app-loading-spinner[data-loading-size=large] {width:32px;height:32px;}
+.app-action-loading {margin-inline:6px;vertical-align:middle;}
 .aws-console .erp-table tbody tr.app-loading-row > td {padding:24px!important;text-align:center!important;vertical-align:middle;height:96px;}
 .aws-console .erp-table tbody tr:not(.app-loading-row) > td[colspan]:only-child {text-align:center!important;vertical-align:middle;white-space:normal;}
 .aws-console .erp-table-wrap.is-loading {overflow:visible!important;}

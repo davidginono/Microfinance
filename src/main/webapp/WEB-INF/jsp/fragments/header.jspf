@@ -289,17 +289,6 @@
     </div>
 </div>
 <div id="appToastContainer" class="pointer-events-none fixed right-4 top-[calc(var(--shell-nav-height)+0.75rem)] z-[140] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-[calc(var(--shell-nav-height)+1rem)]" aria-live="polite" aria-atomic="false"></div>
-<div id="pageSubmitPreloader" class="page-submit-preloader" aria-hidden="true">
-    <div class="page-submit-preloader__panel" role="status" aria-live="polite" aria-label="Loading page">
-        <div class="page-submit-preloader__spinner" aria-hidden="true">
-            <span class="page-submit-preloader__ring"></span>
-            <span class="page-submit-preloader__ring"></span>
-            <span class="page-submit-preloader__ring"></span>
-        </div>
-        <span class="page-submit-preloader__text"><spring:message code="common.processing" text="Processing..." /></span>
-    </div>
-</div>
-
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/45 lg:hidden"></div>
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
