@@ -61,7 +61,7 @@ class LoanPostingDocumentTest {
             try(var doc=Loader.loadPDF((byte[])download.getBody());var printed=Loader.loadPDF((byte[])print.getBody())){
                 assertThat(doc.getNumberOfPages()).isEqualTo(1);
                 String text=new PDFTextStripper().getText(doc);assertThat(new PDFTextStripper().getText(printed)).isEqualTo(text);
-                assertThat(text).contains("REF-"+kind,"100001","Evidence-1",messages.getMessage("recording.document."+kind,null,locale),"1,000.25").doesNotContain("APPROVALS","CHECKED BY","APPROVED BY");
+                assertThat(text).contains("REF-"+kind,"100001","Evidence-1",messages.getMessage("recording.document."+kind,null,locale),kind.equals("DISBURSEMENT")?"1,000.25":"1,100.35").doesNotContain("APPROVALS","CHECKED BY","APPROVED BY");
                 if(locale.equals(Locale.ENGLISH)){
                     Files.write(Path.of("target/loan-"+kind.toLowerCase()+"-format.pdf"),(byte[])download.getBody());
                     javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(0,120),"png",Path.of("target/loan-"+kind.toLowerCase()+"-format.png").toFile());

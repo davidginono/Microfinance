@@ -75,14 +75,18 @@ class ErpTableAlignmentContractTest {
                 // Standalone A4 stationery uses its own screen/print table layout.
                 // ClientLoanStatementDocumentTest covers its document and PDF contract.
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp")))
+                .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/loans/statement-document.jspf")))
                 // The user-supplied statement stationery has a document table, not a resource register.
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/statements/preview.jsp")))
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/statements/print.jsp")))
+                .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/management/document.jspf")))
                 .toList()) {
                 String view = Files.readString(path);
                 Matcher tableMatcher = TABLE_TAG.matcher(view);
                 boolean hasTable = false;
                 while (tableMatcher.find()) {
+                    // Chart source tables are converted into accessible chart data, not workspace registers.
+                    if (tableMatcher.group().contains("data-chart-source")) continue;
                     hasTable = true;
                     Matcher classMatcher = CLASS_ATTRIBUTE.matcher(tableMatcher.group());
                     assertThat(classMatcher.find())

@@ -84,6 +84,6 @@ class AuditServiceTest {
             .createdAt(OffsetDateTime.parse("2026-08-26T14:28:00Z"))
             .build();
 
-        assertThat(auditLog.getCreatedAtLabel()).isEqualTo("2026-08-26 17:28");
+        assertThat(auditLog.getCreatedAtLabel()).isEqualTo("26/08/2026 17:28");
     }
 }

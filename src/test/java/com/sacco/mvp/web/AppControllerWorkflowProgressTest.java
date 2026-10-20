@@ -73,7 +73,7 @@ class AppControllerWorkflowProgressTest {
             .containsEntry("textClasses", "member-dashboard-flow-text--rejected")
             .containsEntry("numberClasses", "member-dashboard-flow-number--rejected")
             .containsEntry("connectorClasses", "member-dashboard-flow-connector--pending")
-            .containsEntry("dateLabel", "29 Jul 2026, 07:05");
+            .containsEntry("dateLabel", "29/07/2026, 07:05");
         assertThat(steps.get(2)).containsEntry("connectorClasses", "member-dashboard-flow-connector--completed");
         assertThat(steps.get(4))
             .containsEntry("stateKey", "closed")
@@ -101,7 +101,7 @@ class AppControllerWorkflowProgressTest {
             .containsEntry("stateLabel", "Rejected")
             .containsEntry("nodeClasses", "member-dashboard-flow-node--rejected")
             .containsEntry("connectorClasses", "member-dashboard-flow-connector--pending")
-            .containsEntry("dateLabel", "29 Jul 2026, 07:05");
+            .containsEntry("dateLabel", "29/07/2026, 07:05");
         assertThat(steps.get(5))
             .containsEntry("stateKey", "closed")
             .containsEntry("stateLabel", "Closed")

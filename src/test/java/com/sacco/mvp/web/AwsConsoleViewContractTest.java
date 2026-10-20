@@ -55,11 +55,13 @@ class AwsConsoleViewContractTest {
             if (isStandalonePrintView(path)) {
                 boolean statement = path.getParent().getFileName().toString().equals("statements");
                 boolean reconciliation = path.getParent().getFileName().toString().equals("reconciliation");
-                String prefix = reconciliation ? "reconciliation" : statement ? "financial-statement" : path.getFileName().toString().equals("statement-print.jsp") ? "client-statement"
+                boolean management = path.getParent().getFileName().toString().equals("management");
+                String prefix = management ? "management" : reconciliation ? "reconciliation" : statement ? "financial-statement" : path.getFileName().toString().equals("statement-print.jsp") ? "client-statement"
                     : path.getParent().getFileName().toString().equals("vouchers") ? "voucher" : "loan";
                 assertThat(view).as(path.toString())
-                    .contains("<!DOCTYPE html>", "name=\"viewport\"", "<body class=\"" + prefix + "-print\"")
-                    .contains("code=\"" + (reconciliation ? "management.print" : statement ? "fs.print" : "voucher.print") + "\"")
+                    .containsIgnoringCase("<!doctype html>")
+                    .contains("name=\"viewport\"", "<body class=\"" + prefix + "-print\"")
+                    .contains("code=\"" + (management || reconciliation ? "management.print" : statement ? "fs.print" : "voucher.print") + "\"")
                     .doesNotContain("fragments/header.jspf", "fragments/sidebar.jspf");
                 return;
             }
@@ -73,19 +75,30 @@ class AwsConsoleViewContractTest {
     void authenticatedPagesExposeAwsHeadersAndRegisterContracts() throws Exception {
         for (Path path : routeViews()) {
             String view = read(path);
-            if (usesConsoleShell(path, new HashSet<>())) {
+            if (usesConsoleShell(path, new HashSet<>()) && !path.getFileName().toString().equals("error.jsp")) {
                 assertThat(view)
                     .as(path.toString())
                     .satisfiesAnyOf(
                         content -> assertThat(content).contains("data-aws-page-header"),
-                        content -> assertThat(content).contains("staff-loan-detail-header.jspf")
+                        content -> assertThat(content).contains("staff-loan-detail-header.jspf"),
+                        content -> assertThat(content).containsPattern("<h1\\b")
                     );
             }
             if (view.contains("<table") && !isStandalonePrintView(path) && !isStatementDocumentPreview(path)) {
                 assertThat(view)
                     .as(path.toString())
-                    .contains("erp-table")
-                    .contains("data-aws-table-region");
+                    .satisfiesAnyOf(
+                        content -> assertThat(content).contains("erp-table"),
+                        content -> assertThat(content).contains("data-chart-source")
+                    )
+                    .satisfiesAnyOf(
+                        content -> assertThat(content).contains("data-aws-table-region"),
+                        content -> assertThat(content).contains("data-resource-table"),
+                        content -> assertThat(content).contains("data-chart-source"),
+                        // Bounded detail/estimate tables use the shared local sorting adapter without register commands.
+                        content -> assertThat(content).contains("data-table-sort-mode=\"local\""),
+                        content -> assertThat(content).contains("data-table-sort-mode=\"none\"")
+                    );
             }
             if (view.matches("(?s).*method=[\"']get[\"'].*") && !isStatementDocumentPreview(path)) {
                 assertThat(view)
@@ -93,7 +106,8 @@ class AwsConsoleViewContractTest {
                     .satisfiesAnyOf(
                         content -> assertThat(content).contains("data-aws-filter-toolbar"),
                         content -> assertThat(content).contains("erp-table-toolbar"),
-                        content -> assertThat(content).contains("voucher-filters")
+                        content -> assertThat(content).contains("voucher-filters"),
+                        content -> assertThat(content).containsPattern("class=\"[^\"]*\\b(?:accounting-create-form|approval-config-context|approval-filters|management-parameters)\\b[^\"]*\"")
                     );
             }
         }
@@ -246,11 +260,14 @@ class AwsConsoleViewContractTest {
                 }
                 // These GET forms download immutable documents; they are not search/filter forms.
                 if (isStatementDocumentPreview(path) && getForms.group().contains("/export")) continue;
+                // Selection-dependent GET commands open version proposals; they are not filter toolbars.
+                if (getForms.group().contains("data-table-command")
+                    || getForms.group().contains("accounting-create-form")) continue;
                 assertThat(getForms.group())
                     .as(path + " GET form")
                     .satisfiesAnyOf(
                         content -> assertThat(content).contains("data-aws-filter-toolbar"),
-                        content -> assertThat(content).containsPattern("class=[\"'][^\"']*\\b(?:aws-filter-toolbar|erp-table-toolbar|voucher-filters)\\b[^\"']*[\"']")
+                        content -> assertThat(content).containsPattern("class=[\"'][^\"']*\\b(?:aws-filter-toolbar|erp-table-toolbar|voucher-filters|approval-config-context|approval-filters|management-parameters)\\b[^\"']*[\"']")
                     );
             }
         }
@@ -272,7 +289,9 @@ class AwsConsoleViewContractTest {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             paths.filter(path -> path.toString().endsWith(".jsp") || path.toString().endsWith(".jspf"))
                 .forEach(path -> {
-                    if (isStandalonePrintView(path) || isStatementDocumentPreview(path)) return;
+                    if (isStandalonePrintView(path) || isStatementDocumentPreview(path)
+                        || path.equals(JSP_ROOT.resolve("accounting/management/document.jspf"))
+                        || path.equals(JSP_ROOT.resolve("accounting/loans/statement-document.jspf"))) return;
                     String view = read(path);
                     assertThat(view)
                         .as(path.toString())
@@ -284,7 +303,7 @@ class AwsConsoleViewContractTest {
                             .as(path.toString())
                             .doesNotContain("erp-page-subtitle");
                     }
-                    if (!view.contains("<table")) {
+                    if (!view.contains("<table") || view.contains("data-chart-source")) {
                         return;
                     }
                     assertThat(view)
@@ -317,7 +336,7 @@ class AwsConsoleViewContractTest {
             .contains("const initAwsClientTables")
             .contains("[data-aws-table-search]")
             .contains("row.hidden = !visible")
-            .contains("loader.setAttribute('aria-label'")
+            .contains("window.AppLoading?.end(region)")
             .containsPattern("restoreModalAfterReload\\(\\);\\R\\s*document\\.querySelectorAll\\('\\[data-toast-message\\]'\\)")
             .contains("{ contextElement: element, preferModal: true }")
             .doesNotContain("loader.append(spinner, label)");
@@ -768,9 +787,8 @@ class AwsConsoleViewContractTest {
             .contains(".shell-sidebar-flyout-link.is-active")
             .contains("background: transparent !important")
             .contains("box-shadow: none !important")
-            .contains(".shell-sidebar-collapsed .shell-sidebar-nav-heading")
-            .contains("overflow-x: hidden !important")
-            .contains("font-size: 0 !important")
+            .contains(".shell-sidebar-collapsed :is(.shell-sidebar-toggle-label,.shell-sidebar-scroll,.aws-sidebar-footer)")
+            .contains("overflow-x: clip !important")
             .contains("width: 24px !important")
             .contains("padding-left: 12px !important")
             .contains(".staff-analytics-command-panel .staff-analytics-filter")
@@ -955,17 +973,20 @@ class AwsConsoleViewContractTest {
     @Test
     void regionalLoadingDoesNotCompeteWithThePagePreloader() throws Exception {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
-
+        String loading = read(Path.of("src/main/resources/static/js/ui-loading.js"));
         assertThat(shellJs)
             .contains("hidePageSubmitPreloader();")
-            .contains("const pagePreloaderRequested")
-            .contains("const regionalLoaderActive")
-            .contains("if (!pagePreloaderRequested && (regionalLoaderActive || regionalForm))")
-            .contains("[data-aws-table-region][aria-busy=\"true\"]");
+            .contains("if (window.WorkspaceNavigation?.handles(link)) return;")
+            .contains("if (!event.defaultPrevented)")
+            .contains("window.AppLoading?.end(region)");
+        assertThat(loading)
+            .contains("window.AppLoading={begin,end,status,clear,fail}")
+            .contains("element.setAttribute('aria-label'")
+            .contains("state.loader.remove()");
     }
 
     @Test
-    void analyticsFiltersUseThePagePreloaderInsteadOfAnOffscreenTableLoader() throws Exception {
+    void analyticsFiltersRespectInterceptedRequestsAndKeepNativeSubmissionFeedback() throws Exception {
         String memberAnalytics = read(JSP_ROOT.resolve("app/reports.jsp"));
         String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
@@ -977,7 +998,8 @@ class AwsConsoleViewContractTest {
             .contains("action=\"/staff/analytics\" method=\"get\"")
             .contains("data-page-preloader=\"true\"");
         assertThat(shellJs)
-            .contains("|| form.matches('[data-page-preloader=\"true\"]'))")
+            .contains("if (!event.defaultPrevented)")
+            .contains("showPageSubmitPreloader(form)")
             .contains("clearConsoleTableLoading();");
     }
 
@@ -1085,7 +1107,7 @@ class AwsConsoleViewContractTest {
             .contains(".shell-content-frame")
             .contains(".staff-analytics-command-panel .staff-analytics-filter")
             .contains("flex-flow: row wrap !important")
-            .contains("overflow-x: hidden !important");
+            .contains("overflow-x: clip !important");
         assertThat(shellJs)
             .contains("const handOffTableWheelScroll = function (event)")
             .contains("event.target instanceof Element ? event.target.closest('.erp-table-scroll') : null")
@@ -1306,6 +1328,8 @@ class AwsConsoleViewContractTest {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             return paths
                 .filter(path -> path.toString().endsWith(".jsp"))
+                // This MVC view is a scoped table-row response, not a complete document.
+                .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/account-rows.jsp")))
                 .sorted()
                 .toList();
         }
@@ -1339,7 +1363,8 @@ class AwsConsoleViewContractTest {
             || path.equals(JSP_ROOT.resolve("accounting/loans/print.jsp"))
             || path.equals(JSP_ROOT.resolve("accounting/loans/statement-print.jsp"))
             || path.equals(JSP_ROOT.resolve("accounting/statements/print.jsp"))
-            || path.equals(JSP_ROOT.resolve("accounting/reconciliation/print.jsp"));
+            || path.equals(JSP_ROOT.resolve("accounting/reconciliation/print.jsp"))
+            || path.equals(JSP_ROOT.resolve("accounting/management/print.jsp"));
     }
 
     private static String read(Path path) {

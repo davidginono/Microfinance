@@ -17,7 +17,7 @@
  </section>
  <section class="erp-panel" data-dashboard-widget="institutions" data-widget-width="1" data-widget-height="480">
   <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.widget.institutions" /></h2></div>
-  <div class="erp-panel-body"><div data-dashboard-chart data-chart-type="bar" data-chart-label="<spring:message code='dashboard.widget.institutions' />"><table data-chart-source><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="dashboard.metric.institutions" /></th></tr></thead><tbody>
+  <div class="erp-panel-body"><div data-dashboard-chart data-chart-type="bar" data-chart-label="<spring:message code='dashboard.widget.institutions' />"><table data-chart-source data-table-sort-mode="none" data-table-sort-reason="chart"><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="dashboard.metric.institutions" /></th></tr></thead><tbody>
    <tr><th><spring:message code="dashboard.metric.healthy" /></th><td data-value="${platformDashboard.healthySaccos}"><c:out value="${platformDashboard.healthySaccos}" /></td></tr>
    <tr><th><spring:message code="dashboard.metric.new" /></th><td data-value="${platformDashboard.newSaccos}"><c:out value="${platformDashboard.newSaccos}" /></td></tr>
    <tr><th><spring:message code="dashboard.metric.review" /></th><td data-value="${platformDashboard.atRiskSaccos}"><c:out value="${platformDashboard.atRiskSaccos}" /></td></tr>

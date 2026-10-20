@@ -3854,8 +3854,16 @@ public class AdminService {
             return getInactiveMemberCount();
         }
 
+        public long onReviewByManagerCount() {
+            return getOnReviewByManagerCount();
+        }
+
         public long getOnReviewByManagerCount() {
             return applicationCounts.getOrDefault(LoanStatus.READY_FOR_MANAGER, 0L);
+        }
+
+        public long awaitingBoardCount() {
+            return getAwaitingBoardCount();
         }
 
         public long getAwaitingBoardCount() {
@@ -3863,12 +3871,24 @@ public class AdminService {
                 + applicationCounts.getOrDefault(LoanStatus.AWAITING_CREDIT_COMMITTEE, 0L);
         }
 
+        public long outboxNewCount() {
+            return getOutboxNewCount();
+        }
+
         public long getOutboxNewCount() {
             return outboxCounts.getOrDefault(OutboxStatus.NEW, 0L);
         }
 
+        public long outboxPublishedCount() {
+            return getOutboxPublishedCount();
+        }
+
         public long getOutboxPublishedCount() {
             return outboxCounts.getOrDefault(OutboxStatus.PUBLISHED, 0L);
+        }
+
+        public long outboxFailedCount() {
+            return getOutboxFailedCount();
         }
 
         public long getOutboxFailedCount() {

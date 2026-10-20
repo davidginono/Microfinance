@@ -11,7 +11,7 @@ class TableSortingCoverageTest {
     @Test void everyColumnHeaderTableDeclaresWorkingSortingOrItsFixedOrderPurpose() throws Exception {
         var tablePattern=Pattern.compile("<table\\b[\\s\\S]*?</table>");
         var headPattern=Pattern.compile("<thead\\b[\\s\\S]*?</thead>");
-        var fixedPurpose=Pattern.compile("data-table-sort-reason=\"(?:editor|picker|property-layout|financial-statement|document|retired-report)\"");
+        var fixedPurpose=Pattern.compile("data-table-sort-reason=\"(?:chart|editor|picker|property-layout|financial-statement|document|retired-report)\"");
         var missing=new ArrayList<String>();
         try(var files=Files.walk(Path.of("src/main/webapp/WEB-INF/jsp"))) {
             for(var file:files.filter(path->path.toString().matches(".*\\.jspf?")).toList()) {

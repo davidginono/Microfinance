@@ -100,7 +100,7 @@
 <section id="StationLoanStatusChart" class="erp-panel" data-dashboard-widget="application-status" data-widget-width="2" data-widget-height="480">
  <div class="erp-panel-header"><h2 class="erp-panel-title"><c:out value="${dashboardChartTitleValue}" /></h2></div>
  <div class="erp-panel-body"><div data-dashboard-chart data-chart-type="bar" data-chart-label="<c:out value='${dashboardChartTitleValue}' />">
-  <table data-chart-source><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="admin.dashboard.applications" /></th></tr></thead><tbody>
+  <table data-chart-source data-table-sort-mode="none" data-table-sort-reason="chart"><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="admin.dashboard.applications" /></th></tr></thead><tbody>
   <c:forEach items="${dashboardStatusChartRows}" var="statusRow"><tr><th><c:out value="${statusRow.label}" /></th><td data-value="<c:out value='${statusRow.count}' />"><c:out value="${statusRow.count}" /></td></tr></c:forEach>
   </tbody></table>
  </div></div>

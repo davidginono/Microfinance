@@ -19,7 +19,7 @@
  <section class="erp-panel" data-dashboard-widget="clients" data-widget-width="1" data-widget-height="480">
   <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.widget.clients" /></h2></div>
   <div class="erp-panel-body"><div data-dashboard-chart data-chart-type="bar" data-chart-label="<spring:message code='dashboard.widget.clients' />">
-   <table data-chart-source><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="admin.dashboard.members" /></th></tr></thead><tbody>
+   <table data-chart-source data-table-sort-mode="none" data-table-sort-reason="chart"><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="admin.dashboard.members" /></th></tr></thead><tbody>
     <tr><th><spring:message code="admin.dashboard.active" /></th><td data-value="${dashboard.activeMemberCount}"><c:out value="${dashboard.activeMemberCount}" /></td></tr>
     <tr><th><spring:message code="admin.dashboard.inactive" /></th><td data-value="${dashboard.inactiveMemberCount}"><c:out value="${dashboard.inactiveMemberCount}" /></td></tr>
    </tbody></table>
