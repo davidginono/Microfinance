@@ -30,6 +30,21 @@ async function setup({guard=false,holdNavigation=false,pageScript=init}={}){
 }
 const until=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('Navigation did not settle');};
 
+test('dashboard navigation reveals only initialized widgets and charts on first and repeat visits',async()=>{
+ const {dom,w,d,pages,failures}=await setup();
+ try{
+  const board='<div data-dashboard-board="staff" aria-busy="true"><section data-dashboard-widget="review"><div class="erp-panel-header"><h2>Review</h2></div><div class="erp-panel-body"><div data-dashboard-chart><table data-chart-source><thead><tr><th>Status</th><th>Applications</th></tr></thead><tbody><tr><th>Waiting</th><td>2</td></tr></tbody></table></div></div></section></div>';
+  pages.set('/accountant/dashboard',html('Accountant').replace('</head>','<style>'+fs.readFileSync('src/main/resources/static/css/ui-loading.css','utf8')+'</style></head>').replace('</main>',board+'</main>').replace('</body>','<template id="dashboard-labels" data-icons="/icons/"></template><script src="/js/dashboard-board.js" defer></script><script src="/js/dashboard-charts.js" defer></script></body>'));
+  for(let visit=0;visit<2;visit++){
+   await w.WorkspaceNavigation.visit('/accountant/dashboard');
+   const root=d.querySelector('[data-dashboard-board]');assert.equal(root.dataset.dashboardReady,'true');assert.equal(root.getAttribute('aria-busy'),'false');
+   assert.equal(d.querySelector('[data-chart-source]'),null);assert.ok(root.querySelector('.dashboard-chart svg'));assert.equal(w.getComputedStyle(root.querySelector('.dashboard-widget')).visibility,'visible');assert.equal(d.querySelectorAll('.dashboard-toolbar').length,1);
+   await w.WorkspaceNavigation.visit('/admin/users');
+  }
+  assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
 test('a saved configuration initialized after its guard stays clean on an in-place workspace visit',async()=>{
  const {dom,w,d,pages}=await setup({pageScript:init+`if(document.querySelector('[data-normalize]'))document.querySelector('[name=name]').value='Saved configuration';`});
  try{

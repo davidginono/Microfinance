@@ -57,7 +57,7 @@
     <h1 class="erp-page-title">${dashboardPageTitleValue}</h1>
 </div>
 
-<div data-dashboard-board="staff">
+<div data-dashboard-board="staff" aria-busy="true">
 <section class="erp-stat-grid" data-dashboard-widget="overview" data-widget-width="4" data-widget-height="360" data-widget-title="<spring:message code='dashboard.widget.overview' />">
     <a href="${dashboardTotalDisbursedHrefValue}" class="erp-stat-card erp-stat-card-interactive erp-stat-green block no-underline" aria-label="Open total disbursed loans">
         <div class="erp-stat-main">

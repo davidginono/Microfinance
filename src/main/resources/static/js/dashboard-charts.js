@@ -100,6 +100,7 @@
         });
         for(const [root,state] of states)if(!root.isConnected){state.observer?.disconnect();states.delete(root);}
         if(window.ResizeObserver)for(const state of states.values())if(!state.observer){state.observer=new ResizeObserver(()=>draw(state));state.observer.observe(state.root);}
+        window.DashboardBoard?.ready();
     }
     window.DashboardCharts={render,init,palette};
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>init(),{once:true});else init();

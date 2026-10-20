@@ -6,7 +6,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/dashboard-support.jspf" %>
 <div class="erp-page-header" data-aws-page-header><p class="erp-breadcrumb"><spring:message code="admin.dashboard.breadcrumb" /></p><h1 class="erp-page-title"><spring:message code="admin.dashboard.title" /></h1></div>
-<div data-dashboard-board="admin">
+<div data-dashboard-board="admin" aria-busy="true">
  <section class="erp-panel" data-dashboard-widget="overview" data-widget-width="2" data-widget-height="480">
   <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.widget.overview" /></h2></div>
   <div class="erp-panel-body"><dl class="dashboard-facts">
