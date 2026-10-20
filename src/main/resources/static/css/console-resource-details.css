@@ -23,6 +23,7 @@
 .console-resource-link>.console-icon,a>.console-external-icon {margin-left:4px;}
 .aws-console .console-status,.aws-console .console-status-host {border:0!important;border-radius:0!important;background:transparent!important;padding:0!important;box-shadow:none!important;text-transform:none!important;letter-spacing:normal!important;font-size:inherit!important;line-height:20px!important;font-weight:400!important;}
 .aws-console .console-status {display:inline-flex!important;align-items:center;gap:4px;max-width:100%;vertical-align:middle;white-space:normal;}
+.aws-console [data-resource-table]:not(.resource-table-wrap-lines) .erp-table .console-status {max-width:none;white-space:nowrap;}
 .aws-console .console-status-host {display:inline!important;}
 .aws-console .console-status[data-status-type=success] {color:#1d8102!important;}
 .aws-console .console-status[data-status-type=error] {color:#d13212!important;}
