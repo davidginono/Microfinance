@@ -227,12 +227,12 @@ test('failed report generation restores entered criteria and retries only after 
 });
 
 
-test('native protected POST feedback stays beside its submitter and restores only controls it disabled',async()=>{
+test('native protected POST feedback stays inside its submitter and restores only controls it disabled',async()=>{
  const {dom,w,d}=await setup();try{
   w.eval(read('ui-loading.js'));const form=d.querySelector('form');form.method='post';
   const button=form.querySelector('button'),restricted=d.createElement('button');restricted.type='submit';restricted.disabled=true;form.append(restricted);
   form.elements.name.value='Keep this draft';const event=new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:button});form.dispatchEvent(event);await new Promise(resolve=>setTimeout(resolve,5));
-  assert.equal(event.defaultPrevented,false);assert.ok(button.nextElementSibling.matches('[data-ui-action-loading]'));assert.equal(button.disabled,true);
+  assert.equal(event.defaultPrevented,false);assert.ok(button.querySelector('[data-ui-action-loading]'));assert.equal(button.disabled,true);
   assert.equal(d.body.hasAttribute('aria-busy'),false);assert.notEqual(d.querySelector('#shellTopNav').inert,true);assert.equal(form.elements.name.value,'Keep this draft');
   w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(button.disabled,false);assert.equal(restricted.disabled,true);
  }finally{dom.window.close();}
@@ -242,7 +242,7 @@ test('downloads use an actual local request spinner and clear it on both success
  const {dom,w,d}=await setup();try{
   w.eval(read('ui-loading.js'));const button=d.querySelector('#command'),calls=[],errors=[];
   w.fetch=(url,options)=>new Promise((resolve,reject)=>calls.push({url,options,resolve,reject}));w.URL.createObjectURL=()=> 'blob:fixture';w.URL.revokeObjectURL=()=>{};let downloads=0;w.HTMLAnchorElement.prototype.click=()=>downloads++;w.showToast=(type,message)=>errors.push(message);
-  const ready=w.downloadExport('/report/pdf',button);assert.equal(calls.length,1);assert.equal(calls[0].options.credentials,'same-origin');assert.ok(button.nextElementSibling.matches('[data-ui-action-loading]'));
+  const ready=w.downloadExport('/report/pdf',button);assert.equal(calls.length,1);assert.equal(calls[0].options.credentials,'same-origin');assert.ok(button.querySelector('[data-ui-action-loading]'));
   assert.equal(d.body.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('#pageSubmitPreloader'),null);
   calls[0].resolve({ok:true,headers:{get:()=>null},blob:async()=>new w.Blob(['pdf'],{type:'application/pdf'})});await ready;
   assert.equal(downloads,1);assert.equal(d.querySelector('.app-loading-spinner'),null);

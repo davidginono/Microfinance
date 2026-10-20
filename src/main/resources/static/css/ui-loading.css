@@ -7,6 +7,10 @@
 .app-loading-status[data-loading-size=large] {min-height:180px;}
 .app-loading-spinner[data-loading-size=large] {width:32px;height:32px;}
 .app-action-loading {margin-inline:6px;vertical-align:middle;}
+.is-action-loading {position:relative;}
+.is-action-loading > .app-action-label {display:inline-flex;align-items:center;justify-content:inherit;gap:inherit;opacity:0;}
+.is-action-loading > .app-action-loading {position:absolute;inset:0;min-height:0;margin:0;color:inherit;pointer-events:none;}
+.is-action-loading > .app-action-loading .app-loading-spinner {border-top-color:currentColor;border-right-color:currentColor;}
 .aws-console .erp-table tbody tr.app-loading-row > td {padding:24px!important;text-align:center!important;vertical-align:middle;height:96px;}
 .aws-console .erp-table tbody tr:not(.app-loading-row) > td[colspan]:only-child {text-align:center!important;vertical-align:middle;white-space:normal;}
 .aws-console .erp-table-wrap.is-loading {overflow:visible!important;}

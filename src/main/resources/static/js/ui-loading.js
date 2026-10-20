@@ -3,8 +3,8 @@
     'use strict';
     const pending = new Map();
     const actions = new Map();
-    const status = (label, animate=false, size='medium') => {
-        const element=document.createElement('div');element.className='app-loading-status';
+    const status = (label, animate=false, size='medium', tag='div') => {
+        const element=document.createElement(tag);element.className='app-loading-status';
         element.dataset.loadingSize=size;
         element.setAttribute('role','status');element.setAttribute('aria-label',label || document.body.dataset.shellLoading);
         if(animate){const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize=size;spinner.setAttribute('aria-hidden','true');element.append(spinner);}
@@ -48,9 +48,18 @@
     function action(control){
         if(!control?.isConnected)return ()=>{};
         actions.get(control)?.();
-        const loader=status(null,true,'small'),busy=control.getAttribute('aria-busy');
-        loader.classList.add('app-action-loading');loader.dataset.uiActionLoading='true';control.after(loader);control.setAttribute('aria-busy','true');
-        const finish=()=>{if(actions.get(control)!==finish)return;actions.delete(control);loader.remove();if(busy===null)control.removeAttribute('aria-busy');else control.setAttribute('aria-busy',busy==='true'?'false':busy);};
+        const loader=status(null,true,'small','span'),busy=control.getAttribute('aria-busy');
+        loader.classList.add('app-action-loading');loader.dataset.uiActionLoading='true';
+        let label;
+        if(control.matches('button,a,[role="button"]')){
+            label=document.createElement('span');label.className='app-action-label';label.append(...control.childNodes);
+            control.append(label,loader);control.classList.add('is-action-loading');
+        }else control.after(loader);
+        control.setAttribute('aria-busy','true');
+        const finish=()=>{if(actions.get(control)!==finish)return;actions.delete(control);loader.remove();
+            if(label?.parentElement===control)label.replaceWith(...label.childNodes);
+            control.classList.remove('is-action-loading');
+            if(busy===null)control.removeAttribute('aria-busy');else control.setAttribute('aria-busy',busy==='true'?'false':busy);};
         actions.set(control,finish);return finish;
     }
     function clear() {for(const region of [...pending.keys()])end(region);for(const finish of [...actions.values()])finish();}

@@ -84,12 +84,23 @@ test('value and chart loaders have silent visual labels, distinct sizes and rest
 });
 
 
-test('button request feedback stays local, unlabeled and clears independently on completion or page exit',async()=>{
+test('button request feedback stays inside its button and clears independently on completion or page exit',async()=>{
  const {dom,w,d}=await setup('<header>Header</header><main><button id="pdf">PDF</button><button id="print" disabled>Print</button><input value="draft"></main>');try{
   const pdf=d.querySelector('#pdf'),print=d.querySelector('#print'),one=w.AppLoading.action(pdf),two=w.AppLoading.action(print);
-  assert.equal(d.querySelectorAll('[data-ui-action-loading]').length,2);assert.equal(pdf.nextElementSibling.textContent,'');assert.equal(pdf.nextElementSibling.getAttribute('role'),'status');
+  assert.equal(d.querySelectorAll('[data-ui-action-loading]').length,2);assert.equal(pdf.querySelector('[data-ui-action-loading]').textContent,'');assert.equal(pdf.querySelector('[data-ui-action-loading]').getAttribute('role'),'status');
+  assert.equal(pdf.classList.contains('is-action-loading'),true);assert.equal(pdf.querySelector('.app-action-label').textContent,'PDF');
   assert.equal(d.body.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('header').inert,undefined);assert.equal(print.disabled,true);
-  one();assert.equal(d.querySelectorAll('[data-ui-action-loading]').length,1);assert.equal(pdf.hasAttribute('aria-busy'),false);
+  one();assert.equal(d.querySelectorAll('[data-ui-action-loading]').length,1);assert.equal(pdf.hasAttribute('aria-busy'),false);assert.equal(pdf.textContent,'PDF');assert.equal(pdf.querySelector('.app-action-label'),null);assert.equal(pdf.classList.contains('is-action-loading'),false);
   w.dispatchEvent(new w.Event('pagehide'));two();assert.equal(d.querySelector('[data-ui-action-loading]'),null);assert.equal(print.disabled,true);assert.equal(d.querySelector('input').value,'draft');
+ }finally{dom.window.close();}
+});
+
+test('button loading preserves existing icons, native listeners and updated labels across retries',async()=>{
+ const {dom,w,d}=await setup('<button class="btn-launch" id="save"><span id="icon" aria-hidden="true">+</span> Save configuration</button>');try{
+  const save=d.querySelector('#save'),icon=d.querySelector('#icon');let clicks=0;icon.addEventListener('click',()=>clicks++);
+  const first=w.AppLoading.action(save),second=w.AppLoading.action(save);first();
+  assert.equal(save.querySelectorAll('[data-ui-action-loading]').length,1);assert.equal(save.querySelectorAll('.app-action-label').length,1);
+  assert.equal(save.querySelector('#icon'),icon);second();assert.equal(save.firstElementChild,icon);icon.click();assert.equal(clicks,1);
+  const finish=w.AppLoading.action(save);save.textContent='Saved';finish();assert.equal(save.textContent,'Saved');assert.equal(save.classList.contains('is-action-loading'),false);
  }finally{dom.window.close();}
 });
