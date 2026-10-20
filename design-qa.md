@@ -12,10 +12,12 @@ Evidence was captured from the signed-in accountant session on localhost:8081: l
 - Mobile: actions and prerequisite notice wrapped, facts stacked and breadcrumbs stayed sticky at 360px.
 - Prerequisite: the existing account-link POST/CSRF envelope is now a persistent Cloudscape-style warning alert; it was not submitted during verification.
 
-Checks: 63 focused JavaScript checks passed; all workspace JSPs compiled through Jasper. The existing AwsConsoleViewContractTest shared-assets assertion still fails because it expects the literal .erp-page-path__link selector in shell.css; this failure predates this change. Typography expectations were updated for the requested font.
+Checks: the focused shared-assets Java contract passed (1 test, 0 failures); 63 focused JavaScript checks passed; all workspace JSPs compiled through Jasper. The shared-assets contract was updated to validate the shared breadcrumb anchor/focus selectors and the current loading initializer rather than retired implementation names. Typography expectations use the requested Amazon Ember family.
 
-The paired comparison caught compounded spacing around tabs inside finance grid workspaces. The contextual margin has been corrected. Browser access then disconnected, preventing a fresh capture of this final spacing adjustment. No remaining functional failure was observed; final pixel sign-off is pending.
+The paired comparison caught compounded spacing around tabs inside finance grid workspaces. The contextual margin was corrected, and the final signed-in desktop page was recaptured at 1265×578. The refreshed paired comparison confirms the intended spacing above the tab strip and the 16px separation below it, blue selected label, dark underline, dividers, blue document filenames and sticky breadcrumb. No actionable P0/P1/P2 visual difference remains in these shared components. Different resource content, section counts and Amazon Ember typography follow the application requirements. The previously verified mobile layout is retained; the temporary viewport override was reset.
 
-Local evidence: C:/Users/USER/.codex/visualizations/2026/10/20/01a157e7-bf8f-7f01-8132-a52bda1497bb/component-comparison.png, loan-details-summary.jpg, loan-details-attachments.jpg and loan-details-mobile.jpg.
+Local evidence: C:/Users/USER/.codex/visualizations/2026/10/20/01a157e7-bf8f-7f01-8132-a52bda1497bb/component-comparison-final.png, loan-details-final.jpg, loan-details-summary.jpg and loan-details-mobile.jpg.
 
-final result: blocked — final visual recapture after the spacing correction requires the browser connection.
+final result: passed — final component comparison and visual recapture completed.
+
+Follow-up heading correction: Loan details no longer includes the Loan ID, and the client container heading shows the client name only. Loan ID and Client Number are labeled summary facts using existing English/Kiswahili messages and the responsive fact grid. The source diff was verified; browser recapture of this text-only correction was unavailable after the Chrome connection disconnected. Earlier screenshots show the prior headings.
