@@ -33,6 +33,7 @@
     background: #fff;
     cursor: pointer;
     align-items: start;
+    transition: background-color 160ms ease, border-color 160ms ease;
 }
 .aws-console:has([data-admin-workspace]) .admin-role-card:has(input:checked) { border-color: #00a1c9; background: #f1faff; }
 .aws-console:has([data-admin-workspace]) .admin-role-card:focus-within { outline: 2px solid #0073bb; outline-offset: 2px; }
@@ -46,10 +47,17 @@
     border-radius: 50%;
     background: #fff;
     box-shadow: none;
+    transition: border-color 160ms ease;
 }
 .aws-console:has([data-admin-workspace]) .admin-role-card input[type=checkbox]:checked { border: 6px solid #0073bb; background: #fff; }
 .admin-role-card-name { font-size: 16px; line-height: 24px; font-weight: 600; overflow-wrap: anywhere; }
-.admin-role-card-image { grid-column: 1/-1; justify-self: center; align-self: center; width: 112px; height: 96px; color: #34495e; }
+.admin-role-card-image { grid-column: 1/-1; justify-self: center; align-self: center; width: 112px; height: 96px; color: #34495e; transition: color 160ms ease; }
+@media (hover: hover) and (pointer: fine) {
+    .aws-console:has([data-admin-workspace]) .admin-role-card:not(:has(input:disabled)):hover { border-color: #0073bb; background: #f1faff; }
+    .aws-console:has([data-admin-workspace]) .admin-role-card:has(input:checked):not(:has(input:disabled)):hover { background: #e6f3fc; }
+    .aws-console:has([data-admin-workspace]) .admin-role-card:not(:has(input:disabled)):hover input[type=checkbox] { border-color: #0073bb; }
+    .aws-console:has([data-admin-workspace]) .admin-role-card:not(:has(input:disabled)):hover .admin-role-card-image { color: #0073bb; }
+}
 @media(max-width:1000px) { .aws-console:has([data-admin-workspace]) .admin-role-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width:640px) {
     .aws-console:has([data-admin-workspace]) .admin-role-grid { grid-template-columns: minmax(0,1fr); gap: 16px; }
