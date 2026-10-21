@@ -76,6 +76,15 @@ class VoucherPostgresTest {
   assertThatThrownBy(()->jdbc.update("delete from accounting_voucher_transaction where voucher_id=?",v.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
 
  }
+ @Test void voucherNumberReservationIsScopedStableAndConsumedByThePostedVoucher(){
+  UUID key=UUID.randomUUID();var reserved=service.reserveNumber(actor,Type.JOURNAL,day,key);
+  assertThat(service.reserveNumber(actor,Type.JOURNAL,day,key)).isEqualTo(reserved);
+  var f=form(Type.JOURNAL);f.setRequestKey(key);var posted=service.post(actor,Type.JOURNAL,f);
+  assertThat(posted.number()).isEqualTo(reserved.number());
+  assertThat(jdbc.queryForObject("select consumed_at is not null from accounting_voucher_number_reservation where request_key=?",Boolean.class,key)).isTrue();
+  assertThatThrownBy(()->service.reserveNumber(actor,Type.JOURNAL,day.minusDays(1),key)).hasMessage("voucher.error.retry");
+  assertThatThrownBy(()->service.reserveNumber(operator("B2"),Type.JOURNAL,day,key)).hasMessage("voucher.error.request");
+ }
  @Test void journalsWithoutPartyPreviewPostRetryAndReverseWithoutChangingHistory(){
   var f=form(Type.JOURNAL);f.setParty("");
   assertThat(service.preview(actor,Type.JOURNAL,f).total()).isEqualByComparingTo("30.03");

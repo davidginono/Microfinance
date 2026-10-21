@@ -94,6 +94,9 @@ public class GeneralLedgerService {
     @Transactional
     public void initializeChart(AppUserPrincipal actor) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");books.lockAccounts(actor.getSaccoId());
+        initializeChartRoots(actor);
+    }
+    private void initializeChartRoots(AppUserPrincipal actor) {
         for(int index=0;index<ROOT_TYPES.size();index++) {
             String code=(index+1)+"00000",type=ROOT_TYPES.get(index);
             var existing=books.accountCode(actor.getSaccoId(),code);
@@ -226,6 +229,9 @@ public class GeneralLedgerService {
         return Map.of("saccoId",a.getSaccoId(),"stationId",a.getStationId(),"policy",p,"reason",reason,"auditReferenceType","ACCOUNT_POLICY","auditReferenceValue",a.getSaccoId());
     }
     private UUID createAccountVersion(AppUserPrincipal actor,AccountCommand c,UUID key,String reason,boolean complete) {
+        return createAccountVersion(actor,c,key,reason,complete,false);
+    }
+    private UUID createAccountVersion(AppUserPrincipal actor,AccountCommand c,UUID key,String reason,boolean complete,boolean productProvision) {
         require(key!=null,"versionInput");
         String hash=requestHash(List.of(c,reason,complete));
         var prior=books.versionRequest(actor.getSaccoId(),key);
@@ -233,7 +239,8 @@ public class GeneralLedgerService {
         require(books.accountCode(actor.getSaccoId(),c.code()).isEmpty(),"duplicate");
         UUID account=UUID.randomUUID();var a=new Account(account,c.code(),c.name(),c.type(),c.normalBalance(),c.kind(),c.purpose(),c.parentId(),true,c.nameSw(),c.description());
         var v=newDraft(actor,account,null,"CREATE",null,a,key,hash);
-        books.createVersion(actor.getSaccoId(),v);return saveAccountVersion(actor,v.id(),versionForm(a,reason,0),complete);
+        books.createVersion(actor.getSaccoId(),v);
+        return productProvision?saveVersionDraft(actor,v,versionForm(a,reason,0),complete):saveAccountVersion(actor,v.id(),versionForm(a,reason,0),complete);
     }
     @Transactional
     public UUID proposeAccountVersion(AppUserPrincipal actor,UUID account,UUID base,String operation,UUID key,EditForm form,boolean complete) {
@@ -270,6 +277,10 @@ public class GeneralLedgerService {
     @Transactional
     public UUID saveAccountVersion(AppUserPrincipal actor,UUID id,EditForm form,boolean complete) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");books.lockAccounts(actor.getSaccoId());var v=findVersion(actor,id);requireActor(actor,v.operation().equals("CREATE")?"ACCOUNTING_ACCOUNTS_CREATE":"ACCOUNTING_ACCOUNTS_UPDATE");
+        return saveVersionDraft(actor,v,form,complete);
+    }
+    private UUID saveVersionDraft(AppUserPrincipal actor,Version v,EditForm form,boolean complete) {
+        UUID id=v.id();
         require(owner(actor,v) && v.state().equals("DRAFT"),"versionTransition");require(v.revision()==form.getRevision(),"versionStale");
         require(form.getReason()!=null && form.getReason().length()<=500 && form.getName()!=null && form.getName().length()<=160 && (form.getDescription()==null || form.getDescription().length()<=500),"versionInput");
         var a=v.proposed();boolean metadata=Set.of("CREATE","UPDATE").contains(v.operation());
@@ -285,6 +296,27 @@ public class GeneralLedgerService {
             versionEvent(actor,v,automatic?"AUTOMATIC_APPROVAL":"SUBMITTED",v.reason());
         }
         return id;
+    }
+    /** Product creation delegates only its two generated accounts; it grants no chart-management claims. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public ProductAccountVersions provisionLoanProductAccounts(String institution,UUID creator,UUID product,String productName) {
+        var member=directory.find(creator).orElseThrow(()->new AccessDeniedException("Product creator unavailable"));
+        var actor=new AppUserPrincipal(member,userClaims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()),true);
+        require(Objects.equals(institution,actor.getSaccoId()),"account");requireActor(actor,"LOAN_PRODUCTS_CREATE");
+        books.lockAccounts(institution);initializeChartRoots(actor);
+        String stem="LP-"+product.toString().replace("-","").toUpperCase(Locale.ROOT),name=trim(productName);
+        require(!name.isEmpty(),"name");if(name.length()>140)name=name.substring(0,140);
+        var versions=new ArrayList<Version>();
+        for(String component:List.of("PRINCIPAL","INTEREST")) {
+            boolean principal=component.equals("PRINCIPAL");UUID key=UUID.nameUUIDFromBytes(("PRODUCT_ACCOUNT/"+product+"/"+component).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var prior=books.versionRequest(institution,key);
+            if(prior.isPresent()){versions.add(prior.get());continue;}
+            var parent=books.accountCode(institution,principal?"100000":"500000").orElseThrow(()->invalid("parent"));
+            var command=new AccountCommand(stem+(principal?"-P":"-I"),name+(principal?" - Principal":" - Interest"),principal?"ASSET":"INCOME",principal?"DEBIT":"CREDIT","POSTING",principal?"OTHER":"INCOME",parent.id(),null,"Loan product "+product+" "+component.toLowerCase(Locale.ROOT));
+            UUID version=createAccountVersion(actor,command,key,"Generated for loan product "+product,true,true);
+            versions.add(books.version(institution,version).orElseThrow());
+        }
+        return new ProductAccountVersions(versions.get(0),versions.get(1));
     }
     private void validateVersion(AppUserPrincipal actor,Version v) {
         var a=v.proposed();validateAccount(actor,new AccountCommand(a.code(),a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.nameSw(),a.description()));

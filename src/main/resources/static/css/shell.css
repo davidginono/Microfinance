@@ -832,63 +832,11 @@ button:active {
     .shell-sidebar-collapsed .shell-sidebar {
         width: var(--shell-sidebar-collapsed-width);
     }
-    .shell-sidebar-collapsed .shell-sidebar-toggle-row {
-        justify-content: center;
-        margin-left: 0.55rem;
-        margin-right: 0.55rem;
-        padding-left: 0.35rem;
-        padding-right: 0.35rem;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-toggle-label {
-        display: none;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-scroll {
-        padding-left: 0.55rem !important;
-        padding-right: 0.55rem !important;
-        scrollbar-gutter: auto;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button {
-        justify-content: center !important;
-        gap: 0 !important;
-        min-height: 2.35rem;
-        padding: 0.52rem 0.35rem !important;
-        overflow: hidden;
-        font-size: 0 !important;
-        line-height: 0 !important;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:first-child,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:first-child,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:first-child,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:first-child {
-        width: 1.72rem !important;
-        height: 1.72rem !important;
-        margin: 0 !important;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > :not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > :not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > :not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > :not(:first-child),
-    .shell-sidebar-collapsed .shell-sidebar-scroll > a > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > button > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > svg,
-    .shell-sidebar-collapsed .shell-sidebar-scroll [id$="Chevron"],
-    .shell-sidebar-collapsed .shell-sidebar-scroll [id$="Panel"],
-    .shell-sidebar-collapsed .shell-sidebar-scroll > .px-3.pb-1.pt-3 {
-        display: none !important;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-panel > .border-t {
-        padding: 0.75rem 0.45rem !important;
-    }
-    .shell-sidebar-collapsed .shell-sidebar-panel > .border-t > * {
-        display: none !important;
+    /* Reveal a stable menu through the animated rail; do not reflow its rows. */
+    .shell-sidebar-panel > :is(.shell-sidebar-scroll, .aws-sidebar-footer) {
+        box-sizing: border-box;
+        width: calc(var(--shell-sidebar-width) - 1px);
+        flex-shrink: 0;
     }
 }
 @media (min-width: 2560px) {
@@ -3923,11 +3871,12 @@ body.aws-console,
     .shell-main, .shell-sidebar-collapsed .shell-main { --shell-workspace-inset:12px;padding-left:var(--shell-workspace-inset)!important;padding-right:var(--shell-workspace-inset)!important; }
     .shell-sidebar-collapsed .shell-sidebar { background:#fafafa!important;border-color:#d5dbdb!important; }
     .shell-sidebar-collapsed .shell-sidebar-panel { border:0!important;background:#fafafa!important; }
-    html.shell-sidebar-collapsed .shell-sidebar-toggle-row { justify-content:center!important;padding:0!important;min-height:32px;background:#fafafa!important; }
+    html.shell-sidebar-collapsed .shell-sidebar-toggle-row { justify-content:center!important;padding:0!important;min-height:48px!important;background:#fafafa!important; }
     html.shell-sidebar-collapsed .shell-sidebar .desktop-sidebar-toggle { width:28px!important;height:32px!important;min-width:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:#545b64!important; }
     html.shell-sidebar-collapsed .desktop-sidebar-toggle svg { width:16px!important;height:16px!important;flex:none; }
     .shell-sidebar-collapsed .desktop-sidebar-toggle:is(:hover,:focus-visible) { background:#eaeded;transform:none; }
-    .shell-sidebar-collapsed :is(.shell-sidebar-toggle-label,.shell-sidebar-scroll,.aws-sidebar-footer) { display:none!important; }
+    .shell-sidebar-collapsed .shell-sidebar-toggle-label { display:none!important; }
+    .shell-sidebar-collapsed :is(.shell-sidebar-scroll,.aws-sidebar-footer) { visibility:hidden;pointer-events:none; }
 }
 
 .shell-support-contact {

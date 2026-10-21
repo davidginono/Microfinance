@@ -22,6 +22,10 @@ public class LoanProductAccountRepository {
     public Optional<Map<String,Object>> product(String institution,UUID product){
         return jdbc.queryForList("select id,principal_gl_account_id,interest_gl_account_id from loan_product_settings where sacco_id=? and id=? for share",institution,product).stream().findFirst();
     }
+    public void provision(String institution,String branch,UUID product,UUID creator,com.sacco.mvp.accounting.dto.GeneralLedgerDtos.ProductAccountVersions accounts,OffsetDateTime now){
+        jdbc.update("insert into loan_product_account_provision(product_id,sacco_id,station_id,principal_account_id,interest_account_id,principal_version_id,interest_version_id,created_by,created_at) values(?,?,?,?,?,?,?,?,?) on conflict(product_id) do nothing",
+            product,institution,branch,accounts.principal().accountId(),accounts.interest().accountId(),accounts.principal().id(),accounts.interest().id(),creator,now);
+    }
     public Optional<Map<String,Object>> binding(AppUserPrincipal a,UUID loan){
         return jdbc.queryForList("select * from loan_product_account_binding where loan_id=? and sacco_id=? and station_id=?",loan,a.getSaccoId(),a.getStationId()).stream().findFirst();
     }

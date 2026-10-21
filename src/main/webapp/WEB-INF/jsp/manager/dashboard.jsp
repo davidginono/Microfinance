@@ -3,6 +3,7 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -56,6 +57,7 @@
     <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
     <h1 class="erp-page-title">${dashboardPageTitleValue}</h1>
 </div>
+<sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE') or @access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')"><div class="dashboard-create-actions"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/new' />"><spring:message code="voucher.createHub" /></a></div></sec:authorize>
 
 <div data-dashboard-board="staff" aria-busy="true">
 <section class="erp-stat-grid" data-dashboard-widget="overview" data-widget-width="4" data-widget-height="360" data-widget-title="<spring:message code='dashboard.widget.overview' />">

@@ -1,2 +1,4 @@
 <template data-admin-workspace></template>
 <link rel="stylesheet" href="<c:url value='/css/admin-workspace.css' />" />
+
+<link rel="stylesheet" href="<c:url value='/css/admin-configurations.css' />" />

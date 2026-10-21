@@ -138,7 +138,7 @@ class AdminConfigurationUiContractTest {
             .contains("class=\"aws-settings-footer\"")
             .contains("class=\"app-btn btn-launch aws-settings-save-action\"")
             .contains("class=\"aws-settings-grid aws-qualification-grid\"")
-            .contains("class=\"aws-settings-group\"")
+            .contains("class=\"aws-settings-group aws-qualification-applicants-group\"")
             .contains("class=\"aws-settings-group-header\"")
             .contains("class=\"aws-settings-checkbox-row\"")
             .contains("class=\"aws-settings-field aws-settings-field--compact\"")

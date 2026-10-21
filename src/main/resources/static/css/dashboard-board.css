@@ -1,5 +1,8 @@
 /* JSP dashboard adapter for the Cloudscape configurable-dashboard pattern. */
 .aws-console .dashboard-toolbar {display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-left:auto;}
+.dashboard-create-actions{display:flex;justify-content:flex-end;margin:0 0 14px}
+.dashboard-create-actions .app-btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px}
+@media(max-width:640px){.dashboard-create-actions{justify-content:flex-start}}
 .aws-console .erp-page-header:has(.dashboard-toolbar) {display:flex;flex-wrap:wrap;align-items:center;gap:12px;}
 .aws-console .erp-page-header:has(.dashboard-toolbar)>.erp-breadcrumb {flex-basis:100%;}
 .aws-console .erp-page-header:has(.dashboard-toolbar)>.erp-page-title {flex:1 1 auto;width:auto;min-width:0;}

@@ -77,4 +77,25 @@ form.addEventListener('click',e=>{
 
 });
 update();
+const numberOutput=form.querySelector('[data-voucher-number]');
+if(numberOutput){
+ const numberValue=numberOutput.querySelector('[data-voucher-number-value]'),retry=form.querySelector('[data-retry-voucher-number]'),date=form.querySelector('[name="effectiveDate"]');
+ let requestVersion=0,requestController=null;
+ async function loadNumber(){
+  const version=++requestVersion;requestController?.abort();requestController=new AbortController();
+  numberOutput.setAttribute('aria-busy','true');numberValue.classList.add('sr-only');numberValue.textContent=form.dataset.numberLoading;numberOutput.querySelector('.voucher-number-spinner').hidden=false;retry.hidden=true;
+  const url=new URL(form.dataset.base+'/number',location.origin),key=form.elements.namedItem('requestKey')?.value;
+  if(!key||!date.value){numberValue.classList.remove('sr-only');numberValue.textContent=form.dataset.numberError;numberOutput.setAttribute('aria-busy','false');numberOutput.querySelector('.voucher-number-spinner').hidden=true;retry.hidden=false;return;}
+  url.searchParams.set('requestKey',key);url.searchParams.set('effectiveDate',date.value);
+  const headers={'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'};
+  if(form.dataset.numberCsrfHeader&&form.dataset.numberCsrfToken)headers[form.dataset.numberCsrfHeader]=form.dataset.numberCsrfToken;
+  try{
+   const response=await fetch(url,{method:'POST',headers,body:new URLSearchParams({requestKey:key,effectiveDate:date.value}),credentials:'same-origin',cache:'no-store',signal:requestController.signal});
+   if(!response.ok)throw new Error('Voucher number request failed');
+   const result=await response.json();if(typeof result.number!=='string'||version!==requestVersion){if(version===requestVersion)throw new Error('Voucher number was not returned');return;}
+   numberValue.classList.remove('sr-only');numberValue.textContent=result.number;numberOutput.setAttribute('aria-busy','false');numberOutput.querySelector('.voucher-number-spinner').hidden=true;
+  }catch(error){if(error.name==='AbortError'||version!==requestVersion)return;numberValue.classList.remove('sr-only');numberValue.textContent=form.dataset.numberError;numberOutput.setAttribute('aria-busy','false');numberOutput.querySelector('.voucher-number-spinner').hidden=true;retry.hidden=false;}
+ }
+ date.addEventListener('change',loadNumber);retry.addEventListener('click',loadNumber);loadNumber();
+}
 })();

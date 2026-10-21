@@ -73,6 +73,8 @@
             'sacco workspace': '/admin/scope/select',
             'saccos': '/admin/saccos',
             'settings & controls': '/admin/settings-controls',
+            'configurations&controls': '/admin/settings-controls',
+            'usanidi na vidhibiti': '/admin/settings-controls',
             'sms usage': '/admin/sms-usage',
             'support': '/admin/support',
             'users & roles': '/admin/users'
@@ -177,7 +179,8 @@
         if (index === segments.length - 1) {
             return null;
         }
-        const root = normalizeBreadcrumbSegment(segments[0]);
+        const rootLabel = normalizeBreadcrumbSegment(segments[0]);
+        const root = rootLabel === 'zana za usimamizi' ? 'admin tools' : rootLabel;
         if (index === 0) {
             return breadcrumbRootHref(root);
         }

@@ -12,6 +12,7 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class VoucherRepository {
     private final JdbcTemplate jdbc;
+    private static final String ORDINARY_ACCOUNT=" and not exists(select 1 from loan_product_account_provision g where g.sacco_id=gl_account.sacco_id and (g.principal_account_id=gl_account.id or g.interest_account_id=gl_account.id))";
     private static final String HEAD="""
         select v.*,m.full_name posted_by_name,i.sacco_name institution_name,
         coalesce((select nullif(s.address_location,'') from sacco_stations s where s.sacco_id=v.sacco_id and s.station_id=v.station_id),v.station_id) branch_name,
@@ -32,7 +33,7 @@ public class VoucherRepository {
             and (?='' or (case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher r where r.reverses_id=v.id) then 'REVERSED' else 'POSTED' end)=?)
             """+" order by "+order+" limit ? offset ?",this::voucher,institution,branch,type.name(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
-    public List<Account> accounts(String institution,String search,int offset){return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING' and (strpos(lower(code||' '||name),?)>0) order by code,id limit 26 offset ?",this::account,institution,search.toLowerCase(Locale.ROOT),offset);}
+    public List<Account> accounts(String institution,String search,int offset){return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING'"+ORDINARY_ACCOUNT+" and (strpos(lower(code||' '||name),?)>0) order by code,id limit 26 offset ?",this::account,institution,search.toLowerCase(Locale.ROOT),offset);}
     public List<Client> clients(String institution,String branch,String search,int offset){return jdbc.query("select id,member_no,full_name from members where sacco_id=? and station_id=? and is_member and status='ACTIVE' and strpos(lower(member_no||' '||full_name),?)>0 order by member_no,id limit 26 offset ?",(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name")),institution,branch,search.toLowerCase(Locale.ROOT),offset);}
     public Optional<Client> client(String institution,String branch,UUID id,boolean lock){return jdbc.query("select id,member_no,full_name from members where id=? and sacco_id=? and station_id=? and is_member and status='ACTIVE'"+(lock?" for share":""),(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name")),id,institution,branch).stream().findFirst();}
     public List<Account> lockAccounts(String institution,List<UUID> ids){
@@ -41,7 +42,7 @@ public class VoucherRepository {
     public List<Account> selectedAccounts(String institution,List<UUID> ids,boolean lock){
         if(ids.isEmpty())return List.of();
         var args=new ArrayList<Object>();args.add(institution);args.addAll(ids);
-        return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING' and id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by id"+(lock?" for share":""),this::account,args.toArray());
+        return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING'"+ORDINARY_ACCOUNT+" and id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by id"+(lock?" for share":""),this::account,args.toArray());
     }
     public List<Mapping> mappings(String institution,String search,int offset){return mappingQuery(institution,null,search,offset,false);}
     public List<Activity> activities(String institution,String search,int offset){
@@ -77,6 +78,8 @@ public class VoucherRepository {
             join gl_account da on da.id=d.account_id and da.sacco_id=t.sacco_id and da.active and da.kind='POSTING'
             join gl_account ca on ca.id=c.account_id and ca.sacco_id=t.sacco_id and ca.active and ca.kind='POSTING'
             where t.sacco_id=? and t.active and a.active
+            and not exists(select 1 from loan_product_account_provision g where g.sacco_id=t.sacco_id
+                and (g.principal_account_id in (da.id,ca.id) or g.interest_account_id in (da.id,ca.id)))
             """+filter+" order by t.id,d.component"+(lock?" for share of a,t,p,d,c,da,ca":ids==null?" limit 26 offset ?":" limit 250"),
             (r,n)->new Mapping(r.getObject("id",UUID.class),r.getObject("request_key",UUID.class),r.getString("transaction_name"),r.getString("component"),
                 new Account(r.getObject("debit_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),r.getString("debit_purpose")),
@@ -99,6 +102,27 @@ public class VoucherRepository {
         UUID id=UUID.randomUUID();jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'OPEN',?,?)",id,institution,date,date,actor,now);return id;
     }
     public String number(Type type,LocalDate date){long n=jdbc.queryForObject("select nextval('accounting_voucher_number_seq')",Long.class);return (type==Type.RECEIPT?"RV":type==Type.PAYMENT?"PV":"JV")+"-"+date.getYear()+"-"+String.format(Locale.ROOT,"%08d",n);}
+    public NumberReservation reserveNumber(String institution,String branch,Type type,LocalDate date,UUID requestKey,OffsetDateTime now){
+        var existing=jdbc.query("select sacco_id,station_id,voucher_type,effective_date,voucher_number,consumed_at from accounting_voucher_number_reservation where request_key=? for update",(r,n)->new ReservationRow(r.getString("sacco_id"),r.getString("station_id"),r.getString("voucher_type"),r.getObject("effective_date",LocalDate.class),r.getString("voucher_number"),r.getObject("consumed_at",OffsetDateTime.class)),requestKey).stream().findFirst();
+        if(existing.isPresent()){
+            var row=existing.get();
+            if(!row.institution().equals(institution)||!row.branch().equals(branch)||!row.type().equals(type.name()))throw new Invalid("","request");
+            if(!row.date().equals(date)){
+                if(row.consumedAt()!=null)throw new Invalid("effectiveDate","retry");
+                String next=number(type,date);
+                jdbc.update("update accounting_voucher_number_reservation set effective_date=?,voucher_number=?,reserved_at=? where request_key=? and consumed_at is null",date,next,now,requestKey);
+                return new NumberReservation(next);
+            }
+            return new NumberReservation(row.number());
+        }
+        String next=number(type,date);
+        jdbc.update("insert into accounting_voucher_number_reservation(request_key,sacco_id,station_id,voucher_type,effective_date,voucher_number,reserved_at) values(?,?,?,?,?,?,?)",requestKey,institution,branch,type.name(),date,next,now);
+        return new NumberReservation(next);
+    }
+    public void consumeNumber(String institution,String branch,UUID requestKey,OffsetDateTime now){
+        int updated=jdbc.update("update accounting_voucher_number_reservation set consumed_at=? where request_key=? and sacco_id=? and station_id=? and consumed_at is null",now,requestKey,institution,branch);
+        if(updated!=1)throw new Invalid("","request");
+    }
     public void insert(Voucher v,String institution,String branch,Form f,String hash,UUID period,UUID originalJournal){
         jdbc.update("""
             insert into gl_journal(id,sacco_id,station_id,policy_version,period_id,source_type,source_reference,request_key,payload_hash,currency,state,evidence_reference,reason,effective_date,maker_id,recorded_at,reverses_id,direct_post)
@@ -122,4 +146,5 @@ public class VoucherRepository {
     public List<Transaction> transactions(UUID id){return jdbc.query("select * from accounting_voucher_transaction where voucher_id=? order by line_no limit 50",(r,n)->new Transaction(r.getObject("id",UUID.class),r.getInt("line_no"),r.getObject("transaction_id",UUID.class),r.getObject("template_key",UUID.class),r.getString("transaction_name"),r.getString("component"),r.getString("description"),r.getBigDecimal("amount"),new Account(r.getObject("debit_account_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),""),new Account(r.getObject("credit_account_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),"")),id);}
     private Account account(ResultSet r,int n)throws SQLException{return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("purpose"));}
     private Voucher voucher(ResultSet r,int n)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.valueOf(r.getString("type")),r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("client_id",UUID.class),r.getString("client_number"));}
+    private record ReservationRow(String institution,String branch,String type,LocalDate date,String number,OffsetDateTime consumedAt){}
 }

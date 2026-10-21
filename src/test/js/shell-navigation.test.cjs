@@ -10,6 +10,7 @@ function setup(width,menu=''){
  const w=dom.window,changes=[];w.innerWidth=width;
  w.matchMedia=()=>({get matches(){return w.innerWidth>=1024;},addEventListener(_,fn){changes.push(fn);}});
  w.localStorage.setItem('shell:desktopSidebarCollapsed','false');
+ w.HTMLElement.prototype.scrollTo=function(options){this.scrollTop=options.top;this.scrollCalls=(this.scrollCalls||0)+1;};
  w.eval(initial);w.eval(source);
  return {dom,w,d:w.document,resize(width){w.innerWidth=width;changes.forEach(fn=>fn());}};
 }
@@ -46,4 +47,21 @@ test('expanded navigation keeps nested menus inline and preserves their state ac
    assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(panel.closest('#appSidebar'),d.querySelector('#appSidebar'));
   }finally{dom.window.close();}
  }
+});
+
+
+test('restoring the active link finishes before expansion and does not override subsequent scrolling',async()=>{
+ const {dom,w,d}=setup(1366);
+ try{
+  const menu=d.querySelector('.shell-sidebar-scroll');
+  assert.equal(menu.scrollCalls,1);
+  d.querySelector('#desktopSidebarToggle').click();
+  menu.scrollTop=175;
+  await new Promise(resolve=>w.setTimeout(resolve,150));
+  assert.equal(menu.scrollTop,175);
+  assert.equal(menu.scrollCalls,1);
+  d.querySelector('#desktopSidebarToggle').click();
+  d.querySelector('#desktopSidebarToggle').click();
+  assert.equal(menu.scrollTop,175);
+ }finally{dom.window.close();}
 });

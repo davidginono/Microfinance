@@ -1,5 +1,6 @@
 package com.sacco.mvp.config;
 import com.sacco.mvp.accounting.controller.VoucherController;
+import com.sacco.mvp.accounting.controller.VoucherLaunchController;
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
 import com.sacco.mvp.accounting.service.*;
 import com.sacco.mvp.domain.*;
@@ -55,6 +56,18 @@ class VoucherMvcTest {
    mvc.perform(post("/finance/vouchers/"+kind).with(user(actor)).with(csrf()).param("activityId",activity.toString()).param("action","post")).andExpect(status().is3xxRedirection());
    verify(service).post(eq(actor),eq(type),argThat(f->activity.equals(f.getActivityId())));
   }
+ }
+ @Test void numberReservationRequiresCreatePermissionAndReturnsAnUncachedVoucherNumber()throws Exception{
+  UUID key=UUID.randomUUID();when(service.reserveNumber(actor,Type.PAYMENT,LocalDate.of(2026,10,8),key)).thenReturn(new NumberReservation("PV-2026-00000017"));
+  mvc.perform(post("/finance/vouchers/payments/number").with(user(actor)).with(csrf()).param("requestKey",key.toString()).param("effectiveDate","2026-10-08"))
+   .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.number").value("PV-2026-00000017"));
+  verify(service).reserveNumber(actor,Type.PAYMENT,LocalDate.of(2026,10,8),key);
+ }
+ @Test void createVoucherHubShowsOnlyTypesTheCurrentUserCanCreate()throws Exception{
+  var types=List.of(Type.RECEIPT,Type.JOURNAL);when(service.creatableTypes(actor)).thenReturn(types);
+  mvc.perform(get("/finance/vouchers/new").with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/vouchers/launch"))
+   .andExpect(model().attribute("creatableVoucherTypes",types));
+  verify(service).creatableTypes(actor);
  }
  @Test void clientLookupAndVoucherBindingUseTheAuthenticatedWorkspace()throws Exception{
   UUID client=UUID.randomUUID();when(service.clients(actor,Type.PAYMENT,"CL-",1)).thenReturn(List.of(new Client(client,"CL-012","Synthetic client")));
@@ -188,5 +201,6 @@ class VoucherMvcTest {
   @Bean com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents(){return mock(com.sacco.mvp.accounting.approval.service.VoucherDocumentService.class);}
   @Bean com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController workflowController(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows,com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService posting,com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents){return new com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController(workflows,posting,documents);}
   @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock,LoanReceiptService receipts,LoanReceiptPdfService loanPdf,com.sacco.mvp.accounting.approval.service.VoucherApprovalGate gate,com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),receipts,loanPdf,gate,workflows);}
+  @Bean VoucherLaunchController voucherLaunchController(VoucherService service){return new VoucherLaunchController(service);}
  }
 }

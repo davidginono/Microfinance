@@ -1,0 +1,58 @@
+/* Focused configuration surfaces and selectable role cards. */
+.aws-console:has([data-admin-workspace]) .product-builder-section-header {
+    background: #fafafa !important;
+    border-bottom-color: #eaeded !important;
+    padding: 16px 20px !important;
+}
+.customised-workflow-form { display: grid; gap: 20px; min-width: 0; max-width: 1100px; }
+.customised-workflow-form .product-builder-section-body { padding: 20px !important; }
+.customised-workflow-section { min-width: 0; padding: 0; margin: 0 0 24px; border: 0; background: transparent; box-shadow: none; }
+.customised-workflow-section-title { margin: 0 0 12px; padding: 0; font-size: 14px; font-weight: 700; }
+.aws-console:has([data-admin-workspace]) .aws-qualification-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    grid-template-areas: "applicants guarantors" "risk guarantors";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+}
+.aws-qualification-applicants-group { grid-area: applicants; }
+.aws-qualification-guarantors-group { grid-area: guarantors; }
+.aws-console:has([data-admin-workspace]) .aws-qualification-risk-group { grid-area: risk; grid-column: auto; }
+.aws-console:has([data-admin-workspace]) .aws-qualification-grid .aws-settings-group { margin: 0; }
+.aws-console:has([data-admin-workspace]) .admin-role-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+.aws-console:has([data-admin-workspace]) .admin-role-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 20px minmax(0,1fr);
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    min-width: 0;
+    min-height: 190px;
+    padding: 20px;
+    border: 1px solid #aab7b8;
+    border-radius: 2px;
+    background: #fff;
+    cursor: pointer;
+    align-items: start;
+}
+.aws-console:has([data-admin-workspace]) .admin-role-card:has(input:checked) { border-color: #00a1c9; background: #f1faff; }
+.aws-console:has([data-admin-workspace]) .admin-role-card:focus-within { outline: 2px solid #0073bb; outline-offset: 2px; }
+.aws-console:has([data-admin-workspace]) .admin-role-card input[type=checkbox] {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 2px 0 0;
+    border: 2px solid #aab7b8;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: none;
+}
+.aws-console:has([data-admin-workspace]) .admin-role-card input[type=checkbox]:checked { border: 6px solid #0073bb; background: #fff; }
+.admin-role-card-name { font-size: 16px; line-height: 24px; font-weight: 600; overflow-wrap: anywhere; }
+.admin-role-card-image { grid-column: 1/-1; justify-self: center; align-self: center; width: 112px; height: 96px; color: #34495e; }
+@media(max-width:1000px) { .aws-console:has([data-admin-workspace]) .admin-role-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:640px) {
+    .aws-console:has([data-admin-workspace]) .admin-role-grid { grid-template-columns: minmax(0,1fr); gap: 16px; }
+    .aws-console:has([data-admin-workspace]) .aws-qualification-grid { grid-template-columns: minmax(0,1fr) !important; grid-template-areas: "applicants" "guarantors" "risk"; grid-template-rows: auto; }
+    .customised-workflow-form .product-builder-section-body { padding: 16px !important; }
+}

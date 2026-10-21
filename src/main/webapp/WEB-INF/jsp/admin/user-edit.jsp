@@ -45,14 +45,15 @@
         </div>
         <div class="admin-role-grid">
             <c:forEach items="${staffPositions}" var="position">
-                <label class="admin-role-option">
+                <label class="admin-role-option admin-role-card">
                     <input type="checkbox"
                            name="positions"
                            value="${position}"
                            data-staff-role-checkbox="edit-user"
                            ${user.staffRoles.contains(position) ? 'checked' : ''}
                            class="admin-cloud-checkbox" />
-                    <span>${position.displayName}</span>
+                    <span class="admin-role-card-name"><spring:message code="admin.role.${position}" text="${position.displayName}" /></span>
+                    <svg fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="admin-role-card-image" viewBox="0 0 120 100" aria-hidden="true" focusable="false"><use href="<c:url value='/images/staff-role-icons.svg' />#${position}" /></svg>
                 </label>
             </c:forEach>
         </div>

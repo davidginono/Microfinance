@@ -70,7 +70,7 @@ class AdminUsersJspLayoutTest {
         assertThat(componentCss).contains(".admin-access-matrix-restore");
         assertThat(componentCss).contains("width: auto");
         assertThat(componentCss)
-            .contains(".admin-user-edit-context-bar")
+            .contains(".admin-user-section-header--actions")
             .contains("border-radius: 2px")
             .contains(".admin-user-section-header")
             .contains(".admin-role-grid")

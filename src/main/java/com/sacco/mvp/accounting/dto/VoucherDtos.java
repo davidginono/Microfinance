@@ -30,6 +30,7 @@ public final class VoucherDtos {
     public record Account(UUID id,String code,String name,String purpose) {}
     public record Client(UUID id,String number,String name) {}
     public record Activity(UUID id,String name,String nameSw) {}
+    public record NumberReservation(String number) {}
     public record Mapping(UUID transactionId,UUID templateKey,String transactionName,String component,Account debit,Account credit) {}
     public record Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,
                               String description,BigDecimal amount,Account debit,Account credit) {}

@@ -219,7 +219,7 @@
                 <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="Set applicant, guarantor, and portfolio risk rules for this Branch. Product-specific guarantor Disposable Income is configured inside each loan product." /></p>
             </div>
             <div class="aws-settings-grid aws-qualification-grid">
-                <section class="aws-settings-group" aria-labelledby="loan-applicant-policy-title">
+                <section class="aws-settings-group aws-qualification-applicants-group" aria-labelledby="loan-applicant-policy-title">
                     <div class="aws-settings-group-header">
                         <h3 id="loan-applicant-policy-title"><spring:message code="admin.settings.loanApplicants" text="Loan Applicants" /></h3>
                     </div>
@@ -233,7 +233,7 @@
                         </label>
                     </div>
                 </section>
-                <section class="aws-settings-group" aria-labelledby="guarantor-policy-title">
+                <section class="aws-settings-group aws-qualification-guarantors-group" aria-labelledby="guarantor-policy-title">
                     <div class="aws-settings-group-header">
                         <h3 id="guarantor-policy-title"><spring:message code="loan.guarantors" text="Guarantors" /></h3>
                     </div>
@@ -488,7 +488,7 @@
                                     <option value="REDUCING_BALANCE"><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                                 </select>
                             </label>
-<c:set var="accountProduct" value="${null}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %>
+
                         </div>
                     </section>
 

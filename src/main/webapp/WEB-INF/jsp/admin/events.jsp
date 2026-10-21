@@ -99,13 +99,13 @@
                     <c:set var="entrySaccoName" value="${registeredSaccoNamesById[entry.saccoId]}" />
                     <td class="px-3 py-2">
                         <c:choose>
-                            <c:when test="${not empty entrysaccoName}"><c:out value="${entrysaccoName}" /></c:when>
+                            <c:when test="${not empty entrySaccoName}"><c:out value="${entrySaccoName}" /></c:when>
                             <c:otherwise>${entry.saccoReferenceLabel}</c:otherwise>
                         </c:choose>
                     </td>
                 </c:if>
                 <td class="px-3 py-2">
-                    <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.statusBadgeClass}"><span data-resource-status="${entry.status}">${entry.displayStatus}</span></span>
+                    <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.statusBadgeClass}"><span data-resource-status="${empty entry.eventStatus ? 'SUCCESS' : entry.eventStatus}">${entry.displayStatus}</span></span>
                 </td>
                 <td class="px-3 py-2">${entry.displayEntityType}</td>
                 <td class="px-3 py-2">${entry.shortEntityReference}</td>

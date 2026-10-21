@@ -6,6 +6,7 @@ import java.util.UUID;
 /** Money enters as BigDecimal; no binary floating-point conversion is permitted. */
 public final class GeneralLedgerDtos {
     private GeneralLedgerDtos() { }
+    public record ProductAccountVersions(AccountVersionDtos.Version principal,AccountVersionDtos.Version interest) {}
     public record AccountCommand(String code, String name, String type, String normalBalance,
                                  String kind, String purpose, UUID parentId, String nameSw, String description) {
         public AccountCommand(String code,String name,String type,String normalBalance,String kind,String purpose,UUID parentId) {

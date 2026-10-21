@@ -58,6 +58,50 @@ class AccountVersionPostgresTest {
     Version version(UUID id){return books.version(institution,id).orElseThrow();}
     PolicyForm policy(boolean create,boolean update,boolean deactivate,boolean reactivate){var f=new PolicyForm();f.setVersion(books.accountPolicy(institution).version());f.setCreateAutomatic(create);f.setUpdateAutomatic(update);f.setDeactivateAutomatic(deactivate);f.setReactivateAutomatic(reactivate);f.setReason("Institution approved configuration");return f;}
     EditForm change(Account a,String name){var f=GeneralLedgerService.metadataForm(a);f.setName(name);f.setReason("Correct account description");return f;}
+    LoanProductSetting product(){
+        UUID id=UUID.randomUUID();jdbc.update("insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at) values(?,?,'DEVELOPMENT_LOAN',true,'ACTIVE',?,'Business growth','{}',0,0.24,'FLAT_RATE','MONTHLY',1,12,now(),now())",id,institution,"PRODUCT-"+id);
+        return LoanProductSetting.builder().id(id).saccoId(institution).productName("Business growth").productCode("PRODUCT-"+id).build();
+    }
+    com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts(){return new com.sacco.mvp.accounting.loans.service.LoanProductAccountService(new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc),new ApplicationClock("Africa/Nairobi"),audit,ledger);}
+    @Test void newProductsGenerateTwoApprovedPostingAccountsWithoutGrantingChartPermissions(){
+        var creator=operator("B1",Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
+        when(claims.effectiveClaims(eq(creator.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
+        var product=product();var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+        tx.executeWithoutResult(t->productAccounts().provision(product,creator.getMemberId()));
+        assertThat(product.getPrincipalGlAccountId()).isNotNull();assertThat(product.getInterestGlAccountId()).isNotNull();
+        assertThat(books.account(institution,product.getPrincipalGlAccountId()).orElseThrow()).satisfies(a->{assertThat(a.kind()).isEqualTo("POSTING");assertThat(a.type()).isEqualTo("ASSET");assertThat(a.name()).isEqualTo("Business growth - Principal");});
+        assertThat(books.account(institution,product.getInterestGlAccountId()).orElseThrow()).satisfies(a->{assertThat(a.kind()).isEqualTo("POSTING");assertThat(a.type()).isEqualTo("INCOME");assertThat(a.name()).isEqualTo("Business growth - Interest");});
+        tx.executeWithoutResult(t->productAccounts().provision(product,creator.getMemberId()));
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code like 'LP-%'",Integer.class,institution)).isEqualTo(2);
+        assertThat(jdbc.queryForMap("select principal_gl_account_id,interest_gl_account_id from loan_product_settings where id=?",product.getId())).containsEntry("principal_gl_account_id",product.getPrincipalGlAccountId()).containsEntry("interest_gl_account_id",product.getInterestGlAccountId());
+        assertThat(creator.getClaims()).containsExactly("LOAN_PRODUCTS_CREATE");
+        var vouchers=new com.sacco.mvp.accounting.repository.VoucherRepository(jdbc);
+        assertThat(vouchers.accounts(institution,"LP-",0)).isEmpty();
+        assertThat(vouchers.selectedAccounts(institution,List.of(product.getPrincipalGlAccountId(),product.getInterestGlAccountId()),false)).isEmpty();
+    }
+    @Test void independentlyApprovedProductAccountsLinkOnlyWhenBothAreEffective(){
+        ledger.configureAccountApproval(maker,policy(false,true,true,true));var creator=operator("B1",Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
+        when(claims.effectiveClaims(eq(creator.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
+        var product=product();var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+        tx.executeWithoutResult(t->productAccounts().provision(product,creator.getMemberId()));
+        var ids=jdbc.queryForMap("select principal_version_id,interest_version_id from loan_product_account_provision where product_id=?",product.getId());
+        var principal=version((UUID)ids.get("principal_version_id"));var interest=version((UUID)ids.get("interest_version_id"));
+        assertThat(principal.state()).isEqualTo("PENDING");assertThat(interest.state()).isEqualTo("PENDING");assertThat(product.getPrincipalGlAccountId()).isNull();
+        assertThat(books.account(institution,principal.accountId())).isEmpty();
+        assertThatThrownBy(()->ledger.accountVersionAction(creator,principal.id(),principal.revision(),"APPROVE","Self approval")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        ledger.accountVersionAction(maker,principal.id(),principal.revision(),"APPROVE","Principal account reviewed");
+        assertThat(jdbc.queryForObject("select principal_gl_account_id is null and interest_gl_account_id is null from loan_product_settings where id=?",Boolean.class,product.getId())).isTrue();
+        ledger.accountVersionAction(maker,interest.id(),interest.revision(),"APPROVE","Interest account reviewed");
+        assertThat(jdbc.queryForMap("select principal_gl_account_id,interest_gl_account_id from loan_product_settings where id=?",product.getId())).containsEntry("principal_gl_account_id",principal.accountId()).containsEntry("interest_gl_account_id",interest.accountId());
+        assertThat(jdbc.queryForObject("select count(*) from audit_log where entity_id=? and action='LOAN_PRODUCT_GENERATED_ACCOUNTS_LINKED'",Integer.class,product.getId())).isEqualTo(1);
+    }
+    @Test void generatedAccountsRollbackWithTheProductCommandAndRejectForeignScope(){
+        var product=product();var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+        assertThatThrownBy(()->tx.executeWithoutResult(t->ledger.provisionLoanProductAccounts("FOREIGN",maker.getMemberId(),product.getId(),product.getDisplayName()))).hasMessage("accounting.error.account");
+        assertThatThrownBy(()->tx.executeWithoutResult(t->{productAccounts().provision(product,maker.getMemberId());throw new IllegalStateException("Rollback whole command");})).hasMessage("Rollback whole command");
+        assertThat(jdbc.queryForObject("select count(*) from loan_product_account_provision where product_id=?",Integer.class,product.getId())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code like 'LP-%'",Integer.class,institution)).isZero();
+    }
     @Test void completeCreationAutomaticallyApprovesOnceAndKeepsSystemEvidence(){
         var f=form(family,"111001","Office cash");UUID id=ledger.onboardVersion(maker,f,false,true);var v=version(id);
         assertThat(v.state()).isEqualTo("APPROVED");assertThat(v.mode()).isEqualTo("AUTOMATIC");assertThat(v.reviewer()).isNull();assertThat(v.policyVersion()).isZero();assertThat(books.account(institution,v.accountId())).isPresent();

@@ -1544,6 +1544,8 @@ public class AdminService {
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.BOARD, normalizedBoardReviewerIds);
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.CREDIT_COMMITTEE, normalizedCreditCommitteeReviewerIds);
         product.setMaximumActiveLoans(normalizedActiveLoanLimit);
+        loanProductSettingRepository.flush();
+        productAccounts.provision(product,adminId);
         auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CREATE_LOAN_PRODUCT", adminId, null, snapshotProduct(product));
         return product;
     }
@@ -4184,7 +4186,7 @@ public class AdminService {
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
         LoanProductSetting product = createLoanProduct(saccoId,adminId,productCode,productName,productDescription,displayOrder,minimumAmount,maximumAmount,guarantorsRequired,ratio,savingsLimitCheckRequired,applicationFee,insuranceRate,processingFeeRate,annualRate,interestMethod,minimum.compatibilityMonths(),maximum.compatibilityMonths(),allowApplicationWithActiveLoan,freshFinancialDataRequired,managerReviewRequired,loanOfficerReviewRequired,workflowStartStage,managerPriority,loanOfficerPriority,chairpersonReviewRequired,chairpersonPriority,chairpersonReviewerIds,boardReviewRequired,boardPriority,boardReviewerIds,committeeReviewRequired,committeePriority,committeeMinimumVotes,committeeApprovalThreshold,creditCommitteeReviewerIds,accountantReviewRequired,accountantPriority,disbursementOfficerRequired,disbursementProofRequired,applicantAttachmentRequired,guarantorMinSavingsCheckRequired,guarantorMinimumSavings,productStatus,maximumActiveLoans);
-        productAccounts.configure(product,adminId,principalGlAccountId,interestGlAccountId);
+
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         loanProductSettingRepository.save(product);
         return product;
@@ -4207,10 +4209,12 @@ public class AdminService {
         var tellers=normalizeReviewerIds(saccoId,f.getDisbursementOfficerIds(),Position.DISBURSEMENT_OFFICER);
         if(tellers.isEmpty())throw new IllegalArgumentException("recording.error.customTellers");
         var product=customisedLoanConfiguration(saccoId).orElse(null);
+        boolean newConfiguration=product==null;
         var before=product==null?Map.<String,Object>of():snapshotProduct(product);
         if(product==null)product=createLoanProduct(saccoId,adminId,(product==null?"CUSTOM-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(java.util.Locale.ROOT):product.getDisplayCode()),"Customised loan","Workflow for staff-recorded customised loan applications.",999,BigDecimal.ZERO,new BigDecimal("9999999999999999.99"),0,new BigDecimal("0.4"),false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,600,true,false,f.isManagerReviewRequired(),f.isLoanOfficerReviewRequired(),ApprovalWorkflowStage.MANAGER,f.getManagerPriority(),f.getLoanOfficerPriority(),f.isChairpersonReviewRequired(),f.getChairpersonPriority(),List.of(),f.isBoardReviewRequired(),f.getBoardPriority(),f.getBoardReviewerIds(),f.isCommitteeReviewRequired(),f.getCommitteePriority(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds(),f.isAccountantReviewRequired(),f.getAccountantPriority(),true,f.isDisbursementProofRequired(),false,false,BigDecimal.ZERO,LoanProductStatus.ACTIVE,null);
         else updateLoanProduct(saccoId,adminId,product.getId(),(product==null?"CUSTOM-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(java.util.Locale.ROOT):product.getDisplayCode()),"Customised loan","Workflow for staff-recorded customised loan applications.",999,BigDecimal.ZERO,new BigDecimal("9999999999999999.99"),0,new BigDecimal("0.4"),false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,600,true,false,f.isManagerReviewRequired(),f.isLoanOfficerReviewRequired(),ApprovalWorkflowStage.MANAGER,f.getManagerPriority(),f.getLoanOfficerPriority(),f.isChairpersonReviewRequired(),f.getChairpersonPriority(),List.of(),f.isBoardReviewRequired(),f.getBoardPriority(),f.getBoardReviewerIds(),f.isCommitteeReviewRequired(),f.getCommitteePriority(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds().size(),f.getCreditCommitteeReviewerIds(),f.isAccountantReviewRequired(),f.getAccountantPriority(),true,f.isDisbursementProofRequired(),false,false,BigDecimal.ZERO,LoanProductStatus.ACTIVE,null);
-        productAccounts.configure(product,adminId,f.getPrincipalGlAccountId(),f.getInterestGlAccountId());
+        if(!newConfiguration || f.getPrincipalGlAccountId()!=null || f.getInterestGlAccountId()!=null)
+            productAccounts.configure(product,adminId,f.getPrincipalGlAccountId(),f.getInterestGlAccountId());
         product.setCustomRecordingConfiguration(true);
         loanProductSettingRepository.saveAndFlush(product);
         replaceLoanProductReviewers(product,ApprovalWorkflowStage.DISBURSEMENT_OFFICER,tellers);

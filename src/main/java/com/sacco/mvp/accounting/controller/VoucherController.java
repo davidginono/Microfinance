@@ -54,6 +54,11 @@ public class VoucherController {
         f.setReceiptPurpose(purpose);if(loanId!=null){if(!"LOAN_REPAYMENT".equals(purpose))throw new Invalid("","request");loanReceipts.prefill(actor,f,loanId);}
         model.addAttribute("voucherForm",f);formContext(kind,actor,f,model);return "accounting/vouchers/form";
     }
+    @PostMapping("/number") @ResponseBody
+    public ResponseEntity<NumberReservation> number(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
+            @RequestParam UUID requestKey,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate effectiveDate){
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(vouchers.reserveNumber(actor,type(kind),effectiveDate,requestKey));
+    }
     @PostMapping
     public String post(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("voucherForm") Form form,
                        BindingResult errors,@RequestParam(defaultValue="post") String action,Model model,RedirectAttributes flash){

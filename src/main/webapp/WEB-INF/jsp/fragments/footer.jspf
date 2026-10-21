@@ -220,21 +220,14 @@
                 return;
             }
 
-            const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-            window.requestAnimationFrame(function () {
-                window.setTimeout(function () {
-                    const scrollRect = sidebarScroll.getBoundingClientRect();
-                    const targetRect = target.getBoundingClientRect();
-                    const targetTop = sidebarScroll.scrollTop
-                        + targetRect.top
-                        - scrollRect.top
-                        - Math.max(12, (sidebarScroll.clientHeight - target.offsetHeight) / 2);
-                    sidebarScroll.scrollTo({
-                        top: Math.max(targetTop, 0),
-                        behavior: behavior
-                    });
-                }, 80);
-            });
+            // Restore before interaction, without a delayed scroll during expansion.
+            const scrollRect = sidebarScroll.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+            const targetTop = sidebarScroll.scrollTop
+                + targetRect.top
+                - scrollRect.top
+                - Math.max(12, (sidebarScroll.clientHeight - target.offsetHeight) / 2);
+            sidebarScroll.scrollTo({top: Math.max(targetTop, 0), behavior: "instant"});
         }
 
         function registerExpandableMenu(toggle, panel, chevron, keyName) {

@@ -61,7 +61,7 @@ public class LoanReceiptService {
         loans.lockReceiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).sorted().toList(),f.getClientId());
         var result=new ArrayList<LoanReceiptRow>();var client=loans.receiptLoan(a,f.getRows().getFirst().getLoanId());int n=0;
         for(var row:f.getRows()){var p=loans.repay(a,command(f,row,++n));result.add(new LoanReceiptRow(n,p.id(),p.loanId(),p.loanNumber(),row.getDescription(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
-        var v=header(a,f,client.client(),total(result),null);receipts.insert(a,v,f.getRequestKey(),f.getClientId(),client.clientNumber(),hash,result);event(a,v);return find(a,v.id()).orElseThrow();
+        var v=header(a,f,client.client(),total(result),null);receipts.insert(a,v,f.getRequestKey(),f.getClientId(),client.clientNumber(),hash,result);ordinary.consumeNumber(a,Type.RECEIPT,f.getRequestKey());event(a,v);return find(a,v.id()).orElseThrow();
     }
     @Transactional
     public LoanReceipt reverse(AppUserPrincipal a,UUID id,UUID key,LocalDate date,String reason){
@@ -77,7 +77,7 @@ public class LoanReceiptService {
         var f=new Form();f.setRequestKey(key);f.setEffectiveDate(date);f.setMoneyAccountId(original.moneyAccountId());f.setReference(original.reference());f.setDescription(reason);f.setEvidence(original.evidence());
         var v=header(a,f,original.party(),original.total(),id);var client=loans.receiptLoan(a,rows.getFirst().loanId());receipts.insert(a,v,key,client.clientId(),source.clientNumber(),hash,reversed);event(a,v);return find(a,v.id()).orElseThrow();
     }
-    private Voucher header(AppUserPrincipal a,Form f,String party,BigDecimal total,UUID reverses){return new Voucher(UUID.randomUUID(),vouchers.number(Type.RECEIPT,f.getEffectiveDate()),Type.RECEIPT,f.getEffectiveDate(),party,f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),total,f.getRows().size(),null,a.getMemberId(),a.getFullName(),clock.now(),reverses,null,"","",List.of());}
+    private Voucher header(AppUserPrincipal a,Form f,String party,BigDecimal total,UUID reverses){var number=reverses==null?ordinary.reserveNumber(a,Type.RECEIPT,f.getEffectiveDate(),f.getRequestKey()).number():vouchers.number(Type.RECEIPT,f.getEffectiveDate());return new Voucher(UUID.randomUUID(),number,Type.RECEIPT,f.getEffectiveDate(),party,f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),total,f.getRows().size(),null,a.getMemberId(),a.getFullName(),clock.now(),reverses,null,"","",List.of());}
     private void event(AppUserPrincipal a,Voucher v){audit.logEvent("ACCOUNTING",v.id(),v.reversesId()==null?"LOAN_RECEIPT_POSTED":"LOAN_RECEIPT_REVERSED",a.getMemberId(),AuditEventStatus.SUCCESS,"Loan receipt","VOUCHER",v.number(),a.getSaccoId(),a.getStationId(),Map.of("amount",v.total()));}
     private PostForm command(Form f,RowForm row,int n){var p=new PostForm();p.setRequestKey(rowKey(f.getRequestKey(),n));p.setLoanId(row.getLoanId());p.setAmount(row.getAmount());p.setEffectiveDate(f.getEffectiveDate());p.setMoneyAccountId(f.getMoneyAccountId());p.setInterestAccountId(f.getInterestAccountId());p.setReference(reference(f,n));p.setEvidence(f.getEvidence());p.setNotes(row.getDescription());return p;}
     private static UUID rowKey(UUID key,int n){return UUID.nameUUIDFromBytes(("LOAN_RECEIPT/"+key+"/"+n).getBytes(StandardCharsets.UTF_8));}

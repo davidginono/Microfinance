@@ -14,7 +14,7 @@ import static org.mockito.Mockito.*;
 class LoanProductAccountServiceTest {
     final LoanProductAccountRepository repository=mock(LoanProductAccountRepository.class);
     final AuditService audit=mock(AuditService.class);
-    final LoanProductAccountService service=new LoanProductAccountService(repository,new ApplicationClock("Africa/Nairobi"),audit);
+    final LoanProductAccountService service=new LoanProductAccountService(repository,new ApplicationClock("Africa/Nairobi"),audit,mock(com.sacco.mvp.accounting.service.GeneralLedgerService.class));
     final UUID principal=UUID.randomUUID(),interest=UUID.randomUUID(),productId=UUID.randomUUID();
     final LoanProductSetting product=LoanProductSetting.builder().id(productId).saccoId("I1").loanType(LoanType.DEVELOPMENT_LOAN).build();
     @Test void mappingsRequireACompletePairAndActivePostableAccountsFromTheSameInstitution(){

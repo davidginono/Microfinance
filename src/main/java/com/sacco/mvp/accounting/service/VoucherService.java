@@ -29,6 +29,19 @@ public class VoucherService {
     public void authorize(AppUserPrincipal actor,Type type,String action){
         ledger.requireActor(actor,(type==Type.JOURNAL?"ACCOUNTING_JOURNALS_":"ACCOUNTING_BUSINESS_")+action);
     }
+    public List<Type> creatableTypes(AppUserPrincipal actor){
+        return Arrays.stream(Type.values()).filter(type->{try{authorize(actor,type,"CREATE");return true;}catch(AccessDeniedException denied){return false;}}).toList();
+    }
+    @Transactional
+    public NumberReservation reserveNumber(AppUserPrincipal actor,Type type,LocalDate date,UUID requestKey){
+        authorize(actor,type,"CREATE");require(requestKey!=null,"","request");require(date!=null && date.getYear()>=1 && !date.isAfter(clock.today()),"effectiveDate","date");
+        vouchers.lockRequest(actor.getSaccoId(),actor.getStationId(),requestKey);
+        return vouchers.reserveNumber(actor.getSaccoId(),actor.getStationId(),type,date,requestKey,clock.now());
+    }
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void consumeNumber(AppUserPrincipal actor,Type type,UUID requestKey){
+        authorize(actor,type,"CREATE");vouchers.consumeNumber(actor.getSaccoId(),actor.getStationId(),requestKey,clock.now());
+    }
     public void requireExport(AppUserPrincipal actor){ledger.requireActor(actor,"FINANCIAL_REPORTS_EXPORT");}
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void requireInterestWaiverPeriod(AppUserPrincipal actor,LocalDate date){
@@ -134,8 +147,10 @@ public class VoucherService {
     }
     private Voucher persist(AppUserPrincipal actor,Type type,Form f,String hash,Preview plan,UUID reverses,UUID journal,UUID period,Client client){
         var now=clock.now();
-        var v=new Voucher(UUID.randomUUID(),vouchers.number(type,f.getEffectiveDate()),type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
+        String number=reverses==null?reserveNumber(actor,type,f.getEffectiveDate(),f.getRequestKey()).number():vouchers.number(type,f.getEffectiveDate());
+        var v=new Voucher(UUID.randomUUID(),number,type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
         vouchers.insert(v,actor.getSaccoId(),actor.getStationId(),f,hash,period,journal);
+        if(reverses==null)consumeNumber(actor,type,f.getRequestKey());
         audit.logEvent("ACCOUNTING",v.id(),reverses==null?"VOUCHER_POSTED":"VOUCHER_REVERSED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Voucher posted","VOUCHER",v.number(),actor.getSaccoId(),actor.getStationId(),Map.of("type",type.name(),"amount",v.total(),"transactions",v.transactionCount(),"journal",v.journalId()));
         return details(scoped(actor,type,v.id(),false));
     }

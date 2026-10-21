@@ -1,11 +1,13 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/dashboard-support.jspf" %>
 <div class="erp-page-header" data-aws-page-header><p class="erp-breadcrumb"><spring:message code="admin.dashboard.breadcrumb" /></p><h1 class="erp-page-title"><spring:message code="admin.dashboard.title" /></h1></div>
+<sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE') or @access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')"><div class="dashboard-create-actions"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/new' />"><spring:message code="voucher.createHub" /></a></div></sec:authorize>
 <div data-dashboard-board="admin" aria-busy="true">
  <section class="erp-panel" data-dashboard-widget="overview" data-widget-width="2" data-widget-height="480">
   <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.widget.overview" /></h2></div>

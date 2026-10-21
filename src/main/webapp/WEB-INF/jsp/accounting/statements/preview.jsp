@@ -4,9 +4,7 @@
 <c:set var="base" value="/reports/financial/statements/${run.id}" />
 <div class="accounting-workspace">
  <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.previewTitle" text="Reports Preview" /></span></nav>
- <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1><div class="accounting-actions">
-  <span class="fs-status"><c:if test="${run.saved}"><spring:message code="fs.saved" /> · </c:if><spring:message code="fs.provisional" /></span>
- </div></div>
+ <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1></div>
  <div class="fs-workspace" data-tab-loading="<spring:message code='fs.tabLoading' />" data-tab-error="<spring:message code='fs.tabError' />">
  <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
  <div class="fs-toolbar">

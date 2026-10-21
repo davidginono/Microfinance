@@ -15,7 +15,17 @@ public class LoanProductAccountService {
     private final LoanProductAccountRepository repository;
     private final ApplicationClock clock;
     private final AuditService audit;
+    private final com.sacco.mvp.accounting.service.GeneralLedgerService ledger;
     public record Accounts(UUID principalId,UUID interestId) {}
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void provision(LoanProductSetting product,UUID creator){
+        var accounts=ledger.provisionLoanProductAccounts(product.getSaccoId(),creator,product.getId(),product.getDisplayName());
+        repository.provision(product.getSaccoId(),accounts.principal().branch(),product.getId(),creator,accounts,clock.now());
+        if("APPROVED".equals(accounts.principal().state()) && "APPROVED".equals(accounts.interest().state())){
+            product.setPrincipalGlAccountId(accounts.principal().accountId());product.setInterestGlAccountId(accounts.interest().accountId());
+        }
+        audit.logEvent("ACCOUNTING",product.getId(),"LOAN_PRODUCT_ACCOUNTS_GENERATED",creator,AuditEventStatus.SUCCESS,"Loan product posting accounts generated","LOAN_PRODUCT",product.getDisplayCode(),product.getSaccoId(),accounts.principal().branch(),Map.of("principalVersion",accounts.principal().id(),"interestVersion",accounts.interest().id()));
+    }
     @Transactional(readOnly=true)
     public List<Choice> choices(String institution,String category,String search,int page,UUID selected){
         require(Set.of("PRINCIPAL","INTEREST").contains(category) && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
