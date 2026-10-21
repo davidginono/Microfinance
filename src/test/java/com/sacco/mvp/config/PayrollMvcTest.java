@@ -26,9 +26,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,PayrollMvcTest.Config.class})
 class PayrollMvcTest {
-    @Autowired WebApplicationContext context;@Autowired PayrollService payroll;MockMvc mvc;
+    @Autowired WebApplicationContext context;@Autowired PayrollService payroll;@Autowired PayrollSpreadsheetService spreadsheet;MockMvc mvc;
     AppUserPrincipal actor(Set<UserClaim> claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),claims,true);}
-    @BeforeEach void setup(){reset(payroll);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
+    @BeforeEach void setup(){reset(payroll,spreadsheet);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
     @Test void requiresClaimAndCsrfAndBindsOnlyCommandFields()throws Exception {
         var permitted=actor(EnumSet.allOf(UserClaim.class));
         mvc.perform(get("/finance/payroll").with(user(actor(Set.of())))).andExpect(status().isForbidden());verifyNoInteractions(payroll);
@@ -42,7 +42,35 @@ class PayrollMvcTest {
         var permitted=actor(Set.of(UserClaim.PAYROLL_DEDUCTIONS_VIEW));
         doThrow(new org.springframework.security.access.AccessDeniedException("Export unavailable")).when(payroll).authorize(permitted,"EXPORT");
         mvc.perform(get("/finance/payroll/"+UUID.randomUUID()+"/pdf").with(user(permitted))).andExpect(status().isForbidden());
+        mvc.perform(get("/finance/payroll/"+UUID.randomUUID()+"/xlsx").with(user(permitted))).andExpect(status().isForbidden());
+        mvc.perform(get("/finance/payroll/"+UUID.randomUUID()+"/xlsx").with(user(actor(Set.of(UserClaim.PAYROLL_DEDUCTIONS_EXPORT))))).andExpect(status().isForbidden());
+        verifyNoInteractions(spreadsheet);
         mvc.perform(get("/finance/payroll/"+UUID.randomUUID()+"/csv").with(user(permitted))).andExpect(status().isNotFound());
+    }
+    @Test void spreadsheetUsesFrozenRowsLocalizedLabelsAndProtectedDownloadHeaders()throws Exception {
+        var actor=actor(Set.of(UserClaim.PAYROLL_DEDUCTIONS_VIEW,UserClaim.PAYROLL_DEDUCTIONS_EXPORT));var id=UUID.randomUUID();
+        var batch=new Batch(id,"Employer",LocalDate.of(2026,10,1),LocalDate.of(2026,10,31),false,OffsetDateTime.now(),"Actor","Institution","Branch","hash",null,"FROZEN",new java.math.BigDecimal("10.00"),1,0);
+        var lines=List.of(new Line(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"0007","Employee","CLIENT","LOAN",new java.math.BigDecimal("9.00"),java.math.BigDecimal.ONE,java.math.BigDecimal.TEN,""));
+        when(payroll.batch(actor,id)).thenReturn(batch);when(payroll.exportLines(actor,id)).thenReturn(lines);
+        var bytes=new byte[]{80,75,3,4};var document=new Document(bytes,PayrollService.hash(bytes));
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"),Locale.FRENCH)) {
+            String language=locale.getLanguage().equals("sw")?"sw":"en";
+            when(spreadsheet.render(batch,lines,Locale.forLanguageTag(language))).thenReturn(bytes);
+            when(payroll.spreadsheetDownloaded(actor,id,language,bytes)).thenReturn(document);
+            mvc.perform(get("/finance/payroll/"+id+"/xlsx").with(user(actor)).locale(locale).param("saccoId","OTHER").param("stationId","FOREIGN"))
+                .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(content().bytes(bytes)).andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(header().string("X-Document-SHA256",document.checksum()))
+                .andExpect(header().string("Content-Disposition","attachment; filename=payroll-"+id+".xlsx"));
+        }
+        verify(payroll,never()).downloaded(any(),any(),any(),any());verify(payroll,never()).preview(any(),any());
+        verify(payroll,never()).changeState(any(),any(),any(),any(),anyBoolean());
+    }
+    @Test void unavailableScopedBatchStopsSpreadsheetGeneration()throws Exception {
+        var actor=actor(Set.of(UserClaim.PAYROLL_DEDUCTIONS_VIEW,UserClaim.PAYROLL_DEDUCTIONS_EXPORT));var id=UUID.randomUUID();
+        when(payroll.batch(actor,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Batch unavailable"));
+        mvc.perform(get("/finance/payroll/"+id+"/xlsx").with(user(actor))).andExpect(status().isForbidden());
+        verifyNoInteractions(spreadsheet);verify(payroll,never()).spreadsheetDownloaded(any(),any(),any(),any());
     }
     @Test void printAndDownloadReturnTheSameRetainedDocumentWithProtectedHeaders()throws Exception {
         var actor=actor(EnumSet.allOf(UserClaim.class));var id=UUID.randomUUID();var bytes="%PDF-test-document".getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -57,8 +85,9 @@ class PayrollMvcTest {
         @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor accessAlias(){return factory->factory.registerAlias("accessControlService","access");}
         @Bean PayrollService payroll(){return mock(PayrollService.class);}
         @Bean PayrollPdfService pdf(){return mock(PayrollPdfService.class);}
+        @Bean PayrollSpreadsheetService spreadsheet(){return mock(PayrollSpreadsheetService.class);}
         @Bean ApplicationClock clock(){return new ApplicationClock("Africa/Nairobi");}
         @Bean ResourceBundleMessageSource messages(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
-        @Bean PayrollController controller(PayrollService p,PayrollPdfService pdf,ApplicationClock clock,ResourceBundleMessageSource messages){return new PayrollController(p,pdf,clock,messages);}
+        @Bean PayrollController controller(PayrollService p,PayrollPdfService pdf,PayrollSpreadsheetService spreadsheet,ApplicationClock clock,ResourceBundleMessageSource messages){return new PayrollController(p,pdf,spreadsheet,clock,messages);}
     }
 }

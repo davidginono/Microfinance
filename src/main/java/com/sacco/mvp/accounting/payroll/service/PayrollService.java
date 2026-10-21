@@ -150,6 +150,12 @@ public class PayrollService {
         records.document(id,language,document,clock.now());var saved=records.document(a,id,language).orElseThrow();
         records.event(a,id,"DOWNLOAD",language+" / SHA-256 "+saved.checksum(),clock.now());return saved;
     }
+    @Transactional
+    public Document spreadsheetDownloaded(AppUserPrincipal a,UUID id,String language,byte[] content) {
+        authorize(a,"EXPORT");check(Set.of("en","sw").contains(language),"input");records.batch(a,id);
+        var document=new Document(content,hash(content));
+        records.event(a,id,"DOWNLOAD","XLSX / "+language+" / SHA-256 "+document.checksum(),clock.now());return document;
+    }
     private LocalDate validate(BatchForm f) {
         check(f!=null && f.getEmployerId()!=null && f.getMonth()!=null,"input");
         try {

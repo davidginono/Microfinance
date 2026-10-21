@@ -1,5 +1,7 @@
 # Accounting Package And Report Customization Goal
 
+2026-10-21 user-requested payroll increment: frozen employer deduction schedules now support Excel alongside PDF/print, using their existing payroll export claim and scoped snapshots. This narrow exception does not enable spreadsheet exports for vouchers or other operational reports and never posts repayments. See [payroll export scope and safeguards](payroll-deductions.md#employer-ready-spreadsheet-export). The broader accounting/report-builder backlog remains open.
+
 2026-10-19 product-account increment: loan products link principal and interest GL accounts; new disbursements retain immutable per-loan routing, and existing directly recorded loans have an explicit linking action. Individual and batch receipts use these accounts automatically. Historical postings are unchanged. See [setup, scope and safeguards](loan-product-account-links.md). This does not complete the broader accounting backlog.
 
 2026-10-18 user-requested increment: configurable individual and batch voucher approvals, with independent validation/approval/posting states and explicit claims. See [scope and verification](voucher-approval-workspaces.md). This does not restore removed accounting workspaces or complete the broader backlog.

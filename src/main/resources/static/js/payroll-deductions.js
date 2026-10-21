@@ -3,7 +3,7 @@
     const register = document.querySelector('[data-payroll-register]');
     if (register) {
         const inputs = () => [...register.querySelectorAll('input[name="payroll-selection"]')];
-        const buttons = [...register.querySelectorAll('[data-payroll-open],[data-payroll-pdf]')];
+        const buttons = [...register.querySelectorAll('[data-payroll-open],[data-payroll-pdf],[data-payroll-xlsx]')];
         const status = register.querySelector('[data-payroll-selection]');
         const selected = () => inputs().find(input => input.checked)?.closest('[data-payroll-id]');
         const update = () => {
@@ -26,6 +26,9 @@
         });
         buttons.forEach(button => button.addEventListener('click', () => {
             const row = selected();if (!row || button.disabled) return;
+            if (button.hasAttribute('data-payroll-xlsx')) {
+                window.downloadExport(register.dataset.base + '/' + encodeURIComponent(row.dataset.payrollId) + '/xlsx', button);return;
+            }
             window.WorkspaceNavigation.navigate(register.dataset.base + '/' + encodeURIComponent(row.dataset.payrollId) + (button.hasAttribute('data-payroll-pdf') ? '/pdf' : ''));
         }));
         ['resource-table:reset','resource-table:updated'].forEach(name => register.addEventListener(name,reset));

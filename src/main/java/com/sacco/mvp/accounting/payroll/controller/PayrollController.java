@@ -27,6 +27,7 @@ import java.util.*;
 public class PayrollController {
     private final PayrollService payroll;
     private final PayrollPdfService pdf;
+    private final PayrollSpreadsheetService spreadsheet;
     private final ApplicationClock clock;
     private final MessageSource messages;
     @ModelAttribute void noCache(HttpServletResponse r) {r.setHeader("Cache-Control","no-store");}
@@ -109,6 +110,16 @@ public class PayrollController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=payroll-"+id+".pdf")
             .header("X-Content-Type-Options","nosniff").header("X-Document-SHA256",saved.checksum()).body(saved.content());
+    }
+    @GetMapping("/{id}/xlsx")
+    @PreAuthorize("@access.has(principal,'PAYROLL_DEDUCTIONS_VIEW') and @access.has(principal,'PAYROLL_DEDUCTIONS_EXPORT')")
+    public ResponseEntity<byte[]> spreadsheet(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Locale locale) {
+        payroll.authorize(a,"EXPORT");String language=locale.getLanguage().equals("sw")?"sw":"en";
+        var bytes=spreadsheet.render(payroll.batch(a,id),payroll.exportLines(a,id),Locale.forLanguageTag(language));
+        var document=payroll.spreadsheetDownloaded(a,id,language,bytes);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=payroll-"+id+".xlsx")
+            .header("X-Content-Type-Options","nosniff").header("X-Document-SHA256",document.checksum()).body(document.content());
     }
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> invalid(IllegalArgumentException e,Locale locale) {return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body(messages.getMessage(safe(e),null,locale));}

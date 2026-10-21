@@ -7,7 +7,7 @@
 <section class="erp-table-wrap" data-resource-table="payroll-register" data-table-selection="single" data-payroll-register data-base="<c:url value='${base}' />">
     <div class="app-table-titlebar"><h2><spring:message code="payroll.nav.${kind}" /></h2><div class="accounting-actions">
         <button type="button" class="app-btn btn-neutral" data-table-command data-payroll-open disabled><spring:message code="common.view" /></button>
-        <c:if test="${kind=='batches'}"><sec:authorize access="@access.has(principal,'PAYROLL_DEDUCTIONS_EXPORT')"><button type="button" class="app-btn btn-neutral" data-payroll-pdf data-table-command disabled><spring:message code="payroll.pdf" /></button></sec:authorize></c:if>
+        <c:if test="${kind=='batches'}"><sec:authorize access="@access.has(principal,'PAYROLL_DEDUCTIONS_EXPORT')"><button type="button" class="app-btn btn-neutral" data-payroll-pdf data-table-command disabled><spring:message code="payroll.pdf" /></button><button type="button" class="app-btn btn-neutral" data-payroll-xlsx data-table-command disabled><spring:message code="payroll.xlsx" /></button></sec:authorize></c:if>
         <sec:authorize access="@access.has(principal,'PAYROLL_DEDUCTIONS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='${base}/new' />"><spring:message code="payroll.create.${kind}" /></a></sec:authorize>
     </div></div>
     <form method="get" action="<c:url value='${base}' />" class="erp-table-toolbar">

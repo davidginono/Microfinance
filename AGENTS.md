@@ -146,6 +146,10 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 - The user's newer instruction enables approval for **individual ordinary receipt/payment/journal vouchers and batches according to branch configuration**. This supersedes the no-approval restriction below only for configured scopes. Preserve direct posting when individual approval is disabled and preserve specialized loan receipt/repayment safeguards. All workspaces and actions require explicit claims; do not grant them automatically. See `docs/voucher-approval-workspaces.md`.
 
+### Payroll schedule Excel export (2026-10-21)
+
+- The user authorizes employer-ready Excel exports of frozen payroll deduction schedules alongside PDF/print. Preserve the frozen snapshot, institution/branch scope and explicit payroll VIEW/EXPORT claims. Exporting never posts repayments or records employer results. This exception does not enable Excel/CSV for vouchers or other operational reports. See `docs/payroll-deductions.md`.
+
 ### Core accounting mandate (2026-10-08)
 
 - Receipt vouchers, payment vouchers and journal vouchers support multiple transactions and accountant **direct posting**. Do not add submission, verification, maker/checker, approval or release-gate steps to these core workflows or fabricate approval evidence. Server-side accounting validation, scope, closed-period protection, audit, idempotency and linked reversals remain mandatory.

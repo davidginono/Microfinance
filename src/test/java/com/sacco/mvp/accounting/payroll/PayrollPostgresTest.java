@@ -3,6 +3,7 @@ package com.sacco.mvp.accounting.payroll;
 import com.sacco.mvp.accounting.payroll.dto.PayrollDtos.*;
 import com.sacco.mvp.accounting.payroll.repository.PayrollRepository;
 import com.sacco.mvp.accounting.payroll.service.PayrollService;
+import com.sacco.mvp.accounting.payroll.service.PayrollSpreadsheetService;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -95,6 +96,38 @@ class PayrollPostgresTest {
         var replacement=batch();replacement.setReplacesId(id);replacement.setPreviewHash(service.preview(actor,replacement).hash());var next=service.freeze(actor,replacement);
         assertThat(service.batch(actor,next).replacesId()).isEqualTo(id);assertThat(service.batch(actor,id).state()).isEqualTo("CANCELLED");
         assertThatThrownBy(()->service.changeState(actor,id,"SENT","Synthetic attempt",false)).hasMessage("payroll.error.state");
+    }
+    @Test void spreadsheetExportUsesFrozenIdentityAndAmountsAuditsDownloadsAndNeverPosts()throws Exception {
+        jdbc.update("update members set employee_number='000007' where id=?",client);
+        instruction(loan,"200.00");var f=batch();f.setPreviewHash(service.preview(actor,f).hash());var id=service.freeze(actor,f);
+        var frozen=service.exportLines(actor,id);
+        jdbc.update("update members set employee_number='CHANGED',full_name='Changed name' where id=?",client);
+        jdbc.update("update loan_ledger_installments set principal_paid=100,interest_paid=10 where loan_application_id=?",loan);
+        assertThat(service.exportLines(actor,id)).isEqualTo(frozen);
+        var messages=new org.springframework.context.support.ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+        var renderer=new PayrollSpreadsheetService(messages,new ReportExportLimiter(1));
+        var bytes=renderer.render(service.batch(actor,id),service.exportLines(actor,id),Locale.ENGLISH);
+        var document=service.spreadsheetDownloaded(actor,id,"en",bytes);
+        assertThat(document.content()).containsExactly(bytes);assertThat(document.checksum()).isEqualTo(PayrollService.hash(bytes));
+        try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(document.content()))) {
+            var sheet=book.getSheetAt(0);var row=sheet.getRow(sheet.getPaneInformation().getHorizontalSplitPosition());
+            assertThat(row.getCell(0).getStringCellValue()).isEqualTo("000007");assertThat(row.getCell(1).getStringCellValue()).isEqualTo("Synthetic Payroll Employee");
+            assertThat(row.getCell(3).getNumericCellValue()).isEqualTo(98.00);
+        }
+        assertThat(service.events(actor,id,0).rows()).singleElement().satisfies(e->{assertThat(e.kind()).isEqualTo("DOWNLOAD");assertThat(e.evidence()).isEqualTo("XLSX / en / SHA-256 "+document.checksum());});
+        assertThat(service.document(actor,id,"en")).isEmpty();assertThat(service.batch(actor,id).state()).isEqualTo("FROZEN");
+        for(var foreign:List.of(actor(institution,"B2"),actor("OTHER-TENANT","B1"))) {
+            assertThatThrownBy(()->service.exportLines(foreign,id)).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(()->service.spreadsheetDownloaded(foreign,id,"en",bytes)).isInstanceOf(AccessDeniedException.class);
+        }
+        doThrow(new AccessDeniedException("Revoked")).when(context.getBean(GeneralLedgerService.class)).requireActor(actor,"PAYROLL_DEDUCTIONS_EXPORT");
+        try {assertThatThrownBy(()->service.spreadsheetDownloaded(actor,id,"en",bytes)).isInstanceOf(AccessDeniedException.class);}
+        finally {reset(context.getBean(GeneralLedgerService.class));}
+        assertThat(service.events(actor,id,0).rows()).hasSize(1);
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Long.class,loan)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Long.class,institution)).isZero();
+        assertThat(jdbc.queryForObject("select sum(principal_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("300.00");
+        assertThat(jdbc.queryForObject("select sum(interest_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("30.00");
     }
     @Test void concurrentFreezeHasOneWinnerAndAuditFailureRollsBackEverything()throws Exception {
         instruction(loan,"100.00");var f=batch();f.setPreviewHash(service.preview(actor,f).hash());
