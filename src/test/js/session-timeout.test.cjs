@@ -26,7 +26,7 @@ function setup() {
     w.eval(fs.readFileSync('src/main/resources/static/js/accounting-form-ux.js', 'utf8'));
     const shell = fs.readFileSync('src/main/resources/static/js/shell.js', 'utf8');
     const start = shell.indexOf('    const initSessionInactivityPrompt = function () {');
-    const end = shell.indexOf("    window.addEventListener('load',", start);
+    const end = shell.indexOf("    onReady(", start);
     w.eval(shell.slice(start, end) + '\ninitSessionInactivityPrompt();');
     const advance = value => {
         now = value;

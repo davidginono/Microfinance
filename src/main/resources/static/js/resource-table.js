@@ -1,6 +1,8 @@
 /* Shared JSP resource tables. Server-owned queries, paging and commands stay authoritative. */
 (() => {
     'use strict';
+    const onReady = window.WorkspaceNavigation?.onReady || (callback => window.addEventListener("load", callback, {once:true}));
+
     const labels = () => document.getElementById('resource-table-labels')?.dataset || {};
     const lifetimes = new Map();
     const localSorts = new Map();
@@ -685,5 +687,5 @@
             }
         });
     }};
-    window.addEventListener('load', () => window.ResourceTable.init());
+    onReady( () => window.ResourceTable.init());
 })();

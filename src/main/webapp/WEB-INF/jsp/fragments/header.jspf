@@ -59,8 +59,8 @@
                 <span class="app-brand-wordmark">
                     <span>microfinance</span>
                     <svg viewBox="0 0 128 9" fill="none" aria-hidden="true" focusable="false">
-                        <path d="M2 2.5C32 9 79 9 121 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-                        <path d="m116 1 7 .5-3 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M2 2.5C32 9 79 9 111 3.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+                        <path d="m115 4 3 3 8-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </span>
                 <span class="app-institution-brand">
@@ -68,7 +68,7 @@
                     <c:when test="${not empty activeSaccoLogoUrl}">
                         <span class="app-global-logo inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
                             <img src="${activeSaccoLogoUrl}"
-                                 alt="${not empty activesaccoName ? activesaccoName : 'Institution'} logo"
+                                 alt="${not empty activeSaccoName ? activeSaccoName : 'Institution'} logo"
                                  class="app-global-logo-image h-full w-full object-contain p-1" />
                         </span>
                     </c:when>
@@ -80,7 +80,7 @@
                 </c:choose>
                     <span class="app-institution-name">
                         <c:choose>
-                            <c:when test="${not empty activesaccoName}">${activesaccoName}</c:when>
+                            <c:when test="${not empty activeSaccoName}"><c:out value="${activeSaccoName}" /></c:when>
                             <c:otherwise><spring:message code="app.title" /></c:otherwise>
                         </c:choose>
                     </span>

@@ -3,19 +3,17 @@
 <%@ include file="support.jspf" %>
 <c:set var="base" value="/reports/financial/statements/${run.id}" />
 <div class="accounting-workspace">
- <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.preview" /></span></nav>
- <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.preview" /></h1><div class="accounting-actions" data-fs-preview-actions>
-  <c:if test="${not run.saved}"><form method="post" action="<c:url value='${base}/save' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="kind" value="${kind}" /><button class="app-btn btn-neutral"><spring:message code="fs.saveSnapshot" /></button></form></c:if>
+ <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.previewTitle" text="Reports Preview" /></span></nav>
+ <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1><div class="accounting-actions">
   <span class="fs-status"><c:if test="${run.saved}"><spring:message code="fs.saved" /> · </c:if><spring:message code="fs.provisional" /></span>
  </div></div>
  <div class="fs-workspace" data-tab-loading="<spring:message code='fs.tabLoading' />" data-tab-error="<spring:message code='fs.tabError' />">
  <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
- <p class="fs-tab-status fs-help" role="status" aria-live="polite" hidden></p>
  <div class="fs-toolbar">
   <details class="fs-view-settings"><summary><spring:message code="fs.viewSettings" /></summary><div class="fs-view-fields">
    <label class="fs-select-setting"><span><spring:message code="fs.font" /></span><select class="aws-control" data-fs-font><option value="reference"><spring:message code="fs.referenceFont" /></option><option value="sans">Arial</option><option value="serif">Times New Roman</option><option value="mono">Courier New</option></select></label>
    <label class="fs-select-setting"><span><spring:message code="fs.density" /></span><select class="aws-control" data-fs-density><option value="compact"><spring:message code="fs.compact" /></option><option value="comfortable"><spring:message code="fs.comfortable" /></option></select></label>
-   <c:if test="${kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES'}"><label><input type="checkbox" checked data-fs-comparison /><spring:message code="fs.showComparison" /></label></c:if>
+   <label data-fs-comparison-setting ${kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES'?'':'hidden'}><input type="checkbox" checked data-fs-comparison /><spring:message code="fs.showComparison" /></label>
   <p class="fs-help"><spring:message code="fs.previewSettingsHelp" /></p></div></details>
   <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" class="accounting-actions">
    <input type="hidden" name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><input type="hidden" name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><input type="hidden" name="line" value="<c:out value='${line}' />" /></c:if><c:if test="${not empty account}"><input type="hidden" name="account" value="${account}" /></c:if>
@@ -23,8 +21,9 @@
    <button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.pdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.excel" /></button><a class="app-btn btn-neutral" href="<c:out value='${printUrl}' />" data-print-action="true"><spring:message code="fs.print" /></a>
   </form></sec:authorize>
  </div>
+ <div data-fs-report-section>
  <c:if test="${filtered}"><p class="fs-help"><spring:message code="fs.filteredTrial" /></p></c:if>
- <section class="fs-paper-scroll" tabindex="0" aria-label="<spring:message code='fs.preview' />"><article class="fs-paper fs-${document.style}" data-fs-paper data-kind="${kind}">
+ <section class="fs-paper-scroll" tabindex="0" aria-label="<spring:message code='fs.previewTitle' text='Reports Preview' />"><article class="fs-paper fs-${document.style}" data-fs-paper data-kind="${kind}">
   <h2><c:out value="${document.title}" /></h2>
   <div class="fs-paper-meta"><strong><c:out value="${snapshot.institutionName}" /></strong><span><c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose></span><span><spring:message code="${document.asAt?'fs.asAt':'fs.period'}" /> <c:if test="${not document.asAt}">${appTime:display(run.from)} — </c:if>${appTime:display(run.through)} · TZS</span><span><spring:message code="fs.generated" /> <c:out value="${generatedLabel}" /></span><span><spring:message code="fs.previous" />: ${appTime:display(snapshot.parameters.previousFrom())} — ${appTime:display(snapshot.parameters.previousThrough())}</span></div>
   <c:if test="${kind=='CASH_FLOW'}"><p class="fs-method"><spring:message code="fs.directMethod" /></p></c:if>
@@ -34,7 +33,11 @@
  </article></section>
  <c:if test="${kind=='LEDGER'}"><div class="fs-pager"><c:if test="${page>0}"><a class="app-btn btn-neutral" href="<c:url value='${base}/ledger/${account}?page=${page-1}' />"><spring:message code="fs.previousPage" /></a></c:if><span>${page+1}</span><c:if test="${hasNext}"><a class="app-btn btn-neutral" href="<c:url value='${base}/ledger/${account}?page=${page+1}' />"><spring:message code="fs.nextPage" /></a></c:if></div></c:if>
  <c:if test="${fn:length(snapshot.checks)>1}"><details class="erp-panel fs-checks"><summary><spring:message code="fs.checks" /></summary><ul><c:forEach items="${snapshot.checks}" var="check"><c:if test="${check.key!='coverage'}"><li><spring:message code="fs.check.${check.key}" /><c:if test="${not empty check.difference}"> <spring:message code="fs.difference" />: TZS <c:out value="${check.difference}" /></c:if></li></c:if></c:forEach></ul></details></c:if>
+ </div>
+ <div class="fs-preview-footer">
  <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" class="accounting-actions fs-package"><input type="hidden" name="kind" value="ALL" /><button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.packagePdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.packageExcel" /></button></form></sec:authorize>
+ <c:if test="${not run.saved}"><form class="fs-save-report" data-fs-save method="post" action="<c:url value='${base}/save' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="kind" value="${kind}" /><button class="app-btn btn-launch"><spring:message code="common.savedraft" /></button></form></c:if>
+ </div>
 </div>
 </div>
 <%@ include file="../../fragments/footer.jspf" %>

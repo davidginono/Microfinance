@@ -16,9 +16,9 @@ document.querySelector('#command').onclick=()=>window.commands.push(label);
 `;
 const discard=`<div id="accounting-discard-modal" hidden><div role="dialog" tabindex="-1"><button data-accounting-keep>Keep editing</button><div class="app-modal-actions"><button data-accounting-keep>Keep</button><button data-accounting-discard>Discard</button></div></div></div>`;
 function html(title,guard=false){return `<!doctype html><html lang="en"><head><title>${title}</title><meta name="_csrf" content="${title}-csrf"><script src="/js/workspace-navigation.js" data-workspace-navigation></script><script src="/js/shell.js" defer></script><script src="/js/page.js" defer></script>${guard?'<script src="/js/accounting-form-ux.js" defer></script>':''}</head><body class="aws-console" data-navigation-loading="Loading workspace" data-navigation-error="Could not load" data-navigation-retry="Try again"><nav id="shellTopNav">Header</nav><aside id="appSidebar"><a href="/admin/dashboard">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/settings-controls?section=loan">Products</a></aside><main class="shell-main"><h1 class="erp-page-title">${title}</h1><form class="accounting-create-form"><input name="name" value="Original"><button type="submit">Save</button></form><button id="command">Command</button></main>${guard?discard:''}</body></html>`;}
-async function setup({guard=false,holdNavigation=false,pageScript=init}={}){
+async function setup({guard=false,holdNavigation=false,pageScript=init,assets={}}={}){
  const requests=[],failures=[],pages=new Map([['/admin/dashboard',html('Dashboard',guard)],['/admin/users',html('Users')],['/admin/settings-controls?section=loan',html('Products')]]);
- const resources={interceptors:[requestInterceptor(request=>{const name=new URL(request.url).pathname.split('/').pop();return new Response(name==='page.js'?pageScript:read(name),{headers:{'Content-Type':'application/javascript'}});})]};
+ const resources={interceptors:[requestInterceptor(request=>{const name=new URL(request.url).pathname.split('/').pop();if(assets[name])return assets[name](request);return new Response(name==='page.js'?pageScript:read(name),{headers:{'Content-Type':'application/javascript'}});})]};
  const console=new VirtualConsole();console.on('jsdomError',error=>failures.push(error));
  const dom=new JSDOM(html('Dashboard',guard),{url:'http://localhost/admin/dashboard',runScripts:'dangerously',resources,pretendToBeVisual:true,virtualConsole:console,beforeParse(w){
    for(const key of ['initialized','commands','ready','loaded','hidden','late'])w[key]=[];
@@ -29,6 +29,53 @@ async function setup({guard=false,holdNavigation=false,pageScript=init}={}){
  return {dom,w:dom.window,d:dom.window.document,requests,pages,failures};
 }
 const until=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('Navigation did not settle');};
+
+const statementUrl=kind=>'/reports/financial/statements/example?kind='+kind;
+function statementPage(kind){
+ return html('Reports Preview').replace('</head>','<script src="/js/financial-statements.js" defer></script><style>'+fs.readFileSync('src/main/resources/static/css/financial-statements.css','utf8')+'</style></head>')
+ .replace('</main>',`<div class="fs-workspace" data-tab-loading="Loading statement" data-tab-error="Could not load statement">
+ <nav class="fs-tabs">${['POSITION','INCOME','TRIAL'].map(k=>`<a data-fs-tab data-no-page-preloader="true" href="${statementUrl(k)}" ${kind===k?'aria-current="page"':''}>${k}</a>`).join('')}</nav>
+ <div class="fs-toolbar"><details class="fs-view-settings"><summary>Settings</summary><select data-fs-font><option value="reference">Reference</option><option value="sans">Arial</option><option value="serif">Times</option><option value="mono">Courier</option></select><select data-fs-density><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select><label data-fs-comparison-setting><input type="checkbox" data-fs-comparison checked>Comparison</label></details>
+ <form action="/reports/financial/statements/example/export"><input type="hidden" name="kind" value="${kind}"><a data-print-action href="/reports/financial/statements/example/print?kind=${kind}">Print</a><button name="format" value="PDF">PDF</button></form></div>
+ <div data-fs-report-section><article data-fs-paper data-kind="${kind}"><h2>${kind}</h2></article></div>
+ <div class="fs-preview-footer"><form data-fs-save class="fs-save-report" method="post" action="/reports/financial/statements/example/save"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="kind" value="${kind}"><button>Save Draft</button></form></div></div></main>`);
+}
+
+test('statement tabs load only the report section while preserving workspace, tabs, settings and save form',async()=>{
+ const {dom,w,d,pages,failures}=await setup();
+ try{
+  pages.set(statementUrl('POSITION'),statementPage('POSITION'));await w.WorkspaceNavigation.visit(statementUrl('POSITION'));
+  const main=d.querySelector('main'),workspace=d.querySelector('.fs-workspace'),tabs=d.querySelector('.fs-tabs'),settings=d.querySelector('.fs-view-settings'),font=d.querySelector('[data-fs-font]'),save=d.querySelector('[data-fs-save]'),exportForm=d.querySelector('.fs-toolbar form');
+  settings.open=true;font.value='serif';font.dispatchEvent(new w.Event('change'));
+  let release;const fetch=w.fetch;w.fetch=(url,options)=>new URL(url,w.location.href).searchParams.get('kind')==='INCOME'?new Promise(resolve=>{release=()=>resolve({ok:true,text:async()=>statementPage('INCOME')});}):fetch(url,options);
+  tabs.querySelector('a[href*="INCOME"]').click();await until(()=>release);
+  assert.equal(d.querySelector('main'),main);assert.equal(main.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+  assert.equal(d.querySelector('[data-fs-report-section]').getAttribute('aria-busy'),'true');assert.equal(w.getComputedStyle(d.querySelector('[data-fs-paper]')).visibility,'hidden');assert.ok(d.querySelector('.fs-tab-status .app-loading-spinner'));assert.equal(d.querySelector('.fs-tab-status').textContent,'');
+  release();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='INCOME');
+  for(const [selector,node] of [['.fs-workspace',workspace],['.fs-tabs',tabs],['.fs-view-settings',settings],['[data-fs-font]',font],['[data-fs-save]',save],['.fs-toolbar form',exportForm]])assert.equal(d.querySelector(selector),node);
+  assert.equal(settings.open,true);assert.equal(save.querySelector('[name=kind]').value,'INCOME');assert.equal(save.querySelector('[name=_csrf]').value,'token');assert.equal(exportForm.querySelector('[name=kind]').value,'INCOME');assert.match(exportForm.querySelector('a').href,/kind=INCOME/);
+  assert.equal(w.location.search,'?kind=INCOME');assert.equal(d.querySelector('.fs-tabs [aria-current]').textContent,'INCOME');assert.equal(d.querySelector('.fs-tab-status'),null);
+  font.value='sans';font.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[data-fs-paper]').dataset.font,'sans');
+  w.history.back();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='POSITION');assert.equal(d.querySelector('main'),main);assert.equal(font.value,'serif');
+  w.history.forward();await until(()=>release && d.querySelector('.fs-tab-status'));release();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='INCOME');assert.equal(font.value,'sans');assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
+test('failed or superseded statement requests retain the last report and support local retry',async()=>{
+ const {dom,w,d,pages}=await setup();
+ try{
+  pages.set(statementUrl('POSITION'),statementPage('POSITION'));await w.WorkspaceNavigation.visit(statementUrl('POSITION'));
+  const workspace=d.querySelector('.fs-workspace'),original=d.querySelector('[data-fs-paper]'),fetch=w.fetch;
+  const requests=[];w.fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
+  d.querySelector('[data-fs-tab][href*="INCOME"]').click();await until(()=>requests.length===1);
+  d.querySelector('[data-fs-tab][href*="TRIAL"]').click();await until(()=>requests.length===2);
+  assert.equal(requests[0].options.signal.aborted,true);requests[0].resolve({ok:true,text:async()=>statementPage('INCOME')});requests[1].resolve({ok:false});
+  await until(()=>d.querySelector('.fs-tab-status[role=alert]'));assert.equal(d.querySelector('.fs-workspace'),workspace);assert.equal(d.querySelector('[data-fs-paper]'),original);assert.equal(w.getComputedStyle(original).visibility,'visible');assert.equal(w.location.search,'?kind=POSITION');
+  d.querySelector('[data-fs-tab][href*="TRIAL"]').click();await until(()=>requests.length===3);requests[2].resolve({ok:true,text:async()=>statementPage('TRIAL')});
+  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='TRIAL');assert.equal(d.querySelector('[data-fs-comparison-setting]').hidden,true);assert.equal(d.querySelector('.fs-tab-status'),null);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+  w.fetch=fetch;
+ }finally{dom.window.close();}
+});
 
 test('dashboard navigation reveals only initialized widgets and charts on first and repeat visits',async()=>{
  const {dom,w,d,pages,failures}=await setup();
@@ -349,4 +396,55 @@ test('leaving during export cancels its request and clears feedback without an e
   w.dispatchEvent(new w.PageTransitionEvent('pagehide'));await exporting;
   assert.equal(signal.aborted,true);assert.equal(d.querySelector('[data-ui-action-loading]'),null);assert.equal(errors.length,0);assert.equal(d.body.hasAttribute('aria-busy'),false);
  }finally{dom.window.close();}
+});
+
+
+test('destination styles load without exposing its source layout, then components initialize behind a local spinner',async()=>{
+ let releaseStyle,releaseScript,scriptLoads=0;
+ const {dom,w,d,pages,failures}=await setup({assets:{
+  'late.css':()=>new Promise(resolve=>{releaseStyle=()=>resolve(new Response('.ready-only{color:rgb(0,115,187)}',{headers:{'Content-Type':'text/css'}}));}),
+  'page.js':()=>++scriptLoads===1?new Response(init,{headers:{'Content-Type':'application/javascript'}}):new Promise(resolve=>{releaseScript=()=>resolve(new Response(init+`document.querySelector('main').dataset.componentsReady='true';`,{headers:{'Content-Type':'application/javascript'}}));})
+ }});
+ try{
+  pages.set('/admin/users',html('Users').replace('</head>','<style>'+fs.readFileSync('src/main/resources/static/css/ui-loading.css','utf8')+'</style></head>').replace('</main>','<link rel="stylesheet" href="/css/late.css"></main>'));
+  const original=d.querySelector('input');original.value='Retained';const navigation=w.WorkspaceNavigation.visit('/admin/users');
+  await until(()=>releaseStyle);assert.equal(d.querySelector('h1').textContent,'Dashboard');assert.equal(d.querySelector('input'),original);assert.equal(d.head.querySelector('link[href="/css/late.css"]').media,'not all');
+  releaseStyle();await until(()=>releaseScript);
+  assert.equal(d.querySelector('h1').textContent,'Users');assert.equal(w.getComputedStyle(d.querySelector('h1')).visibility,'hidden');assert.ok(d.querySelector('[data-workspace-boot-status] .app-loading-spinner'));assert.equal(d.querySelector('main').hasAttribute('data-components-ready'),false);
+  releaseScript();await navigation;
+  assert.equal(d.querySelector('main').dataset.componentsReady,'true');assert.equal(w.getComputedStyle(d.querySelector('h1')).visibility,'visible');assert.equal(d.querySelector('[data-workspace-boot-status]'),null);assert.equal(d.head.querySelector('link[href="/css/late.css"]').hasAttribute('media'),false);assert.equal(d.body.querySelector('link[rel=stylesheet]'),null);assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
+test('a failed destination stylesheet retains the original workspace and edited native fields',async()=>{
+ const {dom,w,d,pages}=await setup({assets:{'broken.css':()=>new Response('',{status:404})}});
+ try{
+  pages.set('/admin/users',html('Users').replace('</head>','<link rel="stylesheet" href="/css/broken.css"></head>'));
+  const original=d.querySelector('input');original.value='Unchanged draft';await w.WorkspaceNavigation.visit('/admin/users');
+  assert.equal(w.location.pathname,'/admin/dashboard');assert.equal(d.querySelector('input'),original);assert.equal(original.value,'Unchanged draft');assert.equal(d.querySelector('h1').textContent,'Dashboard');assert.ok(d.querySelector('#workspace-navigation-feedback[role=alert]'));assert.equal(d.head.querySelector('link[href="/css/broken.css"]'),null);
+ }finally{dom.window.close();}
+});
+
+test('every workspace family keeps unfinished components hidden during an in-place transition',async()=>{
+ let release,loads=0;
+ const {dom,w,d,pages}=await setup({assets:{'page.js':()=>++loads===1?new Response(init,{headers:{'Content-Type':'application/javascript'}}):new Promise(resolve=>{release=()=>resolve(new Response(init,{headers:{'Content-Type':'application/javascript'}}));})}});
+ try{
+  for(const family of ['app','admin','manager','board','chairperson','credit-committee','loan-officer','accountant','disbursement','staff','repayments','finance','reports']){
+   const path='/'+family+'/render-check';release=null;
+   pages.set(path,html(family).replace('</head>','<style>'+fs.readFileSync('src/main/resources/static/css/ui-loading.css','utf8')+'</style></head>'));
+   const transition=w.WorkspaceNavigation.visit(path);await until(()=>release);
+   assert.equal(w.getComputedStyle(d.querySelector('h1')).visibility,'hidden',family+' source content');assert.ok(d.querySelector('[data-workspace-boot-status]'),family+' spinner');
+   release();await transition;assert.equal(w.getComputedStyle(d.querySelector('h1')).visibility,'visible',family+' ready content');assert.equal(d.querySelector('h1').textContent,family);
+  }
+ }finally{dom.window.close();}
+});
+
+test('first-load selects and tables initialize before an unrelated async script finishes loading',async()=>{
+ let releaseExtra,loaded=false;
+ const source=`<!doctype html><html><head><style>${fs.readFileSync('src/main/resources/static/css/ui-loading.css','utf8')}</style><script src="/js/workspace-navigation.js" data-workspace-navigation></script><script src="/js/select-enhancer.js" defer></script><script src="/js/resource-table.js" defer></script></head><body class="aws-console" data-navigation-loading="Loading workspace"><aside id="appSidebar"></aside><main class="shell-main"><script>WorkspaceNavigation.prepare(document.querySelector('main'));</script><h1>Registry</h1><select id="choice"><option>A</option><option>B</option></select><section data-resource-table="example" data-table-tools="none"><h2>Records</h2><table><thead><tr><th>Name</th></tr></thead><tbody><tr><td>Current record</td></tr></tbody></table></section></main><script async src="/slow-extra.js"></script></body></html>`;
+ const dom=new JSDOM(source,{url:'http://localhost/app/registry',runScripts:'dangerously',pretendToBeVisual:true,resources:{interceptors:[requestInterceptor(request=>new URL(request.url).pathname==='/slow-extra.js'?new Promise(resolve=>{releaseExtra=()=>resolve(new Response('/* Optional script */',{headers:{'Content-Type':'application/javascript'}}));}):new Response(read(new URL(request.url).pathname.split('/').pop()),{headers:{'Content-Type':'application/javascript'}}))]},beforeParse(w){w.fetch=()=>new Promise(()=>{});w.matchMedia=()=>({matches:false,addEventListener(){}});w.addEventListener('load',()=>loaded=true);}});
+ try{
+  const w=dom.window,d=w.document;await until(()=>d.querySelector('#choice')?.dataset.neoEnhanced==='true' && d.querySelector('.app-table-titlebar') && !d.querySelector('[data-workspace-initializing]'));
+  assert.equal(loaded,false);assert.equal(w.getComputedStyle(d.querySelector('h1')).visibility,'visible');assert.equal(d.querySelectorAll('.neo-select-button').length,1);assert.equal(d.querySelectorAll('.app-table-titlebar').length,1);
+ }finally{releaseExtra?.();dom.window.close();}
 });

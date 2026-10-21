@@ -314,7 +314,7 @@
 
 <%@ include file="../fragments/analytics-chart-utils.jspf" %>
 <script>
-window.addEventListener('load', function () {
+(window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true})))( function () {
     const productSeries = ${productPerformanceJson};
     const trendSeries = ${trendSeriesJson};
     const trendPeriodButtons = Array.from(document.querySelectorAll('[data-trend-interval]'));

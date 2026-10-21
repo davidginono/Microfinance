@@ -665,7 +665,7 @@
             <div class="shell-powered-by">
                 <span class="shell-powered-by-brand" aria-label="Computer Resources (T) Limited">
                     <img class="shell-powered-by-logo"
-                         src="/images/computer-resources-mark-orange.png"
+                         src="<c:url value='/images/computer-resources-mark-orange.svg' />"
                          alt=""
                          aria-hidden="true" />
                     <span class="shell-powered-by-copy">
@@ -681,4 +681,5 @@
     </div>
 </aside>
 <main id="main-content" class="app-main shell-main box-border" tabindex="-1">
+    <script>window.WorkspaceNavigation?.prepare(document.getElementById('main-content'));</script>
     <div class="shell-content-frame mx-auto min-w-0 space-y-4">

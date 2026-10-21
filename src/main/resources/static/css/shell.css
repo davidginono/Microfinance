@@ -1187,60 +1187,6 @@ button:active {
     box-shadow: none !important;
     backdrop-filter: none !important;
 }
-.shell-sidebar-scroll > a,
-.shell-sidebar-scroll > div > a {
-    gap: 0.68rem !important;
-    padding: 0.58rem 0.72rem !important;
-    font-size: 0.9rem !important;
-}
-.shell-sidebar-scroll > a > span:first-child,
-.shell-sidebar-scroll > div > a > span:first-child {
-    width: 1.55rem !important;
-    height: 1.55rem !important;
-}
-.shell-sidebar-scroll > a > span svg,
-.shell-sidebar-scroll > div > a > span svg {
-    width: 0.92rem !important;
-    height: 0.92rem !important;
-}
-.shell-sidebar-scroll > a,
-.shell-sidebar-scroll > button,
-.shell-sidebar-scroll > div > a,
-.shell-sidebar-scroll > div > button {
-    min-width: 0;
-    border-radius: 0.3rem;
-    border-color: rgba(214, 226, 238, 0.95) !important;
-    background: rgba(255, 255, 255, 0.96) !important;
-    color: #304764 !important;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
-}
-.shell-sidebar-scroll > a:hover,
-.shell-sidebar-scroll > a:focus-visible,
-.shell-sidebar-scroll > button:hover,
-.shell-sidebar-scroll > button:focus-visible,
-.shell-sidebar-scroll > div > a:hover,
-.shell-sidebar-scroll > div > a:focus-visible,
-.shell-sidebar-scroll > div > button:hover,
-.shell-sidebar-scroll > div > button:focus-visible {
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
-    transform: translateY(-1px);
-}
-.shell-sidebar-scroll > a:active,
-.shell-sidebar-scroll > button:active,
-.shell-sidebar-scroll > div > a:active,
-.shell-sidebar-scroll > div > button:active {
-    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
-    transform: translateY(0);
-}
-.shell-sidebar-scroll > a > span:first-child,
-.shell-sidebar-scroll > button > span:first-child,
-.shell-sidebar-scroll > div > a > span:first-child,
-.shell-sidebar-scroll > div > button > span:first-child {
-    border-radius: 0.25rem;
-    border-color: #d7e3ef !important;
-    background: #ffffff !important;
-    color: #516680 !important;
-}
 #memberArchivePanel > a,
 #adminSaccoPanel > a {
     border-radius: 0.25rem;
@@ -1250,19 +1196,6 @@ button:active {
 #adminSaccoPanel > a:hover,
 #adminSaccoPanel > a:focus-visible {
     background: rgba(255, 255, 255, 0.72);
-}
-@media (min-width: 1024px) {
-    .shell-sidebar-scroll > a,
-    .shell-sidebar-scroll > div > a {
-        gap: 0.72rem !important;
-        padding: 0.6rem 0.82rem !important;
-        font-size: 0.88rem !important;
-    }
-    .shell-sidebar-scroll > a > span:first-child,
-    .shell-sidebar-scroll > div > a > span:first-child {
-        width: 1.62rem !important;
-        height: 1.62rem !important;
-    }
 }
 .shell-main {
     width: 100%;
@@ -1544,26 +1477,6 @@ button:active {
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
     border-radius: 0.32rem !important;
 }
-
-.shell-sidebar-scroll a,
-.shell-sidebar-scroll button,
-.shell-sidebar-scroll > div > button {
-    background-color: transparent !important;
-    box-shadow: none !important;
-}
-.shell-sidebar-scroll > a,
-.shell-sidebar-scroll > button,
-.shell-sidebar-scroll > div > button {
-    display: flex;
-    width: 100%;
-    min-height: 3.25rem;
-    align-items: center;
-    gap: 0.68rem !important;
-    padding: 0.58rem 0.72rem !important;
-    border-radius: 0.3rem;
-    font-size: 0.9rem !important;
-    line-height: 1.25rem;
-}
 .shell-sidebar-scroll > :not([hidden]) ~ :not([hidden]) {
     margin-top: 0.25rem !important;
     margin-bottom: 0 !important;
@@ -1571,31 +1484,6 @@ button:active {
 .shell-sidebar-group > :not([hidden]) ~ :not([hidden]) {
     margin-top: 0.2rem !important;
     margin-bottom: 0 !important;
-}
-@media (hover: hover) {
-    .shell-sidebar-scroll a,
-    .shell-sidebar-scroll button,
-    .shell-sidebar-scroll > div > button {
-        transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-    }
-    .shell-sidebar-scroll a:hover,
-    .shell-sidebar-scroll button:hover,
-    .shell-sidebar-scroll > div > button:hover {
-        background-color: #ffffff !important;
-        color: #075985 !important;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
-        text-shadow: 0 0 10px rgba(8, 145, 178, 0.42);
-    }
-}
-.shell-sidebar-scroll .shell-review-panel-link {
-    background-color: transparent !important;
-    box-shadow: none !important;
-}
-.shell-sidebar-scroll .shell-review-panel-link.text-sacco-ink,
-.shell-sidebar-scroll .shell-review-panel-link:hover,
-.shell-sidebar-scroll .shell-review-panel-link:focus-visible {
-    background-color: #ffffff !important;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
 }
 
 /* AWS Management Console-inspired application theme. */
@@ -1959,91 +1847,6 @@ body.aws-console {
 .shell-sidebar-scroll > :not([hidden]) ~ :not([hidden]),
 .shell-sidebar-group > :not([hidden]) ~ :not([hidden]) {
     margin-top: 0 !important;
-}
-
-.shell-sidebar-scroll > a,
-.shell-sidebar-scroll > button,
-.shell-sidebar-scroll > div > a,
-.shell-sidebar-scroll > div > button,
-.shell-sidebar-scroll .shell-review-panel-link {
-    position: relative;
-    min-height: 38px !important;
-    width: 100%;
-    gap: 6px !important;
-    border: 0 !important;
-    border-left: 3px solid transparent !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: #e7edef !important;
-    padding: 8px 12px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    line-height: 20px;
-    transform: none !important;
-}
-
-.shell-sidebar-scroll > a:hover,
-.shell-sidebar-scroll > button:hover,
-.shell-sidebar-scroll > div > a:hover,
-.shell-sidebar-scroll > div > button:hover,
-.shell-sidebar-scroll .shell-review-panel-link:hover {
-    background: var(--aws-sidebar-hover) !important;
-    color: #ffffff !important;
-    text-shadow: none !important;
-}
-
-.shell-sidebar-scroll a[class*="bg-cyan-50"],
-.shell-sidebar-scroll button[class*="bg-cyan-50"],
-.shell-sidebar-scroll a[class*="bg-blue-50"],
-.shell-sidebar-scroll button[class*="bg-blue-50"],
-.shell-sidebar-scroll a[class*="bg-green-50"],
-.shell-sidebar-scroll button[class*="bg-green-50"],
-.shell-sidebar-scroll a[class*="bg-amber-50"],
-.shell-sidebar-scroll button[class*="bg-amber-50"],
-.shell-sidebar-scroll .shell-review-panel-link.shell-nav-active {
-    border-left-color: var(--aws-orange) !important;
-    background: var(--aws-sidebar-active) !important;
-    color: #ff9900 !important;
-    font-weight: 700 !important;
-}
-
-.shell-sidebar-scroll > a > span:first-child,
-.shell-sidebar-scroll > button > span:first-child,
-.shell-sidebar-scroll > div > a > span:first-child,
-.shell-sidebar-scroll > div > button > span:first-child {
-    width: 18px !important;
-    height: 18px !important;
-    min-width: 18px;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    color: #b6c3c8 !important;
-}
-
-.shell-sidebar-scroll > a > span svg,
-.shell-sidebar-scroll > div > a > span svg,
-.shell-sidebar-scroll button > span svg {
-    width: 14px !important;
-    height: 14px !important;
-}
-
-.shell-sidebar-group > div {
-    margin: 0 !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: #142a32 !important;
-    box-shadow: inset 3px 0 0 rgba(213, 219, 219, .18) !important;
-    padding: 2px 0 2px 22px !important;
-}
-
-.shell-sidebar-group > div > a {
-    min-height: 34px;
-    border-radius: 0 !important;
-    padding: 4px 8px !important;
-    color: #d5dfe2 !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
 }
 
 .shell-powered-by {
@@ -3489,24 +3292,6 @@ body.aws-console,
     min-height: 44px;
 }
 
-.shell-sidebar-scroll > a,
-.shell-sidebar-scroll > button,
-.shell-sidebar-scroll > div > a,
-.shell-sidebar-scroll > div > button,
-.shell-sidebar-scroll .shell-review-panel-link {
-    min-height: 38px !important;
-    padding: 8px 12px !important;
-    font-size: 14px !important;
-    line-height: 20px;
-}
-
-.shell-sidebar-group > div a {
-    min-height: 34px;
-    padding: 7px 10px !important;
-    font-size: 13px !important;
-    line-height: 18px;
-}
-
 .session-timeout-overlay {
     padding: 16px !important;
     background: rgba(22, 25, 31, .62) !important;
@@ -4619,95 +4404,6 @@ body.aws-console,
     letter-spacing: .02em !important;
 }
 
-.shell-sidebar-scroll > a,
-.shell-sidebar-scroll > button,
-.shell-sidebar-scroll > div > a,
-.shell-sidebar-scroll > div > button,
-.shell-sidebar-scroll .shell-review-panel-link {
-    width: calc(100% - 16px) !important;
-    min-height: 38px !important;
-    margin-right: 8px !important;
-    margin-left: 8px !important;
-    gap: 8px !important;
-    padding: 8px !important;
-    color: #d5dfe2 !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    line-height: 20px !important;
-}
-
-.shell-sidebar-scroll > a:hover,
-.shell-sidebar-scroll > button:hover,
-.shell-sidebar-scroll > div > a:hover,
-.shell-sidebar-scroll > div > button:hover,
-.shell-sidebar-scroll .shell-review-panel-link:hover {
-    background: var(--shell-sims-sidebar-hover) !important;
-    color: #ffffff !important;
-}
-
-.shell-sidebar-scroll a > span:first-child,
-.shell-sidebar-scroll button > span:first-child {
-    width: 18px !important;
-    height: 18px !important;
-    min-width: 18px !important;
-    border: 0 !important;
-    background: transparent !important;
-}
-
-.shell-sidebar-scroll a > span:first-child svg,
-.shell-sidebar-scroll button > span:first-child svg {
-    width: 16px !important;
-    height: 16px !important;
-}
-
-.shell-sidebar-scroll a[class*="bg-cyan-50"],
-.shell-sidebar-scroll button[class*="bg-cyan-50"],
-.shell-sidebar-scroll a[class*="bg-blue-50"],
-.shell-sidebar-scroll button[class*="bg-blue-50"],
-.shell-sidebar-scroll a[class*="bg-green-50"],
-.shell-sidebar-scroll button[class*="bg-green-50"],
-.shell-sidebar-scroll a[class*="bg-amber-50"],
-.shell-sidebar-scroll button[class*="bg-amber-50"],
-.shell-sidebar-scroll .shell-review-panel-link.shell-nav-active,
-.shell-sidebar-scroll .shell-nav-active {
-    border: 1px solid #50616d !important;
-    border-left: 3px solid var(--aws-orange) !important;
-    background: var(--shell-sims-sidebar-active) !important;
-    color: #ffffff !important;
-}
-
-.shell-sidebar-scroll a[class*="bg-cyan-50"] > span:first-child,
-.shell-sidebar-scroll button[class*="bg-cyan-50"] > span:first-child,
-.shell-sidebar-scroll a[class*="bg-blue-50"] > span:first-child,
-.shell-sidebar-scroll button[class*="bg-blue-50"] > span:first-child,
-.shell-sidebar-scroll a[class*="bg-green-50"] > span:first-child,
-.shell-sidebar-scroll button[class*="bg-green-50"] > span:first-child,
-.shell-sidebar-scroll a[class*="bg-amber-50"] > span:first-child,
-.shell-sidebar-scroll button[class*="bg-amber-50"] > span:first-child,
-.shell-sidebar-scroll .shell-review-panel-link.shell-nav-active > span:first-child {
-    color: var(--aws-orange) !important;
-}
-
-.shell-sidebar-scroll .shell-nav-active > span:first-child {
-    color: var(--aws-orange) !important;
-}
-
-.shell-sidebar-group > div {
-    margin: 0 8px !important;
-    background: #17242a !important;
-    box-shadow: inset 3px 0 0 #52606b !important;
-    padding: 4px 6px 4px 10px !important;
-}
-
-.shell-sidebar-group > div > a {
-    width: 100% !important;
-    margin: 0 !important;
-    min-height: 34px !important;
-    padding: 6px 8px !important;
-    font-size: 13px !important;
-    line-height: 18px !important;
-}
-
 .shell-powered-by {
     border-top: 1px solid var(--shell-sims-sidebar-border) !important;
     background: var(--shell-sims-sidebar) !important;
@@ -5220,107 +4916,6 @@ body.aws-console,
     .shell-sidebar-collapsed :is(.shell-sidebar-toggle-label,.shell-sidebar-scroll,.aws-sidebar-footer) { display:none!important; }
 }
 
-/* Sidebar submenu hierarchy: calm teal surface, clear hover, and warm active state. */
-.shell-sidebar-group > div {
-    box-sizing: border-box;
-    max-width: calc(100% - 16px);
-    margin: 0 8px !important;
-    border: 0 !important;
-    border-radius: 2px !important;
-    background: #182229 !important;
-    box-shadow: none !important;
-    padding: 4px 4px 4px 12px !important;
-    overflow: visible !important;
-}
-
-.shell-sidebar-group > div > a,
-.shell-sidebar-group > div button.shell-sidebar-subitem {
-    position: relative;
-    display: flex !important;
-    align-items: center;
-    justify-content: flex-start;
-    box-sizing: border-box;
-    width: auto !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    min-height: 34px !important;
-    margin: 0 !important;
-    border: 0 !important;
-    border-left: 3px solid transparent !important;
-    border-radius: 2px !important;
-    padding: 6px 8px !important;
-    overflow: visible !important;
-    color: #c4ced4 !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    line-height: 18px !important;
-    text-decoration: none !important;
-    white-space: normal !important;
-    overflow-wrap: anywhere;
-    text-overflow: clip !important;
-    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
-}
-
-.shell-sidebar-group > div > a > .shell-sidebar-subitem-label,
-.shell-sidebar-scroll a.shell-sidebar-subitem > span:first-child,
-.shell-sidebar-scroll a.shell-sidebar-subitem > .shell-sidebar-subitem-label,
-.shell-sidebar-scroll button.shell-sidebar-subitem > .shell-sidebar-subitem-label {
-    display: inline-block;
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    height: auto !important;
-    flex: 1 1 auto !important;
-    margin: 0 !important;
-    border: 0 !important;
-    background: transparent !important;
-    overflow: visible !important;
-    color: inherit !important;
-    font-size: inherit !important;
-    font-weight: inherit !important;
-    line-height: inherit !important;
-    white-space: normal !important;
-    overflow-wrap: anywhere;
-    text-overflow: clip !important;
-}
-
-.shell-sidebar-group > div > a:hover,
-.shell-sidebar-group > div button.shell-sidebar-subitem:hover {
-    border-color: transparent !important;
-    border-left-color: #ec7211 !important;
-    background: #232e36 !important;
-    color: #ffffff !important;
-}
-
-.shell-sidebar-group > div > a:focus-visible,
-.shell-sidebar-group > div button.shell-sidebar-subitem:focus-visible {
-    border-left-color: #ec7211 !important;
-    background: #232e36 !important;
-    color: #ffffff !important;
-    outline: 2px solid #0972d3 !important;
-    outline-offset: -2px !important;
-}
-
-.shell-sidebar-group > div > a.shell-nav-active,
-.shell-sidebar-group > div button.shell-sidebar-subitem.shell-nav-active {
-    border: 0 !important;
-    border-left: 3px solid #ec7211 !important;
-    background: #25313a !important;
-    color: #ffffff !important;
-    font-weight: 700 !important;
-    box-shadow: none !important;
-}
-
-.shell-sidebar-group > div > a.shell-nav-active:hover,
-.shell-sidebar-group > div > a.shell-nav-active:focus-visible,
-.shell-sidebar-group > div button.shell-sidebar-subitem.shell-nav-active:hover,
-.shell-sidebar-group > div button.shell-sidebar-subitem.shell-nav-active:focus-visible {
-    border-color: transparent !important;
-    border-left-color: #ec7211 !important;
-    background: #34434d !important;
-    color: #ffffff !important;
-}
-
 .shell-support-contact {
     overflow: hidden;
     margin: 8px 0 0 !important;
@@ -5365,8 +4960,7 @@ body.aws-console,
     margin-top: 7px;
 }
 
-.shell-support-contact__link,
-.shell-sidebar-group > div .shell-support-contact__link {
+.shell-support-contact__link {
     display: grid !important;
     grid-template-columns: minmax(38px, max-content) minmax(0, 1fr);
     column-gap: 6px;
@@ -5386,9 +4980,7 @@ body.aws-console,
 }
 
 .shell-support-contact__link:hover,
-.shell-support-contact__link:focus-visible,
-.shell-sidebar-group > div .shell-support-contact__link:hover,
-.shell-sidebar-group > div .shell-support-contact__link:focus-visible {
+.shell-support-contact__link:focus-visible {
     border: 0 !important;
     background: transparent !important;
     color: #ffffff !important;
@@ -5889,8 +5481,6 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
 .aws-console .app-station-copy p,
 .aws-console .app-station-mobile,
 .aws-console .shell-sidebar-toggle-label,
-.aws-console .shell-sidebar-scroll a,
-.aws-console .shell-sidebar-scroll button,
 .aws-console .shell-sidebar-flyout-link,
 .aws-console .erp-page-title,
 .aws-console .erp-page-heading,
@@ -5915,8 +5505,6 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
 .aws-console .app-station-copy p,
 .aws-console .app-station-mobile,
 .aws-console .shell-sidebar-toggle-label,
-.aws-console .shell-sidebar-scroll a,
-.aws-console .shell-sidebar-scroll button,
 .aws-console .shell-sidebar-flyout-link {
     white-space: normal;
 }
@@ -6396,7 +5984,7 @@ html:has(body.aws-console) {scrollbar-gutter:stable;}
 .shell-main.is-workspace-pending {position:relative;}
 .shell-main.is-workspace-pending > :not(#workspace-navigation-feedback) {display:none!important;}
 .workspace-navigation-feedback.workspace-navigation-pending {display:block;background:transparent;padding:0;min-width:0;}
-.workspace-navigation-feedback.workspace-navigation-spinner {display:flex;align-items:center;justify-content:center;min-height:55vh;padding:24px;box-sizing:border-box;}
+.workspace-navigation-feedback.workspace-navigation-spinner {display:flex;align-items:flex-start;justify-content:flex-start;min-height:55vh;padding:24px 12px;box-sizing:border-box;}
 .workspace-layout-preview {position:relative;width:100%;overflow:hidden;pointer-events:none;}
 .workspace-layout-card {position:absolute;box-sizing:border-box;background:#fff;border:1px solid #d5dbdb;box-shadow:0 1px 1px #879596;overflow:hidden;}
 .workspace-layout-heading {position:absolute;background:#e1e5e8;border-radius:2px;max-height:24px;}

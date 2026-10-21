@@ -3,6 +3,8 @@
  * See vendor/cloudscape-icons.LICENSE and vendor/cloudscape-icons.NOTICE. */
 (() => {
     'use strict';
+    const onReady = window.WorkspaceNavigation?.onReady || (callback => window.addEventListener("load", callback, {once:true}));
+
     const artwork = {
     "status-positive": "<circle cx=\"8\" cy=\"8\" r=\"7\" />\n<path d=\"M4.5 7.5L7 10L11 5\" class=\"stroke-linejoin-round\"/>",
     "status-negative": "<circle cx=\"8\" cy=\"8\" r=\"7\"/>\n<path d=\"M5.5 5.5L10.5 10.5\" />\n<path d=\"M10.5 5.5L5.5 10.5\" />",
@@ -128,7 +130,7 @@
         scope.querySelectorAll('[data-resource-status]').forEach(status);values(scope);links(scope);breadcrumbs();
     }
     window.ConsoleResourceDetails={init,icon,status};
-    window.addEventListener('load',()=>{window.ResourceTable?.init();details();init();
+    onReady(()=>{window.ResourceTable?.init();details();init();
         let queued=false;new MutationObserver(records=>{if(queued || !records.some(record=>record.addedNodes.length))return;queued=true;queueMicrotask(()=>{queued=false;init();});}).observe(document.querySelector('main') || document.body,{childList:true,subtree:true});
     });
 })();

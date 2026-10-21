@@ -205,7 +205,7 @@
 
 <%@ include file="../fragments/analytics-chart-utils.jspf" %>
 <script>
-window.addEventListener('load', function () {
+(window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true})))( function () {
     const series = ${trendSeriesJson};
     renderMetricSparklines(series);
     renderLineChart('loanAnalyticsChart', series);

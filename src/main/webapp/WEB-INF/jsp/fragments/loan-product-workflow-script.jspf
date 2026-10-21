@@ -1254,7 +1254,7 @@
 
         const createdLoanProductTarget = document.querySelector('[data-created-loan-product-target="true"]');
         if (createdLoanProductTarget) {
-            window.addEventListener('load', () => {
+            (window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true})))( () => {
                 closeAllProductModals();
                 window.SaccosUiState?.clearOpenModal();
                 const revealCreatedProduct = () => {

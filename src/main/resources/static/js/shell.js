@@ -1,4 +1,5 @@
 (function () {
+    const onReady = window.WorkspaceNavigation?.onReady || (callback => window.addEventListener("load", callback, {once:true}));
     const shellTopNav = document.getElementById('shellTopNav');
     const toastContainer = document.getElementById('appToastContainer');
     const pageTitleRail = document.getElementById('shellPageTitleRail');
@@ -2266,7 +2267,7 @@
         startSessionCycle();
     };
 
-    window.addEventListener('load', function () {
+    onReady( function () {
         syncShellNavHeight();
         initConsoleNavigationSearch();
         initUppercaseInputs();
@@ -2439,7 +2440,7 @@
         }
     });
 
-    window.addEventListener('load', function () {
+    onReady( function () {
         const adminScopeOptionsNode = document.getElementById('adminScopeOptionsData');
         const adminScopeSaccoSelect = document.getElementById('adminScopesaccoSelect');
         const adminScopeStationSelect = document.getElementById('adminScopestationSelect');

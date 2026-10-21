@@ -9,4 +9,14 @@
 .fs-view-fields>label:not(.fs-select-setting){flex:0 0 auto;max-width:100%}
 .fs-view-fields>.fs-help{flex:1 0 100%;margin:0}
 .fs-tab-status[hidden]{display:none}
+[data-fs-report-section]{position:relative;min-width:0}
+[data-fs-report-section][aria-busy=true]{min-height:180px}
+[data-fs-report-section][aria-busy=true]>:not(.fs-tab-status){visibility:hidden}
+.fs-tab-status{position:absolute;top:24px;left:12px;margin:0}
+.fs-tab-status[role=alert]{position:static}
+.fs-workspace [data-fs-comparison-setting][hidden]{display:none}
+.fs-preview-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin:16px 0}
+.fs-preview-footer .fs-package{margin:0}
+.fs-save-report{margin-left:auto}
+@media print{.fs-preview-footer,.fs-tab-status{display:none!important}}
 @media(max-width:767px){.fs-view-fields{flex-direction:row}.fs-workspace .fs-view-fields .fs-select-setting{flex:1 1 100%}}

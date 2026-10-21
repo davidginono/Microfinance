@@ -451,7 +451,8 @@
             });
         };
 
-        window.addEventListener('load', function () {
+        const onReady = window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true}));
+        onReady( function () {
             bindGlobalHandlers();
             initEnhancedSelects(document);
             observeNewSelects();

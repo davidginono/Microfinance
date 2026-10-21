@@ -331,7 +331,7 @@ class AdminConfigurationUiContractTest {
             .contains("Language &amp; Preferences")
             .contains("access=\"@access.has(principal, 'PLATFORM_SETTINGS_VIEW')\"")
             .contains("/admin/platform-settings")
-            .contains("/images/computer-resources-mark-orange.png")
+            .contains("/images/computer-resources-mark-orange.svg")
             .contains("Computer Resources")
             .contains("(T) Limited")
             .contains("shell-powered-by-copy")
@@ -344,15 +344,12 @@ class AdminConfigurationUiContractTest {
             .contains("platformSupportContact.officeHours ne '-'")
             .contains("platformSupportContact.supportNote ne '-'");
         assertThat(shellCss)
-            .contains(".shell-review-panel-link.shell-nav-active")
-            .contains(".shell-sidebar-group > div > a.shell-nav-active")
-            .contains(".shell-sidebar-group > div > a:hover")
-            .contains(".shell-sidebar-subitem-label")
-            .contains("border-left-color: #ec7211 !important")
-            .contains("color: #c4ced4 !important")
-            .contains("max-width: calc(100% - 16px)")
+            .contains(".aws-console .shell-sidebar-scroll :is(.shell-nav-active, [aria-current=\"page\"])")
+            .contains(".aws-console .shell-sidebar-scroll :is(a, button):hover")
+            .contains("color: #0073bb !important")
+            .contains("background: #232f3e !important")
+            .doesNotContain(".shell-sidebar-scroll .shell-nav-active {")
             .contains("overflow-wrap: anywhere")
-            .contains(".shell-support-contact__link,")
             .contains(".shell-support-contact__link")
             .contains("grid-template-columns: minmax(38px, max-content) minmax(0, 1fr)")
             .containsPattern("(?s)\\.shell-support-contact__label\\s*\\{[^}]*white-space:\\s*nowrap;")
@@ -365,7 +362,7 @@ class AdminConfigurationUiContractTest {
             .contains(".shell-powered-by-copy")
             .doesNotContain(".shell-sidebar-group > div a[class*=\"bg-white\"]")
             .doesNotContain(".shell-sidebar-scroll .shell-review-panel-link[class*=\"bg-white\"]")
-            .contains("background: #111d2c !important");
+            .contains(".aws-console .aws-sidebar-footer .shell-powered-by { background: #ffffff !important; }");
     }
 
     @Test

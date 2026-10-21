@@ -26,6 +26,26 @@
     }
     const createScope=()=>({alive:true,controller:new AbortController(),timers:new Map(),observers:new Set(),ready:[],load:[]});
     scope=createScope();
+    document.documentElement.dataset.workspaceBooting='true';
+    let documentReady=document.readyState==='complete';
+    function onReady(callback){
+        if(booting)scope.ready.push(callback);
+        else if(!documentReady)document.addEventListener('DOMContentLoaded',callback,{once:true});
+        else callback();
+    }
+    function prepare(main){
+        if(!main || main.hasAttribute('data-workspace-initializing'))return;
+        main.dataset.workspaceInitializing='true';main.inert=true;main.setAttribute('aria-busy','true');
+        const status=document.createElement('div');status.dataset.workspaceBootStatus='true';status.className='workspace-initializing-status';
+        status.setAttribute('role','status');status.setAttribute('aria-label',document.body.dataset.navigationLoading || '');
+        const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='large';spinner.setAttribute('aria-hidden','true');status.append(spinner);main.prepend(status);
+    }
+    function reveal(){
+        document.documentElement.removeAttribute('data-workspace-booting');
+        const main=document.querySelector('[data-workspace-initializing]');
+        if(main){main.querySelector('[data-workspace-boot-status]')?.remove();main.inert=false;main.removeAttribute('aria-busy');delete main.dataset.workspaceInitializing;}
+    }
+    native.add.call(document,'DOMContentLoaded',()=>{documentReady=true;timers.requestAnimationFrame(()=>{if(!committing)reveal();});},{once:true});
     EventTarget.prototype.addEventListener=function(type,callback,options){
         if (!callback) return;
         const owner=scope, settings=typeof options==='boolean'?{capture:options}:{...options};
@@ -164,16 +184,47 @@
     native.add.call(document,'session:logout',()=>layouts.clear());
     const allowed=(url,resume)=>document.dispatchEvent(new CustomEvent('workspace:before-navigate',{cancelable:true,detail:{url,resume}}));
     function undoPop(previous,target){reversing=true;history.go(previous.index-target.index);}
-    function replaceHead(page){
+    async function prepareStyles(page,signal){
+        // Body-owned page styles must be ready before their new components become visible.
+        for(const style of page.body.querySelectorAll('link[rel="stylesheet"],style'))page.head.append(style);
+        const current=new Map([...document.head.querySelectorAll('link[rel="stylesheet"]')].map(link=>[link.href,link]));
+        const staged=new Map(),pending=new Set();
+        try{
+            await Promise.all([...page.head.querySelectorAll('link[rel="stylesheet"]')].map(source=>{
+                const href=new URL(source.getAttribute('href'),location.href).href;
+                if(current.has(href) || staged.has(href))return;
+                const link=document.importNode(source,true);link.media='not all';staged.set(href,link);
+                return new Promise((resolve,reject)=>{
+                    let settled=false;
+                    const finish=error=>{if(settled)return;settled=true;clearTimeout(timeout);pending.delete(abort);signal.removeEventListener('abort',abort);error?reject(error):resolve();};
+                    const abort=()=>finish(new DOMException('Workspace changed','AbortError'));
+                    const timeout=timers.setTimeout(()=>finish(new Error('Workspace stylesheet')),20000);
+                    native.add.call(link,'load',()=>finish(),{once:true});native.add.call(link,'error',()=>finish(new Error('Workspace stylesheet')),{once:true});
+                    pending.add(abort);signal.addEventListener('abort',abort,{once:true});document.head.append(link);
+                    if(signal.aborted)abort();
+                });
+            }));
+            return staged;
+        }catch(error){pending.forEach(abort=>abort());staged.forEach(link=>link.remove());throw error;}
+    }
+    function replaceHead(page,staged){
         const styles=new Map([...document.head.querySelectorAll('link[rel="stylesheet"]')].map(link=>[link.href,link]));
         const keep=new Set(ownScript?[ownScript]:[]), additions=[];
         for(const child of [...page.head.childNodes]){
             const existing=child.nodeType===1 && child.matches('link[rel="stylesheet"]') && styles.get(new URL(child.getAttribute('href'),location.href).href);
-            if(existing)keep.add(existing);else additions.push(document.importNode(child,true));
+            if(existing){
+                keep.add(existing);additions.push(existing);
+                if(staged.has(existing.href)){if(child.hasAttribute('media'))existing.media=child.media;else existing.removeAttribute('media');}
+            }else additions.push(document.importNode(child,true));
         }
         // Shared styles stay connected, so the header and sidebar never lose their layout.
         for(const child of [...document.head.childNodes])if(!keep.has(child))child.remove();
-        document.head.append(...additions);
+        // Do not detach/reappend unchanged styles: that can reload them and flash the shell.
+        let anchor=null;
+        for(const child of additions.reverse()){
+            if(child.parentNode!==document.head || (anchor && child.compareDocumentPosition(anchor)&Node.DOCUMENT_POSITION_PRECEDING))document.head.insertBefore(child,anchor);
+            anchor=child;
+        }
     }
     function replaceBody(page){
         const fragment=document.createDocumentFragment();
@@ -213,7 +264,7 @@
             if(options.pop)undoPop(options.previous,options.pop);return false;
         }
         request?.abort();const controller=new AbortController();request=controller;const version=++generation;
-        let didCommit=false;
+        let didCommit=false,initialized=false,staged;
         const timeout=timers.setTimeout(()=>controller.abort(),20000);feedback(false,url.href);
         try{
             const response=await native.fetch(url.href,{...options.submission?.request,credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:controller.signal});
@@ -225,6 +276,8 @@
             const page=new DOMParser().parseFromString(await response.text(),'text/html');
             if(version!==generation)return true;
             if(!page.body.matches('.aws-console') || !page.querySelector('.shell-main') || !page.querySelector('#appSidebar'))throw new Error('Workspace shell');
+            staged=await prepareStyles(page,controller.signal);
+            if(version!==generation)return true;
             if(!allowed(url.href,()=>options.pop?history.go(options.pop.index-options.previous.index):visit(url.href,options))){if(options.pop)undoPop(options.previous,options.pop);return false;}
             clearFeedback();committing=true;didCommit=true;
             collapsed=window.matchMedia('(min-width: 1024px)').matches?document.documentElement.classList.contains('shell-sidebar-collapsed'):(collapsed ?? true);
@@ -237,9 +290,9 @@
                 [...fresh.attributes].forEach(attribute=>element.setAttribute(attribute.name,attribute.value));
             }
             document.documentElement.classList.toggle('shell-sidebar-collapsed',collapsed && window.matchMedia('(min-width: 1024px)').matches);
-            replaceHead(page);
+            replaceHead(page,staged);
             replaceBody(page);
-            const main=document.querySelector('.shell-main');main.inert=true;main.dataset.workspaceInitializing='true';
+            prepare(document.querySelector('.shell-main'));
             viewKey=options.pop?.key || ++serial;
             if(options.pop || options.replace){entry={url:finalUrl.href,index:options.pop?.index ?? entry.index};native.replace(state(history.state),'',finalUrl.href);}
             else{entry={url:finalUrl.href,index:entry.index+1};native.push(state({},viewKey,entry.index),'',finalUrl.href);}
@@ -248,6 +301,9 @@
             for(const script of deferred)await execute(script,version);
             for(const callback of scope.ready.splice(0))callback();
             for(const callback of scope.load.splice(0))callback();
+            await new Promise(resolve=>timers.requestAnimationFrame(resolve));
+            reveal();
+            initialized=true;
             booting=false;window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
             const title=document.querySelector('.erp-page-title,h1');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
             if(!options.pop){const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));if(anchor)anchor.scrollIntoView();else window.scrollTo({top:0,left:0,behavior:'instant'});}
@@ -256,13 +312,18 @@
             if(version===generation){if(options.pop && !didCommit)undoPop(options.previous,options.pop);feedback(true,url.href,options);}
         }finally{
             clearTimeout(timeout);
-            if(didCommit){booting=false;committing=false;const main=document.querySelector('[data-workspace-initializing]');if(main){main.inert=false;delete main.dataset.workspaceInitializing;}}
+            if(!didCommit)staged?.forEach(link=>link.remove());
+            if(didCommit){
+                booting=false;committing=false;
+                if(initialized)reveal();
+                else{const main=document.querySelector('[data-workspace-initializing]');if(main){main.inert=false;main.removeAttribute('aria-busy');main.querySelector('[data-workspace-boot-status]')?.remove();}}
+            }
             if(version===generation && document.getElementById('workspace-navigation-feedback')?.getAttribute('role')==='status')clearFeedback();
             if(didCommit && queued){const next=queued;queued=null;void visit(...next);}
         }
         return true;
     }
-    window.WorkspaceNavigation={visit,navigate,handles,handlesForm,rememberSidebar(value){collapsed=value;},get sidebarCollapsed(){return collapsed;},get restoring(){return committing;}};
+    window.WorkspaceNavigation={visit,navigate,handles,handlesForm,onReady,prepare,rememberSidebar(value){collapsed=value;},get sidebarCollapsed(){return collapsed;},get restoring(){return committing;}};
     native.add.call(window,'click',event=>{
         if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
         const link=event.target.closest?.('a[href]');if(!handles(link))return;
