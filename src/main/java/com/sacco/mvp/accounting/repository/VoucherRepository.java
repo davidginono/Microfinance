@@ -44,13 +44,27 @@ public class VoucherRepository {
         return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING' and id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by id"+(lock?" for share":""),this::account,args.toArray());
     }
     public List<Mapping> mappings(String institution,String search,int offset){return mappingQuery(institution,null,search,offset,false);}
+    public List<Activity> activities(String institution,String search,int offset){
+        return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and active and strpos(lower(code||' '||name||' '||coalesce(name_sw,'')),?)>0 order by code,id limit 26 offset ?",
+            (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw")),institution,search.toLowerCase(Locale.ROOT),offset);
+    }
+    public Optional<Activity> activity(String institution,UUID id){
+        return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and id=? and active",
+            (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw")),institution,id).stream().findFirst();
+    }
+    public List<Mapping> mappings(String institution,UUID activity,String search,int offset){return mappingQuery(institution,null,activity,search,offset,false);}
+    public List<Mapping> lockMappings(String institution,List<UUID> ids,UUID activity){return mappingQuery(institution,ids,activity,"",0,true);}
     public List<Mapping> selectedMappings(String institution,List<UUID> ids){return ids.isEmpty()?List.of():mappingQuery(institution,ids,"",0,false);}
     public List<Mapping> lockMappings(String institution,List<UUID> ids){return mappingQuery(institution,ids,"",0,true);}
     private List<Mapping> mappingQuery(String institution,List<UUID> ids,String search,int offset,boolean lock){
+        return mappingQuery(institution,ids,null,search,offset,lock);
+    }
+    private List<Mapping> mappingQuery(String institution,List<UUID> ids,UUID activity,String search,int offset,boolean lock){
         var args=new ArrayList<Object>();args.add(institution);
         String filter;
         if(ids==null){filter=" and strpos(lower(concat_ws(' ',t.code,t.name,d.component,da.code,da.name,ca.code,ca.name)),?)>0";args.add(search.toLowerCase(Locale.ROOT));}
         else {filter=" and t.id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+")";args.addAll(ids);}
+        if(activity!=null){filter+=" and a.id=?";args.add(activity);}
         if(!lock && ids==null)args.add(offset);
         return jdbc.query("""
             select t.id,t.code||' - '||t.name transaction_name,p.request_key,d.component,

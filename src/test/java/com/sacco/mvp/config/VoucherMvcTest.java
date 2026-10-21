@@ -43,6 +43,19 @@ class VoucherMvcTest {
    .andExpect(redirectedUrl("/finance/vouchers/receipts/"+id));
   verify(service).post(eq(actor),eq(Type.RECEIPT),argThat(f->f.getRows().size()==2 && f.getRows().get(1).getAmount().compareTo(new BigDecimal("2.02"))==0));
  }
+ @Test void configuredTypesAndTransactionLookupsUseTheAuthorizedVoucherContext()throws Exception{
+  UUID activity=UUID.randomUUID();
+  mvc.perform(get("/finance/vouchers/receipts/activities").with(user(actor)).param("search","Income").param("page","2")).andExpect(status().isOk());
+  verify(service).activities(actor,Type.RECEIPT,"Income",2);
+  for(String kind:List.of("receipts","payments","journals")){
+   Type type=VoucherController.type(kind);
+   mvc.perform(get("/finance/vouchers/"+kind+"/transactions").with(user(actor)).param("activityId",activity.toString())).andExpect(status().isOk());
+   verify(service).mappings(actor,type,activity,"",0);
+   when(service.post(eq(actor),eq(type),any())).thenReturn(voucher());
+   mvc.perform(post("/finance/vouchers/"+kind).with(user(actor)).with(csrf()).param("activityId",activity.toString()).param("action","post")).andExpect(status().is3xxRedirection());
+   verify(service).post(eq(actor),eq(type),argThat(f->activity.equals(f.getActivityId())));
+  }
+ }
  @Test void clientLookupAndVoucherBindingUseTheAuthenticatedWorkspace()throws Exception{
   UUID client=UUID.randomUUID();when(service.clients(actor,Type.PAYMENT,"CL-",1)).thenReturn(List.of(new Client(client,"CL-012","Synthetic client")));
   mvc.perform(get("/finance/vouchers/payments/clients").with(user(actor)).param("search","CL-").param("page","1").param("stationId","FOREIGN"))

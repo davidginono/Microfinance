@@ -89,6 +89,7 @@ public class VoucherWorkflowService {
         var prior=repository.item(id,item).orElseThrow(()->new Invalid("unavailable"));
         require(prior.version()==itemVersion,"stale");
         var form=gate.canonical(source,item);
+        form.setActivityId(prior.form().getActivityId());
         repository.save(w,a,item,prior.line(),form,false);repository.invalidate(id);changed(w,w.itemCount());event(a,w,"CORRECTED","");return item;
     }
     private void changed(Workflow w,int count) {

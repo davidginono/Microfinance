@@ -57,6 +57,12 @@ public class VoucherService {
     @Transactional(readOnly=true)
     public List<Mapping> mappings(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.mappings(actor.getSaccoId(),search,page*25);}
     @Transactional(readOnly=true)
+    public List<Mapping> mappings(AppUserPrincipal actor,Type type,UUID activity,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.mappings(actor.getSaccoId(),activity,search,page*25);}
+    @Transactional(readOnly=true)
+    public List<Activity> activities(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.activities(actor.getSaccoId(),search,page*25);}
+    @Transactional(readOnly=true)
+    public Optional<Activity> selectedActivity(AppUserPrincipal actor,Type type,UUID id){authorize(actor,type,"CREATE");return id==null?Optional.empty():vouchers.activity(actor.getSaccoId(),id);}
+    @Transactional(readOnly=true)
     public Map<UUID,Account> selectedAccounts(AppUserPrincipal actor,Type type,Form form){
         authorize(actor,type,"CREATE");var ids=new TreeSet<UUID>();
         if(form.getMoneyAccountId()!=null)ids.add(form.getMoneyAccountId());
@@ -136,7 +142,7 @@ public class VoucherService {
     private Preview plan(AppUserPrincipal actor,Type type,Form f){
         client(actor,f);
         var transactionIds=f.getRows().stream().map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().sorted().toList();
-        var mappings=transactionIds.isEmpty()?List.<Mapping>of():vouchers.lockMappings(actor.getSaccoId(),transactionIds);
+        var mappings=transactionIds.isEmpty()?List.<Mapping>of():f.getActivityId()==null?vouchers.lockMappings(actor.getSaccoId(),transactionIds):vouchers.lockMappings(actor.getSaccoId(),transactionIds,f.getActivityId());
         var accountIds=new TreeSet<UUID>();if(f.getMoneyAccountId()!=null)accountIds.add(f.getMoneyAccountId());
         for(var r:f.getRows())if(r.getTransactionId()==null){if(r.getDebitAccountId()!=null)accountIds.add(r.getDebitAccountId());if(r.getCreditAccountId()!=null)accountIds.add(r.getCreditAccountId());}
         require(!accountIds.isEmpty() || !mappings.isEmpty(),"rows[0].amount","account");
@@ -168,6 +174,7 @@ public class VoucherService {
         require(type!=Type.JOURNAL || f.getMoneyAccountId()==null,"moneyAccountId","moneyAccount");require(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");
         for(int n=0;n<f.getRows().size();n++){
             var r=f.getRows().get(n);String field="rows["+n+"]";require(r!=null,field,"rows");text(r.getDescription(),500,true,field+".description");
+            require(f.getActivityId()==null || r.getTransactionId()!=null,field+".transactionId","activityTransaction");
             require(r.getAmount()!=null && r.getAmount().signum()>0 && r.getAmount().scale()<=2 && r.getAmount().precision()-r.getAmount().scale()<=16,field+".amount","amount");
             require(r.getComponent()!=null && COMPONENTS.contains(r.getComponent()),field+".component","template");
         }
@@ -178,7 +185,7 @@ public class VoucherService {
     private String hash(Type type,Form f){try{
         // Keep ordinary-voucher retry hashes compatible with the pre-unification form.
         var payload=(tools.jackson.databind.node.ObjectNode)json.valueToTree(f);
-        payload.remove("receiptPurpose");if(f.getClientId()==null)payload.remove("clientId");payload.remove("interestAccountId");
+        payload.remove("receiptPurpose");if(f.getClientId()==null)payload.remove("clientId");payload.remove("interestAccountId");if(f.getActivityId()==null)payload.remove("activityId");
         for(var row:payload.path("rows"))((tools.jackson.databind.node.ObjectNode)row).remove("loanId");
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((type.name()+json.writeValueAsString(payload)).getBytes(StandardCharsets.UTF_8)));
     }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

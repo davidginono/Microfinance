@@ -92,7 +92,7 @@ class LoanRecordingPostgresTest {
             from loan_product_settings where id=?
             """,otherProduct,product);
         jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",otherProduct);
-        UUID secondPrincipal=account("SECOND-LOANS","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        UUID secondPrincipal=account("SECOND-LOANS","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
         jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where id=?",secondPrincipal,interest,otherProduct);
         var first=disbursed("D-FIRST-PRODUCT");var secondForm=form();secondForm.setProductId(otherProduct);var second=service.save(actor,secondForm);
         var funding=post(second,"1000.00","D-SECOND-PRODUCT");funding.setPrincipalAccountId(secondPrincipal);service.disburse(actor,funding);
@@ -539,7 +539,7 @@ class LoanRecordingPostgresTest {
     void processBatch(UUID id,boolean post){var summary=batches().get(actor,id);batches().start(actor,id,summary.batch().version(),post);var runner=new com.sacco.mvp.accounting.batch.service.ReceiptBatchWorker(context.getBean(com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService.class),new io.micrometer.core.instrument.simple.SimpleMeterRegistry());for(int n=0;n<30 && Set.of("VALIDATING","POSTING").contains(batches().get(actor,id).batch().state());n++)runner.tick();}
     @Test void batchWithoutSettingsRoutesMixedProductPrincipalAndInterestToTheirFrozenAccounts(){
         UUID first=disbursed("D-MAPPED-FIRST");
-        UUID secondPrincipal=account("PRODUCT2-PRINCIPAL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        UUID secondPrincipal=account("PRODUCT2-PRINCIPAL","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
         UUID secondInterest=account("PRODUCT2-INTEREST","INCOME","CREDIT","POSTING","INCOME");
         UUID secondProduct=UUID.randomUUID();
         jdbc.update("insert into loan_product_settings select (jsonb_populate_record(null::loan_product_settings,to_jsonb(p)||jsonb_build_object('id',?::text,'product_code','SECOND-MAPPED','product_name','Second mapped product','principal_gl_account_id',?::text,'interest_gl_account_id',?::text))).* from loan_product_settings p where id=?",secondProduct,secondPrincipal,secondInterest,product);
@@ -566,16 +566,19 @@ class LoanRecordingPostgresTest {
             productAccountService().configure(selected,actor.getMemberId(),principalAccount,interestAccount);
         });
     }
-    @Test void productAccountSearchIncludesEveryClassificationAndHeadingsWithScopedPagination(){
+    @Test void productAccountSearchIncludesOnlyPostingAccountsAcrossClassificationsWithScopedPagination(){
         var expected=new ArrayList<UUID>();
         String[] types={"ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"};
         for(int n=0;n<28;n++)expected.add(account("MAPPING-"+String.format("%03d",n),types[n%5],"DEBIT","POSTING","OTHER"));
-        UUID heading=account("MAPPING-GROUP","ASSET","DEBIT","HEADING","OTHER");expected.add(heading);
+        UUID heading=account("MAPPING-GROUP","ASSET","DEBIT","HEADING","OTHER");
+        UUID control=account("MAPPING-CONTROL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
         var service=productAccountService();
         for(String category:List.of("PRINCIPAL","INTEREST")){
             var first=service.choices(institution,category,"mapping",0,null);var last=service.choices(institution,category,"mapping",1,null);
             assertThat(first).extracting(Choice::id).containsExactlyElementsOf(expected.subList(0,26));
-            assertThat(last).extracting(Choice::id).containsExactlyElementsOf(expected.subList(25,29));
+            assertThat(last).extracting(Choice::id).containsExactlyElementsOf(expected.subList(25,28));
+            assertThat(service.choices(institution,category,"",0,heading)).isEmpty();
+            assertThat(service.choices(institution,category,"",0,control)).isEmpty();
             assertThat(service.choices(institution,category,"mapping-001",0,expected.get(1))).extracting(Choice::id).containsExactly(expected.get(1));
             assertThat(service.choices(institution+"-foreign",category,"mapping",0,expected.get(1))).isEmpty();
             assertThat(service.choices(institution,category,"%' OR '1'='1",0,null)).isEmpty();
@@ -592,6 +595,9 @@ class LoanRecordingPostgresTest {
         }
         UUID heading=account("HEADING","ASSET","DEBIT","HEADING","OTHER"),inactive=account("INACTIVE","EXPENSE","DEBIT","POSTING","OTHER");
         context.getBean(GeneralLedgerService.class).deactivateAccount(actor,inactive);
+        UUID control=account("PRODUCT-CONTROL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        assertThatThrownBy(()->configureProductAccounts(control,interest)).hasMessage("recording.error.productAccountsInvalid");
+        assertThatThrownBy(()->configureProductAccounts(interest,control)).hasMessage("recording.error.productAccountsInvalid");
         assertThatThrownBy(()->configureProductAccounts(heading,interest)).hasMessage("recording.error.productAccountsInvalid");
         assertThatThrownBy(()->configureProductAccounts(principal,inactive)).hasMessage("recording.error.productAccountsInvalid");
     }
@@ -608,7 +614,7 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->service.postingPreview(operator("B2"),post(loan,"120.00","WRONG-BRANCH"),"PAYMENT")).isInstanceOf(AccessDeniedException.class);
     }
     @Test void arbitraryProductAccountTypesSupportChargedLoansAndBatchReceipts(){
-        principal=account("CUSTOM-PRINCIPAL","EQUITY","CREDIT","POSTING","OTHER");interest=account("CUSTOM-INTEREST","ASSET","DEBIT","CONTROL","INTEREST_RECEIVABLE");
+        principal=account("CUSTOM-PRINCIPAL","EQUITY","CREDIT","POSTING","OTHER");interest=account("CUSTOM-INTEREST","ASSET","DEBIT","POSTING","INTEREST_RECEIVABLE");
         configureProductAccounts(principal,interest);chargePolicy("SEPARATE");
         UUID loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
         var collected=receiptService().post(actor,receiptForm(loan));
@@ -633,7 +639,7 @@ class LoanRecordingPostgresTest {
         assertThat(status(source)).isEqualTo("DISBURSED");assertThat(status(loan)).isEqualTo("DISBURSEMENT_REVERSED");
     }
     @Test void productEditsApplyToLaterDisbursementsAndCannotRedirectExistingLoanPayments(){
-        UUID loan=disbursed("D-FROZEN-ACCOUNTS");UUID nextPrincipal=account("NEXT-PRINCIPAL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL"),nextInterest=account("NEXT-INTEREST","INCOME","CREDIT","POSTING","INCOME");
+        UUID loan=disbursed("D-FROZEN-ACCOUNTS");UUID nextPrincipal=account("NEXT-PRINCIPAL","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL"),nextInterest=account("NEXT-INTEREST","INCOME","CREDIT","POSTING","INCOME");
         jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where id=?",nextPrincipal,nextInterest,product);
         var input=post(loan,"120.00","FROZEN-PAYMENT");input.setPrincipalAccountId(null);input.setInterestAccountId(null);var paid=service.repay(actor,input);
         assertThat(jdbc.queryForObject("select interest_account_id from accountant_loan_post where id=?",UUID.class,paid.id())).isEqualTo(interest);
@@ -788,7 +794,7 @@ class LoanRecordingPostgresTest {
         UUID customConfiguration=UUID.randomUUID();jdbc.update("insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,manager_review_required,loan_officer_review_required,chairperson_review_required,board_review_required,committee_review_required,accountant_review_required,disbursement_officer_required,disbursement_proof_required,custom_recording_configuration,created_at,updated_at) values(?,?,'CUSTOMIZED_LOAN',true,'ACTIVE','CUSTOM','Customised loan','{}',0,0,'FLAT_RATE','MONTHLY',1,600,false,false,false,false,false,false,true,false,true,now(),now())",customConfiguration,institution);
         jdbc.update("insert into loan_product_board_reviewers(id,loan_product_setting_id,sacco_id,review_stage,board_member_id,created_at) values(?,?,?,'DISBURSEMENT_OFFICER',?,now())",UUID.randomUUID(),customConfiguration,institution,actor.getMemberId());
 
-        cash=account("CASH","ASSET","DEBIT","POSTING","CASH");principal=account("LOANS","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");interest=account("INTEREST","LIABILITY","CREDIT","POSTING","CLEARING");
+        cash=account("CASH","ASSET","DEBIT","POSTING","CASH");principal=account("LOANS","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");interest=account("INTEREST","LIABILITY","CREDIT","POSTING","CLEARING");
         jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where sacco_id=?",principal,interest,institution);
         var institutions=context.getBean(SaccoRegistryService.class);when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().active(true).accessStatus(SaccoAccessStatus.ACTIVE).saccoId(institution).stationId(i.getArgument(1)).build()));
         when(context.getBean(UserClaimService.class).effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));

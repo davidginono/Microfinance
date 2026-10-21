@@ -14,6 +14,8 @@ public final class VoucherDtos {
         private LocalDate effectiveDate;
         private String party="",reference="",description="",evidence="";
         private UUID moneyAccountId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private UUID activityId;
         private String receiptPurpose="OTHER";
         private UUID clientId,interestAccountId;
         private List<RowForm> rows=new ArrayList<>(List.of(new RowForm()));
@@ -27,6 +29,7 @@ public final class VoucherDtos {
     }
     public record Account(UUID id,String code,String name,String purpose) {}
     public record Client(UUID id,String number,String name) {}
+    public record Activity(UUID id,String name,String nameSw) {}
     public record Mapping(UUID transactionId,UUID templateKey,String transactionName,String component,Account debit,Account credit) {}
     public record Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,
                               String description,BigDecimal amount,Account debit,Account credit) {}

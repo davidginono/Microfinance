@@ -56,7 +56,7 @@ public class VoucherApprovalGate {
         require(source!=null && key!=null && "OTHER".equals(source.getReceiptPurpose()) && source.getInterestAccountId()==null,"ordinaryOnly");
         require(source.getRows()!=null && !source.getRows().isEmpty() && source.getRows().size()<=50,"limit");
         var f=new Form(); f.setRequestKey(key);f.setEffectiveDate(source.getEffectiveDate());f.setMoneyAccountId(source.getMoneyAccountId());
-        f.setClientId(source.getClientId());
+        f.setClientId(source.getClientId());f.setActivityId(source.getActivityId());
         f.setParty(text(source.getParty(),160));f.setReference(text(source.getReference(),160));
         f.setDescription(text(source.getDescription(),500));f.setEvidence(text(source.getEvidence(),500));
         var rows=new ArrayList<RowForm>();

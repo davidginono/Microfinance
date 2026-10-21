@@ -192,8 +192,24 @@ class VoucherPostgresTest {
   assertThat(lookup.mappings("OTHER-INSTITUTION","total",0)).isEmpty();
   assertThat(lookup.mappings(institution,"no-match",0)).isEmpty();
   assertThat(lookup.mappings(institution,"total",26)).isEmpty();
-  UUID revision=library.template(actor,transaction).requestKey();var f=form(Type.RECEIPT);
+  assertThat(service.activities(actor,Type.RECEIPT,"operations",0)).extracting(Activity::id).containsExactly(activity);
+  assertThat(service.activities(actor,Type.RECEIPT,"no match",0)).isEmpty();
+  assertThat(lookup.activities("OTHER-INSTITUTION","",0)).isEmpty();
+  assertThat(service.mappings(actor,Type.RECEIPT,activity,"",0)).extracting(Mapping::transactionId).containsExactly(transaction);
+  UUID otherActivity=UUID.randomUUID();
+  assertThat(service.mappings(actor,Type.RECEIPT,otherActivity,"",0)).isEmpty();
+  UUID revision=library.template(actor,transaction).requestKey();var f=form(Type.RECEIPT);f.setActivityId(otherActivity);
   for(var row:f.getRows()){row.setTransactionId(transaction);row.setTemplateKey(revision);row.setCreditAccountId(control);}
+  assertThatThrownBy(()->service.preview(actor,Type.RECEIPT,f)).hasMessage("voucher.error.template");
+  assertThatThrownBy(()->service.post(actor,Type.RECEIPT,f)).hasMessage("voucher.error.template");
+  f.setActivityId(activity);
+  var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,null);
+  var captured=gate.canonical(f,UUID.randomUUID());UUID workflow=workflows.capture(actor,Type.RECEIPT,captured);
+  var details=workflows.details(actor,workflow);var item=details.items().getFirst();
+  var edit=gate.canonical(captured,captured.getRequestKey());edit.setActivityId(null);
+  workflows.save(actor,workflow,item.id(),details.workflow().version(),item.version(),edit);
+  assertThat(workflows.details(actor,workflow).items().getFirst().form().getActivityId()).isEqualTo(activity);
+  assertThat(service.preview(actor,Type.RECEIPT,f).total()).isEqualByComparingTo("30.03");
   var reviewed=service.reviewAccounts(actor,Type.RECEIPT,f);assertThat(reviewed.get("rows[0].debitAccountId").id()).isEqualTo(cash);assertThat(reviewed.get("rows[0].creditAccountId").id()).isEqualTo(capital);
   var v=service.post(actor,Type.RECEIPT,f);assertThat(v.transactions()).allSatisfy(t->{assertThat(t.credit().id()).isEqualTo(capital);assertThat(t.transactionName()).contains("Operating income").hasSizeGreaterThan(160);});
   template.setRequestKey(UUID.randomUUID());template.setExpectedRequestKey(revision);rule.setCreditCode("EXPENSE");tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
@@ -202,6 +218,18 @@ class VoucherPostgresTest {
   template.setExpectedRequestKey(library.template(actor,transaction).requestKey());template.setRequestKey(UUID.randomUUID());rule.setComponent("INTEREST");
   tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   assertThat(lookup.mappings(institution,"interest",0)).singleElement().satisfies(m->assertThat(m.component()).isEqualTo("INTEREST"));
+ }
+ @Test void loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly(){
+  var accounts=new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc);
+  UUID heading=account("GROUP","ASSET","DEBIT","HEADING","OTHER");
+  assertThat(accounts.choices(institution,"",0,null)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id).contains(cash,capital,expense).doesNotContain(heading,control);
+  for(UUID invalid:List.of(heading,control)){
+   assertThat(accounts.choices(institution,"",0,invalid)).isEmpty();
+   assertThat(accounts.valid(institution,invalid)).isFalse();
+  }
+  assertThat(accounts.choices(institution,"",0,cash)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id).containsExactly(cash);
+  assertThat(accounts.valid(institution,cash)).isTrue();
+  assertThat(accounts.choices("FOREIGN","",0,cash)).isEmpty();assertThat(accounts.valid("FOREIGN",cash)).isFalse();
  }
 
  @Test void configuredIndividualApprovalBlocksBypassAndSupportsIndependentApprovalAndPosting(){

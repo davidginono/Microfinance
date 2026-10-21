@@ -21,4 +21,20 @@ class VoucherValidationTest {
   f.setParty("x".repeat(161));assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.text");
  }
  @Test void manualJournalsRejectSharedMoneyAccount(){var f=form();f.setMoneyAccountId(UUID.randomUUID());assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.moneyAccount");}
+ @Test void selectingAnActivityRequiresConfiguredTransactionsForEveryVoucherType(){
+  for(Type type:Type.values()){
+   var f=form();f.setActivityId(UUID.randomUUID());
+   assertThatThrownBy(()->VoucherService.validate(f,type,today)).hasMessage("voucher.error.activityTransaction");
+   f.getRows().getFirst().setTransactionId(UUID.randomUUID());
+   assertThatCode(()->VoucherService.validate(f,type,today)).doesNotThrowAnyException();
+  }
+ }
+ @Test void approvalSnapshotsRetainTheActivityAndLegacyFormsOmitTheNewField(){
+  var f=form();var mapper=tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build();
+  assertThat(mapper.writeValueAsString(f)).doesNotContain("activityId");
+  f.setActivityId(UUID.randomUUID());
+  var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(null,null);
+  assertThat(gate.canonical(f,f.getRequestKey()).getActivityId()).isEqualTo(f.getActivityId());
+  assertThat(mapper.writeValueAsString(f)).contains(f.getActivityId().toString());
+ }
 }
