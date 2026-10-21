@@ -21,8 +21,7 @@
             </c:if>
             <button id="desktopSidebarToggle" type="button" class="desktop-sidebar-toggle" aria-controls="shellSidebarNavigation" aria-label="<spring:message code='shell.navigation.expand' />" aria-expanded="false" data-expand-label="<spring:message code='shell.navigation.expand' />" data-collapse-label="<spring:message code='shell.navigation.collapse' />" title="<spring:message code='shell.navigation.expand' />">
                 <svg class="desktop-sidebar-toggle__collapse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zM7.5 4.5v11h7.75a.25.25 0 00.25-.25V4.75a.25.25 0 00-.25-.25H7.5zm-1.5 0H4.75a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25H6v-11z" clip-rule="evenodd"/>
-                    <path d="M12.28 7.22a.75.75 0 010 1.06L10.56 10l1.72 1.72a.75.75 0 11-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06l2.25-2.25a.75.75 0 011.06 0z"/>
+                    <path d="m5.3 4.2 4.7 4.7 4.7-4.7 1.1 1.1-4.7 4.7 4.7 4.7-1.1 1.1-4.7-4.7-4.7 4.7-1.1-1.1 4.7-4.7-4.7-4.7z"/>
                 </svg>
                 <svg class="desktop-sidebar-toggle__expand" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <line x1="3" y1="6" x2="21" y2="6"></line>

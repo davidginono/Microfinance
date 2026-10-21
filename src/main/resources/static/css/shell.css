@@ -1600,10 +1600,10 @@ button:active {
 
 /* AWS Management Console-inspired application theme. */
 :root {
-    --sacco-topbar: #3A756B;
-    --sacco-sidebar: #183038;
-    --sacco-sidebar-hover: #21414b;
-    --sacco-sidebar-active: #1f414c;
+    --sacco-topbar: #232f3e;
+    --sacco-sidebar: #ffffff;
+    --sacco-sidebar-hover: #f2f3f3;
+    --sacco-sidebar-active: #ffffff;
     --sacco-canvas: #F2F3F3;
     --sacco-panel: #ffffff;
     --sacco-panel-muted: #f7f8f8;
@@ -1624,10 +1624,10 @@ button:active {
     --sacco-sidebar-width: 236px;
     --sacco-sidebar-collapsed-width: 48px;
     --aws-ink: #16191f;
-    --aws-topbar: #3A756B;
-    --aws-sidebar: #183038;
-    --aws-sidebar-hover: #21414b;
-    --aws-sidebar-active: #1f414c;
+    --aws-topbar: #232f3e;
+    --aws-sidebar: #ffffff;
+    --aws-sidebar-hover: #f2f3f3;
+    --aws-sidebar-active: #ffffff;
     --aws-muted: #5f6b7a;
     --aws-panel: #ffffff;
     --aws-bg: #F2F3F3;
@@ -6403,3 +6403,264 @@ html:has(body.aws-console) {scrollbar-gutter:stable;}
 .workspace-layout-card-header {box-sizing:border-box;background:#fafafa;border-bottom:1px solid #eaeded;display:flex;align-items:center;padding:12px 20px;}
 .workspace-layout-card-header::before {content:"";width:35%;max-width:180px;height:12px;background:#e1e5e8;border-radius:2px;}
 .workspace-layout-card-body {position:absolute;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:center;}
+
+/* Classic AWS navigation: navy identity bar and a white, text-led service tree. */
+.aws-console {
+    --shell-sims-sidebar-border: #d5dbdb;
+    --shell-sims-sidebar-muted: #545b64;
+}
+
+.aws-console .app-topbar {
+    background: #232f3e !important;
+    border-bottom: 1px solid #161e2d !important;
+}
+
+.aws-console .app-global-brand {
+    flex: 0 1 auto;
+    min-width: 128px;
+    max-width: 360px;
+    border: 0;
+    padding: 0 12px 0 0;
+    gap: 16px !important;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.app-brand-wordmark {
+    display: inline-flex;
+    flex: 0 0 128px;
+    flex-direction: column;
+    justify-content: center;
+    width: 128px;
+    color: #ffffff;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 23px;
+    letter-spacing: -.65px;
+    white-space: nowrap;
+}
+
+.app-brand-wordmark svg {
+    display: block;
+    width: 128px;
+    height: 9px;
+    color: #ff9900;
+}
+
+.app-institution-brand {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    border-left: 1px solid #545b64;
+    padding-left: 16px;
+}
+
+.app-institution-name {
+    min-width: 0;
+    color: #f2f3f3;
+    font-size: 13px;
+    line-height: 16px;
+    overflow-wrap: anywhere;
+}
+
+.aws-console .app-station-mobile {
+    border: 0 !important;
+    background: transparent !important;
+}
+
+#shellTopNav .app-global-search input {
+    background: #161e2d !important;
+    border-color: #879596 !important;
+    color: #ffffff !important;
+}
+
+.aws-console .app-topbar .app-logout-control button {
+    border: 1px solid #879596 !important;
+    background: transparent !important;
+    color: #ffffff !important;
+}
+
+.aws-console .app-topbar .erp-icon-btn { color: #d5dbdb !important; }
+.aws-console .app-topbar .app-logout-control button:hover { background: #414d5c !important; }
+
+.aws-console .shell-sidebar,
+.aws-console .shell-sidebar-panel {
+    border-color: #d5dbdb !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+}
+
+.aws-console .shell-sidebar-toggle-row {
+    min-height: 48px !important;
+    height: auto;
+    margin: 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #eaeded !important;
+    border-radius: 0;
+    background: #ffffff !important;
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.aws-console .shell-sidebar-toggle-label {
+    padding-left: 24px !important;
+    color: #16191f !important;
+    font-size: 16px !important;
+    line-height: 22px !important;
+    letter-spacing: normal !important;
+    text-transform: none;
+}
+
+.aws-console .desktop-sidebar-toggle {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #545b64 !important;
+    box-shadow: none !important;
+    transform: none;
+}
+
+.aws-console .desktop-sidebar-toggle svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+.aws-console .desktop-sidebar-toggle:is(:hover, :focus-visible) {
+    background: #f2f3f3 !important;
+    color: #16191f !important;
+}
+
+.aws-console .shell-sidebar-scroll {
+    padding: 12px 0 !important;
+    background: #ffffff !important;
+    scrollbar-color: #aab7b8 #ffffff;
+}
+
+.aws-console .shell-sidebar-scroll :is(a, button) {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 30px !important;
+    height: auto !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 5px 24px !important;
+    color: #545b64 !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    line-height: 20px !important;
+    text-align: left;
+    text-decoration: none;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.aws-console .shell-sidebar-scroll :is(a, button):hover {
+    background: #f2f3f3 !important;
+    color: #0073bb !important;
+}
+
+.aws-console .shell-sidebar-scroll :is(a, button):focus-visible,
+.aws-console .desktop-sidebar-toggle:focus-visible,
+.aws-console .app-global-brand:focus-visible {
+    outline: 2px solid #0073bb !important;
+    outline-offset: -2px !important;
+}
+
+.aws-console .shell-sidebar-scroll :is(a, button) > span:first-child:has(svg, i),
+.aws-console .shell-sidebar-scroll button[aria-controls] > svg {
+    display: none !important;
+}
+
+.aws-console .shell-sidebar-scroll :is(a, button) > span:not(:has(svg, i)) {
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    color: inherit !important;
+}
+
+.aws-console .shell-sidebar-scroll button[aria-controls] {
+    position: relative;
+    justify-content: flex-start;
+    font-weight: 700 !important;
+}
+
+.aws-console .shell-sidebar-scroll button[aria-controls]::before {
+    content: "";
+    position: absolute;
+    top: 11px;
+    left: 10px;
+    width: 6px;
+    height: 8px;
+    background: currentColor;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.aws-console .shell-sidebar-scroll button[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+}
+
+.aws-console .shell-sidebar-group > div {
+    max-width: 100%;
+    margin: 0 !important;
+    padding: 0 0 0 12px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.aws-console .shell-sidebar-scroll :is(.shell-nav-active, [aria-current="page"]) {
+    color: #0073bb !important;
+    font-weight: 700 !important;
+}
+
+.aws-console .shell-sidebar-nav-heading,
+.aws-console .shell-sidebar-scroll > .px-3.pb-1.pt-3 {
+    margin: 12px 0 4px !important;
+    border-color: #eaeded;
+    padding: 12px 24px 0 !important;
+    color: #16191f !important;
+    font-size: 14px !important;
+    letter-spacing: normal !important;
+    text-transform: none;
+}
+
+.aws-console :is(.aws-sidebar-footer, .shell-powered-by, .shell-support-contact) {
+    border-color: #eaeded !important;
+    background: #ffffff !important;
+    color: #545b64 !important;
+}
+
+.aws-console :is(.shell-support-contact__eyebrow, .shell-support-contact__role,
+    .shell-support-contact__label, .shell-support-contact__meta) {
+    color: #545b64 !important;
+}
+
+.aws-console .shell-support-contact__name { color: #16191f !important; }
+.aws-console .shell-sidebar-scroll .shell-support-contact__link { color: #0073bb !important; }
+.aws-console .shell-powered-by-wordmark { color: #545b64 !important; }
+.aws-console .aws-sidebar-footer .shell-powered-by { background: #ffffff !important; }
+.aws-console .aws-sidebar-footer > div:first-child,
+.aws-console .shell-powered-by-label { color: #545b64 !important; }
+
+@media (min-width: 1024px) {
+    .aws-console .shell-sidebar-group { margin-top: 8px !important; }
+}
+
+@media (max-width: 1023px) {
+    .app-institution-brand { display: none; }
+    .aws-console .app-global-brand { flex: 0 0 128px; padding: 0; }
+    .aws-console .shell-sidebar-scroll :is(a, button) { min-height: 40px !important; padding-top: 10px !important; padding-bottom: 10px !important; }
+    .aws-console .shell-sidebar-scroll button[aria-controls]::before { top: 16px; }
+}
+
+@media (max-width: 420px) {
+    .aws-console .app-station-mobile { display: none !important; }
+}

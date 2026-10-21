@@ -56,6 +56,14 @@
                 </svg>
             </button>
             <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'LOAN_OFFICER' ? '/loan-officer/queue' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/queue' : (currentMember.position eq 'CREDIT_COMMITTEE' ? '/credit-committee/queue' : (currentMember.position eq 'BOARD' ? '/board/queue' : (currentMember.position eq 'ACCOUNTANT' ? '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT' : (currentMember.position eq 'DISBURSEMENT_OFFICER' ? '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT' : '/app/dashboard')))))))}" class="app-global-brand inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
+                <span class="app-brand-wordmark">
+                    <span>microfinance</span>
+                    <svg viewBox="0 0 128 9" fill="none" aria-hidden="true" focusable="false">
+                        <path d="M2 2.5C32 9 79 9 121 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+                        <path d="m116 1 7 .5-3 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </span>
+                <span class="app-institution-brand">
                 <c:choose>
                     <c:when test="${not empty activeSaccoLogoUrl}">
                         <span class="app-global-logo inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
@@ -70,20 +78,13 @@
                         </span>
                     </c:otherwise>
                 </c:choose>
-                <div class="min-w-0 leading-tight">
-                    <p class="break-words font-display text-[0.92rem] font-semibold tracking-tight text-white sm:text-base">
+                    <span class="app-institution-name">
                         <c:choose>
                             <c:when test="${not empty activesaccoName}">${activesaccoName}</c:when>
                             <c:otherwise><spring:message code="app.title" /></c:otherwise>
                         </c:choose>
-                    </p>
-                    <p class="hidden text-[11px] font-semibold uppercase tracking-[0.17em] text-cyan-50/90 md:block">
-                        <c:choose>
-                            <c:when test="${not empty activesaccoId}">${activesaccoId} &middot; Microfinance</c:when>
-                            <c:otherwise><spring:message code="app.title" /></c:otherwise>
-                        </c:choose>
-                    </p>
-                </div>
+                    </span>
+                </span>
             </a>
             <div class="app-global-search" aria-label="<spring:message code='common.search' text='Search' />">
                 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
