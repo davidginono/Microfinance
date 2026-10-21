@@ -56,6 +56,9 @@
             <button type="button" data-product-config-nav="pricing">
                 <span><strong><spring:message code="admin.settings.loanProducts.repaymentCharges" /></strong></span>
             </button>
+            <button type="button" data-product-config-nav="accounts">
+                <span><strong><spring:message code="productAccounts.title" /></strong></span>
+            </button>
             <button type="button" data-product-config-nav="workflow">
                 <span><strong><spring:message code="admin.settings.workflow.title" /></strong></span>
             </button>
@@ -179,7 +182,12 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
-<c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %>
+                    </div>
+                </section>
+
+                <section class="product-builder-section product-config-step" data-product-config-step="accounts" aria-label="<spring:message code='productAccounts.title' />"><div class="product-builder-section-header"><h2><spring:message code="productAccounts.title" /></h2></div>
+                    <div id="product-config-accounts" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
+                        <c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %><c:set var="productAccountSection" value="${false}" />
                     </div>
                 </section>
 
