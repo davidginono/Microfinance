@@ -26,7 +26,7 @@
 .aws-console .resource-table-page { display:inline-flex; align-items:center; justify-content:center; width:28px; min-width:28px; height:28px; padding:4px; border:0; background:transparent; color:#414d5c; border-radius:2px; }
 .aws-console .resource-table-page:disabled { color:#aab7b8; cursor:default; }
 .aws-console .resource-table-page:hover:not(:disabled) { background:#f1f3f3; color:#0073bb; }
-.aws-console .resource-table-page-number { min-width:24px; text-align:center; font-size:12px; font-weight:700; color:#16191f; font-variant-numeric:tabular-nums; }
+.aws-console .resource-table-page-number { min-width:24px; text-align:center; font-weight:700; color:#16191f; font-variant-numeric:tabular-nums; }
 .aws-console .resource-table-icon svg,.aws-console .resource-table-page svg { width:16px; height:16px; flex:none; }
 .aws-console [data-resource-table] .resource-table-actions .resource-table-icon { padding:4px 9px; order:-1; }
 .aws-console .resource-table-preferences-button { border:0 !important; border-left:1px solid #d5dbdb !important; border-radius:0 !important; background:transparent !important; padding:5px 8px 5px 12px; min-width:32px; min-height:28px; }
@@ -40,7 +40,7 @@
 .aws-console [data-resource-table].resource-table-wrap-lines .erp-table :is(th,td) { white-space:normal; overflow-wrap:anywhere; }
 .aws-console [data-resource-table] .erp-table [hidden] { display:none !important; }
 .aws-console [data-resource-table] .resource-table-selection { width:36px; min-width:36px; text-align:center; }
-.aws-console [data-resource-table] input[type=checkbox] { width:14px !important; height:14px !important; accent-color:#0073bb; vertical-align:middle; }
+.aws-console [data-resource-table] input[type=checkbox] { accent-color:#0073bb; vertical-align:middle; }
 .aws-console [data-resource-table] .coa-tree-toggle { width:20px !important; height:20px !important; min-height:20px !important; flex-basis:20px !important; }
 .aws-console [data-resource-table] .resource-table-selected > td { background:#e6f3fa; }
 .aws-console .resource-table-record-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }

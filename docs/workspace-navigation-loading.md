@@ -15,6 +15,13 @@ Implemented 20 October 2026 in the shared JSP navigation runtime and shell CSS.
 - Destination styles, including links and inline styles owned by body fragments, are prepared before content replacement. Unchanged styles remain attached and retain their cascade order. Failed stylesheet loads retain the original document and edited fields; unfinished replacement content stays hidden after an initialization failure and offers an explicit retry.
 - Removed superseded sidebar link/submenu rules instead of layering another active-state override over the old dark/orange theme. Institution branding uses the correctly cased scoped model attribute. V84 renames only the original `TAHA-SACCOS` institution from its original name to Degra Microfinance; compatibility IDs and stored document snapshots remain intact.
 
+## Legacy UI cleanup (21 October 2026)
+
+- Audited all 29 remaining handwritten stylesheets against JSPs, JavaScript, Java-generated markup and dynamic class/asset references. Removed unreachable component rules and declarations superseded by later rules in the same conditions, including AWS-qualified shell replacements. Retained browser fallbacks, active compatibility names and dynamically loaded vendor/dashboard icons.
+- Removed the hidden duplicate shell title rail, its JavaScript and scroll/resize updates; removed collapsed icon-rail flyouts/tooltips and their event handlers. The current 28px reveal rail, inline navigation groups, mobile drawer, breadcrumbs and request-owned loaders remain the shared implementation.
+- Deleted the unused accounting-business stylesheet, old authentication illustration and two unused raster supplier logos. Current supplier branding uses the transparent orange SVG. Removed obsolete sidebar gradient/shimmer decoration and unused theme variables.
+- Removed about 66 KB of CSS and over 2,600 lines overall. All 207 JavaScript checks and 17 UI contract checks pass; all 133 shared-shell JSP views compile successfully. Browser checks at 360, 768, 1366 and 1920px show no horizontal page overflow. Nested navigation, the mobile drawer, profile and notification dropdowns work; statement tab changes retain the same document, main workspace, toolbar and tab bar, with zero legacy component nodes or console warnings/errors observed. No financial workflow or authorization code changed.
+
 ## Verification
 
 ### 21 October 2026 branding and component preparation

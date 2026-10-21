@@ -51,7 +51,6 @@
 .dashboard-facts>div:first-child {padding-top:0;}
 .dashboard-facts dt {color:#545b64;font-size:14px;line-height:20px;}
 .dashboard-facts dd {margin:0;font-size:20px;line-height:28px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
-.dashboard-facts .dashboard-fact-note {flex-basis:100%;font-size:13px;color:#545b64;}
 .dashboard-event-list {list-style:none;margin:0;padding:0;}
 .dashboard-event-list li {padding:12px 0;border-bottom:1px solid #eaeded;font-size:14px;overflow-wrap:anywhere;}
 .dashboard-event-list time,.dashboard-event-list small {display:block;margin-top:4px;color:#545b64;font-size:13px;}

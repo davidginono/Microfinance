@@ -2,9 +2,6 @@
     const onReady = window.WorkspaceNavigation?.onReady || (callback => window.addEventListener("load", callback, {once:true}));
     const shellTopNav = document.getElementById('shellTopNav');
     const toastContainer = document.getElementById('appToastContainer');
-    const pageTitleRail = document.getElementById('shellPageTitleRail');
-    const pageTitleRailText = document.getElementById('shellPageTitleRailText');
-    const pageBreadcrumbRailText = document.getElementById('shellPageBreadcrumbRailText');
     const toastQueue = [];
     const visibleToasts = [];
     const maxVisibleToasts = 3;
@@ -14,7 +11,6 @@
         visible: visibleToasts
     };
     const modalToastStates = new WeakMap();
-    let titleRailTicking = false;
     let exportDownloadActive = false;
     let exportPrintActive = false;
     const exportDownloadTimeoutMs = 60 * 1000;
@@ -732,52 +728,6 @@
         });
     };
     promotePageHeadersToShell();
-    const resolveStickyTitleSource = function () {
-        return document.querySelector('[data-sticky-title-source]') || document.querySelector('.erp-page-title');
-    };
-    const updatePageTitleRail = function () {
-        if (!pageTitleRail || !pageTitleRailText) {
-            return;
-        }
-        const source = resolveStickyTitleSource();
-        const breadcrumb = document.querySelector('.erp-page-header .erp-breadcrumb');
-        const contentFrame = document.querySelector('.shell-content-frame');
-        if (!source || !contentFrame) {
-            pageTitleRail.classList.remove('is-active');
-            pageTitleRailText.textContent = '';
-            if (pageBreadcrumbRailText) {
-                pageBreadcrumbRailText.textContent = '';
-            }
-            return;
-        }
-        const titleText = (source.getAttribute('data-sticky-title') || source.textContent || '').trim();
-        const frameRect = contentFrame.getBoundingClientRect();
-        if (!titleText) {
-            pageTitleRail.classList.remove('is-active');
-            pageTitleRailText.textContent = '';
-            return;
-        }
-        document.documentElement.style.setProperty('--shell-page-title-left', Math.round(frameRect.left) + 'px');
-        pageTitleRailText.textContent = titleText;
-        if (pageBreadcrumbRailText) {
-            const breadcrumbText = (breadcrumb?.textContent || '').trim();
-            pageBreadcrumbRailText.textContent = breadcrumbText && breadcrumbText !== titleText
-                ? breadcrumbText.replace(/\s*\/\s*/g, '  ›  ')
-                : '';
-        }
-        pageTitleRail.classList.add('is-active');
-    };
-    const schedulePageTitleRailUpdate = function () {
-        if (titleRailTicking) {
-            return;
-        }
-        titleRailTicking = true;
-        window.requestAnimationFrame(function () {
-            titleRailTicking = false;
-            updatePageTitleRail();
-        });
-    };
-
     const resolveToastContextElement = function (options) {
         if (!options || typeof options !== 'object') {
             return null;
@@ -1424,7 +1374,6 @@
         const restore = function () {
             window.scrollTo({ left: targetX, top: targetY, behavior: behavior });
             restoreScrollablePositions(saved.containers, behavior);
-            schedulePageTitleRailUpdate();
         };
         window.requestAnimationFrame(function () {
             restore();
@@ -2277,7 +2226,6 @@
         initAwsClientTables();
         syncConsoleFiltersFromUrl();
         initConsoleTableLoading();
-        schedulePageTitleRailUpdate();
         applyPlaceholderTitles();
         restoreScrollAfterReload();
         restoreModalAfterReload();
@@ -2303,12 +2251,9 @@
 
     window.addEventListener('resize', function () {
         syncShellNavHeight();
-        schedulePageTitleRailUpdate();
     });
-    window.addEventListener('scroll', schedulePageTitleRailUpdate, { passive: true });
     window.requestAnimationFrame(function () {
         syncShellNavHeight();
-        schedulePageTitleRailUpdate();
     });
     initSessionInactivityPrompt();
 

@@ -11,10 +11,9 @@
 .reference-table thead th { text-transform: uppercase; padding-bottom: 9px; }
 .reference-table .reference-description { width: 52%; }
 .reference-table .reference-amount { min-width: 130px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.reference-table .statement-number { text-align: right; }
 .reference-table .reference-heading td { padding-top: 22px; text-transform: uppercase; }
 .reference-table .reference-total td { font-weight: bold; padding-bottom: 7px; }
-.reference-total .reference-amount, .reference-total .statement-number { text-decoration: underline; text-underline-offset: 3px; }
+.reference-total .reference-amount { text-decoration: underline; text-underline-offset: 3px; }
 .reference-detail-button { display: inline-block; font: 16px/1 "Courier New", Courier, monospace; color: #000; background: #eee; border: 1px solid #777; border-radius: 0; padding: 1px 3px; text-decoration: underline; white-space: nowrap; }
 .reference-detail-button:hover { background: #ddd; }
 .reference-detail-button:focus-visible, .reference-scroll:focus-visible { outline: 2px solid #0073bb; outline-offset: 2px; }
@@ -29,11 +28,11 @@
 .reference-pagination { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; align-items: center; margin: 16px 0; }
 @media (max-width: 640px) { .reference-report { padding: 12px; } .reference-facts { grid-template-columns: minmax(0,1fr); } }
 @media print {
-  .reference-details, .reference-pagination, .statement-actions { display: none !important; }
+  .reference-details, .reference-pagination { display: none !important; }
   .reference-report { padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .reference-scroll { overflow: visible; }
   .reference-table { min-width: 0 !important; font-size: 9pt; }
   .reference-table thead { display: table-header-group; }
   .reference-table tr { break-inside: avoid; }
-  .reference-table .reference-amount, .reference-table .statement-number { text-align: right; }
+  .reference-table .reference-amount { text-align: right; }
 }

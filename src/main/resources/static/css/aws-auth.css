@@ -64,7 +64,6 @@ body.auth-shell.aws-auth-shell::before {
 }
 
 body.aws-auth-shell main,
-body.aws-auth-shell > .auth-page-shell,
 body.aws-auth-shell > .min-h-screen {
     padding-top: 68px !important;
     background: transparent !important;
@@ -74,10 +73,7 @@ body.auth-shell.aws-auth-shell > .min-h-screen {
     padding-top: 32px !important;
 }
 
-body.aws-auth-shell .auth-layout,
-body.aws-auth-shell .auth-card,
 body.aws-auth-shell .auth-frame,
-body.aws-auth-shell .registration-card,
 body.aws-auth-shell .error-card,
 body.aws-auth-shell main > div,
 body.aws-auth-shell main > section {
@@ -87,8 +83,6 @@ body.aws-auth-shell main > section {
     box-shadow: 0 1px 1px rgba(0, 28, 36, 0.12) !important;
 }
 
-body.aws-auth-shell .auth-brand-panel,
-body.aws-auth-shell .auth-side-panel,
 body.aws-auth-shell [class*="from-"],
 body.aws-auth-shell [class*="gradient"] {
     background: #f7f8f8 !important;
@@ -113,7 +107,6 @@ body.aws-auth-shell h3 {
 }
 
 body.aws-auth-shell p,
-body.aws-auth-shell .auth-subtitle,
 body.aws-auth-shell .error-message {
     color: var(--aws-muted);
 }
@@ -129,7 +122,6 @@ body.aws-auth-shell label {
 body.aws-auth-shell input,
 body.aws-auth-shell select,
 body.aws-auth-shell textarea,
-body.aws-auth-shell .auth-field,
 body.aws-auth-shell .registration-field,
 body.aws-auth-shell .registration-select {
     min-height: 32px !important;
@@ -146,7 +138,6 @@ body.aws-auth-shell .registration-select {
 }
 
 body.aws-auth-shell textarea,
-body.aws-auth-shell textarea.auth-field,
 body.aws-auth-shell textarea.registration-field {
     height: auto !important;
     min-height: 84px !important;
@@ -407,7 +398,6 @@ body.aws-auth-shell .auth-notification-bar .app-toast-close-icon {
 }
 
 body.aws-auth-shell .auth-frame,
-body.aws-auth-shell .registration-card,
 body.aws-auth-shell .error-card,
 body.aws-auth-shell .forgot-password-dialog {
     overflow: hidden;
@@ -549,7 +539,6 @@ body.aws-auth-shell .auth-ellipsis-loader > span:nth-child(3) {
     }
 
     body.aws-auth-shell main,
-    body.aws-auth-shell > .auth-page-shell,
     body.aws-auth-shell > .min-h-screen {
         align-items: flex-start !important;
         padding: 64px 10px 16px !important;
@@ -559,10 +548,7 @@ body.aws-auth-shell .auth-ellipsis-loader > span:nth-child(3) {
         padding-top: 16px !important;
     }
 
-    body.aws-auth-shell .auth-layout,
-    body.aws-auth-shell .auth-card,
     body.aws-auth-shell .auth-frame,
-    body.aws-auth-shell .registration-card,
     body.aws-auth-shell .error-card,
     body.aws-auth-shell main > div,
     body.aws-auth-shell main > section {

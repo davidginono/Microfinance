@@ -143,6 +143,7 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 - On initial loads and workspace transitions, keep unfinished layouts hidden until their styles and component initialization are ready. Retain individual spinners in measured destination sections; when geometry is unavailable or components are being initialized, place the workspace spinner at the top left. Never flash native/legacy controls, duplicate toolbars or an earlier layout before the current components appear.
 - Shared UI initialization uses `WorkspaceNavigation.onReady`, independently of unrelated image/frame/window-load completion. Keep shared styles connected, prepare destination styles before replacing content, and preserve native financial forms, CSRF, permissions, edited values and local error recovery. Apply this contract across all shared-shell workspaces.
 - Financial statements use the title Reports Preview and bottom-right Save Draft action. Tab requests replace only the report section, with its own spinner; preserve the workspace, tab bar, view settings and action forms, updating their selected-report context after success.
+- Remove superseded UI at its source instead of retaining hidden layouts, duplicate theme declarations or obsolete component handlers behind newer overrides. Check JSP, JavaScript, Java-generated markup and dynamic asset/class references before deletion; retain live compatibility identifiers, browser fallbacks and current request-owned components.
 
 ### Versioned chart of accounts (2026-10-18)
 

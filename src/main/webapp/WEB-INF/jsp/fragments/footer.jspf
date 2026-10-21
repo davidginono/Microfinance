@@ -39,9 +39,6 @@
 
         let desktopCollapsed = window.WorkspaceNavigation?.sidebarCollapsed ?? true;
         const desktopSidebarMedia = window.matchMedia("(min-width: 1024px)");
-        let collapsedSidebarTooltip = null;
-        let collapsedSidebarFlyout = null;
-        let collapsedSidebarFlyoutOwner = null;
 
         function applyDesktopSidebarCollapsed(collapsed) {
             window.WorkspaceNavigation?.rememberSidebar(collapsed);
@@ -50,10 +47,6 @@
             sidebar.inert = !desktopSidebarMedia.matches && !isSidebarOpen();
             if (sidebar.inert) sidebar.setAttribute('aria-hidden', 'true');
             else sidebar.removeAttribute('aria-hidden');
-            if (!shouldCollapse) {
-                hideCollapsedSidebarTooltip();
-                hideCollapsedSidebarFlyout();
-            }
             if (desktopToggle) {
                 desktopToggle.setAttribute("aria-expanded", String(!shouldCollapse));
                 const label = shouldCollapse ? desktopToggle.dataset.expandLabel : desktopToggle.dataset.collapseLabel;
@@ -97,7 +90,6 @@
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
                 closeSidebar();
-                hideCollapsedSidebarFlyout();
             }
         });
 
@@ -154,149 +146,6 @@
 
         const sidebarScroll = sidebar.querySelector(".shell-sidebar-scroll");
         const lastClickedSidebarKey = sidebarStateKey("lastClickedLink");
-
-        function prepareCollapsedSidebarLabels() {
-            if (!sidebarScroll) {
-                return;
-            }
-            sidebarScroll.querySelectorAll("a[href], button").forEach(function (item) {
-                const label = (item.textContent || "").replace(/\s+/g, " ").trim();
-                if (!label) {
-                    return;
-                }
-                if (!item.getAttribute("aria-label")) {
-                    item.setAttribute("aria-label", label);
-                }
-                item.dataset.sidebarLabel = label;
-            });
-        }
-
-        function ensureCollapsedSidebarTooltip() {
-            if (!collapsedSidebarTooltip) {
-                collapsedSidebarTooltip = document.createElement("div");
-                collapsedSidebarTooltip.className = "shell-sidebar-tooltip";
-                collapsedSidebarTooltip.setAttribute("role", "tooltip");
-                document.body.appendChild(collapsedSidebarTooltip);
-            }
-            return collapsedSidebarTooltip;
-        }
-
-        function sidebarTooltipTarget(event) {
-            const eventTarget = event.target instanceof Element ? event.target : null;
-            if (!eventTarget || !isDesktopSidebarCollapsed() || isCollapsedSidebarFlyoutVisible()) {
-                return null;
-            }
-            return eventTarget.closest(".shell-sidebar-scroll a[href], .shell-sidebar-scroll button");
-        }
-
-        function showCollapsedSidebarTooltip(target) {
-            if (!target || !target.dataset.sidebarLabel) {
-                return;
-            }
-            const tooltip = ensureCollapsedSidebarTooltip();
-            tooltip.textContent = target.dataset.sidebarLabel;
-            const rect = target.getBoundingClientRect();
-            const top = Math.min(Math.max(rect.top + rect.height / 2, 36), window.innerHeight - 36);
-            tooltip.style.left = Math.round(rect.right + 10) + "px";
-            tooltip.style.top = Math.round(top) + "px";
-            tooltip.classList.add("is-visible");
-        }
-
-        function hideCollapsedSidebarTooltip() {
-            if (collapsedSidebarTooltip) {
-                collapsedSidebarTooltip.classList.remove("is-visible");
-            }
-        }
-
-        function isDesktopSidebarCollapsed() {
-            return document.documentElement.classList.contains("shell-sidebar-collapsed") && desktopSidebarMedia.matches;
-        }
-
-        function ensureCollapsedSidebarFlyout() {
-            if (!collapsedSidebarFlyout) {
-                collapsedSidebarFlyout = document.createElement("div");
-                collapsedSidebarFlyout.className = "shell-sidebar-flyout";
-                collapsedSidebarFlyout.setAttribute("role", "menu");
-                document.body.appendChild(collapsedSidebarFlyout);
-            }
-            return collapsedSidebarFlyout;
-        }
-
-        function hideCollapsedSidebarFlyout() {
-            collapsedSidebarFlyoutOwner = null;
-            if (collapsedSidebarFlyout) {
-                collapsedSidebarFlyout.classList.remove("is-visible");
-            }
-        }
-
-        function isCollapsedSidebarFlyoutVisible() {
-            return !!collapsedSidebarFlyout && collapsedSidebarFlyout.classList.contains("is-visible");
-        }
-
-        function positionCollapsedSidebarFlyout(owner) {
-            if (!collapsedSidebarFlyout || !owner) {
-                return;
-            }
-            const rect = owner.getBoundingClientRect();
-            const flyoutWidth = collapsedSidebarFlyout.offsetWidth || 224;
-            const flyoutHeight = collapsedSidebarFlyout.offsetHeight || 120;
-            const left = Math.min(rect.right + 10, Math.max(10, window.innerWidth - flyoutWidth - 10));
-            const top = Math.min(Math.max(rect.top, 10), Math.max(10, window.innerHeight - flyoutHeight - 10));
-            collapsedSidebarFlyout.style.left = Math.round(left) + "px";
-            collapsedSidebarFlyout.style.top = Math.round(top) + "px";
-        }
-
-        function sourceLinkIsActive(source) {
-            return Array.from(source.classList).some(function (className) {
-                return className === "text-cyan-800"
-                    || className === "text-blue-800"
-                    || className === "text-green-800"
-                    || className === "text-amber-800"
-                    || className === "text-teal-800"
-                    || className === "text-emerald-800"
-                    || className === "text-sacco-blue"
-                    || className === "text-sacco-green"
-                    || className === "text-sacco-brown";
-            });
-        }
-
-        function showCollapsedSidebarFlyout(toggle, panel) {
-            if (!toggle || !panel) {
-                return;
-            }
-            const links = Array.from(panel.querySelectorAll("a[href]"));
-            if (links.length === 0) {
-                return;
-            }
-
-            hideCollapsedSidebarTooltip();
-            const flyout = ensureCollapsedSidebarFlyout();
-            flyout.textContent = "";
-
-            const title = document.createElement("div");
-            title.className = "shell-sidebar-flyout-title";
-            title.textContent = toggle.dataset.sidebarLabel || (toggle.textContent || "").replace(/\s+/g, " ").trim();
-            flyout.appendChild(title);
-
-            const list = document.createElement("div");
-            list.className = "shell-sidebar-flyout-list";
-            links.forEach(function (source) {
-                const link = document.createElement("a");
-                link.className = "shell-sidebar-flyout-link";
-                if (sourceLinkIsActive(source)) {
-                    link.classList.add("is-active");
-                }
-                link.href = source.getAttribute("href") || source.href;
-                link.textContent = (source.textContent || "").replace(/\s+/g, " ").trim();
-                link.setAttribute("role", "menuitem");
-                list.appendChild(link);
-            });
-            flyout.appendChild(list);
-
-            collapsedSidebarFlyoutOwner = toggle;
-            flyout.classList.add("is-visible");
-            positionCollapsedSidebarFlyout(toggle);
-        }
 
         function normalizeSidebarUrl(url) {
             try {
@@ -405,10 +254,6 @@
             const storedState = activeState || (stored === null ? true : stored === "true");
             applyExpanded(storedState);
             toggle.addEventListener("click", function () {
-                if (isDesktopSidebarCollapsed()) {
-                    showCollapsedSidebarFlyout(toggle, panel);
-                    return;
-                }
                 const isExpanded = toggle.getAttribute("aria-expanded") === "true";
                 const nextExpanded = !isExpanded;
                 applyExpanded(nextExpanded);
@@ -418,60 +263,7 @@
 
         if (sidebarScroll) {
             sidebarScroll.addEventListener("click", reMembersidebarClick);
-            prepareCollapsedSidebarLabels();
-            sidebarScroll.addEventListener("mouseover", function (event) {
-                const target = sidebarTooltipTarget(event);
-                if (target) {
-                    showCollapsedSidebarTooltip(target);
-                } else {
-                    hideCollapsedSidebarTooltip();
-                }
-            });
-            sidebarScroll.addEventListener("mousemove", function (event) {
-                const target = sidebarTooltipTarget(event);
-                if (target) {
-                    showCollapsedSidebarTooltip(target);
-                } else {
-                    hideCollapsedSidebarTooltip();
-                }
-            });
-            sidebarScroll.addEventListener("mouseout", function (event) {
-                const related = event.relatedTarget instanceof Element ? event.relatedTarget : null;
-                if (!related || !sidebarScroll.contains(related)) {
-                    hideCollapsedSidebarTooltip();
-                }
-            });
-            sidebarScroll.addEventListener("focusin", function (event) {
-                showCollapsedSidebarTooltip(sidebarTooltipTarget(event));
-            });
-            sidebarScroll.addEventListener("focusout", hideCollapsedSidebarTooltip);
-            sidebarScroll.addEventListener("scroll", function () {
-                hideCollapsedSidebarTooltip();
-                hideCollapsedSidebarFlyout();
-            }, { passive: true });
         }
-
-        document.addEventListener("click", function (event) {
-            const target = event.target instanceof Element ? event.target : null;
-            if (!target || !collapsedSidebarFlyout || !collapsedSidebarFlyout.classList.contains("is-visible")) {
-                return;
-            }
-            if (collapsedSidebarFlyout.contains(target) || (collapsedSidebarFlyoutOwner && collapsedSidebarFlyoutOwner.contains(target))) {
-                return;
-            }
-            hideCollapsedSidebarFlyout();
-        });
-
-        window.addEventListener("resize", function () {
-            if (!collapsedSidebarFlyout || !collapsedSidebarFlyout.classList.contains("is-visible")) {
-                return;
-            }
-            if (isDesktopSidebarCollapsed() && collapsedSidebarFlyoutOwner) {
-                positionCollapsedSidebarFlyout(collapsedSidebarFlyoutOwner);
-            } else {
-                hideCollapsedSidebarFlyout();
-            }
-        });
 
         if (adminScopeToggle && adminScopePanel) {
             adminScopeToggle.addEventListener("click", function () {
