@@ -63,10 +63,9 @@ class VoucherMvcTest {
    .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.number").value("PV-2026-00000017"));
   verify(service).reserveNumber(actor,Type.PAYMENT,LocalDate.of(2026,10,8),key);
  }
- @Test void createVoucherHubShowsOnlyTypesTheCurrentUserCanCreate()throws Exception{
+ @Test void obsoleteVoucherHubRedirectsToDashboardShortcuts()throws Exception{
   var types=List.of(Type.RECEIPT,Type.JOURNAL);when(service.creatableTypes(actor)).thenReturn(types);
-  mvc.perform(get("/finance/vouchers/new").with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/vouchers/launch"))
-   .andExpect(model().attribute("creatableVoucherTypes",types));
+  mvc.perform(get("/finance/vouchers/new").with(user(actor))).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/staff/dashboard"));
   verify(service).creatableTypes(actor);
  }
  @Test void clientLookupAndVoucherBindingUseTheAuthenticatedWorkspace()throws Exception{

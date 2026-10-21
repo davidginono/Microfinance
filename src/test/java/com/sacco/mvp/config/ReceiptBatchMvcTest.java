@@ -42,6 +42,13 @@ class ReceiptBatchMvcTest {
         mvc.perform(put("/finance/batches/receipts/"+batch+"/items/"+item).with(user(actor)).with(csrf()).contentType("application/json").content("{\"expectedVersion\":2,\"form\":{\"rows\":[{\"amount\":\"9999999999999999.99\"}]}}" )).andExpect(status().isOk());
         verify(batches).save(eq(actor),eq(batch),eq(item),argThat(f->f.expectedVersion()==2 && f.form().getRows().getFirst().getAmount().toPlainString().equals("9999999999999999.99")));
     }
+    @Test void linkingConfiguredAccountsRequiresCsrfAndUsesTheSavedItemVersion()throws Exception{
+        String path="/finance/batches/receipts/"+batch+"/items/"+item+"/link-accounts";
+        mvc.perform(post(path).with(user(actor)).contentType("application/json").content("{\"expectedVersion\":3}")).andExpect(status().isForbidden());
+        verifyNoInteractions(batches);
+        mvc.perform(post(path).with(user(actor)).with(csrf()).contentType("application/json").content("{\"expectedVersion\":3,\"stationId\":\"FOREIGN\"}")).andExpect(status().isOk());
+        verify(batches).linkAccounts(actor,batch,item,new LinkAccounts(3));
+    }
     @Test void postingUsesReviewedVersionAndDoesNotInvokeAnApprovalWorkflow()throws Exception{
         var b=new Batch(batch,"I1","B1",actor.getMemberId(),"Collections",7,"POSTING",false,null,OffsetDateTime.now());when(batches.get(actor,batch)).thenReturn(new Summary(b,2,0,2,0,new BigDecimal("3.03"),BigDecimal.ZERO));
         mvc.perform(post("/finance/batches/receipts/"+batch+"/post?version=6").with(user(actor)).with(csrf())).andExpect(status().isOk()).andExpect(jsonPath("$.remainingTotal").value("3.03")).andExpect(header().string("Cache-Control","no-store"));verify(batches).start(actor,batch,6,true);

@@ -477,6 +477,21 @@ class LoanRecordingPostgresTest {
         var repository=new LoanRecordingRepository(jdbc);
         for(var sort:List.of("number_asc","number_desc","balance_asc","balance_desc"))assertThat(repository.loans(actor,new Filter("",null,null,"",sort,0,null,null),TODAY,10,0)).hasSize(1);
     }
+    @Test void receiptBatchAccountLinkingIsScopedVersionedAndKeepsFrozenAccounts(){
+        var loan=disbursed("D-BATCH-LINK");var batch=batches().create(actor,"Synthetic account linking");var item=UUID.randomUUID();
+        var saved=batches().save(actor,batch,item,new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.SaveItem(0,receiptForm(loan)));
+        var command=new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.LinkAccounts(saved.version());
+        int journals=jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution);
+        var nextInterest=account("NEXT-BATCH-INTEREST","INCOME","CREDIT","POSTING","INCOME");
+        jdbc.update("update loan_product_settings set interest_gl_account_id=? where id=?",nextInterest,product);
+        batches().linkAccounts(actor,batch,item,command);batches().linkAccounts(actor,batch,item,command);
+        assertThat(service.linkedAccounts(actor,loan).orElseThrow().interestId()).isEqualTo(interest);
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isEqualTo(journals);
+        assertThatThrownBy(()->batches().linkAccounts(operator("B2"),batch,item,command)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->batches().linkAccounts(operator("B1"),batch,item,command)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->batches().linkAccounts(actor,batch,item,new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.LinkAccounts(saved.version()+1))).hasMessage("batch.error.stale");
+        assertThat(batches().estimate(actor,batch,item).lines().getFirst().interestAccountId()).isEqualTo(interest);
+    }
     @Test void unifiedReceiptPostsAllLoansOnceAndRetainsHistoricalReceipts(){
         var first=disbursed("D-GROUP-1");var second=disbursed("D-GROUP-2");var f=receiptForm(first,second);
         var preview=receiptService().preview(actor,f);assertThat(preview).hasSize(2);assertThat(preview.getFirst().principal()).isEqualByComparingTo("100.00");

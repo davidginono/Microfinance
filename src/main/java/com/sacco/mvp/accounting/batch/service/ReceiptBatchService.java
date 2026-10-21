@@ -62,6 +62,18 @@ public class ReceiptBatchService {
     public void cancel(AppUserPrincipal a,UUID id){authorize(a,true);var b=find(a,id,true);owner(a,b);require(Set.of("VALIDATING","POSTING").contains(b.state()),"busy");repository.cancel(id);event(a,id,"RECEIPT_BATCH_STOP_REQUESTED");}
     @Transactional
     public Plan estimate(AppUserPrincipal a,UUID batch,UUID item){authorize(a,true);var b=find(a,batch,false);owner(a,b);var i=repository.item(batch,item).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));return plan(a,i,List.of());}
+    @Transactional
+    public Item linkAccounts(AppUserPrincipal a,UUID batch,UUID item,LinkAccounts request){
+        authorize(a,true);editable(a,batch);
+        var row=repository.item(batch,item).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));
+        require(request!=null && request.expectedVersion()==row.version() && !row.state().equals("POSTED"),"stale");
+        require(row.form().getClientId()!=null && row.form().getRows().stream().allMatch(r->r.getLoanId()!=null),"input");
+        var ids=row.form().getRows().stream().map(RowForm::getLoanId).distinct().sorted().toList();
+        loans.lockReceiptLoans(a,ids,row.form().getClientId());
+        for(var loan:ids)loans.linkExistingProductAccounts(a,loan);
+        repository.invalidate(batch);repository.state(batch,"DRAFT",clock.now());
+        return repository.item(batch,item).orElseThrow();
+    }
     // Used by both synchronous estimates and the durable validator; no balances come from the browser.
     public Plan plan(AppUserPrincipal a,Item item,List<Plan> prior){
         Form f=item.form();var policy=policies.effective(a,f.getEffectiveDate(),true);f.setInterestAccountId(null);receipts.preview(a,f);

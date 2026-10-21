@@ -18,6 +18,7 @@ public final class ReceiptBatchDtos {
         public Item withFailureMessage(String message){return new Item(id,lineNo,version,state,form,clientLabel,labels,preview,failureKey,receiptId,total,message);}
     }
     public record SaveItem(int expectedVersion,Form form) {}
+    public record LinkAccounts(int expectedVersion) {}
     public record Plan(UUID policyId,int policyVersion,AllocationOrder allocationOrder,String moneyAccount,
                        String interestAccount,List<PlanLine> lines,@JsonFormat(shape=STRING) BigDecimal total,
                        @JsonFormat(shape=STRING) BigDecimal principal,@JsonFormat(shape=STRING) BigDecimal interest) {}

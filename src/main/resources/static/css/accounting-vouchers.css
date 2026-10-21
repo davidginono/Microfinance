@@ -28,12 +28,3 @@
 .voucher-number-retry{width:max-content}
 @keyframes voucher-number-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.voucher-number-spinner{animation-duration:1.8s}}
-.voucher-launch-panel{padding:18px}
-.voucher-launch-panel>h2{margin:0 0 5px}
-.voucher-launch-panel>.voucher-help{margin:0 0 16px}
-.voucher-launch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.voucher-launch-card{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:76px;padding:16px;border:1px solid #cbd5dc;border-radius:5px;background:#fff;color:#172b4d;text-decoration:none;font-weight:650;transition:border-color .15s,background-color .15s}
-.voucher-launch-card:hover,.voucher-launch-card:focus-visible{border-color:#0073bb;background:#f2f9fd;color:#005b99}
-.voucher-launch-card__arrow{font-size:24px;color:#0073bb}
-@media(max-width:800px){.voucher-launch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){.voucher-launch-grid{grid-template-columns:1fr}.voucher-launch-panel{padding:12px}}

@@ -12,7 +12,7 @@
     <span data-message="field.reference"><spring:message code="batch.field.reference" text="Reference has an invalid format." /></span>
     <span data-message="field.loan"><spring:message code="batch.field.loan" text="Loan is not eligible for repayment." /></span>
     <span data-message="field.amount"><spring:message code="batch.field.amount" text="Use a positive TZS amount, up to 2 decimals." /></span>
-    <span data-message="field.accounts"><spring:message code="batch.field.accounts" text="Loan product accounts are not linked." /></span>
+    <span data-message="field.accounts"><spring:message code="batch.field.accounts" text="This existing loan needs its configured product accounts linked." /></span>
     <span data-message="field.charges"><spring:message code="batch.field.charges" text="Pay fees via loan receipt." /></span>
     <span data-message="field.policy"><spring:message code="batch.field.policy" text="No repayment rules for this date." /></span>
     <span data-message="field.debt"><spring:message code="batch.field.debt" text="Amount exceeds unpaid loan debt." /></span>
@@ -43,4 +43,5 @@
     <span data-message="field.schedule"><spring:message code="batch.field.schedule" text="Loan schedule cannot be verified." /></span>
     <span data-message="field.duplicateLoan"><spring:message code="batch.field.duplicateLoan" text="Loan already used in this receipt." /></span>
     <span data-message="field.referenceLength"><spring:message code="batch.field.referenceLength" text="Reference exceeds 80 characters." /></span>
+    <span data-message="linkAccounts"><spring:message code="batch.linkAccounts" /></span>
 </div>

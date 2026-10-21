@@ -165,6 +165,15 @@ public class AccessControlService {
         return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.LOAN_OFFICER_QUEUE_VIEW);
     }
 
+    public boolean staffDashboardAccess(AppUserPrincipal principal) {
+        return isStaffSession(principal) && notPlatformIdentity(principal)
+            && principal.getSaccoId()!=null && !principal.getSaccoId().isBlank()
+            && principal.getStationId()!=null && !principal.getStationId().isBlank()
+            && (canViewAnyReviewQueue(principal) || hasAny(principal, UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
+                UserClaim.ACCOUNTING_BUSINESS_CREATE, UserClaim.ACCOUNTING_JOURNALS_CREATE)
+                || (isWorkspaceAdminScope(principal) && has(principal, UserClaim.ADMIN_DASHBOARD_VIEW)));
+    }
+
     public boolean canAccessManagerArea(AppUserPrincipal principal) {
         return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.MANAGER_QUEUE_VIEW);
     }

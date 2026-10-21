@@ -157,6 +157,11 @@ public class SecurityConfig {
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && accessControlService.canAccessBoardArea(appUser));
                 })
+                .requestMatchers("/staff/dashboard").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.staffDashboardAccess(appUser));
+                })
                 .requestMatchers("/staff/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser

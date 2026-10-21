@@ -69,8 +69,18 @@ test('editing while an older estimate is pending prevents its stale error return
 });
 test('loan account errors sit below Loan ID rather than the status or amount',async()=>{
   const {dom,d}=await setup(()=>{},{failureKey:'recording.error.loanAccountsMissing'});try{
-    const [issue]=visible(d);assert.equal(issue.textContent,'Loan product accounts are not linked.');assert.equal(issue.closest('td').dataset.label,'loan');
+    const [issue]=visible(d);assert.equal(issue.textContent,'This existing loan needs its configured product accounts linked.');assert.equal(issue.closest('td').dataset.label,'loan');
     assert.equal(d.querySelector('.batch-row td:last-child .batch-field-error'),null);
+  }finally{dom.window.close();}
+});
+
+test('configured account linking retries the saved receipt estimate without changing entered amounts or posting money',async()=>{
+  const {dom,w,d}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'cash',lines:[]})),{failureKey:'recording.error.loanAccountsMissing'});
+  try{
+    const original=w.fetch,calls=[];w.fetch=async(url,options)=>{calls.push({url,options});if(url.endsWith('/link-accounts'))return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({version:0})};return original(url,options);};
+    const action=[...d.querySelectorAll('.batch-row button')].find(button=>button.textContent==='linkAccounts');assert.ok(action);assert.equal(action.hidden,false);action.click();await settle();
+    const link=calls.find(call=>call.url.endsWith('/link-accounts'));assert.equal(link.options.method,'POST');assert.equal(JSON.parse(link.options.body).expectedVersion,0);
+    assert.ok(calls.some(call=>call.url.endsWith('/estimate')));assert.equal(calls.some(call=>call.url.endsWith('/post')),false);assert.equal(visible(d).length,0);assert.equal(d.querySelector('input[type="number"]').value,'500.00');
   }finally{dom.window.close();}
 });
 test('required fields have independent messages and reveal a missing receiving account',async()=>{

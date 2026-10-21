@@ -57,9 +57,9 @@
     <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
     <h1 class="erp-page-title">${dashboardPageTitleValue}</h1>
 </div>
-<sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE') or @access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')"><div class="dashboard-create-actions"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/new' />"><spring:message code="voucher.createHub" /></a></div></sec:authorize>
 
 <div data-dashboard-board="staff" aria-busy="true">
+<%@ include file="../fragments/dashboard-voucher-shortcuts.jspf" %>
 <section class="erp-stat-grid" data-dashboard-widget="overview" data-widget-width="4" data-widget-height="360" data-widget-title="<spring:message code='dashboard.widget.overview' />">
     <a href="${dashboardTotalDisbursedHrefValue}" class="erp-stat-card erp-stat-card-interactive erp-stat-green block no-underline" aria-label="Open total disbursed loans">
         <div class="erp-stat-main">

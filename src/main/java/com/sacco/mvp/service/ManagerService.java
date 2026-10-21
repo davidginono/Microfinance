@@ -53,6 +53,14 @@ public class ManagerService {
     }
 
     public ManagerDashboard dashboard(String saccoId, String stationId) {
+        return dashboard(saccoId,stationId,true);
+    }
+
+    public ManagerDashboard dashboardSummary(String saccoId,String stationId) {
+        return dashboard(saccoId,stationId,false);
+    }
+
+    private ManagerDashboard dashboard(String saccoId,String stationId,boolean includeRecent) {
         LocalDate today = LocalDate.now();
         LocalDate currentYearStart = today.withDayOfYear(1);
         LocalDate recentCutoff = today.minusDays(30);
@@ -79,42 +87,18 @@ public class ManagerService {
         );
 
         List<StatusCount> breakdown = new ArrayList<>();
-        for (LoanStatus status : List.of(
-            LoanStatus.DRAFT,
-            LoanStatus.SUBMITTED,
-            LoanStatus.AWAITING_GUARANTORS,
-            LoanStatus.ALL_GUARANTORS_APPROVED,
-            LoanStatus.READY_FOR_MANAGER,
-            LoanStatus.MANAGER_ACCEPTED,
-            LoanStatus.AWAITING_LOAN_OFFICER,
-            LoanStatus.LOAN_OFFICER_APPROVED,
-            LoanStatus.LOAN_OFFICER_REJECTED,
-            LoanStatus.AWAITING_BOARD,
-            LoanStatus.AWAITING_CREDIT_COMMITTEE,
-            LoanStatus.BOARD_APPROVED,
-            LoanStatus.AWAITING_ACCOUNTANT,
-            LoanStatus.ACCOUNTANT_APPROVED,
-            LoanStatus.ACCOUNTANT_REJECTED,
-            LoanStatus.READY_FOR_DISBURSEMENT,
-            LoanStatus.MANAGER_REJECTED,
-            LoanStatus.BOARD_REJECTED,
-            LoanStatus.REJECTED,
-            LoanStatus.DISBURSED,
-            LoanStatus.PAR,
-            LoanStatus.DEFAULTED,
-            LoanStatus.PAID
-        )) {
+        for (LoanStatus status : LoanStatus.values()) {
             breakdown.add(new StatusCount(status, counts.getOrDefault(status, 0L)));
         }
 
-        List<LoanApplication> recentDisbursements = loanApplicationRepository.findRecentDisbursementsForScope(
+        List<LoanApplication> recentDisbursements = includeRecent ? loanApplicationRepository.findRecentDisbursementsForScope(
             saccoId,
             blankToNull(stationId),
             List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF, LoanStatus.PAID),
             recentCutoff,
             recentCutoff.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()),
             PageRequest.of(0, 5)
-        );
+        ) : List.of();
 
         return new ManagerDashboard(
             totalLoans,

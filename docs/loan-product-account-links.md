@@ -57,3 +57,7 @@ Use only a disposable loopback `microfinance_recording_test` database for the gu
 - The changes reuse the JSP shell, native form bindings, CSRF, claims and existing account-approval decisions. Provisioning uses the existing short institution setup lock and bounded exact lookups; no remote calls, background jobs or executors are introduced. V85 adds only immutable configuration linkage, lookup identities and deferred safeguards. Helpers, test data and screenshots remain under ignored `target/configuration-request-check/`; no operational records were changed.
 
 Restart/rebuild the application to apply V85 through normal Flyway startup before creating products. Existing products and historical financial records are not backfilled or repriced.
+
+## Existing-loan account links in receipt batches (21 October 2026)
+
+An existing loan can still lack its immutable account binding after its product has been configured. Receipt Batch Processing now offers **Link configured accounts** beside that specific validation error. The explicit POST uses the saved receipt item and revision, requires its owner and posting claims, locks its scoped loans, checks the selected client and original disbursement principal account, and reuses the existing audited linking service. All loans in the item link transactionally; the draft is revalidated afterward. Existing frozen bindings and financial postings are unchanged. Missing/unapproved product accounts or a principal mismatch remain actionable errors rather than being silently accepted.

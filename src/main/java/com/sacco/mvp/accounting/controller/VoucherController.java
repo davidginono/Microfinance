@@ -52,7 +52,7 @@ public class VoucherController {
         vouchers.authorize(actor,type(kind),"CREATE");var f=new Form();f.setEffectiveDate(clock.today());
         if(!Set.of("OTHER","LOAN_REPAYMENT").contains(purpose) || (type(kind)!=Type.RECEIPT && !"OTHER".equals(purpose)))throw new Invalid("","request");
         f.setReceiptPurpose(purpose);if(loanId!=null){if(!"LOAN_REPAYMENT".equals(purpose))throw new Invalid("","request");loanReceipts.prefill(actor,f,loanId);}
-        model.addAttribute("voucherForm",f);formContext(kind,actor,f,model);return "accounting/vouchers/form";
+        model.addAttribute("voucherForm",f);model.addAttribute("newVoucherForm",true);formContext(kind,actor,f,model);return "accounting/vouchers/form";
     }
     @PostMapping("/number") @ResponseBody
     public ResponseEntity<NumberReservation> number(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,

@@ -75,7 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function bindField(item,field,control,host,index = 0){
         const issue = el('span',null,'batch-field-error');issue.id = 'receipt-' + item.id + '-' + field + '-' + index;issue.hidden = true;issue.setAttribute('role','status');
-        const binding = {field,control,issue,index};item.fields.push(binding);host.append(issue);queueMicrotask(()=>syncField(binding));
+        const binding = {field,control,issue,index};item.fields.push(binding);host.append(issue);
+        if(field==='loan'){
+            binding.link=button(t('linkAccounts'),()=>linkConfiguredAccounts(item,binding.link),'app-btn btn-neutral');binding.link.hidden=true;host.append(binding.link);
+        }
+        queueMicrotask(()=>syncField(binding));
     }
     function fieldIssue(item,field,key,checking = false,index){
         item.fields.filter(binding=>binding.field === field && (index === undefined || binding.index === index)).forEach(binding=>{
@@ -84,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     function showIssue(item,message,checking = false,code = '',field,index){
-        if(!item.fields)return;item.fields.forEach(binding=>{binding.issue.hidden = true;binding.issue.textContent = '';binding.issue.removeAttribute('title');syncField(binding);});
+        if(!item.fields)return;item.fields.forEach(binding=>{binding.issue.hidden = true;binding.issue.textContent = '';binding.issue.removeAttribute('title');if(binding.link)binding.link.hidden=true;syncField(binding);});
         if(!message)return;
         if(checking){fieldIssue(item,'amount','checking',true);return;}
         if(field){fieldIssue(item,field,'lookup',false,index);return;}
@@ -105,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else requireField(!/^\d+(\.\d{1,2})?$/.test(amount),'amount','amountFormat',n);
         });
         if(missing)return;
-        if(/loanAccountsMissing/.test(code))fieldIssue(item,'loan','accounts');
+        if(/loanAccountsMissing/.test(code)){fieldIssue(item,'loan','accounts');item.fields.filter(binding=>binding.link).forEach(binding=>binding.link.hidden=!editable() || item.state==='POSTED');}
         else if(/productPrincipalMismatch/.test(code))fieldIssue(item,'loan','principalAccount');
         else if(/productAccountsMissing/.test(code))fieldIssue(item,'loan','productAccounts');
         else if(/productAccountsInvalid/.test(code))fieldIssue(item,'loan','inactiveAccounts');
@@ -158,6 +162,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if(dirty.has(item.id) && item.generation !== generation)return save(item);
     }
     async function flush(){for(const item of rows.values())if(dirty.has(item.id) || item.saving)await save(item);if(dirty.size)throw new Error(t('saveFailed'));}
+    async function linkConfiguredAccounts(item,trigger){
+        if(trigger.disabled)return;trigger.disabled=true;
+        try{
+            await flush();const generation=item.generation;pending.add(item.id);controls();
+            const saved=await api(url+'/items/'+item.id+'/link-accounts','POST',{expectedVersion:item.version});item.version=saved.version;item.state=saved.state||'DRAFT';item.failureKey=null;
+            for(const other of rows.values())if(other!==item && other.state!=='POSTED'){other.state='DRAFT';other.preview=null;other.allocation?.replaceChildren();if(other.mapping)other.mapping.textContent='';paintStatus(other);}
+            const estimate=await api(url+'/items/'+item.id+'/estimate','POST');
+            if(generation===item.generation){item.preview=estimate;item.estimated=true;showIssue(item,'');paintPreview(item);paintStatus(item);}
+            await refreshSummary();
+        }catch(error){showIssue(item,error.message,false,error.code);}
+        finally{pending.delete(item.id);trigger.disabled=false;saveStatus();controls();}
+    }
     function paintStatus(item){if(!item.status)return;item.status.replaceChildren(el('span',t('state.' + item.state)));if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}}
     function paintPreview(item){
         const plan = item.preview;item.amountTotal && (item.amountTotal.textContent = total(item));
