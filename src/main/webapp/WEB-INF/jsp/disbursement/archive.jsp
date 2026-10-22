@@ -6,43 +6,22 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.archive.breadcrumb" text="Disbursement Panel / Archive" /></p>
     <h1 class="erp-page-title" id="disbursement-archive-title"><spring:message code="disbursement.archive.title" text="Disbursement Archive" /></h1>
 </div>
 
-<section class="aws-current-filter-toolbar" aria-labelledby="disbursementArchiveCurrentFilterLabel">
-        <div class="aws-current-filter-summary">
-            <div class="aws-current-filter-copy">
-                <p id="disbursementArchiveCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-                <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
-            </div>
-        </div>
-        <c:url var="disbursementArchiveAllUrl" value="/disbursement/archive"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <c:url var="disbursementArchiveActiveUrl" value="/disbursement/archive"><c:param name="filter" value="DISBURSED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <c:url var="disbursementArchivePaidUrl" value="/disbursement/archive"><c:param name="filter" value="PAID" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <c:url var="disbursementArchiveDefaultedUrl" value="/disbursement/archive"><c:param name="filter" value="DEFAULTED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <div class="erp-filter-row aws-current-filter-tabs">
-            <a href="${disbursementArchiveAllUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                <spring:message code="archive.allDisbursedLoans" text="All Disbursed Loans" />
-            </a>
-            <a href="${disbursementArchiveActiveUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-                <spring:message code="archive.activeDisbursedLoans" text="Active Disbursed Loans" />
-            </a>
-            <a href="${disbursementArchivePaidUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'PAID' ? 'is-active' : ''}">
-                <spring:message code="archive.paidLoans" text="Paid Loans" />
-            </a>
-            <a href="${disbursementArchiveDefaultedUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'DEFAULTED' ? 'is-active' : ''}">
-                <spring:message code="archive.defaultedLoans" text="Defaulted Loans" />
-            </a>
-        </div>
-        <form action="/disbursement/archive" method="get" class="erp-filter-form disbursement-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="disbursement-archive-1">
-            <input type="hidden" name="filter" value="${currentFilterKey}" />
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Disbursement Archive results" data-table-sync-query="true" data-resource-table="disbursement-archive-1" data-resource-split data-table-title-id="disbursement-archive-title">
+<form action="/disbursement/archive" method="get" class="erp-filter-form disbursement-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="disbursement-archive-1">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <spring:message code="common.status" />
+                <select name="filter" class="aws-control">
+                    <option value="ALL" ${currentFilterKey eq 'ALL' ? 'selected' : ''}><spring:message code="archive.allDisbursedLoans" text="All Disbursed Loans" /></option>
+                    <option value="DISBURSED" ${currentFilterKey eq 'DISBURSED' ? 'selected' : ''}><spring:message code="archive.activeDisbursedLoans" text="Active Disbursed Loans" /></option>
+                    <option value="PAID" ${currentFilterKey eq 'PAID' ? 'selected' : ''}><spring:message code="archive.paidLoans" text="Paid Loans" /></option>
+                    <option value="DEFAULTED" ${currentFilterKey eq 'DEFAULTED' ? 'selected' : ''}><spring:message code="archive.defaultedLoans" text="Defaulted Loans" /></option>
+                </select>
+            </label>
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="loan.loanId" text="Loan ID" />
                 <input type="search"
@@ -66,9 +45,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.applyFilters" text="Apply Filters" /></button>
             </div>
         </form>
-</section>
 
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Disbursement Archive results" data-resource-table="disbursement-archive-1" data-resource-split data-table-title-id="disbursement-archive-title">
     <div class="erp-table-scroll" data-view-position-key="disbursement-archive-table">
         <table class="erp-table">
         <thead>

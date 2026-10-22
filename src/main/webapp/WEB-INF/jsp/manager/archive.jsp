@@ -6,38 +6,24 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.archive.breadcrumb" text="Manager Panel / Archive" /></p>
     <h1 class="erp-page-title" id="manager-archive-title"><spring:message code="manager.archive.title" text="Manager Archive" /></h1>
 </div>
 
-<c:url var="managerArchiveAllUrl" value="/manager/archive"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-<c:url var="managerArchiveApprovedUrl" value="/manager/archive"><c:param name="filter" value="APPROVED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-<c:url var="managerArchiveRejectedUrl" value="/manager/archive"><c:param name="filter" value="REJECTED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-<c:url var="managerArchiveDisbursedUrl" value="/manager/archive"><c:param name="filter" value="DISBURSED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-<div class="erp-filter-row">
-    <a href="${managerArchiveAllUrl}"
-       class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-        <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
-    </a>
-    <a href="${managerArchiveApprovedUrl}"
-       class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
-        <spring:message code="archive.approvedLoans" text="Approved Loans" />
-    </a>
-    <a href="${managerArchiveRejectedUrl}"
-       class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
-        <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
-    </a>
-    <a href="${managerArchiveDisbursedUrl}"
-       class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-        <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
-    </a>
-</div>
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Manager Archive results" data-table-sync-query="true" data-resource-table="manager-archive-1" data-resource-split data-table-title-id="manager-archive-title">
 <form action="/manager/archive" method="get" class="erp-filter-form manager-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="manager-archive-1">
-            <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                ${archiveSearchLabel}
+                <spring:message code="common.status" />
+                <select name="filter" class="aws-control">
+                    <option value="ALL" ${currentFilterKey eq 'ALL' ? 'selected' : ''}><spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" /></option>
+                    <option value="APPROVED" ${currentFilterKey eq 'APPROVED' ? 'selected' : ''}><spring:message code="archive.approvedLoans" text="Approved Loans" /></option>
+                    <option value="REJECTED" ${currentFilterKey eq 'REJECTED' ? 'selected' : ''}><spring:message code="archive.rejectedLoans" text="Rejected Loans" /></option>
+                    <option value="DISBURSED" ${currentFilterKey eq 'DISBURSED' ? 'selected' : ''}><spring:message code="archive.disbursedLoans" text="Disbursed Loans" /></option>
+                </select>
+            </label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <span data-table-filter-label="searchId">${archiveSearchLabel}</span>
                 <input type="search"
                        name="searchId"
                        value="${fn:escapeXml(queueSearchValue)}"
@@ -61,7 +47,6 @@
             </div>
         </form>
 
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Manager Archive results" data-resource-table="manager-archive-1" data-resource-split data-table-title-id="manager-archive-title">
     <div class="erp-table-scroll" data-view-position-key="manager-archive-table">
         <table class="erp-table">
         <thead>

@@ -176,46 +176,19 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void roleQueueCurrentFiltersUseCompactAwsSummaryStrips() throws Exception {
-        String managerQueue = read(JSP_ROOT.resolve("manager/queue.jsp"));
-        List<String> currentFilterViews = List.of(
-            managerQueue,
-            read(JSP_ROOT.resolve("disbursement/queue.jsp")),
-            read(JSP_ROOT.resolve("disbursement/archive.jsp")),
-            read(JSP_ROOT.resolve("board/assigned.jsp")),
-            read(JSP_ROOT.resolve("accountant/queue.jsp")),
-            read(JSP_ROOT.resolve("accountant/archive.jsp"))
-        );
-        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
-
-        assertThat(managerQueue)
-            .contains("<section class=\"aws-current-filter-toolbar manager-queue-filter-toolbar\" aria-labelledby=\"managerQueueCurrentFilterLabel\">")
-            .contains("id=\"managerQueueCurrentFilterLabel\"")
-            .contains("manager-queue-filter-summary")
-            .contains("class=\"erp-filter-form manager-queue-search-form aws-filter-toolbar\"");
-        for (String view : currentFilterViews) {
-            assertThat(view)
-                .contains("class=\"aws-current-filter-summary")
-                .contains("class=\"aws-current-filter-copy")
-                .contains("class=\"aws-current-filter-kicker")
-                .contains("aws-current-filter-value")
-                .contains("<c:out value=\"${currentFilterLabel}\" />")
-                .doesNotContain("<div class=\"erp-toolbar\">")
-                .doesNotContain("class=\"erp-widget-title\"><spring:message code=\"common.currentFilter\"")
-                .doesNotContain("class=\"erp-widget-heading\">${currentFilterLabel}</h2>")
-                .doesNotContain("manager-queue-filter-stack");
+    void staffStatusFiltersBelongToTheirResourceTableTools() throws Exception {
+        for (String page : List.of("manager/queue.jsp", "manager/archive.jsp", "accountant/queue.jsp",
+                "accountant/archive.jsp", "disbursement/queue.jsp", "disbursement/archive.jsp", "board/assigned.jsp")) {
+            String view = read(JSP_ROOT.resolve(page));
+            assertThat(view).doesNotContain("aws-current-filter", "erp-filter-tab")
+                .contains("data-table-filter-for=", "data-resource-table=");
+            assertThat(view.indexOf("data-table-filter-for=")).isGreaterThan(view.indexOf("data-resource-table="));
+            if (page.endsWith("archive.jsp") || page.equals("board/assigned.jsp")) {
+                assertThat(view).contains("<select name=\"filter\"");
+            }
         }
-        assertThat(consoleCss)
-            .contains(".aws-current-filter-toolbar")
-            .contains(".aws-current-filter-summary")
-            .contains("border-left: 3px solid var(--aws-orange, #ec7211)")
-            .contains("min-height: 38px")
-            .contains(".aws-current-filter-kicker")
-            .contains(".aws-current-filter-value")
-            .contains(".aws-current-filter-toolbar > .aws-filter-toolbar")
-            .contains(".aws-current-filter-toolbar > .aws-current-filter-tabs")
-            .doesNotContain("min-height: 46px")
-            .doesNotContain(".manager-queue-filter-stack");
+        assertThat(read(Path.of("src/main/resources/static/css/console-components.css")))
+            .doesNotContain("aws-current-filter", "manager-queue-filter");
     }
 
     @Test
@@ -260,6 +233,8 @@ class AwsConsoleViewContractTest {
                 }
                 // These GET forms download immutable documents; they are not search/filter forms.
                 if (isStatementDocumentPreview(path) && getForms.group().contains("/export")) continue;
+                if (getForms.group().contains("data-table-export-for=")
+                    && getForms.group().contains("/documents/reports/")) continue;
                 // Selection-dependent GET commands open version proposals; they are not filter toolbars.
                 if (getForms.group().contains("data-table-command")
                     || getForms.group().contains("accounting-create-form")) continue;

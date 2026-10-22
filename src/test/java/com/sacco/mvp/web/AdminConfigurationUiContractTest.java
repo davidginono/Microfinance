@@ -377,7 +377,8 @@ class AdminConfigurationUiContractTest {
             .doesNotContain("/admin/notifications/mark-all-read")
             .doesNotContain("<section class=\"erp-form-wrap\">\n<form action=\"/admin/incidents\"");
         assertThat(managerArchive)
-            .contains("<div class=\"erp-filter-row\">")
+            .contains("<select name=\"filter\"")
+            .containsPattern("(?s)<section class=\"erp-table-wrap\"[^>]*>\\s*<form action=\"/manager/archive\"")
             .contains("class=\"erp-filter-form manager-archive-search-form aws-filter-toolbar\"")
             .doesNotContain("common.currentFilter")
             .doesNotContain("<div class=\"erp-toolbar\">");
@@ -385,8 +386,7 @@ class AdminConfigurationUiContractTest {
             .contains(".aws-console .aws-filter-toolbar label > .neo-select")
             .contains("height: var(--sacco-control-height) !important")
             .contains("max-height: var(--sacco-control-height) !important")
-            .contains("padding-top: 0 !important")
-            .contains("margin-top: 4px !important");
+            .contains("padding-top: 0 !important");
     }
 
     @Test

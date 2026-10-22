@@ -6693,86 +6693,6 @@ html.session-timeout-active,
         display: none !important;
     }
 
-/* Shared AWS current-filter bar for role queues and archives. */
-.aws-current-filter-toolbar,
-.manager-queue-filter-toolbar {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 0;
-    margin: 0 0 10px;
-    overflow: hidden;
-    border: 1px solid var(--aws-line, #d5dbdb);
-    border-radius: 2px;
-    background: #ffffff;
-    box-shadow: 0 1px 1px rgba(0, 28, 36, .12);
-}
-
-.aws-current-filter-summary,
-.manager-queue-filter-summary {
-    display: flex;
-    min-height: 38px;
-    align-items: center;
-    border-left: 3px solid var(--aws-orange, #ec7211);
-    background: #f7f8f8;
-    padding: 6px 10px 6px 8px;
-}
-
-.aws-current-filter-copy,
-.manager-queue-filter-copy {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 3px 8px;
-}
-
-.aws-current-filter-kicker,
-.manager-queue-filter-kicker {
-    margin: 0;
-    color: #414d5c;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    line-height: 16px;
-    text-transform: uppercase;
-}
-
-.aws-current-filter-value,
-.manager-queue-filter-value {
-    margin: 0;
-    color: #000716;
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 20px;
-    overflow-wrap: anywhere;
-}
-
-.aws-current-filter-toolbar > .aws-filter-toolbar,
-.manager-queue-filter-toolbar > .aws-filter-toolbar {
-    margin: 0;
-    border: 0 !important;
-    border-top: 1px solid var(--aws-line, #d5dbdb) !important;
-    border-radius: 0 !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    padding: 8px 10px !important;
-}
-
-.aws-current-filter-toolbar > .aws-current-filter-tabs {
-    margin: 0;
-    border-top: 1px solid var(--aws-line, #d5dbdb);
-    background: #ffffff;
-    padding: 7px 10px;
-}
-
-.aws-current-filter-toolbar .erp-filter-tab {
-    min-height: 30px;
-    border-radius: 2px;
-    font-size: 12px;
-    line-height: 16px;
-}
-
 /* Source: admin loan product catalog and focused configuration workspace */
 .product-catalog {
     min-width: 0;
@@ -7427,19 +7347,6 @@ html.session-timeout-active,
             justify-content: center;
         }
 
-        .aws-current-filter-summary,
-        .manager-queue-filter-summary {
-            min-height: 36px;
-            padding: 6px 10px;
-        }
-        .aws-current-filter-value,
-        .manager-queue-filter-value {
-            font-size: 15px;
-        }
-        .aws-current-filter-toolbar > .aws-filter-toolbar,
-        .manager-queue-filter-toolbar > .aws-filter-toolbar {
-            padding: 8px !important;
-        }
         .manager-queue-search-actions > * {
             flex: 1 1 auto;
         }

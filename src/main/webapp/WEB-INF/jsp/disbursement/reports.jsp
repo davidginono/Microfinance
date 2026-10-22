@@ -10,28 +10,34 @@
     <h1 class="erp-page-title" id="disbursement-reports-title"><spring:message code="disbursement.reports.title" text="Disbursement Reports" /></h1>
 </div>
 
-<form method="get" action="/documents/reports/disbursement-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
+<form method="get" action="/documents/reports/disbursement-loans.pdf" data-page-preloader="false" data-table-toolbar-for="disbursement-reports-1" data-table-export-for="disbursement-reports-1" class="app-table-toolbar">
+    <input type="hidden" name="fromDate" value="${fromDateValue}" />
+    <input type="hidden" name="toDate" value="${toDateValue}" />
+    <button type="submit" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" /></button>
+    <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" /></button>
+</form>
+
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-table-sync-query="true" data-resource-table="disbursement-reports-1" data-resource-split data-table-title-id="disbursement-reports-title">
+<form method="get" action="/disbursement/reports" class="erp-filter-form erp-table-toolbar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="disbursement-reports-1">
     <div class="erp-table-toolbar__control">
-        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
+        <label for="disbursement-reports-1-fromDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
-               name="fromDate"
+               id="disbursement-reports-1-fromDate" name="fromDate"
                value="${fromDateValue}"
                class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div class="erp-table-toolbar__control">
-        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
+        <label for="disbursement-reports-1-toDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
-               name="toDate"
+               id="disbursement-reports-1-toDate" name="toDate"
                value="${toDateValue}"
                class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
-    <div class="erp-table-toolbar__actions pt-6">
-        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generatePdf" text="Generate PDF Report" /></button>
-        <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" text="Print" /></button>
+    <div class="resource-table-filter-actions">
+        <button type="submit" class="app-btn btn-neutral"><spring:message code="common.applyFilters" /></button>
     </div>
 </form>
 
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="disbursement-reports-1" data-resource-split data-table-title-id="disbursement-reports-title">
     <div class="erp-table-scroll">
     <table class="erp-table" data-table-sort-mode="local">
         <thead>

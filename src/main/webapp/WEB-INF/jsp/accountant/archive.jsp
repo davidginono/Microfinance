@@ -6,40 +6,23 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.archive.breadcrumb" text="Accountant Panel / Archive" /></p>
     <h1 class="erp-page-title" id="accountant-archive-title"><spring:message code="accountant.archive.title" text="Accountant Archive" /></h1>
 </div>
 
-<section class="aws-current-filter-toolbar" aria-labelledby="accountantArchiveCurrentFilterLabel">
-        <div class="aws-current-filter-summary">
-            <div class="aws-current-filter-copy">
-                <p id="accountantArchiveCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-                <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
-            </div>
-        </div>
-        <c:url var="accountantArchiveAllUrl" value="/accountant/archive"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <c:url var="accountantArchiveApprovedUrl" value="/accountant/archive"><c:param name="filter" value="APPROVED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <c:url var="accountantArchiveRejectedUrl" value="/accountant/archive"><c:param name="filter" value="REJECTED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-        <div class="erp-filter-row aws-current-filter-tabs">
-            <a href="${accountantArchiveAllUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
-            </a>
-            <a href="${accountantArchiveApprovedUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
-                <spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" />
-            </a>
-            <a href="${accountantArchiveRejectedUrl}"
-               class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
-                <spring:message code="review.rejected" text="Rejected" />
-            </a>
-        </div>
-        <form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-archive-1">
-            <input type="hidden" name="filter" value="${currentFilterKey}" />
+<section data-table-sync-query="true" data-resource-table="accountant-archive-1" data-table-title-id="accountant-archive-title" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
+<form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-archive-1">
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                ${archiveSearchLabel}
+                <spring:message code="common.status" />
+                <select name="filter" class="aws-control">
+                    <option value="ALL" ${currentFilterKey eq 'ALL' ? 'selected' : ''}><spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" /></option>
+                    <option value="APPROVED" ${currentFilterKey eq 'APPROVED' ? 'selected' : ''}><spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" /></option>
+                    <option value="REJECTED" ${currentFilterKey eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
+                </select>
+            </label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <span data-table-filter-label="searchId">${archiveSearchLabel}</span>
                 <input type="search"
                        name="searchId"
                        value="${fn:escapeXml(queueSearchValue)}"
@@ -62,9 +45,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.applyFilters" text="Apply Filters" /></button>
             </div>
         </form>
-</section>
 
-<section data-resource-table="accountant-archive-1" data-table-title-id="accountant-archive-title" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
     <div class="erp-table-scroll" data-view-position-key="accountant-archive-table">
         <table class="erp-table">
         <thead>

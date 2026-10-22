@@ -10,6 +10,41 @@ const row = '<tr><td>V001</td><td>100.00</td><td>Posted</td></tr>';
 const loadingSource=readFileSync('src/main/resources/static/js/ui-loading.js','utf8');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 
+test('report exports retain their own form and use current table filters without issuing an HTML query',async()=>{
+    const key='review-report';
+    const exportForm=`<form action="/documents/reports/accountant-loans.pdf" method="get" data-table-toolbar-for="${key}" data-table-export-for="${key}"><input type="hidden" name="fromDate" value="2026-10-01"><input type="hidden" name="decisionFilter" value="ALL"><button>PDF</button><button data-print-action="true">Print</button></form>`;
+    const markup=exportForm+table(key,row).replace('<form method="get"><input name="search"></form>','<form method="get" action="/accountant/reports"><label>From<input name="fromDate" type="date" value="2026-10-01"></label><label>Decision<select name="decisionFilter"><option>ALL</option><option>REJECTED</option></select></label><button>Apply</button></form>');
+    const {dom,window:w,document:d}=await setup(markup);
+    try {
+        const query=d.querySelector('.resource-table-filters'),output=d.querySelector('[data-table-export-for]');
+        assert.equal(output.parentElement.classList.contains('resource-table-actions'),true);
+        assert.equal(query.closest('.resource-table-tools')!==null,true);
+        query.elements.fromDate.value='2026-10-12';query.elements.decisionFilter.value='REJECTED';
+        let observed,requests=0;w.fetch=async()=>{requests++;throw new Error('Export intercepted');};
+        d.addEventListener('submit',event=>{observed=Object.fromEntries(new w.FormData(event.target));event.preventDefault();});
+        output.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:output.querySelector('button')}));
+        assert.deepEqual(observed,{fromDate:'2026-10-12',decisionFilter:'REJECTED'});
+        assert.equal(output.getAttribute('action'),'/documents/reports/accountant-loans.pdf');
+        assert.equal(output.querySelector('[data-print-action]').form,output);assert.equal(requests,0);
+        query.elements.fromDate.value='2026-10-15';
+        d.addEventListener('click',event=>{if(event.target.hasAttribute('data-print-action')){observed=Object.fromEntries(new w.FormData(output));event.preventDefault();}});
+        output.querySelector('[data-print-action]').click();
+        assert.deepEqual(observed,{fromDate:'2026-10-15',decisionFilter:'REJECTED'});assert.equal(requests,0);
+    } finally {dom.window.close();}
+});
+
+test('server-normalized status changes update the reference filter label and input mode without replacing controls',async()=>{
+    const markup=table('status-query',row,'data-table-sync-query="true"').replace('<input name="search">','<label><span data-table-filter-label="search">Application ID</span><input name="search" placeholder="Application number" inputmode="numeric"></label>');
+    const {dom,window:w,document:d}=await setup(markup);
+    try {
+        const input=d.querySelector('[name="search"]'),label=d.querySelector('[data-table-filter-label]');
+        w.fetch=async()=>({ok:true,redirected:false,text:async()=>markup.replace('Application ID','Loan ID').replace('Application number','Loan number').replace('inputmode="numeric"','inputmode="text"')});
+        d.querySelector('[data-resource-refresh]').click();await settle();await settle();
+        assert.equal(d.querySelector('[name="search"]'),input);assert.equal(label.textContent,'Loan ID');
+        assert.equal(input.placeholder,'Loan number');assert.equal(input.getAttribute('inputmode'),'text');
+    } finally {dom.window.close();}
+});
+
 test('hydrated tables retain their own refresh request instead of fetching placeholder HTML',async()=>{
     const {dom,window:w,document:d}=await setup(table('hydrated',row),loadingSource);
     let hydrated=0,requests=0;

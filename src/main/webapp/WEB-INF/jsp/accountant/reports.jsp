@@ -11,36 +11,43 @@
     <h1 class="erp-page-title"><spring:message code="accountant.reports.title" text="Accountant Review Reports" /></h1>
 </div>
 
-<form method="get" action="/documents/reports/accountant-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
+<form method="get" action="/documents/reports/accountant-loans.pdf" data-page-preloader="false" data-table-toolbar-for="accountant-reports-1" data-table-export-for="accountant-reports-1" class="app-table-toolbar">
+    <input type="hidden" name="fromDate" value="${fromDateValue}" />
+    <input type="hidden" name="toDate" value="${toDateValue}" />
+    <input type="hidden" name="decisionFilter" value="${decisionFilterValue}" />
+    <button type="submit" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" /></button>
+    <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" /></button>
+</form>
+
+<div data-table-sync-query="true" data-resource-table="accountant-reports-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<form method="get" action="/accountant/reports" class="erp-filter-form erp-table-toolbar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-reports-1">
     <div class="erp-table-toolbar__control">
-        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
+        <label for="accountant-reports-1-fromDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
-               name="fromDate"
+               id="accountant-reports-1-fromDate" name="fromDate"
                value="${fromDateValue}"
                class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div class="erp-table-toolbar__control">
-        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
+        <label for="accountant-reports-1-toDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
-               name="toDate"
+               id="accountant-reports-1-toDate" name="toDate"
                value="${toDateValue}"
                class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div class="erp-table-toolbar__control">
-        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="review.decision" text="Decision" /></label>
-        <select name="decisionFilter" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
+        <label for="accountant-reports-1-decisionFilter" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="review.decision" text="Decision" /></label>
+        <select id="accountant-reports-1-decisionFilter" name="decisionFilter" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
             <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}><spring:message code="review.allDecisions" text="All decisions" /></option>
             <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}><spring:message code="archive.approvedForDisbursement" text="Ready for disbursement" /></option>
             <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
         </select>
     </div>
-    <div class="erp-table-toolbar__actions pt-6">
-        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generatePdf" text="Generate PDF Report" /></button>
-        <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" text="Print" /></button>
+    <div class="resource-table-filter-actions">
+        <button type="submit" class="app-btn btn-neutral"><spring:message code="common.applyFilters" /></button>
     </div>
 </form>
 
-<div data-resource-table="accountant-reports-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
     <div class="erp-table-scroll">
     <table class="erp-table" data-table-sort-mode="local">
         <thead>
@@ -53,7 +60,7 @@
             <th><spring:message code="review.decision" text="Decision" /></th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
-            <th></th>
+            <th data-table-actions-header><spring:message code="common.actions" /></th>
         </tr>
         </thead>
         <tbody>

@@ -4444,7 +4444,6 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
 .aws-console .aws-filter-toolbar label > .neo-select,
 .aws-console .aws-filter-toolbar .erp-table-toolbar__control > .neo-select {
     height: var(--sacco-control-height);
-    margin-top: 4px !important;
 }
 
 .aws-console .aws-filter-toolbar .neo-select-button-text {
@@ -4532,7 +4531,6 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
 .aws-console .aws-filter-toolbar .erp-table-toolbar__control > input,
 .aws-console .aws-filter-toolbar .erp-table-toolbar__control > select {
     width: 100%;
-    margin-top: 4px !important;
 }
 
 .aws-console .aws-filter-toolbar input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),

@@ -6,25 +6,13 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.queue.breadcrumb" text="Accountant Panel / Queue" /></p>
     <h1 class="erp-page-title" id="accountant-queue-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
 </div>
-<section class="aws-current-filter-toolbar" aria-labelledby="accountantQueueCurrentFilterLabel">
-        <div class="aws-current-filter-summary">
-            <div class="aws-current-filter-copy">
-                <p id="accountantQueueCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-                <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
-            </div>
-        </div>
-        <div class="erp-filter-row aws-current-filter-tabs">
-            <a href="/accountant/loan-applications?filter=AWAITING_ACCOUNTANT"
-               class="erp-filter-tab ${currentFilterKey eq 'AWAITING_ACCOUNTANT' ? 'is-active' : ''}">
-                <span data-resource-status="AWAITING_ACCOUNTANT"><spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" /></span>
-            </a>
-        </div>
-        <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-queue-1">
+
+<div data-table-sync-query="true" data-resource-table="accountant-queue-1" data-table-title-id="accountant-queue-title" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-queue-1">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="loan.applicationId" text="Loan Application ID" />
@@ -42,8 +30,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-</section>
-<div data-resource-table="accountant-queue-1" data-table-title-id="accountant-queue-title" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

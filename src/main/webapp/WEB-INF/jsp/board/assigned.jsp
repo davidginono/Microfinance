@@ -6,45 +6,25 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${boardListBreadcrumb}</p>
     <h1 class="erp-page-title" id="board-assigned-title">${boardListTitle}</h1>
 </div>
 
-<c:if test="${archiveView}">
-    <section class="aws-current-filter-toolbar" aria-labelledby="boardArchiveCurrentFilterLabel">
-            <div class="aws-current-filter-summary">
-                <div class="aws-current-filter-copy">
-                    <p id="boardArchiveCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-                    <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
-                </div>
-            </div>
-            <c:url var="boardArchiveAllUrl" value="${boardListRoute}"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-            <c:url var="boardArchiveApprovedUrl" value="${boardListRoute}"><c:param name="filter" value="APPROVED" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-            <c:url var="boardArchiveRejectedUrl" value="${boardListRoute}"><c:param name="filter" value="REJECTED" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-            <c:url var="boardArchiveDisbursedUrl" value="${boardListRoute}"><c:param name="filter" value="DISBURSED" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
-            <div class="erp-filter-row aws-current-filter-tabs">
-                <a href="${boardArchiveAllUrl}" class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                    <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
-                </a>
-                <a href="${boardArchiveApprovedUrl}" class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
-                    <spring:message code="archive.approvedLoans" text="Approved Loans" />
-                </a>
-                <a href="${boardArchiveRejectedUrl}" class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
-                    <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
-                </a>
-                <a href="${boardArchiveDisbursedUrl}" class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-                    <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
-                </a>
-            </div>
-    </section>
-</c:if>
-
 <div class="erp-panel overflow-hidden">
+
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results..." data-table-sync-query="true" data-resource-table="board-assigned-1" data-resource-split data-table-title-id="board-assigned-title">
 <form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="board-assigned-1">
         <c:if test="${archiveView}">
-            <input type="hidden" name="filter" value="${currentFilterKey}" />
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <spring:message code="common.status" />
+                <select name="filter" class="aws-control">
+                    <option value="ALL" ${currentFilterKey eq 'ALL' ? 'selected' : ''}><spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" /></option>
+                    <option value="APPROVED" ${currentFilterKey eq 'APPROVED' ? 'selected' : ''}><spring:message code="archive.approvedLoans" text="Approved Loans" /></option>
+                    <option value="REJECTED" ${currentFilterKey eq 'REJECTED' ? 'selected' : ''}><spring:message code="archive.rejectedLoans" text="Rejected Loans" /></option>
+                    <option value="DISBURSED" ${currentFilterKey eq 'DISBURSED' ? 'selected' : ''}><spring:message code="archive.disbursedLoans" text="Disbursed Loans" /></option>
+                </select>
+            </label>
         </c:if>
         <label class="board-queue-search-label text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="loan.applicationId" text="Loan Application ID" />
@@ -78,7 +58,7 @@
             </button>
         </div>
     </form>
-<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results..." data-resource-table="board-assigned-1" data-resource-split data-table-title-id="board-assigned-title">
+
         <div class="erp-table-scroll">
         <table class="erp-table">
             <thead>

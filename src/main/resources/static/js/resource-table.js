@@ -205,6 +205,22 @@
             if (filterCommands.length) { const group = node('div', 'resource-table-filter-actions'); group.append(...filterCommands); filters.append(group); }
             tools.append(filters);
         }
+        document.querySelectorAll('form[data-table-export-for]').forEach(form => {
+            if (form.dataset.tableExportFor !== region.dataset.resourceTable || filters?.tagName !== 'FORM') return;
+            // Keep export envelopes independent while using the current visible report criteria.
+            const syncCriteria = event => {
+                if (!filters.checkValidity()) { event.preventDefault(); filters.reportValidity(); return; }
+                const values = new FormData(filters);
+                [...form.elements].forEach(input => {
+                    if (input.type === 'hidden' && values.has(input.name)) input.value = values.get(input.name);
+                });
+            };
+            form.addEventListener('submit', syncCriteria, {capture:true,signal});
+            // The shared shell handles Print on click, before native form submission.
+            form.addEventListener('click', event => {
+                if (event.target.closest('[data-print-action="true"]')) syncCriteria(event);
+            }, {capture:true,signal});
+        });
         const utilities = node('div', 'resource-table-utilities'); tools.append(utilities);
         const pager = region.querySelector('[data-table-pagination]') || [...document.querySelectorAll('[data-table-pagination][data-table-for]')].find(candidate => candidate.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
         const navigation = node('nav', 'resource-table-pagination'); navigation.setAttribute('aria-label', l.pagination);
@@ -422,7 +438,16 @@
                     [...(filters?.elements || [])].forEach(input=>{
                         if (!input.name || ['submit','button'].includes(input.type)) return;
                         const source=freshFilters?.elements.namedItem(input.name);
-                        if (source && 'value' in source) input.value=source.value;
+                        if (source && 'value' in source) {
+                            input.value=source.value;
+                            ['placeholder','inputmode'].forEach(name=>{
+                                if(source.hasAttribute(name))input.setAttribute(name,source.getAttribute(name));
+                            });
+                        }
+                    });
+                    filters?.querySelectorAll('[data-table-filter-label]').forEach(label=>{
+                        const source=[...(freshFilters?.querySelectorAll('[data-table-filter-label]') || [])].find(item=>item.dataset.tableFilterLabel===label.dataset.tableFilterLabel);
+                        if(source)label.textContent=source.textContent;
                     });
                     window.refreshEnhancedSelects?.(filters);
                     const heading=titlebar.querySelector('h2,h3'), sourceHeading=fresh.querySelector('.app-table-titlebar h2,.app-table-titlebar h3');

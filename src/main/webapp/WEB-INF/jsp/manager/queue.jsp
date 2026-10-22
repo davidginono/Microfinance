@@ -6,19 +6,13 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.queue.breadcrumb" text="Manager Panel / Queue" /></p>
     <h1 class="erp-page-title" id="manager-queue-title"><spring:message code="manager.queue.title" text="Manager Queue" /></h1>
 </div>
-<section class="aws-current-filter-toolbar manager-queue-filter-toolbar" aria-labelledby="managerQueueCurrentFilterLabel">
-    <div class="aws-current-filter-summary manager-queue-filter-summary">
-        <div class="aws-current-filter-copy manager-queue-filter-copy">
-            <p id="managerQueueCurrentFilterLabel" class="aws-current-filter-kicker manager-queue-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <p class="aws-current-filter-value manager-queue-filter-value"><c:out value="${currentFilterLabel}" /></p>
-        </div>
-    </div>
-    <form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="manager-queue-1">
+
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-table-sync-query="true" data-resource-table="manager-queue-1" data-resource-split data-table-title-id="manager-queue-title">
+<form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="manager-queue-1">
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${queueSearchLabel}
                 <input type="search"
@@ -35,8 +29,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-</section>
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="manager-queue-1" data-resource-split data-table-title-id="manager-queue-title">
+
 <div class="erp-table-scroll">
 <table class="erp-table">
     <thead>
