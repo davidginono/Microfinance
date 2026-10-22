@@ -420,7 +420,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'LOAN_RECORDING_VIEW', 'LOAN_ADJUSTMENTS_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'VOUCHER_WORKSPACE_VIEW', 'VOUCHER_RULE_VIEW', 'PAYROLL_DEDUCTIONS_VIEW')">
+            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'LOAN_RECORDING_VIEW', 'LOAN_ADJUSTMENTS_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'VOUCHER_WORKSPACE_VIEW', 'VOUCHER_RULE_VIEW', 'ACCOUNTING_ACCOUNT_RULES_VIEW', 'PAYROLL_DEDUCTIONS_VIEW')">
                 <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.has(principal, 'VOUCHER_WORKSPACE_VIEW')">
                 <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant') or (fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration'))}" />
                 <div class="px-3 pb-1 pt-3">
@@ -479,7 +479,7 @@
             </c:if>
             <c:if test="${memberWorkspace}">
                 <sec:authorize access="@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')">
-                    <c:set var="memberSettingsActive" value="${requestUri eq '/app/settings' or requestUri eq '/account/security' or requestUri eq '/profile' or fn:startsWith(requestUri, '/finance/approval/configuration')}" />
+                    <c:set var="memberSettingsActive" value="${requestUri eq '/app/settings' or requestUri eq '/account/security' or requestUri eq '/profile'}" />
                     <div class="shell-sidebar-group space-y-1">
                         <button type="button"
                                 id="memberSettingsToggle"
@@ -518,7 +518,7 @@
             <c:if test="${staffWorkspace}">
                 <sec:authorize access="@access.isAdminScope(principal)" var="settingsAdminScope" />
                 <c:if test="${settingsAdminScope and not isPlatformAdminIdentity}">
-                        <c:set var="adminSettingsActive" value="${fn:startsWith(requestUri, '/admin/settings-controls') or requestUri eq '/admin/loan-products' or requestUri eq '/finance/accounts/approval-configuration' or fn:startsWith(requestUri, '/finance/approval/configuration')}" />
+                        <c:set var="adminSettingsActive" value="${fn:startsWith(requestUri, '/admin/settings-controls') or requestUri eq '/admin/loan-products'}" />
                         <div class="shell-sidebar-group space-y-1">
                             <button type="button"
                                     id="adminSettingsToggle"
@@ -532,8 +532,6 @@
                                 </svg>
                             </button>
                             <div id="adminSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                                <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNT_RULES_VIEW')"><a href="<c:url value='/finance/accounts/approval-configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/finance/accounts/approval-configuration'?'shell-nav-active':''}"><spring:message code="coav.configuration" /></a></sec:authorize>
-                                <sec:authorize access="@access.has(principal, 'VOUCHER_RULE_VIEW')"><a href="<c:url value='/finance/approval/configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.configuration" /></a></sec:authorize>
                                 <a href="/admin/settings-controls?section=loan" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'language' and param.section ne 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
                                 <a href="/admin/settings-controls/customised-loan" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls/customised-loan' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.customisedLoan" /></a>
                                 <a href="/admin/settings-controls?section=guarantor" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'guarantor' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.applicantGuarantor" text="Applicant & Guarantor Settings" /></a>
@@ -542,7 +540,7 @@
                             </div>
                         </div>
                 </c:if>
-                        <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings' or requestUri eq '/account/security' or requestUri eq '/profile' or ((not settingsAdminScope or isPlatformAdminIdentity) and (requestUri eq '/finance/accounts/approval-configuration' or fn:startsWith(requestUri, '/finance/approval/configuration')))}" />
+                        <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings' or requestUri eq '/account/security' or requestUri eq '/profile'}" />
                         <div class="shell-sidebar-group space-y-1">
                             <button type="button"
                                     id="staffSettingsToggle"
@@ -558,10 +556,6 @@
                                 </svg>
                             </button>
                             <div id="staffSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                                <c:if test="${not settingsAdminScope or isPlatformAdminIdentity}">
-                                    <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNT_RULES_VIEW')"><a href="<c:url value='/finance/accounts/approval-configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/finance/accounts/approval-configuration'?'shell-nav-active':''}"><spring:message code="coav.configuration" /></a></sec:authorize>
-                                    <sec:authorize access="@access.has(principal, 'VOUCHER_RULE_VIEW')"><a href="<c:url value='/finance/approval/configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.configuration" /></a></sec:authorize>
-                                </c:if>
                                 <a href="/staff/settings"
                                    class="shell-sidebar-subitem ${requestUri eq '/staff/settings' ? 'shell-nav-active' : ''}"
                                    <c:if test="${requestUri eq '/staff/settings'}">aria-current="page"</c:if>>

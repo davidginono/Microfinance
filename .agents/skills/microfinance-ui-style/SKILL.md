@@ -32,6 +32,12 @@ Read the relevant definitions before changing individual pages:
 
 The current interface is a compact operational ERP, not a lending marketing site. Preserve its predictable topbar/sidebar and shared controls. Existing `sacco-*` and `aws-*` CSS names are implementation details; do not mass-rename them during a terminology change.
 
+## Messages and notifications
+
+- Use the shared Cloudscape [Alert](https://cloudscape.design/components/alert/) presentation for contextual information, warnings, validation summaries and failures: one complete thin severity-colored border, a calm tinted surface, modest rounded corners, a leading Cloudscape status icon and readable 14px text. Never use a short colored ribbon or a thick border on only one side of a message. Reuse `console-message` and `data-message-type="info|success|warning|error"`, rendered by `console-resource-details.js` and styled in `console-resource-details.css`; compatibility notices use the same component.
+- Preserve the original message, native actions, form values, CSRF, permission restrictions and error recovery. Required financial disclosures and warnings stay visible. Keep field-specific validation beside the input; do not turn every inline field error into a notification. Errors use `role="alert"`; informational and success updates use `role="status"`. A status icon must not be the only description of the result.
+- Task-operation notifications use the shared Cloudscape [Flashbar](https://cloudscape.design/components/flashbar/) style and existing `showToast` lifecycle. Preserve keyboard dismissal, localized labels, queued messages and modal ownership. Do not replace blocking validation with an auto-disappearing toast or dismiss required warnings automatically. Keep loading spinners separate from error alerts.
+
 ## Surfaces And Typography
 
 - Keep optional helper copy absent or limited to one or two short, plain-language sentences, following the [governance copy guidance](../microfinance-ui-governance/SKILL.md#localization-and-privacy). Essential on-screen notes should use at least 14px text, comfortable line spacing and readable contrast, and wrap naturally on mobile. Do not shrink dense explanations into small-print footers.

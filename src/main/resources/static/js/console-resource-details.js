@@ -43,6 +43,21 @@
         const parent=node.parentElement;
         if(parent?.tagName==='SPAN' && parent.childElementCount===1)parent.classList.add('console-status-host');
     }
+    function messages(scope) {
+        scope.querySelectorAll('[data-message-type],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.live-account-status-message,.app-loading-error,.workspace-navigation-feedback[role="alert"],.loan-error-summary,.accounting-error-summary,.accounting-resource-workspace > .coa-error,.accounting-resource-workspace > .coa-success,.library-modal .coa-success').forEach(message=>{
+            if(!message.textContent.trim())return;
+            const classes=message.className;
+            const declared=message.dataset.messageAuto==='true'?null:message.dataset.messageType;
+            if(!declared)message.dataset.messageAuto='true';
+            const kind=/danger|error|delete-callout/.test(classes) || message.getAttribute('role')==='alert'?'error':/warning|is-unavailable|admin-status-callout/.test(classes)?'warning':/success/.test(classes)?'success':declared || 'info';
+            message.classList.add('console-message');message.dataset.messageType=kind;
+            if(!message.hasAttribute('role'))message.setAttribute('role',kind==='error'?'alert':'status');
+            const current=message.querySelector(':scope > .console-message-icon');
+            if(current?.dataset.kind===kind)return;
+            current?.remove();const symbol=icon({'success':'status-positive','error':'status-negative','warning':'status-warning','info':'status-info'}[kind] || 'status-info');
+            symbol.classList.add('console-message-icon');symbol.dataset.kind=kind;message.prepend(symbol);
+        });
+    }
     function breadcrumbs() {
         document.querySelectorAll('.erp-page-path').forEach(path=>{
             if(!path.hasAttribute('aria-label'))path.setAttribute('aria-label',label().breadcrumb || 'Breadcrumb');
@@ -127,7 +142,7 @@
         scope.querySelectorAll('.loan-status-badge,.voucher-status,.staff-recent-disbursements-status').forEach(node=>{
             if(!node.querySelector('[data-resource-status]') && (!node.hasAttribute('data-resource-status') || node.dataset.statusAuto==='true')){node.dataset.statusAuto='true';node.dataset.resourceStatus=node.textContent.trim();}
         });
-        scope.querySelectorAll('[data-resource-status]').forEach(status);values(scope);links(scope);breadcrumbs();
+        scope.querySelectorAll('[data-resource-status]').forEach(status);messages(scope);values(scope);links(scope);breadcrumbs();
     }
     window.ConsoleResourceDetails={init,icon,status};
     onReady(()=>{window.ResourceTable?.init();details();init();

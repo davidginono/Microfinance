@@ -10,6 +10,18 @@ async function setup(markup,query=''){
 }
 const sections='<section class="accounting-section"><h2>Summary</h2><dl class="erp-detail-facts"><div><dt>Loan</dt><dd>L001</dd></div></dl></section><section id="schedule" class="erp-table-wrap"><h2>Schedule</h2><input value="draft"><form method="post"><input name="_csrf" value="token"></form></section><section id="history" class="erp-table-wrap"><h2>History</h2><a href="/receipt">Receipt</a></section>';
 
+test('shared alerts preserve native recovery actions and hidden and empty states',async()=>{
+ const {dom,w,d}=await setup('<p class="aws-inline-notice aws-inline-notice--warning" hidden>Permission required</p><div class="app-loading-error" role="alert">Retry failed <button>Retry</button></div><div class="accounting-error-summary" role="alert"></div><label>Email <span class="coa-error">Invalid email</span></label>');
+ try {
+  const warning=d.querySelector('.aws-inline-notice'),failure=d.querySelector('.app-loading-error'),button=failure.querySelector('button');let calls=0;button.addEventListener('click',()=>calls++);
+  assert.equal(warning.hidden,true);assert.equal(warning.dataset.messageType,'warning');assert.equal(warning.getAttribute('role'),'status');
+  assert.equal(failure.dataset.messageType,'error');assert.equal(failure.getAttribute('role'),'alert');assert.equal(failure.querySelector('svg').getAttribute('aria-hidden'),'true');
+  button.click();assert.equal(calls,1);assert.equal(d.querySelector('.accounting-error-summary').childNodes.length,0);assert.equal(d.querySelector('label .console-message'),null);
+  w.ConsoleResourceDetails.init();assert.equal(failure.querySelectorAll('.console-message-icon').length,1);assert.equal(failure.querySelector('button'),button);
+  failure.textContent='Still failed';await settle();await settle();assert.equal(failure.querySelectorAll('.console-message-icon').length,1);assert.match(failure.textContent,/Still failed/);
+ } finally {dom.window.close();}
+});
+
 test('resource IDs retain native same-tab navigation and only real new-tab links get an external hint',async()=>{
  const {dom,w,d}=await setup('<dl class="erp-detail-facts"><div><dt>Loan</dt><dd><a class="resource-table-id-link" href="/loan/1">L001</a></dd></div></dl><a id="policy" href="https://example.org/policy" target="_blank" rel="help">Policy</a><a id="download" href="/receipt/pdf" target="_blank" download>PDF</a>');
  const loan=d.querySelector('.resource-table-id-link'),policy=d.querySelector('#policy');

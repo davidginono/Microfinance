@@ -51,6 +51,9 @@ public class AccountingCodeLibraryRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_transaction_code where sacco_id=? and activity_id=? and active)",Boolean.class,institution,activity));
     }
     public void activityState(String institution,UUID id,boolean active) {jdbc.update("update gl_activity set active=? where sacco_id=? and id=?",active,institution,id);}
+    public void updateActivity(String institution,UUID id,String name,String description) {
+        jdbc.update("update gl_activity set name=?,description=? where sacco_id=? and id=?",name,description,institution,id);
+    }
     public List<TransactionCode> transactions(String institution,UUID activity,String search,String state,int offset) {
         return jdbc.query(TRANSACTION+" where t.sacco_id=? and t.activity_id=? and (strpos(lower(t.code),?)>0 or strpos(lower(t.name),?)>0 or strpos(lower(coalesce(t.name_sw,'')),?)>0) and (?='' or t.active=(?='ACTIVE')) order by t.code,t.id limit 26 offset ?",
             this::transaction,institution,activity,search,search,search,state,state,offset);

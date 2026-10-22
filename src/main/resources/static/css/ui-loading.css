@@ -4,7 +4,7 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
 .shell-main[data-workspace-initializing] {position:relative;min-height:55vh;}
 .workspace-initializing-status {position:absolute;top:24px;left:var(--shell-workspace-inset,12px);display:flex;align-items:center;justify-content:center;}
 .app-loading-status {display:flex;align-items:center;justify-content:center;min-height:64px;gap:8px;color:#545b64;}
-.app-loading-error {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:8px 12px;border-left:3px solid #d13212;background:#fff3f1;color:#16191f;font-size:14px;line-height:20px;}
+.app-loading-error {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:8px 12px;border:1px solid #d13212;background:#fff3f1;color:#16191f;font-size:14px;line-height:20px;}
 .app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before {display:inline-block;flex:none;width:20px;height:20px;box-sizing:border-box;border:2px solid transparent;border-top-color:#687078;border-right-color:#687078;border-radius:50%;animation:aws-console-spin .7s linear infinite;}
 [data-dashboard-board]:not([data-dashboard-ready]) {position:relative;min-height:180px;}
 [data-dashboard-board]:not([data-dashboard-ready]) > * {visibility:hidden;}

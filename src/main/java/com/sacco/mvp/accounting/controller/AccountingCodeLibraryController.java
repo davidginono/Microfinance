@@ -49,6 +49,21 @@ public class AccountingCodeLibraryController {
     }
     @GetMapping("/activities/new") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String newActivity() {return "redirect:/finance/library?create=true";}
+    @GetMapping("/activities/{id}/edit") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
+    String editActivity(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Model model) {
+        var activity=library.activity(actor,id);
+        if(activity.systemManaged())throw new org.springframework.security.access.AccessDeniedException("Activity configuration unavailable");
+        if(!model.containsAttribute("codeForm")) {
+            var form=new CodeForm();form.setCode(activity.code());form.setName(activity.name());form.setDescription(activity.description());model.addAttribute("codeForm",form);
+        }
+        model.addAttribute("activity",activity);return "accounting/library-activity-edit";
+    }
+    @PostMapping("/activities/{id}/edit") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
+    String updateActivity(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@ModelAttribute("codeForm") CodeForm form,BindingResult errors,Model model,RedirectAttributes flash) {
+        if(!errors.hasErrors())try {library.updateActivity(actor,id,form);success(flash);return "redirect:/finance/library";}
+        catch(IllegalArgumentException failure){codeError(errors,key(failure));}
+        return editActivity(actor,id,model);
+    }
     @GetMapping("/activities/{id}/transactions/new") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String newTransaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@ModelAttribute("codeForm") CodeForm form,Model model) {
         library.activity(actor,id);return "redirect:/finance/library/transactions?create=true&activityId="+id;

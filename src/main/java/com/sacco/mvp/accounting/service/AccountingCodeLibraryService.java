@@ -59,6 +59,15 @@ public class AccountingCodeLibraryService {
         authorize(actor,"CREATE");validateCode(form);UUID id=library.createActivity(actor.getSaccoId(),form,actor.getMemberId(),clock.now());
         event(actor,id,"ACTIVITY_CREATED");return id;
     }
+    @Transactional
+    public void updateActivity(AppUserPrincipal actor,UUID id,CodeForm form) {
+        authorize(actor,"UPDATE");var current=activity(actor,id,true);require(!current.systemManaged(),"systemManaged");
+        require(form!=null,"validation");form.setCode(current.code());validateCode(form);
+        if(current.name().equals(form.getName()) && clean(current.description()).equals(form.getDescription()))return;
+        library.updateActivity(actor.getSaccoId(),id,form.getName(),form.getDescription());
+        audit.logEvent("ACCOUNTING",id,"ACTIVITY_UPDATED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Activity configuration updated","ACCOUNTING_LIBRARY",current.code(),actor.getSaccoId(),actor.getStationId(),
+            Map.of("previousName",current.name(),"name",form.getName(),"previousDescription",clean(current.description()),"description",form.getDescription()));
+    }
     @Transactional(readOnly=true)
     public Page<TransactionCode> transactions(AppUserPrincipal actor,UUID activity,String search,String state,int page) {
         authorize(actor,"VIEW");activity(actor,activity,false);validateQuery(search,state,page);

@@ -3,12 +3,14 @@
     if (register) {
         const inputs = () => Array.from(register.querySelectorAll('input[name="library-selection"]'));
         const view = document.getElementById('library-view'), status = document.getElementById('library-status');
+        const edit = document.getElementById('library-edit');
         const statusForm = document.getElementById('library-status-form'), summary = document.getElementById('library-selection-status');
         const selected = () => inputs().find(input => input.checked && !input.closest('tr').hidden)?.closest('[data-library-row]');
         const update = () => {
             const row = selected();
             inputs().forEach(input => input.closest('tr').classList.toggle('coa-row-selected', input.checked));
             view.disabled = !row;
+            if(edit)edit.disabled=!row || row.dataset.system==='true';
             if (status) {
                 status.disabled = !row || row.dataset.system === 'true';
                 const action = row?.dataset.active === 'false' ? 'reactivate' : 'deactivate';
@@ -31,6 +33,10 @@
         view.addEventListener('click', () => {
             const row = selected(); if (!row || view.disabled) return;
             window.WorkspaceNavigation.navigate(row.dataset.url);
+        });
+        edit?.addEventListener('click',()=>{
+            const row=selected();if(!row || edit.disabled)return;
+            window.WorkspaceNavigation.navigate(edit.dataset.url+encodeURIComponent(row.dataset.id)+'/edit');
         });
         statusForm?.addEventListener('submit', event => { if (!selected() || status.disabled) event.preventDefault(); else status.disabled = true; });
         const reset = () => { inputs().forEach(input => input.checked = false); update(); };

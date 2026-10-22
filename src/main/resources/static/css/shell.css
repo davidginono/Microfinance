@@ -2879,8 +2879,7 @@ body.aws-console,
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    border-bottom: 1px solid var(--aws-line);
-    border-left: 3px solid var(--aws-blue);
+    border: 1px solid var(--aws-blue);
     background: #f1faff;
     padding: 6px 8px;
     color: var(--aws-ink);
@@ -2889,12 +2888,12 @@ body.aws-console,
 }
 
 .aws-inline-notice--success {
-    border-left-color: var(--aws-success);
+    border-color: var(--aws-success);
     background: #f2fcf3;
 }
 
 .aws-inline-notice--danger {
-    border-left-color: var(--aws-danger);
+    border-color: var(--aws-danger);
     background: #fff7f5;
 }
 
@@ -4876,7 +4875,7 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
 }
 .app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #414d5c; color: #fff;}
 .workspace-navigation-feedback {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#f2f8fc;color:#414d5c;font-size:14px;line-height:20px;}
-.workspace-navigation-feedback[role=alert] {border-left:3px solid #d13212;background:#fff3f1;}
+.workspace-navigation-feedback[role=alert] {border:1px solid #d13212;background:#fff3f1;}
 html:has(body.aws-console) {scrollbar-gutter:stable;}
 .shell-main.is-workspace-pending {position:relative;}
 .shell-main.is-workspace-pending > :not(#workspace-navigation-feedback) {display:none!important;}

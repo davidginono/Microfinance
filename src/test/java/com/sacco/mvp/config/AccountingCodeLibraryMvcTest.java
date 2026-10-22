@@ -47,6 +47,30 @@ class AccountingCodeLibraryMvcTest {
         mvc.perform(get("/finance/library").with(user(actor))).andExpect(status().isOk());
         verify(library).activities(actor,"","",0,30,"code","asc");
     }
+    @Test void activityEditRequiresUpdateAndPrefillsOnlyTheSelectedScopedActivity() throws Exception {
+        mvc.perform(get("/finance/library/activities/"+activity+"/edit").with(user(actor)))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library-activity-edit"))
+            .andExpect(model().attribute("codeForm",org.hamcrest.Matchers.hasProperty("name",org.hamcrest.Matchers.is("Operations"))));
+        mvc.perform(get("/finance/library/activities/"+activity+"/edit").with(user(principal(true,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW)))))
+            .andExpect(status().isForbidden());
+    }
+    @Test void activitySaveRequiresCsrfAndIgnoresForgedScopeAndStatus() throws Exception {
+        String url="/finance/library/activities/"+activity+"/edit";
+        mvc.perform(post(url).with(user(actor)).param("name","New name")).andExpect(status().isForbidden());
+        mvc.perform(post(url).with(user(actor)).with(csrf()).param("name","New name").param("description","Updated")
+            .param("saccoId","FOREIGN").param("active","false").param("activityId",UUID.randomUUID().toString()))
+            .andExpect(redirectedUrl("/finance/library"));
+        verify(library).updateActivity(eq(actor),eq(activity),argThat(form->form.getName().equals("New name") && form.getActivityId()==null));
+    }
+    @Test void invalidActivityMetadataRetainsInputAndSystemActivitiesCannotOpenTheEditor() throws Exception {
+        doThrow(new IllegalArgumentException("library.error.name")).when(library).updateActivity(any(),eq(activity),any());
+        mvc.perform(post("/finance/library/activities/"+activity+"/edit").with(user(actor)).with(csrf()).param("name"," ").param("description","Retained"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/library-activity-edit"))
+            .andExpect(model().attributeHasFieldErrors("codeForm","name"))
+            .andExpect(model().attribute("codeForm",org.hamcrest.Matchers.hasProperty("description",org.hamcrest.Matchers.is("Retained"))));
+        when(library.activity(actor,activity)).thenReturn(new Activity(activity,"SYSTEM.LOAN_REPAYMENT","Repayment",null,null,true));
+        mvc.perform(get("/finance/library/activities/"+activity+"/edit").with(user(actor))).andExpect(status().isForbidden());
+    }
     @Test void filtersReachTheScopedList() throws Exception {
         when(library.activities(any(),eq("Office"),eq("ACTIVE"),eq(2))).thenReturn(new Page<>(List.of(),2,false));
         mvc.perform(get("/finance/library").with(user(actor)).param("search","Office").param("state","ACTIVE").param("page","2"))

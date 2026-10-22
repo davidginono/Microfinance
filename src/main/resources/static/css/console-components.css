@@ -618,7 +618,6 @@
     .admin-status-callout {
         max-width: 30rem;
         border: 1px solid var(--aws-line);
-        border-left: 3px solid var(--aws-warning);
         border-radius: 2px;
         background: #ffffff;
         padding: 10px 12px;
@@ -626,7 +625,6 @@
 
     .admin-status-callout.is-warning {
         border-color: #ffcc83;
-        border-left-color: var(--aws-warning);
         background: #fff7ed;
     }
 
@@ -664,7 +662,6 @@
 
     .admin-delete-callout {
         border: 1px solid #f0a08d;
-        border-left: 3px solid var(--aws-danger);
         border-radius: 2px;
         background: #fff7f5;
         color: #7c2718;
@@ -5563,7 +5560,7 @@ html.session-timeout-active,
     }
 
     .live-account-status-message.is-unavailable {
-        border-left-color: #ff9900;
+        border-color: #ff9900;
         background: #fff7e8;
         color: #5f3b00;
     }
@@ -5595,7 +5592,7 @@ html.session-timeout-active,
     }
 
     .aws-inline-notice--warning {
-        border-left-color: #ff9900;
+        border-color: #ff9900;
         background: #fff7e8;
     }
 
@@ -6536,7 +6533,6 @@ html.session-timeout-active,
 
     .loan-empty-state {
         border: 1px solid #d5dbdb;
-        border-left: 3px solid #0972d3;
         border-radius: 2px;
         background: #f1faff;
         padding: 8px 10px;

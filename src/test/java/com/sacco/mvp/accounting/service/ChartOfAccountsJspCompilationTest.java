@@ -21,7 +21,7 @@ class ChartOfAccountsJspCompilationTest {
         var context=tomcat.addContext("",Path.of("src/main/webapp").toAbsolutePath().toString());
         context.setParentClassLoader(getClass().getClassLoader());
         context.addServletContainerInitializer(new JasperInitializer(),null);
-        String[] pages={"accounts.jsp","account-form.jsp","library.jsp","library-code-form.jsp","library-transaction.jsp","library-template-form.jsp","vouchers/register.jsp","vouchers/form.jsp","vouchers/details.jsp","loans/record-form.jsp","loans/register.jsp","loans/details.jsp","loans/posting.jsp","loans/statement.jsp","loans/statement-print.jsp","../reporting/loan-portfolio.jsp","../app/loan-new.jsp","../app/guarantor-selection.jsp","../admin/sms-usage.jsp","../admin/settings-controls.jsp","../admin/customised-loan-workflow.jsp"};
+        String[] pages={"accounts.jsp","account-form.jsp","library.jsp","library-activity-edit.jsp","library-code-form.jsp","library-transaction.jsp","library-template-form.jsp","vouchers/register.jsp","vouchers/form.jsp","vouchers/details.jsp","loans/record-form.jsp","loans/register.jsp","loans/details.jsp","loans/posting.jsp","loans/statement.jsp","loans/statement-print.jsp","../reporting/loan-portfolio.jsp","../app/loan-new.jsp","../app/guarantor-selection.jsp","../admin/sms-usage.jsp","../admin/settings-controls.jsp","../admin/customised-loan-workflow.jsp"};
         if(Boolean.getBoolean("microfinance.receipt.jsp-only"))pages=new String[]{"vouchers/form.jsp","vouchers/loan-details.jsp"};
         else {
             var expanded=new java.util.LinkedHashSet<>(java.util.List.of(pages));
