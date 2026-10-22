@@ -30,3 +30,4 @@
 <script src="<c:url value='/js/dashboard-board.js' />" defer></script>
 <script src="<c:url value='/js/dashboard-charts.js' />" defer></script>
 <script src="<c:url value='/js/dashboard-data.js' />" defer></script>
+<script src="<c:url value='/js/dashboard-work.js' />" defer></script>

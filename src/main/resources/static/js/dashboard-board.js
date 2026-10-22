@@ -105,6 +105,7 @@
             const e={id,title,widget,heading,body,drag,menuButton,menu,preferences,width,height,min,defaultWidth:width,defaultHeight:height,defaultIndex:index};entries.set(id,e);
             const setting=(label,values)=>{const text=node('label','',label),select=node('select');select.dataset.nativeSelect='true';values.forEach(([value,name])=>{const option=node('option','',name);option.value=String(value);select.append(option);});text.append(select);preferences.append(text);return select;};
             const widthSelect=setting(l.width,Array.from({length:5-min},(_,i)=>[i+min,String(i+min)])),heightSelect=setting(l.height,[[280,l.short],[400,l.medium],[560,l.tall]]);
+            if(widget.classList.contains('dashboard-auto-widget'))heightSelect.parentElement.hidden=true;
             const footer=node('footer'),cancel=node('button','app-btn btn-neutral',l.cancel),save=node('button','app-btn btn-primary',l.apply);cancel.type='button';save.type='submit';footer.append(cancel,save);preferences.append(footer);
             cancel.addEventListener('click',()=>{preferences.hidden=true;menuButton.focus();});
             preferences.addEventListener('submit',event=>{event.preventDefault();e.width=bounded(widthSelect.value,min,4,width);e.height=bounded(heightSelect.value,240,720,height);setSize(e);preferences.hidden=true;persist();menuButton.focus();});

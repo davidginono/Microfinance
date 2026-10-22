@@ -263,6 +263,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     </c:if>
 
     <div data-dashboard-board="client" aria-busy="true">
+    <%@ include file="../fragments/dashboard-workspace.jspf" %>
     <c:choose>
         <c:when test="${dashboardProgressive}">
             <div class="erp-stat-grid" aria-busy="true" data-dashboard-widget="overview" data-widget-width="4" data-widget-height="360" data-widget-title="<spring:message code='dashboard.widget.overview' />">

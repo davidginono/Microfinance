@@ -1,17 +1,2 @@
 <%@ page pageEncoding="UTF-8" %>
-<sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE')">
-    <section class="erp-panel" data-dashboard-widget="create-receipt" data-widget-width="1" data-widget-height="240">
-        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="voucher.title.RECEIPT" /></h2></div>
-        <div class="erp-panel-body dashboard-shortcut-body"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/receipts/new' />"><spring:message code="voucher.create.RECEIPT" /></a></div>
-    </section>
-    <section class="erp-panel" data-dashboard-widget="create-payment" data-widget-width="1" data-widget-height="240">
-        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="voucher.title.PAYMENT" /></h2></div>
-        <div class="erp-panel-body dashboard-shortcut-body"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/payments/new' />"><spring:message code="voucher.create.PAYMENT" /></a></div>
-    </section>
-</sec:authorize>
-<sec:authorize access="@access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')">
-    <section class="erp-panel" data-dashboard-widget="create-journal" data-widget-width="1" data-widget-height="240">
-        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="voucher.title.JOURNAL" /></h2></div>
-        <div class="erp-panel-body dashboard-shortcut-body"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/journals/new' />"><spring:message code="voucher.create.JOURNAL" /></a></div>
-    </section>
-</sec:authorize>
+<%@ include file="dashboard-workspace.jspf" %>

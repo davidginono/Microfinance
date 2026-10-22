@@ -1,0 +1,51 @@
+<%@ page pageEncoding="UTF-8" %>
+<sec:authorize var="dashboardCanCreate" access="(@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE') and @access.has(principal, 'MEMBER_LOANS_VIEW')) or (principal.staffSession and !@access.isPlatformIdentity(principal) and (@access.hasAny(principal, 'ACCOUNTING_BUSINESS_CREATE', 'ACCOUNTING_JOURNALS_CREATE', 'LOAN_RECORDING_CREATE', 'LOAN_RECORDING_DISBURSE', 'ACCOUNTING_ACCOUNTS_CREATE', 'LOAN_ADJUSTMENTS_CREATE') or (@access.has(principal, 'PAYROLL_DEDUCTIONS_CREATE') and @access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW'))))" />
+<c:if test="${dashboardCanCreate}">
+<section class="erp-panel dashboard-auto-widget" data-dashboard-widget="create-resources" data-widget-width="4" data-widget-height="240">
+    <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.work.create" /></h2></div>
+    <div class="erp-panel-body dashboard-create-resources">
+        <sec:authorize access="@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE') and @access.has(principal, 'MEMBER_LOANS_VIEW')">
+            <a class="app-btn btn-launch" href="<c:url value='/app/loan-products' />"><spring:message code="dashboard.work.applyLoan" /></a>
+        </sec:authorize>
+        <sec:authorize access="principal.staffSession and !@access.isPlatformIdentity(principal)">
+            <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE')">
+                <a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/receipts/new' />"><spring:message code="voucher.create.RECEIPT" /></a>
+                <a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/payments/new' />"><spring:message code="voucher.create.PAYMENT" /></a>
+            </sec:authorize>
+            <sec:authorize access="@access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/journals/new' />"><spring:message code="voucher.create.JOURNAL" /></a></sec:authorize>
+            <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-records/new' />"><spring:message code="dashboard.work.recordLoan" /></a></sec:authorize>
+            <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_DISBURSE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-disbursements/new' />"><spring:message code="dashboard.work.recordDisbursement" /></a></sec:authorize>
+            <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW') and @access.has(principal, 'LOAN_RECORDING_POST')"><a class="app-btn btn-launch" href="<c:url value='/finance/batches/receipts/new' />"><spring:message code="dashboard.work.createReceiptBatch" /></a></sec:authorize>
+            <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-adjustments/new' />"><spring:message code="dashboard.work.requestAdjustment" /></a></sec:authorize>
+            <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_CREATE') and @access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW')">
+                <a class="app-btn btn-launch" href="<c:url value='/finance/payroll/new' />"><spring:message code="dashboard.work.createSchedule" /></a>
+                <a class="app-btn btn-launch" href="<c:url value='/finance/payroll/employers/new' />"><spring:message code="dashboard.work.addEmployer" /></a>
+                <a class="app-btn btn-launch" href="<c:url value='/finance/payroll/instructions/new' />"><spring:message code="dashboard.work.addInstruction" /></a>
+            </sec:authorize>
+            <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')">
+                <a class="app-btn btn-launch" href="<c:url value='/finance/accounts/groups/new' />"><spring:message code="dashboard.work.createAccount" /></a>
+                <a class="app-btn btn-launch" href="<c:url value='/finance/library/activities/new' />"><spring:message code="dashboard.work.createActivity" /></a>
+                <a class="app-btn btn-launch" href="<c:url value='/finance/budgets/new' />"><spring:message code="management.budget.create" /></a>
+            </sec:authorize>
+        </sec:authorize>
+    </div>
+</section>
+</c:if>
+<section class="erp-panel dashboard-auto-widget" data-dashboard-widget="pending-work" data-widget-width="4" data-widget-height="480" data-dashboard-work data-work-url="<c:url value='/api/dashboard/work' />" data-context-path="${pageContext.request.contextPath}">
+    <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.work.title" /></h2></div>
+    <div class="erp-panel-body">
+        <div class="dashboard-work-tools"><span data-work-updated></span><button type="button" class="app-btn btn-neutral" data-work-refresh><spring:message code="common.refresh" /></button></div>
+        <div data-work-status role="status"></div>
+        <div class="dashboard-infolet-grid" data-work-cards></div>
+        <div class="dashboard-work-chart" data-work-chart></div>
+    </div>
+</section>
+<template data-work-labels>
+    <c:forTokens items="create,title,applyLoan,recordLoan,recordDisbursement,createSchedule,addEmployer,addInstruction,createAccount,createActivity,expand,collapse,filters,back,minimumDays,minimumAmount,apply,reset,open,oldest,days,all,empty,updated,chart,amount,loanDrafts,applications,guarantees,queue.manager,queue.loan-officer,queue.accountant,queue.disbursement,queue.board,queue.chairperson,queue.credit-committee,voucher.INCOMPLETE,voucher.NOT_VALIDATED,voucher.ERROR,voucher.REQUIRED,voucher.INITIATED,voucher.READY,voucher.FAILED,voucher.REJECTED" delims="," var="workMessage">
+        <span data-key="dashboard.work.${workMessage}"><spring:message code="dashboard.work.${workMessage}" /></span>
+    </c:forTokens>
+    <c:forTokens items="DRAFT,SUBMITTED,AWAITING_GUARANTORS,ALL_GUARANTORS_APPROVED,READY_FOR_MANAGER,MANAGER_ACCEPTED,AWAITING_LOAN_OFFICER,LOAN_OFFICER_APPROVED,AWAITING_CHAIRPERSON,CHAIRPERSON_APPROVED,AWAITING_BOARD,BOARD_APPROVED,AWAITING_CREDIT_COMMITTEE,CREDIT_COMMITTEE_APPROVED,AWAITING_ACCOUNTANT,ACCOUNTANT_APPROVED,READY_FOR_DISBURSEMENT" delims="," var="workStatus">
+        <span data-key="loan.status.${workStatus}"><spring:message code="loan.status.${workStatus}" /></span>
+    </c:forTokens>
+    <c:forTokens items="RECEIPT,PAYMENT,JOURNAL" delims="," var="workVoucher"><span data-key="voucher.title.${workVoucher}"><spring:message code="voucher.title.${workVoucher}" /></span></c:forTokens>
+</template>
