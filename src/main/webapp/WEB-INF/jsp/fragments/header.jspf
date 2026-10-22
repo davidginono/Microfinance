@@ -193,7 +193,7 @@
                     </div>
                     <div class="p-3">
                     <div class="flex items-start gap-3">
-                        <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-500">
+                        <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border topbar-profile-avatar">
                             <img src="<c:url value='/profile/image/me' />"
                                  alt=""
                                  class="profile-avatar-img h-full w-full rounded-full object-cover"
@@ -205,29 +205,29 @@
                             </svg>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold text-slate-900">
+                            <p class="text-sm font-semibold topbar-profile-value">
                                 <c:choose>
                                     <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
                                     <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
                                 </c:choose>
                             </p>
-                            <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                            <p class="text-xs font-medium uppercase tracking-[0.18em] topbar-dropdown-muted">
                                 <c:choose>
                                     <c:when test="${not empty currentMember and not empty currentMember.displayRole}">${currentMember.displayRole}</c:when>
                                     <c:otherwise><sec:authentication property="principal.position" /></c:otherwise>
                                 </c:choose>
                             </p>
                             <c:if test="${not empty currentMember and not empty currentMember.email}">
-                                <p class="mt-1 break-words text-xs text-slate-500">${currentMember.email}</p>
+                                <p class="mt-1 break-words text-xs topbar-dropdown-muted">${currentMember.email}</p>
                             </c:if>
                             <c:if test="${not isPlatformAdminIdentity and not empty adminScope}">
-                                <p class="mt-1 text-[11px] font-medium text-slate-500">${adminScope.saccoId} / ${adminScope.stationId}</p>
+                                <p class="mt-1 text-[11px] font-medium topbar-dropdown-muted">${adminScope.saccoId} / ${adminScope.stationId}</p>
                             </c:if>
                         </div>
                     </div>
-                    <div class="mt-3 grid gap-3 border border-slate-200 bg-slate-50 p-3 text-sm">
+                    <div class="mt-3 grid gap-3 border topbar-profile-facts p-3 text-sm">
                         <div class="flex items-center justify-between gap-4">
-                            <span class="text-slate-500">
+                            <span class="topbar-dropdown-muted">
                                 <c:choose>
                                     <c:when test="${not empty currentMember and currentMember.staffSession}">
                                         <spring:message code="profile.staffMemberNo" text="Staff Number" />
@@ -238,7 +238,7 @@
                                     <c:otherwise><spring:message code="profile.userId" text="User ID" /></c:otherwise>
                                 </c:choose>
                             </span>
-                            <span class="font-semibold text-slate-800">
+                            <span class="font-semibold topbar-profile-value">
                                 <c:choose>
                                     <c:when test="${not empty currentMember and currentMember.staffSession and not empty currentMember.staffNo}">${currentMember.staffNo}</c:when>
                                     <c:when test="${not empty currentMember and not empty currentMember.memberNo}">${currentMember.memberNo}</c:when>
@@ -247,8 +247,8 @@
                             </span>
                         </div>
                         <div class="flex items-center justify-between gap-4">
-                            <span class="text-slate-500"><spring:message code="profile.role" /></span>
-                            <span class="font-semibold text-slate-800">
+                            <span class="topbar-dropdown-muted"><spring:message code="profile.role" /></span>
+                            <span class="font-semibold topbar-profile-value">
                                 <c:choose>
                                     <c:when test="${not empty currentMember and not empty currentMember.displayRole}">${currentMember.displayRole}</c:when>
                                     <c:otherwise><sec:authentication property="principal.position" /></c:otherwise>
@@ -257,19 +257,19 @@
                         </div>
                         <c:if test="${not empty currentMember and currentMember.memberAccess}">
                             <div class="flex items-center justify-between gap-4">
-                                <span class="text-slate-500"><spring:message code="profile.memberId" /></span>
-                                <span class="font-semibold text-slate-800">${currentMember.memberNo}</span>
+                                <span class="topbar-dropdown-muted"><spring:message code="profile.memberId" /></span>
+                                <span class="font-semibold topbar-profile-value">${currentMember.memberNo}</span>
                             </div>
                         </c:if>
                         <c:if test="${not empty currentMember and not empty currentMember.staffNo}">
                             <div class="flex items-center justify-between gap-4">
-                                <span class="text-slate-500"><spring:message code="profile.staffMemberNo" text="Staff Number" /></span>
-                                <span class="font-semibold text-slate-800">${currentMember.staffNo}</span>
+                                <span class="topbar-dropdown-muted"><spring:message code="profile.staffMemberNo" text="Staff Number" /></span>
+                                <span class="font-semibold topbar-profile-value">${currentMember.staffNo}</span>
                             </div>
                         </c:if>
                     </div>
-                    <a href="/profile" class="mt-3 inline-flex w-full items-center justify-center border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                        <spring:message code="profile.photo.edit" text="Edit Profile Photo" />
+                    <a href="/profile" class="mt-3 inline-flex w-full items-center justify-center border topbar-profile-edit px-3 py-2 text-sm font-semibold transition">
+                        <spring:message code="profile.edit" text="Edit Profile" />
                     </a>
                     </div>
                 </div>

@@ -107,7 +107,7 @@ button:active {
 }
 .erp-dropdown-subtitle {
     margin-top: 0.15rem;
-    color: #64748b;
+    color: #d5dbdb;
     font-size: 0.78rem;
     line-height: 1.35;
 }
@@ -117,7 +117,7 @@ button:active {
     justify-content: flex-end;
     white-space: nowrap;
     flex-shrink: 0;
-    color: #0972d3;
+    color: #89bdee;
     font-size: 12px;
     font-weight: 700;
     line-height: 16px;
@@ -132,8 +132,8 @@ button:active {
     text-align: center;
     font-size: 13px;
     line-height: 18px;
-    color: #5f6b7a;
-    background: #ffffff;
+    color: #d5dbdb;
+    background: #232f3e;
 }
 .erp-notification-panel {
     width: min(22.5rem, calc(100vw - 1rem));
@@ -142,9 +142,9 @@ button:active {
 .erp-notification-item {
     display: block;
     padding: 9px 10px;
-    border-bottom: 1px solid #eaeded;
-    background: #ffffff;
-    color: #16191f;
+    border-bottom: 1px solid #545b64;
+    background: #232f3e;
+    color: #ffffff;
     text-decoration: none;
 }
 .erp-notification-item:last-child {
@@ -152,7 +152,7 @@ button:active {
 }
 .erp-notification-item:hover,
 .erp-notification-item:focus-visible {
-    background: #f1faff;
+    background: #414d5c;
 }
 .erp-notification-item:focus-visible {
     position: relative;
@@ -171,14 +171,14 @@ button:active {
 }
 .erp-notification-subject {
     margin: 0;
-    color: #16191f;
+    color: #ffffff;
     font-size: 13px;
     font-weight: 700;
     line-height: 18px;
 }
 .erp-notification-message {
     margin: 2px 0 0;
-    color: #414d5c;
+    color: #d5dbdb;
     font-size: 12px;
     line-height: 17px;
     overflow-wrap: break-word;
@@ -187,7 +187,7 @@ button:active {
     flex-wrap: wrap;
     gap: 4px 10px;
     margin-top: 5px;
-    color: #5f6b7a;
+    color: #d5dbdb;
     font-size: 11px;
     line-height: 16px;
 }
@@ -1819,21 +1819,39 @@ body.aws-console table.erp-table :is(th, td).text-center {
 .erp-dropdown,
 .notification-panel,
 .profile-panel {
-    border: 1px solid var(--aws-line-dark) !important;
+    border: 1px solid #545b64 !important;
     border-radius: 2px !important;
-    background: #ffffff !important;
+    background: #232f3e !important;
+    color: #ffffff;
     box-shadow: 0 2px 4px rgba(0, 28, 36, .2) !important;
 }
 
 .erp-dropdown-header {
-    border-color: var(--aws-line) !important;
-    background: #eaeded !important;
+    border-color: #545b64 !important;
+    background: #232f3e !important;
     padding: 7px 9px !important;
 }
 
 .erp-dropdown-title {
-    color: var(--aws-ink) !important;
+    color: #ffffff !important;
     font-size: 13px !important;
+}
+
+.app-topbar .topbar-profile-value { color: #ffffff; }
+.app-topbar .topbar-dropdown-muted { color: #d5dbdb; }
+.app-topbar :is(.topbar-profile-avatar, .topbar-profile-facts, .topbar-profile-edit) {
+    border-color: #545b64;
+    background: #232f3e;
+    color: #ffffff;
+}
+.app-topbar .topbar-profile-edit:is(:hover, :focus-visible),
+.app-topbar .erp-dropdown-link:is(:hover, :focus-visible) {
+    background: #414d5c;
+    color: #ffffff;
+}
+.app-topbar :is(.topbar-profile-edit, .erp-dropdown-link):focus-visible {
+    outline: 2px solid #89bdee;
+    outline-offset: -2px;
 }
 
 .app-modal-overlay {
@@ -4852,14 +4870,14 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
 .app-navigation-search-results {
     position: absolute; top: calc(100% + 4px); left: 0; z-index: 100;
     width: max(100%, 260px); max-width: calc(100vw - 32px); max-height: 320px;
-    overflow-y: auto; background: #fff; color: #16191f; border: 1px solid #aab7b8;
+    overflow-y: auto; background: #232f3e; color: #fff; border: 1px solid #545b64;
     border-radius: 4px; box-shadow: 0 4px 12px #0002;
 }
 .app-navigation-search-results[hidden] {display: none;}
 .app-navigation-search-results a, .app-navigation-search-results p {
-    display: block; margin: 0; padding: 8px 12px; color: #16191f; font-size: 13px; white-space: normal;
+    display: block; margin: 0; padding: 8px 12px; color: #fff; font-size: 13px; white-space: normal;
 }
-.app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #eaf3fa; color: #0073bb;}
+.app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #414d5c; color: #fff;}
 .workspace-navigation-feedback {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#f2f8fc;color:#414d5c;font-size:14px;line-height:20px;}
 .workspace-navigation-feedback[role=alert] {border-left:3px solid #d13212;background:#fff3f1;}
 html:has(body.aws-console) {scrollbar-gutter:stable;}
