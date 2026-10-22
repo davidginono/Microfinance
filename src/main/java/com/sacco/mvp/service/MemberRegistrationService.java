@@ -40,14 +40,16 @@ public class MemberRegistrationService {
             form.getMemberNo(), form.getEmail(), form.getSaccoId());
         VerifiedExternalMember verified = verifyExternalMember(form);
         String normalizedPhone = normalizePhone(form.getPhone());
-        ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone);
+        String employeeNumber = EmployeeNumber.normalize(form.getEmployeeNumber());
+        ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone,
+            employeeNumber, verified.saccoId(), verified.stationId());
         SaccoSettings sacco = resolveLocalSacco(verified);
         OffsetDateTime now = OffsetDateTime.now();
         Member member = Member.builder()
             .id(UUID.randomUUID())
             .saccoId(sacco.getSaccoId())
             .memberNo(verified.memberNo())
-            .employeeNumber(EmployeeNumber.normalize(form.getEmployeeNumber()))
+            .employeeNumber(employeeNumber)
             .stationId(verified.stationId())
             .fullName(verified.fullName())
             .phone(normalizedPhone)
@@ -96,7 +98,8 @@ public class MemberRegistrationService {
         );
     }
 
-    public void ensureLocalUniqueness(String memberNo, String email, String phone) {
+    public void ensureLocalUniqueness(String memberNo, String email, String phone,
+                                      String employeeNumber, String saccoId, String stationId) {
         String normalizedPhone = normalizePhone(phone);
         if (memberRepository.findByMemberNo(memberNo).isPresent()) {
             log.info("Client registration blocked because client number already exists locally: {}", memberNo);
@@ -110,11 +113,35 @@ public class MemberRegistrationService {
             log.info("Client registration blocked because phone already exists locally: {}", normalizedPhone);
             throw new IllegalStateException("That phone number is already registered in this system.");
         }
+        String normalizedEmployeeNumber = EmployeeNumber.normalize(employeeNumber);
+        if (normalizedEmployeeNumber != null && memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase(
+            normalizeSaccoId(saccoId), normalizeStationId(stationId), normalizedEmployeeNumber)) {
+            log.info("Client registration blocked because employee number already exists locally: {}", normalizedEmployeeNumber);
+            throw new IllegalStateException("That employee number is already registered in this branch.");
+        }
     }
 
     public boolean memberNoAvailable(String memberNo) {
         String normalizedMemberNo = normalizeMemberNo(memberNo);
         return !normalizedMemberNo.isBlank() && memberRepository.findByMemberNo(normalizedMemberNo).isEmpty();
+    }
+
+    public boolean employeeNumberAvailable(String employeeNumber, String saccoId, String stationId) {
+        String normalizedEmployeeNumber;
+        try {
+            normalizedEmployeeNumber = EmployeeNumber.normalize(employeeNumber);
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        String normalizedStationId = normalizeStationId(stationId);
+        return normalizedEmployeeNumber != null
+            && !normalizedSaccoId.isBlank()
+            && !normalizedStationId.isBlank()
+            && registeredSaccoRepository.existsById(normalizedSaccoId)
+            && saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue(normalizedSaccoId, normalizedStationId).isPresent()
+            && !memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase(
+                normalizedSaccoId, normalizedStationId, normalizedEmployeeNumber);
     }
 
     private int nextMemberRank(String saccoId) {

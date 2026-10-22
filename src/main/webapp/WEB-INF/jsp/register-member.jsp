@@ -54,8 +54,13 @@
                         </div>
                         <div>
                             <label for="employeeNumber" class="mb-1.5 block registration-section-label"><spring:message code="payroll.employeeNumber.optional" /></label>
-                            <form:input path="employeeNumber" id="employeeNumber" maxlength="50" pattern="[A-Za-z0-9/._ -]*" cssClass="registration-field" aria-describedby="employeeNumberHelp employeeNumberErrors" />
+                            <form:input path="employeeNumber" id="registrationEmployeeNumber" maxlength="50" pattern="[A-Za-z0-9/._ -]*" cssClass="registration-field" aria-describedby="employeeNumberHelp registrationEmployeeNumberAvailability employeeNumberErrors" />
                             <p id="employeeNumberHelp" class="mt-1 text-sm"><spring:message code="payroll.employeeNumber.help" /></p>
+                            <p id="registrationEmployeeNumberAvailability" class="mt-1 hidden text-xs" role="status" aria-live="polite"
+                               data-checking-message="<spring:message code='registration.employeeNumber.checking' />"
+                               data-available-message="<spring:message code='registration.employeeNumber.available' />"
+                               data-unavailable-message="<spring:message code='registration.employeeNumber.unavailable' />"
+                               data-failed-message="<spring:message code='registration.employeeNumber.checkFailed' />"></p>
                             <form:errors path="employeeNumber" id="employeeNumberErrors" cssClass="mt-1 block text-sm text-rose-600" />
                         </div>
                         <div>
@@ -291,7 +296,9 @@
         const registrationSaccosData = document.getElementById("registrationSaccosData");
         const memberNoInput = document.getElementById("registrationMemberNo");
         const memberNoAvailability = document.getElementById("registrationMemberNoAvailability");
-        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData || !memberNoInput || !memberNoAvailability) {
+        const employeeNumberInput = document.getElementById("registrationEmployeeNumber");
+        const employeeNumberAvailability = document.getElementById("registrationEmployeeNumberAvailability");
+        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData || !memberNoInput || !memberNoAvailability || !employeeNumberInput || !employeeNumberAvailability) {
             return;
         }
 
@@ -300,64 +307,86 @@
         let lastOtpReady = false;
         let otpVerificationComplete = false;
         let otpVerificationTimer = null;
-        let memberNoAvailabilityTimer = null;
-        let memberNoAvailabilityRequest = null;
-        let memberNoAvailabilityVersion = 0;
         const registrationSaccos = JSON.parse(registrationSaccosData.textContent || '[]');
 
-        const setMemberNoAvailability = (state) => {
-            const message = memberNoAvailability.dataset[state + "Message"] || "";
-            memberNoAvailability.textContent = message;
-            memberNoAvailability.className = state === "available"
-                ? "mt-1 text-xs text-emerald-700"
-                : state === "unavailable" || state === "failed"
-                    ? "mt-1 text-xs text-rose-700"
-                    : "mt-1 text-xs text-slate-600";
-        };
-
-        const checkMemberNoAvailability = () => {
-            memberNoAvailabilityVersion += 1;
-            const version = memberNoAvailabilityVersion;
-            const memberNo = memberNoInput.value.trim();
-            if (memberNoAvailabilityTimer) {
-                window.clearTimeout(memberNoAvailabilityTimer);
-            }
-            if (memberNoAvailabilityRequest) {
-                memberNoAvailabilityRequest.abort();
-                memberNoAvailabilityRequest = null;
-            }
-            if (!memberNo) {
-                memberNoAvailability.textContent = "";
-                memberNoAvailability.className = "mt-1 hidden text-xs";
-                return;
-            }
-            setMemberNoAvailability("checking");
-            memberNoAvailabilityTimer = window.setTimeout(async () => {
-                const controller = new AbortController();
-                memberNoAvailabilityRequest = controller;
-                try {
-                    const response = await fetch("/register/member/member-number-availability?memberNo=" + encodeURIComponent(memberNo), {
+        const createAvailabilityChecker = (input, availability, requestUrl, ready) => {
+            let timer = null;
+            let request = null;
+            let version = 0;
+            const setAvailability = (state) => {
+                const message = availability.dataset[state + "Message"] || "";
+                availability.textContent = message;
+                availability.className = state === "available"
+                    ? "mt-1 text-xs text-emerald-700"
+                    : state === "unavailable" || state === "failed"
+                        ? "mt-1 text-xs text-rose-700"
+                        : "mt-1 text-xs text-slate-600";
+            };
+            const clearAvailability = () => {
+                availability.textContent = "";
+                availability.className = "mt-1 hidden text-xs";
+            };
+            const check = () => {
+                version += 1;
+                const currentVersion = version;
+                const value = input.value.trim();
+                if (timer) {
+                    window.clearTimeout(timer);
+                }
+                if (request) {
+                    request.abort();
+                    request = null;
+                }
+                if (!value || !ready()) {
+                    clearAvailability();
+                    return;
+                }
+                setAvailability("checking");
+                timer = window.setTimeout(async () => {
+                    const controller = new AbortController();
+                    request = controller;
+                    try {
+                        const response = await fetch(requestUrl(value), {
                         headers: {"Accept": "application/json"},
                         signal: controller.signal
                     });
                     const payload = await response.json();
-                    if (version !== memberNoAvailabilityVersion) {
+                    if (currentVersion !== version) {
                         return;
                     }
-                    setMemberNoAvailability(response.ok && payload.available === true ? "available" : "unavailable");
+                    setAvailability(response.ok && payload.available === true ? "available" : "unavailable");
                 } catch (error) {
-                    if (error.name !== "AbortError" && version === memberNoAvailabilityVersion) {
-                        setMemberNoAvailability("failed");
+                    if (error.name !== "AbortError" && currentVersion === version) {
+                        setAvailability("failed");
                     }
                 } finally {
-                    if (version === memberNoAvailabilityVersion) {
-                        memberNoAvailabilityRequest = null;
+                    if (currentVersion === version) {
+                        request = null;
                     }
                 }
             }, 350);
         };
+            input.addEventListener("input", check);
+            return check;
+        };
 
-        memberNoInput.addEventListener("input", checkMemberNoAvailability);
+        createAvailabilityChecker(
+            memberNoInput,
+            memberNoAvailability,
+            (memberNo) => "/register/member/member-number-availability?memberNo=" + encodeURIComponent(memberNo),
+            () => true
+        );
+        const checkEmployeeNumberAvailability = createAvailabilityChecker(
+            employeeNumberInput,
+            employeeNumberAvailability,
+            (employeeNumber) => "/register/member/employee-number-availability?employeeNumber=" + encodeURIComponent(employeeNumber)
+                + "&saccoId=" + encodeURIComponent(saccoSelect.value)
+                + "&stationId=" + encodeURIComponent(stationSelect.value),
+            () => employeeNumberInput.validity.valid && !!saccoSelect.value && !!stationSelect.value
+        );
+        const recheckEmployeeNumberAvailability = () => window.setTimeout(checkEmployeeNumberAvailability);
+        saccoSelect.addEventListener("change", recheckEmployeeNumberAvailability);
+        stationSelect.addEventListener("change", recheckEmployeeNumberAvailability);
 
         const clearOtpVerification = () => {
             if (otpVerificationTimer) {

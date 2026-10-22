@@ -43,6 +43,32 @@ class MemberRegistrationServiceTest {
     }
 
     @Test
+    void employeeNumberAvailabilityUsesTheSelectedInstitutionAndBranch() {
+        MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        MemberRegistrationService service = new MemberRegistrationService(
+            memberRepository,
+            registeredSaccoRepository,
+            saccoStationRepository,
+            Mockito.mock(SaccoSettingsRepository.class),
+            Mockito.mock(UserSettingsRepository.class),
+            Mockito.mock(PasswordEncoder.class),
+            new NameSignatureService()
+        );
+
+        when(registeredSaccoRepository.existsById("SACCO-1")).thenReturn(true);
+        when(saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-1", "AR704"))
+            .thenReturn(Optional.of(Mockito.mock(com.sacco.mvp.domain.SaccoStation.class)));
+        when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase("SACCO-1", "AR704", "emp-100"))
+            .thenReturn(false);
+
+        assertThat(service.employeeNumberAvailable(" emp-100 ", "sacco-1", "ar704")).isTrue();
+        assertThat(service.employeeNumberAvailable("invalid\nnumber", "sacco-1", "ar704")).isFalse();
+        verify(memberRepository).existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase("SACCO-1", "AR704", "emp-100");
+    }
+
+    @Test
     void ensureLocalUniquenessRejectsEmailAlreadyUsedByAnyAccount() {
         MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
         MemberRegistrationService service = new MemberRegistrationService(
@@ -61,7 +87,10 @@ class MemberRegistrationServiceTest {
         assertThatThrownBy(() -> service.ensureLocalUniqueness(
             "000001",
             "existing@example.com",
-            "255700000001"
+            "255700000001",
+            null,
+            "SACCO-1",
+            "AR704"
         ))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("That email address is already registered in this system.");

@@ -44,6 +44,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     Optional<Member> findByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
+    boolean existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase(String saccoId, String stationId, String employeeNumber);
     Optional<Member> findByStaffNo(String staffNo);
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Member m where m.id = :id")

@@ -50,6 +50,14 @@ class AuthControllerSaccoAccessTest {
             .containsExactly(Map.entry("available", true));
     }
 
+    @Test
+    void employeeNumberAvailabilityOnlyReturnsTheAvailabilityFlag() {
+        when(memberRegistrationService.employeeNumberAvailable("EMP-100", "SACCO-01", "AR704")).thenReturn(true);
+
+        assertThat(controller().employeeNumberAvailability("EMP-100", "SACCO-01", "AR704"))
+            .containsExactly(Map.entry("available", true));
+    }
+
     @Mock private MemberRegistrationService memberRegistrationService;
     @Mock private EmailOtpService emailOtpService;
     @Mock private MemberDirectoryService memberDirectoryService;

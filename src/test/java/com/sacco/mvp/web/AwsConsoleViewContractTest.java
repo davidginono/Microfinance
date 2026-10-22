@@ -164,7 +164,7 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void authenticationScreensSupportPasswordVisibilityAndDebouncedClientNumberChecks() throws Exception {
+    void authenticationScreensSupportPasswordVisibilityAndDebouncedRegistrationIdentifierChecks() throws Exception {
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String registration = read(JSP_ROOT.resolve("register-member.jsp"));
         String claim = read(JSP_ROOT.resolve("auth/claim.jsp"));
@@ -172,10 +172,11 @@ class AwsConsoleViewContractTest {
         String authController = read(Path.of("src/main/java/com/sacco/mvp/web/AuthController.java"));
 
         assertThat(login).contains("data-password-visibility", "password-visibility.js");
-        assertThat(registration).contains("data-password-visibility", "registrationMemberNoAvailability", "setTimeout(async () =>", "}, 350)");
+        assertThat(registration).contains("data-password-visibility", "registrationMemberNoAvailability", "registrationEmployeeNumberAvailability", "setTimeout(async () =>", "}, 350)");
         assertThat(claim).contains("data-password-visibility", "password-visibility.js");
         assertThat(passwordVisibility).contains("input.type = revealed ? \"text\" : \"password\"", "aria-pressed");
-        assertThat(authController).contains("/register/member/member-number-availability", "memberNoAvailable(memberNo)");
+        assertThat(authController).contains("/register/member/member-number-availability", "memberNoAvailable(memberNo)",
+            "/register/member/employee-number-availability", "employeeNumberAvailable(employeeNumber, saccoId, stationId)");
     }
 
     @Test

@@ -101,6 +101,14 @@ public class AuthController {
         return Map.of("available", memberRegistrationService.memberNoAvailable(memberNo));
     }
 
+    @GetMapping("/register/member/employee-number-availability")
+    @ResponseBody
+    public Map<String, Object> employeeNumberAvailability(@RequestParam(defaultValue = "") String employeeNumber,
+                                                           @RequestParam(defaultValue = "") String saccoId,
+                                                           @RequestParam(defaultValue = "") String stationId) {
+        return Map.of("available", memberRegistrationService.employeeNumberAvailable(employeeNumber, saccoId, stationId));
+    }
+
     @PostMapping("/register/member/request-otp")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestMemberRegistrationOtp(@Valid @ModelAttribute("registrationForm") MemberRegistrationForm form,
@@ -124,7 +132,10 @@ public class AuthController {
             memberRegistrationService.ensureLocalUniqueness(
                 verified.memberNo(),
                 verified.email(),
-                form.getPhone()
+                form.getPhone(),
+                form.getEmployeeNumber(),
+                verified.saccoId(),
+                verified.stationId()
             );
             var delivery = emailOtpService.issueOtp(
                 verified.email(),
