@@ -55,6 +55,8 @@ Use Cloudscape's [create](https://cloudscape.design/patterns/resource-management
 
 ## Accounting Configuration Conventions
 
+- The 2026-10-22 instruction removes Control account from the account taxonomy. Show only groups and Posting account, including for principal, receivables, allowances and charge accounts. Old `CONTROL` identifiers are compatibility evidence and display as Posting account. Keep purpose-based and workflow-owned financial safeguards; do not enable ordinary journals to bypass loan posting. See `docs/unified-posting-account-type.md`.
+
 For COA or activity/transaction configuration, read [the accounting architecture](../../../docs/chart-of-accounts-architecture.md) and [accounting implementation gates](../../../docs/accounting-report-builder-checklist.md). These are configuration flows; saving definitions does not post money.
 
 - COA account changes use versions and the institution approval configuration described in `docs/account-version-approvals.md`; incomplete drafts do not change the effective account. Library definitions retain their existing authorized onboarding flow. Preserve current claims, institution/branch checks, CSRF, and lifecycle protections; this convention does not change lending approvals or financial posting controls.

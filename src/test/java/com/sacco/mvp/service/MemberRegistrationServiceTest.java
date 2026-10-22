@@ -15,11 +15,32 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class MemberRegistrationServiceTest {
+
+    @Test
+    void memberNumberAvailabilityUsesTheNormalizedClientNumber() {
+        MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
+        MemberRegistrationService service = new MemberRegistrationService(
+            memberRepository,
+            Mockito.mock(RegisteredSaccoRepository.class),
+            Mockito.mock(SaccoStationRepository.class),
+            Mockito.mock(SaccoSettingsRepository.class),
+            Mockito.mock(UserSettingsRepository.class),
+            Mockito.mock(PasswordEncoder.class),
+            new NameSignatureService()
+        );
+
+        when(memberRepository.findByMemberNo("CLIENT-100")).thenReturn(Optional.empty());
+
+        assertThat(service.memberNoAvailable(" client-100 ")).isTrue();
+        assertThat(service.memberNoAvailable(" ")).isFalse();
+        verify(memberRepository).findByMemberNo("CLIENT-100");
+    }
 
     @Test
     void ensureLocalUniquenessRejectsEmailAlreadyUsedByAnyAccount() {

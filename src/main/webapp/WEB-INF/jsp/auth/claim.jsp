@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260812-navbar-v6' />" />
+    <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="flex min-h-screen items-center justify-center px-4 py-10">
@@ -72,16 +73,16 @@
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Password
-                        <input name="password" type="password" autocomplete="new-password" minlength="8" required
+                        <div class="auth-password-control"><input id="claimPassword" name="password" type="password" autocomplete="new-password" minlength="8" required
                                class="mt-1 w-full border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                               placeholder="At least 8 characters" />
+                               placeholder="At least 8 characters" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="claimPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Confirm password
-                        <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required
+                        <div class="auth-password-control"><input id="claimConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required
                                class="mt-1 w-full border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                               placeholder="Re-enter password" />
+                               placeholder="Re-enter password" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="claimConfirmPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                     </label>
 
                     <button type="submit" class="w-full bg-[#3F9C4B] px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#357f3f]">Activate account</button>

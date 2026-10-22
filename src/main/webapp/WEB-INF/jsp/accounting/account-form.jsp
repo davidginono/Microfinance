@@ -46,7 +46,7 @@
                 <c:if test="${not groupMode}">
                     <fieldset class="accounting-form-section"><legend><spring:message code="coa.accountSettings" /></legend><div class="accounting-grid">
                     <label><spring:message code="accounting.normalBalance" /><form:select path="normalBalance" cssClass="aws-control"><form:option value="DEBIT"><spring:message code="accounting.debit" /></form:option><form:option value="CREDIT"><spring:message code="accounting.credit" /></form:option></form:select><small><spring:message code="coa.balanceHelp" /></small></label>
-                    <label><spring:message code="coa.postingAccess" /><form:select path="kind" cssClass="aws-control"><form:option value="POSTING"><spring:message code="accounting.option.POSTING" /></form:option><form:option value="CONTROL"><spring:message code="coa.control" /></form:option></form:select><form:errors path="kind" cssClass="coa-error" /></label>
+                    <form:hidden path="kind" value="POSTING" />
                     <label><spring:message code="accounting.purpose" /><form:select path="purpose" cssClass="aws-control"><c:forEach items="${accountPurposes}" var="p"><form:option value="${p}"><spring:message code="accounting.option.${p}" /></form:option></c:forEach></form:select></label>
                     </div></fieldset>
                 </c:if>

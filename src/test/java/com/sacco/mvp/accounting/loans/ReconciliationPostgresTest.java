@@ -123,7 +123,7 @@ class ReconciliationPostgresTest {
             assertThat(report().rows()).anyMatch(x->x.issue().equals("OPENING_UNAVAILABLE") && x.slDebit()==null);});
     }
     @Test void accruedInterestHasUnknownSubledgerAndVarianceRatherThanFabricatedZero() {
-        loan();var accrual=f.account("ACCRUED","ASSET","DEBIT","CONTROL","INTEREST_RECEIVABLE");
+        loan();var accrual=f.account("ACCRUED","ASSET","DEBIT","POSTING","INTEREST_RECEIVABLE");
         tx().executeWithoutResult(t->{shadow("gl_journal_line");
             f.jdbc.update("insert into gl_journal_line select gen_random_uuid(),j.id,j.sacco_id,j.station_id,?,6,0 from gl_journal j where j.sacco_id=?",accrual,f.institution);
             assertThat(report().rows()).filteredOn(r->r.component().equals("INTEREST_RECEIVABLE")).hasSize(2).allSatisfy(row->{

@@ -38,7 +38,7 @@ public class GeneralLedgerRepository {
     public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit,String sort,String direction) {
         String column=switch(sort) {
             case "code" -> "a.code"; case "name" -> "a.name"; case "parent" -> "p.name";
-            case "type" -> "a.type"; case "kind" -> "a.kind"; case "normalBalance" -> "a.normal_balance";
+            case "type" -> "a.type"; case "kind" -> "case when a.kind='CONTROL' then 'POSTING' else a.kind end"; case "normalBalance" -> "a.normal_balance";
             case "status" -> "a.active"; default -> throw new IllegalArgumentException("filter");
         };
         String order=switch(direction) { case "asc" -> " asc"; case "desc" -> " desc"; default -> throw new IllegalArgumentException("filter"); };
@@ -51,7 +51,7 @@ public class GeneralLedgerRepository {
             String search=filter.search().toLowerCase(java.util.Locale.ROOT);args.add(search);args.add(search);args.add(search);
         }
         if(!filter.type().isEmpty()){where+=" and a.type=?";args.add(filter.type());}
-        if(!filter.kind().isEmpty()){where+=" and a.kind=?";args.add(filter.kind());}
+        if(!filter.kind().isEmpty()){where+=" and (a.kind=? or (?='POSTING' and a.kind='CONTROL'))";args.add(filter.kind());args.add(filter.kind());}
         if(!filter.state().isEmpty()){where+=" and a.active=?";args.add("ACTIVE".equals(filter.state()));}
         args.add(limit);args.add(offset);
         return jdbc.query("select a.*,p.code parent_code,p.name parent_name,p.name_sw parent_name_sw from gl_account a left join gl_account p on p.id=a.parent_id and p.sacco_id=a.sacco_id"+where+" order by "+column+order+",a.id"+order+" limit ? offset ?",

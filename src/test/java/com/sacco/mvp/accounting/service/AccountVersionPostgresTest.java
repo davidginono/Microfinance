@@ -38,6 +38,13 @@ class AccountVersionPostgresTest {
         var proxy=new ProxyFactory(new GeneralLedgerService(books,new AccessControlService(),audit,clock,claims,directory,institutions));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));ledger=(GeneralLedgerService)proxy.getProxy();
     }
     @AfterAll void stop(){if(ds!=null)ds.close();}
+    @Test void loanPurposesUsePostingAccountsAndNewControlClassificationsAreRejected(){
+        var command=form(family,"111099","Loan principal");command.setPurpose("LOAN_PRINCIPAL");command.setKind("CONTROL");
+        assertThatThrownBy(()->ledger.onboardAccount(maker,command,false)).hasMessage("accounting.error.accountClassification");
+        command.setKind("POSTING");UUID account=ledger.onboardAccount(maker,command,false);
+        assertThat(books.account(institution,account).orElseThrow().kind()).isEqualTo("POSTING");
+        assertThat(jdbc.queryForObject("select gl_account_requires_loan_source(?)",Boolean.class,account)).isTrue();
+    }
     @BeforeEach void setup(){
         reset(audit,claims,directory,institutions);institution="COA-"+UUID.randomUUID();
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,'Synthetic account version institution',true,now(),now())",institution);

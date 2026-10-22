@@ -72,10 +72,10 @@ public class AccountingCodeLibraryRepository {
     }
     public List<TemplateAccount> lockAccounts(String institution,List<String> codes) {
         String slots=String.join(",",Collections.nCopies(codes.size(),"?"));var args=new ArrayList<Object>();args.add(institution);args.addAll(codes);
-        return jdbc.query("select id,code,kind,active from gl_account where sacco_id=? and code in ("+slots+") order by id for share",
-            (r,n)->new TemplateAccount(r.getObject("id",UUID.class),r.getString("code"),r.getString("kind"),r.getBoolean("active")),args.toArray());
+        return jdbc.query("select id,code,kind,active,gl_account_requires_loan_source(id) loan_owned from gl_account where sacco_id=? and code in ("+slots+") order by id for share",
+            (r,n)->new TemplateAccount(r.getObject("id",UUID.class),r.getString("code"),r.getString("kind"),r.getBoolean("active"),r.getBoolean("loan_owned")),args.toArray());
     }
-    public record TemplateAccount(UUID id,String code,String kind,boolean active) { }
+    public record TemplateAccount(UUID id,String code,String kind,boolean active,boolean loanOwned) { }
     public Optional<SavedRequest> request(String institution,UUID transaction,UUID key) {
         return jdbc.query("select payload_hash,saved_by from gl_transaction_template where sacco_id=? and transaction_id=? and request_key=?",
             (r,n)->new SavedRequest(r.getString("payload_hash"),r.getObject("saved_by",UUID.class)),institution,transaction,key).stream().findFirst();

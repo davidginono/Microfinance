@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-auth-notice-width-v1' />" />
+    <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
@@ -92,7 +93,7 @@
                                 </div>
                                 <div>
                                     <label class="mb-2 block auth-section-label">Password</label>
-                                    <input type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <div class="auth-password-control"><input id="systemAdminLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="systemAdminLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
@@ -127,7 +128,7 @@
                                 </div>
                                 <div>
                                     <label class="mb-2 block auth-section-label">Password</label>
-                                    <input type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <div class="auth-password-control"><input id="memberLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="memberLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
@@ -179,7 +180,7 @@
                                 </div>
                                 <div>
                                     <label class="mb-2 block auth-section-label">Password</label>
-                                    <input type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <div class="auth-password-control"><input id="staffLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="staffLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
@@ -257,11 +258,11 @@
             <div id="forgotPasswordNewPasswordBlock" class="hidden space-y-4">
                 <div>
                     <label class="mb-1.5 block auth-section-label">New Password</label>
-                    <input id="forgotPasswordNewPassword" type="password" autocomplete="new-password" minlength="8" class="auth-input w-full px-4 py-3 text-slate-900" />
+                    <div class="auth-password-control"><input id="forgotPasswordNewPassword" type="password" autocomplete="new-password" minlength="8" class="auth-input w-full px-4 py-3 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="forgotPasswordNewPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                 </div>
                 <div>
                     <label class="mb-1.5 block auth-section-label">Confirm Password</label>
-                    <input id="forgotPasswordConfirmPassword" type="password" autocomplete="new-password" minlength="8" class="auth-input w-full px-4 py-3 text-slate-900" />
+                    <div class="auth-password-control"><input id="forgotPasswordConfirmPassword" type="password" autocomplete="new-password" minlength="8" class="auth-input w-full px-4 py-3 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="forgotPasswordConfirmPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                 </div>
             </div>
             <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">

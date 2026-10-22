@@ -75,7 +75,7 @@ class AccountingCodeLibraryPostgresTest {
         when(institutions.findStation(institution,"B1")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         cash=ledger.createAccount(actor,new AccountCommand("CASH","Cash","ASSET","DEBIT","POSTING","CASH",null));
         expense=ledger.createAccount(actor,new AccountCommand("EXPENSE","Office expense","EXPENSE","DEBIT","POSTING","EXPENSE",null));
-        control=ledger.createAccount(actor,new AccountCommand("PRINCIPAL","Principal","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL",null));
+        control=ledger.createAccount(actor,new AccountCommand("PRINCIPAL","Principal","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL",null));
     }
     @Test void forwardMigrationRemovesHistoryStorage() {
         assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version='54' and success",Integer.class)).isEqualTo(1);
@@ -99,8 +99,8 @@ class AccountingCodeLibraryPostgresTest {
     @Test void transactionRegisterStaysScopedAndBoundedAcrossActivities() {
         UUID first=service.createActivity(actor,code("OPS",null)),second=service.createActivity(actor,code("BANK",null));
         for(int n=0;n<30;n++) {var form=code("PAY"+n,n%2==0?first:second);form.setSourceEvent(n%2==0?"MANUAL_JOURNAL":"EXPENSE");service.createTransaction(actor,form);}
-        var page=service.transactionRegister(actor,null,"","",0);assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
-        assertThat(service.transactionRegister(actor,null,"","",1).rows()).hasSize(5);
+        var page=service.transactionRegister(actor,null,"PAY","",0);assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
+        assertThat(service.transactionRegister(actor,null,"PAY","",1).rows()).hasSize(5);
         assertThat(service.transactionRegister(actor,first,"","",0).rows()).hasSize(15).allMatch(c->c.activityId().equals(first));
         assertThat(service.transactionRegister(actor,null,"","ACTIVE","EXPENSE",0).rows()).hasSize(15).allMatch(c->c.sourceEvent().equals("EXPENSE"));
         assertThat(service.transactionRegister(actor,first,"","ACTIVE","EXPENSE",0).rows()).isEmpty();
@@ -189,8 +189,8 @@ class AccountingCodeLibraryPostgresTest {
     }
     @Test void listsAndAccountSearchAreBounded() {
         for(int n=0;n<30;n++)service.createActivity(actor,code("ACT"+n,null));
-        var first=service.activities(actor,"","",0);assertThat(first.rows()).hasSize(25);assertThat(first.hasNext()).isTrue();
-        assertThat(service.activities(actor,"","",1).rows()).hasSize(5);assertThat(service.activities(actor,"act29","",0).rows()).hasSize(1);
+        var first=service.activities(actor,"ACT","",0);assertThat(first.rows()).hasSize(25);assertThat(first.hasNext()).isTrue();
+        assertThat(service.activities(actor,"ACT","",1).rows()).hasSize(5);assertThat(service.activities(actor,"act29","",0).rows()).hasSize(1);
         assertThat(service.accounts(actor,"expense",0).rows()).extracting(AccountChoice::code).containsExactly("EXPENSE");
     }
     static CodeForm code(String code,UUID activity) {var form=new CodeForm();form.setCode(code);form.setName(code);form.setActivityId(activity);return form;}

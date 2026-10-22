@@ -1,5 +1,7 @@
 # Loan product principal and interest accounts
 
+2026-10-22: the [unified posting-account type](unified-posting-account-type.md) includes legacy loan accounts in both selectors. The earlier exclusion of `CONTROL` identifiers below is superseded; these records display as Posting account while retaining their immutable evidence and loan-workflow safeguards.
+
 Implemented increment: 19 October 2026. Loan product editing, including an existing customised-loan configuration, has **Loan principal account** and **Loan interest account** selectors. New products use the automatic creation described below. Editing these links does not post money or create accounts.
 
 2026-10-21: both account selectors, including selected-value hydration, exclude heading/group and control accounts. New assignments are validated as posting accounts on the server. Frozen loan bindings and historical journals remain unchanged.

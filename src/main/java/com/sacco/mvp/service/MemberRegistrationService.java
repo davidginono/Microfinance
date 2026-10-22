@@ -112,6 +112,11 @@ public class MemberRegistrationService {
         }
     }
 
+    public boolean memberNoAvailable(String memberNo) {
+        String normalizedMemberNo = normalizeMemberNo(memberNo);
+        return !normalizedMemberNo.isBlank() && memberRepository.findByMemberNo(normalizedMemberNo).isEmpty();
+    }
+
     private int nextMemberRank(String saccoId) {
         return memberRepository.findTopBySaccoIdAndPositionOrderByRankDesc(saccoId, Position.MEMBER)
             .map(Member::getRank)

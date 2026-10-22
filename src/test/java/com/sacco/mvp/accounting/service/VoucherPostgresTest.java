@@ -63,7 +63,7 @@ class VoucherPostgresTest {
   when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
   when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
   when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
-  actor=operator("B1");cash=account("CASH","ASSET","DEBIT","POSTING","CASH");capital=account("CAPITAL","EQUITY","CREDIT","POSTING","CAPITAL");expense=account("EXPENSE","EXPENSE","DEBIT","POSTING","OTHER");control=account("LOAN","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+  actor=operator("B1");cash=account("CASH","ASSET","DEBIT","POSTING","CASH");capital=account("CAPITAL","EQUITY","CREDIT","POSTING","CAPITAL");expense=account("EXPENSE","EXPENSE","DEBIT","POSTING","OTHER");control=account("LOAN","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
  }
  @Test void postsMultipleRowsDirectlyWithExactTotalsAndImmutableBalancedJournal(){
   var f=form(Type.RECEIPT);var v=service.post(actor,Type.RECEIPT,f);

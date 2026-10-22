@@ -12,7 +12,7 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class VoucherRepository {
     private final JdbcTemplate jdbc;
-    private static final String ORDINARY_ACCOUNT=" and not exists(select 1 from loan_product_account_provision g where g.sacco_id=gl_account.sacco_id and (g.principal_account_id=gl_account.id or g.interest_account_id=gl_account.id))";
+    private static final String ORDINARY_ACCOUNT=" and not gl_account_requires_loan_source(gl_account.id)";
     private static final String HEAD="""
         select v.*,m.full_name posted_by_name,i.sacco_name institution_name,
         coalesce((select nullif(s.address_location,'') from sacco_stations s where s.sacco_id=v.sacco_id and s.station_id=v.station_id),v.station_id) branch_name,

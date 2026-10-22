@@ -51,9 +51,9 @@ class LoanRecordingPostgresTest {
     UUID chargeAccount; UUID managementAccount; UUID insuranceAccount;
     void chargePolicy(String timing){chargePolicy(timing,false,null);}
     void chargePolicy(String timing,boolean allowCustom,BigDecimal limit){
-        chargeAccount=account("CHARGES","ASSET","DEBIT","CONTROL","FEE_RECEIVABLE");
-        managementAccount=account("DEFERRED","LIABILITY","CREDIT","CONTROL","CLEARING");
-        insuranceAccount=account("INSURER","LIABILITY","CREDIT","CONTROL","PAYABLE");
+        chargeAccount=account("CHARGES","ASSET","DEBIT","POSTING","FEE_RECEIVABLE");
+        managementAccount=account("DEFERRED","LIABILITY","CREDIT","POSTING","CLEARING");
+        insuranceAccount=account("INSURER","LIABILITY","CREDIT","POSTING","PAYABLE");
         var f=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();f.setProductId(product);f.setEffectiveFrom(LocalDate.of(2026,1,1));f.setPolicyReference("Synthetic approved policy reference");f.setAgreementReference("Synthetic approved bilingual agreement");f.setInsurer("Synthetic licensed insurer");f.setInsurerVerification("Synthetic licence and premium evidence");f.setEnabled(true);f.setAllowCustom(allowCustom);f.setCustomManagementLimit(limit);
         f.setReceivableAccountId(chargeAccount);f.setManagementAccountId(managementAccount);f.setInsuranceAccountId(insuranceAccount);f.setManagementTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.valueOf(timing));f.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.valueOf(timing));chargeService().savePolicy(actor,f);
         jdbc.update("update loan_product_settings set application_fee=10,processing_fee_rate=0.01,insurance_rate=0.01 where id=?",product);
@@ -296,7 +296,7 @@ class LoanRecordingPostgresTest {
     com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Form adjustment(UUID loan,String kind){
         var f=new com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Form();f.setLoanId(loan);f.setKind(com.sacco.mvp.accounting.adjustments.dto.LoanAdjustmentDtos.Kind.valueOf(kind));f.setDate(TODAY);f.setReason("Synthetic accounting review");f.setEvidence("Synthetic approved policy evidence");return f;
     }
-    UUID provide(UUID loan,String amount){var f=adjustment(loan,"PROVISION");f.setTargetAllowance(new BigDecimal(amount));f.setAllowanceAccountId(account("ALLOW-"+UUID.randomUUID().toString().substring(0,8),"ASSET","CREDIT","CONTROL","ALLOWANCE"));f.setExpenseAccountId(account("LOSS-"+UUID.randomUUID().toString().substring(0,8),"EXPENSE","DEBIT","POSTING","EXPENSE"));var id=adjustments().request(actor,f);adjustments().decide(operator("B1"),id,UUID.randomUUID(),true,"Synthetic independent review");return id;}
+    UUID provide(UUID loan,String amount){var f=adjustment(loan,"PROVISION");f.setTargetAllowance(new BigDecimal(amount));f.setAllowanceAccountId(account("ALLOW-"+UUID.randomUUID().toString().substring(0,8),"ASSET","CREDIT","POSTING","ALLOWANCE"));f.setExpenseAccountId(account("LOSS-"+UUID.randomUUID().toString().substring(0,8),"EXPENSE","DEBIT","POSTING","EXPENSE"));var id=adjustments().request(actor,f);adjustments().decide(operator("B1"),id,UUID.randomUUID(),true,"Synthetic independent review");return id;}
     @Test void loanAdjustmentsPostProvisionsWriteOffAndLinkedWriteBackWithoutInventingPayments(){
         var loan=disbursed("D-ADJ-LIFECYCLE");provide(loan,"1000.00");
         assertThat(adjustments().context(actor,loan).allowance()).isEqualByComparingTo("1000.00");
@@ -591,14 +591,14 @@ class LoanRecordingPostgresTest {
         String[] types={"ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"};
         for(int n=0;n<28;n++)expected.add(account("MAPPING-"+String.format("%03d",n),types[n%5],"DEBIT","POSTING","OTHER"));
         UUID heading=account("MAPPING-GROUP","ASSET","DEBIT","HEADING","OTHER");
-        UUID control=account("MAPPING-CONTROL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
+        UUID control=account("MAPPING-PRINCIPAL","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");expected.add(control);
         var service=productAccountService();
         for(String category:List.of("PRINCIPAL","INTEREST")){
             var first=service.choices(institution,category,"mapping",0,null);var last=service.choices(institution,category,"mapping",1,null);
             assertThat(first).extracting(Choice::id).containsExactlyElementsOf(expected.subList(0,26));
-            assertThat(last).extracting(Choice::id).containsExactlyElementsOf(expected.subList(25,28));
+            assertThat(last).extracting(Choice::id).containsExactlyElementsOf(expected.subList(25,29));
             assertThat(service.choices(institution,category,"",0,heading)).isEmpty();
-            assertThat(service.choices(institution,category,"",0,control)).isEmpty();
+            assertThat(service.choices(institution,category,"",0,control)).extracting(Choice::id).containsExactly(control);
             assertThat(service.choices(institution,category,"mapping-001",0,expected.get(1))).extracting(Choice::id).containsExactly(expected.get(1));
             assertThat(service.choices(institution+"-foreign",category,"mapping",0,expected.get(1))).isEmpty();
             assertThat(service.choices(institution,category,"%' OR '1'='1",0,null)).isEmpty();
@@ -615,9 +615,9 @@ class LoanRecordingPostgresTest {
         }
         UUID heading=account("HEADING","ASSET","DEBIT","HEADING","OTHER"),inactive=account("INACTIVE","EXPENSE","DEBIT","POSTING","OTHER");
         context.getBean(GeneralLedgerService.class).deactivateAccount(actor,inactive);
-        UUID control=account("PRODUCT-CONTROL","ASSET","DEBIT","CONTROL","LOAN_PRINCIPAL");
-        assertThatThrownBy(()->configureProductAccounts(control,interest)).hasMessage("recording.error.productAccountsInvalid");
-        assertThatThrownBy(()->configureProductAccounts(interest,control)).hasMessage("recording.error.productAccountsInvalid");
+        UUID control=account("PRODUCT-PRINCIPAL","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
+        configureProductAccounts(control,interest);
+        configureProductAccounts(interest,control);
         assertThatThrownBy(()->configureProductAccounts(heading,interest)).hasMessage("recording.error.productAccountsInvalid");
         assertThatThrownBy(()->configureProductAccounts(principal,inactive)).hasMessage("recording.error.productAccountsInvalid");
     }

@@ -155,6 +155,45 @@ body.aws-auth-shell textarea:focus {
     box-shadow: none !important;
 }
 
+body.aws-auth-shell .auth-password-control {
+    position: relative;
+}
+
+body.aws-auth-shell .auth-password-control > input {
+    width: 100%;
+    padding-right: 42px !important;
+}
+
+body.aws-auth-shell .password-visibility-toggle {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    width: 32px;
+    min-width: 32px;
+    height: auto !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--aws-blue) !important;
+    padding: 0 !important;
+}
+
+body.aws-auth-shell .password-visibility-toggle svg {
+    width: 16px;
+    height: 16px;
+}
+
+body.aws-auth-shell .password-visibility-toggle:hover {
+    background: #eff6ff !important;
+    color: #033160 !important;
+}
+
+body.aws-auth-shell .password-visibility-toggle:focus-visible {
+    outline: 2px solid var(--aws-blue);
+    outline-offset: -2px;
+}
+
 body.aws-auth-shell button,
 body.aws-auth-shell a.auth-primary-btn,
 body.aws-auth-shell .registration-action,

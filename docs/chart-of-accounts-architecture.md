@@ -1,5 +1,7 @@
 # Chart of accounts onboarding
 
+2026-10-22: the [unified posting-account instruction](unified-posting-account-type.md) supersedes the separate control-account classification below. New transaction accounts use Posting account; legacy identifiers remain only for compatibility and evidence, with loan safeguards enforced through purpose and workflow ownership.
+
 The original direct-accountant setup was implemented on 2026-10-07. The newer 2026-10-18 mandate adds account versions with institution-configured automatic or independent approval for creation, metadata edits and lifecycle changes. See [account version approvals](account-version-approvals.md) for the superseding workflow, access model and historical-evidence limits. This creates account metadata; it does not initialize balances or change lending approvals.
 
 ## Ownership and permission model

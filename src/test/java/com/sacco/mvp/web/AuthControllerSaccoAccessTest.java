@@ -42,6 +42,14 @@ class AuthControllerSaccoAccessTest {
         assertThat(controller().root(null)).isEqualTo("landing");
     }
 
+    @Test
+    void registrationAvailabilityOnlyReturnsTheAvailabilityFlag() {
+        when(memberRegistrationService.memberNoAvailable("CLIENT-100")).thenReturn(true);
+
+        assertThat(controller().memberNumberAvailability("CLIENT-100"))
+            .containsExactly(Map.entry("available", true));
+    }
+
     @Mock private MemberRegistrationService memberRegistrationService;
     @Mock private EmailOtpService emailOtpService;
     @Mock private MemberDirectoryService memberDirectoryService;

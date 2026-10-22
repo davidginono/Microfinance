@@ -40,7 +40,7 @@ public class ChartOfAccountsPageController {
         model.addAttribute("accounts",ledger.chart(actor,filter,page,size,sort,direction));model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
         model.addAttribute("sort",sort);model.addAttribute("direction",direction);
         model.addAttribute("accountTypes",List.of("ASSET","LIABILITY","EQUITY","EXPENSE","INCOME"));
-        model.addAttribute("accountKinds",List.of("HEADING","POSTING","CONTROL"));
+        model.addAttribute("accountKinds",List.of("HEADING","POSTING"));
         return "accounting/accounts";
     }
     @GetMapping({"/groups/new","/posting/new"})

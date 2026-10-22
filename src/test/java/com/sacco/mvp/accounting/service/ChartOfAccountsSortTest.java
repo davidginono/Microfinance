@@ -14,7 +14,7 @@ class ChartOfAccountsSortTest {
         var jdbc=mock(JdbcTemplate.class);var books=new GeneralLedgerRepository(jdbc);var parent=UUID.randomUUID();
         books.chart("I1",new AccountFilter("Cash","ASSET","POSTING","ACTIVE",parent),100,51,"name","desc");
         var call=mockingDetails(jdbc).getInvocations().iterator().next();
-        assertThat((String)call.getArgument(0)).contains("where a.sacco_id=?","and a.parent_id=?","and a.type=?","and a.kind=?","and a.active=?","p.sacco_id=a.sacco_id","order by a.name desc,a.id desc limit ? offset ?");
+        assertThat((String)call.getArgument(0)).contains("where a.sacco_id=?","and a.parent_id=?","and a.type=?","a.kind=?","?='POSTING' and a.kind='CONTROL'","and a.active=?","p.sacco_id=a.sacco_id","order by a.name desc,a.id desc limit ? offset ?");
         assertThat(call.getArguments()).contains("I1",parent,"cash","ASSET","POSTING",true,51,100);
     }
     @Test void invalidSortCannotBeInterpolatedIntoSql() {

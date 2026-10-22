@@ -137,7 +137,7 @@ public class AccountingCodeLibraryService {
         var accountCodes=form.getRules().stream().flatMap(r->java.util.stream.Stream.of(r.getDebitCode(),r.getCreditCode())).distinct().sorted().toList();
         var accounts=library.lockAccounts(actor.getSaccoId(),accountCodes);
         require(accounts.size()==accountCodes.size() && accounts.stream().allMatch(a->a.active() && !"HEADING".equals(a.kind())),"templateAccount");
-        require(!"MANUAL_JOURNAL".equals(code.sourceEvent()) || accounts.stream().noneMatch(a->"CONTROL".equals(a.kind())),"manualControl");
+        require(!"MANUAL_JOURNAL".equals(code.sourceEvent()) || accounts.stream().noneMatch(AccountingCodeLibraryRepository.TemplateAccount::loanOwned),"manualControl");
         library.saveTemplate(actor.getSaccoId(),code,form,hash,accounts,actor.getMemberId());event(actor,id,"TEMPLATE_SAVED");return id;
     }
     private void authorize(AppUserPrincipal actor,String action) {ledger.requireActor(actor,"ACCOUNTING_ACCOUNTS_"+action);}

@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-auth-notice-width-v1' />" />
+    <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
@@ -43,7 +44,12 @@
                             <spring:bind path="registrationForm.memberNo">
                                 <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.memberNo" /></label>
                             </spring:bind>
-                            <form:input path="memberNo" cssClass="registration-field" />
+                            <form:input path="memberNo" id="registrationMemberNo" autocomplete="username" cssClass="registration-field" aria-describedby="registrationMemberNoAvailability" />
+                            <p id="registrationMemberNoAvailability" class="mt-1 hidden text-xs" role="status" aria-live="polite"
+                               data-checking-message="<spring:message code='registration.memberNo.checking' />"
+                               data-available-message="<spring:message code='registration.memberNo.available' />"
+                               data-unavailable-message="<spring:message code='registration.memberNo.unavailable' />"
+                               data-failed-message="<spring:message code='registration.memberNo.checkFailed' />"></p>
                             <form:errors path="memberNo" cssClass="mt-1 block text-xs text-rose-600" />
                         </div>
                         <div>
@@ -130,20 +136,28 @@
                                 <spring:bind path="registrationForm.password">
                                     <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Password</label>
                                 </spring:bind>
-                                <form:password path="password"
-                                               autocomplete="new-password"
-                                               minlength="8"
-                                               cssClass="registration-field" />
+                                <div class="auth-password-control">
+                                    <form:password path="password" id="registrationPassword"
+                                                   autocomplete="new-password"
+                                                   minlength="8"
+                                                   cssClass="registration-field" />
+                                    <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationPassword" aria-pressed="false"
+                                            data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button>
+                                </div>
                                 <form:errors path="password" cssClass="mt-1 block text-xs text-rose-600" />
                             </div>
                             <div>
                                 <spring:bind path="registrationForm.confirmPassword">
                                     <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Confirm Password</label>
                                 </spring:bind>
-                                <form:password path="confirmPassword"
-                                               autocomplete="new-password"
-                                               minlength="8"
-                                               cssClass="registration-field" />
+                                <div class="auth-password-control">
+                                    <form:password path="confirmPassword" id="registrationConfirmPassword"
+                                                   autocomplete="new-password"
+                                                   minlength="8"
+                                                   cssClass="registration-field" />
+                                    <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationConfirmPassword" aria-pressed="false"
+                                            data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button>
+                                </div>
                                 <form:errors path="confirmPassword" cssClass="mt-1 block text-xs text-rose-600" />
                             </div>
                         </div>
@@ -275,7 +289,9 @@
         const saccoSelect = form.querySelector('[name="saccoId"]');
         const stationSelect = document.getElementById("registrationStationSelect");
         const registrationSaccosData = document.getElementById("registrationSaccosData");
-        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData) {
+        const memberNoInput = document.getElementById("registrationMemberNo");
+        const memberNoAvailability = document.getElementById("registrationMemberNoAvailability");
+        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData || !memberNoInput || !memberNoAvailability) {
             return;
         }
 
@@ -284,7 +300,64 @@
         let lastOtpReady = false;
         let otpVerificationComplete = false;
         let otpVerificationTimer = null;
+        let memberNoAvailabilityTimer = null;
+        let memberNoAvailabilityRequest = null;
+        let memberNoAvailabilityVersion = 0;
         const registrationSaccos = JSON.parse(registrationSaccosData.textContent || '[]');
+
+        const setMemberNoAvailability = (state) => {
+            const message = memberNoAvailability.dataset[state + "Message"] || "";
+            memberNoAvailability.textContent = message;
+            memberNoAvailability.className = state === "available"
+                ? "mt-1 text-xs text-emerald-700"
+                : state === "unavailable" || state === "failed"
+                    ? "mt-1 text-xs text-rose-700"
+                    : "mt-1 text-xs text-slate-600";
+        };
+
+        const checkMemberNoAvailability = () => {
+            memberNoAvailabilityVersion += 1;
+            const version = memberNoAvailabilityVersion;
+            const memberNo = memberNoInput.value.trim();
+            if (memberNoAvailabilityTimer) {
+                window.clearTimeout(memberNoAvailabilityTimer);
+            }
+            if (memberNoAvailabilityRequest) {
+                memberNoAvailabilityRequest.abort();
+                memberNoAvailabilityRequest = null;
+            }
+            if (!memberNo) {
+                memberNoAvailability.textContent = "";
+                memberNoAvailability.className = "mt-1 hidden text-xs";
+                return;
+            }
+            setMemberNoAvailability("checking");
+            memberNoAvailabilityTimer = window.setTimeout(async () => {
+                const controller = new AbortController();
+                memberNoAvailabilityRequest = controller;
+                try {
+                    const response = await fetch("/register/member/member-number-availability?memberNo=" + encodeURIComponent(memberNo), {
+                        headers: {"Accept": "application/json"},
+                        signal: controller.signal
+                    });
+                    const payload = await response.json();
+                    if (version !== memberNoAvailabilityVersion) {
+                        return;
+                    }
+                    setMemberNoAvailability(response.ok && payload.available === true ? "available" : "unavailable");
+                } catch (error) {
+                    if (error.name !== "AbortError" && version === memberNoAvailabilityVersion) {
+                        setMemberNoAvailability("failed");
+                    }
+                } finally {
+                    if (version === memberNoAvailabilityVersion) {
+                        memberNoAvailabilityRequest = null;
+                    }
+                }
+            }, 350);
+        };
+
+        memberNoInput.addEventListener("input", checkMemberNoAvailability);
 
         const clearOtpVerification = () => {
             if (otpVerificationTimer) {

@@ -95,6 +95,12 @@ public class AuthController {
         return "register-member";
     }
 
+    @GetMapping("/register/member/member-number-availability")
+    @ResponseBody
+    public Map<String, Object> memberNumberAvailability(@RequestParam(defaultValue = "") String memberNo) {
+        return Map.of("available", memberRegistrationService.memberNoAvailable(memberNo));
+    }
+
     @PostMapping("/register/member/request-otp")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestMemberRegistrationOtp(@Valid @ModelAttribute("registrationForm") MemberRegistrationForm form,

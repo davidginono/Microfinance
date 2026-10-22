@@ -123,9 +123,8 @@ public class GeneralLedgerService {
             : code.matches(parent.code().substring(0,3)+"[0-9]{3}") && !code.endsWith("000");
         require(validCode,"chartCode");
         String kind=group?"HEADING":form.getKind(),purpose=group?"OTHER":form.getPurpose();
-        require(group || Set.of("POSTING","CONTROL").contains(kind),"accountClassification");
+        require(group || "POSTING".equals(kind),"accountClassification");
         require(group || Set.of("DEBIT","CREDIT").contains(form.getNormalBalance()) && PURPOSES.contains(purpose),"accountClassification");
-        require(group || !Set.of("LOAN_PRINCIPAL","INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE").contains(purpose) || "CONTROL".equals(kind),"loanControl");
         var command=new AccountCommand(code,trim(form.getName()),parent.type(),group?normalBalance(parent.type()):form.getNormalBalance(),kind,purpose,parent.id(),trim(form.getNameSw()),trim(form.getDescription()));
         return createAccountVersion(actor,command,form.getRequestKey(),trim(form.getReason()),complete);
     }
@@ -184,7 +183,6 @@ public class GeneralLedgerService {
         require(c.nameSw()==null || c.nameSw().length()<=160,"nameSw");
         require(c.description()==null || c.description().length()<=500,"description");
         require(TYPES.contains(c.type()) && Set.of("DEBIT","CREDIT").contains(c.normalBalance()) && KINDS.contains(c.kind()) && PURPOSES.contains(c.purpose()),"accountClassification");
-        require(!Set.of("LOAN_PRINCIPAL","INTEREST_RECEIVABLE","FEE_RECEIVABLE","ALLOWANCE").contains(c.purpose()) || "CONTROL".equals(c.kind()),"loanControl");
         if(c.parentId()!=null) {
             Account parent=books.account(actor.getSaccoId(),c.parentId()).orElseThrow(()->invalid("parent"));
             require(parent.active() && "HEADING".equals(parent.kind()) && parent.type().equals(c.type()),"parent");
@@ -233,6 +231,7 @@ public class GeneralLedgerService {
     }
     private UUID createAccountVersion(AppUserPrincipal actor,AccountCommand c,UUID key,String reason,boolean complete,boolean productProvision) {
         require(key!=null,"versionInput");
+        require(c!=null && Set.of("HEADING","POSTING").contains(c.kind()),"accountClassification");
         String hash=requestHash(List.of(c,reason,complete));
         var prior=books.versionRequest(actor.getSaccoId(),key);
         if(prior.isPresent()) {require(prior.get().creator().equals(actor.getMemberId()) && Objects.equals(prior.get().branch(),actor.getStationId()) && prior.get().requestHash().equals(hash),"versionRetry");return prior.get().id();}
