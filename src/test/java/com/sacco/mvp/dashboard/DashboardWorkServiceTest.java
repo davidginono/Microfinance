@@ -65,4 +65,3 @@ class DashboardWorkServiceTest {
         verify(repository).loans(eq(a),anyList(),eq(true),isNull(),eq(now),eq(BigDecimal.ZERO));verify(repository).guarantees(a,now);verifyNoMoreInteractions(repository);verifyNoInteractions(vouchers,voucherAccess);
     }
 }
-
