@@ -38,7 +38,7 @@
 .dashboard-widget .erp-stat-main {padding:0!important;min-height:0!important;}
 .aws-console .dashboard-widget .erp-stat-value {font-size:28px!important;line-height:36px!important;color:#16191f;}
 .dashboard-widget .erp-stat-icon {display:none!important;}
-.aws-console .dashboard-widget .erp-stat-footer {display:flex!important;min-height:0;margin-top:8px;padding:0!important;border:0;background:transparent;color:#545b64;font-size:13px;line-height:20px;white-space:normal;}
+.aws-console .dashboard-widget .erp-stat-footer {display:flex!important;min-height:0;margin-top:8px;padding:0!important;border:0!important;background:transparent!important;color:#545b64;font-size:13px;line-height:20px;white-space:normal;}
 .aws-console .dashboard-widget .erp-stat-label {font-size:14px!important;font-weight:400!important;text-transform:none!important;letter-spacing:normal!important;line-height:20px!important;color:#545b64;}
 .dashboard-widget .erp-stat-meta {font-size:13px;line-height:20px;white-space:normal;}
 .dashboard-widget-menu,.dashboard-widget-preferences {position:absolute;z-index:45;right:16px;top:56px;box-sizing:border-box;max-width:calc(100% - 32px);min-width:190px;padding:8px 0;border:1px solid #aab7b8;background:#fff;box-shadow:0 2px 5px #0002;}
