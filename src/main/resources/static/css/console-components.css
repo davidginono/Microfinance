@@ -711,16 +711,6 @@
         display: grid;
         gap: 10px;
     }
-    .aws-qualification-settings .aws-settings-commandbar {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 8px;
-        border: 1px solid var(--aws-line, #d5dbdb);
-        border-radius: 2px;
-        background: #f7f8f8;
-        padding: 7px 10px;
-    }
     .aws-qualification-settings .aws-settings-description {
         max-width: none;
         margin: 0;
@@ -838,9 +828,6 @@
         }
     }
     @media (max-width: 639px) {
-        .aws-qualification-settings .aws-settings-commandbar {
-            grid-template-columns: minmax(0, 1fr);
-        }
         .aws-qualification-settings .aws-settings-save-action {
             justify-self: stretch;
             width: 100%;

@@ -12,6 +12,12 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class LoanProductAccountServiceTest {
+    @Test void currentAccountLabelsAreScopedAndAvailableWithoutChangingMappings(){
+        when(repository.selected("I1",principal)).thenReturn(Optional.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice(principal,"100 - Principal","LOAN_PRINCIPAL")));
+        when(repository.selected("I1",interest)).thenReturn(Optional.empty());
+        assertThat(service.selectedLabels("I1",principal,interest)).containsEntry(principal.toString(),"100 - Principal").doesNotContainKey(interest.toString());
+        verifyNoInteractions(audit);verify(repository,never()).valid(anyString(),any());
+    }
     final LoanProductAccountRepository repository=mock(LoanProductAccountRepository.class);
     final AuditService audit=mock(AuditService.class);
     final LoanProductAccountService service=new LoanProductAccountService(repository,new ApplicationClock("Africa/Nairobi"),audit,mock(com.sacco.mvp.accounting.service.GeneralLedgerService.class));

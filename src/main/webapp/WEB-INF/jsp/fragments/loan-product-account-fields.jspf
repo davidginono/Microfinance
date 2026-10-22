@@ -9,7 +9,7 @@
     <label class="block min-w-0"><spring:message code="productAccounts.principal" />
         <select name="principalGlAccountId" class="aws-control min-w-0 max-w-full" data-choice-select data-searchable="true">
             <option value=""><spring:message code="recording.choose" /></option>
-            <c:if test="${not empty selectedProductPrincipal}"><option value="${selectedProductPrincipal}" selected><spring:message code="productAccounts.linked" /></option></c:if>
+            <c:if test="${not empty selectedProductPrincipal}"><option value="<c:out value='${selectedProductPrincipal}' />" selected data-choice-pinned="true"><c:choose><c:when test="${not empty productAccountLabels[selectedProductPrincipal.toString()]}"><c:out value="${productAccountLabels[selectedProductPrincipal.toString()]}" /></c:when><c:otherwise><spring:message code="productAccounts.linked" /></c:otherwise></c:choose></option></c:if>
         </select>
     </label>
     <%@ include file="../accounting/loans/choice-search.jspf" %>
@@ -18,7 +18,7 @@
     <label class="block min-w-0"><spring:message code="productAccounts.interest" />
         <select name="interestGlAccountId" class="aws-control min-w-0 max-w-full" data-choice-select data-searchable="true">
             <option value=""><spring:message code="recording.choose" /></option>
-            <c:if test="${not empty selectedProductInterest}"><option value="${selectedProductInterest}" selected><spring:message code="productAccounts.linked" /></option></c:if>
+            <c:if test="${not empty selectedProductInterest}"><option value="<c:out value='${selectedProductInterest}' />" selected data-choice-pinned="true"><c:choose><c:when test="${not empty productAccountLabels[selectedProductInterest.toString()]}"><c:out value="${productAccountLabels[selectedProductInterest.toString()]}" /></c:when><c:otherwise><spring:message code="productAccounts.linked" /></c:otherwise></c:choose></option></c:if>
         </select>
     </label>
     <%@ include file="../accounting/loans/choice-search.jspf" %>

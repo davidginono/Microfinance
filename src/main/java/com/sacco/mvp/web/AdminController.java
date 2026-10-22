@@ -1146,6 +1146,7 @@ public class AdminController {
         LoanProductSetting product = adminService.loanProduct(saccoId, id);
         var settings = adminService.settings(saccoId);
         model.addAttribute("product", product);
+        model.addAttribute("productAccountLabels",productAccounts.selectedLabels(saccoId,product.getPrincipalGlAccountId(),product.getInterestGlAccountId()));
         model.addAttribute("settings", settings);
         model.addAttribute("requiredAttachments", requiredAttachmentService.activeForProduct(id));
         model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
@@ -2693,6 +2694,8 @@ public class AdminController {
         customWorkflowOptions(saccoId,model);return "admin/customised-loan-workflow";
     }
     private void customWorkflowOptions(String saccoId,Model model) {
+        if(model.asMap().get("customisedWorkflowForm") instanceof com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm form)
+            model.addAttribute("productAccountLabels",productAccounts.selectedLabels(saccoId,form.getPrincipalGlAccountId(),form.getInterestGlAccountId()));
         model.addAttribute("boardReviewerOptions",adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions",adminService.activeCreditCommitteeReviewerOptions(saccoId));
         model.addAttribute("disbursementReviewerOptions",adminService.activeDisbursementReviewerOptions(saccoId));

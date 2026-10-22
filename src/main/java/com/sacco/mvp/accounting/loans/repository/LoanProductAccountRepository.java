@@ -11,6 +11,11 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class LoanProductAccountRepository {
     private final JdbcTemplate jdbc;
+    public Optional<Choice> selected(String institution,UUID id){
+        if(id==null)return Optional.empty();
+        return jdbc.query("select id,code||' - '||name label,purpose from gl_account where sacco_id=? and id=?",
+            (r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),institution,id).stream().findFirst();
+    }
     public List<Choice> choices(String institution,String search,int page,UUID selected){
         return jdbc.query("select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and kind='POSTING'"+
             " and (?::uuid is null or id=?) and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?",

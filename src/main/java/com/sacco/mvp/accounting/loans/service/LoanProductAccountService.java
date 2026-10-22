@@ -17,6 +17,13 @@ public class LoanProductAccountService {
     private final AuditService audit;
     private final com.sacco.mvp.accounting.service.GeneralLedgerService ledger;
     public record Accounts(UUID principalId,UUID interestId) {}
+    @Transactional(readOnly=true)
+    public Map<String,String> selectedLabels(String institution,UUID principal,UUID interest){
+        var labels=new HashMap<String,String>();
+        for(UUID id:new LinkedHashSet<>(java.util.stream.Stream.of(principal,interest).filter(Objects::nonNull).toList()))
+            repository.selected(institution,id).ifPresent(choice->labels.put(id.toString(),choice.label()));
+        return labels;
+    }
     @Transactional(propagation=Propagation.MANDATORY)
     public void provision(LoanProductSetting product,UUID creator){
         var accounts=ledger.provisionLoanProductAccounts(product.getSaccoId(),creator,product.getId(),product.getDisplayName());

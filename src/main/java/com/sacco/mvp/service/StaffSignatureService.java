@@ -48,13 +48,15 @@ public class StaffSignatureService {
             || member.getPasswordHash() == null || !passwordEncoder.matches(currentPassword, member.getPasswordHash())) {
             throw new IllegalArgumentException("profile.signature.passwordError");
         }
-        if (member.getSignatureText() != null && !member.getSignatureText().isBlank()) return;
+        boolean updating=member.getSignatureText()!=null && !member.getSignatureText().isBlank();
+        String signature=nameSignatureService.signatureFromFullName(normalizedName);
+        if(signature.equals(member.getSignatureText()))return;
         Map<String, Object> before = state(member);
-        member.setFullName(normalizedName);
-        member.setSignatureText(nameSignatureService.signatureFromFullName(normalizedName));
+        if(!updating)member.setFullName(normalizedName);
+        member.setSignatureText(signature);
         member.setSignatureRegisteredAt(OffsetDateTime.now());
         memberRepository.save(member);
-        auditService.log("STAFF_USER", member.getId(), "STAFF_REGISTER_OWN_SIGNATURE", actor.getMemberId(), before, state(member));
+        auditService.log("STAFF_USER", member.getId(), updating?"STAFF_UPDATE_OWN_SIGNATURE":"STAFF_REGISTER_OWN_SIGNATURE", actor.getMemberId(), before, state(member));
     }
 
     private void requireOwner(AppUserPrincipal actor, Member member) {

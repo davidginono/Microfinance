@@ -4,7 +4,7 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberProfileImageService;
-import com.sacco.mvp.service.PlatformAdminProfileService;
+import com.sacco.mvp.service.ProfileContactService;
 import com.sacco.mvp.service.StaffSignatureService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -28,7 +28,7 @@ import java.util.UUID;
 public class ProfileController {
     private final MemberDirectoryService memberDirectoryService;
     private final MemberProfileImageService memberProfileImageService;
-    private final PlatformAdminProfileService platformAdminProfileService;
+    private final ProfileContactService profileContactService;
     private final StaffSignatureService staffSignatureService;
     private final MessageSource messageSource;
     private final com.sacco.mvp.service.EmployeeProfileService employeeProfileService;
@@ -68,7 +68,7 @@ public class ProfileController {
             staffSignatureService.register(principal, fullName, currentPassword, confirmed);
             redirectAttributes.addFlashAttribute("message", messageSource.getMessage("profile.signature.saved", null, LocaleContextHolder.getLocale()));
         } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("signatureFullName", fullName);
+            redirectAttributes.addFlashAttribute("signatureFullName", fullName.substring(0,Math.min(fullName.length(),120)));
             redirectAttributes.addFlashAttribute("signatureError", messageSource.getMessage(ex.getMessage(), null, LocaleContextHolder.getLocale()));
         }
         return "redirect:/profile";
@@ -106,14 +106,42 @@ public class ProfileController {
                                 @RequestParam String currentPassword,
                                 RedirectAttributes redirectAttributes) {
         try {
-            if (principal == null || !principal.isPlatformIdentity()) {
-                throw new IllegalStateException("Only the System Admin can update this contact profile.");
-            }
-            platformAdminProfileService.updateContact(principal.getMemberId(), email, phone, currentPassword);
-            redirectAttributes.addFlashAttribute("message", "Contact details updated.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+            profileContactService.update(principal, email, phone, currentPassword);
+            redirectAttributes.addFlashAttribute("message", messageSource.getMessage("profile.contact.saved", null, LocaleContextHolder.getLocale()));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("contactEmailValue", email.substring(0, Math.min(email.length(),160)));
+            redirectAttributes.addFlashAttribute("contactPhoneValue", phone==null?"":phone.substring(0, Math.min(phone.length(),32)));
+            redirectAttributes.addFlashAttribute("contactError", messageSource.getMessage(ex.getMessage(), null, LocaleContextHolder.getLocale()));
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            redirectAttributes.addFlashAttribute("contactError", messageSource.getMessage("profile.contact.duplicate", null, LocaleContextHolder.getLocale()));
         }
+        return "redirect:/profile";
+    }
+
+    @PostMapping("/profile/phone/request")
+    public String requestPhoneVerification(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String currentPassword,
+            jakarta.servlet.http.HttpSession session,RedirectAttributes redirect) {
+        try {
+            boolean sent=profileContactService.requestPhoneOtp(actor,currentPassword);
+            if(sent)session.removeAttribute("profilePhoneAttempts:"+actor.getMemberId());
+            redirect.addFlashAttribute("message",messageSource.getMessage(sent?"profile.contact.sent":"profile.contact.verified",null,LocaleContextHolder.getLocale()));
+        } catch(IllegalArgumentException ex) {redirect.addFlashAttribute("phoneError",messageSource.getMessage(ex.getMessage(),null,LocaleContextHolder.getLocale()));}
+        return "redirect:/profile";
+    }
+
+    @PostMapping("/profile/phone/verify")
+    public String verifyPhone(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String code,@RequestParam String currentPassword,
+            jakarta.servlet.http.HttpSession session,RedirectAttributes redirect) {
+        String key="profilePhoneAttempts:"+actor.getMemberId();
+        try {
+            synchronized(session) {
+                int attempts=session.getAttribute(key) instanceof Integer n?n:0;
+                if(attempts>=5)throw new IllegalArgumentException("profile.contact.attempts");
+                session.setAttribute(key,attempts+1);
+            }
+            profileContactService.verifyPhone(actor,code,currentPassword);session.removeAttribute(key);
+            redirect.addFlashAttribute("message",messageSource.getMessage("profile.contact.verified",null,LocaleContextHolder.getLocale()));
+        } catch(IllegalArgumentException ex) {redirect.addFlashAttribute("phoneError",messageSource.getMessage(ex.getMessage(),null,LocaleContextHolder.getLocale()));}
         return "redirect:/profile";
     }
 

@@ -29,39 +29,61 @@
     <h1 class="erp-page-title"><spring:message code="profile.page.title" text="Profile" /></h1>
 </div>
 
-<c:if test="${isPlatformAdminIdentity}">
-    <section class="erp-panel aws-settings-panel" aria-labelledby="systemAdminContactTitle">
+<section class="erp-panel aws-settings-panel" aria-labelledby="systemAdminContactTitle">
         <div class="aws-settings-header">
-            <h2 id="systemAdminContactTitle" class="aws-settings-title">Contact details</h2>
-            <p class="aws-settings-description">Used for your own account notifications and OTP delivery.</p>
+            <h2 id="systemAdminContactTitle" class="aws-settings-title"><spring:message code="profile.contact.title" /></h2>
         </div>
-        <form action="/profile/contact" method="post" class="aws-settings-form">
+        <form action="<c:url value='/profile/contact' />" method="post" class="aws-settings-form">
+            <c:if test="${not empty contactError}"><p role="alert" class="coa-error"><c:out value="${contactError}" /></p></c:if>
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="grid gap-3 md:grid-cols-2">
                 <label class="aws-settings-field" for="profileContactEmail">
-                    Email
+                    <spring:message code="profile.contact.email" />
                     <input id="profileContactEmail" name="email" type="email" maxlength="160" required
                            autocomplete="email" class="aws-control"
-                           value="<c:out value='${profileMember.email}' />" />
+                           value="<c:out value='${contactEmailValue != null ? contactEmailValue : profileMember.email}' />" />
                 </label>
                 <label class="aws-settings-field" for="profileContactPhone">
-                    Phone number
+                    <spring:message code="profile.contact.phone" />
                     <input id="profileContactPhone" name="phone" type="tel" inputmode="numeric"
                            pattern="255[0-9]{9}" minlength="12" maxlength="12"
                            autocomplete="tel" placeholder="255712345678" class="aws-control"
-                           value="<c:out value='${profileMember.phone}' />" />
+                           value="<c:out value='${contactPhoneValue != null ? contactPhoneValue : profileMember.phone}' />" />
                 </label>
             </div>
             <label class="aws-settings-field mt-3" for="profileContactPassword">
-                Current password
+                <spring:message code="profile.signature.currentPassword" />
                 <input id="profileContactPassword" name="currentPassword" type="password" required
                        autocomplete="current-password" class="aws-control" />
             </label>
             <div class="aws-settings-footer">
-                <button type="submit" class="app-btn btn-launch">Save Contact Details</button>
+                <button type="submit" class="app-btn btn-launch"><spring:message code="profile.contact.save" /></button>
             </div>
         </form>
     </section>
+
+<c:if test="${not empty profileMember.phone}">
+<section class="erp-panel aws-settings-panel" aria-labelledby="profilePhoneTitle">
+    <div class="aws-settings-header"><h2 id="profilePhoneTitle" class="aws-settings-title"><spring:message code="profile.contact.verification" /></h2></div>
+    <div class="erp-panel-body"><p><c:out value="${profileMember.phone}" /></p>
+        <c:choose><c:when test="${not empty profileMember.phoneVerifiedAt}"><p><spring:message code="profile.contact.verified" /></p></c:when><c:otherwise>
+        <c:if test="${not empty phoneError}"><p class="coa-error" role="alert"><c:out value="${phoneError}" /></p></c:if>
+        <form action="<c:url value='/profile/phone/request' />" method="post" class="aws-settings-form">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <label class="aws-settings-field" for="phoneRequestPassword"><spring:message code="profile.signature.currentPassword" /><input id="phoneRequestPassword" type="password" name="currentPassword" maxlength="128" required autocomplete="current-password" class="aws-control" /></label>
+            <div class="aws-settings-footer"><button class="app-btn btn-neutral" type="submit"><spring:message code="profile.contact.send" /></button></div>
+        </form>
+        <form action="<c:url value='/profile/phone/verify' />" method="post" class="aws-settings-form">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <div class="grid gap-3 md:grid-cols-2">
+                <label class="aws-settings-field" for="phoneVerificationCode"><spring:message code="profile.contact.code" /><input id="phoneVerificationCode" name="code" pattern="[0-9]{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code" required class="aws-control" /></label>
+                <label class="aws-settings-field" for="phoneVerifyPassword"><spring:message code="profile.signature.currentPassword" /><input id="phoneVerifyPassword" type="password" name="currentPassword" maxlength="128" required autocomplete="current-password" class="aws-control" /></label>
+            </div>
+            <div class="aws-settings-footer"><button class="app-btn btn-launch" type="submit"><spring:message code="profile.contact.verify" /></button></div>
+        </form>
+        </c:otherwise></c:choose>
+    </div>
+</section>
 </c:if>
 
 <c:if test="${profileMember.memberAccess and not isPlatformAdminIdentity}">
@@ -86,11 +108,7 @@
             <h2 id="staffSignatureTitle" class="aws-settings-title"><spring:message code="profile.signature.title" /></h2>
             <p class="aws-settings-description"><spring:message code="profile.signature.help" /></p>
         </div>
-        <c:choose>
-            <c:when test="${not empty profileMember.signatureText}">
-                <div class="erp-panel-body"><p class="aws-signature-text"><c:out value="${profileMember.signatureText}" /></p><p><spring:message code="profile.signature.registered" /></p></div>
-            </c:when>
-            <c:otherwise>
+        <c:if test="${not empty profileMember.signatureText}"><div class="erp-panel-body"><p class="aws-signature-text"><c:out value="${profileMember.signatureText}" /></p></div></c:if>
                 <form action="<c:url value='/profile/signature' />" method="post" class="aws-settings-form accounting-create-form">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <c:if test="${not empty signatureError}"><p class="loan-error-summary" role="alert" tabindex="-1"><c:out value="${signatureError}" /></p></c:if>
@@ -104,8 +122,6 @@
                     <div class="aws-settings-footer"><button type="submit" class="app-btn btn-launch"><spring:message code="profile.signature.save" /></button></div>
                 </form>
                 <%@ include file="accounting/accounting-form-support.jspf" %>
-            </c:otherwise>
-        </c:choose>
     </section>
 </c:if>
 
@@ -172,7 +188,7 @@
                 </div>
                     </c:if>
                     <div>
-                        <dt><spring:message code="common.email" text="Email" /></dt>
+                        <dt><spring:message code="profile.contact.email" text="Email" /></dt>
                         <dd><c:out value="${empty profileMember.email ? 'Not set' : profileMember.email}" /></dd>
                     </div>
                     <div>

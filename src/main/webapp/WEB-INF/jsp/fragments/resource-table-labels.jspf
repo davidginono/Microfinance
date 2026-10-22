@@ -4,6 +4,7 @@
     data-actions="<spring:message code='common.actions' />"
     data-sort-ascending="<spring:message code='table.sortAscending' />"
     data-sort-descending="<spring:message code='table.sortDescending' />"
+    data-rows-displayed="<spring:message code='table.rowsDisplayed' />"
     data-records="<spring:message code='table.records' />"
     data-search-page="<spring:message code='table.searchPage' />"
     data-no-matches="<spring:message code='table.noMatches' />"

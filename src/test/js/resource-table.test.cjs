@@ -10,6 +10,31 @@ const row = '<tr><td>V001</td><td>100.00</td><td>Posted</td></tr>';
 const loadingSource=readFileSync('src/main/resources/static/js/ui-loading.js','utf8');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 
+test('legacy tables and dashboard summaries count displayed rows without adding table tools',async()=>{
+    const markup=`<section class="erp-table-wrap"><div class="app-table-titlebar"><h2>Loan balances</h2></div><table><thead><tr><th>Reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>${row}</tbody></table></section><section data-dashboard-widget="recent"><div class="erp-panel-header"><h2>Recent loans</h2></div><table><thead><tr><th>Reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>${row}${row}</tbody></table></section>`;
+    const {dom,window:w,document:d}=await setup(markup+`<section data-dashboard-widget="chart"><div class="erp-panel-header"><h2>Chart</h2></div><div data-dashboard-chart><table><thead><tr><th>Status</th></tr></thead><tbody><tr><td>Pending</td></tr></tbody></table></div></section>`);
+    try {
+        assert.deepEqual([...d.querySelectorAll('.app-table-count')].map(e=>e.textContent),['(1)','(2)']);
+        assert.equal(d.querySelector('.resource-table-tools'),null);
+        d.querySelector('[data-dashboard-widget] tbody tr').hidden=true;await settle();
+        assert.equal(d.querySelector('[data-dashboard-widget] .app-table-count').textContent,'(1)');
+        w.ResourceTable.init();assert.equal(d.querySelectorAll('.app-table-count').length,2);
+    } finally {dom.window.close();}
+});
+
+test('title counters follow visible rows and preserve an authoritative server total',async()=>{
+    const markup=table('row-count',row+row.replace('V001','V002')+'<tr><td colspan="3">No records</td></tr>').replace('<form method="get"><input name="search"></form>','');
+    const {dom,window:w,document:d}=await setup(markup);
+    try {
+        const count=d.querySelector('.app-table-count'),search=d.querySelector('.resource-table-search input');
+        assert.equal(count.textContent,'(2)');search.value='V002';search.dispatchEvent(new w.Event('input'));assert.equal(count.textContent,'(1)');
+        search.value='missing';search.dispatchEvent(new w.Event('input'));assert.equal(count.textContent,'(0)');
+        search.value='';search.dispatchEvent(new w.Event('input'));assert.equal(count.textContent,'(2)');
+    } finally {dom.window.close();}
+    const other=await setup(table('server-total',row).replace('<h2>Records</h2>','<h2>Records <span class="app-table-count">(90)</span></h2>'));
+    try {assert.equal(other.document.querySelectorAll('.app-table-count').length,1);assert.equal(other.document.querySelector('.app-table-count').textContent,'(90)');}finally{other.dom.window.close();}
+});
+
 test('report exports retain their own form and use current table filters without issuing an HTML query',async()=>{
     const key='review-report';
     const exportForm=`<form action="/documents/reports/accountant-loans.pdf" method="get" data-table-toolbar-for="${key}" data-table-export-for="${key}"><input type="hidden" name="fromDate" value="2026-10-01"><input type="hidden" name="decisionFilter" value="ALL"><button>PDF</button><button data-print-action="true">Print</button></form>`;
@@ -137,7 +162,7 @@ test('late hydrated rows receive selection and replacement clears old record com
 test('explicit workspace headings, GET filters and independent POST commands move with their envelopes', async () => {
     const html=`<h2 data-table-heading-for="external">Review queue</h2><form method="get" action="/queue" data-table-filter-for="external"><input name="searchId" value="L001"><input type="hidden" name="filter" value="pending"></form><form id="mark-read" method="post" action="/notifications/mark-all-read" data-table-toolbar-for="external"><input type="hidden" name="_csrf" value="token"><button>Mark read</button></form>${table('external',row).replace('<div class="app-table-titlebar"><h2>Records</h2><div class="accounting-actions"><a class="app-btn btn-primary" href="/create">Create</a></div></div>','').replace('<form method="get"><input name="search"></form>','')}`;
     const {dom,document:d}=await setup(html);
-    assert.equal(d.querySelector('.app-table-titlebar h2').textContent,'Review queue');assert.equal(d.querySelector('.resource-table-tools [name=searchId]').value,'L001');assert.equal(d.querySelector('.resource-table-tools [name=filter]').value,'pending');
+    assert.equal(d.querySelector('.app-table-titlebar h2').textContent,'Review queue (1)');assert.equal(d.querySelector('.resource-table-tools [name=searchId]').value,'L001');assert.equal(d.querySelector('.resource-table-tools [name=filter]').value,'pending');
     assert.equal(d.querySelector('.resource-table-actions #mark-read').action,'http://localhost/notifications/mark-all-read');assert.equal(d.querySelector('#mark-read input').value,'token');assert.equal(d.querySelector('.erp-table-scroll form'),null);dom.window.close();
 });
 
@@ -185,7 +210,7 @@ test('bounded detail tables omit tools and retain all columns and record command
     const {dom,document:d}=await setup(markup+table('next-detail',row,'data-table-tools="none"'),saved);
     assert.equal(d.querySelector('.resource-table-tools'),null);
     assert.equal(d.querySelector('[type="search"],.resource-table-pagination,.resource-table-preferences-button'),null);
-    assert.equal(d.querySelector('.app-table-titlebar h2').textContent,'Records');
+    assert.equal(d.querySelector('.app-table-titlebar h2').textContent,'Records (1)');
     assert.equal(d.querySelector('.resource-split-layout'),null);
     assert.equal(d.querySelector('[data-resource-table="next-detail"]').dataset.resourceTableReady,'true');
     assert.equal([...d.querySelectorAll('tbody td')].every(cell=>!cell.hidden),true);

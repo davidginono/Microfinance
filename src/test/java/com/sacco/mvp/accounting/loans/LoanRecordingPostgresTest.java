@@ -1060,7 +1060,7 @@ class LoanRecordingPostgresTest {
         try(var pool=Executors.newFixedThreadPool(4)){var work=new ArrayList<Callable<Long>>();for(int i=0;i<8;i++)work.add(()->transactions.execute(t->repo.next()));var results=pool.invokeAll(work);var values=new ArrayList<Long>();for(var result:results)values.add(result.get());assertThat(values).hasSize(8).doesNotHaveDuplicates().allMatch(value->value>Long.parseLong(secondLoan.getLoanId()));}
         Long rolledBack=transactions.execute(t->{long value=repo.next();t.setRollbackOnly();return value;});assertThat(transactions.<Long>execute(t->repo.next())).isGreaterThan(rolledBack);
     }
-    @Test void concurrentStaffSignatureRegistrationKeepsTheFirstSignatureAndOneAudit() throws Exception {
+    @Test void concurrentIdenticalSignaturesRegisterOnceAndLaterEditsAreAudited() throws Exception {
         var password="synthetic-signature-password";
         jdbc.update("update members set password_hash=? where id=?",new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(password),actor.getMemberId());
         var signatures=context.getBean(StaffSignatureService.class);
@@ -1071,7 +1071,8 @@ class LoanRecordingPostgresTest {
         var saved=context.getBean(MemberRepository.class).findById(actor.getMemberId()).orElseThrow();
         assertThat(saved.getSignatureText()).isEqualTo("Test A");assertThat(saved.getSignatureRegisteredAt()).isNotNull();
         signatures.register(actor,"Different Name",password,true);
-        assertThat(context.getBean(MemberRepository.class).findById(actor.getMemberId()).orElseThrow().getSignatureText()).isEqualTo("Test A");
+        assertThat(context.getBean(MemberRepository.class).findById(actor.getMemberId()).orElseThrow().getSignatureText()).isEqualTo("Different N");
+        verify(context.getBean(AuditService.class)).log(eq("STAFF_USER"),eq(actor.getMemberId()),eq("STAFF_UPDATE_OWN_SIGNATURE"),eq(actor.getMemberId()),any(),any());
         verify(context.getBean(AuditService.class),times(1)).log(eq("STAFF_USER"),eq(actor.getMemberId()),eq("STAFF_REGISTER_OWN_SIGNATURE"),eq(actor.getMemberId()),any(),any());
     }
     RecordForm form(){var f=new RecordForm();f.setClientId(client);f.setProductId(product);f.setApplicationDate(LocalDate.of(2026,9,1));f.setFirstPaymentDate(LocalDate.of(2026,10,1));f.setMonths(1);f.setRequestedPrincipal(new BigDecimal("1000.00"));f.setPrincipal(new BigDecimal("1000.00"));f.setPurpose("Business stock");return f;}

@@ -215,9 +215,6 @@
         </div>
         <form action="/admin/settings-controls/qualification-policies" method="post" class="aws-settings-form aws-qualification-form">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="aws-settings-commandbar">
-                <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="Set applicant, guarantor, and portfolio risk rules for this Branch. Product-specific guarantor Disposable Income is configured inside each loan product." /></p>
-            </div>
             <div class="aws-settings-grid aws-qualification-grid">
                 <section class="aws-settings-group aws-qualification-applicants-group" aria-labelledby="loan-applicant-policy-title">
                     <div class="aws-settings-group-header">

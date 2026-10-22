@@ -35,7 +35,7 @@ class StaffSignatureServiceTest {
         when(repository.findForSignatureRegistration(member.getId())).thenReturn(Optional.of(member));
     }
 
-    @Test void registersOwnNameBasedSignatureOnceWithAuditAndPreservesExistingSignatures() {
+    @Test void updatesOwnSignatureWithAuditWithoutRenamingTheAccount() {
         when(encoder.matches("password", "encoded")).thenReturn(true);
         service.register(actor, "  Amina  Juma ", "password", true);
         assertThat(member.getFullName()).isEqualTo("AMINA JUMA");
@@ -43,10 +43,10 @@ class StaffSignatureServiceTest {
         var registeredAt = member.getSignatureRegisteredAt();
         assertThat(registeredAt).isNotNull();
         service.register(actor, "Different Name", "password", true);
-        assertThat(member.getSignatureText()).isEqualTo("Amina J");
+        assertThat(member.getSignatureText()).isEqualTo("Different N");
         assertThat(member.getFullName()).isEqualTo("AMINA JUMA");
-        assertThat(member.getSignatureRegisteredAt()).isEqualTo(registeredAt);
-        verify(repository, times(1)).save(member);
+        verify(repository, times(2)).save(member);
+        verify(audit).log(eq("STAFF_USER"), eq(member.getId()), eq("STAFF_UPDATE_OWN_SIGNATURE"), eq(member.getId()), any(), any());
         verify(audit, times(1)).log(eq("STAFF_USER"), eq(member.getId()), eq("STAFF_REGISTER_OWN_SIGNATURE"), eq(member.getId()), any(), any());
     }
 

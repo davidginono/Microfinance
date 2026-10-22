@@ -38,7 +38,7 @@ public enum Position {
             case ACCOUNTANT -> "Accountant";
             case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
             case CHAIRPERSON -> "Chairperson";
-            case BOARD -> "Board";
+            case BOARD -> "Board Committee";
             case CREDIT_COMMITTEE -> "Credit Committee";
             case LOAN_OFFICER -> "Loan Officer";
             case ADMIN -> "Super Admin";

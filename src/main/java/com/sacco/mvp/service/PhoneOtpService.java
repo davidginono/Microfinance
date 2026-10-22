@@ -21,6 +21,7 @@ public class PhoneOtpService {
     private final EmailOtpTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final SmsGateway smsGateway;
+    private final org.springframework.context.MessageSource messages;
 
     @Value("${app.auth.otp.ttl-minutes:10}")
     private int otpTtlMinutes;
@@ -29,6 +30,8 @@ public class PhoneOtpService {
     public void issueClaimOtp(String phone, UUID memberId) {
         String normalizedPhone = TanzaniaPhoneNumber.normalizeRequired(phone);
         OffsetDateTime now = OffsetDateTime.now();
+        var latest=tokenRepository.findTopByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNullOrderByCreatedAtDesc(normalizedPhone,EmailOtpPurpose.CLAIM_PHONE,memberId);
+        if(latest.isPresent() && latest.get().getCreatedAt().isAfter(now.minusSeconds(60)))throw new IllegalArgumentException("profile.contact.wait");
         tokenRepository.findByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNull(
             normalizedPhone, EmailOtpPurpose.CLAIM_PHONE, memberId
         ).forEach(token -> token.setConsumedAt(now));
@@ -45,11 +48,13 @@ public class PhoneOtpService {
             .resendCount(0)
             .build());
 
-        SmsSendResult result = smsGateway.send(normalizedPhone,
-            "Your SACCOS Admin phone verification code is " + code + ". It expires in "
-                + Math.max(1, otpTtlMinutes) + " minutes.");
+        SmsSendResult result;
+        try {
+            result=smsGateway.send(normalizedPhone,messages.getMessage("profile.contact.sms",
+                new Object[]{code,Math.max(1,otpTtlMinutes)},org.springframework.context.i18n.LocaleContextHolder.getLocale()));
+        } catch(RuntimeException failure) {throw new IllegalArgumentException("profile.contact.sendFailed");}
         if (!result.consumesUnit()) {
-            throw new IllegalStateException("The phone verification code could not be sent. Confirm the phone number and try again.");
+            throw new IllegalArgumentException("profile.contact.sendFailed");
         }
     }
 
@@ -60,13 +65,13 @@ public class PhoneOtpService {
             .findTopByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNullOrderByCreatedAtDesc(
                 normalizedPhone, EmailOtpPurpose.CLAIM_PHONE, memberId
             )
-            .orElseThrow(() -> new IllegalStateException("No active phone verification code was found. Request new codes."));
+            .orElseThrow(() -> new IllegalArgumentException("profile.contact.codeInvalid"));
         OffsetDateTime now = OffsetDateTime.now();
         if (token.getExpiresAt() == null || token.getExpiresAt().isBefore(now)) {
-            throw new IllegalStateException("The phone verification code has expired. Request new codes.");
+            throw new IllegalArgumentException("profile.contact.codeInvalid");
         }
-        if (code == null || !passwordEncoder.matches(code.trim(), token.getCodeHash())) {
-            throw new IllegalStateException("The phone verification code is invalid.");
+        if (code == null || !code.matches("[0-9]{6}") || !passwordEncoder.matches(code, token.getCodeHash())) {
+            throw new IllegalArgumentException("profile.contact.codeInvalid");
         }
         token.setConsumedAt(now);
     }

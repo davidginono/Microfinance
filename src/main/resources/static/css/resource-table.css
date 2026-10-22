@@ -1,7 +1,7 @@
 /* Console table: only the data canvas owns horizontal scrolling. */
 .aws-console [data-resource-table] { min-width:0; max-width:100%; overflow:visible; }
 .aws-console [data-resource-table] > .app-table-titlebar { flex-wrap:wrap; background:#fafafa !important; gap:8px 16px; padding:16px 20px 12px; border-bottom:0 !important; }
-.aws-console [data-resource-table] > .app-table-titlebar h2 { margin:0; font-size:16px; font-weight:700; line-height:1.4; text-transform:none !important; letter-spacing:normal; }
+.aws-console .app-table-titlebar :is(h2,h3),.aws-console [data-dashboard-widget][data-table-summary-count] > .erp-panel-header :is(h2,h3,.erp-panel-title) { margin:0; font-size:20px!important; font-weight:700; line-height:28px; text-transform:none !important; letter-spacing:normal; }
 .aws-console [data-resource-table] .resource-table-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:6px; margin-left:auto; min-width:0; padding:0 !important; }
 .aws-console [data-resource-table] .resource-table-actions form { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0; }
 .aws-console [data-resource-table] .resource-table-actions .app-btn,
@@ -160,3 +160,5 @@
 @media(max-width:600px){.resource-table-dialog-body{grid-template-columns:minmax(0,1fr);gap:12px}.resource-table-dialog-body .resource-table-column-options{border-left:0;border-top:1px solid #d5dbdb;padding:16px 0 0}.aws-console [data-resource-table]>.app-table-titlebar{padding:12px}.aws-console .resource-table-tools{padding:0 12px 12px}}
 
 .resource-table-retry {margin-left:12px;}
+
+.aws-console .app-table-titlebar .app-table-count,.aws-console [data-table-summary-count] > .erp-panel-header .app-table-count {font-size:20px;line-height:28px;font-weight:400;color:#545b64;}

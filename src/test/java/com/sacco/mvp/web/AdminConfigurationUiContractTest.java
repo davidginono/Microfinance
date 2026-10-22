@@ -134,7 +134,7 @@ class AdminConfigurationUiContractTest {
             .contains("aria-labelledby=\"qualification-settings-title\"")
             .contains("id=\"qualification-settings-title\" class=\"aws-settings-title\"")
             .contains("class=\"aws-settings-form aws-qualification-form\"")
-            .contains("class=\"aws-settings-commandbar\"")
+            .doesNotContain("class=\"aws-settings-commandbar\"")
             .contains("class=\"aws-settings-footer\"")
             .contains("class=\"app-btn btn-launch aws-settings-save-action\"")
             .contains("class=\"aws-settings-grid aws-qualification-grid\"")
@@ -160,8 +160,7 @@ class AdminConfigurationUiContractTest {
         assertThat(settings.substring(guarantorHeaderIndex, portfolioHeaderIndex))
             .doesNotContain("name=\"portfolioAtRiskDays\"");
         assertThat(consoleCss)
-            .contains(".aws-qualification-settings .aws-settings-commandbar")
-            .contains("grid-template-columns: minmax(0, 1fr) auto")
+            .doesNotContain(".aws-qualification-settings .aws-settings-commandbar")
             .contains(".aws-qualification-settings .aws-qualification-grid")
             .contains("max-width: none !important")
             .contains(".aws-settings-checkbox-row")

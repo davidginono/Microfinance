@@ -6,12 +6,39 @@
     const labels = () => document.getElementById('resource-table-labels')?.dataset || {};
     const lifetimes = new Map();
     const localSorts = new Map();
+    const summaryCounts = new Map();
     const node = (tag, className, text) => {
         const element = document.createElement(tag);
         if (className) element.className = className;
         if (text) element.textContent = text;
         return element;
     };
+    function syncRowCount(heading, table, l, source) {
+        if (!heading) return;
+        let counter=heading.parentElement.querySelector('.app-table-count');
+        const serverCounter=source?.querySelector('.app-table-count:not([data-visible-row-count])');
+        if (!counter) {counter=node('span','app-table-count');counter.dataset.visibleRowCount='true';heading.append(document.createTextNode(' '),counter);}
+        else if (!heading.contains(counter)) heading.append(document.createTextNode(' '),counter);
+        if(serverCounter){counter.textContent=serverCounter.textContent;delete counter.dataset.visibleRowCount;}
+        if(!counter.hasAttribute('data-visible-row-count'))return;
+        if(l.rowsDisplayed)counter.title=l.rowsDisplayed;
+        if(table.querySelector('.app-loading-row')){if(!counter.textContent)counter.textContent='(–)';return;}
+        const count=[...table.tBodies].flatMap(body=>[...body.rows]).filter(row=>!row.hidden && !row.classList.contains('hidden') && !row.matches('.resource-table-no-matches,.resource-table-error') && row.cells.length===table.tHead.rows[0].cells.length && ![...row.cells].some(cell=>cell.hasAttribute('colspan'))).length;
+        counter.textContent='('+new Intl.NumberFormat(document.documentElement.lang||'en').format(count)+')';
+    }
+    function initSummaryCount(region) {
+        if(summaryCounts.has(region) || region.hasAttribute('data-resource-table'))return;
+        const table=region.querySelector('table:not([data-chart-source])');
+        const heading=region.querySelector(':scope > .app-table-titlebar h2,:scope > .app-table-titlebar h3,:scope > .erp-panel-header h2,:scope > .erp-panel-header h3');
+        if(!table?.tHead?.rows[0] || !heading || table.closest('[data-resource-table],[data-dashboard-chart]'))return;
+        if(region.hasAttribute('data-dashboard-widget') && table.closest('.erp-table-wrap'))return;
+        region.dataset.tableSummaryCount='true';
+        const update=()=>syncRowCount(heading,table,labels());
+        update();
+        const observer=new MutationObserver(update);
+        observer.observe(table,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','class']});
+        summaryCounts.set(region,observer);
+    }
     const icon = name => {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         const consoleArrow = ['previous','next','refresh','sort','caret'].includes(name);
@@ -163,6 +190,7 @@
         }
         const duplicateHeading = region.querySelector(':scope > h2, :scope > h3');
         if (duplicateHeading && duplicateHeading.textContent.trim() === titlebar.querySelector('h2,h3')?.textContent.trim()) duplicateHeading.remove();
+        const syncCount = source => syncRowCount(titlebar.querySelector('h2,h3'),table,l,source);
         scroller.tabIndex = 0; scroller.setAttribute('role', 'region');
         scroller.setAttribute('aria-label', titlebar.querySelector('h2,h3')?.textContent.trim() || l.records);
         let actions = titlebar.querySelector('.accounting-actions, .app-table-toolbar');
@@ -451,7 +479,7 @@
                     });
                     window.refreshEnhancedSelects?.(filters);
                     const heading=titlebar.querySelector('h2,h3'), sourceHeading=fresh.querySelector('.app-table-titlebar h2,.app-table-titlebar h3');
-                    if (heading && sourceHeading) {heading.textContent=sourceHeading.textContent;scroller.setAttribute('aria-label',heading.textContent.trim());}
+                    if (heading && sourceHeading) {heading.replaceChildren(...[...sourceHeading.childNodes].map(child=>document.importNode(child,true)));scroller.setAttribute('aria-label',heading.textContent.trim());}
                     const states=[...page.querySelectorAll('[data-table-query-state-for]')].filter(item=>item.dataset.tableQueryStateFor===region.dataset.resourceTable);
                     document.querySelectorAll('[data-table-query-state-for]').forEach(state=>{
                         if (state.dataset.tableQueryStateFor!==region.dataset.resourceTable) return;
@@ -477,6 +505,7 @@
                 const freshPager = fresh.querySelector('[data-table-pagination]') || [...page.querySelectorAll('[data-table-pagination][data-table-for]')].find(item=>item.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
                 renderPager(freshPager);
                 if(changeHistory){history.replaceState(history.state,'',url.href);document.dispatchEvent(new Event('resource-table:query'));}
+                syncCount(fresh);
                 region.dispatchEvent(new CustomEvent('resource-table:updated',{bubbles:true}));
                 queueMicrotask(()=>{apply();applySearch();syncSelection();});
             } catch (error) {
@@ -526,7 +555,7 @@
         const searchVisibility = new WeakMap();
         let noMatches;
         const applySearch = () => {
-            if (!search) return;
+            if (!search) {syncCount();return;}
             if(table.querySelector('.app-loading-row')){if(noMatches)noMatches.hidden=true;return;}
             const query = search.value.trim().toLocaleLowerCase();
             const rows = [...table.tBodies].flatMap(body => [...body.rows]).filter(row => row !== noMatches && !row.classList.contains('app-loading-row') && row.cells.length === headers.length && ![...row.cells].some(cell => cell.colSpan > 1));
@@ -543,6 +572,7 @@
                 const cell = node('td', '', l.noMatches); cell.colSpan = headers.length; cell.setAttribute('role', 'status'); noMatches.append(cell); table.tBodies[0].append(noMatches);
             }
             if (noMatches) noMatches.hidden = loading || !query || !rows.length || visible > 0;
+            syncCount();
             syncSelection();
         };
         search?.addEventListener('input', () => { clearSelection(); applySearch(); });
@@ -599,6 +629,7 @@
             stickyOffsets();
         };
         apply();
+        syncCount();
         if (window.ResizeObserver) {const resizeObserver=new ResizeObserver(stickyOffsets);resizeObserver.observe(scroller);lifetime.observers.push(resizeObserver);}
         window.addEventListener('resize', stickyOffsets,{signal});
         const observer = new MutationObserver(() => { if(region.isConnected){apply(); applySearch(); syncSelection();} });
@@ -691,10 +722,12 @@
         region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));return true;
     }, init: root => {
         for (const [table,observer] of localSorts) if (!table.isConnected) {observer.disconnect();localSorts.delete(table);}
+        for (const [region,observer] of summaryCounts) if (!region.isConnected) {observer.disconnect();summaryCounts.delete(region);}
         for (const [region,lifetime] of lifetimes) if (!region.isConnected) {
             lifetime.controller.abort(); lifetime.observers.forEach(observer=>observer.disconnect()); lifetimes.delete(region);
         }
         (root || document).querySelectorAll('[data-resource-table]').forEach(init);
+        (root || document).querySelectorAll('.erp-table-wrap:not([data-resource-table]),[data-dashboard-widget]').forEach(initSummaryCount);
         (root || document).querySelectorAll('table[data-table-sort-mode="local"]').forEach(localSort);
         document.querySelectorAll('[data-table-pagination-used]').forEach(pager => pager.remove());
         document.querySelectorAll('[data-table-pagination-shell]').forEach(shell => {

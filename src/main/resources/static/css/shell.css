@@ -1349,7 +1349,6 @@ body.aws-console {
 }
 
 .erp-panel-title,
-.app-table-heading h2,
 .erp-widget-heading {
     color: var(--aws-ink) !important;
     font-family: inherit !important;
