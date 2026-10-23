@@ -1,6 +1,9 @@
 <c:if test="${staffWorkspace}">
     <sec:authorize access="@access.has(principal, 'GROUP_LENDING_VIEW')">
-        <a href="<c:url value='/finance/groups' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/groups')?'shell-nav-active':''}"><spring:message code="group.title" /></a>
+        <a href="<c:url value='/finance/groups' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/groups') and not fn:startsWith(requestUri, '/finance/groups/product-rules')?'shell-nav-active':''}"><spring:message code="group.title" /></a>
+        <sec:authorize access="@access.has(principal, 'GROUP_LENDING_CONFIGURE')">
+            <a href="<c:url value='/finance/groups/product-rules' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/groups/product-rules')?'shell-nav-active':''}"><spring:message code="group.productRules" /></a>
+        </sec:authorize>
     </sec:authorize>
     <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_VIEW')">
         <a href="<c:url value='/finance/loan-adjustments' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/loan-adjustments')?'shell-nav-active':''}"><spring:message code="adjustment.title" /></a>

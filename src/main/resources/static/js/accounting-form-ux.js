@@ -71,7 +71,7 @@
             if (submitting) { event.preventDefault(); return; }
             submitted = {state, event, values:values(form)};
             submitting = true; form.setAttribute('aria-busy', 'true');
-            if (form.hasAttribute('data-account-version-form') && event.submitter?.name) {
+            if ((form.hasAttribute('data-account-version-form') || form.hasAttribute('data-preserve-submit-command')) && event.submitter?.name) {
                 const command = document.createElement('input');
                 command.type = 'hidden'; command.name = event.submitter.name; command.value = event.submitter.value;
                 command.dataset.accountVersionCommand = ''; form.appendChild(command);

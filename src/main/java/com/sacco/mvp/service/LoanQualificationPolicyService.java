@@ -33,6 +33,17 @@ public class LoanQualificationPolicyService {
         });
     }
 
+    /** Resolve once for a group command; participant exposure is supplied by a bounded batch read. */
+    public GroupQualificationPolicy groupPolicy(String saccoId,String stationId) {
+        var settings=saccoSettingsRepository.findById(saccoId).orElse(null);
+        if(settings==null)return new GroupQualificationPolicy(null,null,null);
+        var policy=resolvePolicy(settings,stationId);
+        return new GroupQualificationPolicy(positive(policy.applicantMaxDefaultedLoans()),
+            positive(policy.guarantorMaxDefaultedLoans()),positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount()));
+    }
+
+    public record GroupQualificationPolicy(Integer applicantDefaultLimit,Integer guarantorDefaultLimit,Integer guaranteeCountLimit) {}
+
     public Optional<String> applicantFailureReason(String saccoId, UUID memberId) {
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
         if (settings == null) {
