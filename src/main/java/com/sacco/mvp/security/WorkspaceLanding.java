@@ -77,6 +77,9 @@ public final class WorkspaceLanding {
         if (hasClaim(claims, UserClaim.VOUCHER_RULE_VIEW)) {
             return "/finance/approval/configuration";
         }
+        if (hasClaim(claims, UserClaim.GROUP_LENDING_VIEW)) {
+            return "/finance/groups";
+        }
         return null;
     }
 

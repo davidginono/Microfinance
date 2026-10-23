@@ -420,7 +420,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'LOAN_RECORDING_VIEW', 'LOAN_ADJUSTMENTS_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'VOUCHER_WORKSPACE_VIEW', 'VOUCHER_RULE_VIEW', 'ACCOUNTING_ACCOUNT_RULES_VIEW', 'PAYROLL_DEDUCTIONS_VIEW')">
+            <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.hasAny(principal, 'GROUP_LENDING_VIEW', 'LOAN_RECORDING_VIEW', 'LOAN_ADJUSTMENTS_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'VOUCHER_WORKSPACE_VIEW', 'VOUCHER_RULE_VIEW', 'ACCOUNTING_ACCOUNT_RULES_VIEW', 'PAYROLL_DEDUCTIONS_VIEW')">
                 <sec:authorize access="@access.canAccessAccountantArea(principal) or @access.has(principal, 'VOUCHER_WORKSPACE_VIEW')">
                 <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant') or (fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration'))}" />
                 <div class="px-3 pb-1 pt-3">

@@ -5,6 +5,16 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
+    @Test void groupLendingClaimsRequireExplicitAssignmentAndPermitTheirOwnLanding() {
+        var groupClaims=java.util.Arrays.stream(UserClaim.values()).filter(c->c.getFeature()==AccessFeature.GROUP_LENDING).toList();
+        assertThat(groupClaims).hasSize(8);
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()),true)).doesNotContainAnyElementsOf(groupClaims);
+        assertThat(UserClaim.matrixRows()).anyMatch(row->row.feature()==AccessFeature.GROUP_LENDING && row.claimsByAction().size()==8);
+        var member=Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B").position(Position.ACCOUNTANT)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
+        var actor=new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.GROUP_LENDING_VIEW),true);
+        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(actor)).isEqualTo("/finance/groups");
+    }
     @Test
     void obsoleteReportClaimsKeepIdentifiersButCannotBeAssignedOrLoaded() {
         var retired = java.util.List.of(UserClaim.REPORT_TEMPLATE_DESIGN, UserClaim.REPORT_TEMPLATE_PUBLISH,

@@ -11,6 +11,14 @@ import java.util.Optional;
 import java.util.Set;
 
 public enum UserClaim {
+    GROUP_LENDING_VIEW(AccessFeature.GROUP_LENDING, AccessAction.VIEW),
+    GROUP_LENDING_CREATE(AccessFeature.GROUP_LENDING, AccessAction.CREATE),
+    GROUP_LENDING_UPDATE(AccessFeature.GROUP_LENDING, AccessAction.UPDATE),
+    GROUP_LENDING_CONFIGURE(AccessFeature.GROUP_LENDING, AccessAction.CONFIGURE),
+    GROUP_LENDING_SUBMIT(AccessFeature.GROUP_LENDING, AccessAction.INITIATE),
+    GROUP_LENDING_POST(AccessFeature.GROUP_LENDING, AccessAction.POST),
+    GROUP_LENDING_REVERSE(AccessFeature.GROUP_LENDING, AccessAction.REVERSE),
+    GROUP_LENDING_EXPORT(AccessFeature.GROUP_LENDING, AccessAction.EXPORT),
     PAYROLL_DEDUCTIONS_VIEW(AccessFeature.PAYROLL_DEDUCTIONS, AccessAction.VIEW),
     PAYROLL_DEDUCTIONS_CREATE(AccessFeature.PAYROLL_DEDUCTIONS, AccessAction.CREATE),
     PAYROLL_DEDUCTIONS_UPDATE(AccessFeature.PAYROLL_DEDUCTIONS, AccessAction.UPDATE),
