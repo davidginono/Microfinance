@@ -149,10 +149,10 @@ class VoucherMvcTest {
   mvc.perform(get("/finance/approval/"+id).with(user(actor))).andExpect(status().isForbidden());
  }
  @Test void ruleBindingIsBoundedAndDoesNotAcceptApprovalEvidence()throws Exception{
-  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("type","PAYMENT").param("rules[0].name","Office payments").param("rules[0].minimum","0").param("individuals","true").param("approvedBy",UUID.randomUUID().toString()))
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("type","PAYMENT").param("rules[0].scope","SINGLE").param("rules[0].stages[0].role","MANAGER").param("rules[0].stages[0].approvals","2").param("rules[0].autoPost","true").param("rules[0].minimum","0").param("individuals","true").param("approvedBy",UUID.randomUUID().toString()))
    .andExpect(redirectedUrl("/finance/approval/configuration?type=PAYMENT"));
-  verify(workflows).configure(eq(actor),argThat(f->f.isIndividuals() && f.getRules().size()==1 && f.getType()==Type.PAYMENT));
-  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[999].name","Overflow")).andExpect(status().isBadRequest());
+  verify(workflows).configure(eq(actor),argThat(f->f.getRules().size()==1 && f.getType()==Type.PAYMENT && f.getRules().getFirst().isAutoPost() && f.getRules().getFirst().getStages().getFirst().getApprovals()==2));
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[999].scope","Overflow")).andExpect(status().isBadRequest());
  }
  @Test void anIndividualEditorCannotSubmitItsParentBatch()throws Exception{
   var details=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details.class);var workflow=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Workflow.class);
@@ -161,10 +161,17 @@ class VoucherMvcTest {
    .andExpect(status().isOk()).andExpect(view().name("accounting/approval/editor"));
   verify(workflows,never()).save(any(),any(),any(),anyInt(),anyInt(),any());verify(workflows,never()).action(any(),any(),anyInt(),any(),any());
  }
- @Test void configurationValidateDoesNotSaveTheRules()throws Exception{
-  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("type","JOURNAL").param("command","VALIDATE").param("rules[0].name","Review").param("rules[0].minimum","0"))
-   .andExpect(status().isOk()).andExpect(view().name("accounting/approval/configuration")).andExpect(model().attribute("configurationValid",true));
-  verify(workflows).validateConfiguration(eq(actor),any());verify(workflows,never()).configure(any(),any());
+ @Test void ruleStepsAreBoundedAndClientApprovalEvidenceIsIgnored()throws Exception{
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[0].stages[999].role","MANAGER")).andExpect(status().isBadRequest());
+  mvc.perform(post("/finance/approval/configuration").with(user(actor)).with(csrf()).param("rules[0].stages[0].role","ACCOUNTANT").param("rules[0].stages[0].approvals","1").param("rules[0].automatic","true").param("forceAllowed","true"))
+   .andExpect(redirectedUrl("/finance/approval/configuration?type=JOURNAL"));
+  verify(workflows).configure(eq(actor),argThat(f->!f.getRules().getFirst().isAutoPost() && f.getRules().getFirst().getStages().size()==1));
+ }
+ @Test void batchCreationAndAddRequireCsrfAndUseServerScope()throws Exception{
+  UUID key=UUID.randomUUID();mvc.perform(post("/finance/vouchers/journals/batches").with(user(actor)).param("requestKey",key.toString())).andExpect(status().isForbidden());
+  UUID itemId=UUID.randomUUID();var details=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details.class);var item=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Item.class);when(item.id()).thenReturn(itemId);when(details.items()).thenReturn(List.of(item));when(workflows.batch(actor,Type.JOURNAL,key)).thenReturn(id);when(workflows.details(actor,id)).thenReturn(details);
+  mvc.perform(post("/finance/vouchers/journals/batches").with(user(actor)).with(csrf()).param("requestKey",key.toString()).param("stationId","FOREIGN")).andExpect(redirectedUrl("/finance/approval/"+id+"/vouchers/"+itemId));
+  when(workflows.add(actor,id,7)).thenReturn(itemId);mvc.perform(post("/finance/approval/"+id+"/vouchers").with(user(actor)).with(csrf()).param("version","7")).andExpect(redirectedUrl("/finance/approval/"+id+"/vouchers/"+itemId));
  }
  @Test void standaloneApprovalCreationAndItemRemovalEndpointsAreUnavailable()throws Exception{
   mvc.perform(get("/finance/approval/new").with(user(actor))).andExpect(status().is4xxClientError());
@@ -173,7 +180,7 @@ class VoucherMvcTest {
   verifyNoInteractions(workflows,workflowPosting);
  }
  @Test void correctionRoutesCannotCreateAnUnknownVoucher()throws Exception{
-  when(workflows.details(actor,id)).thenReturn(new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details(null,List.of(),List.of(),Set.of("EDIT")));
+  when(workflows.details(actor,id)).thenReturn(new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details(null,List.of(),List.of(),Set.of("EDIT"),Map.of()));
   UUID item=UUID.randomUUID();
   mvc.perform(get("/finance/approval/"+id+"/vouchers/"+item).with(user(actor))).andExpect(status().isNotFound());
   mvc.perform(post("/finance/approval/"+id+"/vouchers/"+item).with(user(actor)).with(csrf()).param("version","1").param("itemVersion","0").param("party","Forged creation")).andExpect(status().isNotFound());
@@ -198,7 +205,7 @@ class VoucherMvcTest {
   @Bean com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows(){return mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService.class);}
   @Bean com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService workflowPosting(){return mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService.class);}
   @Bean com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents(){return mock(com.sacco.mvp.accounting.approval.service.VoucherDocumentService.class);}
-  @Bean com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController workflowController(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows,com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService posting,com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents){return new com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController(workflows,posting,documents);}
+  @Bean com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController workflowController(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows,com.sacco.mvp.accounting.approval.service.VoucherWorkflowPostingService posting,com.sacco.mvp.accounting.approval.service.VoucherDocumentService documents){return new com.sacco.mvp.accounting.approval.controller.VoucherWorkflowController(workflows,posting,documents,mock(com.sacco.mvp.accounting.approval.service.VoucherAutomaticPostingService.class));}
   @Bean VoucherController controller(VoucherService service,VoucherPdfService pdf,ApplicationClock voucherClock,LoanReceiptService receipts,LoanReceiptPdfService loanPdf,com.sacco.mvp.accounting.approval.service.VoucherApprovalGate gate,com.sacco.mvp.accounting.approval.service.VoucherWorkflowService workflows){return new VoucherController(service,pdf,voucherClock,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),receipts,loanPdf,gate,workflows);}
   @Bean VoucherLaunchController voucherLaunchController(VoucherService service){return new VoucherLaunchController(service);}
  }

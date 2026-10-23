@@ -88,9 +88,6 @@ public class VoucherWorkflowRepository {
         if(rows.isEmpty())return Set.of();var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId(),a.getMemberId()));rows.forEach(w->args.add(w.id()));
         return new HashSet<>(jdbc.query("select distinct w.id from voucher_workflow w join voucher_workflow_history h on h.workflow_id=w.id and h.round=w.round where w.sacco_id=? and w.station_id=? and h.actor_id=? and h.action='APPROVE' and w.id in ("+String.join(",",Collections.nCopies(rows.size(),"?"))+")",(r,n)->r.getObject(1,UUID.class),args.toArray()));
     }
-    public List<UUID> reviewerCandidates(AppUserPrincipal a,String search,int page) {
-        return jdbc.query("select id from members where sacco_id=? and station_id=? and status='ACTIVE' and (strpos(lower(full_name),?)>0 or strpos(lower(coalesce(staff_no,'')),?)>0) order by full_name,id limit 26 offset ?",(r,n)->r.getObject(1,UUID.class),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),search.toLowerCase(Locale.ROOT),page*25);
-    }
     private static String sortSql(String sort) {
         String[] parts=sort.split("_");
         String column=switch(parts[0]) {case "number"->"number";case "title"->"title";case "scope"->"scope";case "count"->"item_count";case "total"->"total";case "approval"->"approval";case "validation"->"validation";case "posting"->"posting";case "updated"->"updated_at";case "type"->"type";case "owner"->"(select m.full_name from members m where m.id=voucher_workflow.owner_id)";case "date"->"(select min(i.form_json->>'effectiveDate') from voucher_workflow_item i where i.workflow_id=voucher_workflow.id)";default->throw new Invalid("input");};
@@ -135,6 +132,12 @@ public class VoucherWorkflowRepository {
         else jdbc.update("update voucher_workflow_item set form_json=?::jsonb,version=version+1 where workflow_id=? and id=? and voucher_id is null",write(form),w.id(),id);
     }
     public void invalidate(UUID workflow) { jdbc.update("update voucher_workflow_item set plan_hash=null,issues='[]'::jsonb where workflow_id=? and voucher_id is null",workflow); }
+    public int nextLine(UUID workflow) {
+        return jdbc.queryForObject("select min(n) from generate_series(1,50) n where not exists(select 1 from voucher_workflow_item i where i.workflow_id=? and i.line=n)",Integer.class,workflow);
+    }
+    public int removeItem(UUID workflow,UUID item) {
+        return jdbc.update("delete from voucher_workflow_item where workflow_id=? and id=? and voucher_id is null",workflow,item);
+    }
     public void issues(UUID workflow, UUID item, List<Issue> issues, String hash) { jdbc.update("update voucher_workflow_item set issues=?::jsonb,plan_hash=? where workflow_id=? and id=?",write(issues),hash,workflow,item); }
     public void update(Workflow w, Approval approval, String validation, String posting, BigDecimal total, BigDecimal amount,
                        int count, int stage, int configVersion, List<Stage> stages, boolean force, String failure, OffsetDateTime now) {
@@ -145,9 +148,44 @@ public class VoucherWorkflowRepository {
     }
     public void link(UUID workflow,UUID item,UUID voucher) { jdbc.update("update voucher_workflow_item set voucher_id=? where workflow_id=? and id=?",voucher,workflow,item); }
     public void history(AppUserPrincipal a,UUID workflow,String action,String comments,OffsetDateTime now) {
-        jdbc.update("insert into voucher_workflow_history(id,workflow_id,sacco_id,station_id,action,round,actor_id,comments,recorded_at,context) select ?,id,sacco_id,station_id,?,round,?,?,?,jsonb_build_object('configurationVersion',config_version,'assessmentAmount',assessment_amount,'approval',approval,'validation',validation,'posting',posting,'stages',stages,'stage',stage) from voucher_workflow where id=? and sacco_id=? and station_id=?",UUID.randomUUID(),action,a.getMemberId(),comments,now,workflow,a.getSaccoId(),a.getStationId());
+        jdbc.update("""
+            insert into voucher_workflow_history(id,workflow_id,sacco_id,station_id,action,round,actor_id,comments,recorded_at,context)
+            select ?,w.id,w.sacco_id,w.station_id,?,w.round,?,?,?,
+             jsonb_build_object('configurationVersion',w.config_version,'assessmentAmount',w.assessment_amount,
+              'approval',w.approval,'validation',w.validation,'posting',w.posting,'stages',w.stages,'stage',w.stage,
+              'rule',w.rule_name,'autoPost',w.auto_post,
+              'vouchers',case when ?='INITIATE' then
+               (select jsonb_agg(jsonb_build_object('id',i.id,'form',i.form_json,'planHash',i.plan_hash) order by i.line)
+                from voucher_workflow_item i where i.workflow_id=w.id) else null end,
+              'documents',case when ?='INITIATE' then
+               (select coalesce(jsonb_agg(d.id order by d.id),'[]'::jsonb) from voucher_workflow_document d where d.workflow_id=w.id) else null end)
+             from voucher_workflow w where w.id=? and w.sacco_id=? and w.station_id=?
+            """,UUID.randomUUID(),action,a.getMemberId(),comments,now,action,action,workflow,a.getSaccoId(),a.getStationId());
     }
     public void beginRound(UUID workflow) { jdbc.update("update voucher_workflow set round=round+1 where id=?",workflow); }
+    public void route(UUID workflow,Rule rule) {
+        jdbc.update("update voucher_workflow set auto_post=?,model_version=2,rule_name=? where id=?",rule.autoPost(),rule.name(),workflow);
+    }
+    public Map<Integer,Long> responses(Workflow w) {
+        return jdbc.query("select decision_stage,count(*) n from voucher_workflow_history where workflow_id=? and round=? and action='APPROVE' and decision_stage is not null group by decision_stage",r->{var out=new HashMap<Integer,Long>();while(r.next())out.put(r.getInt(1),r.getLong(2));return out;},w.id(),w.round());
+    }
+    public void decisionStage(UUID workflow,int round,UUID actor,int stage,String comments) {
+        // Decisions are inserted once; the stage is supplied by the locked workflow, never the request.
+        jdbc.update("insert into voucher_workflow_history(id,workflow_id,sacco_id,station_id,action,round,actor_id,comments,recorded_at,context,decision_stage) select ?,id,sacco_id,station_id,'APPROVE',?,?,?,updated_at,jsonb_build_object('configurationVersion',config_version,'assessmentAmount',assessment_amount,'approval',approval,'validation',validation,'posting',posting,'stages',stages,'stage',stage,'rule',rule_name,'autoPost',auto_post),? from voucher_workflow where id=?",UUID.randomUUID(),round,actor,comments,stage,workflow);
+    }
+    public List<UUID> roleCandidates(AppUserPrincipal a,com.sacco.mvp.domain.Position role) {
+        return jdbc.query("select m.id from members m where m.sacco_id=? and m.station_id=? and m.status='ACTIVE' and (m.position=? or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name=?)) order by m.id limit 501",(r,n)->r.getObject(1,UUID.class),a.getSaccoId(),a.getStationId(),role.name(),role.name());
+    }
+    public List<UUID> automaticCandidates() {
+        return jdbc.query("select id from voucher_workflow where auto_post and approval='WORKFLOW_APPROVED' and validation='VALIDATED' and posting='NOT_POSTED' order by updated_at,id limit 10",(r,n)->r.getObject(1,UUID.class));
+    }
+    public Optional<AutomaticRequest> automaticRequest(UUID id) {
+        return jdbc.query("select id,owner_id,sacco_id,station_id,version from voucher_workflow where id=? and auto_post and approval='WORKFLOW_APPROVED' and validation='VALIDATED' and posting='NOT_POSTED'",(r,n)->new AutomaticRequest(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getString(4),r.getInt(5)),id).stream().findFirst();
+    }
+    public void automaticFailed(UUID id,int version,String error,OffsetDateTime now) {
+        int changed=jdbc.update("update voucher_workflow set posting='FAILED',failure=?,version=version+1,updated_at=? where id=? and version=? and auto_post and approval='WORKFLOW_APPROVED' and posting='NOT_POSTED'",error,now,id,version);
+        if(changed==1)jdbc.update("insert into voucher_workflow_history(id,workflow_id,sacco_id,station_id,action,round,actor_id,comments,recorded_at,context) select ?,id,sacco_id,station_id,'POSTING_FAILED',round,owner_id,'',?,jsonb_build_object('automatic',true,'failure',failure,'configurationVersion',config_version) from voucher_workflow where id=?",UUID.randomUUID(),now,id);
+    }
     public boolean alreadyApproved(Workflow w,UUID actor) {return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from voucher_workflow_history where workflow_id=? and round=? and actor_id=? and action='APPROVE')",Boolean.class,w.id(),w.round(),actor));}
     public List<History> history(UUID workflow) {
         return jdbc.query("select h.*,m.full_name from voucher_workflow_history h join members m on m.id=h.actor_id where workflow_id=? order by recorded_at desc,h.id limit 100",
@@ -165,7 +203,7 @@ public class VoucherWorkflowRepository {
         jdbc.update("insert into voucher_workflow_document(id,workflow_id,sacco_id,station_id,filename,media_type,content,uploaded_by,uploaded_at) values(?,?,?,?,?,?,?,?,?)",id,workflow,a.getSaccoId(),a.getStationId(),filename,type,bytes,a.getMemberId(),now);
     }
     private Workflow workflow(ResultSet r,int n)throws SQLException {
-        return new Workflow(r.getObject("id",UUID.class),r.getString("number"),Type.valueOf(r.getString("type")),r.getString("scope"),r.getString("title"),r.getObject("owner_id",UUID.class),r.getInt("version"),Approval.valueOf(r.getString("approval")),r.getString("validation"),r.getString("posting"),r.getBigDecimal("total"),r.getBigDecimal("assessment_amount"),r.getInt("item_count"),r.getInt("stage"),r.getInt("round"),r.getInt("config_version"),read(r.getString("stages"),new TypeReference<List<Stage>>(){}),r.getBoolean("force_allowed"),r.getString("failure"),r.getObject("created_at",OffsetDateTime.class),r.getObject("updated_at",OffsetDateTime.class));
+        return new Workflow(r.getObject("id",UUID.class),r.getString("number"),Type.valueOf(r.getString("type")),r.getString("scope"),r.getString("title"),r.getObject("owner_id",UUID.class),r.getInt("version"),Approval.valueOf(r.getString("approval")),r.getString("validation"),r.getString("posting"),r.getBigDecimal("total"),r.getBigDecimal("assessment_amount"),r.getInt("item_count"),r.getInt("stage"),r.getInt("round"),r.getInt("config_version"),read(r.getString("stages"),new TypeReference<List<Stage>>(){}),r.getBoolean("force_allowed"),r.getString("failure"),r.getObject("created_at",OffsetDateTime.class),r.getObject("updated_at",OffsetDateTime.class),r.getBoolean("auto_post"),r.getInt("model_version"),r.getString("rule_name"));
     }
     private Item item(ResultSet r,int n)throws SQLException {
         return new Item(r.getObject("id",UUID.class),r.getObject("workflow_id",UUID.class),r.getInt("line"),r.getInt("version"),read(r.getString("form_json"),Form.class),read(r.getString("issues"),new TypeReference<List<Issue>>(){}),r.getString("plan_hash"),r.getObject("voucher_id",UUID.class));

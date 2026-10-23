@@ -1,3 +1,41 @@
+# Role-based voucher approval rules (2026-10-23)
+
+This user-authorized replacement supersedes the configuration and routing described in the historical sections below. It applies to ordinary receipt, payment and journal vouchers. Specialized loan receipts and loan collection batches retain their existing ledger safeguards.
+
+## Rules
+
+Configuration remains under Vouchers, with explicit VOUCHER_RULE_VIEW/CONFIGURE access and institution/branch scope. Each voucher type has up to 20 rules. Each rule chooses One voucher or Batch, an inclusive From amount and exclusive Below amount (blank means no upper limit), one to ten ordered role steps, one to ten distinct approvals per step (50 total), and Post now or Maker posts after approval. No seeded thresholds, automatic approvals, force-approval option, named-person picker or permission grants are introduced. Staff roles are the institution's existing assignable roles, not new authority bundles.
+
+Rules cannot overlap within the same voucher type and level. Gaps fail closed when an amount is submitted. Amounts come from server-resolved posting plans: the complete voucher total, or the sum of every voucher total in a batch, including journal batches. A balanced journal counts one side only. A level with no rules retains the existing unconfigured/direct-posting boundary; a configured level cannot bypass its rules. Batch creation is offered only when batch rules exist.
+
+Saving activates a new immutable policy revision immediately. Complete ordinary voucher creation validates and routes in the same transaction; no separate initiation is needed. Save draft leaves incomplete work editable. Ordinary voucher registers offer Create batch; its maker adds/corrects vouchers and sends the whole batch from its details. Batches contain one voucher type, up to 50 vouchers and 2,500 transaction rows. Existing editor routes cannot append unknown item IDs. Only the owning maker can add/remove unposted batch items, and removal retains an audit event. Sending freezes all contents and the selected rule, role steps, amounts, posting option and policy revision. Corrections/withdrawal/resubmission start a new round using the current rules; posted history remains immutable.
+
+## Decisions and posting
+
+VIEW permits only the scoped queue and authorized voucher types. Approval also requires the current step's role, explicit VOUCHER_APPROVAL_APPROVE and current active staff access. Rejection additionally requires VOUCHER_APPROVAL_REJECT. The maker cannot approve, and a person can approve only once per round across all steps. A role step advances only after its required distinct approvals; later roles cannot approve early. Configuration and routing check staff capacity, including cross-role overlap, using bounded candidate queries and batched effective claims. Submission excludes the maker from that capacity check. Missing/revoked staffing blocks routing; it never skips a step.
+
+Pending and already-approved requests keep their recorded policy revision after new rules are saved. Posting checks the archived revision, immutable plan, current accounts, period, maker's current permissions and scope. Maker posts permits only that maker's explicit Post action. Post now queues durable automatic work after final approval, attempts immediately after browser approval, and scans at most ten ready rows every five seconds for crash recovery. Automatic posting acts on the maker's instruction with that maker's freshly resolved permissions; it grants no posting authority to approvers. Final approval commits independently of posting. Failure leaves Approved with Posting failed and permits an authorized maker retry; it does not create a new approval round. Stable keys, locked envelopes and transactional all-row posting prevent duplicate/partial journals. Disabled or moved makers produce a visible failure rather than cross-branch posting. Approval alone never represents a payment or bank release.
+
+## Upgrade and UI
+
+V89 adds posting-choice/rule-model snapshots, decision-step evidence and a bounded automatic-posting index. Old rules and decisions stay in immutable history. Legacy active rules cannot route new requests until an authorized user saves replacement role rules. Previously initiated/approved requests retain their historical route; no historical approvals are fabricated. All claims must already be assigned explicitly.
+
+The replacement UI uses short English/Kiswahili labels, one simple rule form, numbered role rows and compact actions. The old IF/THEN table, approver dialog, two-stage controls, force option and saved-rule test panel are removed. The approval queue has three quick filters; history is collapsed. The maintained UI skills now require minimal text, no routine explanations/subtitles and clean, accessible mobile layouts for all future UI work.
+
+## Verification (2026-10-23)
+
+- Production compilation and the final focused run passed 62 checks: 35 PostgreSQL voucher/workflow checks, 22 MVC/CSRF/binding checks, four finance workspace security checks and one Jasper check compiling all six affected JSPs. The six JSPs compiled again after the final confirmation markup change. PostgreSQL 18 applied all 110 migrations through V89 on a disposable loopback database. Tests cover all ordinary voucher types, exact boundaries, scope, quorum, distinct people across roles, concurrent decisions/posting, old snapshots, immutable submitted contents, changed rules, incomplete batches, creator-only posting, automatic posting, revoked maker permissions, atomic rollback and retry.
+- The broader voucher-class run also exposed the existing `loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly` assertion: it still expects a loan-purpose Posting account to be excluded after V88's unified Posting account change. No product-account implementation or assertion was changed for this request; that unrelated method was explicitly excluded from the final focused run. This is not a full-suite success claim.
+- Real controller/service browser checks on loopback port 8087 used only synthetic staff and disposable data. Verified staff login/logout, saving role rules, adding/removing steps, adding a batch rule, creating a batch from the journal register, choosing accounts, saving a voucher, sending the batch, immediate reviewer queue visibility, selection-dependent Approve, the exact amount in confirmation, and an independent manager decision. The resulting batch was Approved and Not posted, with no Post action for the reviewer. Browser financial posting was not performed; automatic and creator posting were tested against PostgreSQL.
+- Configuration containment passed at 360, 768, 1366 and 1920 CSS pixels. Mobile navigation opened and closed; final desktop/mobile screenshots are under ignored `target/approval-rules-*.png`. Browser checks found and corrected duplicate counts/headings and excess spacing. No approval-page JavaScript errors were observed; the shared Lucide bundle reported its existing missing `x` icon warning, and notification hydration was unavailable in the synthetic fixture. English/Kiswahili labels, both maintained UI skills, JavaScript syntax, UTF-8 JSP sources and Git whitespace checks were verified.
+- The app started successfully with Java 25 and Spring Boot 4.1.0 against the disposable database. Operational institution rules/permissions, full-suite tests, exports and throughput were not changed or certified. Restart/load V89 before configuring replacement rules. The local commit for this increment is titled `Replace voucher approval rules with role-based workflows`.
+
+This increment does not complete the broader accounting/report-builder backlog or establish measured throughput.
+
+---
+
+# Historical implementation (superseded configuration)
+
 # Configurable voucher approvals
 
 The user-requested 2026-10-18 increment enables approval for individual ordinary receipt, payment and journal vouchers and for batches, independently per branch and voucher type. This supersedes the earlier prohibition on core approval steps **only where configuration enables them**. Unconfigured individual vouchers retain direct posting. Specialized loan repayment receipts and the existing loan collection batch worker retain their established ledger controls; they cannot enter this ordinary-voucher workspace.

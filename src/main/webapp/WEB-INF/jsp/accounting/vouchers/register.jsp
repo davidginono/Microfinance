@@ -15,6 +15,7 @@
 <button type="button" class="app-btn btn-neutral" data-aws-table-refresh><spring:message code="common.refresh" /></button>
 <button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="details" disabled><spring:message code="common.view" /></button>
 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="pdf" disabled><spring:message code="voucher.pdf" /></button><button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="print" disabled><spring:message code="voucher.print" /></button></sec:authorize>
+<sec:authorize access="@access.has(principal, '${createClaim}')"><c:if test="${batchEnabled}"><form method="post" action="<c:url value='${base}/batches' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="requestKey" value="${batchRequestKey}" /><button class="app-btn btn-launch"><spring:message code="approval.newBatch" /></button></form></c:if></sec:authorize>
 <sec:authorize access="@access.has(principal, '${createClaim}')"><a class="app-btn btn-launch" href="<c:url value='${base}/new' />"><spring:message code="voucher.create.${voucherType}" /></a></sec:authorize>
 </div></div>
 <form class="voucher-filters" method="get">

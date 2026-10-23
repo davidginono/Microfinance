@@ -35,10 +35,8 @@ public class VoucherApprovalGate {
         authorize(a,"VOUCHER_WORKSPACE_VIEW");authorize(a,"VOUCHER_WORKSPACE_POST");
         var w=repository.find(a,parent.get(),true).orElseThrow(()->new Invalid("unavailable"));
         var item=repository.item(w.id(),form.getRequestKey()).orElseThrow();
-        var config=repository.configuration(a,type);
         require(w.type()==type && w.approval().approved() && "VALIDATED".equals(w.validation())
             && "POSTING".equals(w.posting()),"required");
-        require(w.configVersion()==config.version(),"configurationChanged");
         require(item.planHash()!=null && formHash(type,canonical(form,form.getRequestKey())).equals(formHash(type,item.form())),"changed");
         return new Proof(item.planHash());
     }

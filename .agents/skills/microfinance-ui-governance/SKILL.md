@@ -90,6 +90,7 @@ For COA or activity/transaction configuration, read [the accounting architecture
 
 ## Localization And Privacy
 
+- The user's 2026-10-23 instruction applies to all future UI work: keep pages clean and very easy to use for people with limited reading skills. Use familiar, short English words and equally clear Kiswahili. Prefer direct labels such as Amount, Role, Approvals, Send and Save. Remove routine explanations, subtitles, repeated headings, duplicate labels and decorative status text at their source. Show only fields and actions needed for the current task; use a simple ordered form instead of an expression builder or technical workflow editor. Retain accessible names, necessary financial facts, required disclosures, clear errors and recovery actions. Do not describe users by literacy level in the product.
 - The user's 2026-10-20 instruction is to avoid explanations in forms and workflows. Use clear labels and necessary feedback; omit routine helper paragraphs and internal posting/activity explanations. Keep implementation details in maintained documentation. Preserve required disclosures, essential financial limitations, validation errors and row-level missing-information warnings.
 - Use the existing `messages_en.properties` and `messages_sw.properties` bundles. Check both languages for fit and consistent financial meaning.
 - Treat Kiswahili-default digital lending as a release gate to verify against the current official guidance, not as a reason to silently change every existing user's preference.

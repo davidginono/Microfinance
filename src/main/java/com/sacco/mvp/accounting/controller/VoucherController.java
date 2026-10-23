@@ -44,7 +44,8 @@ public class VoucherController {
                        @RequestParam(defaultValue="") String search,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
                        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(defaultValue="") String state,
                        @RequestParam(defaultValue="newest") String sort,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="30") int size,Model model){
-        var filter=new Filter(search,from,through,state,sort,page,size);context(kind,model);model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
+        vouchers.authorize(actor,type(kind),"VIEW");var filter=new Filter(search,from,through,state,sort,page,size);context(kind,model);model.addAttribute("filter",filter);model.addAttribute("tablePageSize",size);
+        model.addAttribute("batchEnabled",approvalWorkflows.batchAvailable(actor,type(kind)));model.addAttribute("batchRequestKey",UUID.randomUUID());
         model.addAttribute("vouchers",type(kind)==Type.RECEIPT?loanReceipts.list(actor,filter):vouchers.list(actor,type(kind),filter));return "accounting/vouchers/register";
     }
     @GetMapping("/new")
@@ -65,6 +66,7 @@ public class VoucherController {
         vouchers.authorize(actor,type(kind),"CREATE");context(kind,model);boolean loan=type(kind)==Type.RECEIPT && "LOAN_REPAYMENT".equals(form.getReceiptPurpose());
         if(!errors.hasErrors())try{
             if("preview".equals(action)){if(loan)model.addAttribute("loanPreview",loanReceipts.preview(actor,form));else model.addAttribute("preview",vouchers.preview(actor,type(kind),form));formContext(kind,actor,form,model);return "accounting/vouchers/form";}
+            if("draft".equals(action) && !loan && approvalGate.required(actor,type(kind)))return "redirect:/finance/approval/"+approvalWorkflows.capture(actor,type(kind),form,false);
             if(!"post".equals(action))throw new Invalid("","request");
             if(!loan && approvalGate.required(actor,type(kind)))return "redirect:/finance/approval/"+approvalWorkflows.capture(actor,type(kind),form);
             var saved=loan?loanReceipts.post(actor,form).header():vouchers.post(actor,type(kind),form);flash.addFlashAttribute("voucherPosted",true);return "redirect:/finance/vouchers/"+kind+"/"+saved.id();
@@ -72,6 +74,10 @@ public class VoucherController {
          catch(DataIntegrityViolationException duplicate){errors.reject("voucher.error.duplicate");}
          catch(IllegalArgumentException invalid){errors.reject(accountingError(invalid));}
         formContext(kind,actor,form,model);return "accounting/vouchers/form";
+    }
+    @PostMapping("/batches") public String batch(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID requestKey){
+        var id=approvalWorkflows.batch(actor,type(kind),requestKey);var details=approvalWorkflows.details(actor,id);
+        return "redirect:/finance/approval/"+id+"/vouchers/"+details.items().getFirst().id();
     }
     @GetMapping("/{id}")
     public String details(@PathVariable String kind,@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,Model model){

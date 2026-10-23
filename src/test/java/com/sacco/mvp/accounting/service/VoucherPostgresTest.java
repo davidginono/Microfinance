@@ -2,6 +2,10 @@ package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
 import com.sacco.mvp.accounting.repository.*;
+import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm;
+import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow;
+import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.StepRow;
+import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Approval;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -63,6 +67,8 @@ class VoucherPostgresTest {
   when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
   when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
   when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
+  when(directory.findAll(anyCollection())).thenAnswer(inv->{Collection<UUID> ids=inv.getArgument(0);return ids.stream().map(id->directory.find(id).orElse(null)).filter(Objects::nonNull).toList();});
+  when(claims.effectiveClaims(anyMap())).thenAnswer(inv->{Map<UUID,UserClaimService.ClaimSubject> subjects=inv.getArgument(0);var out=new HashMap<UUID,Set<UserClaim>>();subjects.forEach((id,subject)->out.put(id,claims.effectiveClaims(id,subject.staffRoles(),subject.memberAccess())));return out;});
   actor=operator("B1");cash=account("CASH","ASSET","DEBIT","POSTING","CASH");capital=account("CAPITAL","EQUITY","CREDIT","POSTING","CAPITAL");expense=account("EXPENSE","EXPENSE","DEBIT","POSTING","OTHER");control=account("LOAN","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
  }
  @Test void postsMultipleRowsDirectlyWithExactTotalsAndImmutableBalancedJournal(){
@@ -213,7 +219,7 @@ class VoucherPostgresTest {
   assertThatThrownBy(()->service.post(actor,Type.RECEIPT,f)).hasMessage("voucher.error.template");
   f.setActivityId(activity);
   var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,null);
-  var captured=gate.canonical(f,UUID.randomUUID());UUID workflow=workflows.capture(actor,Type.RECEIPT,captured);
+  var captured=gate.canonical(f,UUID.randomUUID());UUID workflow=workflows.capture(actor,Type.RECEIPT,captured,false);
   var details=workflows.details(actor,workflow);var item=details.items().getFirst();
   var edit=gate.canonical(captured,captured.getRequestKey());edit.setActivityId(null);
   workflows.save(actor,workflow,item.id(),details.workflow().version(),item.version(),edit);
@@ -241,131 +247,180 @@ class VoucherPostgresTest {
   assertThat(accounts.choices("FOREIGN","",0,cash)).isEmpty();assertThat(accounts.valid("FOREIGN",cash)).isFalse();
  }
 
- @Test void configuredIndividualApprovalBlocksBypassAndSupportsIndependentApprovalAndPosting(){
-  configure(true,true,false,false);var f=form(Type.JOURNAL);f.setParty("");UUID client=client("B1","CL-APPROVED");f.setClientId(client);
+ @Test void completeVoucherRoutesImmediatelyAndOnlyMakerCanPost(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));var f=form(Type.JOURNAL);
   assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
-  UUID id=workflows.capture(actor,Type.JOURNAL,f);assertThat(workflows.details(actor,id).items().getFirst().form().getClientId()).isEqualTo(client);validateWorkflow(id);
-  command(actor,id,"INITIATE","");assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("INITIATED");
-  assertThatThrownBy(()->command(actor,id,"APPROVE","")).hasMessage("approval.error.assignment");
-  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,f)).hasMessage("approval.error.required");
-  var reviewer=operator("B1");command(reviewer,id,"APPROVE","Reviewed");
-  workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version());
-  var d=workflows.details(actor,id);assertThat(d.workflow().posting()).isEqualTo("POSTED");assertThat(d.items()).allSatisfy(i->assertThat(i.voucherId()).isNotNull());
-  workflowPosting.post(actor,id,0);assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(d.items().getFirst().voucherId());assertThat(service.view(actor,Type.JOURNAL,d.items().getFirst().voucherId()).clientNumber()).isEqualTo(clientNumber("CL-APPROVED"));
-  assertThatThrownBy(()->workflows.save(actor,id,d.items().getFirst().id(),d.workflow().version(),0,f)).hasMessage("approval.error.stale");
+  UUID id=workflows.capture(actor,Type.JOURNAL,f);var w=workflows.details(actor,id).workflow();
+  assertThat(w.approval()).isEqualTo(Approval.INITIATED);assertThat(w.validation()).isEqualTo("VALIDATED");
+  assertThat(workflows.reviewActions(reviewer,List.of(w)).get(id)).contains("APPROVE");
+  assertThat(workflows.reviewActions(actor,List.of(w)).get(id)).isEmpty();
+  assertThatThrownBy(()->command(actor,id,"APPROVE")).hasMessage("approval.error.assignment");
+  command(reviewer,id,"APPROVE");assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("NOT_POSTED");
+  assertThatThrownBy(()->workflowPosting.post(reviewer,id,version(id))).hasMessage("approval.error.assignment");
+  workflowPosting.post(actor,id,version(id));workflowPosting.post(actor,id,0);
+  assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
+  assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(workflows.details(actor,id).items().getFirst().voucherId());
  }
- @Test void withdrawHoldRejectAndMaterialCorrectionsRequireResubmission(){
-  configure(true,true,false,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);
-  command(actor,id,"HOLD","Check reference");assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("HELD_FROM_APPROVAL");
-  command(actor,id,"RESUBMIT","");command(actor,id,"WITHDRAW","");command(actor,id,"RESUBMIT","");
-  var reviewer=operator("B1");command(reviewer,id,"REJECT","Wrong account");command(actor,id,"RESUBMIT","");command(reviewer,id,"APPROVE","");
-  var d=workflows.details(actor,id);var item=d.items().getFirst();item.form().getRows().getFirst().setAmount(new BigDecimal("11.00"));
-  workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());
-  assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("RESUBMIT_FOR_APPROVAL");
-  assertThatThrownBy(()->workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version())).hasMessage("approval.error.validate");
-  validateWorkflow(id);command(actor,id,"RESUBMIT","");command(reviewer,id,"APPROVE","");
+ @Test void automaticPostingUsesMakerPermissionsAndPostsOnce(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",true,Position.MANAGER,1));UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));
+  command(reviewer,id,"APPROVE");automatic().attempt(id);automatic().attempt(id);
+  assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+  assertThat(jdbc.queryForObject("select posted_by from accounting_voucher where sacco_id=?",UUID.class,institution)).isEqualTo(actor.getMemberId());
  }
- @Test void batchPostingIsAtomicWhenLaterVoucherFailsAndCanRetryAfterCorrection(){
-  configure(false,true,true,false);UUID id=batch(2);var before=workflows.details(actor,id);var later=before.items().get(1);later.form().setEffectiveDate(day.plusDays(1));workflows.save(actor,id,later.id(),before.workflow().version(),later.version(),later.form());
-  validateWorkflow(id);command(actor,id,"INITIATE","");
-  jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'OPEN',?,?)",UUID.randomUUID(),institution,day,day,actor.getMemberId(),now);
-  jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'CLOSED',?,?)",UUID.randomUUID(),institution,day.plusDays(1),day.plusDays(1),actor.getMemberId(),now);
-  var version=workflows.details(actor,id).workflow().version();assertThatThrownBy(()->workflowPosting.post(actor,id,version)).hasMessage("voucher.error.period");
+ @Test void automaticPostingFailureKeepsApprovalAndAllowsMakerRetry(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",true,Position.MANAGER,1));UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));command(reviewer,id,"APPROVE");
+  var restricted=EnumSet.allOf(UserClaim.class);restricted.remove(UserClaim.VOUCHER_WORKSPACE_POST);
+  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(restricted);automatic().attempt(id);
+  var w=workflows.details(actor,id).workflow();assertThat(w.approval()).isEqualTo(Approval.WORKFLOW_APPROVED);assertThat(w.posting()).isEqualTo("FAILED");
   assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
-  assertThat(workflows.details(actor,id).items()).allSatisfy(i->assertThat(i.voucherId()).isNull());
-  workflowPosting.failed(actor,id,version,new IllegalArgumentException("voucher.error.period"));assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("FAILED");
-  var d=workflows.details(actor,id);var item=d.items().get(1);item.form().setEffectiveDate(day);workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());
-  validateWorkflow(id);command(actor,id,"RESUBMIT","");workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version());
-  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(2);
+  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));workflowPosting.post(actor,id,version(id));
+  assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
  }
- @Test void forceApprovalRequiresEnabledOptionCurrentClaimsAndReason(){
-  configure(true,true,false,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);
-  assertThatThrownBy(()->command(actor,id,"FORCE","Urgent")).hasMessage("approval.error.force");
-  configure(true,true,false,true);validateWorkflow(id);
-  assertThatThrownBy(()->command(actor,id,"FORCE","")).hasMessage("approval.error.comments");
-  var allowed=EnumSet.allOf(UserClaim.class);allowed.remove(UserClaim.VOUCHER_APPROVAL_FORCE);when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(allowed);
-  assertThatThrownBy(()->command(actor,id,"FORCE","Urgent")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));command(actor,id,"FORCE","Documented exception");
-  assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("MANUALLY_APPROVED");
+ @Test void roleQuorumAndLaterStepsRequireDifferentPeople(){
+  var first=approver(Position.MANAGER);var second=approver(Position.MANAGER);var last=approver(Position.ACCOUNTANT);
+  var r=rule("SINGLE",false,Position.MANAGER,2);var step=new StepRow();step.setRole(Position.ACCOUNTANT);r.getStages().add(step);configure(r);
+  UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));command(first,id,"APPROVE");
+  assertThat(workflows.details(actor,id).workflow().stage()).isZero();assertThat(workflows.details(actor,id).responses()).containsEntry(0,1L);
+  assertThatThrownBy(()->command(first,id,"APPROVE")).hasMessage("approval.error.independent");
+  assertThatThrownBy(()->command(last,id,"APPROVE")).hasMessage("approval.error.assignment");command(second,id,"APPROVE");
+  assertThat(workflows.details(actor,id).workflow().stage()).isEqualTo(1);command(last,id,"APPROVE");
+  assertThat(workflows.details(actor,id).workflow().approval()).isEqualTo(Approval.WORKFLOW_APPROVED);
+  assertThat(jdbc.queryForObject("select count(distinct actor_id) from voucher_workflow_history where workflow_id=? and action='APPROVE'",Integer.class,id)).isEqualTo(3);
  }
- @Test void sequentialStagesRequireDistinctApproversAndPolicyChangesInvalidatePosting(){
-  var f=ruleForm(true,true,false,false);f.getRules().getFirst().setSecondClaim("VOUCHER_APPROVAL_ESCALATED_APPROVE");workflows.configure(actor,f);
-  UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
-  var reviewer=operator("B1");command(reviewer,id,"APPROVE","");assertThatThrownBy(()->command(reviewer,id,"APPROVE","")).hasMessage("approval.error.independent");
-  var senior=operator("B1");var reviewerOnly=new AppUserPrincipal(directory.find(senior.getMemberId()).orElseThrow(),EnumSet.of(UserClaim.VOUCHER_WORKSPACE_VIEW,UserClaim.VOUCHER_APPROVAL_ESCALATED_APPROVE,UserClaim.ACCOUNTING_JOURNALS_VIEW),true);
-  assertThat(workflows.selectedAccounts(reviewerOnly,id,workflows.details(reviewerOnly,id).items().getFirst().form())).containsKeys("rows[0].debitAccountId","rows[0].creditAccountId");command(reviewerOnly,id,"APPROVE","");
-  configure(true,true,false,false);
-  assertThatThrownBy(()->workflowPosting.post(actor,id,workflows.details(actor,id).workflow().version())).hasMessage("approval.error.configurationChanged");
+ @Test void onePersonCannotFillTwoRoleSteps(){
+  var reviewer=approver(Position.MANAGER);var member=directory.find(reviewer.getMemberId()).orElseThrow();member.setStaffRoles(Set.of(Position.MANAGER,Position.ACCOUNTANT));
+  jdbc.update("insert into member_staff_roles values(?,?)",member.getId(),"ACCOUNTANT");
+  var r=rule("SINGLE",false,Position.MANAGER,1);var step=new StepRow();step.setRole(Position.ACCOUNTANT);r.getStages().add(step);
+  configure(r);assertThatThrownBy(()->workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL))).hasMessage("approval.error.staff");
+  approver(Position.ACCOUNTANT);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));command(reviewer,id,"APPROVE");
+  assertThatThrownBy(()->command(reviewer,id,"APPROVE")).hasMessage("approval.error.independent");
  }
- @Test void validationRecordsFieldWarningsAndRejectsCrossBranchOrRevokedWorkspaceAccess(){
-  UUID id=workflows.capture(actor,Type.PAYMENT,form(Type.PAYMENT));var d=workflows.details(actor,id);var i=d.items().getFirst();i.form().getRows().getFirst().setAmount(null);i.form().setParty("");workflows.save(actor,id,i.id(),d.workflow().version(),i.version(),i.form());validateWorkflow(id);
-  var invalid=workflows.details(actor,id);assertThat(invalid.workflow().validation()).isEqualTo("ERROR");assertThat(invalid.items().getFirst().issues()).extracting(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Issue::field).contains("party","rows[0].amount");
-  assertThatThrownBy(()->workflows.details(operator("B2"),id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of());assertThatThrownBy(()->workflows.details(actor,id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+ @Test void rangesAreSeparateForSinglesAndBatchesAndUseExactBoundaries(){
+  approver(Position.MANAGER);approver(Position.ACCOUNTANT);
+  var low=rule("SINGLE",false,Position.MANAGER,1);low.setMaximum(new BigDecimal("30.03"));
+  var high=rule("SINGLE",true,Position.ACCOUNTANT,1);high.setMinimum(new BigDecimal("30.03"));
+  var batchRule=rule("BATCH",false,Position.MANAGER,1);configure(low,high,batchRule);
+  UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));var w=workflows.details(actor,id).workflow();assertThat(w.autoPost()).isTrue();assertThat(w.stages().getFirst().role()).isEqualTo(Position.ACCOUNTANT);
+  UUID batch=batch(2);command(actor,batch,"SEND");w=workflows.details(actor,batch).workflow();assertThat(w.total()).isEqualByComparingTo("60.06");assertThat(w.assessmentAmount()).isEqualByComparingTo("60.06");assertThat(w.autoPost()).isFalse();
  }
- @Test void mixedRegisterUsesScopedTypesDatesCountsAndRealSorts(){
-  UUID journal=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));workflows.capture(actor,Type.PAYMENT,form(Type.PAYMENT));workflows.capture(actor,Type.RECEIPT,form(Type.RECEIPT));
-  var result=workflows.register(actor,null,"","","date_asc",0,0,10);assertThat(result.rows()).hasSize(3);assertThat(result.counts().get("ALL")).isEqualTo(3L);assertThat(result.counts().get("recent_created")).isEqualTo(3L);
-  assertThat(workflows.transactionDates(actor,result.rows()).get(journal)).isEqualTo(day.toString());
-  assertThat(workflows.register(actor,null,"","RECENT_CREATED","owner_desc",7,0,10).rows()).hasSize(3);
-  var restricted=EnumSet.allOf(UserClaim.class);restricted.remove(UserClaim.ACCOUNTING_BUSINESS_VIEW);var journalOnly=new AppUserPrincipal(directory.find(actor.getMemberId()).orElseThrow(),restricted,true);
-  assertThat(workflows.register(journalOnly,null,"","","type_asc",0,0,10).rows()).extracting(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Workflow::type).containsExactly(Type.JOURNAL);
-  assertThatThrownBy(()->workflows.register(journalOnly,Type.PAYMENT,"","","date_desc",0,0,10)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-  configure(true,true,false,false);validateWorkflow(journal);command(actor,journal,"INITIATE","");var reviewer=operator("B1");var workflow=workflows.details(actor,journal).workflow();
-  assertThat(workflows.reviewActions(reviewer,List.of(workflow)).get(journal)).contains("APPROVE","REJECT");assertThat(workflows.reviewActions(actor,List.of(workflow)).get(journal)).isEmpty();
-  assertThat(workflows.register(operator("B2"),null,"","","date_desc",0,0,10).rows()).isEmpty();
+ @Test void overlappingRulesAreRejectedButDifferentLevelsCanShareRanges(){
+  approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1),rule("BATCH",false,Position.MANAGER,1));
+  assertThatThrownBy(()->configure(rule("SINGLE",false,Position.MANAGER,1),rule("SINGLE",true,Position.MANAGER,1))).hasMessage("approval.error.overlap");
  }
- @Test void ruleValidationDoesNotActivateOrSaveAPolicy(){
-  var f=ruleForm(true,true,false,false);workflows.validateConfiguration(actor,f);assertThat(workflows.configuration(actor,Type.JOURNAL).version()).isZero();
-  var overlap=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow();overlap.setName("Overlap");f.getRules().add(overlap);
-  assertThatThrownBy(()->workflows.validateConfiguration(actor,f)).hasMessage("approval.error.overlap");assertThat(workflows.configuration(actor,Type.JOURNAL).individuals()).isFalse();
+ @Test void missingRuleNeverPostsOrCreatesAnApproval(){
+  approver(Position.MANAGER);var r=rule("SINGLE",false,Position.MANAGER,1);r.setMinimum(new BigDecimal("100"));configure(r);
+  assertThatThrownBy(()->workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL))).hasMessage("approval.error.noRule");
+  assertThat(jdbc.queryForObject("select count(*) from voucher_workflow where sacco_id=?",Integer.class,institution)).isZero();
+  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,form(Type.JOURNAL))).hasMessage("approval.error.required");
  }
- @Test void validationRetainsEngineErrorsWithoutRollingBackOtherVoucherResults(){
-  UUID id=batch(2);var d=workflows.details(actor,id);var item=d.items().get(1);item.form().getRows().getFirst().setCreditAccountId(control);
-  workflows.save(actor,id,item.id(),d.workflow().version(),item.version(),item.form());validateWorkflow(id);
-  var result=workflows.details(actor,id);assertThat(result.workflow().validation()).isEqualTo("ERROR");
-  assertThat(result.items().getFirst().planHash()).isNotNull();assertThat(result.items().get(1).issues()).extracting(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Issue::code).contains("voucher.error.account");
- }
- @Test void postingAndFailureRecordingCannotBypassVoucherTypeViewClaims(){
-  configure(true,true,true,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
-  int version=workflows.details(actor,id).workflow().version();var restricted=EnumSet.allOf(UserClaim.class);restricted.remove(UserClaim.ACCOUNTING_JOURNALS_VIEW);
-  var withoutTypeView=new AppUserPrincipal(directory.find(actor.getMemberId()).orElseThrow(),restricted,true);
-  assertThatThrownBy(()->workflowPosting.post(withoutTypeView,id,version)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-  assertThatThrownBy(()->workflowPosting.failed(withoutTypeView,id,version,new IllegalArgumentException("voucher.error.account"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-  assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("NOT_POSTED");
- }
- @Test void policyRevisionsAndApprovalContextRemainImmutableAfterConfigurationChanges(){
-  configure(true,true,true,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
-  var original=jdbc.queryForObject("select definition::text from voucher_approval_configuration_history where sacco_id=? and version=1",String.class,institution);
-  configure(true,true,false,false);
-  assertThat(jdbc.queryForObject("select definition::text from voucher_approval_configuration_history where sacco_id=? and version=1",String.class,institution)).isEqualTo(original);
-  assertThat(jdbc.queryForObject("select (context->>'configurationVersion')::integer from voucher_workflow_history where workflow_id=? and action='INITIATE'",Integer.class,id)).isEqualTo(1);
+ @Test void savedRulesApplyImmediatelyAndPendingRequestsKeepTheirPath(){
+  var manager=approver(Position.MANAGER);var accountant=approver(Position.ACCOUNTANT);configure(rule("SINGLE",false,Position.MANAGER,1));
+  UUID old=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));configure(rule("SINGLE",true,Position.ACCOUNTANT,1));UUID next=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));
+  assertThat(workflows.details(actor,old).workflow().configVersion()).isEqualTo(1);assertThat(workflows.details(actor,next).workflow().configVersion()).isEqualTo(2);
+  command(manager,old,"APPROVE");workflowPosting.post(actor,old,version(old));command(accountant,next,"APPROVE");automatic().attempt(next);
+  assertThat(workflows.details(actor,old).workflow().posting()).isEqualTo("POSTED");assertThat(workflows.details(actor,next).workflow().posting()).isEqualTo("POSTED");
   assertThatThrownBy(()->jdbc.update("delete from voucher_approval_configuration_history where sacco_id=?",institution)).isInstanceOf(org.springframework.dao.DataAccessException.class);
  }
- @Test void documentEvidenceIsScopedAndInvalidatesAnApproval(){
-  configure(true,true,true,false);UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));validateWorkflow(id);command(actor,id,"INITIATE","");
-  documents.add(actor,id,"proof.pdf","application/pdf","%PDF-1.7 synthetic".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-  assertThat(workflows.details(actor,id).workflow().approval().name()).isEqualTo("RESUBMIT_FOR_APPROVAL");var doc=documents.list(actor,id).getFirst();assertThat(doc.content()).isNull();
-  assertThat(documents.get(actor,id,doc.id()).content()).isNotEmpty();assertThatThrownBy(()->documents.get(operator("B2"),id,doc.id())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-  assertThatThrownBy(()->documents.add(actor,id,"x.pdf","application/pdf","not a pdf".getBytes())).hasMessage("approval.error.document");
+ @Test void draftsStayEditableUntilSentAndCorrectionsStartANewRound(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL),false);
+  assertThat(workflows.details(actor,id).workflow().approval()).isEqualTo(Approval.REQUIRED);command(actor,id,"SEND");
+  assertThatThrownBy(()->workflows.save(actor,id,workflows.details(actor,id).items().getFirst().id(),version(id),0,form(Type.JOURNAL))).hasMessage("approval.error.stale");
+  command(actor,id,"WITHDRAW");var d=workflows.details(actor,id);var item=d.items().getFirst();item.form().getRows().getFirst().setAmount(new BigDecimal("11"));workflows.save(actor,id,item.id(),version(id),item.version(),item.form());
+  command(actor,id,"SEND");command(reviewer,id,"REJECT");command(actor,id,"SEND");command(reviewer,id,"APPROVE");
+  assertThat(workflows.details(actor,id).workflow().round()).isEqualTo(3);
+  assertThat(jdbc.queryForObject("select context->'vouchers'->0->'form'->'rows'->0->>'amount' from voucher_workflow_history where workflow_id=? and action='INITIATE' and round=1",String.class,id)).isEqualTo("10.01");
  }
- @Test void concurrentWorkflowPostingCommitsOneBatchAndRulesRejectOverlaps()throws Exception{
-  configure(false,true,true,false);UUID id=batch(2);validateWorkflow(id);command(actor,id,"INITIATE","");int version=workflows.details(actor,id).workflow().version();
-  var pool=Executors.newFixedThreadPool(2);try{var a=pool.submit(()->workflowPosting.post(actor,id,version));var b=pool.submit(()->workflowPosting.post(actor,id,version));a.get(30,TimeUnit.SECONDS);b.get(30,TimeUnit.SECONDS);}finally{pool.shutdownNow();}
-  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(2);
-  var f=ruleForm(true,true,false,false);var row=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow();row.setName("Overlapping");f.getRules().add(row);assertThatThrownBy(()->workflows.configure(actor,f)).hasMessage("approval.error.overlap");
+ @Test void missingStaffOrRevokedAccessCannotCreateAnUnusableRoute(){
+  assertThatThrownBy(()->configure(rule("SINGLE",false,Position.MANAGER,1))).hasMessage("approval.error.staff");
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));
+  var limited=EnumSet.allOf(UserClaim.class);limited.remove(UserClaim.VOUCHER_APPROVAL_APPROVE);when(claims.effectiveClaims(eq(reviewer.getMemberId()),anyCollection(),anyBoolean())).thenReturn(limited);
+  assertThatThrownBy(()->workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL))).hasMessage("approval.error.staff");
  }
- // Existing batch records are fixture data, not a production creation API.
- UUID batch(int count){return tx.execute(status->{var workflow=workflowRepository.create(actor,UUID.randomUUID(),Type.JOURNAL,"BATCH","Synthetic existing batch",now);for(int n=0;n<count;n++){var f=form(Type.JOURNAL);workflowRepository.save(workflow,actor,f.getRequestKey(),n+1,f,true);}jdbc.update("update voucher_workflow set item_count=?,validation='NOT_VALIDATED' where id=?",count,workflow.id());return workflow.id();});}
- @Test void correctingAnApprovalCannotAppendAnUnknownVoucher(){
-  UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));var before=workflows.details(actor,id);var extra=form(Type.JOURNAL);
-  assertThatThrownBy(()->workflows.save(actor,id,extra.getRequestKey(),before.workflow().version(),0,extra)).hasMessage("approval.error.unavailable");
-  var after=workflows.details(actor,id);assertThat(after.items()).hasSize(1);assertThat(after.workflow().version()).isEqualTo(before.workflow().version());
+ @Test void wrongRoleBranchAndRevokedClaimsCannotApprove(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));
+  assertThatThrownBy(()->command(operator("B1"),id,"APPROVE")).hasMessage("approval.error.assignment");
+  assertThatThrownBy(()->workflows.details(operator("B2"),id)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  var limited=EnumSet.allOf(UserClaim.class);limited.remove(UserClaim.VOUCHER_APPROVAL_APPROVE);when(claims.effectiveClaims(eq(reviewer.getMemberId()),anyCollection(),anyBoolean())).thenReturn(limited);
+  assertThatThrownBy(()->command(reviewer,id,"APPROVE")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
  }
- void validateWorkflow(UUID id){workflows.validate(actor,id,workflows.details(actor,id).workflow().version());}
- void command(AppUserPrincipal user,UUID id,String action,String comments){workflows.action(user,id,workflows.details(user,id).workflow().version(),action,comments);}
- void configure(boolean individual,boolean batch,boolean automatic,boolean force){workflows.configure(actor,ruleForm(individual,batch,automatic,force));}
- com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm ruleForm(boolean individual,boolean batch,boolean automatic,boolean force){var f=new com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm();f.setVersion(workflows.configuration(actor,Type.JOURNAL).version());f.setIndividuals(individual);f.setBatches(batch);f.setForceAllowed(force);f.getRules().getFirst().setName("Default approval rule");f.getRules().getFirst().setAutomatic(automatic);return f;}
+ @Test void batchCreationAndSendingUseTheWholeFrozenBatch(){
+  var reviewer=approver(Position.MANAGER);configure(rule("BATCH",false,Position.MANAGER,1));UUID key=UUID.randomUUID();UUID id=workflows.batch(actor,Type.JOURNAL,key);
+  assertThat(workflows.batch(actor,Type.JOURNAL,key)).isEqualTo(id);var d=workflows.details(actor,id);var first=d.items().getFirst();
+  workflows.save(actor,id,first.id(),version(id),first.version(),form(Type.JOURNAL));UUID second=workflows.add(actor,id,version(id));
+  workflows.save(actor,id,second,version(id),0,form(Type.JOURNAL));command(actor,id,"SEND");assertThat(workflows.details(actor,id).workflow().total()).isEqualByComparingTo("60.06");
+  assertThatThrownBy(()->workflows.add(actor,id,version(id))).hasMessage("approval.error.stale");command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
+  assertThat(workflows.details(actor,id).items()).hasSize(2).allSatisfy(i->assertThat(i.voucherId()).isNotNull());
+ }
+ @Test void batchPostingRollsBackAllRowsOnFailure(){
+  var reviewer=approver(Position.MANAGER);configure(rule("BATCH",false,Position.MANAGER,1));UUID id=batch(2);var d=workflows.details(actor,id);var second=d.items().get(1);second.form().setEffectiveDate(day.plusDays(1));workflows.save(actor,id,second.id(),version(id),second.version(),second.form());command(actor,id,"SEND");command(reviewer,id,"APPROVE");
+  jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'OPEN',?,?)",UUID.randomUUID(),institution,day,day,actor.getMemberId(),now);
+  jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'CLOSED',?,?)",UUID.randomUUID(),institution,day.plusDays(1),day.plusDays(1),actor.getMemberId(),now);
+  assertThatThrownBy(()->workflowPosting.post(actor,id,version(id))).hasMessage("voucher.error.period");assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
+  assertThat(workflows.details(actor,id).items()).allSatisfy(i->assertThat(i.voucherId()).isNull());
+ }
+ @Test void concurrentPostingAndApprovalRetriesCannotDuplicateDecisionsOrJournals()throws Exception{
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));int v=version(id);command(reviewer,id,"APPROVE");
+  assertThatThrownBy(()->workflows.action(reviewer,id,v,"APPROVE","")).hasMessage("approval.error.stale");final int approvedVersion=version(id);
+  var pool=Executors.newFixedThreadPool(2);try{var first=pool.submit(()->workflowPosting.post(actor,id,approvedVersion));var second=pool.submit(()->workflowPosting.post(actor,id,approvedVersion));first.get(30,TimeUnit.SECONDS);second.get(30,TimeUnit.SECONDS);}finally{pool.shutdownNow();}
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+  assertThat(jdbc.queryForObject("select count(*) from voucher_workflow_history where workflow_id=? and action='APPROVE'",Integer.class,id)).isEqualTo(1);
+ }
+ @Test void draftValidationDocumentsAndUnknownItemsPreserveTheirGuards(){
+  var f=form(Type.JOURNAL);UUID id=workflows.capture(actor,Type.JOURNAL,f,false);var d=workflows.details(actor,id);var item=d.items().getFirst();item.form().getRows().getFirst().setAmount(null);workflows.save(actor,id,item.id(),version(id),item.version(),item.form());
+  workflows.validate(actor,id,version(id));assertThat(workflows.details(actor,id).items().getFirst().issues()).isNotEmpty();
+  assertThatThrownBy(()->workflows.save(actor,id,UUID.randomUUID(),version(id),0,f)).hasMessage("approval.error.unavailable");
+  documents.add(actor,id,"evidence.pdf","application/pdf","%PDF-1.4 synthetic".getBytes());assertThat(documents.list(actor,id)).hasSize(1);
+  assertThatThrownBy(()->documents.get(operator("B2"),id,documents.list(actor,id).getFirst().id())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+ }
+ @Test void legacyRulesCannotRouteNewRequestsAndExistingHistoryIsUntouched(){
+  String definition="{\"type\":\"JOURNAL\",\"version\":1,\"individuals\":true,\"batches\":false,\"forceAllowed\":false,\"rules\":[]}";
+  jdbc.update("insert into voucher_approval_configuration values(?,?,'JOURNAL',1,?::jsonb,?,?)",institution,"B1",definition,actor.getMemberId(),now);
+  assertThatThrownBy(()->workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL))).hasMessage("approval.error.configuration");
+  assertThat(jdbc.queryForObject("select definition->>'version' from voucher_approval_configuration_history where sacco_id=?",String.class,institution)).isEqualTo("1");
+ }
+ @Test void allOrdinaryVoucherTypesRouteWithTheirOwnRules(){
+  var reviewer=approver(Position.MANAGER);
+  for(var type:Type.values()){
+   var rules=new RuleForm();rules.setType(type);rules.setRules(List.of(rule("SINGLE",false,Position.MANAGER,1)));workflows.configure(actor,rules);
+   UUID id=workflows.capture(actor,type,form(type));assertThat(workflows.details(actor,id).workflow().type()).isEqualTo(type);command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
+   assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
+  }
+ }
+ @Test void removingDraftBatchItemsRequiresOwnerAndReusesAvailableLines(){
+  approver(Position.MANAGER);configure(rule("BATCH",false,Position.MANAGER,1));UUID id=workflows.batch(actor,Type.JOURNAL,UUID.randomUUID());UUID item=workflows.add(actor,id,version(id));
+  var other=operator("B1");assertThatThrownBy(()->workflows.remove(other,id,item,version(id),0)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  workflows.remove(actor,id,item,version(id),0);assertThat(workflows.details(actor,id).items()).hasSize(1);
+  UUID replacement=workflows.add(actor,id,version(id));assertThat(workflows.details(actor,id).items()).hasSize(2);assertThat(workflowRepository.item(id,replacement).orElseThrow().line()).isEqualTo(2);
+ }
+ @Test void concurrentQuorumApprovalsKeepEveryPersonDistinct()throws Exception{
+  var first=approver(Position.MANAGER);var second=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,2));UUID id=workflows.capture(actor,Type.JOURNAL,form(Type.JOURNAL));int expected=version(id);
+  var pool=Executors.newFixedThreadPool(2);var outcomes=new ArrayList<Boolean>();
+  try{var attempts=List.of(first,second).stream().map(person->pool.submit(()->{try{workflows.action(person,id,expected,"APPROVE","");return true;}catch(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Invalid stale){assertThat(stale).hasMessage("approval.error.stale");return false;}})).toList();for(var attempt:attempts)outcomes.add(attempt.get(30,TimeUnit.SECONDS));}finally{pool.shutdownNow();}
+  assertThat(outcomes).containsExactlyInAnyOrder(true,false);var pending=workflows.reviewActions(first,List.of(workflows.details(actor,id).workflow())).get(id).contains("APPROVE")?first:second;command(pending,id,"APPROVE");
+  assertThat(workflows.details(actor,id).responses()).containsEntry(0,2L);assertThat(workflows.details(actor,id).workflow().approval()).isEqualTo(Approval.WORKFLOW_APPROVED);
+ }
+ @Test void sendingAnIncompleteBatchKeepsFieldErrorsWithoutOpeningApproval(){
+  approver(Position.MANAGER);configure(rule("BATCH",false,Position.MANAGER,1));UUID id=workflows.batch(actor,Type.JOURNAL,UUID.randomUUID());command(actor,id,"SEND");
+  var d=workflows.details(actor,id);assertThat(d.workflow().validation()).isEqualTo("ERROR");assertThat(d.workflow().approval()).isEqualTo(Approval.REQUIRED);assertThat(d.items().getFirst().issues()).isNotEmpty();
+ }
+ @Test void legacyRuleAndStepSnapshotsStillReadWithoutInventingDecisions(){
+  var json=JsonMapper.builder().findAndAddModules().build();
+  var configuration=json.readValue("""
+   {"type":"JOURNAL","version":1,"individuals":true,"batches":false,"forceAllowed":false,
+    "rules":[{"name":"Historical","minimum":0,"maximum":null,"automatic":false,
+      "stages":[{"claim":"VOUCHER_APPROVAL_APPROVE","memberId":null}]}]}
+   """,com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Configuration.class);
+  assertThat(configuration.modelVersion()).isEqualTo(1);assertThat(configuration.rules().getFirst().autoPost()).isFalse();
+  assertThat(configuration.rules().getFirst().stages().getFirst().required()).isEqualTo(1);assertThat(configuration.rules().getFirst().stages().getFirst().role()).isNull();
+ }
+ RuleRow rule(String scope,boolean autoPost,Position role,int count){var r=new RuleRow();r.setScope(scope);r.setAutoPost(autoPost);r.getStages().getFirst().setRole(role);r.getStages().getFirst().setApprovals(count);return r;}
+ void configure(RuleRow... rows){var f=new RuleForm();f.setVersion(workflows.configuration(actor,Type.JOURNAL).version());f.setRules(new ArrayList<>(List.of(rows)));workflows.configure(actor,f);}
+ AppUserPrincipal approver(Position role){var p=operator("B1");var member=directory.find(p.getMemberId()).orElseThrow();member.setPosition(role);jdbc.update("update members set position=? where id=?",role.name(),member.getId());return new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);}
+ int version(UUID id){return workflows.details(actor,id).workflow().version();}
+ void command(AppUserPrincipal user,UUID id,String action){workflows.action(user,id,workflows.details(user,id).workflow().version(),action,action.equals("REJECT")?"Wrong reference":"");}
+ UUID batch(int count){return tx.execute(status->{var w=workflowRepository.create(actor,UUID.randomUUID(),Type.JOURNAL,"BATCH","Synthetic batch",now);for(int n=0;n<count;n++){var f=form(Type.JOURNAL);workflowRepository.save(w,actor,f.getRequestKey(),n+1,f,true);}jdbc.update("update voucher_workflow set item_count=?,validation='NOT_VALIDATED' where id=?",count,w.id());return w.id();});}
+ com.sacco.mvp.accounting.approval.service.VoucherAutomaticPostingService automatic(){var c=mock(ApplicationClock.class);when(c.now()).thenReturn(now);return new com.sacco.mvp.accounting.approval.service.VoucherAutomaticPostingService(workflowRepository,workflowPosting,directory,claims,c,tx.getTransactionManager());}
  @SuppressWarnings("unchecked") static <T>T transactional(T raw,org.springframework.transaction.PlatformTransactionManager manager){var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));return (T)proxy.getProxy();}
  Form form(Type type){var f=new Form();f.setEffectiveDate(day);f.setParty("Synthetic payer");f.setReference("REF-"+UUID.randomUUID());if(type!=Type.JOURNAL)f.setMoneyAccountId(cash);var rows=new ArrayList<RowForm>();for(String amount:List.of("10.01","20.02")){var r=new RowForm();r.setDescription("Synthetic transaction "+amount);r.setAmount(new BigDecimal(amount));r.setDebitAccountId(expense);r.setCreditAccountId(capital);rows.add(r);}f.setRows(rows);return f;}
  String clientNumber(String base){return base+"-"+actor.getMemberId().toString().substring(0,8);}

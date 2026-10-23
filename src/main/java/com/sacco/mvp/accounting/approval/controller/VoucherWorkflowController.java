@@ -20,11 +20,12 @@ public class VoucherWorkflowController {
     private final VoucherWorkflowService workflows;
     private final VoucherWorkflowPostingService posting;
     private final VoucherDocumentService documents;
+    private final VoucherAutomaticPostingService automatic;
     @InitBinder("voucherForm") void formBinder(WebDataBinder b) {
         b.setAutoGrowCollectionLimit(50);b.setAllowedFields("requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","clientId",
             "rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].transactionId","rows[*].templateKey","rows[*].component");
     }
-    @InitBinder("ruleForm") void ruleBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(20);b.setAllowedFields("type","version","individuals","batches","forceAllowed","rules[*].name","rules[*].minimum","rules[*].maximum","rules[*].automatic","rules[*].firstClaim","rules[*].secondClaim","rules[*].firstMember","rules[*].secondMember");}
+    @InitBinder("ruleForm") void ruleBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(20);b.setAllowedFields("type","version","rules[*].minimum","rules[*].maximum","rules[*].scope","rules[*].autoPost","rules[*].stages[*].role","rules[*].stages[*].approvals");}
     @ExceptionHandler({org.springframework.beans.InvalidPropertyException.class,Invalid.class})
     @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST) @ResponseBody String invalid() {return "Invalid voucher workflow request";}
     @GetMapping
@@ -44,6 +45,7 @@ public class VoucherWorkflowController {
             else if(action.equals("POST")) {
                 try{posting.post(a,id,version);}catch(RuntimeException e){posting.failed(a,id,version,e);throw e;}
             } else workflows.action(a,id,version,action,comments);
+            automatic.attempt(id);
         }catch(IllegalArgumentException e){flash.addFlashAttribute("workflowError",VoucherWorkflowService.safeError(e));}
          catch(org.springframework.dao.DataIntegrityViolationException e){flash.addFlashAttribute("workflowError","approval.error.duplicate");}
         return redirect(id);
@@ -57,13 +59,14 @@ public class VoucherWorkflowController {
         var before=workflows.details(a,id);existingItem(before,item);
         boolean saved=false;
         if(!errors.hasErrors())try{
-            VoucherApprovalGate.require(Set.of("SAVE","CLOSE","VALIDATE","SUBMIT").contains(command),"input");
+            VoucherApprovalGate.require(Set.of("SAVE","CLOSE","VALIDATE","SUBMIT","REMOVE").contains(command),"input");
+            if(command.equals("REMOVE")){workflows.remove(a,id,item,version,itemVersion);return redirect(id);}
             if(command.equals("VALIDATE") || command.equals("SUBMIT"))workflows.authorize(a,"VOUCHER_WORKSPACE_VALIDATE");if(command.equals("SUBMIT"))workflows.authorize(a,"VOUCHER_APPROVAL_INITIATE");
             if(command.equals("SUBMIT"))VoucherApprovalGate.require(before.workflow().scope().equals("SINGLE"),"transition");
             workflows.save(a,id,item,version,itemVersion,f);saved=true;
             if(command.equals("VALIDATE") || command.equals("SUBMIT")) {
                 var latest=workflows.details(a,id);workflows.validate(a,id,latest.workflow().version());
-                if(command.equals("SUBMIT")){latest=workflows.details(a,id);VoucherApprovalGate.require(latest.workflow().validation().equals("VALIDATED"),"validate");if(!latest.workflow().approval().approved())workflows.action(a,id,latest.workflow().version(),latest.workflow().approval()==Approval.REQUIRED?"INITIATE":"RESUBMIT","");}
+                if(command.equals("SUBMIT")){latest=workflows.details(a,id);VoucherApprovalGate.require(latest.workflow().validation().equals("VALIDATED"),"validate");if(!latest.workflow().approval().approved())workflows.action(a,id,latest.workflow().version(),"SEND","");}
             }
             return command.equals("CLOSE") || command.equals("SUBMIT")?redirect(id):"redirect:/finance/approval/"+id+"/vouchers/"+item;
         }catch(IllegalArgumentException e){if(saved){flash.addFlashAttribute("workflowError",VoucherWorkflowService.safeError(e));return "redirect:/finance/approval/"+id+"/vouchers/"+item;}errors.reject(VoucherWorkflowService.safeError(e));}
@@ -81,19 +84,23 @@ public class VoucherWorkflowController {
     }
     @GetMapping("/{id}/accounts") @ResponseBody public Object accounts(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return workflows.accounts(a,id,search,page);}
     @GetMapping("/{id}/clients") @ResponseBody public Object clients(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return workflows.clients(a,id,search,page);}
-    @GetMapping("/configuration/reviewers") @ResponseBody public Object reviewers(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam String claim,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return workflows.reviewers(a,claim,search,page);}
-    @GetMapping("/configuration") public String configuration(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="JOURNAL") Type type,@RequestParam(required=false) java.math.BigDecimal example,Model m) {
-        var c=workflows.configuration(a,type);
-        if(example!=null){m.addAttribute("example",example);try{VoucherApprovalGate.require(example.signum()>=0 && example.scale()<=2 && example.precision()<=18,"amount");m.addAttribute("matchedRule",VoucherWorkflowService.match(c,example));}catch(Invalid e){m.addAttribute("exampleError",e.getMessage());}}
-        var f=new RuleForm();f.setType(type);f.setVersion(c.version());f.setIndividuals(c.individuals());f.setBatches(c.batches());f.setForceAllowed(c.forceAllowed());
-        var rows=new ArrayList<RuleRow>();for(var r:c.rules()) {var row=new RuleRow();row.setName(r.name());row.setMinimum(r.minimum());row.setMaximum(r.maximum());row.setAutomatic(r.automatic());
-            if(!r.stages().isEmpty()){row.setFirstClaim(r.stages().getFirst().claim());row.setFirstMember(r.stages().getFirst().memberId());}
-            if(r.stages().size()>1){row.setSecondClaim(r.stages().get(1).claim());row.setSecondMember(r.stages().get(1).memberId());}rows.add(row);}
-        if(!rows.isEmpty())f.setRules(rows);m.addAttribute("ruleForm",f);return "accounting/approval/configuration";
+    @GetMapping("/configuration") public String configuration(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="JOURNAL") Type type,Model m) {
+        var c=workflows.configuration(a,type);var f=new RuleForm();f.setType(type);f.setVersion(c.version());
+        if(c.modelVersion()==2 && !c.rules().isEmpty()){
+            var rows=new ArrayList<RuleRow>();for(var r:c.rules()){
+                var row=new RuleRow();row.setMinimum(r.minimum());row.setMaximum(r.maximum());row.setScope(r.scope());row.setAutoPost(r.autoPost());
+                var steps=new ArrayList<StepRow>();for(var stage:r.stages()){var step=new StepRow();step.setRole(stage.role());step.setApprovals(stage.required());steps.add(step);}row.setStages(steps);rows.add(row);
+            }f.setRules(rows);
+        }
+        m.addAttribute("ruleForm",f);ruleSupport(m);return "accounting/approval/configuration";
     }
-    @PostMapping("/configuration") public String configure(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("ruleForm") RuleForm f,BindingResult errors,@RequestParam(defaultValue="SAVE") String command,Model m,RedirectAttributes flash) {
-        if(!errors.hasErrors())try{VoucherApprovalGate.require(Set.of("SAVE","CLOSE","VALIDATE").contains(command),"input");if(command.equals("VALIDATE")){workflows.validateConfiguration(a,f);m.addAttribute("configurationValid",true);return "accounting/approval/configuration";}workflows.configure(a,f);flash.addFlashAttribute("configurationSaved",true);return command.equals("CLOSE") && a.getClaims().contains("VOUCHER_WORKSPACE_VIEW")?"redirect:/finance/approval":"redirect:/finance/approval/configuration?type="+f.getType();}catch(IllegalArgumentException e){errors.reject(VoucherWorkflowService.safeError(e));}
-        return "accounting/approval/configuration";
+    @PostMapping("/configuration") public String configure(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("ruleForm") RuleForm f,BindingResult errors,Model m,RedirectAttributes flash) {
+        if(!errors.hasErrors())try{workflows.configure(a,f);flash.addFlashAttribute("configurationSaved",true);return "redirect:/finance/approval/configuration?type="+f.getType();}catch(IllegalArgumentException e){errors.reject(VoucherWorkflowService.safeError(e));}
+        ruleSupport(m);return "accounting/approval/configuration";
+    }
+    private void ruleSupport(Model m){m.addAttribute("roles",com.sacco.mvp.domain.Position.staffAssignableRoles());}
+    @PostMapping("/{id}/vouchers") public String add(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam int version){
+        return "redirect:/finance/approval/"+id+"/vouchers/"+workflows.add(a,id,version);
     }
     private void support(AppUserPrincipal a,UUID id,Model m) {
         if(a.getClaims().contains("VOUCHER_DOCUMENT_VIEW"))m.addAttribute("documents",documents.list(a,id));
