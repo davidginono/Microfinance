@@ -131,8 +131,17 @@
 /* Oracle-style progressive disclosure within the existing JSP dashboard. */
 .aws-console .dashboard-widget.dashboard-auto-widget{height:auto;min-height:0;container-type:inline-size;}
 .dashboard-auto-widget>.dashboard-resize{display:none;}
-.dashboard-create-resources{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
-.aws-console .dashboard-create-resources>.app-btn{width:auto;flex:0 1 auto;white-space:normal;text-decoration:none;}
+.aws-console .dashboard-widget>.dashboard-create-vouchers{overflow:visible;}
+.dashboard-widget:has(.dashboard-voucher-shortcut[open]){z-index:6;}
+.dashboard-voucher-shortcut{position:relative;width:fit-content;max-width:100%;}
+.aws-console .dashboard-voucher-shortcut>summary{display:flex;align-items:center;justify-content:center;gap:12px;width:fit-content;max-width:100%;min-height:32px;padding:4px 20px;border-radius:2px;list-style:none;background:#d87929!important;border-color:#d87929!important;color:#fff!important;font-size:14px!important;font-weight:700;line-height:22px;cursor:pointer;}
+.dashboard-voucher-shortcut>summary::-webkit-details-marker{display:none;}
+.dashboard-voucher-shortcut>summary svg{flex:none;}
+.aws-console .dashboard-voucher-shortcut>summary:is(:hover,:focus-visible){background:#c66b20!important;border-color:#c66b20!important;}
+.dashboard-voucher-shortcut>summary:focus-visible{outline:2px solid #0972d3;outline-offset:2px;}
+.dashboard-voucher-choices{position:absolute;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(280px,calc(100vw - 72px));padding:4px 0;border:1px solid #879596;border-radius:2px;background:#fff;box-shadow:0 2px 5px #0002;}
+.aws-console .dashboard-voucher-choices>a{display:block;padding:8px 16px;color:#16191f;font-size:14px;line-height:20px;text-decoration:none;overflow-wrap:anywhere;}
+.aws-console .dashboard-voucher-choices>a:is(:hover,:focus-visible){background:#f1faff;color:#0972d3;outline:2px solid #0972d3;outline-offset:-2px;}
 .dashboard-work-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:16px;}
 .dashboard-work-tools>[data-work-updated]{margin-right:auto;color:#545b64;font-size:13px;}
 [data-work-status]:not(:empty){padding:14px 0;color:#545b64;}

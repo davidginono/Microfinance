@@ -11,6 +11,14 @@
         if(boards.has(root))return;
         const widgets=[...root.querySelectorAll('[data-dashboard-widget]')];if(!widgets.length)return;
         const l=context(),lifetime=new AbortController(),signal=lifetime.signal;
+        const voucherMenu=root.querySelector('[data-dashboard-voucher-menu]');
+        if(voucherMenu){
+            const closeVoucherMenu=restore=>{voucherMenu.open=false;if(restore)voucherMenu.querySelector('summary').focus();};
+            voucherMenu.addEventListener('keydown',event=>{if(event.key==='Escape'&&voucherMenu.open){event.preventDefault();event.stopPropagation();closeVoucherMenu(true);}},{signal});
+            document.addEventListener('click',event=>{if(!voucherMenu.contains(event.target))closeVoucherMenu(false);},{signal});
+            document.addEventListener('focusin',event=>{if(!voucherMenu.contains(event.target))closeVoucherMenu(false);},{signal});
+            voucherMenu.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>closeVoucherMenu(false),{signal}));
+        }
         const entries=new Map(),grid=node('div','dashboard-grid');root.append(grid);
         const header=root.closest('.shell-content-frame')?.querySelector('.erp-page-header') || document.querySelector('.erp-page-header');
         header?.querySelector('.dashboard-toolbar')?.remove();

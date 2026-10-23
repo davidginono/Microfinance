@@ -1,33 +1,19 @@
 <%@ page pageEncoding="UTF-8" %>
-<sec:authorize var="dashboardCanCreate" access="(@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE') and @access.has(principal, 'MEMBER_LOANS_VIEW')) or (principal.staffSession and !@access.isPlatformIdentity(principal) and (@access.hasAny(principal, 'ACCOUNTING_BUSINESS_CREATE', 'ACCOUNTING_JOURNALS_CREATE', 'LOAN_RECORDING_CREATE', 'LOAN_RECORDING_DISBURSE', 'ACCOUNTING_ACCOUNTS_CREATE', 'LOAN_ADJUSTMENTS_CREATE') or (@access.has(principal, 'PAYROLL_DEDUCTIONS_CREATE') and @access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW'))))" />
+<sec:authorize var="dashboardCanCreate" access="principal.staffSession and !@access.isPlatformIdentity(principal) and @access.hasAny(principal, 'ACCOUNTING_BUSINESS_CREATE', 'ACCOUNTING_JOURNALS_CREATE')" />
 <c:if test="${dashboardCanCreate}">
 <section class="erp-panel dashboard-auto-widget" data-dashboard-widget="create-resources" data-widget-width="4" data-widget-height="240">
-    <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.work.create" /></h2></div>
-    <div class="erp-panel-body dashboard-create-resources">
-        <sec:authorize access="@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE') and @access.has(principal, 'MEMBER_LOANS_VIEW')">
-            <a class="app-btn btn-launch" href="<c:url value='/app/loan-products' />"><spring:message code="dashboard.work.applyLoan" /></a>
-        </sec:authorize>
-        <sec:authorize access="principal.staffSession and !@access.isPlatformIdentity(principal)">
+    <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="voucher.createHub" /></h2></div>
+    <div class="erp-panel-body dashboard-create-vouchers">
+        <details class="dashboard-voucher-shortcut" data-dashboard-voucher-menu>
+            <summary class="app-btn btn-launch"><spring:message code="voucher.createHub" /><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="m4 6 4 5 4-5H4Z" /></svg></summary>
+            <div class="dashboard-voucher-choices">
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE')">
-                <a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/receipts/new' />"><spring:message code="voucher.create.RECEIPT" /></a>
-                <a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/payments/new' />"><spring:message code="voucher.create.PAYMENT" /></a>
+                <a href="<c:url value='/finance/vouchers/receipts/new' />"><spring:message code="voucher.create.RECEIPT" /></a>
+                <a href="<c:url value='/finance/vouchers/payments/new' />"><spring:message code="voucher.create.PAYMENT" /></a>
             </sec:authorize>
-            <sec:authorize access="@access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/vouchers/journals/new' />"><spring:message code="voucher.create.JOURNAL" /></a></sec:authorize>
-            <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-records/new' />"><spring:message code="dashboard.work.recordLoan" /></a></sec:authorize>
-            <sec:authorize access="@access.has(principal, 'LOAN_RECORDING_DISBURSE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-disbursements/new' />"><spring:message code="dashboard.work.recordDisbursement" /></a></sec:authorize>
-            <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal, 'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal, 'LOAN_RECORDING_VIEW') and @access.has(principal, 'LOAN_RECORDING_POST')"><a class="app-btn btn-launch" href="<c:url value='/finance/batches/receipts/new' />"><spring:message code="dashboard.work.createReceiptBatch" /></a></sec:authorize>
-            <sec:authorize access="@access.has(principal, 'LOAN_ADJUSTMENTS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-adjustments/new' />"><spring:message code="dashboard.work.requestAdjustment" /></a></sec:authorize>
-            <sec:authorize access="@access.has(principal, 'PAYROLL_DEDUCTIONS_CREATE') and @access.has(principal, 'PAYROLL_DEDUCTIONS_VIEW')">
-                <a class="app-btn btn-launch" href="<c:url value='/finance/payroll/new' />"><spring:message code="dashboard.work.createSchedule" /></a>
-                <a class="app-btn btn-launch" href="<c:url value='/finance/payroll/employers/new' />"><spring:message code="dashboard.work.addEmployer" /></a>
-                <a class="app-btn btn-launch" href="<c:url value='/finance/payroll/instructions/new' />"><spring:message code="dashboard.work.addInstruction" /></a>
-            </sec:authorize>
-            <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')">
-                <a class="app-btn btn-launch" href="<c:url value='/finance/accounts/groups/new' />"><spring:message code="dashboard.work.createAccount" /></a>
-                <a class="app-btn btn-launch" href="<c:url value='/finance/library/activities/new' />"><spring:message code="dashboard.work.createActivity" /></a>
-                <a class="app-btn btn-launch" href="<c:url value='/finance/budgets/new' />"><spring:message code="management.budget.create" /></a>
-            </sec:authorize>
-        </sec:authorize>
+            <sec:authorize access="@access.has(principal, 'ACCOUNTING_JOURNALS_CREATE')"><a href="<c:url value='/finance/vouchers/journals/new' />"><spring:message code="voucher.create.JOURNAL" /></a></sec:authorize>
+            </div>
+        </details>
     </div>
 </section>
 </c:if>
