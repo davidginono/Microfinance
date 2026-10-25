@@ -15,10 +15,10 @@ import java.util.*;
 public class LoanRecordingRepository {
     private final JdbcTemplate jdbc;
     private static final String LOANS="""
-        select coalesce(c.outstanding,0) charges,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
+        select coalesce(c.outstanding,0) charges,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
         a.amount,a.status,(a.top_up_source_loan_id is null and a.status='DISBURSED' and coalesce(l.principal-l.principal_paid,0)>0 and coalesce((select loan_top_up_enabled from sacco_settings where sacco_id=a.sacco_id),true) and not exists(select 1 from loan_applications child where child.top_up_source_loan_id=a.id and child.status not in ('WITHDRAWN','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED','DISBURSEMENT_REVERSED','PAID'))) topup_eligible,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,
         coalesce(l.interest_paid,0) interest_paid,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.interest,0) end due_interest,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.arrears,0) end arrears,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.future,0) end future_interest
-        from accountant_loan_record r join loan_applications a on a.id=r.loan_id join members m on m.id=a.applicant_member_id
+        from accountant_loan_record r join loan_applications a on a.id=r.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id
         left join loan_charge_balance c on c.loan_id=a.id and c.sacco_id=r.sacco_id and c.station_id=r.station_id
         left join loan_ledgers l on l.loan_application_id=a.id
         left join lateral (select sum(loan_interest_due(id,?)) interest,
@@ -29,7 +29,7 @@ public class LoanRecordingRepository {
     private static final String POST_FROM="""
         from accountant_loan_movement p join loan_applications a on a.id=p.loan_id
         join accountant_loan_record r on r.loan_id=p.loan_id and r.sacco_id=p.sacco_id and r.station_id=p.station_id
-        join members m on m.id=a.applicant_member_id join members u on u.id=p.actor_id
+        join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id join members u on u.id=p.actor_id
         """;
     private static final String POSTS="""
         select p.*,coalesce((select cash from accountant_loan_topup where id=p.id),p.amount-case when p.kind in ('DISBURSEMENT','FUNDING_UNDO') then coalesce((select sum(amount) from loan_charge_event where journal_id=p.journal_id and kind in ('DEDUCT','DEDUCT_UNDO')),0) else 0 end) cash_amount,a.loan_id loan_number,m.full_name,m.member_no,u.full_name actor_name,r.product_name,
@@ -39,7 +39,7 @@ public class LoanRecordingRepository {
     public UUID disbursementCorrection(AppUserPrincipal a,UUID posting){return jdbc.query("select q.id from loan_adjustment_request q join loan_adjustment_decision d on d.request_id=q.id join gl_journal j on j.id=d.journal_id and j.state='POSTED' join accountant_loan_post p on p.journal_id=q.reverses_journal_id where p.id=? and q.sacco_id=? and q.station_id=? and q.kind='DISBURSEMENT_REVERSAL'",(r,n)->r.getObject(1,UUID.class),posting,a.getSaccoId(),a.getStationId()).stream().findFirst().orElse(null);}
     public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){return jdbc.query("select receipt_id from accountant_loan_receipt_row where posting_id=? and sacco_id=? and station_id=? union all select receipt_id from lending_group_receipt_loan where posting_id=? and sacco_id=? and station_id=?",(r,n)->r.getObject(1,UUID.class),id,a.getSaccoId(),a.getStationId(),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<LoanRow> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page,LocalDate today){
-        return jdbc.query(LOANS+" where r.sacco_id=? and r.station_id=? and m.id=? and a.status in ('DISBURSED','PAR','DEFAULTED') and l.loan_application_id is not null and strpos(lower(a.loan_id),?)>0 order by a.loan_id,a.id limit 26 offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>)this::loan,today,today,today,a.getSaccoId(),a.getStationId(),client,search.toLowerCase(Locale.ROOT),page*25);
+        return jdbc.query(LOANS+" where r.sacco_id=? and r.station_id=? and m.client_id=? and a.status in ('DISBURSED','PAR','DEFAULTED') and l.loan_application_id is not null and strpos(lower(a.loan_id),?)>0 order by a.loan_id,a.id limit 26 offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>)this::loan,today,today,today,a.getSaccoId(),a.getStationId(),client,search.toLowerCase(Locale.ROOT),page*25);
     }
     public List<UUID> lockReceiptLoans(AppUserPrincipal a,List<UUID> ids,UUID client){
         var args=new ArrayList<Object>();args.add(a.getSaccoId());args.add(a.getStationId());args.add(client);args.add(client);args.addAll(ids);
@@ -51,7 +51,7 @@ public class LoanRecordingRepository {
             select l.id,l.applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,greatest(b.last_payment_date,c.last_date,(select max(effective_date) from loan_interest_waiver where loan_id=l.id)) last_payment_date,
             b.principal-b.principal_paid outstanding,coalesce(d.principal,0) due_principal,coalesce(d.interest,0) due_interest,coalesce(c.outstanding,0) charges,
             r.product_name,ab.principal_account_id,ab.interest_account_id,pa.code||' - '||pa.name principal_account,ia.code||' - '||ia.name interest_account
-            from accountant_loan_record r join loan_applications l on l.id=r.loan_id join members m on m.id=l.applicant_member_id
+            from accountant_loan_record r join loan_applications l on l.id=r.loan_id join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id
             left join loan_ledgers b on b.loan_application_id=l.id
             left join loan_charge_balance c on c.loan_id=l.id
             left join loan_product_account_binding ab on ab.loan_id=l.id and ab.sacco_id=r.sacco_id and ab.station_id=r.station_id
@@ -87,7 +87,7 @@ public class LoanRecordingRepository {
     private String loanWhere(){return """
         where r.sacco_id=? and r.station_id=? and (?='' or strpos(lower(coalesce(a.loan_id,a.application_number::text)||' '||m.full_name||' '||m.member_no),?)>0)
         and (?::date is null or r.application_date>=?::date) and (?::date is null or r.application_date<=?::date)
-        and (?='' or a.status=?) and (?::uuid is null or m.id=?::uuid)
+        and (?='' or a.status=?) and (?::uuid is null or m.client_id=?::uuid)
         and (?::uuid is null or a.loan_product_setting_id=?::uuid)
         """;}
     private Object[] loanArgs(AppUserPrincipal a,Filter f,LocalDate today){return new Object[]{today,today,today,a.getSaccoId(),a.getStationId(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.clientId(),f.clientId(),f.productId(),f.productId()};}

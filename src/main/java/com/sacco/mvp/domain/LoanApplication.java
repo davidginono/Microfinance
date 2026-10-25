@@ -39,6 +39,14 @@ public class LoanApplication {
     @Column(name = "applicant_member_id", nullable = false)
     private UUID applicantMemberId;
 
+    @Column(name = "borrower_party_id", nullable = false, updatable = false)
+    private UUID borrowerPartyId;
+
+    @PrePersist
+    private void initializeBorrowerIdentity() {
+        if (borrowerPartyId == null) borrowerPartyId = applicantMemberId;
+    }
+
     @Column(name = "top_up_source_loan_id")
     private UUID topUpSourceLoanId;
 
