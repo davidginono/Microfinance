@@ -150,11 +150,20 @@ public class GroupCycleRepository {
         where x.cycle_id=? and x.sacco_id=? and x.station_id=? order by
         """+ResourceTableSort.order("group-cycle-participants",Map.of("client","m.member_no","principal","x.principal","monthly","x.monthly_payment","loan","loan_number","consent","consented","status","l.status"),"x.id","m.member_no,x.id")+" limit 50",(r,n)->new Participant(r.getObject("id",UUID.class),r.getObject("client_id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getBigDecimal("principal"),r.getBigDecimal("monthly_payment"),r.getBigDecimal("guarantee_capacity"),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("loan_status"),r.getBoolean("consented")),cycle,a.getSaccoId(),a.getStationId());}
     public List<ClientCycle> clientCycles(AppUserPrincipal a,int page){return jdbc.query("""
-        select c.id,g.name,c.submitted_at,c.state,exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
-        from lending_group_participant x join lending_group_cycle c on c.id=x.cycle_id join lending_group g on g.id=c.group_id
-        where x.sacco_id=? and x.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED') order by
-        """+ResourceTableSort.order("client-group-loans",Map.of("group","g.name","date","c.submitted_at","accepted","accepted","state","c.state"),"c.id","c.submitted_at desc,c.id desc")+" limit 26 offset ?",
-        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted"),r.getString("state")),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
+        select * from (
+         select c.id,g.name,c.submitted_at,c.state,c.model,
+          exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
+         from lending_group_participant x join lending_group_cycle c on c.id=x.cycle_id join lending_group g on g.id=c.group_id
+         where x.sacco_id=? and x.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED')
+         union all
+         select c.id,g.name,c.submitted_at,c.state,c.model,
+          exists(select 1 from lending_group_org_signature s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
+         from lending_group_org_agreement p join lending_group_authority_signer x on x.authority_id=p.authority_id and x.may_sign
+         join lending_group_cycle c on c.id=p.cycle_id join lending_group g on g.id=c.group_id
+         where p.sacco_id=? and p.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED')
+        ) requests order by
+        """+ResourceTableSort.order("client-group-loans",Map.of("group","name","date","submitted_at","accepted","accepted","state","state"),"id","submitted_at desc,id desc")+" limit 26 offset ?",
+        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted"),r.getString("state"),Model.valueOf(r.getString("model"))),a.getSaccoId(),a.getStationId(),a.getMemberId(),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
     public boolean participant(AppUserPrincipal a,UUID cycle){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_participant where cycle_id=? and sacco_id=? and station_id=? and client_id=?)",Boolean.class,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
     public List<Guarantee> guarantees(AppUserPrincipal a,UUID cycle){return jdbc.query("""
         select g.*,m.full_name guarantor,b.full_name borrower,coalesce(l.loan_id,l.application_number::text) loan_number
