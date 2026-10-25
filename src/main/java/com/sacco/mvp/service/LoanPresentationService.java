@@ -355,7 +355,7 @@ public class LoanPresentationService {
             return List.of(progressItem("Draft", true, true, "current"));
         }
 
-        if (isAccountantRecorded(app)) {
+        if (app.getStatus()==LoanStatus.WITHDRAWN || isAccountantRecorded(app)) {
             String label = statusLabel(app.getStatus());
             return List.of(progressItem(label, true, true, "current"));
         }
@@ -423,7 +423,7 @@ public class LoanPresentationService {
                 labels.add("Defaulted");
                 currentIndex = labels.size() - 1;
             }
-            case WRITTEN_OFF, DISBURSEMENT_REVERSED -> {
+            case WITHDRAWN, WRITTEN_OFF, DISBURSEMENT_REVERSED -> {
                 labels.add(message("loan.status."+app.getStatus().name()));
                 currentIndex = labels.size() - 1;
             }

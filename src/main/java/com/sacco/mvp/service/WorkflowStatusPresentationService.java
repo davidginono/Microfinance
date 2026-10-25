@@ -90,7 +90,7 @@ public class WorkflowStatusPresentationService {
 
     public String dashboardStatusLabel(LoanStatus status) {
         return switch (status) {
-            case WRITTEN_OFF, DISBURSEMENT_REVERSED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("loan.status."+status.name());
+            case WITHDRAWN, WRITTEN_OFF, DISBURSEMENT_REVERSED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("loan.status."+status.name());
             case RECORDED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("recording.status.RECORDED");
             case SUBMITTED -> "Submitted";
             case READY_FOR_MANAGER -> "On Review By Manager";
@@ -125,7 +125,7 @@ public class WorkflowStatusPresentationService {
     public String dashboardStatusColor(LoanStatus status) {
         return switch (status) {
             case WRITTEN_OFF -> "#DC2626";
-            case DISBURSEMENT_REVERSED -> "#64748B";
+            case WITHDRAWN, DISBURSEMENT_REVERSED -> "#64748B";
             case RECORDED -> "#64748B";
             case DRAFT -> "#60A5FA";
             case SUBMITTED -> "#94A3B8";

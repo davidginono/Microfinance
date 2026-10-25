@@ -53,8 +53,14 @@ public final class GroupCycleDtos {
     }
     public record Cycle(UUID id,UUID groupId,String groupName,UUID policyId,UUID productId,Model model,
         String state,int version,CycleForm form,OffsetDateTime submittedAt) {}
+    public record TerminationNotice(String kind,OffsetDateTime recordedAt) {}
+    public record Termination(String kind,UUID actorId,String actor,String reason,OffsetDateTime recordedAt) {}
+    @Data public static class TerminationForm {
+        private int expectedVersion;
+        private String reason="";
+    }
     public record CycleSummary(UUID id,LocalDate date,String purpose,Model model,String state,OffsetDateTime submittedAt) {}
-    public record ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted) {}
+    public record ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted,String state) {}
     public record Participant(UUID id,UUID clientId,String clientNumber,String name,BigDecimal principal,
         BigDecimal monthlyPayment,BigDecimal guaranteeCapacity,UUID loanId,String loanNumber,String loanStatus,boolean consented) {}
     public record Guarantee(UUID id,UUID guarantorId,String guarantor,UUID borrowerId,String borrower,String loanNumber,

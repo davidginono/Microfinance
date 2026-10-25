@@ -107,6 +107,12 @@ public class GroupCycleService {
         for(UUID borrower:ids)for(UUID guarantor:ids)if(!borrower.equals(guarantor))cycles.guarantee(a,c,guarantor,borrower,loanIds.get(borrower),caps.get(borrower),p.agreementReference(),clock.now());
         cycles.save(c,f,true,clock.now());event(a,id,"GROUP_CYCLE_SUBMITTED",Map.of("participants",ids.size(),"principal",total,"policy",p.id()));
     }
+    @Transactional(readOnly=true) public Optional<Termination> termination(AppUserPrincipal a,UUID id){authorize(a,"VIEW");cycles.cycle(a,id,false);return cycles.termination(a,id);}
+    @Transactional public void withdraw(AppUserPrincipal a,UUID id,TerminationForm form){
+        authorize(a,"SUBMIT");check(form!=null && form.getExpectedVersion()>=0,"request");text(form.getReason(),500);var c=cycles.cycle(a,id,true);
+        if("CANCELLED".equals(c.state())){var t=cycles.termination(a,id).orElseThrow();check(t.kind().equals("WITHDRAWN") && t.actorId().equals(a.getMemberId()) && t.reason().equals(form.getReason().strip()) && c.version()==form.getExpectedVersion()+1,"changed");return;}
+        check(c.version()==form.getExpectedVersion(),"changed");check(cycles.lockUnfundedLoans(a,id),"fundedCycle");cycles.terminate(a,c,"WITHDRAWN",form.getReason().strip(),clock.now());event(a,id,"GROUP_CYCLE_WITHDRAWN",Map.of("reason",form.getReason().strip()));
+    }
     private static void draft(CycleForm f){check(f!=null && f.getRequestKey()!=null && f.getPolicyId()!=null && f.getExpectedVersion()>=0 && f.getParticipants()!=null && f.getParticipants().size()<=50 && f.getParticipants().stream().allMatch(Objects::nonNull),"request");}
     private void prepare(AppUserPrincipal a){if(a!=null && a.getClaims().contains(UserClaim.GROUP_LENDING_CREATE.name()))authorize(a,"CREATE");else authorize(a,"UPDATE");}
     private static UUID key(UUID cycle,UUID client){return UUID.nameUUIDFromBytes(("GROUP_ORIGINATION/"+cycle+"/"+client).getBytes(StandardCharsets.UTF_8));}

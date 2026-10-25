@@ -762,7 +762,7 @@ public class AppController {
             return dashboardStepAfterReviewStage(approvedReviewStage, reviewStages);
         }
         return switch (status) {
-            case DRAFT, RECORDED -> 0;
+            case DRAFT, RECORDED, WITHDRAWN -> 0;
             case SUBMITTED, AWAITING_GUARANTORS -> 1;
             case ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED,
@@ -1453,7 +1453,7 @@ public class AppController {
             return "bg-slate-100 text-slate-700";
         }
         return switch (status) {
-            case DRAFT, RECORDED, DISBURSEMENT_REVERSED -> "bg-slate-100 text-slate-700";
+            case DRAFT, RECORDED, WITHDRAWN, DISBURSEMENT_REVERSED -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED, WRITTEN_OFF -> "bg-rose-50 text-rose-700";

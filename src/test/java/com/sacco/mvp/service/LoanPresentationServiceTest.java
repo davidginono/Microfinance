@@ -88,6 +88,16 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void withdrawnProgressDoesNotManufactureCompletedApprovals() {
+        messageSource.addMessage("recording.status.WITHDRAWN",Locale.ENGLISH,"Withdrawn");
+        var application=LoanApplication.builder().id(UUID.randomUUID()).status(LoanStatus.WITHDRAWN).build();
+        assertThat(loanPresentationService.buildProgressItems(application)).singleElement().satisfies(item->{
+            assertThat(item).containsEntry("label","Withdrawn").containsEntry("state","current");
+        });
+        org.mockito.Mockito.verifyNoInteractions(loanProductWorkflowService);
+    }
+
+    @Test
     void weeklyQuoteDisplaysActualCountAndLocalizedPaymentBasis() {
         var sw = Locale.forLanguageTag("sw");
         messageSource.addMessage("newloan.calculation.frequency", sw, "Muda Kati ya Marejesho");

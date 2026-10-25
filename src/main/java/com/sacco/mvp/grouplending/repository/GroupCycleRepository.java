@@ -80,6 +80,23 @@ public class GroupCycleRepository {
         (r,n)->new CycleSummary(r.getObject("id",UUID.class),r.getObject("application_date",LocalDate.class),r.getString("purpose"),Model.valueOf(r.getString("model")),r.getString("state"),r.getObject("submitted_at",OffsetDateTime.class)),a.getSaccoId(),a.getStationId(),group,page*25);}
     public void save(Cycle c,CycleForm form,boolean submit,OffsetDateTime now){if(jdbc.update("update lending_group_cycle set form_data=?::jsonb,version=version+1,state=?,submitted_at=? where id=? and version=? and state='DRAFT'",
         json.writeValueAsString(form),submit?"SUBMITTED":"DRAFT",submit?now:null,c.id(),form.getExpectedVersion())!=1)throw new IllegalArgumentException("group.error.changed");}
+    public Optional<Termination> termination(AppUserPrincipal a,UUID id){return jdbc.query("select t.*,m.full_name actor from lending_group_termination t join members m on m.id=t.actor_id where t.cycle_id=? and t.sacco_id=? and t.station_id=?",(r,n)->new Termination(r.getString("kind"),r.getObject("actor_id",UUID.class),r.getString("actor"),r.getString("reason"),r.getObject("recorded_at",OffsetDateTime.class)),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
+    public boolean lockUnfundedLoans(AppUserPrincipal a,UUID cycle){var eligible=jdbc.query("""
+        select l.status not in ('DISBURSED','PAR','DEFAULTED','WRITTEN_OFF','PAID','DISBURSEMENT_REVERSED')
+          and not exists(select 1 from loan_ledgers b where b.loan_application_id=l.id)
+          and not exists(select 1 from accountant_loan_post b where b.loan_id=l.id) eligible
+        from lending_group_participant p join loan_applications l on l.id=p.loan_id
+        where p.cycle_id=? and p.sacco_id=? and p.station_id=? order by l.id limit 51 for update of l
+        """,(r,n)->r.getBoolean("eligible"),cycle,a.getSaccoId(),a.getStationId());return eligible.size()<=50 && eligible.stream().allMatch(Boolean.TRUE::equals);}
+    public void terminate(AppUserPrincipal a,Cycle c,String kind,String reason,OffsetDateTime now){
+        jdbc.update("insert into lending_group_termination(cycle_id,sacco_id,station_id,kind,actor_id,reason,recorded_at) values(?,?,?,?,?,?,?)",c.id(),a.getSaccoId(),a.getStationId(),kind,a.getMemberId(),reason,now);
+        jdbc.update("""
+            update loan_applications l set status='WITHDRAWN',updated_at=?,version=version+1 where l.sacco_id=? and l.station_id=?
+            and exists(select 1 from lending_group_participant p where p.cycle_id=? and p.loan_id=l.id)
+            and l.status not in ('MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')
+            """,now,a.getSaccoId(),a.getStationId(),c.id());
+        if(jdbc.update("update lending_group_cycle set state='CANCELLED',version=version+1 where id=? and sacco_id=? and station_id=? and version=?",c.id(),a.getSaccoId(),a.getStationId(),c.version())!=1)throw new IllegalArgumentException("group.error.changed");
+    }
     public void lockClients(AppUserPrincipal a,List<UUID> clients){
         var args=new ArrayList<Object>();args.add("GROUP_CAPACITY/"+a.getSaccoId()+"/"+a.getStationId()+"/");args.addAll(clients);
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(? || client::text,0)) from (select client from (values "+
@@ -103,7 +120,7 @@ public class GroupCycleRepository {
             risk as (select l.applicant_member_id client,count(*) risk_loans from scoped l join selected s on s.client=l.applicant_member_id
               where l.status in ('PAR','DEFAULTED','WRITTEN_OFF') group by l.applicant_member_id),
             pending as not materialized (select * from scoped where status not in
-              ('PAID','DISBURSEMENT_REVERSED','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')),
+              ('WITHDRAWN','PAID','DISBURSEMENT_REVERSED','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')),
             cycles as (select x.client_id client,count(distinct x.cycle_id) active_cycles from lending_group_participant x
               join selected s on s.client=x.client_id where exists(select 1 from lending_group_participant peer join pending p on p.id=peer.loan_id where peer.cycle_id=x.cycle_id) group by x.client_id),
             liabilities as (select g.guarantor_id client,g.amount_cap cap from lending_guarantor_commitment g where g.sacco_id=? and g.station_id=? and g.guarantor_id in (
@@ -132,11 +149,11 @@ public class GroupCycleRepository {
         where x.cycle_id=? and x.sacco_id=? and x.station_id=? order by
         """+ResourceTableSort.order("group-cycle-participants",Map.of("client","m.member_no","principal","x.principal","monthly","x.monthly_payment","loan","loan_number","consent","consented","status","l.status"),"x.id","m.member_no,x.id")+" limit 50",(r,n)->new Participant(r.getObject("id",UUID.class),r.getObject("client_id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getBigDecimal("principal"),r.getBigDecimal("monthly_payment"),r.getBigDecimal("guarantee_capacity"),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("loan_status"),r.getBoolean("consented")),cycle,a.getSaccoId(),a.getStationId());}
     public List<ClientCycle> clientCycles(AppUserPrincipal a,int page){return jdbc.query("""
-        select c.id,g.name,c.submitted_at,exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
+        select c.id,g.name,c.submitted_at,c.state,exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
         from lending_group_participant x join lending_group_cycle c on c.id=x.cycle_id join lending_group g on g.id=c.group_id
-        where x.sacco_id=? and x.station_id=? and x.client_id=? and c.state='SUBMITTED' order by
-        """+ResourceTableSort.order("client-group-loans",Map.of("group","g.name","date","c.submitted_at","accepted","accepted"),"c.id","c.submitted_at desc,c.id desc")+" limit 26 offset ?",
-        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted")),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
+        where x.sacco_id=? and x.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED') order by
+        """+ResourceTableSort.order("client-group-loans",Map.of("group","g.name","date","c.submitted_at","accepted","accepted","state","c.state"),"c.id","c.submitted_at desc,c.id desc")+" limit 26 offset ?",
+        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted"),r.getString("state")),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
     public boolean participant(AppUserPrincipal a,UUID cycle){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_participant where cycle_id=? and sacco_id=? and station_id=? and client_id=?)",Boolean.class,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
     public List<Guarantee> guarantees(AppUserPrincipal a,UUID cycle){return jdbc.query("""
         select g.*,m.full_name guarantor,b.full_name borrower,coalesce(l.loan_id,l.application_number::text) loan_number

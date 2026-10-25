@@ -1284,7 +1284,7 @@ public class LoanWorkflowService {
         validateLocalGuarantor(app.getSaccoId(),app.getStationId(),app.getApplicantMemberId(),app.getAmount(),resolveWorkflowProduct(app),guarantor);
     }
     private void guardGuarantorTarget(LoanApplication app){
-        if(app.getStatus()==null || app.getStatus()==LoanStatus.DRAFT || app.getStatus()==LoanStatus.PAID || app.getStatus()==LoanStatus.DISBURSEMENT_REVERSED || REJECTED_ACKNOWLEDGEMENT_STATUSES.contains(app.getStatus()))
+        if(app.getStatus()==null || app.getStatus()==LoanStatus.WITHDRAWN || app.getStatus()==LoanStatus.DRAFT || app.getStatus()==LoanStatus.PAID || app.getStatus()==LoanStatus.DISBURSEMENT_REVERSED || REJECTED_ACKNOWLEDGEMENT_STATUSES.contains(app.getStatus()))
             throw new org.springframework.security.access.AccessDeniedException("Guarantor request unavailable");
     }
 

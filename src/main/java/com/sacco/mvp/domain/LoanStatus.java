@@ -3,6 +3,7 @@ package com.sacco.mvp.domain;
 public enum LoanStatus {
     DRAFT,
     RECORDED,
+    WITHDRAWN,
     SUBMITTED,
     AWAITING_GUARANTORS,
     ALL_GUARANTORS_APPROVED,

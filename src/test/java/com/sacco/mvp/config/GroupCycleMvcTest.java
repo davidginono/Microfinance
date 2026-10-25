@@ -73,6 +73,18 @@ class GroupCycleMvcTest {
         mvc.perform(post("/app/group-loans/"+cycle+"/accept").with(user(principal)).with(csrf()).param("accepted","true").param("otpCode","123456"))
             .andExpect(status().is3xxRedirection()).andExpect(flash().attribute("consentError","group.error.otpInvalid"));
     }
+    @Test void withdrawalNeedsCsrfAndBindsOnlyTheReasonAndVersion()throws Exception{
+        String path="/finance/groups/cycles/"+cycle+"/withdraw";mvc.perform(post(path).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(cycles);
+        mvc.perform(post(path).with(user(actor)).with(csrf()).param("reason","Unfunded request").param("expectedVersion","1").param("actorId",client.toString()).param("stationId","FOREIGN"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/groups/cycles/"+cycle));
+        verify(cycles).withdraw(eq(actor),eq(cycle),argThat(f->f.getReason().equals("Unfunded request") && f.getExpectedVersion()==1));
+    }
+    @Test void refusalUsesTheAuthenticatedParticipantAndExplicitConfirmation()throws Exception{
+        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        String path="/app/group-loans/"+cycle+"/refuse";mvc.perform(post(path).with(user(principal))).andExpect(status().isForbidden());verifyNoInteractions(consents);
+        mvc.perform(post(path).with(user(principal)).with(csrf()).param("reason","Terms declined").param("confirmed","true").param("clientId",UUID.randomUUID().toString()))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/app/group-loans/"+cycle));verify(consents).refuse(principal,cycle,"Terms declined",true);
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean GroupCycleService cycles(){return mock(GroupCycleService.class);}@Bean GroupLendingService groups(){return mock(GroupLendingService.class);}@Bean GroupConsentService consents(){return mock(GroupConsentService.class);}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(LocalDate.of(2026,10,23));return c;}
