@@ -6,6 +6,9 @@ import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.UserClaim;
+import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
@@ -63,6 +66,9 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class LoanPresentationService {
 
+    private static final Set<UserClaim> BORROWER_NAME_READ_CLAIMS=Set.of(UserClaim.MANAGER_QUEUE_VIEW,UserClaim.ACCOUNTANT_QUEUE_VIEW,
+        UserClaim.DISBURSEMENT_QUEUE_VIEW,UserClaim.DISBURSEMENT_QUEUE_DISBURSE,UserClaim.LOAN_OFFICER_QUEUE_VIEW,
+        UserClaim.BOARD_QUEUE_VIEW,UserClaim.CHAIRPERSON_QUEUE_VIEW,UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW);
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
     private final BoardReviewRepository boardReviewRepository;
@@ -72,6 +78,20 @@ public class LoanPresentationService {
     private final LoanAttachmentService loanAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final MessageSource messageSource;
+    private final GeneralLedgerService staffScope;
+
+    /** Minimal labels for a bounded set of already selected staff loans; no client-profile fields. */
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
+    public Map<UUID,String> borrowerNames(AppUserPrincipal actor,UserClaim permission,Collection<UUID> loanIds) {
+        if(permission==null || !BORROWER_NAME_READ_CLAIMS.contains(permission))
+            throw new org.springframework.security.access.AccessDeniedException("Loan workspace permission required");
+        staffScope.requireActor(actor,permission.name());
+        if(loanIds==null || loanIds.size()>100 || loanIds.stream().anyMatch(java.util.Objects::isNull))throw new IllegalArgumentException("Invalid loan selection");
+        if(loanIds.isEmpty())return Map.of();
+        var names=new LinkedHashMap<UUID,String>();
+        for(var row:loanApplicationRepository.findBorrowerNamesForLoans(actor.getSaccoId(),actor.getStationId(),loanIds))names.put(row.getLoanId(),row.getName());
+        return Collections.unmodifiableMap(names);
+    }
 
     public java.util.Optional<LoanApplication> findLoan(UUID loanId) {
         return loanId == null ? java.util.Optional.empty() : loanApplicationRepository.findById(loanId);

@@ -59,7 +59,7 @@ public class AuthzService {
             return false;
         }
         return loanApplicationRepository.findAccessRowById(loanId)
-            .map(app -> app.getApplicantMemberId().equals(principal.getMemberId()))
+            .map(app -> principal.getMemberId()!=null && principal.getMemberId().equals(app.getApplicantMemberId()))
             .orElse(false);
     }
 
@@ -105,7 +105,7 @@ public class AuthzService {
         }
         return loanApplicationRepository.findAccessRowById(loanId)
             .map(app -> {
-                if (app.getApplicantMemberId().equals(principal.getMemberId())
+                if (principal.getMemberId()!=null && principal.getMemberId().equals(app.getApplicantMemberId())
                     && access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)) {
                     return true;
                 }

@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
@@ -75,9 +76,9 @@ public class ManagerController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.MANAGER_QUEUE_VIEW,
             dashboard.recentDisbursements().stream()
-                .map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId)
+                .map(com.sacco.mvp.domain.LoanApplication::getId)
                 .collect(Collectors.toSet()));
 
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
@@ -94,7 +95,7 @@ public class ManagerController {
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
-                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
+                row.put("applicantName", borrowerNames.getOrDefault(loan.getId(), "-"));
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", switch (loan.getStatus()) {
                     case PAID -> message("loan.status.PAID");
@@ -133,11 +134,11 @@ public class ManagerController {
             loanIdSearch,
             principal.getStationId()
         );
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
-            apps.stream().map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.MANAGER_QUEUE_VIEW,
+            apps.stream().map(com.sacco.mvp.domain.LoanApplication::getId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
-        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("applicantNames", borrowerNames);
         model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
@@ -187,8 +188,8 @@ public class ManagerController {
             })
             .filter(Objects::nonNull)
             .toList();
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
-            archiveEntries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()));
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.MANAGER_QUEUE_VIEW,
+            archiveEntries.stream().map(entry -> entry.loan().getId()).collect(Collectors.toSet()));
         Map<com.sacco.mvp.domain.LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
 
         model.addAttribute("archiveRows", archiveEntries.stream()
@@ -198,7 +199,7 @@ public class ManagerController {
                 row.put("applicationNumber", entry.loan().getApplicationNumber() == null ? "-" : entry.loan().getApplicationNumber().toString());
                 row.put("loanId", entry.loan().getLoanId() == null || entry.loan().getLoanId().isBlank() ? "-" : entry.loan().getLoanId());
                 row.put("loanProductName", loanProductDisplayService.displayName(entry.loan(), loanProductNames));
-                row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), shortLoanId(entry.loan().getApplicantMemberId())));
+                row.put("applicantName", borrowerNames.getOrDefault(entry.loan().getId(), "-"));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? message("review.approved") : message("review.rejected"));
                 row.put("reason", entry.review().getDecision() == ManagerDecision.REJECT

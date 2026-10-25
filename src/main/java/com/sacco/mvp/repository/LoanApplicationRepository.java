@@ -28,6 +28,16 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     @Query("select l from LoanApplication l where l.id=:id")
     Optional<LoanApplication> findForDisbursement(@Param("id") UUID id);
 
+    interface BorrowerNameRow { UUID getLoanId(); String getName(); }
+
+    @Query(value="""
+        select l.id as "loanId",b.full_name as "name" from loan_applications l
+        join loan_borrower_directory b on b.party_id=l.borrower_party_id and b.sacco_id=l.sacco_id
+        where l.sacco_id=:institution and l.station_id=:branch and l.id in :ids
+        order by l.id
+        """,nativeQuery=true)
+    List<BorrowerNameRow> findBorrowerNamesForLoans(@Param("institution") String institution,@Param("branch") String branch,@Param("ids") Collection<UUID> ids);
+
     interface StatusCountProjection {
         LoanStatus getStatus();
         long getTotal();

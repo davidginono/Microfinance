@@ -41,6 +41,15 @@ class AuthzServiceTest {
     }
 
     @Test
+    void aGroupBorrowerIsNeverMistakenForThePersonalLoanOwner() {
+        var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build();
+        var principal=new AppUserPrincipal(member,java.util.Set.of(UserClaim.MEMBER_LOANS_VIEW,UserClaim.LOAN_DOCUMENTS_VIEW),false);
+        var loan=LoanApplication.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").borrowerPartyId(UUID.randomUUID()).status(LoanStatus.DRAFT).build();
+        when(loanApplicationRepository.findAccessRowById(loan.getId())).thenReturn(Optional.of(accessRow(loan)));
+        assertThat(authzService.isLoanOwner(loan.getId(),principal)).isFalse();assertThat(authzService.canViewLoan(loan.getId(),principal)).isFalse();
+    }
+
+    @Test
     void ownershipAndAssignmentsAreEnforced() {
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";

@@ -9,6 +9,7 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
@@ -88,9 +89,9 @@ public class LoanOfficerController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.LOAN_OFFICER_QUEUE_VIEW,
             dashboard.recentDisbursements().stream()
-                .map(LoanApplication::getApplicantMemberId)
+                .map(LoanApplication::getId)
                 .collect(Collectors.toSet()));
 
         model.addAttribute("dashboardBreadcrumb", "Loan Officer Panel / Dashboard");
@@ -115,7 +116,7 @@ public class LoanOfficerController {
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
-                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
+                row.put("applicantName", borrowerNames.getOrDefault(loan.getId(), "-"));
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", workflowStatusPresentationService.dashboardStatusLabel(loan.getStatus()));
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
@@ -642,11 +643,11 @@ public class LoanOfficerController {
                         : "-");
                 });
         }
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
-            apps.stream().map(LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.LOAN_OFFICER_QUEUE_VIEW,
+            apps.stream().map(LoanApplication::getId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
-        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("applicantNames", borrowerNames);
         model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("myDecisions", myDecisions);
         model.addAttribute("myDecisionDates", myDecisionDates);

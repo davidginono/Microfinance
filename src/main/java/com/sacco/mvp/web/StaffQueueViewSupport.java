@@ -2,7 +2,6 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.service.LoanPresentationService;
-import com.sacco.mvp.service.MemberDirectoryService;
 
 import java.util.List;
 import java.util.Map;
@@ -21,7 +20,4 @@ final class StaffQueueViewSupport {
         return loanPresentationService.loansById(loanIds);
     }
 
-    static Map<UUID, String> loadApplicantNames(MemberDirectoryService memberDirectoryService, List<UUID> applicantIds) {
-        return memberDirectoryService.fullNames(applicantIds);
-    }
 }

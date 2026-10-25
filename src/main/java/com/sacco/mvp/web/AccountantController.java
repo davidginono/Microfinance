@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
@@ -85,9 +86,9 @@ public class AccountantController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.ACCOUNTANT_QUEUE_VIEW,
             dashboard.recentDisbursements().stream()
-                .map(LoanApplication::getApplicantMemberId)
+                .map(LoanApplication::getId)
                 .collect(Collectors.toSet()));
 
         model.addAttribute("dashboardBreadcrumb", "Accountant Panel / Dashboard");
@@ -112,7 +113,7 @@ public class AccountantController {
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
-                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
+                row.put("applicantName", borrowerNames.getOrDefault(loan.getId(), "-"));
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", workflowStatusPresentationService.dashboardStatusLabel(loan.getStatus()));
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
@@ -140,11 +141,11 @@ public class AccountantController {
             false,
             principal.getStationId()
         );
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
-            apps.stream().map(LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.ACCOUNTANT_QUEUE_VIEW,
+            apps.stream().map(LoanApplication::getId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
-        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("applicantNames", borrowerNames);
         model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
@@ -190,12 +191,12 @@ public class AccountantController {
             })
             .filter(Objects::nonNull)
             .toList();
-        Map<UUID, String> applicantNames = StaffQueueViewSupport.loadApplicantNames(memberDirectoryService, entries.stream()
-            .map(entry -> entry.loan().getApplicantMemberId())
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,UserClaim.ACCOUNTANT_QUEUE_VIEW, entries.stream()
+            .map(entry -> entry.loan().getId())
             .toList());
 
         model.addAttribute("archiveEntries", entries);
-        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("applicantNames", borrowerNames);
         model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), entries.stream().map(ArchiveEntry::loan).toList()));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());

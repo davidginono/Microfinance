@@ -74,8 +74,8 @@
                 </td>
                 <td>
                     <c:choose>
-                        <c:when test="${not empty applicantNames[entry.loan.applicantMemberId]}">${applicantNames[entry.loan.applicantMemberId]}</c:when>
-                        <c:otherwise>#${fn:substring(entry.loan.applicantMemberId, 0, 8)}</c:otherwise>
+                        <c:when test="${not empty applicantNames[entry.loan.id]}"><c:out value="${applicantNames[entry.loan.id]}" /></c:when>
+                        <c:otherwise><spring:message code="common.notAvailable" /></c:otherwise>
                     </c:choose>
                 </td>
                 <td><fmt:formatNumber value="${entry.loan.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>

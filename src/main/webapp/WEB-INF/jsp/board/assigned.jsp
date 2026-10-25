@@ -85,8 +85,8 @@
                     </td>
                     <td class="px-3 py-2">
                         <c:choose>
-                            <c:when test="${not empty applicantNames[app.applicantMemberId]}">${applicantNames[app.applicantMemberId]}</c:when>
-                            <c:otherwise>#${fn:substring(app.applicantMemberId, 0, 8)}</c:otherwise>
+                            <c:when test="${not empty applicantNames[app.id]}"><c:out value="${applicantNames[app.id]}" /></c:when>
+                            <c:otherwise><spring:message code="common.notAvailable" /></c:otherwise>
                         </c:choose>
                     </td>
                     <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>

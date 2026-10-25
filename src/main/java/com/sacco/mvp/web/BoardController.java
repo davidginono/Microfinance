@@ -9,6 +9,7 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
@@ -83,9 +84,9 @@ public class BoardController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,reviewReadClaim(principal),
             dashboard.recentDisbursements().stream()
-                .map(LoanApplication::getApplicantMemberId)
+                .map(LoanApplication::getId)
                 .collect(Collectors.toSet()));
 
         String workspaceLabel = reviewWorkspaceLabel(principal);
@@ -111,7 +112,7 @@ public class BoardController {
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
-                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
+                row.put("applicantName", borrowerNames.getOrDefault(loan.getId(), "-"));
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", workflowStatusPresentationService.dashboardStatusLabel(loan.getStatus()));
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
@@ -749,11 +750,11 @@ public class BoardController {
                         : "-");
                 });
         }
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
-            apps.stream().map(LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,reviewReadClaim(principal),
+            apps.stream().map(LoanApplication::getId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
-        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("applicantNames", borrowerNames);
         model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("myDecisions", myDecisions);
         model.addAttribute("myDecisionDates", myDecisionDates);
@@ -842,6 +843,10 @@ public class BoardController {
 
     private String humanizeEnum(String value) {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private UserClaim reviewReadClaim(AppUserPrincipal principal) {
+        return UserClaim.valueOf(primaryReviewStage(principal).name()+"_QUEUE_VIEW");
     }
 
     private Member requireMemberWithEmail(UUID memberId, ApprovalWorkflowStage reviewStage) {

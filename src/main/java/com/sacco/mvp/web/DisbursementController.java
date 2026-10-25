@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
@@ -94,9 +95,9 @@ public class DisbursementController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,disbursementReadClaim(principal),
             dashboard.recentDisbursements().stream()
-                .map(LoanApplication::getApplicantMemberId)
+                .map(LoanApplication::getId)
                 .collect(Collectors.toSet()));
 
         model.addAttribute("dashboardBreadcrumb", "Disbursement Panel / Dashboard");
@@ -118,7 +119,7 @@ public class DisbursementController {
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
-                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
+                row.put("applicantName", borrowerNames.getOrDefault(loan.getId(), "-"));
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", workflowStatusPresentationService.dashboardStatusLabel(loan.getStatus()));
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
@@ -146,11 +147,11 @@ public class DisbursementController {
             false,
             principal.getStationId()
         );
-        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
-            apps.stream().map(LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,disbursementReadClaim(principal),
+            apps.stream().map(LoanApplication::getId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
-        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("applicantNames", borrowerNames);
         model.addAttribute("applicationProductNames", loanProductDisplayService.namesForApplications(principal.getSaccoId(), apps));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
@@ -200,8 +201,8 @@ public class DisbursementController {
             })
             .filter(Objects::nonNull)
             .toList();
-        Map<UUID, String> applicantNames = StaffQueueViewSupport.loadApplicantNames(memberDirectoryService, entries.stream()
-            .map(entry -> entry.loan().getApplicantMemberId())
+        Map<UUID, String> borrowerNames = loanPresentationService.borrowerNames(principal,disbursementReadClaim(principal), entries.stream()
+            .map(entry -> entry.loan().getId())
             .toList());
         Map<com.sacco.mvp.domain.LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
 
@@ -213,7 +214,7 @@ public class DisbursementController {
                 row.put("loanId", entry.loan().getLoanId() == null ? "-" : entry.loan().getLoanId());
                 row.put("applicationNumber", entry.loan().getApplicationNumber() == null ? "-" : entry.loan().getApplicationNumber().toString());
                 row.put("loanProductName", loanProductDisplayService.displayName(entry.loan(), loanProductNames));
-                row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
+                row.put("applicantName", borrowerNames.getOrDefault(entry.loan().getId(), "-"));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("disbursedAt", entry.loan().getDisbursementDate() == null ? "-" : entry.loan().getDisbursementDate().toString());
                 row.put("currentStatusLabel", workflowStatusPresentationService.dashboardStatusLabel(entry.loan().getStatus()));
@@ -761,6 +762,10 @@ public class DisbursementController {
             case "DISBURSED" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", LoanStatus.DISBURSED);
             default -> new ArchiveFilter("ALL", "All Disbursed Loans", null);
         };
+    }
+
+    private UserClaim disbursementReadClaim(AppUserPrincipal principal) {
+        return access.has(principal,UserClaim.DISBURSEMENT_QUEUE_VIEW)?UserClaim.DISBURSEMENT_QUEUE_VIEW:UserClaim.DISBURSEMENT_QUEUE_DISBURSE;
     }
 
     private String message(String code) {

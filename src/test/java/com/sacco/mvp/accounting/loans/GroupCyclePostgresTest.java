@@ -29,7 +29,8 @@ import static org.mockito.Mockito.*;
 class GroupCyclePostgresTest {
     final LoanRecordingPostgresTest f=new LoanRecordingPostgresTest();
     GroupLendingService groups;GroupCycleService cycles;GroupConsentService consents;UUID group,second,policy;
-    @BeforeAll void start(){f.context=new AnnotationConfigApplicationContext(Config.class);f.jdbc=f.context.getBean(JdbcTemplate.class);f.service=f.context.getBean(LoanRecordingService.class);
+    @BeforeAll void start(){start(Config.class);}
+    void start(Class<?> configuration){f.context=new AnnotationConfigApplicationContext(configuration);f.jdbc=f.context.getBean(JdbcTemplate.class);f.service=f.context.getBean(LoanRecordingService.class);
         groups=f.context.getBean(GroupLendingService.class);cycles=f.context.getBean(GroupCycleService.class);consents=f.context.getBean(GroupConsentService.class);}
     @AfterAll void stop(){f.stop();}
     @BeforeEach void setup(){
