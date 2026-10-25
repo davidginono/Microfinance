@@ -23,7 +23,7 @@ class GroupCollectionPostgresTest {
     @BeforeAll void start(){setup.start();f=setup.f;collections=f.context.getBean(GroupCollectionService.class);}
     @AfterAll void stop(){setup.stop();}
     @BeforeEach void fixture(){setup.setup();var form=setup.form();form.setTenureValue(3);cycle=setup.cycles.create(f.actor,setup.group,form);setup.cycles.submit(f.actor,cycle,form);
-        setup.consents.accept(setup.client(f.client),cycle,true);setup.consents.accept(setup.client(setup.second),cycle,true);
+        setup.consents.accept(setup.client(f.client),cycle,true,"");setup.consents.accept(setup.client(setup.second),cycle,true,"");
         var participants=setup.cycles.participants(f.actor,cycle);first=participants.stream().filter(p->p.clientId().equals(f.client)).findFirst().orElseThrow().loanId();second=participants.stream().filter(p->p.clientId().equals(setup.second)).findFirst().orElseThrow().loanId();
         for(var loan:List.of(first,second))f.service.disburse(f.actor,f.post(loan,"1000.00","D-GROUP-"+loan));
     }

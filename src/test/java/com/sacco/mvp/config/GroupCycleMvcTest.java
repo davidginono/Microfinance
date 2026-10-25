@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class GroupCycleMvcTest {
     @Autowired WebApplicationContext context;@Autowired GroupCycleService cycles;@Autowired GroupLendingService groups;@Autowired GroupConsentService consents;
     MockMvc mvc;AppUserPrincipal actor;final UUID group=UUID.randomUUID(),cycle=UUID.randomUUID(),client=UUID.randomUUID();
-    @BeforeEach void setup(){reset(cycles,groups,consents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    @BeforeEach void setup(){reset(cycles,groups,consents,context.getBean(GroupConsentDeliveryService.class));mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
         when(groups.detail(actor,group)).thenReturn(new Group(group,"GRP-1","Synthetic group","INFORMAL","Evidence","ACTIVE",0,2));
         when(cycles.policies(actor,0)).thenReturn(new Page<>(List.of(),0,false));when(cycles.memberLabels(eq(actor),eq(group),any())).thenReturn(Map.of(client,"C31 · Synthetic participant"));}
@@ -58,14 +58,27 @@ class GroupCycleMvcTest {
     @Test void personalAcceptanceUsesAuthenticatedClientAndCsrf()throws Exception{
         var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
         String path="/app/group-loans/"+cycle+"/accept";mvc.perform(post(path).with(user(principal)).param("accepted","true")).andExpect(status().isForbidden());verifyNoInteractions(consents);
-        mvc.perform(post(path).with(user(principal)).with(csrf()).param("accepted","true").param("clientId",UUID.randomUUID().toString()))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/app/group-loans/"+cycle));verify(consents).accept(principal,cycle,true);
+        mvc.perform(post(path).with(user(principal)).with(csrf()).param("accepted","true").param("otpCode","123456").param("clientId",UUID.randomUUID().toString()))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/app/group-loans/"+cycle));verify(consents).accept(principal,cycle,true,"123456");
+    }
+    @Test void codeRequestsRequireCsrfAndUseTheAuthenticatedParticipant()throws Exception{
+        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        String path="/app/group-loans/"+cycle+"/code";mvc.perform(post(path).with(user(principal))).andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(principal)).with(csrf()).param("clientId",UUID.randomUUID().toString())).andExpect(status().is3xxRedirection()).andExpect(flash().attribute("consentCodeSent",true));
+        verify(context.getBean(GroupConsentDeliveryService.class)).send(eq(principal),eq(cycle),any());
+    }
+    @Test void wrongCodeRedirectsWithASafeErrorAndNeverEchoesIt()throws Exception{
+        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        when(consents.accept(principal,cycle,true,"123456")).thenReturn("group.error.otpInvalid");
+        mvc.perform(post("/app/group-loans/"+cycle+"/accept").with(user(principal)).with(csrf()).param("accepted","true").param("otpCode","123456"))
+            .andExpect(status().is3xxRedirection()).andExpect(flash().attribute("consentError","group.error.otpInvalid"));
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean GroupCycleService cycles(){return mock(GroupCycleService.class);}@Bean GroupLendingService groups(){return mock(GroupLendingService.class);}@Bean GroupConsentService consents(){return mock(GroupConsentService.class);}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(LocalDate.of(2026,10,23));return c;}
         @Bean ResourceBundleMessageSource messageSource(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
         @Bean GroupCycleController controller(GroupCycleService c,GroupLendingService g,ApplicationClock clock,ResourceBundleMessageSource m){return new GroupCycleController(c,g,clock,m);}
-        @Bean GroupConsentController consentController(GroupConsentService c){return new GroupConsentController(c);}
+        @Bean GroupConsentDeliveryService delivery(){return mock(GroupConsentDeliveryService.class);}
+        @Bean GroupConsentController consentController(GroupConsentService c,GroupConsentDeliveryService d){return new GroupConsentController(c,d);}
     }
 }
