@@ -40,7 +40,7 @@ public class GroupCycleService {
     @Transactional public UUID configure(AppUserPrincipal a,PolicyForm f){
         authorize(a,"CONFIGURE");access.requireActor(a,"LOAN_PRODUCTS_CONFIGURE");
         check(f!=null && f.getRequestKey()!=null && f.getProductId()!=null && f.getModel()!=null,"request");
-        check(f.getMinMembers()!=null && f.getMaxMembers()!=null && f.getMinMembers()>=2 && f.getMaxMembers()>=f.getMinMembers() && f.getMaxMembers()<=50,"members");
+        check(f.getMinMembers()!=null && f.getMaxMembers()!=null && f.getMinMembers()>=(f.getModel()==Model.ORGANIZATION?1:2) && f.getMaxMembers()>=f.getMinMembers() && f.getMaxMembers()<=50,"members");
         money(f.getMaxPrincipal(),true);money(f.getMaxGuarantee(),true);check(f.getMaxActiveCycles()!=null && f.getMaxActiveCycles()>=1 && f.getMaxActiveCycles()<=10,"form");
         text(f.getPolicyReference(),500);text(f.getAgreementReference(),500);
         check(f.getModel()!=Model.INDIVIDUAL || f.isOwnLoanGuarantors(),"ownLoanGuarantors");
@@ -61,6 +61,7 @@ public class GroupCycleService {
     }
     @Transactional public void save(AppUserPrincipal a,UUID id,CycleForm f){
         authorize(a,"UPDATE");draft(f);var c=cycles.cycle(a,id,true);check("DRAFT".equals(c.state()) && c.policyId().equals(f.getPolicyId()),"changed");
+        check(c.model()!=Model.ORGANIZATION,"organizationEditor");
         cycles.save(c,f,false,clock.now());event(a,id,"GROUP_CYCLE_DRAFT_SAVED",Map.of("version",f.getExpectedVersion()+1));
     }
     @Transactional public void submit(AppUserPrincipal a,UUID id,CycleForm f){

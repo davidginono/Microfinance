@@ -28,6 +28,7 @@
         <c:set var="reviewActiveExposureLabel" value="${applicantExternalAccountStatus.activeExposureLabel}" />
         <c:set var="reviewRiskHistoryLabel" value="${applicantExternalAccountStatus.riskHistoryLabel}" />
         <c:set var="reviewLiveStatusUrl" value="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status" />
+        <c:if test="${not empty borrower and not borrower.person}"><c:set var="reviewLiveStatusUrl" value="" /><c:set var="reviewActiveExposureLabel" value="${empty activeApplicantLoanTotalAmount?'-':activeApplicantLoanTotalAmount}" /><spring:message code="common.notAvailable" var="reviewRiskHistoryLabel" /></c:if>
     </c:otherwise>
 </c:choose>
 
@@ -108,7 +109,7 @@
                 <span class="loan-staff-kpi-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 0 8h-1l-1 3h-3l-1-3H9l-1 3H5l1-3H5a4 4 0 0 1 0-8h1Z"/><path d="M9 9V6a3 3 0 0 1 5.5-1.7"/><path d="M18 12h.01"/></svg>
                 </span>
-                <dt class="loan-stat-label"><spring:message code="loan.currentSavings" text="Active Loan Exposure" /></dt>
+                <dt class="loan-stat-label"><c:choose><c:when test="${not empty borrower and not borrower.person}"><spring:message code="group.localExposure" /></c:when><c:otherwise><spring:message code="loan.currentSavings" text="Active Loan Exposure" /></c:otherwise></c:choose></dt>
                 <dd class="loan-stat-value" data-live-account-status-active-exposure><c:out value="${reviewActiveExposureLabel}" /></dd>
             </div>
             <div class="loan-staff-kpi-card">
@@ -121,7 +122,7 @@
         </dl>
         <c:if test="${not processedLoanDetail}">
             <div class="loan-staff-review-live-status">
-                <%@ include file="live-account-status-message.jspf" %>
+                <c:choose><c:when test="${not empty borrower and not borrower.person}"><div class="console-message" data-message-type="info" role="status"><spring:message code="group.creditHistoryUnavailable" /></div></c:when><c:otherwise><%@ include file="live-account-status-message.jspf" %></c:otherwise></c:choose>
             </div>
         </c:if>
     </div>

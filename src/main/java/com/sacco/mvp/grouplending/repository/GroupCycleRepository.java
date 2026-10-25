@@ -40,6 +40,7 @@ public class GroupCycleRepository {
         coalesce(maximum_active_loans,1) max_active from loan_product_settings where id=? and sacco_id=? for share
         """,(r,n)->new ProductRules(r.getInt("guarantors_required"),r.getBigDecimal("ratio"),r.getBoolean("collateral"),r.getBigDecimal("coverage"),r.getBoolean("allow_active"),r.getInt("max_active")),id,a.getSaccoId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Product unavailable"));}
     public void lock(AppUserPrincipal a,String kind,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))",kind+"/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);}
+    public void lockProductPolicy(AppUserPrincipal a,UUID product){jdbc.queryForList("select pg_advisory_xact_lock_shared(hashtextextended(?,0))","GROUP_PRODUCT/"+a.getSaccoId()+"/"+a.getStationId()+"/"+product);}
     public Optional<UUID> retry(AppUserPrincipal a,UUID key,String hash,boolean cycle){
         String table=cycle?"lending_group_cycle":"lending_group_policy";var rows=jdbc.queryForList("select id,payload_hash,created_by from "+table+" where sacco_id=? and station_id=? and request_key=?",a.getSaccoId(),a.getStationId(),key);
         if(rows.isEmpty())return Optional.empty();var r=rows.getFirst();
@@ -47,10 +48,10 @@ public class GroupCycleRepository {
     }
     public UUID policy(AppUserPrincipal a,PolicyForm f,String hash,OffsetDateTime now){UUID id=UUID.randomUUID();jdbc.update("""
         insert into lending_group_policy(id,sacco_id,station_id,product_id,model,min_members,max_members,max_principal,max_guarantee,max_active_cycles,
-          own_loan_guarantors,policy_reference,agreement_reference,enabled,request_key,payload_hash,created_by,created_at)
-        values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          own_loan_guarantors,policy_reference,agreement_reference,enabled,request_key,payload_hash,created_by,created_at,capability_version)
+        values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,id,a.getSaccoId(),a.getStationId(),f.getProductId(),f.getModel().name(),f.getMinMembers(),f.getMaxMembers(),f.getMaxPrincipal(),f.getMaxGuarantee(),f.getMaxActiveCycles(),
-        f.isOwnLoanGuarantors(),f.getPolicyReference().strip(),f.getAgreementReference().strip(),f.isEnabled(),f.getRequestKey(),hash,a.getMemberId(),now);return id;}
+        f.isOwnLoanGuarantors(),f.getPolicyReference().strip(),f.getAgreementReference().strip(),f.isEnabled(),f.getRequestKey(),hash,a.getMemberId(),now,f.getModel()==Model.ORGANIZATION?1:0);return id;}
     public Policy policy(AppUserPrincipal a,UUID id){return jdbc.query(POLICIES+" and p.id=?",POLICY,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Group product unavailable"));}
     public List<Policy> policies(AppUserPrincipal a,int page){return policies(a,"",page);}
     public List<Policy> policies(AppUserPrincipal a,String search,int page){return jdbc.query(POLICIES+" and strpos(lower(coalesce(l.product_name,l.loan_type)),?)>0 and not exists(select 1 from lending_group_policy newer where newer.sacco_id=p.sacco_id and newer.station_id=p.station_id and newer.product_id=p.product_id and newer.model=p.model and newer.revision>p.revision) order by "+
@@ -85,14 +86,14 @@ public class GroupCycleRepository {
         select l.status not in ('DISBURSED','PAR','DEFAULTED','WRITTEN_OFF','PAID','DISBURSEMENT_REVERSED')
           and not exists(select 1 from loan_ledgers b where b.loan_application_id=l.id)
           and not exists(select 1 from accountant_loan_post b where b.loan_id=l.id) eligible
-        from lending_group_participant p join loan_applications l on l.id=p.loan_id
+        from (select cycle_id,loan_id,sacco_id,station_id from lending_group_participant union all select cycle_id,loan_id,sacco_id,station_id from lending_group_facility) p join loan_applications l on l.id=p.loan_id
         where p.cycle_id=? and p.sacco_id=? and p.station_id=? order by l.id limit 51 for update of l
         """,(r,n)->r.getBoolean("eligible"),cycle,a.getSaccoId(),a.getStationId());return eligible.size()<=50 && eligible.stream().allMatch(Boolean.TRUE::equals);}
     public void terminate(AppUserPrincipal a,Cycle c,String kind,String reason,OffsetDateTime now){
         jdbc.update("insert into lending_group_termination(cycle_id,sacco_id,station_id,kind,actor_id,reason,recorded_at) values(?,?,?,?,?,?,?)",c.id(),a.getSaccoId(),a.getStationId(),kind,a.getMemberId(),reason,now);
         jdbc.update("""
             update loan_applications l set status='WITHDRAWN',updated_at=?,version=version+1 where l.sacco_id=? and l.station_id=?
-            and exists(select 1 from lending_group_participant p where p.cycle_id=? and p.loan_id=l.id)
+            and exists(select 1 from (select cycle_id,loan_id from lending_group_participant union all select cycle_id,loan_id from lending_group_facility) p where p.cycle_id=? and p.loan_id=l.id)
             and l.status not in ('MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')
             """,now,a.getSaccoId(),a.getStationId(),c.id());
         if(jdbc.update("update lending_group_cycle set state='CANCELLED',version=version+1 where id=? and sacco_id=? and station_id=? and version=?",c.id(),a.getSaccoId(),a.getStationId(),c.version())!=1)throw new IllegalArgumentException("group.error.changed");

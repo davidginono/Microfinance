@@ -239,11 +239,12 @@ public class ManagerController {
         String managerReason =
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "";
         List<com.sacco.mvp.domain.LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+            app.getId(), principal.getSaccoId(), principal.getStationId());
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
         model.addAttribute("borrower", loanPresentationService.borrowerProfile(principal,UserClaim.MANAGER_QUEUE_VIEW,id));
+        model.addAttribute("borrowerAssessment", loanPresentationService.recordedBorrowerAssessment(app));
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));
@@ -316,7 +317,7 @@ public class ManagerController {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+            app.getId(), principal.getSaccoId(), principal.getStationId());
         return ResponseEntity.ok(activeLoanDisplayService.staffReviewRows(
             applicant,
             principal.getSaccoId(),

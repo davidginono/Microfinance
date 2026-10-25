@@ -4,6 +4,7 @@
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                 <c:choose>
+                    <c:when test="${not empty borrower and not borrower.person}"><spring:message code="authority.payout" /></c:when>
                     <c:when test="${reviewBasePath eq '/disbursement'}">
                         <spring:message code="applicant.paymentDetails.disbursementTitle" text="Applicant Bank/Mobile Account Details for Disbursement Deposit" />
                     </c:when>
@@ -16,7 +17,7 @@
         </div>
         <c:if test="${paymentDetails.available}">
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                <c:out value="${paymentDetails.sourceLabel}" />
+                <c:choose><c:when test="${paymentDetails.sourceLabel=='GROUP_AUTHORITY'}"><spring:message code="group.verifiedAuthority" /></c:when><c:otherwise><c:out value="${paymentDetails.sourceLabel}" /></c:otherwise></c:choose>
             </span>
         </c:if>
     </div>
@@ -25,7 +26,7 @@
             <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="applicant-info-card">
                     <div class="applicant-info-label"><spring:message code="member.settings.payment.type" text="Payment Method" /></div>
-                    <div class="applicant-info-value"><c:out value="${paymentDetails.destinationTypeLabel}" /></div>
+                    <div class="applicant-info-value"><c:choose><c:when test="${not empty paymentDetails.destinationType}"><spring:message code="paymentDestination.${paymentDetails.destinationType}" /></c:when><c:otherwise><c:out value="${paymentDetails.destinationTypeLabel}" /></c:otherwise></c:choose></div>
                 </div>
                 <div class="applicant-info-card">
                     <div class="applicant-info-label"><spring:message code="member.settings.payment.provider" text="Bank or Provider" /></div>

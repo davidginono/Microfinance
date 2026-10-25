@@ -10,6 +10,7 @@ import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.lending.dto.LoanBorrowerProfile;
+import com.sacco.mvp.lending.dto.LoanBorrowerAssessment;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
@@ -112,6 +113,20 @@ public class LoanPresentationService {
         boolean person="CLIENT".equals(row.getKind());
         return new LoanBorrowerProfile(row.getPartyId(),row.getKind(),person?row.getClientId():null,person?null:row.getGroupId(),
             row.getNumber(),row.getName(),person?row.getEmail():null,person?row.getPhone():null,row.getBranch(),person?null:row.getLegalForm());
+    }
+
+    /** Pure mapping of the already scoped staff application; never a personal credit-history lookup. */
+    public LoanBorrowerAssessment recordedBorrowerAssessment(LoanApplication app) {
+        if(app==null || app.getApplicantMemberId()!=null || app.getFormData()==null || app.getFormData().isBlank()
+            || !"ACCOUNTANT_DIRECT".equals(financialSnapshot(app).get("recordingSource")))return null;
+        try {
+            var value=objectMapper.readValue(app.getFormData(),LoanBorrowerAssessment.class);
+            if(value==null)return null;
+            String source=value.informationSource();
+            if(source==null || !Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(source))
+                return new LoanBorrowerAssessment(value.business(),value.income(),value.expenses(),value.otherDebt(),"UNAVAILABLE",value.evidence());
+            return value;
+        }catch(tools.jackson.core.JacksonException e){return null;}
     }
 
     public java.util.Optional<LoanApplication> findLoan(UUID loanId) {

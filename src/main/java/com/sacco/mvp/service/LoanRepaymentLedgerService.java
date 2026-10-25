@@ -428,7 +428,7 @@ public class LoanRepaymentLedgerService {
         if (actor == null) throw new AccessDeniedException("Forbidden");
         LoanLedger l = ledgers.findById(id).orElseThrow(() -> new AccessDeniedException("Forbidden"));
         boolean owner = !actor.isStaffSession() && actor.isMemberAccess()
-            && access.has(actor, UserClaim.MEMBER_LOANS_VIEW) && l.getApplicantMemberId().equals(actor.getMemberId());
+            && access.has(actor, UserClaim.MEMBER_LOANS_VIEW) && actor.getMemberId().equals(l.getApplicantMemberId());
         boolean staff = actor.isStaffSession() && (access.has(actor, UserClaim.LOAN_REPAYMENTS_VIEW)
             || (access.has(actor, UserClaim.LOAN_RECORDING_VIEW) && accountingGuard.recordedLoan(id)))
             && l.getStationId().equals(actor.getStationId());

@@ -36,7 +36,7 @@ public class LoanApplication {
     @Column(name = "station_id")
     private String stationId;
 
-    @Column(name = "applicant_member_id", nullable = false)
+    @Column(name = "applicant_member_id")
     private UUID applicantMemberId;
 
     @Column(name = "borrower_party_id", nullable = false, updatable = false)

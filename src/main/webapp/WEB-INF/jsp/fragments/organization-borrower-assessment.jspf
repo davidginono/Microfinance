@@ -1,0 +1,9 @@
+<c:if test="${borrower.kind=='ORGANIZATION'}">
+<section class="erp-resource-section"><h2><spring:message code="group.organizationAssessment" /></h2>
+<c:choose><c:when test="${not empty borrowerAssessment}"><dl class="erp-detail-facts">
+<div><dt><spring:message code="recording.information" /></dt><dd><spring:message code="recording.source.${borrowerAssessment.informationSource}" /></dd></div>
+<div><dt><spring:message code="group.business" /></dt><dd><c:choose><c:when test="${not empty borrowerAssessment.business}"><c:out value="${borrowerAssessment.business}" /></c:when><c:otherwise><spring:message code="common.notProvided" /></c:otherwise></c:choose></dd></div>
+<c:forEach items="${['income','expenses','otherDebt']}" var="field"><div><dt><c:choose><c:when test="${field=='otherDebt'}"><spring:message code="group.otherDebt" /></c:when><c:otherwise><spring:message code="recording.${field}" /> (TZS)</c:otherwise></c:choose></dt><dd><c:choose><c:when test="${borrowerAssessment[field]!=null}"><fmt:formatNumber value="${borrowerAssessment[field]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise><spring:message code="common.notAvailable" /></c:otherwise></c:choose></dd></div></c:forEach>
+<div><dt><spring:message code="group.assessmentEvidence" /></dt><dd><c:choose><c:when test="${not empty borrowerAssessment.evidence}"><c:out value="${borrowerAssessment.evidence}" /></c:when><c:otherwise><spring:message code="common.notProvided" /></c:otherwise></c:choose></dd></div>
+</dl></c:when><c:otherwise><p><spring:message code="common.notAvailable" /></p></c:otherwise></c:choose>
+</section></c:if>

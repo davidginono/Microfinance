@@ -23,6 +23,7 @@
     </c:if>
     <%@ include file="../fragments/previous-approved-reviews.jspf" %>
     <%@ include file="../fragments/staff-borrower-profile.jspf" %>
+    <%@ include file="../fragments/organization-borrower-assessment.jspf" %>
     <div class="loan-view-summary-card px-5 py-5">
         <div>
             <h2 class="erp-resource-heading"><spring:message code="board.myReview" /></h2>

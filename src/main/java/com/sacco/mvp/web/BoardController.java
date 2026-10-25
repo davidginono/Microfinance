@@ -269,6 +269,7 @@ public class BoardController {
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
         model.addAttribute("borrower", loanPresentationService.borrowerProfile(principal,UserClaim.valueOf(myReview.getReviewStage().name()+"_QUEUE_VIEW"),id));
+        model.addAttribute("borrowerAssessment", loanPresentationService.recordedBorrowerAssessment(app));
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));
@@ -294,7 +295,7 @@ public class BoardController {
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+            app.getId(), principal.getSaccoId(), principal.getStationId());
         ActiveLoanDisplayService.ActiveLoanDisplay activeLoanDisplay =
             activeLoanDisplayService.localStaffReviewRows(principal.getSaccoId(), app, activeApplicantLoans);
         model.addAttribute("activeApplicantLoans", activeLoanDisplay.rows());
@@ -364,7 +365,7 @@ public class BoardController {
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+            app.getId(), principal.getSaccoId(), principal.getStationId());
         return ResponseEntity.ok(activeLoanDisplayService.staffReviewRows(
             applicant,
             principal.getSaccoId(),

@@ -36,7 +36,17 @@ public final class GroupCycleDtos {
         private Integer tenureValue;
         private String purpose="";
         private List<ParticipantForm> participants=new ArrayList<>();
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private OrganizationForm organization;
     }
+    @Data public static class OrganizationForm {
+        private UUID authorityId;
+        private UUID representativeId;
+        private BigDecimal principal,income,expenses,otherDebt,collateralValue,insurancePremium;
+        private String business="",assessmentEvidence="",collateral="",insuranceEvidence="";
+    }
+    public record OrganizationLoan(UUID loanId,String number,String status,UUID authorityId,UUID representativeId,
+        String representative,BigDecimal principal,BigDecimal monthlyPayment) {}
     @Data public static class ParticipantForm {
         private UUID clientId;
         private BigDecimal principal;

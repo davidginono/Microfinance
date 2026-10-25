@@ -17,6 +17,14 @@ import java.util.UUID;
 import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
+    @Query("""
+        select l from LoanApplication l where l.saccoId=:institution and l.stationId=:branch and l.id<>:reference
+          and l.status in :statuses and exists(select r.id from LoanApplication r where r.id=:reference
+            and r.saccoId=:institution and r.stationId=:branch and r.borrowerPartyId=l.borrowerPartyId)
+        order by l.disbursementDate desc nulls last,l.createdAt desc,l.id
+        """)
+    List<LoanApplication> findActiveBorrowerLoansForReference(@Param("reference") UUID reference,@Param("institution") String institution,
+        @Param("branch") String branch,@Param("statuses") Collection<LoanStatus> statuses,Pageable pageable);
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from LoanApplication l where l.id=:id and exists(select m.id from Member m where m.id=:guarantor and m.saccoId=l.saccoId and lower(m.stationId)=lower(l.stationId))")
     Optional<LoanApplication> findForGuarantorDecision(@Param("id") UUID id,@Param("guarantor") UUID guarantor);

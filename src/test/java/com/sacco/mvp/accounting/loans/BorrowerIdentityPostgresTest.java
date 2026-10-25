@@ -61,7 +61,7 @@ class BorrowerIdentityPostgresTest {
             insert into loan_applications(id,sacco_id,station_id,borrower_party_id,applicant_member_id,application_number,loan_type,status,amount,tenor_months,
             form_data,required_guarantors,policy_snapshot,version,created_at,updated_at)
             values(?,?,'B1',?,?,900001,'DEVELOPMENT_LOAN','DRAFT',1000,1,'{}',0,'{}',0,now(),now())
-            ""","Group borrower origination is not enabled",UUID.randomUUID(),f.institution,party,f.client);
+            ""","Unsupported loan borrower or origination path",UUID.randomUUID(),f.institution,party,f.client);
         assertThat(identity(source)).isEqualTo(f.client);
         assertThatThrownBy(()->f.jdbc.update("insert into loan_borrower_party(id,sacco_id,kind,group_id,group_station_id) values(?,?,'JOINT_GROUP',?,'B2')",UUID.randomUUID(),f.institution,group)).isInstanceOf(DataAccessException.class);
     }

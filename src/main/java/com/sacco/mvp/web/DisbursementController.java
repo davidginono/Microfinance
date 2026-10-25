@@ -315,7 +315,7 @@ public class DisbursementController {
         Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, member -> member));
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+            app.getId(), principal.getSaccoId(), principal.getStationId());
 
         model.addAttribute("app", app);
         var tenureData=app.getFinancialSnapshot()==null?Map.<String,Object>of():objectMapper.readValue(app.getFinancialSnapshot(),new TypeReference<Map<String,Object>>(){});
@@ -324,6 +324,7 @@ public class DisbursementController {
         model.addAttribute("firstRepaymentDateDefault",loanTenure.firstDate(applicationClock.today(),app.getRepaymentFrequency()==null?com.sacco.mvp.domain.RepaymentFrequency.MONTHLY:app.getRepaymentFrequency()));
         model.addAttribute("applicant", applicant);
         model.addAttribute("borrower", loanPresentationService.borrowerProfile(principal,disbursementReadClaim(principal),id));
+        model.addAttribute("borrowerAssessment", loanPresentationService.recordedBorrowerAssessment(app));
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));
@@ -393,7 +394,9 @@ public class DisbursementController {
         boolean recordedApplication=loanRecordingService.recordedForStaff(principal,app.getId());
         model.addAttribute("recordedLoanApplication",recordedApplication);
         if(!model.containsAttribute("disbursementRequestKey"))model.addAttribute("disbursementRequestKey",UUID.randomUUID());
-        boolean canDisburseLoan = access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE") && (!recordedApplication || loanRecordingService.allowedTeller(app,principal.getMemberId()));
+        boolean organizationFundingPending = app.getApplicantMemberId()==null;
+        model.addAttribute("organizationFundingPending",organizationFundingPending);
+        boolean canDisburseLoan = !organizationFundingPending && access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE") && (!recordedApplication || loanRecordingService.allowedTeller(app,principal.getMemberId()));
         if(recordedApplication && canDisburseLoan) {
             for(var accountType:List.of("Money","Principal","Interest")) {
                 var retained=model.getAttribute("posting"+accountType+"AccountId");
@@ -409,7 +412,7 @@ public class DisbursementController {
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("disbursementOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
-        model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan);
+        model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan && !organizationFundingPending);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", recordedApplication ? loanRecordingService.disbursementProofRequired(app) : managerService.isDisbursementProofRequired(app));

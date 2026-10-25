@@ -45,8 +45,8 @@ public class GroupCycleController {
         catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("group.error.duplicate");}editor(a,group,m);return "groups/cycle-form";
     }
     @GetMapping("/cycles/{id}") public String detail(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){
-        var c=cycles.detail(a,id);m.addAttribute("cycle",c);m.addAttribute("policy",cycles.policy(a,c.policyId()));
-        if("DRAFT".equals(c.state())){var f=c.form();f.setExpectedVersion(c.version());m.addAttribute("cycleForm",f);editor(a,c.groupId(),m);return "groups/cycle-form";}
+        var c=cycles.detail(a,id);if(c.model()==com.sacco.mvp.grouplending.dto.GroupCycleDtos.Model.ORGANIZATION)return "redirect:/finance/groups/cycles/"+id+"/organization";m.addAttribute("cycle",c);m.addAttribute("policy",cycles.policy(a,c.policyId()));
+        if("DRAFT".equals(c.state())){var f=c.form();f.setExpectedVersion(c.version());if(f.getParticipants().isEmpty()){f.getParticipants().add(new ParticipantForm());f.getParticipants().add(new ParticipantForm());}m.addAttribute("cycleForm",f);editor(a,c.groupId(),m);return "groups/cycle-form";}
         var participants=cycles.participants(a,id);m.addAttribute("participants",participants);m.addAttribute("termination",cycles.termination(a,id).orElse(null));m.addAttribute("canWithdraw","SUBMITTED".equals(c.state()) && participants.stream().noneMatch(p->Set.of("DISBURSED","PAR","DEFAULTED","WRITTEN_OFF","PAID","DISBURSEMENT_REVERSED").contains(p.loanStatus())));m.addAttribute("hasFundedLoans",participants.stream().anyMatch(p->Set.of("DISBURSED","PAR","DEFAULTED").contains(p.loanStatus())));return "groups/cycle-details";
     }
     @PostMapping("/cycles/{id}") public String save(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute CycleForm cycleForm,BindingResult errors,

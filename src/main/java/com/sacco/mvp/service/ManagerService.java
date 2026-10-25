@@ -196,16 +196,13 @@ public class ManagerService {
         return app;
     }
 
-    public List<LoanApplication> activeApplicantLoans(UUID applicantMemberId, UUID excludeLoanId, String saccoId) {
-        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
-                applicantMemberId, List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.WRITTEN_OFF)).stream()
-            .filter(loan -> loan.getSaccoId().equals(saccoId))
-            .filter(loan -> excludeLoanId == null || !loan.getId().equals(excludeLoanId))
-            .sorted(Comparator.comparing(
-                LoanApplication::getDisbursementDate,
-                Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
+    @Transactional(readOnly=true)
+    public List<LoanApplication> activeApplicantLoans(UUID referenceLoanId,String saccoId,String stationId) {
+        if(referenceLoanId==null || saccoId==null || stationId==null || stationId.isBlank())throw new org.springframework.security.access.AccessDeniedException("Loan scope unavailable");
+        var rows=loanApplicationRepository.findActiveBorrowerLoansForReference(referenceLoanId,saccoId,stationId,
+            List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF),PageRequest.of(0,101));
+        if(rows.size()>100)throw new IllegalArgumentException("Borrower loan history requires a scoped report");
+        return rows;
     }
 
     public SaccoSettings getSettings(String saccoId) {

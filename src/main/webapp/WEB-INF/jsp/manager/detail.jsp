@@ -32,6 +32,7 @@
     <c:if test="${not isDisbursementReview}">
         <%@ include file="../fragments/previous-approved-reviews.jspf" %>
         <%@ include file="../fragments/staff-borrower-profile.jspf" %>
+        <%@ include file="../fragments/organization-borrower-assessment.jspf" %>
     </c:if>
 </div>
 
@@ -413,6 +414,7 @@
         </div>
 </c:if>
 
+<c:if test="${organizationFundingPending}"><div class="console-message" data-message-type="info" role="status"><spring:message code="group.organizationFundingPending" /></div></c:if>
 <c:if test="${showDisbursementPermissionMessage}">
     <div class="erp-form-wrap mt-5">
         <div class="border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
