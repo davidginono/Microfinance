@@ -70,13 +70,21 @@ public class LoanRecordingService {
     public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){authorize(a,"VIEW");check(ids!=null && ids.size()<=50 && date!=null,"request");if(ids.isEmpty())return List.of();var found=records.receiptLoans(a,ids,date);if(found.size()!=new HashSet<>(ids).size())throw new AccessDeniedException("Loan unavailable");return found;}
     @Transactional(readOnly=true)
     public List<AllocationPreview> receiptPreview(AppUserPrincipal a,com.sacco.mvp.accounting.dto.VoucherDtos.Form f){
-        authorize(a,"POST");var contexts=receiptLoans(a,f.getRows().stream().map(r->r.getLoanId()).toList(),f.getEffectiveDate());
-        records.account(a,f.getMoneyAccountId(),"MONEY",false);var result=new ArrayList<AllocationPreview>();var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);
-        for(var row:f.getRows()){var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();
+        return previewCollections(a,f.getRows().stream().map(r->new CollectionAmount(r.getLoanId(),f.getClientId(),r.getAmount())).toList(),f.getEffectiveDate(),f.getMoneyAccountId());
+    }
+    /** Each request supplies its expected borrower; group orchestration verifies cycle ownership separately. */
+    @Transactional(readOnly=true)
+    public List<AllocationPreview> previewCollections(AppUserPrincipal a,List<CollectionAmount> amounts,LocalDate date,UUID moneyAccount){
+        authorize(a,"POST");check(amounts!=null && !amounts.isEmpty() && amounts.size()<=50 && date!=null && !date.isAfter(clock.today()),"request");
+        check(amounts.stream().allMatch(r->r!=null && r.loanId()!=null && r.clientId()!=null) && amounts.stream().map(CollectionAmount::loanId).distinct().count()==amounts.size(),"request");
+        amounts.forEach(r->money(r.amount()));
+        var contexts=receiptLoans(a,amounts.stream().map(CollectionAmount::loanId).toList(),date).stream().collect(java.util.stream.Collectors.toMap(ReceiptLoan::id,java.util.function.Function.identity()));
+        records.account(a,moneyAccount,"MONEY",false);var result=new ArrayList<AllocationPreview>();repaymentPolicies.effective(a,date,false);
+        for(var row:amounts){var loan=contexts.get(row.loanId());
             check(loan.principalAccountId()!=null && loan.interestAccountId()!=null,"loanAccountsMissing");check(loan.principalAccount()!=null && loan.interestAccount()!=null,"productAccountsInvalid");
-            check(loan.clientId().equals(f.getClientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
-            check(loan.disbursed()!=null && !f.getEffectiveDate().isBefore(loan.disbursed()) && (loan.lastPayment()==null || !f.getEffectiveDate().isBefore(loan.lastPayment())),"date");
-            result.add(chargeAllocation(row.getAmount(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
+            check(loan.clientId().equals(row.clientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
+            check(loan.disbursed()!=null && !date.isBefore(loan.disbursed()) && (loan.lastPayment()==null || !date.isBefore(loan.lastPayment())),"date");
+            result.add(chargeAllocation(row.amount(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
         }
         return result;
     }
@@ -136,9 +144,6 @@ public class LoanRecordingService {
         return records.topUpRequest(a,key,hash).orElseThrow();
     }
     public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule,String tenureUnit,int tenureValue) {}
-    public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges) {
-        public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance){this(principal,interest,balance,ZERO);}
-    }
     private AllocationPreview chargeAllocation(BigDecimal amount,BigDecimal interest,BigDecimal balance,BigDecimal fees){
         if(amount.compareTo(balance.add(interest).add(fees))>0)throw new IllegalArgumentException("repayment.error.advance");var i=amount.min(interest);var fee=amount.subtract(i).min(fees);var p=amount.subtract(i).subtract(fee);return new AllocationPreview(p,i,balance.subtract(p),fee);
     }

@@ -30,6 +30,7 @@ public class LoanReceiptService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final ObjectMapper json;
+    private final com.sacco.mvp.grouplending.service.GroupCollectionService groups;
     public boolean available(AppUserPrincipal a,String action){try{loans.authorize(a,action);return true;}catch(AccessDeniedException denied){return false;}}
     @Transactional(readOnly=true)
     public com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.Policy defaults(AppUserPrincipal a,Form f){authorize(a,"POST");return loans.receiptDefaults(a,f);}
@@ -37,11 +38,12 @@ public class LoanReceiptService {
     @Transactional(readOnly=true)
     public void prefill(AppUserPrincipal a,Form f,UUID loanId){authorize(a,"POST");var loan=loans.receiptLoan(a,loanId);f.setClientId(loan.clientId());f.getRows().getFirst().setLoanId(loanId);}
     @Transactional(readOnly=true)
-    public Page list(AppUserPrincipal a,Filter f){ordinary.authorize(a,Type.RECEIPT,"VIEW");VoucherService.validateFilter(f);var rows=receipts.list(a,f,available(a,"VIEW"));return new Page(rows.stream().limit(f.size()).toList(),f.page(),rows.size()>f.size());}
+    public Page list(AppUserPrincipal a,Filter f){ordinary.authorize(a,Type.RECEIPT,"VIEW");VoucherService.validateFilter(f);var rows=receipts.list(a,f,available(a,"VIEW"),groups.available(a,"VIEW"));return new Page(rows.stream().limit(f.size()).toList(),f.page(),rows.size()>f.size());}
     @Transactional(readOnly=true)
-    public Optional<LoanReceipt> find(AppUserPrincipal a,UUID id){ordinary.authorize(a,Type.RECEIPT,"VIEW");var source=receipts.find(a,id,false);if(source.isEmpty()){var legacy=receipts.legacy(a,id);if(legacy.isPresent())loans.authorize(a,"VIEW");return legacy;}loans.authorize(a,"VIEW");var r=source.get();return Optional.of(new LoanReceipt(r.header(),r.clientNumber(),receipts.rows(a,id)));}
+    public Optional<LoanReceipt> find(AppUserPrincipal a,UUID id){ordinary.authorize(a,Type.RECEIPT,"VIEW");var source=receipts.find(a,id,false);if(source.isEmpty()){var legacy=receipts.legacy(a,id);if(legacy.isPresent()){loans.authorize(a,"VIEW");return legacy;}return groups.find(a,id);}loans.authorize(a,"VIEW");var r=source.get();return Optional.of(new LoanReceipt(r.header(),r.clientNumber(),receipts.rows(a,id)));}
     @Transactional(readOnly=true)
-    public LoanReceipt export(AppUserPrincipal a,UUID id){ordinary.requireExport(a);loans.authorize(a,"EXPORT");return find(a,id).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));}
+    public LoanReceipt export(AppUserPrincipal a,UUID id){ordinary.requireExport(a);loans.authorize(a,"EXPORT");var receipt=find(a,id).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));if(receipt.group()!=null)groups.authorize(a,"EXPORT");return receipt;}
+    public boolean canReverse(AppUserPrincipal a,LoanReceipt receipt){return receipt.group()==null?available(a,"REVERSE"):groups.available(a,"REVERSE");}
     @Transactional(readOnly=true)
     public List<Choice> choices(AppUserPrincipal a,String category,UUID client,String search,int page){authorize(a,"POST");return category.equals("loans")?loans.repaymentLoans(a,client,search,page):loans.choices(a,switch(category){case "clients"->"ledger-clients";case "interest"->"interest";default->throw new Invalid("","filter");},search,page);}
     @Transactional(readOnly=true)
@@ -67,7 +69,7 @@ public class LoanReceiptService {
     public LoanReceipt reverse(AppUserPrincipal a,UUID id,UUID key,LocalDate date,String reason){
         authorize(a,"REVERSE");check(key!=null && date!=null && !date.isAfter(clock.today()),"","request");text(reason,500,true,"description");
         vouchers.lockRequest(a.getSaccoId(),a.getStationId(),key);var aggregate=receipts.find(a,id,true);
-        if(aggregate.isEmpty()){var legacy=receipts.legacy(a,id).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));var p=loans.reverse(a,legacy.rows().getFirst().postingId(),key,date,reason);return find(a,p.id()).orElseThrow();}
+        if(aggregate.isEmpty()){var legacy=receipts.legacy(a,id);if(legacy.isEmpty())return groups.reverse(a,id,key,date,reason);var p=loans.reverse(a,legacy.get().rows().getFirst().postingId(),key,date,reason);return find(a,p.id()).orElseThrow();}
         var source=aggregate.get();
         var original=source.header();check(!a.getMemberId().equals(original.postedBy()),"","independentCorrection");
         String hash=hash(List.of(id,key,date,reason));var prior=receipts.retry(a,key,hash);if(prior.isPresent())return find(a,prior.get()).orElseThrow();

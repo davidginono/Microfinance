@@ -51,7 +51,15 @@ public final class VoucherDtos {
     }
     public record Page(List<Voucher> rows,int page,boolean hasNext) {}
     public record Preview(List<Transaction> rows,BigDecimal total) {}
-    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows) {}
+    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group) {
+        public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows){this(header,clientNumber,rows,null);}
+    }
+    public record GroupReceipt(UUID cycleId,String code,String name,List<ReceiptContribution> contributions,String reversesNumber,String reversedByNumber) {
+        public GroupReceipt(UUID cycleId,String code,String name,List<ReceiptContribution> contributions){this(cycleId,code,name,contributions,"","");}
+    }
+    public record ReceiptContribution(UUID id,int lineNo,UUID loanId,String loanNumber,UUID payerId,String payerNumber,String payer,
+        UUID beneficiaryId,String beneficiaryNumber,String beneficiary,String description,BigDecimal amount,BigDecimal principal,
+        BigDecimal interest,BigDecimal charges,UUID reversesId) {}
     public record LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,
                                  BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,
                                  String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount) {

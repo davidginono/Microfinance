@@ -136,6 +136,12 @@ class VoucherMvcTest {
   when(receipts.export(actor,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Export revoked"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/pdf").with(user(actor))).andExpect(status().isForbidden());
  }
  @Test void printCannotBypassResourceExportAuthorization()throws Exception {when(service.export(actor,Type.RECEIPT,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Outside branch"));mvc.perform(get("/finance/vouchers/receipts/"+id+"/print").with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(pdf);}
+ @Test void groupCorrectionErrorsRetainTheReasonAndCurrentReceipt()throws Exception {
+  var receipt=new LoanReceipt(voucher(),"",List.of(),new GroupReceipt(UUID.randomUUID(),"GRP-1","Synthetic group",List.of()));when(receipts.find(actor,id)).thenReturn(Optional.of(receipt));
+  when(receipts.reverse(eq(actor),eq(id),any(),any(),any())).thenThrow(new IllegalArgumentException("group.error.correction"));
+  mvc.perform(post("/finance/vouchers/receipts/"+id+"/reverse").with(user(actor)).with(csrf()).param("requestKey",UUID.randomUUID().toString()).param("effectiveDate","2026-10-25").param("reason","Retained correction reason"))
+   .andExpect(status().isOk()).andExpect(view().name("accounting/vouchers/loan-details")).andExpect(model().attribute("reverseError","group.error.correction")).andExpect(model().attribute("reason","Retained correction reason"));
+ }
  @Test void configuredIndividualFormSavesApprovalDraftWithoutPosting()throws Exception{
   UUID workflow=UUID.randomUUID();when(gate.required(actor,Type.JOURNAL)).thenReturn(true);when(workflows.capture(eq(actor),eq(Type.JOURNAL),any())).thenReturn(workflow);
   mvc.perform(post("/finance/vouchers/journals").with(user(actor)).with(csrf()).param("party","Prepared voucher").param("rows[0].amount","1.00"))

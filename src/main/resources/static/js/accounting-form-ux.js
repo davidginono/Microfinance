@@ -8,7 +8,7 @@
     const disabledOnSubmit = new Set();
     const values = form => JSON.stringify(Array.from(form.elements).filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action').map(el => [el.name, el.value, el.checked]));
     const states = forms.map(form => ({form, initial:values(form), edited:false,
-        restoredErrors:Boolean(form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary'))}));
+        restoredErrors:Boolean(form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary')) || form.dataset.unsavedFinancialForm === 'true'}));
     const dirty = except => states.some(state => state !== except && (state.restoredErrors || values(state.form) !== state.initial));
     const initialize = (complete = false) => {
         if (initialized) return;

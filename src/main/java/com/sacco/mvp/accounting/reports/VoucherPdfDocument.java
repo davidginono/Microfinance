@@ -98,6 +98,7 @@ public final class VoucherPdfDocument implements AutoCloseable {
         }
     }
     private void paymentMethods(float top)throws IOException {
+        if(source.methods().isEmpty())return;
         paragraph(source.methodLabel().toUpperCase(Locale.ROOT),325,top,106,8);
         for(int n=0;n<source.methods().size();n++){
             float x=438+(n%2)*67,baseline=top-(n/2)*19;

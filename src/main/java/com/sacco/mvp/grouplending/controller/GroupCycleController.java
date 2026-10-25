@@ -46,7 +46,7 @@ public class GroupCycleController {
     @GetMapping("/cycles/{id}") public String detail(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){
         var c=cycles.detail(a,id);m.addAttribute("cycle",c);m.addAttribute("policy",cycles.policy(a,c.policyId()));
         if("DRAFT".equals(c.state())){var f=c.form();f.setExpectedVersion(c.version());m.addAttribute("cycleForm",f);editor(a,c.groupId(),m);return "groups/cycle-form";}
-        m.addAttribute("participants",cycles.participants(a,id));return "groups/cycle-details";
+        var participants=cycles.participants(a,id);m.addAttribute("participants",participants);m.addAttribute("hasFundedLoans",participants.stream().anyMatch(p->Set.of("DISBURSED","PAR","DEFAULTED").contains(p.loanStatus())));return "groups/cycle-details";
     }
     @PostMapping("/cycles/{id}") public String save(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute CycleForm cycleForm,BindingResult errors,
         @RequestParam(defaultValue="save") String action,Model m){

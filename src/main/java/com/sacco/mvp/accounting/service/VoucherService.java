@@ -42,6 +42,16 @@ public class VoucherService {
     public void consumeNumber(AppUserPrincipal actor,Type type,UUID requestKey){
         authorize(actor,type,"CREATE");vouchers.consumeNumber(actor.getSaccoId(),actor.getStationId(),requestKey,clock.now());
     }
+    @Transactional
+    public NumberReservation reserveCorrectionNumber(AppUserPrincipal actor,Type type,LocalDate date,UUID requestKey){
+        authorize(actor,type,"REVERSE");require(requestKey!=null,"","request");require(date!=null && date.getYear()>=1 && !date.isAfter(clock.today()),"effectiveDate","date");
+        vouchers.lockRequest(actor.getSaccoId(),actor.getStationId(),requestKey);
+        return vouchers.reserveNumber(actor.getSaccoId(),actor.getStationId(),type,date,requestKey,clock.now());
+    }
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void consumeCorrectionNumber(AppUserPrincipal actor,Type type,UUID requestKey){
+        authorize(actor,type,"REVERSE");vouchers.consumeNumber(actor.getSaccoId(),actor.getStationId(),requestKey,clock.now());
+    }
     public void requireExport(AppUserPrincipal actor){ledger.requireActor(actor,"FINANCIAL_REPORTS_EXPORT");}
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void requireInterestWaiverPeriod(AppUserPrincipal actor,LocalDate date){

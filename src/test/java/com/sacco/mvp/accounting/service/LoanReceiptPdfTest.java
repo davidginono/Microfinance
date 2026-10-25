@@ -15,6 +15,20 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class LoanReceiptPdfTest {
+    @Test void groupReceiptsRetainPayerAndBeneficiaryAttributionInBothLanguages()throws Exception{
+        var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
+        var renderer=new LoanReceiptPdfService(new LoanRecordingPdfService(new ReportExportLimiter(1)),messages);
+        UUID first=UUID.randomUUID(),second=UUID.randomUUID();var attributions=new ArrayList<ReceiptContribution>();
+        for(int n=1;n<=50;n++)attributions.add(new ReceiptContribution(UUID.randomUUID(),n,n%2==0?first:second,"LN-"+(n%2+1),UUID.randomUUID(),"PAYER-"+n,"Synthetic payer "+n,UUID.randomUUID(),"BORROWER-"+(n%2+1),"Synthetic borrower "+(n%2+1),"Contribution "+n,new BigDecimal("60.00"),new BigDecimal("50.00"),new BigDecimal("10.00"),BigDecimal.ZERO,null));
+        var rows=List.of(new LoanReceiptRow(1,UUID.randomUUID(),first,"LN-1","Group collection",new BigDecimal("1500.00"),new BigDecimal("1250.00"),new BigDecimal("250.00"),new BigDecimal("1000.00"),"PRIVATE CASH ACCOUNT","PRIVATE PRINCIPAL ACCOUNT","PRIVATE INTEREST ACCOUNT","GROUP-REF/G1"),
+            new LoanReceiptRow(2,UUID.randomUUID(),second,"LN-2","Group collection",new BigDecimal("1500.00"),new BigDecimal("1250.00"),new BigDecimal("250.00"),new BigDecimal("1000.00"),"PRIVATE CASH ACCOUNT","PRIVATE PRINCIPAL ACCOUNT","PRIVATE INTEREST ACCOUNT","GROUP-REF/G2"));
+        var v=new Voucher(UUID.randomUUID(),"RV-GROUP-TEST",Type.RECEIPT,LocalDate.of(2026,10,25),"Synthetic treasurer","GROUP-REF","Synthetic group collection","Verified synthetic cash evidence",UUID.randomUUID(),new BigDecimal("3000.00"),2,null,UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-25T10:30:00+03:00"),null,null,"Synthetic institution","Synthetic branch",List.of());
+        var receipt=new LoanReceipt(v,"",rows,new GroupReceipt(UUID.randomUUID(),"GRP-TEST","Synthetic trading group",attributions,"RV-ORIGINAL-123",""));
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw")))try(var document=Loader.loadPDF(renderer.render(receipt,locale,null))){
+            var text=new PDFTextStripper().getText(document);assertThat(text).contains("GRP-TEST","RV-ORIGINAL-123","Synthetic treasurer","PAYER-50","BORROWER-1","Contribution 50","60.00").doesNotContain("PRIVATE CASH ACCOUNT","PRIVATE PRINCIPAL ACCOUNT","PRIVATE INTEREST ACCOUNT",messages.getMessage("voucher.print.method",null,locale).toUpperCase(Locale.ROOT));
+            if(locale.equals(Locale.ENGLISH)){javax.imageio.ImageIO.write(new PDFRenderer(document).renderImageWithDPI(0,100),"png",Path.of("target/group-receipt-first.png").toFile());javax.imageio.ImageIO.write(new PDFRenderer(document).renderImageWithDPI(document.getNumberOfPages()-1,100),"png",Path.of("target/group-receipt-last.png").toFile());}
+        }
+    }
     @Test void loanReceiptAndCorrectionShowOneTransactionWithoutLedgerAccounts()throws Exception{
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
         var renderer=new LoanReceiptPdfService(new LoanRecordingPdfService(new ReportExportLimiter(1)),messages);

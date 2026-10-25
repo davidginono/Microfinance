@@ -119,6 +119,10 @@ public final class LoanRecordingDtos {
                               BigDecimal beginningBalance, BigDecimal endingBalance) {
         public ScheduleRow(int number,LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal amount){this(number,date,principal,interest,amount,null,null);}
     }
+    public record CollectionAmount(UUID loanId,UUID clientId,BigDecimal amount) {}
+    public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges) {
+        public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance){this(principal,interest,balance,new BigDecimal("0.00"));}
+    }
     public record Statement(String client, String clientNumber, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
         BigDecimal futureInterest, long loans, Page<LoanRow> page,BigDecimal charges) {
         public Statement(String client,String clientNumber,BigDecimal principal,BigDecimal interest,BigDecimal arrears,BigDecimal futureInterest,long loans,Page<LoanRow> page){this(client,clientNumber,principal,interest,arrears,futureInterest,loans,page,BigDecimal.ZERO);}
