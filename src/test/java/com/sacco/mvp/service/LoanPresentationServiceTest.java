@@ -94,7 +94,7 @@ class LoanPresentationServiceTest {
         messageSource.addMessage("recording.status.WITHDRAWN",Locale.ENGLISH,"Withdrawn");
         var application=LoanApplication.builder().id(UUID.randomUUID()).status(LoanStatus.WITHDRAWN).build();
         assertThat(loanPresentationService.buildProgressItems(application)).singleElement().satisfies(item->{
-            assertThat(item).containsEntry("label","Withdrawn").containsEntry("state","current");
+            assertThat(item).containsEntry("label","Withdrawn").containsEntry("state","closed");
         });
         org.mockito.Mockito.verifyNoInteractions(loanProductWorkflowService);
     }

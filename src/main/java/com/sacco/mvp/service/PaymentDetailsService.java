@@ -23,6 +23,7 @@ public class PaymentDetailsService {
     private final AuditService auditService;
 
     public PaymentDetailsView currentForMember(UUID memberId) {
+        if (memberId == null) return PaymentDetailsView.empty();
         return repository.findById(memberId)
             .map(details -> toView(details, "Current member settings"))
             .orElse(PaymentDetailsView.empty());

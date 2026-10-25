@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -36,6 +37,29 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JspRecordAccessorCompatibilityTest {
+    @Test
+    void borrowerProfileMessagesExistInBothLanguages() throws IOException {
+        var keys=new HashSet<String>(List.of("member.memberNo","group.code","loan.borrowerKind.CLIENT","loan.borrowerKind.JOINT_GROUP","loan.borrowerKind.ORGANIZATION"));
+        var matcher=Pattern.compile("<spring:message code=\"([^\"$]+)\"").matcher(Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/staff-borrower-profile.jspf")));
+        while(matcher.find())keys.add(matcher.group(1));
+        for(var locale:List.of(Locale.ENGLISH,Locale.of("sw"))) {
+            var messages=java.util.ResourceBundle.getBundle("messages",locale);
+            for(var key:keys)assertTrue(messages.containsKey(key) && !messages.getString(key).isBlank(),locale+" missing "+key);
+        }
+    }
+
+    @Test
+    void jakartaElDistinguishesPersonalAndGroupBorrowerProfiles() {
+        for (String kind : List.of("CLIENT", "JOINT_GROUP", "ORGANIZATION")) {
+            var profile = new com.sacco.mvp.lending.dto.LoanBorrowerProfile(UUID.randomUUID(), kind,
+                "CLIENT".equals(kind) ? UUID.randomUUID() : null, "CLIENT".equals(kind) ? null : UUID.randomUUID(),
+                "QA-001", "Synthetic borrower", null, null, "B1", "ORGANIZATION");
+            assertElProperty("borrower", profile, "person", "CLIENT".equals(kind));
+            assertElProperty("borrower", profile, "name", "Synthetic borrower");
+            assertElProperty("borrower", profile, "branch", "B1");
+        }
+    }
+
     @Test
     void jakartaElResolvesPopulatedStaffArchiveRows() {
         var loan = com.sacco.mvp.domain.LoanApplication.builder().id(UUID.randomUUID()).build();

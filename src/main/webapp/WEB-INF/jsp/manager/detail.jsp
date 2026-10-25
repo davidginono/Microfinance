@@ -31,46 +31,7 @@
     </c:if>
     <c:if test="${not isDisbursementReview}">
         <%@ include file="../fragments/previous-approved-reviews.jspf" %>
-        <div class="loan-view-summary-card px-5 py-5">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantDetails" text="Applicant Details" /></p>
-                    <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantDetailsHelp" text="Key applicant information for review before making a decision." /></p>
-                </div>
-                <c:if test="${not empty repaymentCountdown}">
-                    <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue">${repaymentCountdown}</span>
-                </c:if>
-            </div>
-            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="register.member.email" text="Email" /></div>
-                    <div class="applicant-info-value">
-                        <c:choose>
-                            <c:when test="${not empty applicant.email}">${applicant.email}</c:when>
-                            <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
-                        </c:choose>
-                    </div>
-                </div>
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="register.member.phone" text="Phone" /></div>
-                    <div class="applicant-info-value">
-                        <c:choose>
-                            <c:when test="${not empty applicant.phone}">${applicant.phone}</c:when>
-                            <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
-                        </c:choose>
-                    </div>
-                </div>
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="admin.saccoRegistry.station" text="Branch" /></div>
-                    <div class="applicant-info-value">
-                        <c:choose>
-                            <c:when test="${not empty applicant.stationId}">${applicant.stationId}</c:when>
-                            <c:otherwise><spring:message code="common.notAvailable" text="Not available" /></c:otherwise>
-                        </c:choose>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <%@ include file="../fragments/staff-borrower-profile.jspf" %>
     </c:if>
 </div>
 

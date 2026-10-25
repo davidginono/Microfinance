@@ -323,6 +323,7 @@ public class DisbursementController {
         model.addAttribute("loanTenure",loanTenure);
         model.addAttribute("firstRepaymentDateDefault",loanTenure.firstDate(applicationClock.today(),app.getRepaymentFrequency()==null?com.sacco.mvp.domain.RepaymentFrequency.MONTHLY:app.getRepaymentFrequency()));
         model.addAttribute("applicant", applicant);
+        model.addAttribute("borrower", loanPresentationService.borrowerProfile(principal,disbursementReadClaim(principal),id));
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));

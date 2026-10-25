@@ -278,6 +278,7 @@ public class AccountantController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("borrower", loanPresentationService.borrowerProfile(principal,UserClaim.ACCOUNTANT_QUEUE_VIEW,id));
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));

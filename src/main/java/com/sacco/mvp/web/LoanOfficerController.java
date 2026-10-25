@@ -250,8 +250,7 @@ public class LoanOfficerController {
         applyLoanOfficerUi(model);
         LoanApplication app = boardService.findLoan(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        Member applicant = memberDirectoryService.find(app.getApplicantMemberId())
-            .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         BoardReview myReview = boardService.getMyReview(id, principal.getMemberId(), STAGE);
         List<BoardReview> stageReviews = boardService.reviewsForLoan(id, STAGE);
         List<GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(id);
@@ -265,6 +264,7 @@ public class LoanOfficerController {
                 stageReviews.stream().map(BoardReview::getBoardMemberId).collect(Collectors.toSet()));
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("borrower", loanPresentationService.borrowerProfile(principal,UserClaim.LOAN_OFFICER_QUEUE_VIEW,id));
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));

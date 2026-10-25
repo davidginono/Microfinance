@@ -1,0 +1,16 @@
+<section class="erp-resource-section">
+    <h2><spring:message code="loan.borrower" /></h2>
+    <dl class="erp-detail-facts">
+        <div><dt><spring:message code="common.type" /></dt><dd><spring:message code="loan.borrowerKind.${borrower.kind}" /></dd></div>
+        <div><dt><spring:message code="admin.saccoRegistry.station" /></dt><dd><c:out value="${borrower.branch}" /></dd></div>
+        <c:choose>
+            <c:when test="${borrower.person}">
+                <div><dt><spring:message code="register.member.email" /></dt><dd><c:choose><c:when test="${not empty borrower.email}"><c:out value="${borrower.email}" /></c:when><c:otherwise><spring:message code="common.notProvided" /></c:otherwise></c:choose></dd></div>
+                <div><dt><spring:message code="register.member.phone" /></dt><dd><c:choose><c:when test="${not empty borrower.phone}"><c:out value="${borrower.phone}" /></c:when><c:otherwise><spring:message code="common.notProvided" /></c:otherwise></c:choose></dd></div>
+            </c:when>
+            <c:otherwise>
+                <div><dt><spring:message code="group.legalForm" /></dt><dd><spring:message code="group.legalForm.${borrower.legalForm}" /></dd></div>
+            </c:otherwise>
+        </c:choose>
+    </dl>
+</section>

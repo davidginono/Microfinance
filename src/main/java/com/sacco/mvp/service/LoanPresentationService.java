@@ -9,6 +9,7 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
+import com.sacco.mvp.lending.dto.LoanBorrowerProfile;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
@@ -91,6 +92,26 @@ public class LoanPresentationService {
         var names=new LinkedHashMap<UUID,String>();
         for(var row:loanApplicationRepository.findBorrowerNamesForLoans(actor.getSaccoId(),actor.getStationId(),loanIds))names.put(row.getLoanId(),row.getName());
         return Collections.unmodifiableMap(names);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
+    public LoanBorrowerProfile borrowerProfile(AppUserPrincipal actor,UserClaim permission,UUID loanId) {
+        if(permission==null || !BORROWER_NAME_READ_CLAIMS.contains(permission))
+            throw new org.springframework.security.access.AccessDeniedException("Loan workspace permission required");
+        staffScope.requireActor(actor,permission.name());
+        if(loanId==null)throw new IllegalArgumentException("Loan required");
+        String stage=switch(permission) {
+            case BOARD_QUEUE_VIEW -> "BOARD";
+            case CHAIRPERSON_QUEUE_VIEW -> "CHAIRPERSON";
+            case CREDIT_COMMITTEE_QUEUE_VIEW -> "CREDIT_COMMITTEE";
+            case LOAN_OFFICER_QUEUE_VIEW -> "LOAN_OFFICER";
+            default -> null;
+        };
+        var row=loanApplicationRepository.findBorrowerProfile(actor.getSaccoId(),actor.getStationId(),loanId,actor.getMemberId(),stage)
+            .orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Loan unavailable"));
+        boolean person="CLIENT".equals(row.getKind());
+        return new LoanBorrowerProfile(row.getPartyId(),row.getKind(),person?row.getClientId():null,person?null:row.getGroupId(),
+            row.getNumber(),row.getName(),person?row.getEmail():null,person?row.getPhone():null,row.getBranch(),person?null:row.getLegalForm());
     }
 
     public java.util.Optional<LoanApplication> findLoan(UUID loanId) {
@@ -377,7 +398,7 @@ public class LoanPresentationService {
 
         if (app.getStatus()==LoanStatus.WITHDRAWN || isAccountantRecorded(app)) {
             String label = statusLabel(app.getStatus());
-            return List.of(progressItem(label, true, true, "current"));
+            return List.of(progressItem(label, true, true, app.getStatus()==LoanStatus.WITHDRAWN?"closed":"current"));
         }
 
         List<String> labels = new ArrayList<>();

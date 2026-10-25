@@ -18,9 +18,9 @@
         <c:set var="reviewApplicationId" value="${loanIdShort}" />
         <c:set var="reviewDisbursedLoanId" value="${disbursedLoanId}" />
         <c:set var="reviewLoanStatus" value="${app.status}" />
-        <c:set var="reviewApplicantId" value="${applicant.id}" />
-        <c:set var="reviewApplicantName" value="${applicant.fullName}" />
-        <c:set var="reviewApplicantMemberNo" value="${applicant.memberNo}" />
+        <c:set var="reviewApplicantId" value="${borrower.clientId}" />
+        <c:set var="reviewApplicantName" value="${borrower.name}" />
+        <c:set var="reviewApplicantMemberNo" value="${borrower.number}" />
         <c:set var="reviewLoanProductName" value="${loanProductName}" />
         <c:set var="reviewLoanPurpose" value="${formFields['Loan Purpose']}" />
         <c:set var="reviewLoanAmount" value="${app.amount}" />
@@ -41,7 +41,7 @@
                     <dd><c:out value="${reviewApplicationId}" /></dd>
                 </div>
                 <div>
-                    <dt><spring:message code="Member.memberNo" text="Client No" /></dt>
+                    <dt><c:choose><c:when test="${not empty borrower and not borrower.person}"><spring:message code="group.code" /></c:when><c:otherwise><spring:message code="member.memberNo" /></c:otherwise></c:choose></dt>
                     <dd><c:out value="${empty reviewApplicantMemberNo ? '-' : reviewApplicantMemberNo}" /></dd>
                 </div>
                 <div>
@@ -69,6 +69,7 @@
                     <dd><c:out value="${empty reviewLoanPurpose ? '-' : reviewLoanPurpose}" /></dd>
                 </div>
             </dl>
+            <c:if test="${not empty reviewApplicantId}">
             <div class="loan-applicant-photo-card">
                 <div class="loan-applicant-photo-frame" title="<spring:message code='profile.photo.applicant' text='Applicant profile photo' />">
                     <img src="<c:url value='/profile/image/members/${reviewApplicantId}' />"
@@ -80,6 +81,7 @@
                     </svg>
                 </div>
             </div>
+            </c:if>
         </div>
     </div>
 

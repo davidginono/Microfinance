@@ -38,6 +38,21 @@ class PaymentDetailsServiceTest {
     }
 
     @Test
+    void nonPersonalBorrowerDoesNotReadSomeoneElsesPaymentProfile() {
+        var view = paymentDetailsService.resolveForLoan(LoanApplication.builder().borrowerPartyId(UUID.randomUUID()).build());
+        assertThat(view.available()).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
+    void nonPersonalBorrowerCanDisplayItsOwnCapturedDestinationWithoutPersonalFallback() {
+        String snapshot = "{\"available\":true,\"destinationType\":\"BANK_ACCOUNT\",\"destinationTypeLabel\":\"Bank account\",\"provider\":\"Synthetic bank\",\"accountHolderName\":\"Synthetic organization\",\"accountIdentifier\":\"QA-ACCOUNT\",\"sourceLabel\":\"Captured when submitted\"}";
+        var view = paymentDetailsService.resolveForLoan(LoanApplication.builder().borrowerPartyId(UUID.randomUUID()).paymentDetailsSnapshot(snapshot).build());
+        assertThat(view.available()).isTrue();assertThat(view.accountHolderName()).isEqualTo("Synthetic organization");
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
     void submittedLoanUsesCapturedPaymentDetailsAfterProfileChanges() {
         UUID memberId = UUID.randomUUID();
         MemberPaymentDetails original = details(memberId, "M-Pesa", "255700000001");

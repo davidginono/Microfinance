@@ -30,6 +30,26 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
 
     interface BorrowerNameRow { UUID getLoanId(); String getName(); }
 
+    interface BorrowerProfileRow {
+        UUID getPartyId(); String getKind(); UUID getClientId(); UUID getGroupId();
+        String getNumber(); String getName(); String getEmail(); String getPhone();
+        String getBranch(); String getLegalForm();
+    }
+
+    @Query(value="""
+        select b.party_id as "partyId",b.kind,b.client_id as "clientId",b.group_id as "groupId",
+          b.member_no as "number",b.full_name as "name",m.email,m.phone,l.station_id as "branch",g.legal_form as "legalForm"
+        from loan_applications l
+        join loan_borrower_directory b on b.party_id=l.borrower_party_id and b.sacco_id=l.sacco_id
+        left join members m on m.id=b.client_id and m.sacco_id=l.sacco_id
+        left join lending_group g on g.id=b.group_id and g.sacco_id=l.sacco_id and g.station_id=l.station_id
+        where l.id=:loan and l.sacco_id=:institution and l.station_id=:branch
+          and (cast(:stage as text) is null or exists(select 1 from board_reviews r
+            where r.loan_application_id=l.id and r.board_member_id=:reviewer and r.review_stage=:stage))
+        """,nativeQuery=true)
+    Optional<BorrowerProfileRow> findBorrowerProfile(@Param("institution") String institution,@Param("branch") String branch,
+        @Param("loan") UUID loan,@Param("reviewer") UUID reviewer,@Param("stage") String stage);
+
     @Query(value="""
         select l.id as "loanId",b.full_name as "name" from loan_applications l
         join loan_borrower_directory b on b.party_id=l.borrower_party_id and b.sacco_id=l.sacco_id

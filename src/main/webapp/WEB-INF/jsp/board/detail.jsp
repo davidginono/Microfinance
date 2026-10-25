@@ -22,15 +22,15 @@
         </div>
     </c:if>
     <%@ include file="../fragments/previous-approved-reviews.jspf" %>
+    <%@ include file="../fragments/staff-borrower-profile.jspf" %>
     <div class="loan-view-summary-card px-5 py-5">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantDetails" text="Applicant Details" /></p>
-            <p class="mt-1 text-sm text-slate-600">Key applicant information for ${reviewRoleLabelLower} review before making a decision.</p>
+            <h2 class="erp-resource-heading"><spring:message code="board.myReview" /></h2>
         </div>
         <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="board.myReview" text="My Review" /></div>
-                <div class="applicant-info-value">${myReview.decision}</div>
+                <div class="applicant-info-label"><spring:message code="review.decision" /></div>
+                <div class="applicant-info-value"><c:out value="${myReview.decision}" /></div>
             </div>
         </div>
     </div>
