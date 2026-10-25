@@ -30,6 +30,21 @@ class GroupLendingPostgresTest {
     @BeforeEach void setup(){fixture.fixture();}
     GroupForm form(){var f=new GroupForm();f.setName("Synthetic trading group");f.setEvidence("Synthetic identity documents");return f;}
     MemberForm member(){var f=new MemberForm();f.setClientId(fixture.client);f.setStartsOn(LoanRecordingPostgresTest.TODAY);f.setEvidence("Synthetic appointment consent");return f;}
+    @Test void permanentGroupAuditSurvivesOperationalCleanupAndCannotBeChanged(){
+        var ids=new ArrayList<UUID>();var old=java.time.OffsetDateTime.parse("1970-01-01T00:00:00Z");
+        for(var action:List.of("GROUP_COLLECTION_POSTED","GROUP_COLLECTION_REVERSED","GROUP_TERMS_ACCEPTED")){
+            UUID id=UUID.randomUUID();ids.add(id);fixture.jdbc.update("insert into audit_log(id,entity_type,entity_id,action,actor_member_id,event_status,sacco_id,station_id,created_at) values(?,'GROUP_LENDING',?, ?,?,'SUCCESS',?,'B1',?)",id,UUID.randomUUID(),action,fixture.actor.getMemberId(),fixture.institution,old);
+        }
+        UUID operational=UUID.randomUUID();fixture.jdbc.update("insert into audit_log(id,entity_type,action,sacco_id,created_at) values(?,'SYSTEM','SYNTHETIC_TEST',?,?)",operational,fixture.institution,old);
+        var tx=new org.springframework.transaction.support.TransactionTemplate(fixture.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        Integer removed=tx.execute(status->fixture.context.getBean(com.sacco.mvp.repository.AuditLogRepository.class).deleteExpiredOperationalAudit(old.plusYears(1)));assertThat(removed).isGreaterThanOrEqualTo(1);
+        assertThat(fixture.jdbc.queryForObject("select count(*) from audit_log where id=?",Integer.class,operational)).isZero();
+        for(var id:ids){
+            assertThatThrownBy(()->fixture.jdbc.update("update audit_log set action='CHANGED' where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThatThrownBy(()->fixture.jdbc.update("delete from audit_log where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        }
+        assertThat(fixture.jdbc.queryForObject("select count(*) from audit_log where sacco_id=? and entity_type='GROUP_LENDING'",Integer.class,fixture.institution)).isEqualTo(3);
+    }
     @Test void registryIsScopedIdempotentAndCreatesNoFinancialRecords(){
         var f=form();UUID group=groups.create(fixture.actor,f);assertThat(groups.create(fixture.actor,f)).isEqualTo(group);
         assertThat(groups.list(fixture.actor,"trading","name",0).rows()).extracting(Group::id).containsExactly(group);
