@@ -11,6 +11,9 @@ import java.util.Optional;
 import java.util.Set;
 
 public enum UserClaim {
+    GROUP_AUTHORITY_VIEW(AccessFeature.GROUP_AUTHORITY, AccessAction.VIEW),
+    GROUP_AUTHORITY_CREATE(AccessFeature.GROUP_AUTHORITY, AccessAction.CREATE),
+    GROUP_AUTHORITY_UPDATE(AccessFeature.GROUP_AUTHORITY, AccessAction.UPDATE),
     GROUP_LENDING_VIEW(AccessFeature.GROUP_LENDING, AccessAction.VIEW),
     GROUP_LENDING_CREATE(AccessFeature.GROUP_LENDING, AccessAction.CREATE),
     GROUP_LENDING_UPDATE(AccessFeature.GROUP_LENDING, AccessAction.UPDATE),

@@ -2,6 +2,7 @@ package com.sacco.mvp.domain;
 
 public enum AccessFeature {
     GROUP_LENDING("Group lending"),
+    GROUP_AUTHORITY("Group borrowing authority"),
     PAYROLL_DEDUCTIONS("Payroll deductions"),
     VOUCHER_WORKSPACE("Approval Voucher Workspace"),
     VOUCHER_APPROVAL("Voucher approval actions"),
