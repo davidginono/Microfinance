@@ -18,6 +18,13 @@ import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from LoanApplication l where l.id=:id and exists(select m.id from Member m where m.id=:guarantor and m.saccoId=l.saccoId and lower(m.stationId)=lower(l.stationId))")
+    Optional<LoanApplication> findForGuarantorDecision(@Param("id") UUID id,@Param("guarantor") UUID guarantor);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from LoanApplication l where l.id=:id and l.applicantMemberId=:applicant and exists(select m.id from Member m where m.id=:applicant and m.saccoId=l.saccoId)")
+    Optional<LoanApplication> findForApplicantDecision(@Param("id") UUID id,@Param("applicant") UUID applicant);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from LoanApplication l where l.id=:id")
     Optional<LoanApplication> findForDisbursement(@Param("id") UUID id);
 

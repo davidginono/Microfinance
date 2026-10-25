@@ -27,6 +27,12 @@ public class LoanQualificationPolicyService {
     private final SaccoStationPolicyRepository saccoStationPolicyRepository;
     private final LoanAnalyticsService loanAnalyticsService;
 
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockGuarantorCapacity(String saccoId,String stationId,UUID clientId){
+        if(saccoId==null || stationId==null || clientId==null || !guarantorRequestRepository.lockGuarantorCapacity(clientId,saccoId,stationId))
+            throw new org.springframework.security.access.AccessDeniedException("Guarantor capacity unavailable");
+    }
+
     public void assertApplicantEligible(String saccoId, UUID memberId) {
         applicantFailureReason(saccoId, memberId).ifPresent(reason -> {
             throw new IllegalStateException(reason);

@@ -17,6 +17,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface GuarantorRequestRepository extends JpaRepository<GuarantorRequest, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from GuarantorRequest g where g.id=:id and g.guarantorMemberId=:client")
+    Optional<GuarantorRequest> findForClientDecision(@Param("id") UUID id,@Param("client") UUID client);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from GuarantorRequest g where g.id=:id and exists(select l.id from LoanApplication l where l.id=g.loanApplicationId and l.applicantMemberId=:applicant)")
+    Optional<GuarantorRequest> findForApplicantDecision(@Param("id") UUID id,@Param("applicant") UUID applicant);
     List<GuarantorRequest> findByLoanApplicationId(UUID loanApplicationId);
 
     List<GuarantorRequest> findByLoanApplicationIdIn(Collection<UUID> loanApplicationIds);
@@ -159,66 +166,23 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
                                                               @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive,
                                                               Pageable pageable);
 
-    @Query("""
-        select coalesce(sum(l.amount), 0)
-        from GuarantorRequest g, LoanApplication l
-        where g.loanApplicationId = l.id
-          and g.guarantorMemberId = :guarantorMemberId
-          and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
-          and l.status in (
-            com.sacco.mvp.domain.LoanStatus.DISBURSED,
-            com.sacco.mvp.domain.LoanStatus.PAR,
-            com.sacco.mvp.domain.LoanStatus.DEFAULTED,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
-            com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED,
-            com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_CREDIT_COMMITTEE,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
-            com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER
-          )
-          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
-          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
-          and not exists (
-            select superseding.id
-            from LoanApplication superseding
-            where superseding.topUpSourceLoanId = g.loanApplicationId
-              and superseding.status <> com.sacco.mvp.domain.LoanStatus.DRAFT
-          )
-        """)
+    @Query(value="""
+        select coalesce(sum(principal_amount),0) from lending_guarantor_commitment
+        where guarantor_id=:guarantorMemberId and sacco_id=:saccoId
+          and (cast(:stationId as text) is null or lower(station_id)=lower(cast(:stationId as text)))
+        """,nativeQuery=true)
     java.math.BigDecimal sumActiveGuaranteedAmount(@Param("guarantorMemberId") UUID guarantorMemberId,
                                                    @Param("saccoId") String saccoId,
                                                    @Param("stationId") String stationId);
 
-    @Query("""
-        select count(g)
-        from GuarantorRequest g, LoanApplication l
-        where g.loanApplicationId = l.id
-          and g.guarantorMemberId = :guarantorMemberId
-          and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
-          and l.status in (
-            com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
-            com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED,
-            com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_CREDIT_COMMITTEE,
-            com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
-            com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
-            com.sacco.mvp.domain.LoanStatus.DISBURSED,
-            com.sacco.mvp.domain.LoanStatus.PAR,
-            com.sacco.mvp.domain.LoanStatus.DEFAULTED
-          )
-          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
-          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
-          and not exists (
-            select superseding.id
-            from LoanApplication superseding
-            where superseding.topUpSourceLoanId = g.loanApplicationId
-              and superseding.status <> com.sacco.mvp.domain.LoanStatus.DRAFT
-          )
-        """)
+    @Query(value="select lending_guarantor_capacity_lock(:client,:institution,:branch)",nativeQuery=true)
+    boolean lockGuarantorCapacity(@Param("client") UUID client,@Param("institution") String institution,@Param("branch") String branch);
+
+    @Query(value="""
+        select count(*) from lending_guarantor_commitment
+        where guarantor_id=:guarantorMemberId and sacco_id=:saccoId
+          and (cast(:stationId as text) is null or lower(station_id)=lower(cast(:stationId as text)))
+        """,nativeQuery=true)
     long countActiveGuarantees(@Param("guarantorMemberId") UUID guarantorMemberId,
                                @Param("saccoId") String saccoId,
                                @Param("stationId") String stationId);

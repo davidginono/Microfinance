@@ -1252,7 +1252,9 @@ class LoanWorkflowServiceTest {
             .status(LoanStatus.AWAITING_GUARANTORS)
             .build();
 
-        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
+        when(guarantorRequestRepository.findForClientDecision(requestId, guarantorId)).thenReturn(Optional.of(request));
+        when(loanApplicationRepository.findForGuarantorDecision(loanId, guarantorId)).thenReturn(Optional.of(app));
+        when(memberRepository.findAllById(List.of(guarantorId))).thenReturn(List.of(Member.builder().id(guarantorId).saccoId(app.getSaccoId()).stationId("ST01").memberAccount(true).position(com.sacco.mvp.domain.Position.MEMBER).status(MemberStatus.ACTIVE).build()));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(loanId, GuarantorRequestStatus.APPROVED)).thenReturn(1L);
         when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(LoanType.DEVELOPMENT_LOAN),
@@ -1273,6 +1275,19 @@ class LoanWorkflowServiceTest {
                 && requestId.toString().equals(details.get("guarantorRequestId"))
                 && guarantorId.toString().equals(details.get("guarantorId")))
         );
+    }
+
+    @Test
+    void changedCapacityPreventsApprovalBeforeAnyDecisionOrNotification(){
+        UUID requestId=UUID.randomUUID(),loanId=UUID.randomUUID(),guarantorId=UUID.randomUUID();
+        var request=GuarantorRequest.builder().id(requestId).loanApplicationId(loanId).guarantorMemberId(guarantorId).status(GuarantorRequestStatus.PENDING).build();
+        var app=LoanApplication.builder().id(loanId).saccoId("CIRCLE-1001").stationId("ST01").applicantMemberId(UUID.randomUUID()).amount(new BigDecimal("100000")).status(LoanStatus.AWAITING_GUARANTORS).build();
+        when(guarantorRequestRepository.findForClientDecision(requestId,guarantorId)).thenReturn(Optional.of(request));when(loanApplicationRepository.findForGuarantorDecision(loanId,guarantorId)).thenReturn(Optional.of(app));
+        when(memberRepository.findAllById(List.of(guarantorId))).thenReturn(List.of(Member.builder().id(guarantorId).saccoId(app.getSaccoId()).stationId("ST01").memberAccount(true).position(com.sacco.mvp.domain.Position.MEMBER).status(MemberStatus.ACTIVE).build()));
+        when(loanQualificationPolicyService.guarantorFailureReason("CIRCLE-1001",guarantorId,app.getAmount(),null)).thenReturn(Optional.of("Current guarantee limit reached"));
+        assertThatThrownBy(()->loanWorkflowService.approveGuarantorRequest(requestId,guarantorId)).hasMessageContaining("Current guarantee limit reached");
+        assertThat(request.getStatus()).isEqualTo(GuarantorRequestStatus.PENDING);verify(guarantorRequestRepository,never()).save(any());verifyNoInteractions(outboxService);
+        verify(loanQualificationPolicyService).lockGuarantorCapacity("CIRCLE-1001","ST01",guarantorId);
     }
 
     @Test
@@ -1675,6 +1690,7 @@ class LoanWorkflowServiceTest {
             .id(appId)
             .applicantMemberId(UUID.randomUUID())
             .saccoId("CIRCLE-1001")
+            .stationId("ST01")
             .loanType(LoanType.DEVELOPMENT_LOAN)
             .amount(new BigDecimal("90000"))
             .tenorMonths(12)
@@ -1687,7 +1703,9 @@ class LoanWorkflowServiceTest {
             .version(0)
             .build();
 
-        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
+        when(guarantorRequestRepository.findForClientDecision(requestId, guarantorId)).thenReturn(Optional.of(request));
+        when(loanApplicationRepository.findForGuarantorDecision(appId, guarantorId)).thenReturn(Optional.of(app));
+        when(memberRepository.findAllById(List.of(guarantorId))).thenReturn(List.of(Member.builder().id(guarantorId).saccoId(app.getSaccoId()).stationId("ST01").memberAccount(true).position(com.sacco.mvp.domain.Position.MEMBER).status(MemberStatus.ACTIVE).build()));
         when(loanApplicationRepository.findById(appId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(appId, GuarantorRequestStatus.APPROVED))
             .thenReturn(1L);

@@ -1180,11 +1180,14 @@ public class LoanWorkflowService {
                                                  UUID guarantorId,
                                                  String signatureText,
                                                  OffsetDateTime verifiedAt) {
-        GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)
+        GuarantorRequest request = guarantorRequestRepository.findForClientDecision(requestId, guarantorId)
             .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
         if (request.getStatus() != GuarantorRequestStatus.PENDING) {
             throw new IllegalStateException("Request already decided");
         }
+        LoanApplication application = loanApplicationRepository.findForGuarantorDecision(request.getLoanApplicationId(),guarantorId)
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Guarantor request unavailable"));
+        guardGuarantorCapacity(application,guarantorId);
         request.setStatus(GuarantorRequestStatus.APPROVED);
         request.setCommittedAmount(null);
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
@@ -1217,9 +1220,9 @@ public class LoanWorkflowService {
                                                  UUID applicantId,
                                                  String signatureText,
                                                  OffsetDateTime verifiedAt) {
-        GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+        GuarantorRequest request = guarantorRequestRepository.findForApplicantDecision(requestId,applicantId)
             .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
-        LoanApplication app = loanApplicationRepository.findById(request.getLoanApplicationId())
+        LoanApplication app = loanApplicationRepository.findForApplicantDecision(request.getLoanApplicationId(),applicantId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         if (!Objects.equals(app.getApplicantMemberId(), applicantId)) {
             throw new IllegalArgumentException("Guarantor request not found");
@@ -1230,6 +1233,7 @@ public class LoanWorkflowService {
         if (request.getStatus() != GuarantorRequestStatus.PENDING) {
             throw new IllegalStateException("Request already decided");
         }
+        guardGuarantorTarget(app);if(request.getGuarantorMemberId()!=null)guardGuarantorCapacity(app,request.getGuarantorMemberId());
         request.setStatus(GuarantorRequestStatus.APPROVED);
         request.setCommittedAmount(null);
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
@@ -1272,6 +1276,16 @@ public class LoanWorkflowService {
             "GUARANTOR_REQUEST_APPROVED",
             "Guarantor request approved"
         );
+    }
+
+    private void guardGuarantorCapacity(LoanApplication app,UUID guarantor){
+        guardGuarantorTarget(app);
+        loanQualificationPolicyService.lockGuarantorCapacity(app.getSaccoId(),app.getStationId(),guarantor);
+        validateLocalGuarantor(app.getSaccoId(),app.getStationId(),app.getApplicantMemberId(),app.getAmount(),resolveWorkflowProduct(app),guarantor);
+    }
+    private void guardGuarantorTarget(LoanApplication app){
+        if(app.getStatus()==null || app.getStatus()==LoanStatus.DRAFT || app.getStatus()==LoanStatus.PAID || app.getStatus()==LoanStatus.DISBURSEMENT_REVERSED || REJECTED_ACKNOWLEDGEMENT_STATUSES.contains(app.getStatus()))
+            throw new org.springframework.security.access.AccessDeniedException("Guarantor request unavailable");
     }
 
     private ExternalGuarantorRegistry upsertExternalGuarantorRegistry(LoanApplication app, GuarantorRequest request) {

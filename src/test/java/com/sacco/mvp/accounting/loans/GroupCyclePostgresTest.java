@@ -7,6 +7,7 @@ import com.sacco.mvp.grouplending.dto.GroupCycleDtos.*;
 import com.sacco.mvp.grouplending.dto.GroupLendingDtos.*;
 import com.sacco.mvp.grouplending.repository.*;
 import com.sacco.mvp.grouplending.service.*;
+import com.sacco.mvp.repository.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import org.junit.jupiter.api.*;
@@ -169,7 +170,11 @@ class GroupCyclePostgresTest {
     @Configuration(proxyBeanMethods=false) @Import(GroupLendingPostgresTest.Config.class)
     static class Config {
         @Bean GroupCycleRepository cycles(JdbcTemplate jdbc,ObjectMapper json){return new GroupCycleRepository(jdbc,json);}
-        @Bean LoanQualificationPolicyService qualification(com.sacco.mvp.repository.SaccoSettingsRepository settings,com.sacco.mvp.repository.MemberRepository members){return new LoanQualificationPolicyService(settings,mock(com.sacco.mvp.repository.GuarantorRequestRepository.class),members,mock(com.sacco.mvp.repository.ExternalGuarantorRegistryRepository.class),mock(com.sacco.mvp.repository.SaccoStationPolicyRepository.class),mock(LoanAnalyticsService.class));}
+        @Bean LoanQualificationPolicyService qualification(SaccoSettingsRepository settings,MemberRepository members,GuarantorRequestRepository guarantors){return new LoanQualificationPolicyService(settings,guarantors,members,mock(ExternalGuarantorRegistryRepository.class),mock(SaccoStationPolicyRepository.class),mock(LoanAnalyticsService.class));}
+        @Bean LoanWorkflowService borrowerWorkflow(LoanProductSettingRepository products,LoanApplicationRepository applications,GuarantorRequestRepository guarantors,MemberRepository members,SaccoSettingsRepository settings,ObjectMapper json,LoanQualificationPolicyService policies,AuditService audit,org.springframework.transaction.PlatformTransactionManager transactions,ApplicationClock clock){
+            var eligibility=mock(EligibilityService.class);when(eligibility.check(anyString(),any(),any(LoanProductSetting.class),any(),anyMap(),anyMap())).thenReturn(new EligibilityService.EligibilityResult(true,BigDecimal.ONE,BigDecimal.TEN,BigDecimal.TEN));
+            return new LoanWorkflowService(products,applications,guarantors,mock(ExternalGuarantorRegistryRepository.class),mock(BoardReviewRepository.class),mock(ManagerReviewRepository.class),members,settings,mock(FormSchemaService.class),eligibility,mock(OutboxService.class),mock(LoanAttachmentService.class),mock(LoanProductRequiredAttachmentService.class),mock(FinancialDetailsService.class),json,mock(ApplicationNumberService.class),mock(RoleDirectoryService.class),mock(LoanProductWorkflowService.class),mock(WorkflowRoutingService.class),policies,mock(PaymentDetailsService.class),mock(ReversalRequestRepository.class),audit,transactions,clock);
+        }
         @Bean GroupCycleService cycleService(GroupCycleRepository r,GroupLendingRepository g,GeneralLedgerService access,LoanRecordingService loans,LoanQualificationPolicyService qualification,ApplicationClock clock,AuditService audit,ObjectMapper json){return new GroupCycleService(r,g,access,loans,qualification,clock,audit,json);}
         @Bean StationOtpSettingsService otpSettings(){return mock(StationOtpSettingsService.class);}
         @Bean org.springframework.mock.env.MockEnvironment consentEnvironment(){return new org.springframework.mock.env.MockEnvironment();}

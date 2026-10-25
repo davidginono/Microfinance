@@ -61,7 +61,7 @@ public final class GroupCycleDtos {
         BigDecimal cap,String agreementReference) {}
     public record ProductRules(int guarantors,BigDecimal affordabilityRatio,boolean collateralRequired,BigDecimal collateralRatio,
         boolean activeLoanAllowed,int maximumActiveLoans) {}
-    public record Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved) {}
+    public record Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory) {}
     public record Terms(BigDecimal principal,BigDecimal annualRate,BigDecimal contractualInterest,BigDecimal instalment,
         String frequency,String tenureUnit,int tenureValue,LocalDate firstPaymentDate,String purpose,
         BigDecimal maximumInstalment,BigDecimal chargeTotal,BigDecimal deductions,BigDecimal netCash,BigDecimal totalPayable,

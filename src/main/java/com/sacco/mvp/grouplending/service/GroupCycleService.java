@@ -80,7 +80,7 @@ public class GroupCycleService {
         for(var row:rows){
             money(row.getPrincipal(),true);money(row.getIncome(),true);money(row.getExpenses(),false);money(row.getOtherDebt(),false);money(row.getGuaranteeCapacity(),false);
             text(row.getAssessmentEvidence(),500);text(row.getCapacityEvidence(),500);
-            var exposure=exposures.get(row.getClientId());check(exposure.activeCycles()<p.maxActiveCycles(),"activeCycles");
+            var exposure=exposures.get(row.getClientId());check(exposure.missingHistory()==0,"historyMissing");check(exposure.activeCycles()<p.maxActiveCycles(),"activeCycles");
             check((branchPolicy.applicantDefaultLimit()==null || exposure.riskLoans()<branchPolicy.applicantDefaultLimit())
                 && (branchPolicy.guarantorDefaultLimit()==null || exposure.riskLoans()<branchPolicy.guarantorDefaultLimit()),"defaultPolicy");
             check(branchPolicy.guaranteeCountLimit()==null || exposure.guaranteeCount()+ids.size()-1<=branchPolicy.guaranteeCountLimit(),"guaranteeCount");
