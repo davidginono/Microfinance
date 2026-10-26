@@ -106,8 +106,8 @@ class GroupSharedLoanPostgresTest {
     }
     @Test void staffAllocationStatementDistinguishesUnfundedSharesAndEnforcesBranchAndExportClaims(){
         var statements=new com.sacco.mvp.grouplending.service.GroupSharedStatementService(s.s.g.cycles,shared,f.service,f.context.getBean(com.sacco.mvp.accounting.service.GeneralLedgerService.class));
-        assertThat(statements.statement(f.actor,s.cycle,false).funded()).isFalse();f.service.disburse(f.actor,funding());f.service.repay(f.actor,payment("120.00"));
-        var statement=statements.statement(f.actor,s.cycle,true);assertThat(statement.funded()).isTrue();assertThat(statement.members()).hasSize(2);
+        assertThat(statements.statement(f.actor,s.cycle,false).funded()).isFalse();assertThat(statements.statement(f.actor,s.cycle,false).known()).isFalse();f.service.disburse(f.actor,funding());f.service.repay(f.actor,payment("120.00"));
+        var statement=statements.statement(f.actor,s.cycle,true);assertThat(statement.funded()).isTrue();assertThat(statement.known()).isTrue();assertThat(statement.members()).hasSize(2);
         assertThat(statement.members().stream().map(b->b.remainingPrincipal()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(statement.parent().loan().outstandingPrincipal());
         assertThatThrownBy(()->statements.statement(f.operator("B2"),s.cycle,false)).isInstanceOf(AccessDeniedException.class);
         var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.GROUP_LENDING_EXPORT);when(f.context.getBean(UserClaimService.class).effectiveClaims(eq(f.actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(claims);

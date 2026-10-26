@@ -17,6 +17,7 @@ public class LoanPrepaymentService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final com.sacco.mvp.accounting.service.VoucherService vouchers;
+    private final com.sacco.mvp.grouplending.service.GroupSharedLoanService shared;
     public Optional<LoanPrepaymentRepository.Terms> terms(UUID loan){return repository.terms(loan);}
     @Transactional(propagation=Propagation.MANDATORY)
     public void bind(LoanLedger ledger,Map<String,Object> snapshot) {
@@ -67,6 +68,7 @@ public class LoanPrepaymentService {
         require(key!=null && date!=null && !date.isAfter(clock.today()) && !date.isBefore(l.getDisbursementDate()),"input");
         require(reason!=null && !reason.isBlank() && reason.strip().length()<=500,"reason");reason=reason.strip();
         require(amount!=null && amount.signum()>0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");
+        shared.authorizeWaiver(actor,l.getLoanApplicationId(),reverses);
         var retry=repository.request(l,key);if(retry.isPresent()){
             var r=retry.get();require(r.loanId().equals(l.getLoanApplicationId()) && r.actor().equals(actor.getMemberId()) && r.date().equals(date) && r.amount().compareTo(amount)==0 && r.reason().equals(reason) && Objects.equals(r.reverses(),reverses),"retry");return r.id();
         }
@@ -83,7 +85,7 @@ public class LoanPrepaymentService {
             require(!repository.laterPayment(l.getLoanApplicationId(),original.sequence()) && !repository.laterWaiver(l.getLoanApplicationId(),original.sequence()),"latest");parts.putAll(repository.parts(reverses));
         }
         for(var row:rows)if(parts.containsKey(row.getId()))row.setInterestWaived(reverses==null?row.getInterestWaived().add(parts.get(row.getId())):row.getInterestWaived().subtract(parts.get(row.getId())));
-        UUID id=UUID.randomUUID();repository.waiver(l,id,key,date,amount,actor.getMemberId(),reason,reverses,clock.now(),parts);l.setNextSequence(l.getNextSequence()+1);
+        UUID id=UUID.randomUUID();repository.waiver(l,id,key,date,amount,actor.getMemberId(),reason,reverses,clock.now(),parts);shared.waiver(actor,l.getLoanApplicationId(),id,amount,reverses);l.setNextSequence(l.getNextSequence()+1);
         audit.logEvent("LOAN_REPAYMENT",id,reverses==null?"INTEREST_WAIVED":"INTEREST_WAIVER_REVERSED",actor.getMemberId(),AuditEventStatus.SUCCESS,reason,"LOAN",l.getLoanId(),l.getSaccoId(),l.getStationId(),Map.of("loan",l.getLoanApplicationId(),"amount",amount,"date",date,"reverses",Objects.toString(reverses,"")));
         return id;
     }

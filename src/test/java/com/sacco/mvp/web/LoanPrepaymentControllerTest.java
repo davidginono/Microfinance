@@ -31,6 +31,9 @@ class LoanPrepaymentControllerTest {
     @AfterEach void stop(){context.close();}
     AppUserPrincipal actor(UserClaim... claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),Set.of(claims),true);}
     org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder command(){return post("/repayments/loans/"+loan+"/interest-waivers").param("requestKey",key.toString()).param("effectiveDate","2026-10-19").param("amount","5.00").param("reason","Approved concession").param("confirmed","true");}
+    @Test void incompleteSharedEvidenceKeepsRecoverableFeedbackAndSubmittedValues()throws Exception{
+        doThrow(new IllegalArgumentException("recording.error.sharedWaiverHistory")).when(ledger).waiveInterest(any(),any(),any(),any(),any(),any(),any());mvc.perform(command().with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf())).andExpect(status().is3xxRedirection()).andExpect(flash().attribute("prepaymentError","recording.error.sharedWaiverHistory")).andExpect(flash().attributeExists("waiverForm"));
+    }
     @Test void waiverRequiresCsrf()throws Exception{mvc.perform(command().with(user(actor(UserClaim.LOAN_INTEREST_WAIVE)))).andExpect(status().isForbidden());verifyNoInteractions(ledger);}
     @Test void viewAndPostingClaimsDoNotGrantWaiver()throws Exception{mvc.perform(command().with(user(actor(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_POST))).with(csrf())).andExpect(status().isForbidden());verifyNoInteractions(ledger);}
     @Test void validWaiverUsesTheScopedPathAndIgnoresInjectedActorAndLoanFields()throws Exception{

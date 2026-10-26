@@ -117,6 +117,8 @@ public class LoanRepaymentLedgerService {
     public UUID waiveInterest(UUID id,AppUserPrincipal actor,UUID key,LocalDate date,BigDecimal amount,String reason,UUID reverses){
         requireStaff(actor,UserClaim.LOAN_INTEREST_WAIVE);
         if(reverses!=null)requireStaff(actor,accountingGuard.recordedLoan(id)?UserClaim.LOAN_RECORDING_REVERSE:UserClaim.LOAN_REPAYMENTS_REVERSE);
+        // Recorded repayment commands lock the owning loan before its ledger.
+        if(accountingGuard.recordedLoan(id))loans.lockFinancialRecord(id,actor.getSaccoId(),actor.getStationId()).orElseThrow(()->new AccessDeniedException("Forbidden"));
         LoanLedger l=lockedLedger(id,actor);readableLedger(id,actor);
         var loan=loans.findById(id).orElseThrow();require(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         require(date!=null,"date");requireAfterAdjustment(l,date);var rows=rows(id);

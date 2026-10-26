@@ -80,10 +80,10 @@ class SharedCreditExposurePostgresTest {
         f.service.disburse(f.actor,s.funding());var paid=f.service.repay(f.actor,s.payment("1000.01"));assertThat(own().active()).isZero();assertThat(own().liability()).isZero();
         f.service.reverse(f.operator("B1"),paid.id(),UUID.randomUUID(),LoanRecordingPostgresTest.TODAY,"Synthetic settlement correction restores credit obligation");assertThat(own().active()).isEqualTo(1);assertThat(own().liability()).isEqualByComparingTo("125.91");
     }
-    @Test void unallocatedNonCashInterestCannotBeReportedAsVerifiedCreditHistory(){
+    @Test void conservedNonCashInterestRetainsVerifiedAllocationHistory(){
         f.service.disburse(f.actor,s.funding());var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(LoanRecordingPostgresTest.TODAY.plusDays(15));
         f.context.getBean(LoanRepaymentLedgerService.class).waiveInterest(s.loan,f.actor,UUID.randomUUID(),clock.today(),new BigDecimal("1.00"),"Synthetic shared waiver awaiting member attribution",null);
-        assertThat(own().known()).isFalse();assertThatThrownBy(()->analytics().activeLoanAmount(f.client,f.institution,"B1")).hasMessageContaining("evidence is incomplete");
+        assertThat(own().known()).isTrue();assertThat(own().liability()).isEqualByComparingTo("125.79");assertThat(analytics().activeLoanAmount(f.client,f.institution,"B1")).isEqualByComparingTo("125.79");
     }
     @Test void staffRecordingCannotBypassPendingSharedApplicationsOrActiveProductRules(){
         assertThatThrownBy(()->f.service.save(f.actor,f.form())).hasMessage("recording.error.sharedApplicationPending");

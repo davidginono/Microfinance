@@ -50,9 +50,9 @@ class GroupMemberStatementPostgresTest {
         var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.MEMBER_LOANS_VIEW);when(f.context.getBean(UserClaimService.class).effectiveClaims(eq(f.client),anyCollection(),anyBoolean())).thenReturn(claims);assertThatThrownBy(this::own).isInstanceOf(AccessDeniedException.class);
         claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.GROUP_LENDING_EXPORT);when(f.context.getBean(UserClaimService.class).effectiveClaims(eq(f.actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(claims);assertThat(statements.staff(f.actor,s.s.cycle,f.client,null,null,0,0,false).staff()).isTrue();assertThatThrownBy(()->statements.staff(f.actor,s.s.cycle,f.client,null,null,0,0,true)).isInstanceOf(AccessDeniedException.class);
     }
-    @Test void unallocatedWaiverMarksPersonalBalancesUnavailable(){
+    @Test void conservedWaiverKeepsPersonalBalancesKnown(){
         f.service.disburse(f.actor,s.funding());var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(LoanRecordingPostgresTest.TODAY.plusDays(15));f.context.getBean(LoanRepaymentLedgerService.class).waiveInterest(s.loan,f.actor,UUID.randomUUID(),clock.today(),new BigDecimal("1.00"),"Synthetic statement waiver needing allocation",null);
-        assertThat(own().source().known()).isFalse();assertThat(own().source().maximumLiability()).isNull();assertThat(own().source().dueInterest()).isNotNull();
+        assertThat(own().source().known()).isTrue();assertThat(own().source().member().waivedInterest()).isEqualByComparingTo("0.12");assertThat(own().credits()).anySatisfy(c->{assertThat(c.kind()).isEqualTo("INTEREST_WAIVER");assertThat(c.amount()).isZero();assertThat(c.waivedInterest()).isEqualByComparingTo("0.12");});assertThat(own().source().dueInterest()).isNotNull();
     }
     @Test void fullSettlementAndFundingCorrectionRemainDistinct(){
         f.service.disburse(f.actor,s.funding());var payment=f.service.repay(f.actor,s.payment("1000.01"));assertThat(own().source().member().remainingPrincipal()).isZero();assertThat(own().source().maximumLiability()).isZero();assertThat(own().source().member().excludedInterest()).isPositive();

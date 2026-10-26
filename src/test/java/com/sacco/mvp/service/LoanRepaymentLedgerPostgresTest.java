@@ -290,7 +290,7 @@ class LoanRepaymentLedgerPostgresTest {
                 LoanApplicationRepository loans, ObjectMapper mapper, ApplicationClock clock, AccessControlService access, AuditService audit, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
             return new LoanRepaymentLedgerService(ledgers, installments, payments, allocations, journal, loans, mapper, clock, access, audit,
                 org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanPostingGuard.class),
-                new com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService(new com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository(jdbcTemplate),clock,audit,org.mockito.Mockito.mock(com.sacco.mvp.accounting.service.VoucherService.class)));
+                new com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService(new com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository(jdbcTemplate),clock,audit,org.mockito.Mockito.mock(com.sacco.mvp.accounting.service.VoucherService.class),org.mockito.Mockito.mock(com.sacco.mvp.grouplending.service.GroupSharedLoanService.class)));
         }
     }
 }

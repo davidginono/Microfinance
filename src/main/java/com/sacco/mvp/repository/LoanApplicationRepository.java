@@ -36,6 +36,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     @Query("select l from LoanApplication l where l.id=:id")
     Optional<LoanApplication> findForDisbursement(@Param("id") UUID id);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from LoanApplication l where l.id=:id and l.saccoId=:institution and l.stationId=:branch")
+    Optional<LoanApplication> lockFinancialRecord(@Param("id") UUID id,@Param("institution") String institution,@Param("branch") String branch);
+
     interface BorrowerNameRow { UUID getLoanId(); String getName(); }
 
     interface BorrowerProfileRow {

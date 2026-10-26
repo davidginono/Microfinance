@@ -17,7 +17,7 @@ public class GroupSharedStatementService {
     private final GroupSharedLoanService shared;
     private final LoanRecordingService loans;
     private final GeneralLedgerService access;
-    public record Statement(UUID cycle,Detail parent,List<Balance> members,boolean funded) {}
+    public record Statement(UUID cycle,Detail parent,List<Balance> members,boolean funded) {public boolean known(){return members.stream().allMatch(Balance::known);}}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Statement statement(AppUserPrincipal a,UUID cycle,boolean export){
         if(export){access.requireActor(a,"GROUP_LENDING_EXPORT");loans.authorize(a,"EXPORT");}

@@ -43,7 +43,7 @@ class LoanPrepaymentCalculationTest {
     LoanPrepaymentService service(InterestMethod method,LoanPrepaymentTerms.PartialInterest partial){
         var repository=mock(LoanPrepaymentRepository.class);
         when(repository.terms(loan)).thenReturn(Optional.of(new LoanPrepaymentRepository.Terms(new LoanPrepaymentTerms(LoanPrepaymentTerms.Schedule.LAST_INSTALMENTS,partial,LoanPrepaymentTerms.DayBasis.ACTUAL_PERIOD),method,"CONTRACT")));
-        return new LoanPrepaymentService(repository,mock(ApplicationClock.class),mock(AuditService.class),mock(com.sacco.mvp.accounting.service.VoucherService.class));
+        return new LoanPrepaymentService(repository,mock(ApplicationClock.class),mock(AuditService.class),mock(com.sacco.mvp.accounting.service.VoucherService.class),mock(com.sacco.mvp.grouplending.service.GroupSharedLoanService.class));
     }
     @Test void reducingBalanceRebateUsesThePrepaidPrincipalUntilItsOriginalDueDate(){
         var a=row(1,start.plusMonths(1),"100.00");var b=row(2,start.plusMonths(2),"50.00");
