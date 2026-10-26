@@ -8,7 +8,6 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users &amp; Roles" /></p>
-    <h1 class="erp-page-title" id="admin-users-title"><spring:message code="admin.users.title" text="Users &amp; Roles" /></h1>
 </div>
 
 <c:if test="${not empty createdStaffUserId}">
@@ -28,7 +27,7 @@
 <section class="erp-table-wrap admin-register-shell admin-users-register" aria-label="<spring:message code='admin.users.title' />" data-resource-table="admin-users-1" data-resource-split data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
-            <h2><spring:message code="admin.users.title" /> <span class="app-table-count">(${userTotal})</span></h2>
+            <h2 id="admin-users-title" data-workspace-title><spring:message code="admin.users.title" /> <span class="app-table-count">(${userTotal})</span></h2>
         </div>
         <div class="app-table-toolbar">
 

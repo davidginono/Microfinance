@@ -102,13 +102,6 @@
         disabledOnSubmit.forEach(button => button.disabled = false); disabledOnSubmit.clear();
         forms.forEach(form => form.querySelectorAll('[data-account-version-command]').forEach(input => input.remove()));
     });
-    forms.forEach((form, formIndex) => form.querySelectorAll('label').forEach((label, index) => {
-        const error = label.querySelector('.coa-error'), control = label.querySelector('input,select,textarea');
-        if (!error || !control) return;
-        error.id = `accounting-field-error-${formIndex}-${index}`; control.setAttribute('aria-invalid', 'true');
-        control.setAttribute('aria-describedby', error.id);
-        const details = label.closest('details'); if (details) details.open = true;
-    }));
     const failed = states.find(state => state.restoredErrors && !state.form.closest('.library-modal'));
     failed?.form.querySelector('.accounting-error-summary, .loan-error-summary')?.focus();
 })();

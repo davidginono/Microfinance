@@ -27,6 +27,8 @@
     <script src="<c:url value='/js/ui-loading.js' />" defer></script>
     <script src="<c:url value='/js/vendor/lucide-repayments.js' />" defer></script>
 <%@ include file="select-enhancer.jspf" %>
+    <link rel="stylesheet" href="<c:url value='/css/form-validation.css' />" />
+    <script src="<c:url value='/js/form-validation.js' />" defer></script>
 </head>
 <spring:message code="shell.control.results" var="shellControlresults" />
 <spring:message code="shell.control.refresh" var="shellControlrefresh" />
@@ -39,6 +41,14 @@
 <spring:message code="select.loadMore" var="selectLoadMore" />
 <body data-navigation-loading="<spring:message code='navigation.loading' text='Loading workspace…' />" data-navigation-error="<spring:message code='navigation.error' text='The workspace could not be loaded. Please try again.' />" data-navigation-retry="<spring:message code='navigation.retry' text='Try again' />" data-date-choose="<spring:message code='date.choose' />" data-date-invalid="<spring:message code='date.invalid' />" data-select-search="<c:out value='${selectSearch}' />" data-select-no-matches="<c:out value='${selectNoMatches}' />" data-select-load-more="<c:out value='${selectLoadMore}' />" data-search-unavailable="<c:out value='${searchUnavailable}' />" class="aws-console min-h-screen font-sans text-sacco-ink antialiased" data-shell-results="<c:out value='${shellControlresults}' />" data-shell-refresh="<c:out value='${shellControlrefresh}' />" data-shell-loading="<c:out value='${shellControlloading}' />" data-shell-select="<c:out value='${shellControlselect}' />" data-shell-no-options="<c:out value='${shellControlnoOptions}' />">
 <a class="aws-skip-link" href="#main-content"><spring:message code="common.skipToContent" text="Skip to main content" /></a>
+<span id="form-validation-labels" hidden
+      data-field="<spring:message code='validation.field' htmlEscape='true' />"
+      data-required="<spring:message code='validation.required' htmlEscape='true' />"
+      data-invalid="<spring:message code='validation.invalid' htmlEscape='true' />"
+      data-minimum="<spring:message code='validation.minimum' htmlEscape='true' />"
+      data-maximum="<spring:message code='validation.maximum' htmlEscape='true' />"
+      data-short="<spring:message code='validation.short' htmlEscape='true' />"
+      data-long="<spring:message code='validation.long' htmlEscape='true' />"></span>
 <script>
     if (!window.WorkspaceNavigation?.restoring && window.matchMedia("(min-width: 1024px)").matches) {
         document.documentElement.classList.add("shell-sidebar-collapsed");

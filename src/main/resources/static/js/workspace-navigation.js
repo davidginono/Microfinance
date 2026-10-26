@@ -305,7 +305,7 @@
             reveal();
             initialized=true;
             booting=false;window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
-            const title=document.querySelector('.erp-page-title,h1');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
+            const title=document.querySelector('.erp-page-title,h1,[data-workspace-title]');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
             if(!options.pop){const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));if(anchor)anchor.scrollIntoView();else window.scrollTo({top:0,left:0,behavior:'instant'});}
             document.dispatchEvent(new CustomEvent('workspace:navigated',{detail:{url:finalUrl.href}}));
         }catch(error){

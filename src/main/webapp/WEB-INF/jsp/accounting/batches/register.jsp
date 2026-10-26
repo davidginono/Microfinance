@@ -3,9 +3,9 @@
 <%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/accounting-vouchers.css' />" />
-<div class="accounting-workspace" data-voucher-register data-base="<c:url value='/finance/batches/receipts' />"><div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="batch.receipts" /></h1></div>
+<div class="accounting-workspace" data-voucher-register data-base="<c:url value='/finance/batches/receipts' />">
 <section class="erp-table-wrap" data-resource-table="receipt-batches" data-table-selection="single">
-<div class="app-table-titlebar"><h2><spring:message code="batch.saved" /></h2><div class="accounting-actions">
+<div class="app-table-titlebar"><h2 data-workspace-title><spring:message code="batch.saved" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="details" disabled><spring:message code="common.view" /></button>
 <sec:authorize access="@access.has(principal,'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal,'LOAN_RECORDING_POST')"><a class="app-btn btn-launch" href="<c:url value='/finance/batches/receipts/new' />"><spring:message code="batch.create" /></a></sec:authorize>
 </div></div>

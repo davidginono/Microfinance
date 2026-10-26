@@ -13,6 +13,34 @@
         if (text) element.textContent = text;
         return element;
     };
+    function removeRepeatedPageTitle(region, titlebar) {
+        const separateContext = '[data-dashboard-widget],[data-dashboard-board],form,dialog,[role="dialog"]';
+        if (region.closest(separateContext)) return;
+        const heading = titlebar.querySelector('h2,h3'); if (!heading) return;
+        const titleText = element => {
+            const copy = element.cloneNode(true);
+            copy.querySelectorAll('.app-table-count,[aria-hidden="true"]').forEach(child => child.remove());
+            return copy.textContent.replace(/\s+/g,' ').trim().toLocaleLowerCase();
+        };
+        const referenced = document.getElementById(region.dataset.tableTitleId);
+        const pageTitle = referenced?.matches('.erp-page-title,h1') ? referenced
+            : [...document.querySelectorAll('.erp-page-title,h1')].find(candidate => !region.contains(candidate) && !candidate.closest(separateContext) && titleText(candidate) === titleText(heading));
+        if (!pageTitle || region.contains(pageTitle) || pageTitle.closest(separateContext)) return;
+        // Keep the table's heading, count and commands; retire only its repeated page heading.
+        if (pageTitle.id && !heading.id) heading.id = pageTitle.id;
+        if (pageTitle.id && heading.id !== pageTitle.id) {
+            document.querySelectorAll('[aria-labelledby]').forEach(element => {
+                element.setAttribute('aria-labelledby', element.getAttribute('aria-labelledby').split(/\s+/).map(id => id === pageTitle.id ? heading.id : id).join(' '));
+            });
+            if (region.dataset.tableTitleId === pageTitle.id) region.dataset.tableTitleId = heading.id;
+        }
+        heading.dataset.workspaceTitle = '';
+        const header = pageTitle.closest('.erp-page-header'); let empty = pageTitle.parentElement;
+        pageTitle.remove();
+        while (header && (empty === header || header.contains(empty)) && !empty.children.length && !empty.textContent.trim()) {
+            const parent = empty.parentElement; empty.remove(); if (empty === header) break; empty = parent;
+        }
+    }
     function syncRowCount(heading, table, l, source) {
         if (!heading) return;
         let counter=heading.parentElement.querySelector('.app-table-count');
@@ -32,6 +60,7 @@
         const heading=region.querySelector(':scope > .app-table-titlebar h2,:scope > .app-table-titlebar h3,:scope > .erp-panel-header h2,:scope > .erp-panel-header h3');
         if(!table?.tHead?.rows[0] || !heading || table.closest('[data-resource-table],[data-dashboard-chart]'))return;
         if(region.hasAttribute('data-dashboard-widget') && table.closest('.erp-table-wrap'))return;
+        removeRepeatedPageTitle(region, heading.parentElement);
         region.dataset.tableSummaryCount='true';
         const update=()=>syncRowCount(heading,table,labels());
         update();
@@ -190,6 +219,7 @@
         }
         const duplicateHeading = region.querySelector(':scope > h2, :scope > h3');
         if (duplicateHeading && duplicateHeading.textContent.trim() === titlebar.querySelector('h2,h3')?.textContent.trim()) duplicateHeading.remove();
+        removeRepeatedPageTitle(region, titlebar);
         const syncCount = source => syncRowCount(titlebar.querySelector('h2,h3'),table,l,source);
         scroller.tabIndex = 0; scroller.setAttribute('role', 'region');
         scroller.setAttribute('aria-label', titlebar.querySelector('h2,h3')?.textContent.trim() || l.records);

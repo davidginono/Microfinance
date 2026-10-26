@@ -709,6 +709,7 @@
             });
             header.parentElement?.insertBefore(path, header);
             breadcrumb.remove();
+            if (!header.children.length && !header.textContent.trim()) header.remove();
         });
     };
     enhancePageBreadcrumbs();

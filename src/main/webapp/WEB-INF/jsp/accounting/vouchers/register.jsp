@@ -9,9 +9,8 @@
 <link rel="stylesheet" href="<c:url value='/css/accounting-vouchers.css' />" />
 
 <div class="accounting-workspace voucher-register" data-voucher-register data-base="<c:url value='${base}' />">
-<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="voucher.register.${voucherType}" /></h1></div>
 <section data-resource-table="accounting-vouchers-register-1" data-table-selection="single" data-resource-split data-table-page-size="${tablePageSize}" class="erp-table-wrap" data-aws-table-region>
-<div class="app-table-titlebar voucher-toolbar" data-aws-action-pin="true"><h2 class="erp-panel-title"><spring:message code="voucher.records" /></h2><div class="accounting-actions">
+<div class="app-table-titlebar voucher-toolbar" data-aws-action-pin="true"><h2 class="erp-panel-title" data-workspace-title><spring:message code="voucher.records" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-aws-table-refresh><spring:message code="common.refresh" /></button>
 <button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="details" disabled><spring:message code="common.view" /></button>
 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="pdf" disabled><spring:message code="voucher.pdf" /></button><button type="button" class="app-btn btn-neutral" data-table-command data-selection-action="print" disabled><spring:message code="voucher.print" /></button></sec:authorize>

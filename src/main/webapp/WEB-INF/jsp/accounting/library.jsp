@@ -11,12 +11,11 @@
 
 <c:set var="listBase" value="${isActivity?'/finance/library':'/finance/library/transactions'}" />
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library' />"><spring:message code="library.navigation" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" aria-current="page" href="<c:url value='${listBase}' />"><spring:message code="${isActivity?'library.activities':'library.transactions'}" /></a></nav>
-    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${isActivity?'library.activities':'library.transactions'}" /></h1></div>
 <div class="accounting-workspace accounting-resource-workspace">
     <c:if test="${not empty libraryError}"><p class="coa-error" role="alert"><spring:message code="${libraryError}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
     <section data-resource-table="accounting-library-1" data-table-selection="single" data-resource-split data-table-page-size="${tablePageSize}" class="erp-table-wrap" data-aws-table-region id="library-register">
-        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="${isActivity?'library.activityRegister':'library.transactionRegister'}" /></h2>
+        <div class="app-table-titlebar coa-titlebar"><h2 data-workspace-title><spring:message code="${isActivity?'library.activityRegister':'library.transactionRegister'}" /></h2>
             <div class="accounting-actions">
             <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" data-table-command id="library-status-form" data-url="<c:url value='/finance/library/${isActivity?"activities":"transactions"}/' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button type="submit" class="app-btn btn-neutral" id="library-status" disabled data-deactivate="<spring:message code='accounting.deactivate' />" data-reactivate="<spring:message code='coa.reactivate' />"><spring:message code="accounting.deactivate" /></button></form></sec:authorize>
             <button type="button" class="app-btn btn-neutral" data-table-command id="library-view" disabled><spring:message code="${isActivity?'library.transactions':'library.open'}" /></button>
