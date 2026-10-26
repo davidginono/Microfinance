@@ -26,10 +26,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,GroupOrganizationMvcTest.Config.class})
 class GroupOrganizationMvcTest {
-    @Autowired WebApplicationContext context;@Autowired GroupOrganizationService service;
+    @Autowired WebApplicationContext context;@Autowired GroupOrganizationService service;@Autowired com.sacco.mvp.grouplending.service.GroupOrganizationDocumentService documents;
     MockMvc mvc;AppUserPrincipal actor;UUID cycle=UUID.randomUUID(),authority=UUID.randomUUID(),client=UUID.randomUUID();
     String path(){return "/finance/groups/cycles/"+cycle+"/organization";}
-    @BeforeEach void setup(){reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+    @BeforeEach void setup(){reset(service,documents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
     void editor(){when(service.workspace(eq(actor),eq(cycle),any(CycleForm.class))).thenAnswer(i->new GroupOrganizationService.Workspace(null,null,null,null,i.getArgument(2),true));}
     @Test void submissionRequiresCsrfAndCannotBindPersonalBorrowerOrTenantFields()throws Exception{
         mvc.perform(post(path()).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(service);
@@ -59,9 +59,36 @@ class GroupOrganizationMvcTest {
         doThrow(new AccessDeniedException("Synthetic revoked submit")).when(service).authorize(eq(actor),eq("SUBMIT"));
         mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","submit")).andExpect(status().isForbidden());verify(service,never()).submit(any(),any(),any());
     }
+    @Test void documentUploadUsesThePrincipalAndKeepsCreditDraftFields()throws Exception{
+        var file=new org.springframework.mock.web.MockMultipartFile("agreementPdf","approved.pdf","application/pdf","%PDF-fixture".getBytes());
+        mvc.perform(multipart(path()).file(file).with(user(actor)).param("action","recordDocument")).andExpect(status().isForbidden());verifyNoInteractions(documents);
+        mvc.perform(multipart(path()).file(file).with(user(actor)).with(csrf()).param("action","recordDocument").param("organization.business","Retained draft activity").param("documentReference","Approved reference").param("documentLanguage","SW").param("documentChecked","true").param("institutionName","FOREIGN NAME").param("recordedBy",UUID.randomUUID().toString()))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl(path()));
+        verify(documents).record(eq(actor),eq(cycle),argThat(f->f.getOrganization().getBusiness().equals("Retained draft activity")),argThat(d->d.getDocumentReference().equals("Approved reference")&&d.getDocumentLanguage().equals("SW")&&d.isDocumentChecked()),any());verify(service,never()).submit(any(),any(),any());
+    }
+    @Test void documentValidationRetainsContactsAndCreditEdits()throws Exception{
+        editor();doThrow(new IllegalArgumentException("group.error.documentContacts")).when(documents).record(any(),any(),any(),any(),any());
+        mvc.perform(multipart(path()).file(new org.springframework.mock.web.MockMultipartFile("agreementPdf","approved.pdf","application/pdf","%PDF-fixture".getBytes())).with(user(actor)).with(csrf()).param("action","recordDocument").param("organization.business","Kept business").param("contactEmail","office@example.invalid"))
+            .andExpect(status().isOk()).andExpect(view().name("groups/organization")).andExpect(model().attributeHasErrors("documentForm"));
+        verify(service).workspace(eq(actor),eq(cycle),argThat(f->f.getOrganization().getBusiness().equals("Kept business")));
+    }
+    @Test void fullTermsDownloadUsesDocumentScope()throws Exception{
+        var document=UUID.randomUUID();when(documents.original(actor,cycle,document)).thenThrow(new AccessDeniedException("Synthetic scoped document denial"));mvc.perform(get(path()+"/documents/"+document+"/pdf").with(user(actor))).andExpect(status().isForbidden());
+    }
+    @Test void approvedTermsUseANativePdfAttachment()throws Exception{
+        var document=UUID.randomUUID();var bytes="%PDF-test".getBytes();when(documents.original(actor,cycle,document)).thenReturn(bytes);
+        mvc.perform(get(path()+"/documents/"+document+"/pdf").with(user(actor))).andExpect(status().isOk()).andExpect(header().string("Content-Type","application/pdf"))
+            .andExpect(header().string("Content-Disposition","attachment; filename=organization-terms.pdf")).andExpect(header().string("Cache-Control","no-store")).andExpect(content().bytes(bytes));
+    }
+    @Test void unsavedReplacementCannotBeSilentlyDiscardedOrSubmitted()throws Exception{
+        editor();for(var action:List.of("save","submit"))mvc.perform(multipart(path()).file(new org.springframework.mock.web.MockMultipartFile("agreementPdf","replacement.pdf","application/pdf","%PDF-fixture".getBytes())).with(user(actor)).with(csrf()).param("action",action).param("organization.business","Retained business").param("documentReference","Unrecorded replacement"))
+            .andExpect(status().isOk()).andExpect(view().name("groups/organization")).andExpect(model().attributeHasErrors("documentForm"));
+        verify(service,never()).save(any(),any(),any());verify(service,never()).submit(any(),any(),any());verifyNoInteractions(documents);
+    }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc static class Config {
         @Bean GroupOrganizationService organizationService(){return mock(GroupOrganizationService.class);}
-        @Bean GroupOrganizationController organizationController(GroupOrganizationService service){return new GroupOrganizationController(service);}
+        @Bean com.sacco.mvp.grouplending.service.GroupOrganizationDocumentService documents(){return mock(com.sacco.mvp.grouplending.service.GroupOrganizationDocumentService.class);}
+        @Bean GroupOrganizationController organizationController(GroupOrganizationService service,com.sacco.mvp.grouplending.service.GroupOrganizationDocumentService documents){return new GroupOrganizationController(service,documents);}
         @Bean ResourceBundleMessageSource messageSource(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
     }
 }

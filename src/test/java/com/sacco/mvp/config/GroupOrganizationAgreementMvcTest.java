@@ -23,10 +23,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,GroupOrganizationAgreementMvcTest.Config.class})
 class GroupOrganizationAgreementMvcTest {
-    @Autowired WebApplicationContext context;@Autowired GroupOrganizationAgreementService service;@Autowired GroupOrganizationAgreementDeliveryService delivery;
+    @Autowired WebApplicationContext context;@Autowired GroupOrganizationAgreementService service;@Autowired GroupOrganizationAgreementDeliveryService delivery;@Autowired GroupOrganizationAgreementExportService exports;
     MockMvc mvc;AppUserPrincipal actor;UUID cycle=UUID.randomUUID();String hash="a".repeat(64);
     String path(){return "/app/group-loans/"+cycle+"/organization-agreement";}
-    @BeforeEach void setup(){reset(service,delivery);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    @BeforeEach void setup(){reset(service,delivery,exports);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MEMBER).status(MemberStatus.ACTIVE).memberAccount(true).build(),EnumSet.allOf(UserClaim.class),false);}
     @Test void signatureAndCodeRequireCsrfAndCannotBindAnotherPerson()throws Exception{
         mvc.perform(post(path()+"/sign").with(user(actor)).param("packetHash",hash)).andExpect(status().isForbidden());
@@ -49,9 +49,16 @@ class GroupOrganizationAgreementMvcTest {
         doThrow(new IllegalArgumentException("group.error.otpDelivery")).when(delivery).send(eq(actor),eq(cycle),eq(hash),any());
         mvc.perform(post(path()+"/code").with(user(actor)).with(csrf()).param("packetHash",hash)).andExpect(status().is3xxRedirection()).andExpect(flash().attribute("consentError","group.error.otpDelivery"));
     }
+    @Test void pdfDelegatesToTheScopedFullDocumentUseCase()throws Exception{
+        mvc.perform(get(path()+"/pdf").with(user(actor))).andExpect(status().isMethodNotAllowed());
+        mvc.perform(post(path()+"/pdf").with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(exports);
+        when(exports.client(eq(actor),eq(cycle),any())).thenReturn("%PDF-test".getBytes());mvc.perform(post(path()+"/pdf").with(user(actor)).with(csrf())).andExpect(status().isOk()).andExpect(header().string("Content-Type","application/pdf")).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("Content-Disposition","attachment; filename=organization-agreement.pdf"));
+        verify(exports).client(eq(actor),eq(cycle),any());reset(exports);when(exports.client(any(),any(),any())).thenThrow(new AccessDeniedException("Synthetic missing export permission"));mvc.perform(post(path()+"/pdf").with(user(actor)).with(csrf())).andExpect(status().isForbidden());
+    }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc static class Config {
         @Bean GroupOrganizationAgreementService signing(){return mock(GroupOrganizationAgreementService.class);}
         @Bean GroupOrganizationAgreementDeliveryService delivery(){return mock(GroupOrganizationAgreementDeliveryService.class);}
-        @Bean GroupOrganizationAgreementController controller(GroupOrganizationAgreementService s,GroupOrganizationAgreementDeliveryService d){return new GroupOrganizationAgreementController(s,d);}
+        @Bean GroupOrganizationAgreementExportService exports(){return mock(GroupOrganizationAgreementExportService.class);}
+        @Bean GroupOrganizationAgreementController controller(GroupOrganizationAgreementService s,GroupOrganizationAgreementDeliveryService d,GroupOrganizationAgreementExportService e){return new GroupOrganizationAgreementController(s,d,e);}
     }
 }

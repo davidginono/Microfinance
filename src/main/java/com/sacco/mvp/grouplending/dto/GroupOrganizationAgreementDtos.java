@@ -23,10 +23,12 @@ public final class GroupOrganizationAgreementDtos {
         BigDecimal periodicRepaymentAmount,BigDecimal maximumInstallmentAmount,BigDecimal interestAmount,
         Plan recordedCharges,BigDecimal recordedChargeTotal,BigDecimal recordedChargeDeductions,
         BigDecimal recordedNetCashEstimate,BigDecimal recordedTotalPayable,Map<String,Object> prepaymentTerms) {}
-    public record Snapshot(Organization organization,Authority authority,Loan loan,Finance financial,PaymentDetailsView payout) {}
+    public record Snapshot(Organization organization,Authority authority,Loan loan,Finance financial,PaymentDetailsView payout,
+        GroupOrganizationDocumentDtos.Document document) {}
     public record Row(UUID cycle,Snapshot snapshot,String hash,OffsetDateTime preparedAt,String state,String loanStatus,
         int signedCount,boolean signed,OffsetDateTime signedAt,boolean currentAuthority) {}
     public record Packet(UUID cycle,Snapshot snapshot,String hash,String state,String loanStatus,int signedCount,
         boolean signed,OffsetDateTime signedAt,boolean canSign,boolean signatureReady,boolean otpRequired,
-        List<ScheduleRow> schedule,int page,boolean hasNext) {}
+        List<ScheduleRow> schedule,int page,boolean hasNext,boolean documentOpened) {}
+    public record ExportData(Row row,byte[] terms,List<GroupOrganizationDocumentDtos.Signature> signatures) {}
 }

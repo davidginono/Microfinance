@@ -15,7 +15,9 @@ import java.util.*;
 public class GroupOrganizationAgreementController {
     private final GroupOrganizationAgreementService agreements;
     private final GroupOrganizationAgreementDeliveryService delivery;
+    private final GroupOrganizationAgreementExportService exports;
     @GetMapping public String packet(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model model){model.addAttribute("packet",agreements.packet(actor,id,page));return "groups/organization-agreement";}
+    @PostMapping("/pdf") public org.springframework.http.ResponseEntity<byte[]> pdf(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Locale locale){return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF).cacheControl(org.springframework.http.CacheControl.noStore()).header("Content-Disposition","attachment; filename=organization-agreement.pdf").body(exports.client(actor,id,locale));}
     @PostMapping("/sign") public String sign(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam String packetHash,
         @RequestParam(defaultValue="false") boolean accepted,@RequestParam(defaultValue="") String otpCode,RedirectAttributes flash){
         String error=agreements.sign(actor,id,packetHash,accepted,otpCode);if(error!=null)flash.addFlashAttribute("consentError",error);return redirect(id);

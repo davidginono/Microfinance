@@ -23,6 +23,7 @@ public class GroupOrganizationService {
     private final GroupLendingRepository groups;
     private final GroupAuthorityRepository authorities;
     private final GroupOrganizationRepository organizations;
+    private final GroupOrganizationDocumentRepository documents;
     private final GeneralLedgerService access;
     private final LoanRecordingService loans;
     private final LoanQualificationPolicyService qualification;
@@ -30,13 +31,16 @@ public class GroupOrganizationService {
     private final AuditService audit;
     private final ObjectMapper json;
 
-    public record Workspace(Cycle cycle,Policy policy,Authority authority,OrganizationLoan loan,CycleForm form,boolean supported) {}
+    public record Workspace(Cycle cycle,Policy policy,Authority authority,OrganizationLoan loan,CycleForm form,boolean supported,
+        com.sacco.mvp.grouplending.dto.GroupOrganizationDocumentDtos.Document document) {
+        public Workspace(Cycle c,Policy p,Authority a,OrganizationLoan l,CycleForm f,boolean s){this(c,p,a,l,f,s,null);}
+    }
     public void authorize(AppUserPrincipal a,String action){access.requireActor(a,"GROUP_LENDING_"+action);access.requireActor(a,"GROUP_AUTHORITY_VIEW");}
     @Transactional(readOnly=true) public Workspace workspace(AppUserPrincipal a,UUID id,CycleForm submitted){
         authorize(a,"VIEW");var c=cycles.cycle(a,id,false);check(c.model()==Model.ORGANIZATION,"request");var f=submitted==null?c.form():submitted;
         if(submitted==null){f.setExpectedVersion(c.version());if(f.getOrganization()==null){f.setOrganization(new OrganizationForm());f.setParticipants(new ArrayList<>());f.getOrganization().setAuthorityId(authorities.latest(a,c.groupId()).orElse(null));}}
         var org=f.getOrganization();var authority=org==null || org.getAuthorityId()==null?null:authorities.authority(a,c.groupId(),org.getAuthorityId(),clock.today());
-        return new Workspace(c,cycles.policy(a,c.policyId()),authority,organizations.loan(a,id).orElse(null),f,organizations.enabled(a,c.policyId()));
+        return new Workspace(c,cycles.policy(a,c.policyId()),authority,organizations.loan(a,id).orElse(null),f,organizations.enabled(a,c.policyId()),documents.latest(a,id).orElse(null));
     }
     @Transactional public void save(AppUserPrincipal a,UUID id,CycleForm f){
         authorize(a,"UPDATE");draft(f);var c=cycles.cycle(a,id,true);check(c.model()==Model.ORGANIZATION && "DRAFT".equals(c.state()) && c.policyId().equals(f.getPolicyId()),"changed");
@@ -51,6 +55,7 @@ public class GroupOrganizationService {
         authorize(a,"SUBMIT");loans.authorize(a,"CREATE");draft(f);var c=cycles.cycle(a,id,true);
         if("SUBMITTED".equals(c.state()) && c.version()==f.getExpectedVersion()+1 && json.writeValueAsString(c.form()).equals(json.writeValueAsString(f)))return organizations.loan(a,id).orElseThrow().loanId();
         check(c.model()==Model.ORGANIZATION && "DRAFT".equals(c.state()) && c.version()==f.getExpectedVersion() && c.policyId().equals(f.getPolicyId()),"changed");
+        check(documents.latest(a,id).isPresent(),"documentRequired");
         check(organizations.enabled(a,c.policyId()),"organizationPolicy");cycles.lockProductPolicy(a,c.productId());var p=cycles.policy(a,c.policyId());check(p.enabled() && cycles.current(p,a) && cycles.product(a,c.productId()),"policy");
         var group=groups.group(a,c.groupId(),true);check("ACTIVE".equals(group.status()) && "ORGANIZATION".equals(group.legalForm()),"organizationIdentity");
         var o=f.getOrganization();check(o.getAuthorityId()!=null && o.getRepresentativeId()!=null,"authoritySigners");var h=authorities.authority(a,c.groupId(),o.getAuthorityId(),clock.today());

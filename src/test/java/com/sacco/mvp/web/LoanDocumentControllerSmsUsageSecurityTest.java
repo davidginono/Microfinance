@@ -261,7 +261,8 @@ class LoanDocumentControllerSmsUsageSecurityTest {
                 auditService,
                 access,
                 adminScopeService,
-                smsUsageManagementService
+                smsUsageManagementService,
+                Mockito.mock(com.sacco.mvp.grouplending.service.GroupOrganizationAgreementExportService.class)
             );
         }
 

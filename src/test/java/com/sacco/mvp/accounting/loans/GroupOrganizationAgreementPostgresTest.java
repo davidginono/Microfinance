@@ -24,13 +24,15 @@ import static org.mockito.Mockito.*;
 class GroupOrganizationAgreementPostgresTest {
     final GroupOrganizationPostgresTest o=new GroupOrganizationPostgresTest();
     GroupOrganizationAgreementService service;AppUserPrincipal signer;UUID cycle,loan;String hash;
-    @BeforeAll void start(){o.f.context=new AnnotationConfigApplicationContext(Config.class);o.f.jdbc=o.f.context.getBean(JdbcTemplate.class);o.f.service=o.f.context.getBean(com.sacco.mvp.accounting.loans.service.LoanRecordingService.class);
+    @BeforeAll void start(){start(Config.class);}
+    void start(Class<?> configuration){o.f.context=new AnnotationConfigApplicationContext(configuration);o.f.jdbc=o.f.context.getBean(JdbcTemplate.class);o.f.service=o.f.context.getBean(com.sacco.mvp.accounting.loans.service.LoanRecordingService.class);
         o.service=o.f.context.getBean(GroupOrganizationService.class);o.authorities=o.f.context.getBean(GroupAuthorityService.class);o.cycles=o.f.context.getBean(GroupCycleService.class);o.groups=o.f.context.getBean(GroupLendingService.class);service=o.f.context.getBean(GroupOrganizationAgreementService.class);}
     @AfterAll void stop(){o.stop();}
     @BeforeEach void fixture(){o.fixture();reset(o.f.context.getBean(StationOtpSettingsService.class));reset(o.f.context.getBean(StationOtpDeliveryService.class));
         o.f.context.getBean(org.springframework.mock.env.MockEnvironment.class).setProperty("app.auth.otp.ttl-minutes","10");
         var form=o.form();cycle=o.create(form);loan=o.service.submit(o.f.actor,cycle,form);signer=client(o.f.client);
-        hash=service.packet(signer,cycle,0).hash();}
+        hash=service.packet(signer,cycle,0).hash();openDocument(signer,cycle);}
+    void openDocument(AppUserPrincipal person,UUID id){o.f.context.getBean(GroupOrganizationAgreementExportService.class).client(person,id,Locale.ENGLISH);}
     AppUserPrincipal client(UUID id){var member=Member.builder().id(id).saccoId(o.f.institution).stationId("B1").memberNo(id.toString()).fullName("Synthetic named signatory").status(MemberStatus.ACTIVE).position(Position.MEMBER).memberAccount(true).signatureText("Synthetic representative signature").email("signer@example.invalid").build();
         o.f.jdbc.update("update members set signature_text=?,signature_registered_at=now() where id=?",member.getSignatureText(),id);
         when(o.f.context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(member));return new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),false);}
@@ -103,6 +105,7 @@ class GroupOrganizationAgreementPostgresTest {
         var withdrawal=new com.sacco.mvp.grouplending.dto.GroupCycleDtos.TerminationForm();withdrawal.setExpectedVersion(o.f.jdbc.queryForObject("select version from lending_group_cycle where id=?",Integer.class,cycle));withdrawal.setReason("Synthetic replacement for two-signatory authority");o.cycles.withdraw(o.f.actor,cycle,withdrawal);
         var next=o.authorityForm();next.setRequiredSignatures(2);var named=new com.sacco.mvp.grouplending.dto.GroupAuthorityDtos.SignerForm();named.setClientId(second);named.setMaySign(true);next.getSigners().add(named);o.authority=o.authorities.record(o.f.actor,o.group,next);
         var request=o.form();var otherCycle=o.create(request);o.service.submit(o.f.actor,otherCycle,request);var otherSigner=client(second);var otherHash=service.packet(signer,otherCycle,0).hash();
+        openDocument(signer,otherCycle);openDocument(otherSigner,otherCycle);
         try(var pool=Executors.newFixedThreadPool(2)){var gate=new CountDownLatch(1);var jobs=List.of(pool.submit(()->{gate.await();return service.sign(signer,otherCycle,otherHash,true,"");}),pool.submit(()->{gate.await();return service.sign(otherSigner,otherCycle,otherHash,true,"");}));gate.countDown();for(var job:jobs)assertThat(job.get(20,TimeUnit.SECONDS)).isNull();}
         assertThat(service.packet(signer,otherCycle,0).signedCount()).isEqualTo(2);assertThat(service.packet(otherSigner,otherCycle,0).snapshot().authority().requiredSignatures()).isEqualTo(2);
         assertThat(count("loan_ledgers")).isZero();
@@ -134,7 +137,12 @@ class GroupOrganizationAgreementPostgresTest {
     }
     @Configuration(proxyBeanMethods=false) @Import(GroupOrganizationPostgresTest.Config.class) static class Config {
         @Bean GroupOrganizationAgreementRepository agreements(JdbcTemplate j,ObjectMapper json){return new GroupOrganizationAgreementRepository(j,json);}
-        @Bean GroupOrganizationAgreementService signing(GroupOrganizationAgreementRepository r,MemberDirectoryService m,UserClaimService c,SaccoRegistryService i,ApplicationClock clock,AuditService a,StationOtpSettingsService otp,org.springframework.mock.env.MockEnvironment env){return new GroupOrganizationAgreementService(r,m,new AccessControlService(),c,i,clock,a,otp,new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(4),env);}
+        @Bean GroupOrganizationAgreementService signing(GroupOrganizationAgreementRepository r,GroupOrganizationDocumentRepository d,MemberDirectoryService m,UserClaimService c,SaccoRegistryService i,ApplicationClock clock,AuditService a,StationOtpSettingsService otp,org.springframework.mock.env.MockEnvironment env){return new GroupOrganizationAgreementService(r,d,m,new AccessControlService(),c,i,clock,a,otp,new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(4),env);}
         @Bean GroupOrganizationAgreementDeliveryService organizationDelivery(GroupOrganizationAgreementService s,StationOtpDeliveryService d){var m=new org.springframework.context.support.ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return new GroupOrganizationAgreementDeliveryService(s,d,m);}
+        @Bean org.springframework.context.support.ResourceBundleMessageSource messageSource(){var m=new org.springframework.context.support.ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
+        @Bean ReportExportLimiter exportLimiter(){return new ReportExportLimiter(1);}
+        @Bean GroupOrganizationAgreementPdf pdf(org.springframework.context.MessageSource messages,ReportExportLimiter limiter){return new GroupOrganizationAgreementPdf(messages);}
+        @Bean com.sacco.mvp.security.AuthzService authz(com.sacco.mvp.repository.LoanApplicationRepository l,com.sacco.mvp.repository.GuarantorRequestRepository g,com.sacco.mvp.repository.BoardReviewRepository b){return new com.sacco.mvp.security.AuthzService(l,g,b,new AccessControlService());}
+        @Bean GroupOrganizationAgreementExportService exports(GroupOrganizationAgreementService s,GroupOrganizationAgreementRepository r,GroupOrganizationDocumentRepository d,GroupOrganizationAgreementPdf pdf,com.sacco.mvp.accounting.service.GeneralLedgerService a,com.sacco.mvp.security.AuthzService authz,org.springframework.transaction.PlatformTransactionManager tx,ApplicationClock clock,AuditService audit,ReportExportLimiter limiter){return new GroupOrganizationAgreementExportService(s,r,d,pdf,a,authz,tx,clock,audit,limiter);}
     }
 }

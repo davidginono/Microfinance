@@ -63,6 +63,7 @@ public class LoanDocumentController {
     private final AccessControlService access;
     private final AdminScopeService adminScopeService;
     private final SmsUsageManagementService smsUsageManagementService;
+    private final com.sacco.mvp.grouplending.service.GroupOrganizationAgreementExportService organizationAgreements;
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal) and @access.has(principal, 'LOAN_DOCUMENTS_EXPORT')")
@@ -70,6 +71,8 @@ public class LoanDocumentController {
                                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                                     @RequestParam(name = "signatureMode", defaultValue = "signed") String signatureMode) {
         boolean includeRecordedSignatures = !"unsigned".equalsIgnoreCase(signatureMode);
+        var organization=organizationAgreements.staffLoan(principal,loanId,org.springframework.context.i18n.LocaleContextHolder.getLocale(),includeRecordedSignatures);
+        if(organization.isPresent())return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=organization-agreement.pdf").cacheControl(org.springframework.http.CacheControl.noStore()).body(organization.get());
         LoanApplication app = loanPresentationService.findLoan(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
