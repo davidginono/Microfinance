@@ -76,6 +76,7 @@ public class DisbursementController {
     private final com.sacco.mvp.service.ArchivedLoanDeletionService archivedLoanDeletionService;
     private final ManagerService managerService;
     private final com.sacco.mvp.accounting.loans.service.LoanRecordingService loanRecordingService;
+    private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
@@ -394,9 +395,11 @@ public class DisbursementController {
         boolean recordedApplication=loanRecordingService.recordedForStaff(principal,app.getId());
         model.addAttribute("recordedLoanApplication",recordedApplication);
         if(!model.containsAttribute("disbursementRequestKey"))model.addAttribute("disbursementRequestKey",UUID.randomUUID());
-        boolean organizationFundingPending = app.getApplicantMemberId()==null;
+        var organizationContext=app.getApplicantMemberId()==null?organizationFunding.context(principal,id).orElse(null):null;
+        model.addAttribute("organizationFunding",organizationContext);
+        boolean organizationFundingPending = app.getApplicantMemberId()==null && app.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT && (organizationContext==null || !organizationContext.ready());
         model.addAttribute("organizationFundingPending",organizationFundingPending);
-        boolean canDisburseLoan = !organizationFundingPending && access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE") && (!recordedApplication || loanRecordingService.allowedTeller(app,principal.getMemberId()));
+        boolean canDisburseLoan = !organizationFundingPending && (app.getApplicantMemberId()!=null || access.has(principal,"GROUP_LENDING_EXECUTE")) && access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE") && (!recordedApplication || loanRecordingService.allowedTeller(app,principal.getMemberId()));
         if(recordedApplication && canDisburseLoan) {
             for(var accountType:List.of("Money","Principal","Interest")) {
                 var retained=model.getAttribute("posting"+accountType+"AccountId");
@@ -479,6 +482,8 @@ public class DisbursementController {
                            @RequestParam(required = false) Long settlementChargeSequence,
                            @RequestParam(required = false) String settlementEvidence,
                            @RequestParam(defaultValue = "false") boolean settlementConfirmed,
+                           @RequestParam(required = false) String organizationPacketHash,
+                           @RequestParam(defaultValue = "false") boolean organizationAccepted,
                            @RequestParam(required = false) List<MultipartFile> attachments,
                            RedirectAttributes ra) {
         try {
@@ -489,6 +494,7 @@ public class DisbursementController {
             if(loanRecordingService.recordedForStaff(principal,id)) {
                 var form=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm();
                 form.setRequestKey(requestKey);form.setLoanId(id);form.setEffectiveDate(disbursementDate);form.setFirstPaymentDate(firstRepaymentDate);
+                if(application.getApplicantMemberId()==null){form.setOrganizationPacketHash(organizationPacketHash);form.setOrganizationAccepted(organizationAccepted);}
                 form.setAmount(application.getAmount());form.setMoneyAccountId(moneyAccountId);form.setPrincipalAccountId(principalAccountId);
                 form.setInterestAccountId(interestAccountId);form.setSettlementSequence(settlementSequence);form.setSettlementPrincipal(settlementPrincipal);form.setSettlementInterest(settlementInterest);form.setSettlementCharges(settlementCharges);form.setSettlementChargeSequence(settlementChargeSequence);form.setEvidence(settlementEvidence==null?"":settlementEvidence);
                 if(application.getTopUpSourceLoanId()!=null && !settlementConfirmed)throw new IllegalArgumentException("recording.error.topUpChanged");

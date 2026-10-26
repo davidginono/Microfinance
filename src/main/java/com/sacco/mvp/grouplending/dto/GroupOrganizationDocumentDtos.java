@@ -15,5 +15,7 @@ public final class GroupOrganizationDocumentDtos {
     public record Document(UUID id,int revision,String filename,String language,String sha256,long sizeBytes,int pageCount,String reference,
         String institutionName,String branch,String institutionAddress,String contactPhone,String contactEmail,
         String complaintPhone,String complaintEmail,String complaintAddress,OffsetDateTime recordedAt) {}
-    public record Signature(String name,String number,OffsetDateTime at,boolean otpRequired) {}
+    public record Signature(String name,String number,OffsetDateTime at,boolean otpRequired,boolean lender) {
+        public Signature(String name,String number,OffsetDateTime at,boolean otpRequired){this(name,number,at,otpRequired,false);}
+    }
 }

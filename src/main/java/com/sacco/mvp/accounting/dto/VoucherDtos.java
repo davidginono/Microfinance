@@ -17,6 +17,8 @@ public final class VoucherDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private UUID activityId;
         private String receiptPurpose="OTHER";
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private String loanPayer;
         private UUID clientId,interestAccountId;
         private List<RowForm> rows=new ArrayList<>(List.of(new RowForm()));
     }
@@ -51,8 +53,9 @@ public final class VoucherDtos {
     }
     public record Page(List<Voucher> rows,int page,boolean hasNext) {}
     public record Preview(List<Transaction> rows,BigDecimal total) {}
-    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group) {
-        public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows){this(header,clientNumber,rows,null);}
+    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group,String payer) {
+        public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows){this(header,clientNumber,rows,null,"");}
+        public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group){this(header,clientNumber,rows,group,"");}
     }
     public record GroupReceipt(UUID cycleId,String code,String name,List<ReceiptContribution> contributions,String reversesNumber,String reversedByNumber) {
         public GroupReceipt(UUID cycleId,String code,String name,List<ReceiptContribution> contributions){this(cycleId,code,name,contributions,"","");}

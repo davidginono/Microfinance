@@ -20,7 +20,7 @@ public class LoanAdjustmentRepository {
         d.recorded_at decided_at,d.journal_id,dr.name debit_name,cr.name credit_name,
         i.sacco_name institution,coalesce(nullif(s.address_location,''),s.station_id) branch
         from loan_adjustment_request q join loan_applications a on a.id=q.loan_id
-        join members m on m.id=a.applicant_member_id join members u on u.id=q.actor_id
+        join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id join members u on u.id=q.actor_id
         join registered_saccos i on i.sacco_id=q.sacco_id
         join sacco_stations s on s.sacco_id=q.sacco_id and s.station_id=q.station_id
         join gl_account dr on dr.id=q.debit_account_id join gl_account cr on cr.id=q.credit_account_id
@@ -36,7 +36,7 @@ public class LoanAdjustmentRepository {
             b.allowance,b.written_off,b.last_adjustment,greatest(b.last_date,l.last_payment_date) last_date,b.allowance_account,b.write_off_journal,
             p.principal_account_id,p.money_account_id,p.journal_id,p.actor_id,(select maker_id from gl_journal where id=b.write_off_journal) write_off_posted_by
             from accountant_loan_record r join loan_applications a on a.id=r.loan_id
-            join loan_ledgers l on l.loan_application_id=a.id join members m on m.id=a.applicant_member_id
+            join loan_ledgers l on l.loan_application_id=a.id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id
             join accountant_loan_post p on p.loan_id=a.id and p.kind='DISBURSEMENT' and p.state='POSTED'
             join loan_adjustment_balance b on b.loan_id=a.id
             where r.loan_id=? and r.sacco_id=? and r.station_id=? and a.sacco_id=r.sacco_id and a.station_id=r.station_id
@@ -44,7 +44,7 @@ public class LoanAdjustmentRepository {
     }
     public List<Choice> loans(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select a.id,a.loan_id||' - '||m.full_name label from accountant_loan_record r
-        join loan_applications a on a.id=r.loan_id join members m on m.id=a.applicant_member_id
+        join loan_applications a on a.id=r.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id
         join loan_ledgers l on l.loan_application_id=a.id
         where r.sacco_id=? and r.station_id=? and a.status in ('DISBURSED','PAR','DEFAULTED','WRITTEN_OFF','PAID')
         and exists(select 1 from accountant_loan_post p where p.loan_id=a.id and p.kind='DISBURSEMENT' and p.state='POSTED')

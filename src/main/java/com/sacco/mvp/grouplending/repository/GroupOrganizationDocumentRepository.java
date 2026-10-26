@@ -24,9 +24,11 @@ public class GroupOrganizationDocumentRepository {
     public boolean opened(AppUserPrincipal a,UUID cycle,UUID document,String hash){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_org_document_access where cycle_id=? and client_id=? and document_id=? and sacco_id=? and station_id=? and packet_hash=?)",Boolean.class,cycle,a.getMemberId(),document,a.getSaccoId(),a.getStationId(),hash));}
     public void opened(AppUserPrincipal a,UUID cycle,UUID document,String hash,OffsetDateTime at){jdbc.update("insert into lending_group_org_document_access(cycle_id,client_id,document_id,sacco_id,station_id,packet_hash,requested_at) values(?,?,?,?,?,?,?) on conflict(cycle_id,client_id,document_id) do nothing",cycle,a.getMemberId(),document,a.getSaccoId(),a.getStationId(),hash,at);}
     public List<Signature> signatures(AppUserPrincipal a,UUID cycle){return jdbc.query("""
-        select n.name,n.client_number,s.signed_at,s.otp_required from lending_group_org_signature s
+        select n.name,n.client_number,s.signed_at,s.otp_required,false lender from lending_group_org_signature s
         join lending_group_org_agreement p on p.cycle_id=s.cycle_id
         join lending_group_authority_signer n on n.authority_id=p.authority_id and n.client_id=s.client_id
-        where s.cycle_id=? and s.sacco_id=? and s.station_id=? order by s.signed_at,s.client_id limit 50
-        """,(r,n)->new Signature(r.getString("name"),r.getString("client_number"),r.getObject("signed_at",OffsetDateTime.class),r.getBoolean("otp_required")),cycle,a.getSaccoId(),a.getStationId());}
+        where s.cycle_id=? and s.sacco_id=? and s.station_id=?
+        union all select actor_name,actor_number,signed_at,false,true from lending_group_org_funding
+        where cycle_id=? and sacco_id=? and station_id=? order by signed_at,client_number limit 51
+        """,(r,n)->new Signature(r.getString("name"),r.getString("client_number"),r.getObject("signed_at",OffsetDateTime.class),r.getBoolean("otp_required"),r.getBoolean("lender")),cycle,a.getSaccoId(),a.getStationId(),cycle,a.getSaccoId(),a.getStationId());}
 }

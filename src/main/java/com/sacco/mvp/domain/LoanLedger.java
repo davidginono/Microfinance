@@ -15,7 +15,7 @@ public class LoanLedger {
     @Column(name = "sacco_id", nullable = false) private String saccoId;
     @Column(name = "station_id", nullable = false) private String stationId;
     @Column(name = "loan_id", nullable = false, length = 20) private String loanId;
-    @Column(name = "applicant_member_id", nullable = false) private UUID applicantMemberId;
+    @Column(name = "applicant_member_id") private UUID applicantMemberId;
     @Column(name = "disbursement_date", nullable = false) private LocalDate disbursementDate;
     @Column(nullable = false, precision = 18, scale = 2) private BigDecimal principal;
     @Column(name = "principal_paid", nullable = false, precision = 18, scale = 2) private BigDecimal principalPaid;

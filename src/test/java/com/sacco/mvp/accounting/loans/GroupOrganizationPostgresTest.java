@@ -57,7 +57,7 @@ class GroupOrganizationPostgresTest {
         assertThat(row).containsEntry("applicant_member_id",null).containsEntry("kind","ORGANIZATION").containsEntry("group_id",group).containsEntry("payout","QA-ACCOUNT");
         assertThat(groups.detail(f.actor,group).members()).isZero();assertThat(count("loan_applications")).isEqualTo(1);assertThat(count("lending_group_facility")).isEqualTo(1);
         for(String table:List.of("loan_ledgers","gl_journal","lending_group_guarantee","lending_group_participant"))assertThat(count(table)).as(table).isZero();
-        var detail=f.service.detail(f.actor,loan);assertThat(detail.loan().clientId()).isNull();assertThat(detail.loan().client()).isEqualTo("Synthetic organization <Company>");assertThat(detail.contractualInterest()).isEqualByComparingTo("20.00");
+        var detail=f.service.detail(f.actor,loan);assertThat(detail.loan().clientId()).isEqualTo(f.jdbc.queryForObject("select borrower_party_id from loan_applications where id=?",UUID.class,loan));assertThat(detail.loan().client()).isEqualTo("Synthetic organization <Company>");assertThat(detail.contractualInterest()).isEqualByComparingTo("20.00");
         assertThat(service.workspace(f.actor,cycle,null).loan().loanId()).isEqualTo(loan);assertThat(status(loan)).isEqualTo("READY_FOR_DISBURSEMENT");
     }
     @Test void productReviewOrderAndFrozenPricingRemainAuthoritative(){

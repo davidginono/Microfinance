@@ -16,7 +16,7 @@ public class LoanRecordingRepository {
     public boolean organizationParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='ORGANIZATION' and g.legal_form='ORGANIZATION' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     private final JdbcTemplate jdbc;
     private static final String LOANS="""
-        select coalesce(c.outstanding,0) charges,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
+        select coalesce(c.outstanding,0) charges,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.party_id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
         a.amount,a.status,(m.kind='CLIENT' and a.top_up_source_loan_id is null and a.status='DISBURSED' and coalesce(l.principal-l.principal_paid,0)>0 and coalesce((select loan_top_up_enabled from sacco_settings where sacco_id=a.sacco_id),true) and not exists(select 1 from loan_applications child where child.top_up_source_loan_id=a.id and child.status not in ('WITHDRAWN','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED','DISBURSEMENT_REVERSED','PAID'))) topup_eligible,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,
         coalesce(l.interest_paid,0) interest_paid,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.interest,0) end due_interest,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.arrears,0) end arrears,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.future,0) end future_interest
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id
@@ -40,16 +40,16 @@ public class LoanRecordingRepository {
     public UUID disbursementCorrection(AppUserPrincipal a,UUID posting){return jdbc.query("select q.id from loan_adjustment_request q join loan_adjustment_decision d on d.request_id=q.id join gl_journal j on j.id=d.journal_id and j.state='POSTED' join accountant_loan_post p on p.journal_id=q.reverses_journal_id where p.id=? and q.sacco_id=? and q.station_id=? and q.kind='DISBURSEMENT_REVERSAL'",(r,n)->r.getObject(1,UUID.class),posting,a.getSaccoId(),a.getStationId()).stream().findFirst().orElse(null);}
     public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){return jdbc.query("select receipt_id from accountant_loan_receipt_row where posting_id=? and sacco_id=? and station_id=? union all select receipt_id from lending_group_receipt_loan where posting_id=? and sacco_id=? and station_id=?",(r,n)->r.getObject(1,UUID.class),id,a.getSaccoId(),a.getStationId(),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<LoanRow> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page,LocalDate today){
-        return jdbc.query(LOANS+" where r.sacco_id=? and r.station_id=? and m.client_id=? and a.status in ('DISBURSED','PAR','DEFAULTED') and l.loan_application_id is not null and strpos(lower(a.loan_id),?)>0 order by a.loan_id,a.id limit 26 offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>)this::loan,today,today,today,a.getSaccoId(),a.getStationId(),client,search.toLowerCase(Locale.ROOT),page*25);
+        return jdbc.query(LOANS+" where r.sacco_id=? and r.station_id=? and m.party_id=? and a.status in ('DISBURSED','PAR','DEFAULTED') and l.loan_application_id is not null and strpos(lower(a.loan_id),?)>0 order by a.loan_id,a.id limit 26 offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>)this::loan,today,today,today,a.getSaccoId(),a.getStationId(),client,search.toLowerCase(Locale.ROOT),page*25);
     }
     public List<UUID> lockReceiptLoans(AppUserPrincipal a,List<UUID> ids,UUID client){
         var args=new ArrayList<Object>();args.add(a.getSaccoId());args.add(a.getStationId());args.add(client);args.add(client);args.addAll(ids);
-        return jdbc.query("select r.loan_id from accountant_loan_record r join loan_applications l on l.id=r.loan_id where r.sacco_id=? and r.station_id=? and (?::uuid is null or l.applicant_member_id=?::uuid) and r.loan_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by r.loan_id for update of r",(r,n)->r.getObject(1,UUID.class),args.toArray());
+        return jdbc.query("select r.loan_id from accountant_loan_record r join loan_applications l on l.id=r.loan_id where r.sacco_id=? and r.station_id=? and (?::uuid is null or l.borrower_party_id=?::uuid) and r.loan_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by r.loan_id for update of r",(r,n)->r.getObject(1,UUID.class),args.toArray());
     }
     public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){
         var args=new ArrayList<Object>();args.add(date);args.add(date);args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(ids);
         return jdbc.query("""
-            select l.id,l.applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,greatest(b.last_payment_date,c.last_date,(select max(effective_date) from loan_interest_waiver where loan_id=l.id)) last_payment_date,
+            select l.id,l.borrower_party_id applicant_member_id,l.loan_id,m.full_name,m.member_no,l.status,b.disbursement_date,greatest(b.last_payment_date,c.last_date,(select max(effective_date) from loan_interest_waiver where loan_id=l.id)) last_payment_date,
             b.principal-b.principal_paid outstanding,coalesce(d.principal,0) due_principal,coalesce(d.interest,0) due_interest,coalesce(c.outstanding,0) charges,
             r.product_name,ab.principal_account_id,ab.interest_account_id,pa.code||' - '||pa.name principal_account,ia.code||' - '||ia.name interest_account
             from accountant_loan_record r join loan_applications l on l.id=r.loan_id join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id
@@ -88,7 +88,7 @@ public class LoanRecordingRepository {
     private String loanWhere(){return """
         where r.sacco_id=? and r.station_id=? and (?='' or strpos(lower(coalesce(a.loan_id,a.application_number::text)||' '||m.full_name||' '||m.member_no),?)>0)
         and (?::date is null or r.application_date>=?::date) and (?::date is null or r.application_date<=?::date)
-        and (?='' or a.status=?) and (?::uuid is null or m.client_id=?::uuid)
+        and (?='' or a.status=?) and (?::uuid is null or m.party_id=?::uuid)
         and (?::uuid is null or a.loan_product_setting_id=?::uuid)
         """;}
     private Object[] loanArgs(AppUserPrincipal a,Filter f,LocalDate today){return new Object[]{today,today,today,a.getSaccoId(),a.getStationId(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.clientId(),f.clientId(),f.productId(),f.productId()};}
@@ -103,8 +103,18 @@ public class LoanRecordingRepository {
         and strpos(lower(member_no||' '||full_name),?)>0 order by member_no,id limit 26 offset ?
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
     public Optional<Choice> client(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no||' - '||full_name label from members where id=? and sacco_id=? and station_id=? and status='ACTIVE' and is_member",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
-    public List<Choice> ledgerClients(AppUserPrincipal a,String search,int page){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.sacco_id=? and ((m.station_id=? and m.is_member) or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?)) and strpos(lower(m.member_no||' '||m.full_name),?)>0 order by "+com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-clients-1",Map.of("client","m.member_no||' - '||m.full_name"),"m.id","m.member_no,m.id")+" limit 26 offset ?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
-    public Optional<Choice> ledgerClient(AppUserPrincipal a,UUID id){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label from members m where m.id=? and m.sacco_id=? and (m.station_id=? or exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?))",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId()).stream().findFirst();}
+    // clientId is the retained UI parameter; an organization selection carries its typed borrower party ID.
+    private static final String LEDGER_BORROWERS="""
+        select m.id,m.member_no,m.full_name,'CLIENT' kind from members m where m.sacco_id=?
+          and ((m.station_id=? and m.is_member) or exists(select 1 from accountant_loan_record r
+            join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?))
+        union all
+        select b.party_id,b.member_no,b.full_name,b.kind from loan_borrower_directory b where b.sacco_id=? and b.group_station_id=? and b.kind='ORGANIZATION'
+          and exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id
+            where l.borrower_party_id=b.party_id and r.sacco_id=b.sacco_id and r.station_id=b.group_station_id)
+        """;
+    public List<Choice> ledgerClients(AppUserPrincipal a,String search,int page){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label,m.kind from ("+LEDGER_BORROWERS+") m where strpos(lower(m.member_no||' '||m.full_name),?)>0 order by "+com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-clients-1",Map.of("client","m.member_no||' - '||m.full_name"),"m.id","m.member_no,m.id")+" limit 26 offset ?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("kind")),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
+    public Optional<Choice> ledgerClient(AppUserPrincipal a,UUID id){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label,m.kind from ("+LEDGER_BORROWERS+") m where m.id=?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("kind")),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),id).stream().findFirst();}
     public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client){return statementTerms(a,client,null);}
     public List<StatementTerms> statementTerms(AppUserPrincipal a,UUID client,UUID loan){return jdbc.query("""
         select coalesce((a.financial_snapshot->'recordedCharges')::text,'') charge_snapshot,a.id,a.tenor_months,coalesce(a.first_repayment_date,r.first_payment_date) first_payment_date,a.final_due_date,
@@ -119,7 +129,7 @@ public class LoanRecordingRepository {
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id
         join registered_saccos i on i.sacco_id=r.sacco_id
         join sacco_stations s on s.sacco_id=r.sacco_id and s.station_id=r.station_id
-        where a.applicant_member_id=? and r.sacco_id=? and r.station_id=? and (?::uuid is null or a.id=?)
+        where a.borrower_party_id=? and r.sacco_id=? and r.station_id=? and (?::uuid is null or a.id=?)
         order by r.application_date,a.id limit 501
         """,(r,n)->new StatementTerms(r.getObject("id",UUID.class),r.getBigDecimal("rate"),r.getString("frequency"),
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
@@ -177,7 +187,7 @@ public class LoanRecordingRepository {
     public Posting posting(AppUserPrincipal a,UUID id){return jdbc.query(POSTS+" where p.id=? and p.sacco_id=? and p.station_id=?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Posting unavailable"));}
     public Optional<Posting> loanOpening(AppUserPrincipal a,UUID loan){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='DISBURSEMENT' order by p.recorded_at,p.id limit 1",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Posting> loanPosts(AppUserPrincipal a,UUID loan,int limit,int offset){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? order by "+historyOrder()+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId(),limit,offset);}
-    public List<Posting> clientPosts(AppUserPrincipal a,UUID client,int limit,int offset){return jdbc.query(POSTS+" where a.applicant_member_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by "+historyOrder()+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,client,a.getSaccoId(),a.getStationId(),limit,offset);}
+    public List<Posting> clientPosts(AppUserPrincipal a,UUID client,int limit,int offset){return jdbc.query(POSTS+" where a.borrower_party_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by "+historyOrder()+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,client,a.getSaccoId(),a.getStationId(),limit,offset);}
     private String historyOrder() {
         var columns=Map.of("date","p.effective_date","loan","a.loan_id","product","r.product_name","reference","p.reference","kind","p.kind","amount","cash_amount","principal","p.principal_amount","interest","p.interest_amount","balance","p.principal_balance");
         String order=com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-details-1",columns,"p.id","p.recorded_at,p.id");

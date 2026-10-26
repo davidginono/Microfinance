@@ -19,6 +19,7 @@
     <properties>
         <java.version>25</java.version>
         <lombok.version>1.18.42</lombok.version>
+        <microfinance.build.directory>target</microfinance.build.directory>
     </properties>
 
     <dependencies>
@@ -132,6 +133,7 @@
     </dependencies>
 
     <build>
+        <directory>${microfinance.build.directory}</directory>
         <finalName>ROOT</finalName>
         <plugins>
             <plugin>

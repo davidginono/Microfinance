@@ -48,7 +48,7 @@ public class GroupOrganizationAgreementPdf {
                 page.endTable();page.section(label("orgDocument.signatures",locale));page.text(label("orgAgreement.signatures",locale)+": "+data.row().signedCount()+" / "+s.authority().requiredSignatures());
                 if(includeSignatures&&data.signatures().isEmpty())page.text(label("group.notSigned",locale));
                 if(!includeSignatures){page.text(label("orgDocument.physical",locale));for(int i=0;i<s.authority().requiredSignatures();i++)page.text(label("orgDocument.paperLine",locale));}
-                if(includeSignatures)for(var signature:data.signatures())page.text(signature.name()+" ("+signature.number()+") - "+signature.at().format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm xxx"))+" - "+label(signature.otpRequired()?"orgDocument.signatureOtp":"orgDocument.signature",locale));
+                if(includeSignatures)for(var signature:data.signatures())page.text((signature.lender()?label("orgFunding.lender",locale)+": ":"")+signature.name()+" ("+signature.number()+") - "+signature.at().format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm xxx"))+" - "+label(signature.otpRequired()?"orgDocument.signatureOtp":"orgDocument.signature",locale));
                 page.section(label("orgDocument.evidence",locale));page.text(label("orgDocument.packetHash",locale)+": "+data.row().hash());page.text(label("orgDocument.fileHash",locale)+": "+d.sha256());page.text(label("orgDocument.appended",locale));
             }
             new PDFMergerUtility().appendDocument(pdf,original);pdf.getDocumentInformation().setTitle(label("orgAgreement.title",locale));pdf.save(out);return out.toByteArray();

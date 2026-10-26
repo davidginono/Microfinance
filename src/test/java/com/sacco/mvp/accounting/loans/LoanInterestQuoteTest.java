@@ -16,7 +16,7 @@ class LoanInterestQuoteTest {
     private final GeneralLedgerService guard=mock(GeneralLedgerService.class);
     private final LoanProductSettingRepository products=mock(LoanProductSettingRepository.class);
     private final AppUserPrincipal actor=mock(AppUserPrincipal.class);
-    private final LoanRecordingService service=new LoanRecordingService(null,null,products,null,null,null,guard,null,null,null,null,null,null,null,null,null,null,null,null,null);
+    private final LoanRecordingService service=new LoanRecordingService(null,null,products,null,null,null,guard,null,null,null,null,null,null,null,null,null,null,null,null,null,null);
     @org.junit.jupiter.api.BeforeEach void configuredCustomWorkflow(){when(products.findBySaccoIdAndCustomRecordingConfigurationTrue(any())).thenReturn(Optional.of(LoanProductSetting.builder().id(UUID.randomUUID()).saccoId("I1").productName("Customised loan").customRecordingConfiguration(true).active(true).productStatus(LoanProductStatus.ACTIVE).build()));}
     private RecordForm custom(){var f=new RecordForm();f.setLoanMode("CUSTOM");f.setPrincipal(new BigDecimal("1000.00"));f.setInterestPercent(new BigDecimal("12"));f.setTenureValue(6);return f;}
     @Test void recorderCanChooseWholeLoanAnnualOrAmountInterest(){

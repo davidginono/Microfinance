@@ -120,7 +120,9 @@ public class LoanPortfolioReportRepository {
             CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE coalesce(:through-t.oldest,0) END dpd,p.collected_principal,p.collected_interest,
             p.principal paid_principal,p.interest paid_interest,t.scheduled_interest,t.excluded_interest,t.waived_interest,t.periodic_payment,t.maturity,t.installments,
             coalesce(c.application_branch=c.station_id AND c.application_institution=c.sacco_id
-              AND c.application_client=c.applicant_member_id AND c.top_up_source_loan_id IS NULL
+              AND c.application_client IS NOT DISTINCT FROM c.applicant_member_id AND c.top_up_source_loan_id IS NULL
+              AND (c.application_client IS NOT NULL OR EXISTS(SELECT 1 FROM lending_group_org_funding f
+                WHERE f.loan_id=c.loan_application_id AND f.sacco_id=c.sacco_id AND f.station_id=c.station_id AND f.signed_at<=:cutoff))
               AND o.lines=2 AND o.vouchers=1 AND o.net=0 AND o.principal=c.principal AND o.cleared=c.principal AND o.dates
               AND p.valid AND p.principal>=0 AND p.principal<=c.principal
               AND t.installments>0 AND t.installments<=600 AND t.contract_count=t.installments AND t.scheduled_principal=c.principal AND t.valid

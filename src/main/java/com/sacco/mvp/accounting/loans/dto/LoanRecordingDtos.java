@@ -45,6 +45,8 @@ public final class LoanRecordingDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String insuranceEvidence;
     }
     @Data public static class PostForm {
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String organizationPacketHash;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private Boolean organizationAccepted;
         private UUID requestKey = UUID.randomUUID();
         private UUID loanId;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate firstPaymentDate;

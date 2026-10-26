@@ -41,6 +41,7 @@ public class LoanRecordingService {
     private final com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicies;
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
     private final LoanProductAccountService productAccounts;
+    private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -82,7 +83,7 @@ public class LoanRecordingService {
         records.account(a,moneyAccount,"MONEY",false);var result=new ArrayList<AllocationPreview>();repaymentPolicies.effective(a,date,false);
         for(var row:amounts){var loan=contexts.get(row.loanId());
             check(loan.principalAccountId()!=null && loan.interestAccountId()!=null,"loanAccountsMissing");check(loan.principalAccount()!=null && loan.interestAccount()!=null,"productAccountsInvalid");
-            check(loan.clientId().equals(row.clientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
+            check(loan.clientId()!=null && loan.clientId().equals(row.clientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
             check(loan.disbursed()!=null && !date.isBefore(loan.disbursed()) && (loan.lastPayment()==null || !date.isBefore(loan.lastPayment())),"date");
             result.add(chargeAllocation(row.amount(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges()));
         }
@@ -238,10 +239,11 @@ public class LoanRecordingService {
     public Posting disburse(AppUserPrincipal a,PostForm f,List<org.springframework.web.multipart.MultipartFile> files){
         validateFiles(files);
         accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
+        organizationFunding.lock(a,f.getLoanId());
         var source=records.topUpSource(a,f.getLoanId());
         if(source.isPresent())records.lockTopUpPair(a,source.get(),f.getLoanId());
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
-        check(loan.getApplicantMemberId()!=null,"organizationFundingPending");
+        if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted()),"organizationFundingPending");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
         if(Boolean.TRUE.equals(policy.get("disbursementProofRequired")))check(files.stream().anyMatch(file->!file.isEmpty()),"attachments");
@@ -268,6 +270,7 @@ public class LoanRecordingService {
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
         if(settlement==null)records.journal(a,journal,id,f,hash,period,deductions.signum()>0?"LOAN_CHARGE_FUNDING":"DISBURSEMENT",null,now);
         else records.topUpJournal(a,id,journal,f,hash,period,null,now);
+        if(loan.getApplicantMemberId()==null)organizationFunding.execute(a,f,id,journal,first,deductions);
         records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
         var schedule=schedules.buildSchedule(loan,f.getEffectiveDate(),first,loan.getRepaymentFrequency(),null,f.getReference(),f.getNotes());
         loan.setFirstRepaymentDate(first);
@@ -366,7 +369,7 @@ public class LoanRecordingService {
         authorize(a,export?"EXPORT":"VIEW");check(page>=0 && page<=10000,"filter");
         var owner=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
         var record=records.loan(a,loan,clock.today());
-        if(!record.clientId().equals(client))throw new org.springframework.security.access.AccessDeniedException("Loan outside client statement");
+        if(!Objects.equals(record.clientId(),client))throw new org.springframework.security.access.AccessDeniedException("Loan outside client statement");
         var rows=records.loanPosts(a,loan,export?501:26,export?0:page*25);if(export)check(rows.size()<=500,"reportLimit");
         return new LoanStatementView(new StatementExport(owner.label(),List.of(record),export?rows:rows.stream().limit(25).toList(),records.statementTerms(a,client,loan)),records.loanOpening(a,loan).orElse(null),page,!export && rows.size()>25);
     }

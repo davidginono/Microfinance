@@ -29,7 +29,7 @@ public class LoanReceiptRepository {
         p.id posting_id,p.loan_id,a.loan_id loan_number,p.amount,p.principal_amount,p.interest_amount,p.principal_balance,
         p.money_account_name,p.principal_account_name,p.interest_account_name,coalesce((select t1.receivable_account_name from loan_charge_event e join loan_charge_term t1 on t1.id=e.term_id where e.posting_id=p.id limit 1),'') charge_account,1 line_no
         from accountant_loan_post p join loan_repayment_transactions t on t.id=p.transaction_id
-        join loan_applications a on a.id=p.loan_id join members m on m.id=a.applicant_member_id join members u on u.id=p.actor_id
+        join loan_applications a on a.id=p.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id join members u on u.id=p.actor_id
         join registered_saccos i on i.sacco_id=p.sacco_id join sacco_stations s on s.sacco_id=p.sacco_id and s.station_id=p.station_id
         where p.sacco_id=? and p.station_id=? and p.id=? and p.kind in ('PAYMENT','REVERSAL')
         and not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
@@ -38,7 +38,7 @@ public class LoanReceiptRepository {
     public Optional<LoanReceipt> legacy(AppUserPrincipal a,UUID id){return jdbc.query(LEGACY,(r,n)->new LoanReceipt(header(r),r.getString("client_number"),List.of(row(r))),a.getSaccoId(),a.getStationId(),id).stream().findFirst();}
     public Optional<LoanReceipt> find(AppUserPrincipal a,UUID id,boolean lock){
         return jdbc.query(HEAD+" where r.sacco_id=? and r.station_id=? and r.id=?"+(lock?" for update of r":""),
-            (r,n)->new LoanReceipt(header(r),r.getString("client_number"),List.of()),a.getSaccoId(),a.getStationId(),id).stream().findFirst();
+            (r,n)->new LoanReceipt(header(r),r.getString("client_number"),List.of(),null,r.getString("payer_name")),a.getSaccoId(),a.getStationId(),id).stream().findFirst();
     }
     public Optional<UUID> retry(AppUserPrincipal a,UUID key,String hash){
         var rows=jdbc.queryForList("select id,payload_hash,posted_by from accountant_loan_receipt where sacco_id=? and station_id=? and request_key=?",a.getSaccoId(),a.getStationId(),key);
@@ -51,12 +51,12 @@ public class LoanReceiptRepository {
         join accountant_loan_post p on p.id=x.posting_id join loan_applications l on l.id=p.loan_id
         where x.receipt_id=? and x.sacco_id=? and x.station_id=? order by x.line_no limit 50
         """,(r,n)->row(r),id,a.getSaccoId(),a.getStationId());}
-    public void insert(AppUserPrincipal a,Voucher v,UUID requestKey,UUID client,String clientNumber,String hash,List<LoanReceiptRow> rows){
+    public void insert(AppUserPrincipal a,Voucher v,UUID requestKey,UUID client,String clientNumber,String hash,List<LoanReceiptRow> rows,String payer){
         jdbc.update("""
-            insert into accountant_loan_receipt(id,sacco_id,station_id,number,request_key,payload_hash,effective_date,client_id,party,client_number,
-            reference,description,evidence,money_account_id,total,transaction_count,posted_by,posted_by_name,posted_at,reverses_id)
-            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,v.id(),a.getSaccoId(),a.getStationId(),v.number(),requestKey,hash,v.effectiveDate(),client,v.party(),clientNumber,v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),rows.size(),a.getMemberId(),v.postedByName(),v.postedAt(),v.reversesId());
+            insert into accountant_loan_receipt(id,sacco_id,station_id,number,request_key,payload_hash,effective_date,borrower_party_id,client_id,party,client_number,
+            reference,description,evidence,money_account_id,total,transaction_count,posted_by,posted_by_name,posted_at,reverses_id,payer_name)
+            values(?,?,?,?,?,?,?,?,(select client_id from loan_borrower_party where id=? and sacco_id=?),?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,v.id(),a.getSaccoId(),a.getStationId(),v.number(),requestKey,hash,v.effectiveDate(),client,client,a.getSaccoId(),v.party(),clientNumber,v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),rows.size(),a.getMemberId(),v.postedByName(),v.postedAt(),v.reversesId(),payer==null?"":payer.strip());
         jdbc.batchUpdate("insert into accountant_loan_receipt_row(receipt_id,sacco_id,station_id,line_no,posting_id,description) values(?,?,?,?,?,?)",
             rows.stream().map(r->new Object[]{v.id(),a.getSaccoId(),a.getStationId(),r.lineNo(),r.postingId(),r.description()}).toList());
     }
@@ -73,7 +73,7 @@ public class LoanReceiptRepository {
               union all
               select p.id,p.sacco_id,p.station_id,t.receipt_reference,p.request_key,p.effective_date,m.full_name,p.reference,p.notes,p.evidence,p.money_account_id,
               p.amount,1,null::uuid,p.actor_id,p.recorded_at,p.reverses_id from accountant_loan_post p
-              join loan_repayment_transactions t on t.id=p.transaction_id join loan_applications l on l.id=p.loan_id join members m on m.id=l.applicant_member_id
+              join loan_repayment_transactions t on t.id=p.transaction_id join loan_applications l on l.id=p.loan_id join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id
               where p.sacco_id=? and p.station_id=? and ? and p.kind in ('PAYMENT','REVERSAL')
               and not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
               and not exists(select 1 from lending_group_receipt_loan x where x.posting_id=p.id)

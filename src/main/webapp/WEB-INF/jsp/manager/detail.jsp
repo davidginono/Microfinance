@@ -430,14 +430,15 @@
           class="erp-form-wrap mt-5 space-y-3"
           data-loan-form="true"
           data-confirm-title="<spring:message code='loan.disbursement.action' text='Disburse Loan' />"
-          data-confirm-message="<spring:message code='loan.disbursement.confirmMessage' text='Disburse this loan now? There will be no reversal of this action.' />"
+          data-confirm-message="<spring:message code='loan.disbursement.confirmMessage' />"
           data-confirm-proceed="<spring:message code='loan.disbursement.action' text='Disburse Loan' />">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <input type="hidden" name="decision" value="FINAL_APPROVE" />
         <c:if test="${recordedLoanApplication}"><input type="hidden" name="requestKey" value="${disbursementRequestKey}" /></c:if>
+
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.formTitle" text="Loan Disbursement" /></label>
+                <h2 class="block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.formTitle" text="Loan Disbursement" /></h2>
                 <p class="mt-1 text-sm text-slate-500"><spring:message code="loan.disbursement.formHelp" text="Enter the release details before final approval." /></p>
                             </div>
             <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
@@ -447,6 +448,12 @@
                 </c:choose>
             </span>
                             </div>
+        <c:if test="${not empty organizationFunding}">
+            <section class="erp-panel"><div class="erp-panel-header"><h2><spring:message code="orgFunding.lender" /></h2></div><div class="erp-panel-body">
+                <input type="hidden" name="organizationPacketHash" value="<c:out value='${organizationFunding.hash}' />" />
+                <label class="aws-settings-checkbox-row"><input class="aws-settings-checkbox" type="checkbox" name="organizationAccepted" value="true" required /><span class="aws-settings-checkbox-copy"><spring:message code="orgFunding.accept" /></span></label>
+            </div></section>
+        </c:if>
         <div class="grid gap-4 md:grid-cols-2">
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.disbursementDate" text="Disbursement Date" /></label>
@@ -542,7 +549,7 @@
             </div>
         </div>
             <c:if test="${recordedLoanApplication}"><%@ include file="../fragments/staff-disbursement-posting-fields.jspf" %></c:if>
-            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${postingFirstPaymentDate ne null ? postingFirstPaymentDate : firstRepaymentDateDefault}" required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
+            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${not empty organizationFunding ? organizationFunding.firstPaymentDate : (postingFirstPaymentDate ne null ? postingFirstPaymentDate : firstRepaymentDateDefault)}" ${not empty organizationFunding ? 'readonly' : ''} required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
             <div><span class="text-sm font-medium text-slate-700"><spring:message code="loan.loanId" /></span><p><spring:message code="recording.numberAssigned" /></p></div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>

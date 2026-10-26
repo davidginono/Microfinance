@@ -18,7 +18,7 @@
         <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="resource.details.summary" /></h2></div>
         <div class="erp-panel-body">
         <dl class="erp-detail-facts">
-            <div><dt><spring:message code="recording.client" /></dt><dd><c:out value="${statement.client}" /></dd></div>
+            <div><dt><spring:message code="orgFunding.borrower" /></dt><dd><c:out value="${statement.client}" /></dd></div>
             <div><dt><spring:message code="recording.outstandingPrincipal" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.principal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
             <div><dt><spring:message code="recording.dueInterest" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.interest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
             <div><dt><spring:message code="charges.outstanding" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.charges}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.arrears" /> (TZS)</dt><dd><fmt:formatNumber value="${statement.arrears}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
