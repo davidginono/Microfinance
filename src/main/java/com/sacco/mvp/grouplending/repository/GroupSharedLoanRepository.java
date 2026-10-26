@@ -47,8 +47,10 @@ public class GroupSharedLoanRepository {
         var rows=new ArrayList<Object[]>();for(int i=0;i<f.payouts().size();i++){var p=f.payouts().get(i);rows.add(new Object[]{f.cycle(),p.client(),a.getSaccoId(),a.getStationId(),p.amount(),references.get(i).strip()});}
         jdbc.batchUpdate("insert into lending_group_shared_transfer(cycle_id,client_id,sacco_id,station_id,amount,reference) values(?,?,?,?,?,?)",rows);
     }
-    public List<Balance> balances(AppUserPrincipal a,UUID loan){return jdbc.query("""
-        select s.client_id,s.client_number,s.client_name,s.principal,s.interest,s.charges-s.deductions charges,l.status='DISBURSEMENT_REVERSED' funding_reversed,
+    public Set<UUID> sharedLoans(AppUserPrincipal a,List<UUID> ids){if(ids.isEmpty())return Set.of();var args=new ArrayList<Object>(List.of(a.getSaccoId(),a.getStationId()));args.addAll(ids);return new LinkedHashSet<>(jdbc.query("select loan_id from lending_group_shared_facility where sacco_id=? and station_id=? and loan_id in ("+placeholders(ids.size())+") order by loan_id limit 50",(r,n)->r.getObject(1,UUID.class),args.toArray()));}
+    public List<Balance> balances(AppUserPrincipal a,UUID loan){return balances(a,List.of(loan)).getOrDefault(loan,List.of());}
+    public Map<UUID,List<Balance>> balances(AppUserPrincipal a,List<UUID> ids){if(ids.isEmpty())return Map.of();var args=new ArrayList<Object>(List.of(a.getSaccoId(),a.getStationId()));args.addAll(ids);var result=new LinkedHashMap<UUID,List<Balance>>();jdbc.query("""
+        select f.loan_id,s.client_id,s.client_number,s.client_name,s.principal,s.interest,s.charges-s.deductions charges,l.status='DISBURSEMENT_REVERSED' funding_reversed,
           coalesce(sum(case when p.kind='REVERSAL' then -x.principal else x.principal end),0) paid_principal,
           coalesce(sum(case when p.kind='REVERSAL' then -x.interest else x.interest end),0) paid_interest,
           coalesce(sum(case when p.kind='REVERSAL' then -x.charges else x.charges end),0) paid_charges,
@@ -56,8 +58,18 @@ public class GroupSharedLoanRepository {
         from lending_group_shared_facility f join loan_applications l on l.id=f.loan_id join lending_group_shared_allocation s on s.cycle_id=f.cycle_id
         left join lending_group_shared_movement x on x.cycle_id=f.cycle_id and x.client_id=s.client_id
         left join accountant_loan_post p on p.id=x.posting_id
-        where f.loan_id=? and f.sacco_id=? and f.station_id=? group by s.participant_id,l.id order by s.ordinal limit 50
-        """,(r,n)->new Balance(r.getObject("client_id",UUID.class),r.getString("client_number"),r.getString("client_name"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("paid_principal"),r.getBigDecimal("paid_interest"),r.getBigDecimal("paid_charges"),r.getBigDecimal("excluded"),r.getBoolean("funding_reversed")),loan,a.getSaccoId(),a.getStationId());}
+        where f.sacco_id=? and f.station_id=? and f.loan_id in (%s) group by f.loan_id,s.participant_id,l.id order by f.loan_id,s.ordinal limit 2500
+
+        """.formatted(placeholders(ids.size())),(org.springframework.jdbc.core.RowCallbackHandler)r->result.computeIfAbsent(r.getObject("loan_id",UUID.class),k->new ArrayList<>()).add(new Balance(r.getObject("client_id",UUID.class),r.getString("client_number"),r.getString("client_name"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("paid_principal"),r.getBigDecimal("paid_interest"),r.getBigDecimal("paid_charges"),r.getBigDecimal("excluded"),r.getBoolean("funding_reversed"))),args.toArray());return result;}
+    public Map<UUID,List<com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit>> receiptBenefits(AppUserPrincipal a,List<UUID> postings){
+        if(postings.isEmpty())return Map.of();var args=new ArrayList<Object>(List.of(a.getSaccoId(),a.getStationId()));args.addAll(postings);var result=new LinkedHashMap<UUID,List<com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit>>();
+        jdbc.query("""
+            select x.posting_id,s.client_id,s.client_number,s.client_name,x.payer,x.principal,x.interest,x.charges,x.excluded_interest
+            from lending_group_shared_movement x join lending_group_shared_allocation s on s.cycle_id=x.cycle_id and s.client_id=x.client_id
+            where x.sacco_id=? and x.station_id=? and x.posting_id in (%s) order by x.posting_id,s.ordinal limit 2500
+            """.formatted(placeholders(postings.size())),(org.springframework.jdbc.core.RowCallbackHandler)r->result.computeIfAbsent(r.getObject("posting_id",UUID.class),k->new ArrayList<>()).add(new com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit(r.getObject("client_id",UUID.class),r.getString("client_number"),r.getString("client_name"),r.getString("payer"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("excluded_interest"))),args.toArray());return result;
+    }
+    private static String placeholders(int count){if(count<1||count>50)throw new IllegalArgumentException("group.error.request");return String.join(",",Collections.nCopies(count,"?"));}
     public BigDecimal excluded(UUID posting){return jdbc.queryForObject("select coalesce(t.future_interest_excluded,0) from accountant_loan_post p left join loan_repayment_transactions t on t.id=p.transaction_id where p.id=?",BigDecimal.class,posting);}
     public List<Movement> movements(AppUserPrincipal a,UUID posting){return jdbc.query("select * from lending_group_shared_movement where posting_id=? and sacco_id=? and station_id=? order by client_id limit 50",(r,n)->new Movement(posting,r.getObject("client_id",UUID.class),r.getString("payer"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("excluded_interest"),r.getObject("reverses_posting_id",UUID.class)),posting,a.getSaccoId(),a.getStationId());}
     public void movements(AppUserPrincipal a,UUID loan,List<Movement> rows){jdbc.batchUpdate("""

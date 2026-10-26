@@ -92,6 +92,8 @@ public class LoanRecordingService {
         return result;
     }
     @Transactional(readOnly=true)
+    public List<com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow> sharedReceiptRows(AppUserPrincipal a,List<com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow> rows,boolean preview,String payer){authorize(a,preview?"POST":"VIEW");return sharedLoans.receiptRows(a,rows,preview,payer);}
+    @Transactional(readOnly=true)
     public LoanRepaymentLedgerService.PaymentPreview stagedReceiptPreview(AppUserPrincipal a,UUID loan,LocalDate date,BigDecimal amount,List<LoanRepaymentLedgerService.StagedPayment> prior){
         authorize(a,"POST");records.record(a,loan,false);return repayments.previewPayment(loan,a,date,amount,prior);
     }

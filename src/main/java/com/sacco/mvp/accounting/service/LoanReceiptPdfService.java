@@ -23,15 +23,21 @@ public class LoanReceiptPdfService {
             rows.add(List.of(Integer.toString(r.lineNo()),description,money(r.amount(),locale)));
         }
         else for(var r:receipt.rows()){
-            String description=r.description()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.reference();
-            rows.add(List.of(Integer.toString(r.lineNo()),description,money(r.amount(),locale)));
+            if(r.sharedBenefits().isEmpty()){
+                String description=r.description()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.reference();
+                rows.add(List.of(Integer.toString(rows.size()+1),description,money(r.amount(),locale)));
+            }else for(var b:r.sharedBenefits()){
+                String description=label("sharedReceipt.title",locale)+"\n"+label("group.paidFor",locale)+": "+b.clientNumber()+" - "+b.clientName()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.description()+"\n"+label("recording.principal",locale)+": "+money(b.principal(),locale)+"; "+label("recording.interest",locale)+": "+money(b.interest(),locale)+"; "+label("charges.title",locale)+": "+money(b.charges(),locale);
+                if(b.excludedInterest()!=null&&b.excludedInterest().signum()>0)description+="\n"+label(v.reversesId()==null?"sharedReceipt.excluded":"sharedReceipt.restored",locale)+": "+money(b.excludedInterest(),locale);
+                rows.add(List.of(Integer.toString(rows.size()+1),description,money(b.amount(),locale)));
+            }
         }
         var principal=receipt.rows().stream().map(r->r.principal()).reduce(BigDecimal.ZERO,BigDecimal::add);
         var interest=receipt.rows().stream().map(r->r.interest()).reduce(BigDecimal.ZERO,BigDecimal::add);
         var date=v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu"));
         var payerFields=new ArrayList<Field>();payerFields.add(field("voucher.print.name",v.party(),locale));
         if(receipt.payer()!=null&&!receipt.payer().isBlank())payerFields.add(field("voucher.receivedFrom",receipt.payer(),locale));
-        if(receipt.group()==null)payerFields.add(field("voucher.print.clientNumber",receipt.clientNumber(),locale));
+        if(receipt.group()==null)payerFields.add(field(receipt.hasSharedBenefits()?"group.code":"voucher.print.clientNumber",receipt.clientNumber(),locale));
         else payerFields.add(field("group.group",receipt.group().code()+" - "+receipt.group().name(),locale));
         var details=new ArrayList<Field>();details.add(field("voucher.print.reference",v.reference(),locale));details.add(field("voucher.date",date,locale));
         if(receipt.group()!=null){

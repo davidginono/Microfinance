@@ -54,6 +54,7 @@ public final class VoucherDtos {
     public record Page(List<Voucher> rows,int page,boolean hasNext) {}
     public record Preview(List<Transaction> rows,BigDecimal total) {}
     public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group,String payer) {
+        public boolean hasSharedBenefits(){return rows.stream().anyMatch(r->!r.sharedBenefits().isEmpty());}
         public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows){this(header,clientNumber,rows,null,"");}
         public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group){this(header,clientNumber,rows,group,"");}
     }
@@ -67,10 +68,15 @@ public final class VoucherDtos {
     }
     public record LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,
                                  BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,
-                                 String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount) {
+                                 String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount,List<SharedReceiptBenefit> sharedBenefits) {
+        public LoanReceiptRow(int line,UUID posting,UUID loan,String number,String description,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,String money,String principalAccount,String interestAccount,String reference,String chargeAccount){this(line,posting,loan,number,description,amount,principal,interest,balance,money,principalAccount,interestAccount,reference,chargeAccount,List.of());}
+        public LoanReceiptRow withSharedBenefits(List<SharedReceiptBenefit> benefits){return new LoanReceiptRow(lineNo,postingId,loanId,loanNumber,description,amount,principal,interest,principalBalance,moneyAccount,principalAccount,interestAccount,reference,chargeAccount,List.copyOf(benefits));}
         public LoanReceiptRow(int line,UUID posting,UUID loan,String number,String description,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,String money,String principalAccount,String interestAccount,String reference){this(line,posting,loan,number,description,amount,principal,interest,balance,money,principalAccount,interestAccount,reference,"");}
         public BigDecimal charges(){return amount.subtract(principal).subtract(interest);}
         public BigDecimal getCharges(){return charges();}
+    }
+    public record SharedReceiptBenefit(UUID clientId,String clientNumber,String clientName,String payer,BigDecimal principal,BigDecimal interest,BigDecimal charges,BigDecimal excludedInterest) {
+        public BigDecimal amount(){return principal.add(interest).add(charges);}
     }
     public static class Invalid extends IllegalArgumentException {
         private final String field;

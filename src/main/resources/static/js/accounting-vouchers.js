@@ -46,7 +46,8 @@ form.querySelector('[data-receipt-purpose]')?.addEventListener('change',()=>{
  if(form.elements.interestAccountId)form.elements.interestAccountId.value='';
  update();form.dispatchEvent(new Event('input',{bubbles:true}));
 });
-form.addEventListener('input',()=>{const preview=form.querySelector('[data-voucher-preview]');if(preview)preview.hidden=true;update();});
+const invalidatePreview=()=>{form.querySelectorAll('[data-voucher-preview]').forEach(preview=>preview.hidden=true);update();};
+form.addEventListener('input',invalidatePreview);form.addEventListener('change',invalidatePreview);
 form.addEventListener('submit',e=>{let hidden=form.querySelector('[data-submit-action]');if(!hidden){hidden=document.createElement('input');hidden.type='hidden';hidden.name='action';hidden.dataset.submitAction='';form.append(hidden);}hidden.value=e.submitter?.value||'post';});
 form.querySelector('[data-add-row]').addEventListener('click',()=>{
  if(rows.children.length>=50){status.textContent=form.dataset.limit;return;}

@@ -69,12 +69,12 @@ public class LoanReceiptRepository {
               total,transaction_count,journal_id,posted_by,posted_at,reverses_id from accounting_voucher where type='RECEIPT' and sacco_id=? and station_id=?
               union all
               select id,sacco_id,station_id,number,request_key,effective_date,party,reference,description,evidence,money_account_id,
-              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id from accountant_loan_receipt where sacco_id=? and station_id=? and ?
+              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id from accountant_loan_receipt r where sacco_id=? and station_id=? and ? and (? or not exists(select 1 from loan_borrower_party b where b.id=r.borrower_party_id and b.kind='JOINT_GROUP'))
               union all
               select p.id,p.sacco_id,p.station_id,t.receipt_reference,p.request_key,p.effective_date,m.full_name,p.reference,p.notes,p.evidence,p.money_account_id,
               p.amount,1,null::uuid,p.actor_id,p.recorded_at,p.reverses_id from accountant_loan_post p
               join loan_repayment_transactions t on t.id=p.transaction_id join loan_applications l on l.id=p.loan_id join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id
-              where p.sacco_id=? and p.station_id=? and ? and p.kind in ('PAYMENT','REVERSAL')
+              where p.sacco_id=? and p.station_id=? and ? and (? or m.kind<>'JOINT_GROUP') and p.kind in ('PAYMENT','REVERSAL')
               and not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
               and not exists(select 1 from lending_group_receipt_loan x where x.posting_id=p.id)
               union all
@@ -90,7 +90,7 @@ public class LoanReceiptRepository {
             where (?='' or strpos(lower(v.number||' '||v.party||' '||v.reference),?)>0)
             and (?::date is null or v.effective_date>=?::date) and (?::date is null or v.effective_date<=?::date)
             and (?='' or (case when v.reverses_id is not null then 'REVERSAL' when v.reversed_by is not null then 'REVERSED' else 'POSTED' end)=?)
-            """+" order by "+order+" limit ? offset ?",(r,n)->header(r),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),includeLoans,a.getSaccoId(),a.getStationId(),includeLoans,a.getSaccoId(),a.getStationId(),includeGroups,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
+            """+" order by "+order+" limit ? offset ?",(r,n)->header(r),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeGroups,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
     private LoanReceiptRow row(ResultSet r)throws SQLException{return new LoanReceiptRow(r.getInt("line_no"),r.getObject("posting_id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("description"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getBigDecimal("principal_balance"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("reference"),r.getBigDecimal("amount").subtract(r.getBigDecimal("principal_amount")).subtract(r.getBigDecimal("interest_amount")).signum()>0?r.getString("charge_account"):"");}
     private Voucher header(ResultSet r)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.RECEIPT,r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of());}

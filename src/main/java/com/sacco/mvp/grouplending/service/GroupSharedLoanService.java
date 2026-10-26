@@ -50,6 +50,20 @@ public class GroupSharedLoanService {
         if(!shared.shared(a,loan))return;access.requireActor(a,"GROUP_LENDING_REVERSE");var rows=shared.movements(a,original);check(!rows.isEmpty(),"sharedAttribution");
         shared.movements(a,loan,rows.stream().map(r->new Movement(posting,r.client(),r.payer(),r.principal(),r.interest(),r.charges(),r.excluded(),original)).toList());
     }
+    @Transactional(readOnly=true) public List<com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow> receiptRows(AppUserPrincipal a,List<com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow> rows,boolean preview,String payer){
+        check(rows!=null&&!rows.isEmpty()&&rows.size()<=50,"request");var ids=rows.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow::loanId).distinct().toList();var sharedIds=shared.sharedLoans(a,ids);if(sharedIds.isEmpty())return rows;
+        access.requireActor(a,"GROUP_LENDING_VIEW");access.requireActor(a,"LOAN_RECORDING_VIEW");if(preview){access.requireActor(a,"GROUP_LENDING_POST");access.requireActor(a,"LOAN_RECORDING_POST");}
+        var balances=preview?shared.balances(a,new ArrayList<>(sharedIds)):Map.<UUID,List<Balance>>of();
+        var evidence=preview?Map.<UUID,List<com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit>>of():shared.receiptBenefits(a,rows.stream().filter(r->sharedIds.contains(r.loanId())).map(com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow::postingId).toList());
+        var result=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow>();
+        for(var row:rows){if(!sharedIds.contains(row.loanId())){result.add(row);continue;}List<com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit> benefits;
+            if(preview){var people=balances.getOrDefault(row.loanId(),List.of());check(!people.isEmpty(),"sharedAttribution");var principal=split(row.principal(),people.stream().map(Balance::remainingPrincipal).toList());var interest=split(row.interest(),people.stream().map(Balance::remainingInterest).toList());var charges=split(row.charges(),people.stream().map(Balance::remainingCharges).toList());benefits=new ArrayList<>();
+                for(int i=0;i<people.size();i++){var person=people.get(i);benefits.add(new com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit(person.client(),person.number(),person.name(),payer,principal.get(i).setScale(2),interest.get(i).setScale(2),charges.get(i).setScale(2),null));}
+            }else benefits=evidence.getOrDefault(row.postingId(),List.of());
+            check(!benefits.isEmpty()&&benefits.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit::principal).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(row.principal())==0&&benefits.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit::interest).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(row.interest())==0&&benefits.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit::charges).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(row.charges())==0,"sharedAttribution");
+            result.add(row.withSharedBenefits(benefits.stream().filter(b->b.amount().signum()>0||(b.excludedInterest()!=null&&b.excludedInterest().signum()>0)).toList()));
+        }return List.copyOf(result);
+    }
     // Cumulative cent allocation conserves the component exactly and never exceeds a remaining share.
     static List<BigDecimal> split(BigDecimal amount,List<BigDecimal> remaining){
         var total=remaining.stream().reduce(BigDecimal.ZERO,BigDecimal::add);check(amount!=null&&amount.signum()>=0&&remaining.stream().allMatch(x->x.signum()>=0)&&amount.compareTo(total)<=0,"sharedAttribution");

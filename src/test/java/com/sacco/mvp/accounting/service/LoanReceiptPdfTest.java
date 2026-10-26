@@ -76,4 +76,12 @@ class LoanReceiptPdfTest {
         }
     }
 
+    @Test void ordinarySharedReceiptsShowBeneficiariesAndNonCashExclusionsWithoutDuplicatingCash()throws Exception{
+        var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);var renderer=new LoanReceiptPdfService(new LoanRecordingPdfService(new ReportExportLimiter(1)),messages);
+        var benefits=List.of(new SharedReceiptBenefit(UUID.randomUUID(),"SHARED-A","First borrower","Actual remitter",new BigDecimal("14.81"),BigDecimal.ZERO,BigDecimal.ZERO,new BigDecimal("0.29")),new SharedReceiptBenefit(UUID.randomUUID(),"SHARED-B","Second borrower","Actual remitter",new BigDecimal("105.19"),BigDecimal.ZERO,BigDecimal.ZERO,new BigDecimal("2.11")));
+        var row=new LoanReceiptRow(1,UUID.randomUUID(),UUID.randomUUID(),"SHARED-PARENT","Verified collection",new BigDecimal("120.00"),new BigDecimal("120.00"),BigDecimal.ZERO,new BigDecimal("880.01"),"PRIVATE CASH","PRIVATE PRINCIPAL","PRIVATE INTEREST","REF").withSharedBenefits(benefits);
+        for(boolean reversal:List.of(false,true)){var voucher=new Voucher(UUID.randomUUID(),"RV-SHARED-STANDARD",Type.RECEIPT,LocalDate.of(2026,10,8),"Joint borrowers","REF","Verified collection","Evidence",UUID.randomUUID(),new BigDecimal("120.00"),1,null,UUID.randomUUID(),"Accountant",OffsetDateTime.parse("2026-10-08T12:00:00+03:00"),reversal?UUID.randomUUID():null,null,"Synthetic institution","Branch",List.of());
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw")))try(var doc=Loader.loadPDF(renderer.render(new LoanReceipt(voucher,"GROUP",List.of(row),null,"Actual remitter"),locale,null))){var text=new PDFTextStripper().getText(doc);assertThat(text).contains("SHARED-A","SHARED-B","14.81","105.19","Actual remitter","0.29","2.11",messages.getMessage(reversal?"sharedReceipt.restored":"sharedReceipt.excluded",null,locale)).doesNotContain("PRIVATE CASH","PRIVATE PRINCIPAL","PRIVATE INTEREST","122.40");}}
+    }
+
 }
