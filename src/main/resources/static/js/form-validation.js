@@ -15,6 +15,8 @@
     const members = control => control.type === 'radio' && control.name
         ? Array.from(control.form?.elements || [control]).filter(el => el.type === 'radio' && el.name === control.name && !el.disabled) : [control];
     const canonical = control => members(control)[0] || control;
+    const value = control => control.type === 'radio' ? members(control).find(member => member.checked)?.value || ''
+        : control.type === 'checkbox' ? control.checked : control.value;
     function describe(control, id, add) {
         const ids = new Set((control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
         if (add) ids.add(id); else ids.delete(id);
@@ -52,10 +54,11 @@
     function show(control, text, existing) {
         control = canonical(control);
         let state = states.get(control);
+        if (existing && state && state.error !== existing) {clear(control); state = null;}
         if (!state || !state.error.isConnected) {
             const error = existing || document.createElement('span');
             if (!error.id || document.getElementById(error.id) !== error) error.id = `erp-field-error-${++serial}`;
-            state = {error, server:!!existing, value:control.value}; states.set(control, state);
+            state = {error, server:!!existing, value:value(control)}; states.set(control, state);
             place(control, error);
         }
         const {error} = state;
@@ -82,7 +85,7 @@
     function validate(control, edited = false) {
         control = canonical(control);
         const state = states.get(control);
-        if (state?.server && (!edited || control.value === state.value)) return;
+        if (state?.server && (!edited || value(control) === state.value)) return;
         if (state?.server) clear(control);
         if (control.validity.valid && (!proxy(control).validity || proxy(control).validity.valid)) clear(control);
         else show(control, message(control));

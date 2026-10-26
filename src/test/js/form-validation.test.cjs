@@ -165,3 +165,24 @@ test('localized text follows the page language and ignores disabled and readonly
         assert.equal(d.querySelector('.erp-field-error').textContent, 'Jina inahitajika.');
     } finally {await tick(); dom.window.close();}
 });
+test('server consent and radio errors clear when checked state or the chosen option changes', async () => {
+    const {dom,d,fire} = fixture('<label>Consent<input id="consent" name="consent" type="checkbox" required><span id="consent.errors" class="coa-error">Consent is required.</span></label><fieldset><legend>Mode</legend><label>First<input id="mode" name="mode" type="radio" value="a" checked></label><label>Second<input name="mode" type="radio" value="b"></label><span id="mode.errors" class="coa-error">Choose another mode.</span></fieldset>');
+    try {
+        const checkbox=d.getElementById('consent'), radio=d.querySelector('input[value=b]');
+        checkbox.checked=true;fire(checkbox,'change');radio.checked=true;fire(radio,'change');
+        assert.equal(d.querySelectorAll('.erp-field-error:not([hidden])').length,0);
+        assert.ok([...d.querySelectorAll('input')].every(input=>!input.hasAttribute('aria-invalid')));
+    } finally {await tick();dom.window.close();}
+});
+test('a dynamic server error replaces a stale browser error and its association', async () => {
+    const {dom,d,form,fire} = fixture('<label>Name<input id="name" name="name" required></label>');
+    try {
+        const input=form.elements.name;fire(input,'focusout');
+        const oldId=d.querySelector('.erp-field-error').id;input.value='Taken';
+        input.insertAdjacentHTML('afterend','<span class="coa-error" id="name.errors">Name is already in use.</span>');
+        await tick();
+        assert.equal(d.querySelectorAll('.erp-field-error:not([hidden])').length,1);
+        assert.equal(d.querySelector('.erp-field-error').textContent,'Name is already in use.');
+        assert.equal(input.getAttribute('aria-describedby'),'name.errors');assert.equal(d.getElementById(oldId),null);
+    } finally {await tick();dom.window.close();}
+});
