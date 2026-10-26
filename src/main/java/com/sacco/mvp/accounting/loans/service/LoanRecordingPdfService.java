@@ -23,7 +23,9 @@ public class LoanRecordingPdfService {
     private static final float STATEMENT_WIDTH=PDRectangle.A4.getHeight()-2*STATEMENT_MARGIN;
     public record Document(String title,String institution,String branch,String filename,List<String> lines) {}
     public record StatementField(String label,String value) {}
-    public record StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows) {}
+    public record StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths) {
+        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows){this(fields,columns,rows,List.of());}
+    }
     public record StatementDocument(String title,List<StatementField> client,List<StatementSection> sections,String empty,String note) {}
     public byte[] renderAmortization(LoanAmortizationPdfDocument.Source source){return limiter.run(()->{
         try(var doc=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
@@ -43,10 +45,15 @@ public class LoanRecordingPdfService {
         try(var doc=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var out=new ByteArrayOutputStream()){
             PDFont fallback=PDType0Font.load(doc,fontStream);PDFont font=new PDType1Font(FontName.COURIER);
             PDFont titleFont=readable(new PDType1Font(FontName.TIMES_BOLD),fallback,source.title());
-            float[] widths={70,80,55,76,58,173,70,70,70,70};
-            for(int c=0;c<widths.length;c++)widths[c]*=STATEMENT_WIDTH/792;
+
             var sections=source.sections().isEmpty()?List.of(new StatementSection(List.of(),List.of(),List.of())):source.sections();
             for(var section:sections){
+                float[] widths={70,80,55,76,58,173,70,70,70,70};
+                if(section.columnWidths()!=null&&!section.columnWidths().isEmpty()){
+                    if(section.columnWidths().size()!=section.columns().size()||section.columnWidths().stream().anyMatch(w->w==null||!Float.isFinite(w)||w<=0))throw new IllegalArgumentException("Invalid statement columns");
+                    widths=new float[section.columnWidths().size()];for(int c=0;c<widths.length;c++)widths[c]=section.columnWidths().get(c);
+                }
+                float totalWidth=0;for(float width:widths)totalWidth+=width;for(int c=0;c<widths.length;c++)widths[c]*=STATEMENT_WIDTH/totalWidth;
                 PDPageContentStream stream=null;float y=0;
                 try{
                     var rows=section.rows().isEmpty()?List.of(List.of(source.empty())):section.rows();

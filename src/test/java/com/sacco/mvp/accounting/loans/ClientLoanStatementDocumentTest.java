@@ -48,7 +48,7 @@ class ClientLoanStatementDocumentTest {
         java.nio.file.Files.write(java.nio.file.Path.of("target/loan-statement-reference.pdf"),(byte[])response.getBody());
         try(var pdf=Loader.loadPDF((byte[])response.getBody())){
             assertThat(pdf.getPage(0).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(0).getMediaBox().getHeight());
-            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("CLIENT LOAN STATEMENT","James Mafumba","D001","P001","R001","Principal balance","24.00");
+            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains(messages.getMessage("recording.statement",null,Locale.ENGLISH).toUpperCase(Locale.ROOT),"James Mafumba","D001","P001","R001","Principal balance","24.00");
         }
     }
     @Test void landscapeStatementRepeatsHeadersAndKeepsEveryTransactionAcrossPages() throws Exception {
