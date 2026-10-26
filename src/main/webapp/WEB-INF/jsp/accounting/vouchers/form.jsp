@@ -10,8 +10,8 @@
 
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <spring:htmlEscape defaultHtmlEscape="true" />
-<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='${base}' />"><spring:message code="voucher.register.${voucherType}" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><c:out value="${activeSaccoName}" /><c:if test="${not empty activeSaccoName}"> · </c:if><spring:message code="voucher.title.${voucherType}" /></span></nav>
-<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${activeSaccoName}" /><c:if test="${not empty activeSaccoName}"> · </c:if><spring:message code="voucher.title.${voucherType}" /></h1></div>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='${base}' />"><spring:message code="voucher.register.${voucherType}" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="voucher.title.${voucherType}" /></span></nav>
+<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="voucher.title.${voucherType}" /></h1></div>
 <div class="accounting-workspace accounting-create-workspace">
 <c:url value="${base}" var="postUrl" />
 <spring:message code="voucher.limit" var="voucherLimit" />
@@ -22,7 +22,7 @@
 <form:form modelAttribute="voucherForm" method="post" action="${postUrl}" cssClass="accounting-create-form voucher-form" data-voucher-form="true" data-new-voucher="${newVoucherForm eq true}" data-kind="${voucherType}" data-base="${postUrl}" data-limit="${voucherLimit}" data-choose-account="${voucherChooseAccount}" data-lookup-error="${voucherLookupError}" data-number-loading="${voucherNumberLoading}" data-number-error="${voucherNumberError}" data-number-csrf-header="${_csrf.headerName}" data-number-csrf-token="${_csrf.token}">
 <form:hidden path="requestKey" />
 <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" element="p" cssClass="coa-error" /></div>
-<section class="accounting-form accounting-create-card"><h2><spring:message code="voucher.information" /></h2>
+<section class="accounting-form accounting-create-card"><h2><c:choose><c:when test="${not empty activeSaccoName}"><c:out value="${activeSaccoName}" /></c:when><c:otherwise><spring:message code="voucher.information" /></c:otherwise></c:choose></h2>
 <div class="accounting-grid">
 <div class="voucher-field"><label for="voucher-type"><spring:message code="voucher.activity" /></label>
 <div class="voucher-account-choice"><form:hidden path="receiptPurpose" data-receipt-purpose="true" /><form:hidden path="activityId" />
