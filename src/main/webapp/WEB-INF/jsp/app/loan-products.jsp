@@ -338,7 +338,6 @@
         const msgEnterAmountTenor = "<spring:message code='products.js.enterAmountTenor' />";
         const msgUnableLoadCalculator = "<spring:message code='products.js.unableLoadCalculator' />";
         const msgWithinEligibility = "<spring:message code='products.js.withinEligibility' />";
-        const msgAboveEligibility = "<spring:message code='products.js.aboveEligibility' />";
         const msgEligibleStatus = "<spring:message code='products.js.eligibleStatus' text='Eligible' />";
         const msgNotEligibleStatus = "<spring:message code='products.js.notEligibleStatus' text='Not eligible' />";
         const msgNotCheckedStatus = "<spring:message code='products.eligibilityResult.notChecked' text='Not checked' />";
@@ -589,7 +588,7 @@
                     +"<div class='app-table-titlebar'>"
                     +"<div class='app-table-heading'><h3></h3></div>"
                     + "</div>"
-                    +"<div class='erp-table-scroll erp-table-scroll-sm loan-calculator-detail-scroll'><table data-table-sort-mode="none" data-table-sort-reason="property-layout" class='erp-table loan-calculator-detail-table'>"
+                    +"<div class='erp-table-scroll erp-table-scroll-sm loan-calculator-detail-scroll'><table data-table-sort-mode='none' data-table-sort-reason='property-layout' class='erp-table loan-calculator-detail-table'>"
                     + "<thead><tr><th></th><th></th></tr></thead>"
                     + "<tbody></tbody>"
                     +"</table></div>";
@@ -743,11 +742,11 @@
 
                 const eligibility = payload.eligibility || {};
                 savingsLabel.textContent = eligibility.savingsLabel || "-";
-                ratioLabel.textContent = eligibility.savingsMultipleLabel || eligibility.ratioPercentLabel || "-";
+                ratioLabel.textContent = eligibility.ratioPercentLabel || "-";
                 maxAllowedLabel.textContent = eligibility.maxAllowedLabel || "-";
-                eligibilityMessage.textContent = eligibility.eligible
+                eligibilityMessage.textContent = payload.message || (eligibility.eligible
                     ? msgWithinEligibility
-                    : msgAboveEligibility;
+                    : msgNotEligibleStatus);
                 updateEligibilityStatus(eligibility.eligible === true ? true : eligibility.eligible === false ? false : null);
 
                 resultsRegion?.classList.remove("hidden");
@@ -763,7 +762,7 @@
                     resultsRegion?.scrollIntoView({ behavior: "smooth", block: "start" });
                 });
 
-                showFeedback("success", payload.message || msgLoaded);
+                showFeedback(eligibility.eligible === false ? "error" : "success", payload.message || msgLoaded);
             } catch (error) {
                 showFeedback("error", error.message || msgFailedLoad);
             } finally {

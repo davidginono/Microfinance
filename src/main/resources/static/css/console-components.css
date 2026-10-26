@@ -6021,6 +6021,10 @@ html.session-timeout-active,
     margin-right: auto;
 }
 
+.loan-calculator-footer-actions .app-btn.hidden {
+    display: none !important;
+}
+
 .loan-calculator-load-button {
     display: inline-flex;
     align-items: center;
