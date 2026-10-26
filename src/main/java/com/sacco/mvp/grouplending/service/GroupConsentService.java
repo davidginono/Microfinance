@@ -31,7 +31,7 @@ public class GroupConsentService {
     public record Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination,SharedObligation shared) {
         public Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination){this(id,group,policy,borrower,terms,guarantees,accepted,otpRequired,signatureReady,termination,null);}
     }
-    private Member authorize(AppUserPrincipal actor,UserClaim... required){
+    Member authorize(AppUserPrincipal actor,UserClaim... required){
         if(actor==null || !actor.isMemberAccess())throw new AccessDeniedException("Participant access required");
         var current=members.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Participant unavailable"));
         if(current.getStatus()!=MemberStatus.ACTIVE || !current.isMemberAccess() || !Objects.equals(current.getSaccoId(),actor.getSaccoId())

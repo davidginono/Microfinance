@@ -2,6 +2,12 @@
 
 Goal: implement and verify all three models in [the implementation plan](group-lending-implementation-plan.md), including accounting and servicing. Work started 23 October 2026.
 
+## Shared agreement and payout authority (26 October 2026)
+
+- Retains the institution-supplied full PDF, contacts, complaint details, exact document hash and frozen loan source. Each joint borrower downloads their own packet and signs their own net destination, liability and disclosed component-attribution rule. The original approved PDF is appended without rewriting it; bounded validation rejects active forms/actions. This records authority, not cash.
+- Personal current claims, client-session scope, signatures, delivered/expiring challenge codes, attempt/resend limits and audit rollback remain enforced. Changed destinations invalidate unread/unsigned packets; confirmed destinations remain immutable. Closed cycles retain evidence but cannot create another instruction. No claims are assigned.
+- Resumed verification passed all 43 selected checks with no failures, errors or skips: 16 shared agreement PostgreSQL cases, 20 original organization-document cases, five MVC/CSRF cases, feature architecture and Jasper for four group pages. Command uses `-Dmicrofinance.build.directory=target/group-lending-build`, `-Dtest=GroupSharedAgreementPostgresTest,GroupOrganizationDocumentPostgresTest,GroupSharedAgreementMvcTest,GroupLendingArchitectureTest,ChartOfAccountsJspCompilationTest`; evidence is `target/shared-agreement-resumed-tests.log`. Shared PDF dates now use the common DD/MM/YYYY presentation. Runtime verification of these new pages and shared funding/servicing remain open at this checkpoint. No capacity claim follows from correctness checks.
+
 ## Delivery checklist
 
 - [x] Scoped group registry, membership/office history, explicit claims and responsive screens with English/Kiswahili labels. Borrowing/signatory mandates follow with cycles and organization lending.
