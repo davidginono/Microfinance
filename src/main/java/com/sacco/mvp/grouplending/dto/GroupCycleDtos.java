@@ -9,6 +9,7 @@ import java.util.*;
 public final class GroupCycleDtos {
     private GroupCycleDtos() {}
     public enum Model { INDIVIDUAL, SHARED, ORGANIZATION }
+    public enum SharedLiability { PROPORTIONAL, JOINT_AND_SEVERAL }
     @Data public static class PolicyForm {
         private UUID requestKey=UUID.randomUUID();
         private UUID productId;
@@ -22,6 +23,8 @@ public final class GroupCycleDtos {
         private boolean enabled;
         private String policyReference="";
         private String agreementReference="";
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private SharedLiability sharedLiability;
     }
     public record Policy(UUID id,UUID productId,String product,Model model,int minMembers,int maxMembers,
         BigDecimal maxPrincipal,BigDecimal maxGuarantee,int maxActiveCycles,boolean ownLoanGuarantors,
@@ -83,7 +86,11 @@ public final class GroupCycleDtos {
     public record SharedShare(UUID clientId,BigDecimal principal,BigDecimal interest,BigDecimal charges,
         BigDecimal deductions,BigDecimal net,BigDecimal monthlyPayment) {}
     public record SharedQuote(BigDecimal principal,BigDecimal interest,BigDecimal charges,BigDecimal deductions,
-        BigDecimal net,BigDecimal totalPayable,BigDecimal monthlyPayment,String frequency,List<SharedShare> shares) {}
+        BigDecimal net,BigDecimal totalPayable,BigDecimal monthlyPayment,String frequency,List<SharedShare> shares,
+        List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow> schedule,List<SharedDue> dueShares) {}
+    public record SharedDue(UUID clientId,int number,LocalDate date,BigDecimal principal,BigDecimal interest) {}
+    public record SharedFacility(UUID loanId,String number,String status,SharedLiability liability,SharedQuote quote) {}
+    public record SharedObligation(SharedLiability liability,BigDecimal cap,SharedShare allocation) {}
     public record Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory) {}
     public record Terms(BigDecimal principal,BigDecimal annualRate,BigDecimal contractualInterest,BigDecimal instalment,
         String frequency,String tenureUnit,int tenureValue,LocalDate firstPaymentDate,String purpose,

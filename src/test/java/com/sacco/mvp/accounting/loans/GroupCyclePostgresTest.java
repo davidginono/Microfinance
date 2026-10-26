@@ -48,7 +48,7 @@ class GroupCyclePostgresTest {
     CycleForm form(){var c=new CycleForm();c.setPolicyId(policy);c.setApplicationDate(LocalDate.of(2026,9,1));c.setFirstPaymentDate(LocalDate.of(2026,10,1));c.setTenureValue(1);c.setPurpose("Business stock");
         for(var id:List.of(f.client,second)){var r=new ParticipantForm();r.setClientId(id);r.setPrincipal(new BigDecimal("1000.00"));r.setIncome(new BigDecimal("10000.00"));r.setExpenses(new BigDecimal("1000.00"));r.setOtherDebt(BigDecimal.ZERO);r.setGuaranteeCapacity(new BigDecimal("5000.00"));r.setAssessmentEvidence("Synthetic verified income and expenses");r.setCapacityEvidence("Synthetic verified guarantee capacity");c.getParticipants().add(r);}return c;}
     @Test void sharedPreviewUsesOneParentAndConservesUnequalComponentsWithoutCreatingDebt(){
-        var p=policy();p.setModel(Model.SHARED);policy=cycles.configure(f.actor,p);var form=form();
+        var p=policy();p.setModel(Model.SHARED);p.setSharedLiability(SharedLiability.PROPORTIONAL);policy=cycles.configure(f.actor,p);var form=form();
         form.getParticipants().get(0).setPrincipal(new BigDecimal("123.45"));form.getParticipants().get(1).setPrincipal(new BigDecimal("876.56"));
         UUID id=cycles.create(f.actor,group,form);var quote=cycles.previewShared(f.actor,id,form);
         assertThat(quote.principal()).isEqualByComparingTo("1000.01");
@@ -60,7 +60,7 @@ class GroupCyclePostgresTest {
         assertThat(cycles.detail(f.actor,id).state()).isEqualTo("DRAFT");
     }
     @Test void sharedPreviewCannotUseForeignPersonMissingAssessmentOrFailedAffordability(){
-        var p=policy();p.setModel(Model.SHARED);policy=cycles.configure(f.actor,p);var form=form();UUID id=cycles.create(f.actor,group,form);
+        var p=policy();p.setModel(Model.SHARED);p.setSharedLiability(SharedLiability.PROPORTIONAL);policy=cycles.configure(f.actor,p);var form=form();UUID id=cycles.create(f.actor,group,form);
         form.getParticipants().get(0).setExpenses(null);
         assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.amount");
         form.getParticipants().get(0).setExpenses(new BigDecimal("9999.00"));
@@ -69,7 +69,7 @@ class GroupCyclePostgresTest {
         assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.membership");
     }
     @Test void sharedPreviewRejectsAFormerBranchClientWithoutRewritingMembership(){
-        var p=policy();p.setModel(Model.SHARED);policy=cycles.configure(f.actor,p);var form=form();UUID id=cycles.create(f.actor,group,form);
+        var p=policy();p.setModel(Model.SHARED);p.setSharedLiability(SharedLiability.PROPORTIONAL);policy=cycles.configure(f.actor,p);var form=form();UUID id=cycles.create(f.actor,group,form);
         f.jdbc.update("update members set station_id='B2' where id=?",second);
         assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.membership");
         assertThat(f.jdbc.queryForObject("select count(*) from lending_group_member where group_id=? and client_id=?",Integer.class,group,second)).isEqualTo(1);

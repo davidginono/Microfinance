@@ -44,6 +44,7 @@ public class GroupCycleService {
         money(f.getMaxPrincipal(),true);money(f.getMaxGuarantee(),true);check(f.getMaxActiveCycles()!=null && f.getMaxActiveCycles()>=1 && f.getMaxActiveCycles()<=10,"form");
         text(f.getPolicyReference(),500);text(f.getAgreementReference(),500);
         check(f.getModel()!=Model.INDIVIDUAL || f.isOwnLoanGuarantors(),"ownLoanGuarantors");
+        check((f.getModel()==Model.SHARED)==(f.getSharedLiability()!=null),"sharedLiability");
         String hash=hash(f);cycles.lock(a,"GROUP_POLICY",f.getRequestKey());var retry=cycles.retry(a,f.getRequestKey(),hash,false);if(retry.isPresent())return retry.get();
         check(cycles.product(a,f.getProductId()),"product");cycles.lock(a,"GROUP_PRODUCT",f.getProductId());
         UUID id=cycles.policy(a,f,hash,clock.now());event(a,id,"GROUP_PRODUCT_RULES_SAVED",Map.of("product",f.getProductId(),"model",f.getModel(),"enabled",f.isEnabled()));return id;
@@ -65,7 +66,10 @@ public class GroupCycleService {
         cycles.save(c,f,false,clock.now());event(a,id,"GROUP_CYCLE_DRAFT_SAVED",Map.of("version",f.getExpectedVersion()+1));
     }
     @Transactional public SharedQuote previewShared(AppUserPrincipal a,UUID id,CycleForm f){
-        authorize(a,"UPDATE");loans.authorize(a,"CREATE");draft(f);var c=cycles.cycle(a,id,false);
+        authorize(a,"UPDATE");loans.authorize(a,"CREATE");return assessShared(a,id,f);
+    }
+    private SharedQuote assessShared(AppUserPrincipal a,UUID id,CycleForm f){
+        draft(f);var c=cycles.cycle(a,id,false);
         check(c.model()==Model.SHARED && "DRAFT".equals(c.state()) && c.version()==f.getExpectedVersion() && c.policyId().equals(f.getPolicyId()),"changed");
         var p=cycles.policy(a,c.policyId());check(p.enabled() && cycles.current(p,a) && cycles.product(a,c.productId()),"policy");
         check("ACTIVE".equals(groups.group(a,c.groupId(),false).status()),"inactive");
@@ -77,21 +81,23 @@ public class GroupCycleService {
         check(cycles.memberships(a,c.groupId(),ids).size()==ids.size(),"membership");
         for(var r:rows){money(r.getPrincipal(),true);money(r.getIncome(),true);money(r.getExpenses(),false);money(r.getOtherDebt(),false);text(r.getAssessmentEvidence(),500);}
         var weights=rows.stream().map(ParticipantForm::getPrincipal).toList();var principal=weights.stream().reduce(BigDecimal.ZERO,BigDecimal::add);check(principal.compareTo(p.maxPrincipal())<=0,"principalLimit");
-        var command=new RecordForm();command.setProductId(c.productId());command.setPrincipal(principal);command.setApplicationDate(f.getApplicationDate());
-        command.setFirstPaymentDate(f.getFirstPaymentDate());command.setTenureUnit(tenure.unit());command.setTenureValue(tenure.value());command.setPurpose(f.getPurpose());
+        var command=sharedCommand(c,f,principal);
         // A shared facility is quoted once. Separate participant quotes would price a different contract.
         var quote=loans.interestQuote(a,command);var charges=loans.chargeQuote(a,command);check(charges.supported(),"product");
+        var frequency=RepaymentFrequency.valueOf(quote.frequency());
+        var schedule=quote.schedule().stream().map(row->new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(row.number(),tenure.dueDate(f.getApplicationDate(),f.getFirstPaymentDate(),frequency,row.number(),quote.schedule().size()),row.principal(),row.interest(),row.amount(),row.beginningBalance(),row.endingBalance())).toList();
         var maximum=quote.schedule().stream().map(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow::amount).max(BigDecimal::compareTo).orElseThrow();
         var monthly=LoanAmortizationCalculator.monthlyEquivalent(maximum,RepaymentFrequency.valueOf(quote.frequency()));
         var interests=GroupSharedAllocator.split(quote.interest(),weights);var chargeShares=GroupSharedAllocator.split(charges.total(),weights);
         var deductions=GroupSharedAllocator.split(charges.deductions(),weights);var payments=new ArrayList<BigDecimal>(Collections.nCopies(rows.size(),new BigDecimal("0.00")));
-        var remainingPrincipal=new ArrayList<>(weights);var remainingInterest=new ArrayList<>(interests);
+        var remainingPrincipal=new ArrayList<>(weights);var remainingInterest=new ArrayList<>(interests);var dueShares=new ArrayList<SharedDue>();
         // Allocate each due component within the remaining personal component budgets.
         // This conserves both the parent instalment and every person's contractual totals.
-        for(var due:quote.schedule()){
+        for(var due:schedule){
             var pp=GroupSharedAllocator.split(due.principal(),remainingPrincipal);var ii=GroupSharedAllocator.split(due.interest(),remainingInterest);
             for(int n=0;n<rows.size();n++){
                 var instalment=pp.get(n).add(ii.get(n));remainingPrincipal.set(n,remainingPrincipal.get(n).subtract(pp.get(n)));remainingInterest.set(n,remainingInterest.get(n).subtract(ii.get(n)));
+                dueShares.add(new SharedDue(ids.get(n),due.number(),due.date(),pp.get(n),ii.get(n)));
                 payments.set(n,payments.get(n).max(LoanAmortizationCalculator.monthlyEquivalent(instalment,RepaymentFrequency.valueOf(quote.frequency()))));
             }
         }
@@ -101,17 +107,45 @@ public class GroupCycleService {
             var r=rows.get(n);var e=exposures.get(r.getClientId());check(e.missingHistory()==0,"historyMissing");check(e.activeCycles()<p.maxActiveCycles(),"activeCycles");
             check(e.activeLoans()==0 || (rules.activeLoanAllowed() && e.activeLoans()<rules.maximumActiveLoans()),"activeLoans");
             check(branch.applicantDefaultLimit()==null || e.riskLoans()<branch.applicantDefaultLimit(),"defaultPolicy");
+            if(rules.collateralRequired()){text(r.getCollateral(),500);money(r.getCollateralValue(),false);check(r.getCollateralValue().compareTo(r.getPrincipal().multiply(rules.collateralRatio()))>=0,"collateral");}
             var disposable=r.getIncome().subtract(r.getExpenses()).subtract(r.getOtherDebt().max(e.monthlyDebt()));
             check(disposable.signum()>0 && payments.get(n).compareTo(disposable.multiply(rules.affordabilityRatio()).setScale(2,RoundingMode.DOWN))<=0,"affordability");
             check(deductions.get(n).compareTo(r.getPrincipal())<0,"amount");
             shares.add(new SharedShare(r.getClientId(),r.getPrincipal(),interests.get(n),chargeShares.get(n),deductions.get(n),r.getPrincipal().subtract(deductions.get(n)),payments.get(n)));
         }
-        return new SharedQuote(principal,quote.interest(),charges.total(),charges.deductions(),principal.subtract(charges.deductions()),principal.add(quote.interest()).add(charges.total()),monthly,quote.frequency(),List.copyOf(shares));
+        return new SharedQuote(principal,quote.interest(),charges.total(),charges.deductions(),principal.subtract(charges.deductions()),principal.add(quote.interest()).add(charges.total()),monthly,quote.frequency(),List.copyOf(shares),schedule,List.copyOf(dueShares));
+    }
+    private RecordForm sharedCommand(Cycle c,CycleForm f,BigDecimal principal){
+        var command=new RecordForm();command.setRequestKey(UUID.nameUUIDFromBytes(("SHARED_ORIGINATION/"+c.id()).getBytes(StandardCharsets.UTF_8)));
+        command.setProductId(c.productId());command.setPrincipal(principal);command.setApplicationDate(f.getApplicationDate());command.setFirstPaymentDate(f.getFirstPaymentDate());
+        command.setTenureUnit(f.getTenureUnit());command.setTenureValue(f.getTenureValue());command.setPurpose(f.getPurpose());command.setBusiness(f.getPurpose());
+        command.setIncome(f.getParticipants().stream().map(ParticipantForm::getIncome).reduce(BigDecimal.ZERO,BigDecimal::add));
+        command.setExpenses(f.getParticipants().stream().map(ParticipantForm::getExpenses).reduce(BigDecimal.ZERO,BigDecimal::add));
+        command.setOtherDebt(f.getParticipants().stream().map(ParticipantForm::getOtherDebt).reduce(BigDecimal.ZERO,BigDecimal::add));
+        command.setInformationSource("DOCUMENTED");command.setEvidence("Joint borrower assessments retained in group cycle");command.setGuarantors("");
+        command.setCollateral(f.getParticipants().stream().anyMatch(r->r.getCollateral()!=null&&!r.getCollateral().isBlank())?"Collateral evidence retained in individual joint borrower assessments":"");
+        if(f.getParticipants().stream().anyMatch(r->r.getInsurancePremium()!=null)){
+            for(var r:f.getParticipants()){money(r.getInsurancePremium(),false);text(r.getInsuranceEvidence(),500);}
+            command.setInsurancePremium(f.getParticipants().stream().map(ParticipantForm::getInsurancePremium).reduce(BigDecimal.ZERO,BigDecimal::add));
+            command.setInsuranceEvidence("Premium evidence retained in individual joint borrower assessments");
+        }
+        return command;
+    }
+    @Transactional(readOnly=true) public Optional<SharedFacility> sharedFacility(AppUserPrincipal a,UUID id){authorize(a,"VIEW");cycles.cycle(a,id,false);return cycles.sharedFacility(a,id);}
+    private void submitShared(AppUserPrincipal a,Cycle c,CycleForm f){
+        cycles.lockProductPolicy(a,c.productId());check("ACTIVE".equals(groups.group(a,c.groupId(),true).status()),"inactive");
+        var ids=f.getParticipants().stream().map(ParticipantForm::getClientId).toList();check(!ids.isEmpty() && ids.stream().allMatch(Objects::nonNull),"members");cycles.lockClients(a,ids);
+        var quote=assessShared(a,c.id(),f);var rule=cycles.sharedLiability(a,c.policyId()).orElseThrow(()->new IllegalArgumentException("group.error.sharedLiability"));
+        check(cycles.rules(a,c.productId()).guarantors()==0,"sharedGuarantors");
+        UUID party=cycles.sharedParty(a,c.groupId());UUID loan=loans.saveShared(a,sharedCommand(c,f,quote.principal()),party);
+        cycles.sharedParticipants(a,c,f,quote,cycles.memberships(a,c.groupId(),ids));cycles.sharedFacility(a,c,loan,rule,quote,clock.now());cycles.save(c,f,true,clock.now());
+        event(a,c.id(),"SHARED_LOAN_SUBMITTED",Map.of("loan",loan,"principal",quote.principal(),"participants",ids.size(),"liability",rule));
     }
     @Transactional public void submit(AppUserPrincipal a,UUID id,CycleForm f){
         authorize(a,"SUBMIT");loans.authorize(a,"CREATE");draft(f);var c=cycles.cycle(a,id,true);
         if("SUBMITTED".equals(c.state()) && c.version()==f.getExpectedVersion()+1 && hash(c.form()).equals(hash(f)))return;
         check("DRAFT".equals(c.state()) && c.version()==f.getExpectedVersion() && c.policyId().equals(f.getPolicyId()),"changed");
+        if(c.model()==Model.SHARED){submitShared(a,c,f);return;}
         check(c.model()==Model.INDIVIDUAL,"modelUnavailable");cycles.lock(a,"GROUP_PRODUCT",c.productId());var p=cycles.policy(a,c.policyId());check(p.enabled() && cycles.current(p,a),"policy");
         check("ACTIVE".equals(groups.group(a,c.groupId(),true).status()) && cycles.product(a,c.productId()),"product");
         text(f.getPurpose(),500);check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()) && f.getFirstPaymentDate()!=null && f.getFirstPaymentDate().isAfter(f.getApplicationDate()),"date");

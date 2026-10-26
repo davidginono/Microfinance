@@ -28,7 +28,9 @@ public class GroupConsentService {
     private final PasswordEncoder passwords;
     private final org.springframework.core.env.Environment configuration;
     private static final java.security.SecureRandom RANDOM=new java.security.SecureRandom();
-    public record Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination) {}
+    public record Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination,SharedObligation shared) {
+        public Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination){this(id,group,policy,borrower,terms,guarantees,accepted,otpRequired,signatureReady,termination,null);}
+    }
     private Member authorize(AppUserPrincipal actor,UserClaim... required){
         if(actor==null || !actor.isMemberAccess())throw new AccessDeniedException("Participant access required");
         var current=members.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Participant unavailable"));
@@ -51,11 +53,12 @@ public class GroupConsentService {
         if(!cycles.participant(a,id))throw new AccessDeniedException("Group agreement unavailable");var c=cycles.cycle(a,id,false);
         if(!Set.of("SUBMITTED","CANCELLED").contains(c.state()))throw new AccessDeniedException("Group agreement unavailable");
         var own=cycles.participants(a,id).stream().filter(p->p.clientId().equals(a.getMemberId())).findFirst().orElseThrow();
-        return new Packet(id,c.groupName(),cycles.policy(a,c.policyId()),own,cycles.ownTerms(a,id),cycles.guarantees(a,id),cycles.consented(a,id),otpSettings.requiresApprovalOtp(a.getMemberId(),a.getSaccoId(),a.getStationId()),signatureReady(current),cycles.termination(a,id).map(t->new TerminationNotice(t.kind(),t.recordedAt())).orElse(null));
+        return new Packet(id,c.groupName(),cycles.policy(a,c.policyId()),own,cycles.ownTerms(a,id),cycles.guarantees(a,id),cycles.consented(a,id),otpSettings.requiresApprovalOtp(a.getMemberId(),a.getSaccoId(),a.getStationId()),signatureReady(current),cycles.termination(a,id).map(t->new TerminationNotice(t.kind(),t.recordedAt())).orElse(null),c.model()==Model.SHARED?cycles.sharedObligation(a,id).orElseThrow():null);
     }
+    private Member signer(AppUserPrincipal a,UUID id){var current=authorize(a,UserClaim.MEMBER_LOANS_VIEW,UserClaim.MEMBER_LOANS_UPDATE);if(cycles.cycle(a,id,false).model()!=Model.SHARED)authorize(a,UserClaim.GUARANTOR_REQUESTS_APPROVE);return current;}
     /** Returns a validation key without rolling back failed-code attempt accounting. */
     @Transactional public String accept(AppUserPrincipal a,UUID id,boolean accepted,String code){
-        var current=authorize(a,UserClaim.MEMBER_LOANS_VIEW,UserClaim.MEMBER_LOANS_UPDATE,UserClaim.GUARANTOR_REQUESTS_APPROVE);if(!accepted)throw new AccessDeniedException("Personal acceptance required");
+        var current=signer(a,id);if(!accepted)throw new AccessDeniedException("Personal acceptance required");
         consentLock(a,id);var packet=loadPacket(a,id,current);if(packet.termination()!=null)return "group.error.endedCycle";if(packet.accepted())return null;
         if(!packet.signatureReady())return "group.error.signature";UUID challengeId=null;var signedAt=clock.now();
         if(packet.otpRequired()){
@@ -70,7 +73,7 @@ public class GroupConsentService {
         return null;
     }
     @Transactional public Delivery prepareCode(AppUserPrincipal a,UUID id){
-        var current=authorize(a,UserClaim.MEMBER_LOANS_VIEW,UserClaim.MEMBER_LOANS_UPDATE,UserClaim.GUARANTOR_REQUESTS_APPROVE);consentLock(a,id);var packet=loadPacket(a,id,current);
+        var current=signer(a,id);consentLock(a,id);var packet=loadPacket(a,id,current);
         if(packet.termination()!=null)throw new IllegalArgumentException("group.error.endedCycle");
         if(packet.accepted() || !packet.otpRequired())throw new IllegalArgumentException("group.error.otpDisabled");
         if(!packet.signatureReady())throw new IllegalArgumentException("group.error.signature");
@@ -81,7 +84,7 @@ public class GroupConsentService {
         return new Delivery(challenge,id,a.getMemberId(),packet.borrower().loanId(),current.getEmail(),current.getPhone(),code,a.getSaccoId(),a.getStationId(),ttl);
     }
     @Transactional public void codeDelivered(AppUserPrincipal a,UUID cycle,UUID id){
-        authorize(a,UserClaim.MEMBER_LOANS_VIEW,UserClaim.MEMBER_LOANS_UPDATE,UserClaim.GUARANTOR_REQUESTS_APPROVE);consentLock(a,cycle);if(cycles.termination(a,cycle).isPresent())throw new IllegalArgumentException("group.error.endedCycle");
+        signer(a,cycle);consentLock(a,cycle);if(cycles.termination(a,cycle).isPresent())throw new IllegalArgumentException("group.error.endedCycle");
         var challenge=cycles.challenges(a,cycle).stream().findFirst().filter(c->c.id().equals(id) && c.expires().isAfter(clock.now()) && c.consumed()==null).orElseThrow(()->new IllegalArgumentException("group.error.otpExpired"));
         cycles.challengeDelivered(challenge.id(),clock.now());
     }

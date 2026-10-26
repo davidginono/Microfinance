@@ -12,6 +12,7 @@
 <c:forEach items="${['minMembers','maxMembers','maxActiveCycles']}" var="field"><label><spring:message code="${field=='minMembers'?'group.minimumPeople':field=='maxMembers'?'group.maximumPeople':'group.maxActiveCycles'}" /><form:input path="${field}" type="number" min="1" max="${field=='maxActiveCycles'?10:50}" cssClass="aws-control" required="required" /></label></c:forEach>
 <c:forEach items="${['maxPrincipal','maxGuarantee']}" var="field"><label><spring:message code="group.${field}" /><form:input path="${field}" type="number" min="0.01" step="0.01" cssClass="aws-control" required="required" /></label></c:forEach>
 <label><form:checkbox path="ownLoanGuarantors" /><spring:message code="group.ownLoanGuarantors" /></label>
+<label><spring:message code="group.sharedLiability" /><form:select path="sharedLiability" cssClass="aws-control"><form:option value=""><spring:message code="voucher.choose" /></form:option><c:forEach items="${['PROPORTIONAL','JOINT_AND_SEVERAL']}" var="rule"><form:option value="${rule}"><spring:message code="group.sharedLiability.${rule}" /></form:option></c:forEach></form:select></label>
 <label><spring:message code="group.policyReference" /><form:input path="policyReference" maxlength="500" cssClass="aws-control" required="required" /></label>
 <label><spring:message code="group.agreement" /><form:input path="agreementReference" maxlength="500" cssClass="aws-control" required="required" /></label>
 <label><form:checkbox path="enabled" /><spring:message code="group.enabled" /></label>

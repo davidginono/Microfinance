@@ -189,6 +189,13 @@ public class LoanRecordingService {
         authorize(a,"CREATE");check(records.organizationParty(a,borrowerParty),"client");
         return saveInternal(a,f,List.of(),borrowerParty,payoutSnapshot);
     }
+    /** Source, joint obligors and conserved allocations must commit with this application. */
+    @Transactional
+    public UUID saveShared(AppUserPrincipal a,RecordForm f,UUID borrowerParty){
+        check(f!=null && f.getClientId()==null && f.getTopUpSourceLoanId()==null && "CONFIGURED".equals(f.getLoanMode()) && borrowerParty!=null,"request");
+        authorize(a,"CREATE");check(records.sharedParty(a,borrowerParty),"client");
+        return saveInternal(a,f,List.of(),borrowerParty,"{\"available\":false}");
+    }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();

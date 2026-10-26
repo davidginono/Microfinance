@@ -48,10 +48,27 @@ public class GroupCycleRepository {
     }
     public UUID policy(AppUserPrincipal a,PolicyForm f,String hash,OffsetDateTime now){UUID id=UUID.randomUUID();jdbc.update("""
         insert into lending_group_policy(id,sacco_id,station_id,product_id,model,min_members,max_members,max_principal,max_guarantee,max_active_cycles,
-          own_loan_guarantors,policy_reference,agreement_reference,enabled,request_key,payload_hash,created_by,created_at,capability_version)
-        values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          own_loan_guarantors,policy_reference,agreement_reference,enabled,request_key,payload_hash,created_by,created_at,capability_version,shared_liability)
+        values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,id,a.getSaccoId(),a.getStationId(),f.getProductId(),f.getModel().name(),f.getMinMembers(),f.getMaxMembers(),f.getMaxPrincipal(),f.getMaxGuarantee(),f.getMaxActiveCycles(),
-        f.isOwnLoanGuarantors(),f.getPolicyReference().strip(),f.getAgreementReference().strip(),f.isEnabled(),f.getRequestKey(),hash,a.getMemberId(),now,f.getModel()==Model.ORGANIZATION?1:0);return id;}
+        f.isOwnLoanGuarantors(),f.getPolicyReference().strip(),f.getAgreementReference().strip(),f.isEnabled(),f.getRequestKey(),hash,a.getMemberId(),now,f.getModel()==Model.ORGANIZATION?1:f.getModel()==Model.SHARED?2:0,f.getSharedLiability()==null?null:f.getSharedLiability().name());return id;}
+    public Optional<SharedLiability> sharedLiability(AppUserPrincipal a,UUID policy){return jdbc.query("select shared_liability from lending_group_policy where id=? and sacco_id=? and station_id=? and model='SHARED' and capability_version=2",(r,n)->SharedLiability.valueOf(r.getString(1)),policy,a.getSaccoId(),a.getStationId()).stream().findFirst();}
+    public UUID sharedParty(AppUserPrincipal a,UUID group){
+        jdbc.update("insert into loan_borrower_party(id,sacco_id,kind,group_id,group_station_id) values(?,?,'JOINT_GROUP',?,?) on conflict(sacco_id,group_id,kind) do nothing",UUID.randomUUID(),a.getSaccoId(),group,a.getStationId());
+        return jdbc.queryForObject("select id from loan_borrower_party where sacco_id=? and group_station_id=? and group_id=? and kind='JOINT_GROUP'",UUID.class,a.getSaccoId(),a.getStationId(),group);
+    }
+    public void sharedFacility(AppUserPrincipal a,Cycle c,UUID loan,SharedLiability liability,SharedQuote quote,OffsetDateTime now){
+        jdbc.update("insert into lending_group_shared_facility(cycle_id,loan_id,sacco_id,station_id,liability_rule,snapshot,created_by,created_at) values(?,?,?,?,?,?::jsonb,?,?)",c.id(),loan,a.getSaccoId(),a.getStationId(),liability.name(),json.writeValueAsString(quote),a.getMemberId(),now);
+        jdbc.update("""
+            insert into lending_group_shared_allocation(cycle_id,participant_id,client_id,ordinal,client_name,client_number,principal,interest,charges,deductions,net,monthly_payment,liability_cap)
+            select ?,p.id,p.client_id,s.ordinality,m.full_name,m.member_no,s.principal,s.interest,s.charges,s.deductions,s.net,s.monthly,
+              case when ?='JOINT_AND_SEVERAL' then ? else s.principal+s.interest+s.charges end
+            from jsonb_to_recordset(?::jsonb) as s("clientId" uuid,principal numeric,interest numeric,charges numeric,deductions numeric,net numeric,ordinality integer,monthly numeric)
+            join lending_group_participant p on p.cycle_id=? and p.client_id=s."clientId" join members m on m.id=p.client_id
+            """,c.id(),liability.name(),quote.totalPayable(),json.writeValueAsString(java.util.stream.IntStream.range(0,quote.shares().size()).mapToObj(n->{var s=quote.shares().get(n);return Map.of("clientId",s.clientId(),"principal",s.principal(),"interest",s.interest(),"charges",s.charges(),"deductions",s.deductions(),"net",s.net(),"monthly",s.monthlyPayment(),"ordinality",n+1);}).toList()),c.id());
+    }
+    public Optional<SharedFacility> sharedFacility(AppUserPrincipal a,UUID cycle){return jdbc.query("select f.*,coalesce(l.loan_id,l.application_number::text) number,l.status from lending_group_shared_facility f join loan_applications l on l.id=f.loan_id where f.cycle_id=? and f.sacco_id=? and f.station_id=?",(r,n)->new SharedFacility(r.getObject("loan_id",UUID.class),r.getString("number"),r.getString("status"),SharedLiability.valueOf(r.getString("liability_rule")),json.readValue(r.getString("snapshot"),SharedQuote.class)),cycle,a.getSaccoId(),a.getStationId()).stream().findFirst();}
+    public Optional<SharedObligation> sharedObligation(AppUserPrincipal a,UUID cycle){return jdbc.query("select f.liability_rule,s.* from lending_group_shared_facility f join lending_group_shared_allocation s on s.cycle_id=f.cycle_id where f.cycle_id=? and f.sacco_id=? and f.station_id=? and s.client_id=?",(r,n)->new SharedObligation(SharedLiability.valueOf(r.getString("liability_rule")),r.getBigDecimal("liability_cap"),new SharedShare(a.getMemberId(),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("deductions"),r.getBigDecimal("net"),r.getBigDecimal("monthly_payment"))),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst();}
     public Policy policy(AppUserPrincipal a,UUID id){return jdbc.query(POLICIES+" and p.id=?",POLICY,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Group product unavailable"));}
     public List<Policy> policies(AppUserPrincipal a,int page){return policies(a,"",page);}
     public List<Policy> policies(AppUserPrincipal a,String search,int page){return jdbc.query(POLICIES+" and strpos(lower(coalesce(l.product_name,l.loan_type)),?)>0 and not exists(select 1 from lending_group_policy newer where newer.sacco_id=p.sacco_id and newer.station_id=p.station_id and newer.product_id=p.product_id and newer.model=p.model and newer.revision>p.revision) order by "+
@@ -86,14 +103,14 @@ public class GroupCycleRepository {
         select l.status not in ('DISBURSED','PAR','DEFAULTED','WRITTEN_OFF','PAID','DISBURSEMENT_REVERSED')
           and not exists(select 1 from loan_ledgers b where b.loan_application_id=l.id)
           and not exists(select 1 from accountant_loan_post b where b.loan_id=l.id) eligible
-        from (select cycle_id,loan_id,sacco_id,station_id from lending_group_participant union all select cycle_id,loan_id,sacco_id,station_id from lending_group_facility) p join loan_applications l on l.id=p.loan_id
+        from (select cycle_id,loan_id,sacco_id,station_id from lending_group_participant union all select cycle_id,loan_id,sacco_id,station_id from lending_group_facility union all select cycle_id,loan_id,sacco_id,station_id from lending_group_shared_facility) p join loan_applications l on l.id=p.loan_id
         where p.cycle_id=? and p.sacco_id=? and p.station_id=? order by l.id limit 51 for update of l
         """,(r,n)->r.getBoolean("eligible"),cycle,a.getSaccoId(),a.getStationId());return eligible.size()<=50 && eligible.stream().allMatch(Boolean.TRUE::equals);}
     public void terminate(AppUserPrincipal a,Cycle c,String kind,String reason,OffsetDateTime now){
         jdbc.update("insert into lending_group_termination(cycle_id,sacco_id,station_id,kind,actor_id,reason,recorded_at) values(?,?,?,?,?,?,?)",c.id(),a.getSaccoId(),a.getStationId(),kind,a.getMemberId(),reason,now);
         jdbc.update("""
             update loan_applications l set status='WITHDRAWN',updated_at=?,version=version+1 where l.sacco_id=? and l.station_id=?
-            and exists(select 1 from (select cycle_id,loan_id from lending_group_participant union all select cycle_id,loan_id from lending_group_facility) p where p.cycle_id=? and p.loan_id=l.id)
+            and exists(select 1 from (select cycle_id,loan_id from lending_group_participant union all select cycle_id,loan_id from lending_group_facility union all select cycle_id,loan_id from lending_group_shared_facility) p where p.cycle_id=? and p.loan_id=l.id)
             and l.status not in ('MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')
             """,now,a.getSaccoId(),a.getStationId(),c.id());
         if(jdbc.update("update lending_group_cycle set state='CANCELLED',version=version+1 where id=? and sacco_id=? and station_id=? and version=?",c.id(),a.getSaccoId(),a.getStationId(),c.version())!=1)throw new IllegalArgumentException("group.error.changed");
@@ -123,7 +140,8 @@ public class GroupCycleRepository {
             pending as not materialized (select * from scoped where status not in
               ('WITHDRAWN','PAID','DISBURSEMENT_REVERSED','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')),
             cycles as (select x.client_id client,count(distinct x.cycle_id) active_cycles from lending_group_participant x
-              join selected s on s.client=x.client_id where exists(select 1 from lending_group_participant peer join pending p on p.id=peer.loan_id where peer.cycle_id=x.cycle_id) group by x.client_id),
+              join selected s on s.client=x.client_id where exists(select 1 from lending_group_participant peer join pending p on p.id=peer.loan_id where peer.cycle_id=x.cycle_id)
+                or exists(select 1 from lending_group_shared_facility sf join pending p on p.id=sf.loan_id where sf.cycle_id=x.cycle_id) group by x.client_id),
             liabilities as (select g.guarantor_id client,g.amount_cap cap from lending_guarantor_commitment g where g.sacco_id=? and g.station_id=? and g.guarantor_id in (
             """+String.join(",",Collections.nCopies(clients.size(),"?"))+"""
             )),
@@ -140,15 +158,22 @@ public class GroupCycleRepository {
           guarantee_capacity,assessment_evidence,capacity_evidence,loan_id) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,UUID.randomUUID(),c.id(),a.getSaccoId(),a.getStationId(),f.getClientId(),membership,f.getPrincipal(),f.getIncome(),f.getExpenses(),f.getOtherDebt(),monthly,
         f.getGuaranteeCapacity(),f.getAssessmentEvidence().strip(),f.getCapacityEvidence().strip(),loan);}
+    public void sharedParticipants(AppUserPrincipal a,Cycle c,CycleForm form,SharedQuote quote,Map<UUID,UUID> memberships){
+        var args=new ArrayList<Object[]>();for(int n=0;n<form.getParticipants().size();n++){
+            var r=form.getParticipants().get(n);args.add(new Object[]{UUID.randomUUID(),c.id(),a.getSaccoId(),a.getStationId(),r.getClientId(),memberships.get(r.getClientId()),r.getPrincipal(),r.getIncome(),r.getExpenses(),r.getOtherDebt(),quote.shares().get(n).monthlyPayment(),r.getAssessmentEvidence().strip(),r.getAssessmentEvidence().strip()});
+        }
+        jdbc.batchUpdate("insert into lending_group_participant(id,cycle_id,sacco_id,station_id,client_id,membership_id,principal,income,expenses,other_debt,monthly_payment,guarantee_capacity,assessment_evidence,capacity_evidence,loan_id) values(?,?,?,?,?,?,?,?,?,?,?,0,?,?,null)",args);
+    }
     public void guarantee(AppUserPrincipal a,Cycle c,UUID guarantor,UUID borrower,UUID loan,BigDecimal cap,String reference,OffsetDateTime now){jdbc.update("""
         insert into lending_group_guarantee(id,cycle_id,sacco_id,station_id,guarantor_id,borrower_id,loan_id,amount_cap,terms_reference,created_at) values(?,?,?,?,?,?,?,?,?,?)
         """,UUID.randomUUID(),c.id(),a.getSaccoId(),a.getStationId(),guarantor,borrower,loan,cap,reference,now);}
     public List<Participant> participants(AppUserPrincipal a,UUID cycle){return jdbc.query("""
-        select x.*,m.member_no,m.full_name,coalesce(l.loan_id,l.application_number::text) loan_number,l.status loan_status,
+        select x.*,coalesce(sa.client_number,m.member_no) member_no,coalesce(sa.client_name,m.full_name) full_name,coalesce(x.loan_id,sf.loan_id) resolved_loan_id,coalesce(l.loan_id,l.application_number::text) loan_number,l.status loan_status,
         exists(select 1 from lending_group_consent_evidence s where s.cycle_id=x.cycle_id and s.client_id=x.client_id) consented
-        from lending_group_participant x join members m on m.id=x.client_id left join loan_applications l on l.id=x.loan_id
+        from lending_group_participant x join members m on m.id=x.client_id left join lending_group_shared_facility sf on sf.cycle_id=x.cycle_id
+        left join lending_group_shared_allocation sa on sa.participant_id=x.id left join loan_applications l on l.id=coalesce(x.loan_id,sf.loan_id)
         where x.cycle_id=? and x.sacco_id=? and x.station_id=? order by
-        """+ResourceTableSort.order("group-cycle-participants",Map.of("client","m.member_no","principal","x.principal","monthly","x.monthly_payment","loan","loan_number","consent","consented","status","l.status"),"x.id","m.member_no,x.id")+" limit 50",(r,n)->new Participant(r.getObject("id",UUID.class),r.getObject("client_id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getBigDecimal("principal"),r.getBigDecimal("monthly_payment"),r.getBigDecimal("guarantee_capacity"),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("loan_status"),r.getBoolean("consented")),cycle,a.getSaccoId(),a.getStationId());}
+        """+ResourceTableSort.order("group-cycle-participants",Map.of("client","member_no","principal","x.principal","monthly","x.monthly_payment","loan","loan_number","consent","consented","status","l.status"),"x.id","member_no,x.id")+" limit 50",(r,n)->new Participant(r.getObject("id",UUID.class),r.getObject("client_id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getBigDecimal("principal"),r.getBigDecimal("monthly_payment"),r.getBigDecimal("guarantee_capacity"),r.getObject("resolved_loan_id",UUID.class),r.getString("loan_number"),r.getString("loan_status"),r.getBoolean("consented")),cycle,a.getSaccoId(),a.getStationId());}
     public List<ClientCycle> clientCycles(AppUserPrincipal a,int page){return jdbc.query("""
         select * from (
          select c.id,g.name,c.submitted_at,c.state,c.model,
@@ -191,7 +216,7 @@ public class GroupCycleRepository {
         (l.financial_snapshot->>'recordedChargeDeductions')::numeric deductions,
         (l.financial_snapshot->>'recordedNetCashEstimate')::numeric net_cash,
         (l.financial_snapshot->>'recordedTotalPayable')::numeric total_payable,
-        l.financial_snapshot->'recordedCharges' charges from lending_group_participant x join loan_applications l on l.id=x.loan_id
+        l.financial_snapshot->'recordedCharges' charges from lending_group_participant x left join lending_group_shared_facility sf on sf.cycle_id=x.cycle_id join loan_applications l on l.id=coalesce(x.loan_id,sf.loan_id)
         join lending_group_cycle c on c.id=x.cycle_id where x.cycle_id=? and x.sacco_id=? and x.station_id=? and x.client_id=?
         """,(r,n)->new Terms(r.getBigDecimal("amount"),r.getBigDecimal("rate"),r.getBigDecimal("interest"),r.getBigDecimal("installment_amount"),r.getString("repayment_frequency"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("first_repayment_date",LocalDate.class),r.getString("purpose"),
             r.getBigDecimal("maximum_instalment"),r.getBigDecimal("charge_total"),r.getBigDecimal("deductions"),r.getBigDecimal("net_cash"),r.getBigDecimal("total_payable"),json.readValue(r.getString("charges"),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan.class)),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Own agreement unavailable"));}
