@@ -43,6 +43,7 @@ public class LoanRecordingService {
     private final LoanProductAccountService productAccounts;
     private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
     private final com.sacco.mvp.grouplending.service.GroupSharedLoanService sharedLoans;
+    private final com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -200,7 +201,17 @@ public class LoanRecordingService {
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
-        check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);var chargePlan=charges.quote(a,f,product,true);var now=clock.now();
+        check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
+        var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
+        if(shared.active()>0){
+            check(product.isApplicationWithActiveLoanAllowed(),"sharedActiveLoan");
+            if(product.getMaximumActiveLoans()!=null)check(shared.active()+loans.countBySaccoIdAndApplicantMemberIdAndStatusIn(a.getSaccoId(),f.getClientId(),List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF))<=product.getMaximumActiveLoans(),"sharedActiveLoan");
+            if(product.isAffordabilityCheckRequired()){
+                var disposable=f.getIncome().subtract(f.getExpenses()).subtract(f.getOtherDebt().max(shared.monthlyPayment()));
+                check(disposable.signum()>0&&LoanAmortizationCalculator.monthlyEquivalent(calculation.maximumInstallment(),product.getResolvedRepaymentFrequency()).compareTo(disposable.multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,java.math.RoundingMode.DOWN))<=0,"sharedAffordability");
+            }
+        }
+        var chargePlan=charges.quote(a,f,product,true);var now=clock.now();
         TopUpQuote settlement=null;
         if(f.getTopUpSourceLoanId()!=null){
             check(records.lockReceiptLoans(a,List.of(f.getTopUpSourceLoanId()),f.getClientId()).size()==1,"topUpUnavailable");
@@ -216,6 +227,7 @@ public class LoanRecordingService {
         snapshot.put("prepaymentTerms",LoanPrepaymentTerms.product(selectedProduct).snapshot());
         if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
+        if(shared.active()>0)policy.put("sharedCredit",Map.of("active",shared.active(),"maximumLiability",shared.liability(),"monthlyPayment",shared.monthlyPayment(),"assessedAt",now));
         snapshot.put("recordedCharges",chargePlan);snapshot.put("recordedChargeTotal",chargePlan.total());snapshot.put("recordedChargeDeductions",chargePlan.deductions());snapshot.put("recordedNetCashEstimate",f.getPrincipal().subtract(settlement==null?ZERO:settlement.total()).subtract(chargePlan.deductions()));snapshot.put("recordedTotalPayable",f.getPrincipal().add(calculation.totalInterest()).add(chargePlan.total()));policy.put("recordedChargePolicy",Objects.toString(chargePlan.policyId(),""));
         long number=numbers.nextFor(a.getSaccoId());
         var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())

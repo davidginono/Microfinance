@@ -127,7 +127,7 @@ public class GroupCycleRepository {
     /** One bounded read for every selected participant; never one exposure query per member. */
     public Map<UUID,Exposure> exposures(AppUserPrincipal a,List<UUID> clients){
         if(clients.isEmpty() || clients.size()>50)throw new IllegalArgumentException("group.error.members");
-        var args=new ArrayList<Object>(clients);args.add(a.getSaccoId());args.add(a.getStationId());args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(clients);
+        var args=new ArrayList<Object>(clients);args.add(a.getSaccoId());args.add(a.getStationId());args.add(a.getSaccoId());args.add(a.getStationId());args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(clients);
         var rows=jdbc.query("with selected(client) as (values "+String.join(",",Collections.nCopies(clients.size(),"(?::uuid)"))+") , "+"""
             scoped as not materialized (select id,applicant_member_id,status,repayment_frequency,installment_amount,amount,financial_snapshot from loan_applications
               where sacco_id=? and station_id=?),
@@ -139,6 +139,15 @@ public class GroupCycleRepository {
               where l.status in ('PAR','DEFAULTED','WRITTEN_OFF') group by l.applicant_member_id),
             pending as not materialized (select * from scoped where status not in
               ('WITHDRAWN','PAID','DISBURSEMENT_REVERSED','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED')),
+            personal_pending as (select l.applicant_member_id client,count(*) applications from pending l join selected s on s.client=l.applicant_member_id
+              where l.status not in ('DISBURSED','PAR','DEFAULTED','WRITTEN_OFF') group by l.applicant_member_id),
+            shared as (select o.client_id client,count(*) filter(where o.funded and (o.maximum_liability>0 or o.missing_history)) active_loans,
+              count(*) filter(where o.pending) applications,count(*) filter(where o.status in ('PAR','DEFAULTED','WRITTEN_OFF')) risk_loans,
+              count(*) filter(where o.missing_history) missing_history,coalesce(sum(o.monthly_payment) filter(where o.funded),0) monthly_debt,
+              coalesce(sum(greatest(0,o.maximum_liability-o.allocated_obligation)),0) contingent
+              from lending_shared_credit_obligation o join scoped l on l.id=o.loan_id join selected s on s.client=o.client_id group by o.client_id),
+            off_branch_shared as (select o.client_id client,count(*) missing from lending_shared_credit_obligation o join selected s on s.client=o.client_id
+              where o.sacco_id=? and o.station_id<>? group by o.client_id),
             cycles as (select x.client_id client,count(distinct x.cycle_id) active_cycles from lending_group_participant x
               join selected s on s.client=x.client_id where exists(select 1 from lending_group_participant peer join pending p on p.id=peer.loan_id where peer.cycle_id=x.cycle_id)
                 or exists(select 1 from lending_group_shared_facility sf join pending p on p.id=sf.loan_id where sf.cycle_id=x.cycle_id) group by x.client_id),
@@ -146,11 +155,13 @@ public class GroupCycleRepository {
             """+String.join(",",Collections.nCopies(clients.size(),"?"))+"""
             )),
             guarantees as (select client,sum(cap) reserved,count(*) guarantee_count,count(*) filter(where cap is null) missing_cap from liabilities group by client)
-            select s.client,coalesce(c.active_cycles,0) active_cycles,coalesce(d.active_loans,0) active_loans,
-              coalesce(d.monthly_debt,0) monthly_debt,coalesce(g.reserved,0) reserved,coalesce(g.guarantee_count,0) guarantee_count,
-              coalesce(r.risk_loans,0) risk_loans,coalesce(d.missing_debt,0)+coalesce(g.missing_cap,0) missing_history from selected s
+            select s.client,coalesce(c.active_cycles,0) active_cycles,coalesce(d.active_loans,0)+coalesce(h.active_loans,0) active_loans,
+              coalesce(d.monthly_debt,0)+coalesce(h.monthly_debt,0) monthly_debt,coalesce(g.reserved,0)+coalesce(h.contingent,0) reserved,coalesce(g.guarantee_count,0) guarantee_count,
+              coalesce(r.risk_loans,0)+coalesce(h.risk_loans,0) risk_loans,coalesce(d.missing_debt,0)+coalesce(g.missing_cap,0)+coalesce(h.missing_history,0)+coalesce(o.missing,0) missing_history,
+              coalesce(p.applications,0)+coalesce(h.applications,0) applications from selected s
               left join debt d on d.client=s.client left join cycles c on c.client=s.client left join guarantees g on g.client=s.client left join risk r on r.client=s.client
-            """,(r,n)->Map.entry(r.getObject("client",UUID.class),new Exposure(r.getInt("active_cycles"),r.getInt("active_loans"),r.getInt("risk_loans"),r.getInt("guarantee_count"),r.getBigDecimal("monthly_debt"),r.getBigDecimal("reserved"),r.getInt("missing_history"))),args.toArray());
+              left join shared h on h.client=s.client left join personal_pending p on p.client=s.client left join off_branch_shared o on o.client=s.client
+            """,(r,n)->Map.entry(r.getObject("client",UUID.class),new Exposure(r.getInt("active_cycles"),r.getInt("active_loans"),r.getInt("risk_loans"),r.getInt("guarantee_count"),r.getBigDecimal("monthly_debt"),r.getBigDecimal("reserved"),r.getInt("missing_history"),r.getInt("applications"))),args.toArray());
         return rows.stream().collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,Map.Entry::getValue));
     }
     public void participant(AppUserPrincipal a,Cycle c,ParticipantForm f,UUID membership,UUID loan,BigDecimal monthly){jdbc.update("""

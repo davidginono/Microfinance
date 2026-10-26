@@ -25,6 +25,7 @@ public class EligibilityService {
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanAnalyticsService loanAnalyticsService;
     private final ObjectMapper objectMapper;
+    private final com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
 
     public EligibilityResult check(String saccoId, UUID memberId, LoanType loanType, BigDecimal amount) {
         return check(saccoId, memberId, resolveProduct(saccoId, loanType), amount, Map.of(), Map.of());
@@ -75,9 +76,10 @@ public class EligibilityService {
         BigDecimal incomeInput = readMoney(safeFormData, "monthlyIncome", "income", "declaredMonthlyIncome");
         BigDecimal expensesInput = readMoney(safeFormData, "monthlyExpenses", "expenses", "declaredMonthlyExpenses");
         BigDecimal debtInput = readMoney(safeFormData, "otherDebtRepayments", "monthlyDebtRepayments", "debtRepayments");
+        var shared=sharedCredit.summary(saccoId,memberId,null);
         BigDecimal monthlyIncome = money(incomeInput);
         BigDecimal monthlyExpenses = money(expensesInput);
-        BigDecimal otherDebtRepayments = money(debtInput);
+        BigDecimal otherDebtRepayments = money(debtInput).max(shared.monthlyPayment());
         BigDecimal collateralValue = readMoney(safeFormData, "collateralEstimatedValue", "collateralValue");
         String collateralDescription = readText(safeFormData, "collateralDescription", "securityDescription");
         BigDecimal repaymentInput = monthlyRepayment(safeFinancialSnapshot);
@@ -89,7 +91,7 @@ public class EligibilityService {
             ratio = DEFAULT_RATIO;
         }
         BigDecimal maxAffordableRepayment = disposableIncome.multiply(ratio).setScale(2, RoundingMode.DOWN);
-        BigDecimal activeExposure = loanAnalyticsService.activeLoanAmount(memberId, saccoId, null);
+        BigDecimal activeExposure = shared.known()?loanAnalyticsService.activeLoanAmount(memberId, saccoId, null):null;
         BigDecimal repaymentBurdenRatio = disposableIncome.compareTo(BigDecimal.ZERO) <= 0
             ? BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP)
             : repayment.divide(disposableIncome, 4, RoundingMode.HALF_UP);
@@ -106,8 +108,8 @@ public class EligibilityService {
             || (!collateralDescription.isBlank()
                 && collateralValue != null && collateralValue.signum() >= 0
                 && collateralValue.compareTo(minCollateralValue(product, safeAmount)) >= 0);
-        boolean eligible = amountProvided && affordabilityOk && collateralOk;
-        String reason = reason(product, amountProvided, cashFlowValid, repaymentInput, monthlyIncome, disposableIncome, repayment,
+        boolean eligible = amountProvided && affordabilityOk && collateralOk && shared.known();
+        String reason = !shared.known()?sharedCredit.message("sharedCreditHistory"):reason(product, amountProvided, cashFlowValid, repaymentInput, monthlyIncome, disposableIncome, repayment,
             maxAffordableRepayment, collateralDescription, collateralValue, safeAmount);
 
         return new EligibilityResult(
@@ -121,7 +123,7 @@ public class EligibilityService {
             otherDebtRepayments,
             repayment,
             repaymentBurdenRatio,
-            activeExposure == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : activeExposure,
+            !shared.known()?null:activeExposure == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : activeExposure,
             money(collateralValue),
             product.isCollateralRequired(),
             reason

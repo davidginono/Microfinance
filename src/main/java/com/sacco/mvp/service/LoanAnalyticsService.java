@@ -76,6 +76,7 @@ public class LoanAnalyticsService {
     private final AccessControlService access;
     private final ApplicationClock applicationClock;
     private final ObjectMapper objectMapper;
+    private final com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
 
     public MemberLoanAnalytics forMember(UUID memberId, LocalDate fromDate, LocalDate toDate) {
         return forMember(memberId, fromDate, toDate, null, null);
@@ -477,15 +478,17 @@ public class LoanAnalyticsService {
     }
 
     public BigDecimal activeLoanAmount(UUID memberId, String saccoId, String stationId) {
+        var shared=sharedCredit.summary(saccoId,memberId,stationId);sharedCredit.requireKnown(shared);
         return sumInterestInclusiveActiveAmount(loanApplicationRepository.findActiveAmountRowsForApplicantScope(
-            memberId, saccoId, stationId, ACTIVE_STATUSES));
+            memberId, saccoId, stationId, ACTIVE_STATUSES)).add(shared.liability());
     }
 
     public long defaultedRiskLoanCount(UUID memberId, String saccoId, String stationId) {
         if (memberId == null) {
             return 0L;
         }
-        return loanApplicationRepository.countByStatusForApplicantScope(memberId, saccoId, stationId).stream()
+        var shared=sharedCredit.summary(saccoId,memberId,stationId);sharedCredit.requireKnown(shared);
+        return shared.risk()+loanApplicationRepository.countByStatusForApplicantScope(memberId, saccoId, stationId).stream()
             .filter(row -> row.getStatus() != null && DEFAULTED_RISK_STATUSES.contains(row.getStatus()))
             .mapToLong(LoanApplicationRepository.StatusCountProjection::getTotal)
             .sum();

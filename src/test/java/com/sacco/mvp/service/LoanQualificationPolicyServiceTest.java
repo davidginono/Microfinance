@@ -37,19 +37,28 @@ class LoanQualificationPolicyServiceTest {
     @Mock private ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     @Mock private SaccoStationPolicyRepository saccoStationPolicyRepository;
     @Mock private LoanAnalyticsService loanAnalyticsService;
+    @Mock private com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
 
     private LoanQualificationPolicyService service;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(sharedCredit.summary(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenReturn(com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE);
         service = new LoanQualificationPolicyService(
             saccoSettingsRepository,
             guarantorRequestRepository,
             memberRepository,
             externalGuarantorRegistryRepository,
             saccoStationPolicyRepository,
-            loanAnalyticsService
+            loanAnalyticsService,sharedCredit
         );
+    }
+
+    @Test void aPendingSharedApplicationCannotBeBypassedByAnIndividualProduct(){
+        var id=UUID.randomUUID();var product=LoanProductSetting.builder().allowApplicationWithActiveLoan(true).build();
+        when(sharedCredit.summary(SACCO_ID,id,null)).thenReturn(new com.sacco.mvp.grouplending.dto.SharedCreditExposure(0,1,0,0,BigDecimal.ZERO,BigDecimal.ZERO));
+        when(sharedCredit.message("sharedApplicationPending")).thenReturn("Existing shared application");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.sharedApplicantExposure(SACCO_ID,id,product)).hasMessage("Existing shared application");
     }
 
     @Test

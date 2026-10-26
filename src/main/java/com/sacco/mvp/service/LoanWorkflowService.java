@@ -299,6 +299,7 @@ public class LoanWorkflowService {
             throw new IllegalStateException("This loan product is not currently available for new applications.");
         }
         loanQualificationPolicyService.assertApplicantEligible(saccoId, memberId);
+        long sharedActiveLoans=loanQualificationPolicyService.sharedApplicantExposure(saccoId,memberId,product);
         findBlockingApplicationInProgress(memberId, allowedApplicationId)
             .ifPresent(application -> {
                 throw new IllegalStateException(
@@ -308,7 +309,7 @@ public class LoanWorkflowService {
             });
         Integer maximumActiveLoans = product.getMaximumActiveLoans();
         if (product.isApplicationWithActiveLoanAllowed() && maximumActiveLoans != null) {
-            long activeLoanCount = loanApplicationRepository.countBySaccoIdAndApplicantMemberIdAndStatusIn(
+            long activeLoanCount = sharedActiveLoans+loanApplicationRepository.countBySaccoIdAndApplicantMemberIdAndStatusIn(
                 saccoId, memberId, ACTIVE_LOAN_LOCK_STATUSES);
             if (activeLoanCount > maximumActiveLoans) {
                 throw new IllegalStateException("This product allows applications with at most " + maximumActiveLoans + " existing active loans.");
@@ -722,6 +723,7 @@ public class LoanWorkflowService {
     private LoanApplication persistSubmittedApplication(LoanApplication app,
                                                        UUID memberId,
                                                        List<GuarantorSelection> selectedGuarantors) {
+        recheckSharedCreditAtSubmission(app,resolveWorkflowProduct(app));
         app.setSubmittedAt(OffsetDateTime.now());
 
         if (app.getRequiredGuarantors() == 0) {
@@ -777,6 +779,7 @@ public class LoanWorkflowService {
 
         capturePaymentDetailsIfMissing(app);
         return inTransaction(() -> {
+            recheckSharedCreditAtSubmission(app,product);
             moveIntoConfiguredReviewStage(app, memberId);
             LoanApplication saved = loanApplicationRepository.save(app);
             auditLoan(saved, memberId, "LOAN_SENT_TO_STAFF", "Application sent to staff");
@@ -788,6 +791,18 @@ public class LoanWorkflowService {
         if (app.getPaymentDetailsSnapshot() == null || app.getPaymentDetailsSnapshot().isBlank()) {
             app.setPaymentDetailsSnapshot(paymentDetailsService.snapshotJsonForMember(app.getApplicantMemberId()));
         }
+    }
+
+    private void recheckSharedCreditAtSubmission(LoanApplication app,LoanProductSetting product){
+        loanQualificationPolicyService.lockGuarantorCapacity(app.getSaccoId(),app.getStationId(),app.getApplicantMemberId());
+        long shared=loanQualificationPolicyService.sharedApplicantExposure(app.getSaccoId(),app.getApplicantMemberId(),product);
+        if(shared==0)return;
+        Integer maximum=product.getMaximumActiveLoans();
+        if(maximum!=null&&shared+loanApplicationRepository.countBySaccoIdAndApplicantMemberIdAndStatusIn(app.getSaccoId(),app.getApplicantMemberId(),ACTIVE_LOAN_LOCK_STATUSES)>maximum)
+            throw new IllegalStateException("This product allows applications with at most "+maximum+" existing active loans.");
+        var result=checkApplicantCreditEligibility(app,product);
+        app.setPolicySnapshot(eligibilityService.policySnapshotJson(result,Math.max(0,app.getRequiredGuarantors()),
+            loanProductWorkflowService.snapshotData(loanProductWorkflowService.resolveForProduct(app.getSaccoId(),product))));
     }
 
     private void validateTopUpSourceForApplication(LoanApplication app) {

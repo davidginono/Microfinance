@@ -91,7 +91,9 @@ public final class GroupCycleDtos {
     public record SharedDue(UUID clientId,int number,LocalDate date,BigDecimal principal,BigDecimal interest) {}
     public record SharedFacility(UUID loanId,String number,String status,SharedLiability liability,SharedQuote quote) {}
     public record SharedObligation(SharedLiability liability,BigDecimal cap,SharedShare allocation) {}
-    public record Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory) {}
+    public record Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory,int pendingApplications) {
+        public Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory){this(activeCycles,activeLoans,riskLoans,guaranteeCount,monthlyDebt,reserved,missingHistory,0);}
+    }
     public record Terms(BigDecimal principal,BigDecimal annualRate,BigDecimal contractualInterest,BigDecimal instalment,
         String frequency,String tenureUnit,int tenureValue,LocalDate firstPaymentDate,String purpose,
         BigDecimal maximumInstalment,BigDecimal chargeTotal,BigDecimal deductions,BigDecimal netCash,BigDecimal totalPayable,

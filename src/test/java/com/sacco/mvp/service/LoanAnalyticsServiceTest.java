@@ -40,6 +40,7 @@ class LoanAnalyticsServiceTest {
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
+    @Mock private com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
 
     @Test
     void staffProductPerformanceUsesLoansHandledByTheStaffMember() {
@@ -56,7 +57,7 @@ class LoanAnalyticsServiceTest {
             loanProductSettingRepository,
             new AccessControlService(),
             new ApplicationClock("Africa/Nairobi"),
-            JsonMapper.builder().findAndAddModules().build()
+            JsonMapper.builder().findAndAddModules().build(),sharedCredit
         );
 
         when(managerReviewRepository.findForAnalytics(
@@ -118,7 +119,7 @@ class LoanAnalyticsServiceTest {
             loanProductSettingRepository,
             new AccessControlService(),
             new ApplicationClock("Africa/Nairobi"),
-            JsonMapper.builder().findAndAddModules().build()
+            JsonMapper.builder().findAndAddModules().build(),sharedCredit
         );
         when(managerReviewRepository.findForAnalytics(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of(
@@ -155,6 +156,7 @@ class LoanAnalyticsServiceTest {
 
     @Test
     void memberActiveLoanAmountIncludesInterestFromFinancialSnapshot() {
+        when(sharedCredit.summary(any(),any(),any())).thenReturn(com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE);
         UUID memberId = UUID.randomUUID();
         LoanApplication activeLoan = loan(UUID.randomUUID(), LoanType.EDUCATION_LOAN, LoanStatus.DISBURSED);
         activeLoan.setAmount(new BigDecimal("700000.00"));
@@ -171,7 +173,7 @@ class LoanAnalyticsServiceTest {
             loanProductSettingRepository,
             new AccessControlService(),
             new ApplicationClock("Africa/Nairobi"),
-            JsonMapper.builder().findAndAddModules().build()
+            JsonMapper.builder().findAndAddModules().build(),sharedCredit
         );
 
         when(loanApplicationRepository.findActiveAmountRowsForApplicantScope(
@@ -180,6 +182,14 @@ class LoanAnalyticsServiceTest {
 
         assertThat(service.activeLoanAmount(memberId, "SACCO-01", "ST-1"))
             .isEqualByComparingTo("770000.00");
+    }
+
+    @Test void sharedCreditLiabilityIsAddedOnceWithoutInventingAnIndividualLoanRow(){
+        var client=UUID.randomUUID();when(sharedCredit.summary("I1",client,"B1")).thenReturn(new com.sacco.mvp.grouplending.dto.SharedCreditExposure(1,0,1,0,new BigDecimal("1020.01"),new BigDecimal("125.91")));
+        when(loanApplicationRepository.findActiveAmountRowsForApplicantScope(org.mockito.ArgumentMatchers.eq(client),org.mockito.ArgumentMatchers.eq("I1"),org.mockito.ArgumentMatchers.eq("B1"),any())).thenReturn(List.of());
+        when(loanApplicationRepository.countByStatusForApplicantScope(client,"I1","B1")).thenReturn(List.of());
+        var service=new LoanAnalyticsService(loanApplicationRepository,managerReviewRepository,boardReviewRepository,loanProductSettingRepository,new AccessControlService(),new ApplicationClock("Africa/Nairobi"),JsonMapper.builder().findAndAddModules().build(),sharedCredit);
+        assertThat(service.activeLoanAmount(client,"I1","B1")).isEqualByComparingTo("1020.01");assertThat(service.defaultedRiskLoanCount(client,"I1","B1")).isEqualTo(1);
     }
 
     private AppUserPrincipal principal(UUID memberId, Position position) {

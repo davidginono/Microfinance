@@ -26,6 +26,15 @@ public class LoanQualificationPolicyService {
     private final ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     private final SaccoStationPolicyRepository saccoStationPolicyRepository;
     private final LoanAnalyticsService loanAnalyticsService;
+    private final com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
+
+    /** Shared obligations supplement the existing individual product/count rules. */
+    public long sharedApplicantExposure(String institution,UUID client,LoanProductSetting product){
+        var facts=sharedCredit.summary(institution,client,null);sharedCredit.requireKnown(facts);
+        if(facts.pending()>0)throw new IllegalStateException(sharedCredit.message("sharedApplicationPending"));
+        if(facts.active()>0&&(product==null||!product.isApplicationWithActiveLoanAllowed()))throw new IllegalStateException(sharedCredit.message("sharedActiveLoan"));
+        return facts.active();
+    }
 
     @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void lockGuarantorCapacity(String saccoId,String stationId,UUID clientId){
@@ -90,6 +99,8 @@ public class LoanQualificationPolicyService {
     }
 
     public Optional<String> guarantorFailureReason(String saccoId, UUID guarantorMemberId, BigDecimal pendingGuaranteedAmount, LoanProductSetting product) {
+        var facts=sharedCredit.summary(saccoId,guarantorMemberId,resolveMemberStationId(guarantorMemberId));
+        if(!facts.known())return Optional.of(sharedCredit.message("sharedCreditHistory"));
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
         if (settings == null) {
             return Optional.empty();
@@ -97,7 +108,7 @@ public class LoanQualificationPolicyService {
         String stationId = resolveMemberStationId(guarantorMemberId);
         ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
         if (!policy.guarantorWithActiveLoanAllowed()
-            && nullToZero(loanAnalyticsService.activeLoanAmount(guarantorMemberId, saccoId, stationId)).compareTo(BigDecimal.ZERO) > 0) {
+            && (facts.active()+facts.pending()>0 || nullToZero(loanAnalyticsService.activeLoanAmount(guarantorMemberId, saccoId, stationId)).compareTo(BigDecimal.ZERO) > 0)) {
             return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
         }
         Integer maxDefaulted = positive(policy.guarantorMaxDefaultedLoans());

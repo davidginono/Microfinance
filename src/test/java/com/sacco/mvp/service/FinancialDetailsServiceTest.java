@@ -57,7 +57,8 @@ class FinancialDetailsServiceTest {
         assertThat((BigDecimal)shortTerm.get("periodicRepaymentAmount")).isEqualByComparingTo("1000.00");
         assertThat((BigDecimal)shortTerm.get("monthlyRepaymentAmount")).isEqualByComparingTo("3041.67");
         var analytics=org.mockito.Mockito.mock(LoanAnalyticsService.class);when(analytics.activeLoanAmount(client,"S1",null)).thenReturn(BigDecimal.ZERO);
-        var eligibility=new EligibilityService(loanProductSettingRepository,analytics,JsonMapper.builder().findAndAddModules().build());
+        var shared=org.mockito.Mockito.mock(com.sacco.mvp.grouplending.service.SharedCreditExposureService.class);when(shared.summary(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenReturn(com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE);
+        var eligibility=new EligibilityService(loanProductSettingRepository,analytics,JsonMapper.builder().findAndAddModules().build(),shared);
         var declared=java.util.Map.of("monthlyIncome",new BigDecimal("2500.00"),"monthlyExpenses",BigDecimal.ZERO,"otherDebtRepayments",BigDecimal.ZERO);
         assertThat(eligibility.check("S1",client,product,amount,declared,shortTerm).eligible()).isFalse();
         var monthly=financialDetailsService.generateSnapshot("S1",client,product,amount,1,null,new LoanTenure("MONTHS",1));

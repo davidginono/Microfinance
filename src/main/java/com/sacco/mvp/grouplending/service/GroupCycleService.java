@@ -104,7 +104,7 @@ public class GroupCycleService {
         var rules=cycles.rules(a,c.productId());check(rules.affordabilityRatio().signum()>0 && rules.affordabilityRatio().compareTo(BigDecimal.ONE)<=0,"product");
         var exposures=cycles.exposures(a,ids);var branch=qualification.groupPolicy(a.getSaccoId(),a.getStationId());var shares=new ArrayList<SharedShare>();
         for(int n=0;n<rows.size();n++){
-            var r=rows.get(n);var e=exposures.get(r.getClientId());check(e.missingHistory()==0,"historyMissing");check(e.activeCycles()<p.maxActiveCycles(),"activeCycles");
+            var r=rows.get(n);var e=exposures.get(r.getClientId());check(e.missingHistory()==0,"historyMissing");check(e.activeCycles()<p.maxActiveCycles(),"activeCycles");check(e.pendingApplications()==0,"sharedApplicationPending");
             check(e.activeLoans()==0 || (rules.activeLoanAllowed() && e.activeLoans()<rules.maximumActiveLoans()),"activeLoans");
             check(branch.applicantDefaultLimit()==null || e.riskLoans()<branch.applicantDefaultLimit(),"defaultPolicy");
             if(rules.collateralRequired()){text(r.getCollateral(),500);money(r.getCollateralValue(),false);check(r.getCollateralValue().compareTo(r.getPrincipal().multiply(rules.collateralRatio()))>=0,"collateral");}
@@ -159,7 +159,7 @@ public class GroupCycleService {
         for(var row:rows){
             money(row.getPrincipal(),true);money(row.getIncome(),true);money(row.getExpenses(),false);money(row.getOtherDebt(),false);money(row.getGuaranteeCapacity(),false);
             text(row.getAssessmentEvidence(),500);text(row.getCapacityEvidence(),500);
-            var exposure=exposures.get(row.getClientId());check(exposure.missingHistory()==0,"historyMissing");check(exposure.activeCycles()<p.maxActiveCycles(),"activeCycles");
+            var exposure=exposures.get(row.getClientId());check(exposure.missingHistory()==0,"historyMissing");check(exposure.activeCycles()<p.maxActiveCycles(),"activeCycles");check(exposure.pendingApplications()==0,"sharedApplicationPending");
             check((branchPolicy.applicantDefaultLimit()==null || exposure.riskLoans()<branchPolicy.applicantDefaultLimit())
                 && (branchPolicy.guarantorDefaultLimit()==null || exposure.riskLoans()<branchPolicy.guarantorDefaultLimit()),"defaultPolicy");
             check(branchPolicy.guaranteeCountLimit()==null || exposure.guaranteeCount()+ids.size()-1<=branchPolicy.guaranteeCountLimit(),"guaranteeCount");

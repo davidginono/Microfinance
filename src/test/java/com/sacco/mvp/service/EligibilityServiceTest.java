@@ -25,16 +25,36 @@ import static org.mockito.Mockito.when;
 class EligibilityServiceTest {
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private LoanAnalyticsService loanAnalyticsService;
+    @Mock private com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
 
     private EligibilityService eligibilityService;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(sharedCredit.summary(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenReturn(com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE);
         eligibilityService = new EligibilityService(
             loanProductSettingRepository,
             loanAnalyticsService,
-            JsonMapper.builder().findAndAddModules().build()
+            JsonMapper.builder().findAndAddModules().build(),sharedCredit
         );
+    }
+
+    @Test void sharedMonthlyPaymentsCannotBeOmittedOrCountedTwiceInDeclaredDebt(){
+        var id=UUID.randomUUID();var product=product("S1").maxRepaymentToDisposableIncomeRatio(new BigDecimal("0.4")).build();
+        when(sharedCredit.summary("S1",id,null)).thenReturn(new com.sacco.mvp.grouplending.dto.SharedCreditExposure(1,0,0,0,new BigDecimal("500.00"),new BigDecimal("200.00")));
+        var form=Map.<String,Object>of("monthlyIncome",new BigDecimal("1000"),"monthlyExpenses",new BigDecimal("100"),"otherDebtRepayments",BigDecimal.ZERO);
+        var quote=Map.<String,Object>of("monthlyRepaymentAmount",new BigDecimal("300"));
+        var result=eligibilityService.check("S1",id,product,new BigDecimal("1000"),form,quote);assertThat(result.eligible()).isFalse();assertThat(result.otherDebtRepayments()).isEqualByComparingTo("200");
+        var declared=new java.util.HashMap<>(form);declared.put("otherDebtRepayments",new BigDecimal("250"));
+        assertThat(eligibilityService.check("S1",id,product,new BigDecimal("1000"),declared,quote).otherDebtRepayments()).isEqualByComparingTo("250");
+    }
+
+    @Test void missingSharedLedgerEvidenceCannotPassEvenAnOptionalAffordabilityCheck(){
+        var id=UUID.randomUUID();var product=product("S1").affordabilityCheckRequired(false).build();
+        when(sharedCredit.summary("S1",id,null)).thenReturn(new com.sacco.mvp.grouplending.dto.SharedCreditExposure(1,0,0,1,BigDecimal.ZERO,BigDecimal.ZERO));
+        when(sharedCredit.message("sharedCreditHistory")).thenReturn("Shared repayment evidence unavailable");
+        var result=eligibilityService.check("S1",id,product,new BigDecimal("1000"),Map.of(),Map.of());
+        assertThat(result.eligible()).isFalse();assertThat(result.activeExposure()).isNull();assertThat(result.reason()).contains("unavailable");
     }
 
     @Test
