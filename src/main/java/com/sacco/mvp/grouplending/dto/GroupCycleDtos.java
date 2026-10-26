@@ -80,6 +80,10 @@ public final class GroupCycleDtos {
         BigDecimal cap,String agreementReference) {}
     public record ProductRules(int guarantors,BigDecimal affordabilityRatio,boolean collateralRequired,BigDecimal collateralRatio,
         boolean activeLoanAllowed,int maximumActiveLoans) {}
+    public record SharedShare(UUID clientId,BigDecimal principal,BigDecimal interest,BigDecimal charges,
+        BigDecimal deductions,BigDecimal net,BigDecimal monthlyPayment) {}
+    public record SharedQuote(BigDecimal principal,BigDecimal interest,BigDecimal charges,BigDecimal deductions,
+        BigDecimal net,BigDecimal totalPayable,BigDecimal monthlyPayment,String frequency,List<SharedShare> shares) {}
     public record Exposure(int activeCycles,int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory) {}
     public record Terms(BigDecimal principal,BigDecimal annualRate,BigDecimal contractualInterest,BigDecimal instalment,
         String frequency,String tenureUnit,int tenureValue,LocalDate firstPaymentDate,String purpose,

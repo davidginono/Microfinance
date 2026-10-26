@@ -53,6 +53,7 @@ public class GroupCycleController {
         @RequestParam(defaultValue="save") String action,Model m){
         cycles.authorize(a,action.equals("submit")?"SUBMIT":"UPDATE");if(!errors.hasErrors())try{
             if(rows(cycleForm,action)){var c=cycles.detail(a,id);m.addAttribute("cycle",c);editor(a,c.groupId(),m);return "groups/cycle-form";}
+            if(action.equals("previewShared")){m.addAttribute("sharedQuote",cycles.previewShared(a,id,cycleForm));var c=cycles.detail(a,id);m.addAttribute("cycle",c);editor(a,c.groupId(),m);return "groups/cycle-form";}
             if(action.equals("submit"))cycles.submit(a,id,cycleForm);else if(action.equals("save"))cycles.save(a,id,cycleForm);else throw new IllegalArgumentException("group.error.request");
             return "redirect:/finance/groups/cycles/"+id;
         }catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("group.error.financialValidation");}

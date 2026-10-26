@@ -51,6 +51,17 @@ class GroupCycleMvcTest {
         verify(cycles).memberLabels(eq(actor),eq(group),argThat(f->f.getParticipants().size()==2 && f.getPurpose().equals("Unsaved purpose")));
         verify(cycles,never()).create(any(),any(),any());
     }
+    @Test void sharedPreviewRequiresCsrfPreservesValuesAndDoesNotSubmit()throws Exception{
+        String path="/finance/groups/cycles/"+cycle;
+        mvc.perform(post(path).with(user(actor)).param("action","previewShared")).andExpect(status().isForbidden());verifyNoInteractions(cycles);
+        var f=new CycleForm();var policy=UUID.randomUUID();f.setPolicyId(policy);
+        when(cycles.detail(actor,cycle)).thenReturn(new Cycle(cycle,group,"Synthetic group",policy,UUID.randomUUID(),com.sacco.mvp.grouplending.dto.GroupCycleDtos.Model.SHARED,"DRAFT",0,f,null));
+        mvc.perform(post(path).with(user(actor)).with(csrf()).param("action","previewShared").param("policyId",policy.toString()).param("purpose","Retained shared purpose")
+            .param("participants[0].clientId",client.toString()).param("participants[0].principal","123.45").param("stationId","FOREIGN"))
+            .andExpect(status().isOk()).andExpect(view().name("groups/cycle-form"));
+        verify(cycles).previewShared(eq(actor),eq(cycle),argThat(form->form.getPurpose().equals("Retained shared purpose") && form.getParticipants().getFirst().getPrincipal().toPlainString().equals("123.45")));
+        verify(cycles,never()).submit(any(),any(),any());verify(cycles,never()).save(any(),any(),any());
+    }
     @Test void oversizedParticipantIndexReturnsSafeBadRequest()throws Exception{
         mvc.perform(post("/finance/groups/"+group+"/cycles").with(user(actor)).with(csrf()).param("participants[50].clientId",client.toString()))
             .andExpect(status().isBadRequest()).andExpect(view().name("groups/error"));verify(cycles,never()).create(any(),any(),any());

@@ -47,6 +47,33 @@ class GroupCyclePostgresTest {
     PolicyForm policy(){var p=new PolicyForm();p.setProductId(f.product);p.setModel(Model.INDIVIDUAL);p.setMinMembers(2);p.setMaxMembers(5);p.setMaxPrincipal(new BigDecimal("10000.00"));p.setMaxGuarantee(new BigDecimal("5000.00"));p.setMaxActiveCycles(1);p.setOwnLoanGuarantors(true);p.setEnabled(true);p.setPolicyReference("Synthetic approved group credit policy");p.setAgreementReference("Synthetic approved bilingual agreement");return p;}
     CycleForm form(){var c=new CycleForm();c.setPolicyId(policy);c.setApplicationDate(LocalDate.of(2026,9,1));c.setFirstPaymentDate(LocalDate.of(2026,10,1));c.setTenureValue(1);c.setPurpose("Business stock");
         for(var id:List.of(f.client,second)){var r=new ParticipantForm();r.setClientId(id);r.setPrincipal(new BigDecimal("1000.00"));r.setIncome(new BigDecimal("10000.00"));r.setExpenses(new BigDecimal("1000.00"));r.setOtherDebt(BigDecimal.ZERO);r.setGuaranteeCapacity(new BigDecimal("5000.00"));r.setAssessmentEvidence("Synthetic verified income and expenses");r.setCapacityEvidence("Synthetic verified guarantee capacity");c.getParticipants().add(r);}return c;}
+    @Test void sharedPreviewUsesOneParentAndConservesUnequalComponentsWithoutCreatingDebt(){
+        var p=policy();p.setModel(Model.SHARED);policy=cycles.configure(f.actor,p);var form=form();
+        form.getParticipants().get(0).setPrincipal(new BigDecimal("123.45"));form.getParticipants().get(1).setPrincipal(new BigDecimal("876.56"));
+        UUID id=cycles.create(f.actor,group,form);var quote=cycles.previewShared(f.actor,id,form);
+        assertThat(quote.principal()).isEqualByComparingTo("1000.01");
+        assertThat(quote.shares().stream().map(SharedShare::principal).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.principal());
+        assertThat(quote.shares().stream().map(SharedShare::interest).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.interest());
+        assertThat(quote.shares().stream().map(SharedShare::charges).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.charges());
+        assertThat(quote.shares().stream().map(SharedShare::net).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(quote.net());
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_applications where sacco_id=?",Integer.class,f.institution)).isZero();
+        assertThat(cycles.detail(f.actor,id).state()).isEqualTo("DRAFT");
+    }
+    @Test void sharedPreviewCannotUseForeignPersonMissingAssessmentOrFailedAffordability(){
+        var p=policy();p.setModel(Model.SHARED);policy=cycles.configure(f.actor,p);var form=form();UUID id=cycles.create(f.actor,group,form);
+        form.getParticipants().get(0).setExpenses(null);
+        assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.amount");
+        form.getParticipants().get(0).setExpenses(new BigDecimal("9999.00"));
+        assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.affordability");
+        form.getParticipants().get(0).setClientId(UUID.randomUUID());
+        assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.membership");
+    }
+    @Test void sharedPreviewRejectsAFormerBranchClientWithoutRewritingMembership(){
+        var p=policy();p.setModel(Model.SHARED);policy=cycles.configure(f.actor,p);var form=form();UUID id=cycles.create(f.actor,group,form);
+        f.jdbc.update("update members set station_id='B2' where id=?",second);
+        assertThatIllegalArgumentException().isThrownBy(()->cycles.previewShared(f.actor,id,form)).withMessage("group.error.membership");
+        assertThat(f.jdbc.queryForObject("select count(*) from lending_group_member where group_id=? and client_id=?",Integer.class,group,second)).isEqualTo(1);
+    }
     AppUserPrincipal client(UUID id){var m=Member.builder().id(id).saccoId(f.institution).stationId("B1").memberNo(id.toString()).fullName("Synthetic participant").status(MemberStatus.ACTIVE).position(Position.MEMBER).memberAccount(true).signatureText("Synthetic personal signature").email("synthetic@example.invalid").build();
         when(f.context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(m));return new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class),false);}
     @Test void submissionFreezesTwoLoansAndGuaranteesWithoutPostingMoney(){

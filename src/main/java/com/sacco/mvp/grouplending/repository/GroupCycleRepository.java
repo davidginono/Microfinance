@@ -105,7 +105,7 @@ public class GroupCycleRepository {
     }
     public Map<UUID,UUID> memberships(AppUserPrincipal a,UUID group,List<UUID> ids){
         var args=new ArrayList<Object>(List.of(a.getSaccoId(),a.getStationId(),group));args.addAll(ids);var result=new HashMap<UUID,UUID>();
-        jdbc.query("select gm.client_id,gm.id from lending_group_member gm join members m on m.id=gm.client_id where gm.sacco_id=? and gm.station_id=? and gm.group_id=? and gm.ends_on is null and m.status='ACTIVE' and gm.client_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+")",(org.springframework.jdbc.core.RowCallbackHandler)r->result.put(r.getObject(1,UUID.class),r.getObject(2,UUID.class)),args.toArray());return result;
+        jdbc.query("select gm.client_id,gm.id from lending_group_member gm join members m on m.id=gm.client_id and m.sacco_id=gm.sacco_id and m.station_id=gm.station_id where gm.sacco_id=? and gm.station_id=? and gm.group_id=? and gm.ends_on is null and m.status='ACTIVE' and m.is_member and gm.client_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+")",(org.springframework.jdbc.core.RowCallbackHandler)r->result.put(r.getObject(1,UUID.class),r.getObject(2,UUID.class)),args.toArray());return result;
     }
     /** One bounded read for every selected participant; never one exposure query per member. */
     public Map<UUID,Exposure> exposures(AppUserPrincipal a,List<UUID> clients){
