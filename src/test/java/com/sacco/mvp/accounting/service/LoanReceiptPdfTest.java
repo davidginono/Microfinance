@@ -63,4 +63,17 @@ class LoanReceiptPdfTest {
             }
         }
     }
+    @Test void sharedReceiptRetainsAllNinetyNineBenefitEdgesAndSourceContributions()throws Exception{
+        var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
+        var renderer=new LoanReceiptPdfService(new LoanRecordingPdfService(new ReportExportLimiter(1)),messages);var edges=new ArrayList<ReceiptContribution>();UUID loan=UUID.randomUUID();
+        for(int i=1;i<=99;i++)edges.add(new ReceiptContribution(UUID.randomUUID(),i,loan,"SHARED-ONE",UUID.randomUUID(),"PAYER-"+((i+1)/2),"Synthetic contributor",UUID.randomUUID(),"BENEFIT-"+i,"Synthetic joint borrower","Synthetic verified cash",new BigDecimal("1.00"),new BigDecimal("0.60"),new BigDecimal("0.30"),new BigDecimal("0.10"),null,(i+1)/2));
+        var row=new LoanReceiptRow(1,UUID.randomUUID(),loan,"SHARED-ONE","One parent payment",new BigDecimal("99.00"),new BigDecimal("59.40"),new BigDecimal("29.70"),new BigDecimal("100.00"),"PRIVATE CASH","PRIVATE PRINCIPAL","PRIVATE INTEREST","SHARED-REF/G1");
+        var voucher=new Voucher(UUID.randomUUID(),"RV-SHARED-99",Type.RECEIPT,LocalDate.of(2026,10,25),"Synthetic treasurer","SHARED-REF","Synthetic shared receipt","Verified synthetic evidence",UUID.randomUUID(),new BigDecimal("99.00"),1,null,UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-25T10:30:00+03:00"),null,null,"Synthetic institution","Synthetic branch",List.of());
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw")))try(var doc=Loader.loadPDF(renderer.render(new LoanReceipt(voucher,"",List.of(row),new GroupReceipt(UUID.randomUUID(),"SHARED-GROUP","Synthetic shared borrowers",edges)),locale,null))){
+            var text=new PDFTextStripper().getText(doc);assertThat(text).contains("BENEFIT-99","PAYER-50","RV-SHARED-99","59.40","29.70","9.90","99.00",messages.getMessage("group.contribution",null,locale)+" 50").doesNotContain("PRIVATE CASH","PRIVATE PRINCIPAL","PRIVATE INTEREST");
+            assertThat(doc.getNumberOfPages()).isGreaterThan(2);
+            if(locale.equals(Locale.ENGLISH)){Files.write(Path.of("target/shared-receipt-99.pdf"),renderer.render(new LoanReceipt(voucher,"",List.of(row),new GroupReceipt(UUID.randomUUID(),"SHARED-GROUP","Synthetic shared borrowers",edges)),locale,null));javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(0,100),"png",Path.of("target/shared-receipt-99-first.png").toFile());javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(doc.getNumberOfPages()-1,100),"png",Path.of("target/shared-receipt-99-last.png").toFile());}
+        }
+    }
+
 }

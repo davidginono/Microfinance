@@ -28,6 +28,7 @@ public class GroupCollectionService {
     private final GroupCollectionRepository receipts;
     private final GeneralLedgerService access;
     private final LoanRecordingService loans;
+    private final GroupSharedLoanService shared;
     private final VoucherService vouchers;
     private final ApplicationClock clock;
     private final AuditService audit;
@@ -60,7 +61,9 @@ public class GroupCollectionService {
         check(borrowers.size()==ids.size(),"collectionLoan");var payerIds=form.getRows().stream().map(Row::getPayerId).distinct().toList();var payers=receipts.payers(a,cycle.id(),payerIds);check(payers.size()==payerIds.size(),"collectionPayer");
         var requests=ids.stream().map(id->new CollectionAmount(id,borrowers.get(id).clientId(),amounts.get(id))).toList();var allocations=loans.previewCollections(a,requests,form.getEffectiveDate(),form.getMoneyAccountId());
         var components=new LinkedHashMap<UUID,AllocationPreview>();var rows=new ArrayList<PreviewLoan>();for(int i=0;i<ids.size();i++){components.put(ids.get(i),allocations.get(i));rows.add(new PreviewLoan(borrowers.get(ids.get(i)),amounts.get(ids.get(i)),allocations.get(i)));}
-        var contributions=GroupContributionAllocator.allocate(form,borrowers,payers,components);
+        List<ReceiptContribution> contributions;
+        if("SHARED".equals(cycle.model())){check(ids.size()==1,"collectionLoan");var id=ids.getFirst();contributions=SharedContributionAllocator.allocate(form,borrowers.get(id),payers,components.get(id),shared.balances(a,id));}
+        else contributions=GroupContributionAllocator.allocate(form,borrowers,payers,components);
         String fingerprint=hash(List.of(command(cycle.id(),form),number,rows,contributions,receipts.versions(a,ids)));
         return new GroupCollectionDtos.Preview(fingerprint,number,List.copyOf(rows),contributions,amounts.values().stream().reduce(new BigDecimal("0.00"),BigDecimal::add));
     }
@@ -72,6 +75,7 @@ public class GroupCollectionService {
         var rows=new ArrayList<LoanReceiptRow>();int line=0;
         for(var row:preview.loans()){
             var request=new PostForm();request.setRequestKey(GroupContributionAllocator.key(form.getRequestKey(),"LOAN/"+row.beneficiary().loanId()));request.setLoanId(row.beneficiary().loanId());request.setAmount(row.amount());request.setEffectiveDate(form.getEffectiveDate());request.setMoneyAccountId(form.getMoneyAccountId());
+            if("SHARED".equals(c.model()))request.setSharedPayer("Group receipt "+number);
             request.setReference(postReference(form,++line));request.setEvidence(form.getEvidence());request.setNotes(c.groupCode()+" / "+form.getRemitter());var p=loans.repay(a,request);
             check(p.principal().compareTo(row.allocation().principal())==0 && p.interest().compareTo(row.allocation().interest())==0 && p.charges().compareTo(row.allocation().charges())==0,"previewChanged");
             rows.add(new LoanReceiptRow(line,p.id(),p.loanId(),p.loanNumber(),request.getNotes(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));
@@ -89,14 +93,14 @@ public class GroupCollectionService {
         var originals=receipts.rows(a,id);loans.lockReceiptLoans(a,originals.stream().map(LoanReceiptRow::loanId).sorted().toList(),null);var rows=new ArrayList<LoanReceiptRow>();
         for(var row:originals){var p=loans.reverseReceiptRow(a,id,row.postingId(),GroupContributionAllocator.key(key,"LOAN/"+row.loanId()),date,reason);
             rows.add(new LoanReceiptRow(row.lineNo(),p.id(),p.loanId(),p.loanNumber(),row.description(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
-        var contributions=receipts.contributions(a,id).stream().map(r->new ReceiptContribution(GroupContributionAllocator.key(key,"CONTRIBUTION/"+r.lineNo()),r.lineNo(),r.loanId(),r.loanNumber(),r.payerId(),r.payerNumber(),r.payer(),r.beneficiaryId(),r.beneficiaryNumber(),r.beneficiary(),r.description(),r.amount(),r.principal(),r.interest(),r.charges(),r.id())).toList();
+        var contributions=receipts.contributions(a,id).stream().map(r->new ReceiptContribution(GroupContributionAllocator.key(key,"CONTRIBUTION/"+r.lineNo()),r.lineNo(),r.loanId(),r.loanNumber(),r.payerId(),r.payerNumber(),r.payer(),r.beneficiaryId(),r.beneficiaryNumber(),r.beneficiary(),r.description(),r.amount(),r.principal(),r.interest(),r.charges(),r.id(),r.sourceLineNo())).toList();
         var form=new GroupCollectionDtos.Form();form.setRequestKey(key);form.setEffectiveDate(date);form.setMoneyAccountId(original.moneyAccountId());form.setReference(original.reference());form.setRemitter(original.party());form.setEvidence(original.evidence());
-        String number=vouchers.reserveCorrectionNumber(a,Type.RECEIPT,date,key).number();var c=new Cycle(source.group().cycleId(),source.group().code(),source.group().name(),"INDIVIDUAL","SUBMITTED");
+        String number=vouchers.reserveCorrectionNumber(a,Type.RECEIPT,date,key).number();var scope=receipts.cycle(a,source.group().cycleId());var c=new Cycle(scope.id(),source.group().code(),source.group().name(),scope.model(),scope.state());
         var receipt=new LoanReceipt(header(a,form,c,number,original.total(),rows.size(),id,reason),"",List.copyOf(rows),new GroupReceipt(c.id(),c.groupCode(),c.groupName(),contributions));
         receipts.insert(a,receipt,key,payload,json.writeValueAsString(Map.of("original",id,"reason",reason)));vouchers.consumeCorrectionNumber(a,Type.RECEIPT,key);event(a,receipt);return find(a,receipt.header().id()).orElseThrow();
     }
     private Voucher header(AppUserPrincipal a,GroupCollectionDtos.Form f,Cycle c,String number,BigDecimal total,int count,UUID original,String reason){return new Voucher(UUID.randomUUID(),number,Type.RECEIPT,f.getEffectiveDate(),f.getRemitter().strip(),f.getReference().strip(),original==null?c.groupName():reason,f.getEvidence().strip(),f.getMoneyAccountId(),total,count,null,a.getMemberId(),a.getFullName(),clock.now(),original,null,"","",List.of());}
-    private Cycle cycleReady(AppUserPrincipal a,UUID id){var c=receipts.cycle(a,id);check("SUBMITTED".equals(c.state()) && "INDIVIDUAL".equals(c.model()),"collectionCycle");return c;}
+    private Cycle cycleReady(AppUserPrincipal a,UUID id){var c=receipts.cycle(a,id);check("SUBMITTED".equals(c.state()) && Set.of("INDIVIDUAL","SHARED").contains(c.model()),"collectionCycle");return c;}
     private void validate(GroupCollectionDtos.Form f){check(f!=null && f.getRequestKey()!=null && f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(clock.today()) && f.getMoneyAccountId()!=null,"request");text(f.getRemitter(),255);text(f.getReference(),76);text(f.getEvidence(),500);
         check(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"request");for(var row:f.getRows()){check(row!=null && row.getLoanId()!=null && row.getPayerId()!=null,"request");var n=row.getAmount();check(n!=null && n.signum()>0 && n.scale()<=2 && n.precision()-n.scale()<=16,"amount");text(row.getDescription(),500);}}
     private LinkedHashMap<UUID,BigDecimal> totals(GroupCollectionDtos.Form f){var sums=new LinkedHashMap<UUID,BigDecimal>();f.getRows().forEach(r->sums.merge(r.getLoanId(),r.getAmount(),BigDecimal::add));return sums;}

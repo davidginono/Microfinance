@@ -63,6 +63,15 @@ class GroupCollectionMvcTest {
     @Test void oversizedCollectionsReturnABadRequest()throws Exception{
         mvc.perform(post(path()).with(user(actor)).with(csrf()).param("rows[50].loanId",loan.toString())).andExpect(status().isBadRequest()).andExpect(view().name("groups/error"));verify(collections,never()).post(any(),any(),any());
     }
+    @Test void sharedCreateAndNewRowsUseTheOneScopedParentWithoutAcceptingBeneficiaryComponents()throws Exception{
+        when(collections.cycle(actor,cycle)).thenReturn(new GroupCollectionDtos.Cycle(cycle,"GRP-1","Synthetic shared borrowers","SHARED","SUBMITTED"));
+        when(collections.choices(actor,cycle,"loans","",0)).thenReturn(List.of(new com.sacco.mvp.grouplending.dto.GroupLendingDtos.Choice(loan,"SHARED-1")));
+        mvc.perform(get(path()+"/new").with(user(actor))).andExpect(status().isOk()).andExpect(model().attributeExists("sharedLoan"));
+        verify(collections).selected(eq(actor),eq(cycle),argThat(f->loan.equals(f.getRows().getFirst().getLoanId())));
+        mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","addRow").param("rows[0].loanId",loan.toString()).param("rows[0].payerId",payer.toString()).param("rows[0].amount","30.00"))
+            .andExpect(status().isOk()).andExpect(model().attribute("collectionForm",org.hamcrest.Matchers.hasProperty("rows",org.hamcrest.Matchers.hasSize(2))));
+        verify(collections).selected(eq(actor),eq(cycle),argThat(f->f.getRows().size()==2&&f.getRows().stream().allMatch(r->loan.equals(r.getLoanId()))));verify(collections,never()).post(any(),any(),any());
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean GroupCollectionService collections(){return mock(GroupCollectionService.class);}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(LocalDate.of(2026,10,25));return c;}

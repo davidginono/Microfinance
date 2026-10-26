@@ -18,11 +18,12 @@ import static org.mockito.Mockito.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GroupSharedFacilityPostgresTest {
     final GroupCyclePostgresTest g=new GroupCyclePostgresTest();
+    LocalDate firstPaymentDate=LocalDate.of(2026,11,8);
     @BeforeAll void start(){g.start(GroupCyclePostgresTest.Config.class);}
     @AfterAll void stop(){g.stop();}
     @BeforeEach void setup(){g.setup();g.f.jdbc.update("update loan_product_settings set guarantors_required=0 where id=?",g.f.product);rule(SharedLiability.PROPORTIONAL);}
     void rule(SharedLiability liability){var p=g.policy();p.setModel(Model.SHARED);p.setSharedLiability(liability);g.policy=g.cycles.configure(g.f.actor,p);}
-    CycleForm form(){var f=g.form();f.setApplicationDate(LoanRecordingPostgresTest.TODAY);f.setFirstPaymentDate(LocalDate.of(2026,11,8));f.getParticipants().getFirst().setPrincipal(new BigDecimal("123.45"));f.getParticipants().getLast().setPrincipal(new BigDecimal("876.56"));return f;}
+    CycleForm form(){var f=g.form();f.setApplicationDate(LoanRecordingPostgresTest.TODAY);f.setFirstPaymentDate(firstPaymentDate);f.getParticipants().getFirst().setPrincipal(new BigDecimal("123.45"));f.getParticipants().getLast().setPrincipal(new BigDecimal("876.56"));return f;}
     UUID submit(){var f=form();UUID id=g.cycles.create(g.f.actor,g.group,f);g.cycles.submit(g.f.actor,id,f);return id;}
     int count(String table){return g.f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Integer.class,g.f.institution);}
     @Test void oneJointBorrowerOwnsTheParentWhileAllocationsConserveEveryComponent(){

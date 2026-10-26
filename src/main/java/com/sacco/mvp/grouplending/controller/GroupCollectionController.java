@@ -38,6 +38,8 @@ public class GroupCollectionController {
         }catch(IllegalArgumentException e){errors.reject(error(e));form.setPreviewHash("");}catch(DataIntegrityViolationException e){errors.reject("group.error.collectionConflict");form.setPreviewHash("");}
         context(actor,cycle,form,model);return "groups/collection-form";
     }
-    private void context(AppUserPrincipal actor,UUID cycle,Form form,Model model){model.addAttribute("groupCycle",collections.cycle(actor,cycle));model.addAttribute("labels",collections.selected(actor,cycle,form));}
+    private void context(AppUserPrincipal actor,UUID cycle,Form form,Model model){var c=collections.cycle(actor,cycle);model.addAttribute("groupCycle",c);
+        if("SHARED".equals(c.model())){var choices=collections.choices(actor,cycle,"loans","",0);if(choices.size()==1){model.addAttribute("sharedLoan",choices.getFirst());form.getRows().stream().filter(java.util.Objects::nonNull).filter(r->r.getLoanId()==null).forEach(r->r.setLoanId(choices.getFirst().id()));}}
+        model.addAttribute("labels",collections.selected(actor,cycle,form));}
     private String error(IllegalArgumentException e){return e.getMessage()!=null && e.getMessage().matches("(?:group|recording|charges|prepayment|repayment|voucher)\\.error\\.[A-Za-z]+")?e.getMessage():"group.error.form";}
 }

@@ -62,7 +62,9 @@ public final class VoucherDtos {
     }
     public record ReceiptContribution(UUID id,int lineNo,UUID loanId,String loanNumber,UUID payerId,String payerNumber,String payer,
         UUID beneficiaryId,String beneficiaryNumber,String beneficiary,String description,BigDecimal amount,BigDecimal principal,
-        BigDecimal interest,BigDecimal charges,UUID reversesId) {}
+        BigDecimal interest,BigDecimal charges,UUID reversesId,Integer sourceLineNo) {
+        public ReceiptContribution(UUID id,int lineNo,UUID loanId,String loanNumber,UUID payerId,String payerNumber,String payer,UUID beneficiaryId,String beneficiaryNumber,String beneficiary,String description,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal charges,UUID reversesId){this(id,lineNo,loanId,loanNumber,payerId,payerNumber,payer,beneficiaryId,beneficiaryNumber,beneficiary,description,amount,principal,interest,charges,reversesId,null);}
+    }
     public record LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,
                                  BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,
                                  String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount) {

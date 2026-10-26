@@ -18,7 +18,7 @@ public class LoanReceiptPdfService {
     public byte[] render(LoanReceipt receipt,Locale locale,byte[] logo){
         var v=receipt.header();var rows=new ArrayList<List<String>>();
         if(receipt.group()!=null)for(var r:receipt.group().contributions()){
-            String description=label("group.payer",locale)+": "+r.payerNumber()+" - "+r.payer()+"\n"+label("group.paidFor",locale)+": "+r.beneficiaryNumber()+" - "+r.beneficiary()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.description()+"\n"+
+            String description=(r.sourceLineNo()==null?"":label("group.contribution",locale)+" "+r.sourceLineNo()+"\n")+label("group.payer",locale)+": "+r.payerNumber()+" - "+r.payer()+"\n"+label("group.paidFor",locale)+": "+r.beneficiaryNumber()+" - "+r.beneficiary()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.description()+"\n"+
                 label("recording.principal",locale)+": "+money(r.principal(),locale)+"; "+label("recording.interest",locale)+": "+money(r.interest(),locale)+"; "+label("charges.title",locale)+": "+money(r.charges(),locale);
             rows.add(List.of(Integer.toString(r.lineNo()),description,money(r.amount(),locale)));
         }
