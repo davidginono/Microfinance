@@ -16,10 +16,11 @@ import java.util.UUID;
 public class GroupConsentController {
     private final GroupConsentService consents;
     private final GroupConsentDeliveryService codes;
+    private final com.sacco.mvp.grouplending.service.GroupOrganizationAccountService accounts;
     @InitBinder("terminationForm") public void terminationBinder(org.springframework.web.bind.WebDataBinder b){b.setAllowedFields("reason");}
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
     public String invalid(Model m){m.addAttribute("groupError","group.error.request");return "groups/error";}
-    @GetMapping public String list(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="0") int page,Model m){m.addAttribute("packets",consents.list(a,page));return "groups/client-cycles";}
+    @GetMapping public String list(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="0") int accountPage,Model m){m.addAttribute("packets",consents.list(a,page));m.addAttribute("organizationAccounts",accounts.list(a,accountPage));return "groups/client-cycles";}
     @GetMapping("/{id}") public String packet(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){m.addAttribute("packet",consents.packet(a,id));return "groups/consent";}
     @GetMapping("/{id}/refuse") public String refusal(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){
         var packet=consents.packet(a,id);if(packet.termination()!=null || packet.accepted())return "redirect:/app/group-loans/"+id;

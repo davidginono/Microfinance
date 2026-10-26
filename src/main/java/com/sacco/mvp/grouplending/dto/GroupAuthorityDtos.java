@@ -24,10 +24,10 @@ public final class GroupAuthorityDtos {
     }
     @Data public static class SignerForm {
         private UUID clientId;
-        private boolean mayApply,maySign,mayReceive;
+        private boolean mayApply,maySign,mayReceive,mayViewAccount;
     }
     @Data public static class RevocationForm { private String reason=""; }
-    public record Signer(UUID clientId,String number,String name,boolean mayApply,boolean maySign,boolean mayReceive) {}
+    public record Signer(UUID clientId,String number,String name,boolean mayApply,boolean maySign,boolean mayReceive,boolean mayViewAccount) {}
     public record Summary(UUID id,int revision,LocalDate validFrom,LocalDate validThrough,BigDecimal maxPrincipal,String state) {}
     public record Editor(GroupLendingDtos.Group group,AuthorityForm form,Map<UUID,Signer> selected) {}
     public record History(GroupLendingDtos.Group group,GroupLendingDtos.Page<Summary> page) {}

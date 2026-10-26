@@ -53,7 +53,7 @@ public class GroupAuthorityService {
         BigDecimal amount=f.getMaxPrincipal();check(amount!=null && amount.signum()>0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");
         text(f.getCapacityEvidence(),500);text(f.getResolutionEvidence(),500);text(f.getSignatureEvidence(),500);text(f.getPayoutProvider(),120);text(f.getPayoutHolder(),160);text(f.getPayoutIdentifier(),160);text(f.getPayoutEvidence(),500);check(f.getPayoutType()!=null,"form");
         check(!f.getSigners().isEmpty() && f.getRequiredSignatures()!=null && f.getRequiredSignatures()>0 && f.getRequiredSignatures()<=f.getSigners().size(),"authoritySigners");
-        check(f.getSigners().stream().allMatch(s->s.getClientId()!=null && (s.isMayApply() || s.isMaySign() || s.isMayReceive()))
+        check(f.getSigners().stream().allMatch(s->s.getClientId()!=null && (s.isMayApply() || s.isMaySign() || s.isMayReceive() || s.isMayViewAccount()))
             && f.getSigners().stream().map(SignerForm::getClientId).distinct().count()==f.getSigners().size()
             && f.getSigners().stream().filter(SignerForm::isMaySign).count()>=f.getRequiredSignatures()
             && f.getSigners().stream().anyMatch(SignerForm::isMayApply) && f.getSigners().stream().anyMatch(SignerForm::isMayReceive),"authoritySigners");

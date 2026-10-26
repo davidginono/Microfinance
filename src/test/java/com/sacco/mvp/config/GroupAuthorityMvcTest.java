@@ -37,9 +37,9 @@ class GroupAuthorityMvcTest {
     @Test void recordingRequiresCsrfAndBindsOnlyAuthorityInputs()throws Exception{
         mvc.perform(post(path()).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(service);
         when(service.record(eq(actor),eq(group),any())).thenReturn(authority);
-        mvc.perform(post(path()).with(user(actor)).with(csrf()).param("requestKey",UUID.randomUUID().toString()).param("verified","true").param("maxPrincipal","10000.00").param("signers[0].clientId",client.toString()).param("signers[0].maySign","true").param("saccoId","FOREIGN").param("stationId","OTHER").param("recordedBy",client.toString()).param("revision","99"))
+        mvc.perform(post(path()).with(user(actor)).with(csrf()).param("requestKey",UUID.randomUUID().toString()).param("verified","true").param("maxPrincipal","10000.00").param("signers[0].clientId",client.toString()).param("signers[0].maySign","true").param("signers[0].mayViewAccount","true").param("saccoId","FOREIGN").param("stationId","OTHER").param("recordedBy",client.toString()).param("revision","99"))
             .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl(path()+"/"+authority));
-        verify(service).record(eq(actor),eq(group),argThat(f->f.isVerified() && f.getMaxPrincipal().toPlainString().equals("10000.00") && f.getSigners().size()==1 && f.getSigners().getFirst().getClientId().equals(client) && f.getSigners().getFirst().isMaySign() && !f.getSigners().getFirst().isMayApply()));
+        verify(service).record(eq(actor),eq(group),argThat(f->f.isVerified() && f.getMaxPrincipal().toPlainString().equals("10000.00") && f.getSigners().size()==1 && f.getSigners().getFirst().getClientId().equals(client) && f.getSigners().getFirst().isMaySign() && f.getSigners().getFirst().isMayViewAccount() && !f.getSigners().getFirst().isMayApply()));
     }
     @Test void invalidAmountsRetainBoundValuesAndDoNotCreateAuthority()throws Exception{
         editor();var result=mvc.perform(post(path()).with(user(actor)).with(csrf()).param("maxPrincipal","not-money").param("capacityEvidence","Retained source reference").param("signers[0].clientId",client.toString()))

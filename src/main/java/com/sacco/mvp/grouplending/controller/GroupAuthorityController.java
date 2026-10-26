@@ -17,7 +17,7 @@ import java.util.UUID;
 @Controller @RequestMapping("/finance/groups/{group}/authority") @RequiredArgsConstructor
 public class GroupAuthorityController {
     private final GroupAuthorityService service;
-    @InitBinder("authorityForm") public void authorityBinder(WebDataBinder binder){binder.setAutoGrowCollectionLimit(50);binder.setAllowedFields("requestKey","expectedPreviousId","validFrom","validThrough","maxPrincipal","requiredSignatures","capacityEvidence","resolutionEvidence","signatureEvidence","payoutType","payoutProvider","payoutHolder","payoutIdentifier","payoutEvidence","verified","signers[*].clientId","signers[*].mayApply","signers[*].maySign","signers[*].mayReceive");}
+    @InitBinder("authorityForm") public void authorityBinder(WebDataBinder binder){binder.setAutoGrowCollectionLimit(50);binder.setAllowedFields("requestKey","expectedPreviousId","validFrom","validThrough","maxPrincipal","requiredSignatures","capacityEvidence","resolutionEvidence","signatureEvidence","payoutType","payoutProvider","payoutHolder","payoutIdentifier","payoutEvidence","verified","signers[*].clientId","signers[*].mayApply","signers[*].maySign","signers[*].mayReceive","signers[*].mayViewAccount");}
     @InitBinder("revocationForm") public void revocationBinder(WebDataBinder binder){binder.setAllowedFields("reason");}
     @ExceptionHandler({IllegalArgumentException.class,org.springframework.beans.InvalidPropertyException.class}) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalid(RuntimeException error,Model model){model.addAttribute("groupError",error instanceof IllegalArgumentException e?key(e):"group.error.request");return "groups/error";}

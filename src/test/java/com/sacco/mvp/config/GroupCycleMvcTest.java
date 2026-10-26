@@ -102,6 +102,6 @@ class GroupCycleMvcTest {
         @Bean ResourceBundleMessageSource messageSource(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
         @Bean GroupCycleController controller(GroupCycleService c,GroupLendingService g,ApplicationClock clock,ResourceBundleMessageSource m){return new GroupCycleController(c,g,clock,m);}
         @Bean GroupConsentDeliveryService delivery(){return mock(GroupConsentDeliveryService.class);}
-        @Bean GroupConsentController consentController(GroupConsentService c,GroupConsentDeliveryService d){return new GroupConsentController(c,d);}
+        @Bean GroupConsentController consentController(GroupConsentService c,GroupConsentDeliveryService d){return new GroupConsentController(c,d,mock(GroupOrganizationAccountService.class));}
     }
 }
