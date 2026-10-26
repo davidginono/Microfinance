@@ -12,17 +12,18 @@
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="reconciliation.title" /></h1></div>
 <c:if test="${not empty formError}"><p class="coa-error" role="alert" tabindex="-1"><spring:message code="${formError}" /></p></c:if>
 <section class="erp-table-wrap" data-resource-table="sl-gl-reconciliation" data-aws-table-region>
-  <div class="app-table-titlebar"><h2><spring:message code="reconciliation.discrepancies" /><c:if test="${not empty report}"> (<c:out value="${report.count}" />)</c:if></h2>
+  <div class="app-table-titlebar"><h2><spring:message code="reconciliation.discrepancies" /><c:if test="${not empty report}"> <span class="app-table-count">(<c:out value="${report.count}" />)</span></c:if></h2>
     <div class="accounting-actions resource-table-actions">
-      <c:if test="${not empty report}"><sec:authorize access="@access.has(principal,'FINANCIAL_REPORTS_EXPORT')">
+      <c:if test="${not empty report}"><c:if test="${canExportReport}">
         <c:forEach items="${['pdf','print']}" var="output"><c:url value="/reports/financial/sl-gl-reconciliation/${output}" var="outputUrl"><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="component" value="${filter.component}" /><c:param name="activityId" value="${filter.activityFilter}" /></c:url>
           <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><spring:message code="management.${output}" /></a>
         </c:forEach>
-      </sec:authorize></c:if>
+      </c:if></c:if>
     </div>
   </div>
   <form method="get" action="<c:url value='/reports/financial/sl-gl-reconciliation' />" class="resource-table-filters" data-reconciliation-query data-aws-filter-toolbar>
     <input type="hidden" name="run" value="true" /><input type="hidden" name="cutoff" value="<c:out value='${filter.cutoff}' />" />
+    <label><spring:message code="reconciliation.check" /><select class="aws-control" name="component"><c:forEach items="${['ALL','PRINCIPAL','ALLOWANCE','INTEREST_COLLECTIONS','INTEREST_RECEIVABLE']}" var="check"><option value="${check}" ${filter.component==check?'selected':''}><spring:message code="reconciliation.component.${check}" /></option></c:forEach><c:if test="${canViewGroupAttribution}"><option value="GROUP_ATTRIBUTION" ${filter.component=='GROUP_ATTRIBUTION'?'selected':''}><spring:message code="reconciliation.component.GROUP_ATTRIBUTION" /></option></c:if></select></label>
     <label><spring:message code="management.from" /><input class="aws-control" type="date" name="from" value="<c:out value='${filter.from}' />" max="${today}" required /></label>
     <label><spring:message code="management.through" /><input class="aws-control" type="date" name="through" value="<c:out value='${filter.through}' />" max="${today}" required /></label>
     <label data-loan-choice data-category="activities" data-choice-url="${pageContext.request.contextPath}/reports/financial/sl-gl-reconciliation/activities"><spring:message code="reconciliation.activity" />

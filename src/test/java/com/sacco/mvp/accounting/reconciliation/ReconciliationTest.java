@@ -36,7 +36,8 @@ class ReconciliationTest {
         UUID foreign=UUID.randomUUID();when(repository.activity(actor,foreign)).thenReturn(Optional.empty());
         var selected=new Parameters(p().from(),p().through(),p().cutoff(),"ALL",0,foreign);
         assertThatThrownBy(()->service.report(actor,selected,false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-        verify(repository,never()).groups(any(),any());verify(repository,never()).rows(any(),any(),anyBoolean());
+        verify(repository,never()).groups(any(),any());verify(repository,never()).rows(any(),any(),anyBoolean(),anyBoolean());
+        assertThat(service.canExport(actor,null)).isFalse();assertThat(service.canExport(actor,"INVALID")).isFalse();
     }
     @Test void onlyReadPermissionReturnsToTheAccessMatrixWithoutDefaultGrants() {
         assertThat(UserClaim.ACCOUNTING_RECONCILIATION_VIEW.isAvailable()).isTrue();
@@ -51,7 +52,7 @@ class ReconciliationTest {
         verifyNoInteractions(repository);
     }
     @Test void exportNeverSilentlyTruncatesAndRequiresCurrentClaims() {
-        when(repository.groups(actor,p())).thenReturn(List.of(new Group("PRINCIPAL","MOVEMENT",5001,List.of())));
+        when(repository.groups(actor,p(),true)).thenReturn(List.of(new Group("PRINCIPAL","MOVEMENT",5001,List.of())));
         assertThatThrownBy(()->service.report(actor,p(),true)).hasMessage("reconciliation.error.large");
         verify(guard).requireActor(actor,"ACCOUNTING_RECONCILIATION_VIEW");verify(guard).requireActor(actor,"FINANCIAL_REPORTS_EXPORT");verify(repository,never()).rows(any(),any(),anyBoolean());
     }

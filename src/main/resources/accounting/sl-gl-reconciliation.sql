@@ -3,9 +3,9 @@
 WITH repayment_activity AS (
   SELECT id FROM gl_activity WHERE sacco_id=:institution AND system_key='LOAN_REPAYMENT'
 ), loans AS MATERIALIZED (
-  SELECT a.id,a.loan_id,a.sacco_id,a.station_id,a.applicant_member_id,a.disbursement_date,a.status,m.member_no,
+  SELECT a.id,a.loan_id,a.sacco_id,a.station_id,a.applicant_member_id,a.amount,r.application_date,a.disbursement_date,a.status,coalesce(m.member_no,'') member_no,m.party_id borrower_known,m.kind borrower_kind,
     l.created_at ledger_created,r.loan_id recorded_loan
-  FROM loan_applications a JOIN members m ON m.id=a.applicant_member_id AND m.sacco_id=a.sacco_id
+  FROM loan_applications a LEFT JOIN loan_borrower_directory m ON m.party_id=a.borrower_party_id AND m.sacco_id=a.sacco_id
   LEFT JOIN loan_ledgers l ON l.loan_application_id=a.id AND l.sacco_id=a.sacco_id AND l.station_id=a.station_id
   LEFT JOIN accountant_loan_record r ON r.loan_id=a.id AND r.sacco_id=a.sacco_id AND r.station_id=a.station_id AND r.recorded_at<=:cutoff
   WHERE a.sacco_id=:institution AND a.station_id=:branch AND a.created_at<=:cutoff
@@ -193,6 +193,11 @@ WITH repayment_activity AS (
   WHERE t.sacco_id=:institution AND t.station_id=:branch AND t.posted_at<=:cutoff AND t.payment_date<=:through AND v.amount>0
     AND (:allActivities OR :activityId::uuid=(SELECT id FROM repayment_activity))
     AND NOT EXISTS(SELECT 1 FROM raw_sl s WHERE s.loan_id=t.loan_application_id AND s.transaction_id=t.id AND s.account_code=v.code)
+  UNION ALL
+  SELECT 'PRINCIPAL','COVERAGE','',coalesce(a.loan_id,''),'','',a.disbursement_date,'COVERAGE','BORROWER_UNAVAILABLE',
+    null::numeric,null::numeric,null::numeric,null::numeric,null::numeric,null::numeric,a.id::text
+  FROM loans a WHERE :allActivities AND a.borrower_known IS NULL AND (a.disbursement_date<=:through
+    OR a.disbursement_date IS NULL AND a.status IN ('DISBURSED','PAR','DEFAULTED','PAID','WRITTEN_OFF'))
 ), exceptions AS (
   SELECT * FROM all_exceptions WHERE :component='ALL' OR component=:component
 )

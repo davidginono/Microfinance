@@ -12,6 +12,7 @@ import java.util.*;
 
 @Service @RequiredArgsConstructor
 public class ReconciliationService {
+    private static final Set<String> COMPONENTS=Set.of("ALL","PRINCIPAL","ALLOWANCE","INTEREST_COLLECTIONS","INTEREST_RECEIVABLE","GROUP_ATTRIBUTION");
     private final ReconciliationRepository reports;
     private final GeneralLedgerService guard;
     private final ApplicationClock clock;
@@ -36,20 +37,25 @@ public class ReconciliationService {
     private Activity scopedActivity(AppUserPrincipal actor,UUID id) {
         return reports.activity(actor,id).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Activity outside institution"));
     }
+    public boolean canViewGroupAttribution(AppUserPrincipal actor){authorize(actor,false);return groupAvailable(actor);}
+    public boolean canExport(AppUserPrincipal actor,String component){if(component==null||!COMPONENTS.contains(component))return false;try{authorize(actor,true);if(groupAvailable(actor)&&Set.of("ALL","GROUP_ATTRIBUTION").contains(component))guard.requireActor(actor,"GROUP_LENDING_EXPORT");return true;}catch(org.springframework.security.access.AccessDeniedException ignored){return false;}}
+    private boolean groupAvailable(AppUserPrincipal actor){try{guard.requireActor(actor,"GROUP_LENDING_VIEW");return true;}catch(org.springframework.security.access.AccessDeniedException ignored){return false;}}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
     public Result report(AppUserPrincipal actor, Parameters p, boolean export) {
         authorize(actor,export);
         if(p==null || p.from()==null || p.through()==null || p.cutoff()==null || p.from().getYear()<1900
             || p.through().isBefore(p.from()) || p.through().isAfter(p.from().plusDays(366)) || p.through().isAfter(clock.today())
             || p.cutoff().isAfter(clock.now()) || p.page()<0 || p.page()>10000 || p.unassigned() && p.activityId()!=null
-            || p.component()==null || !Set.of("ALL","PRINCIPAL","ALLOWANCE","INTEREST_COLLECTIONS","INTEREST_RECEIVABLE").contains(p.component()))
+            || p.component()==null || !COMPONENTS.contains(p.component()))
             throw new IllegalArgumentException("reconciliation.error.parameters");
+        boolean groupView=groupAvailable(actor);if(p.component().equals("GROUP_ATTRIBUTION"))guard.requireActor(actor,"GROUP_LENDING_VIEW");
+        if(export && groupView && Set.of("ALL","GROUP_ATTRIBUTION").contains(p.component()))guard.requireActor(actor,"GROUP_LENDING_EXPORT");
         var selected=p.activityId()==null?null:scopedActivity(actor,p.activityId());
         return limiter.run(()->{
-            var groups=reports.groups(actor,p);
+            var groups=reports.groups(actor,p,groupView);
             long count=groups.stream().mapToLong(Group::count).sum();
             if(export && count>5000)throw new IllegalArgumentException("reconciliation.error.large");
-            var rows=reports.rows(actor,p,export);
+            var rows=reports.rows(actor,p,export,groupView);
             if(export && rows.size()!=count)throw new IllegalArgumentException("reconciliation.error.large");
             var identity=reports.identity(actor);
             return new Result(p,identity[0],identity[1],export?rows:rows.stream().limit(25).toList(),groups,count,!export && rows.size()>25,selected);

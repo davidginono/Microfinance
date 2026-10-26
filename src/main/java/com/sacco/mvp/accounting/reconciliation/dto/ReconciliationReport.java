@@ -17,10 +17,13 @@ public final class ReconciliationReport {
     public record ActivityChoice(UUID id,String label) {}
     public record Row(String component, String section, String client, String loan, String account,
             String reference, LocalDate date, String activity, String issue, BigDecimal slDebit, BigDecimal slCredit,
-            BigDecimal glDebit, BigDecimal glCredit, BigDecimal debitVariance, BigDecimal creditVariance, String identity) {
+            BigDecimal glDebit, BigDecimal glCredit, BigDecimal debitVariance, BigDecimal creditVariance, String identity, BigDecimal sourceAmount, BigDecimal attributedAmount, BigDecimal attributionVariance) {
+        public Row(String component,String section,String client,String loan,String account,String reference,LocalDate date,String activity,String issue,BigDecimal slDebit,BigDecimal slCredit,BigDecimal glDebit,BigDecimal glCredit,BigDecimal debitVariance,BigDecimal creditVariance,String identity) {
+            this(component,section,client,loan,account,reference,date,activity,issue,slDebit,slCredit,glDebit,glCredit,debitVariance,creditVariance,identity,null,null,null);
+        }
         public String group() { return component + "/" + section; }
         public String getGroup() { return group(); }
-        public List<BigDecimal> amounts() { return Arrays.asList(slDebit,slCredit,glDebit,glCredit,debitVariance,creditVariance); }
+        public List<BigDecimal> amounts() { return component.startsWith("GROUP_")?Arrays.asList(sourceAmount,attributedAmount,attributionVariance):Arrays.asList(slDebit,slCredit,glDebit,glCredit,debitVariance,creditVariance); }
         public List<BigDecimal> getAmounts() { return amounts(); }
     }
     public record Group(String component, String section, long count, List<BigDecimal> totals) {

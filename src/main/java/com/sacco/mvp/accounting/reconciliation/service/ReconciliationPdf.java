@@ -39,7 +39,10 @@ public class ReconciliationPdf {
                 boolean[] numeric={false,false,false,false,false,false,true,true,true,true,true,true};
                 for(var group:r.groups()) {
                     page.endTable();page.section(msg("componentLabel",locale)+": "+msg("component."+group.component(),locale)+" | "+msg("section."+group.section(),locale));
-                    page.columns(labels,widths,numeric);
+                    if(group.section().equals("ATTRIBUTION")){
+                        var allocationLabels=List.of("group","account","reference","date","transaction","description","sourceAmount","attributedAmount","attributionVariance").stream().map(k->msg("column."+k,locale)).toList();
+                        page.columns(allocationLabels,new float[]{.08f,.08f,.12f,.08f,.1f,.24f,.1f,.1f,.1f},new boolean[]{false,false,false,false,false,false,true,true,true});
+                    }else page.columns(labels,widths,numeric);
                     for(var row:r.rows())if(row.getGroup().equals(group.getKey())) {
                         var cells=new ArrayList<>(List.of(row.client(),row.loan().isBlank()?row.account():row.loan()+" / "+row.account(),row.reference(),
                             row.date()==null?"":com.sacco.mvp.service.ApplicationTimestamps.date(row.date()),msg("event."+row.activity(),locale),msg("issue."+row.issue(),locale)));
@@ -48,7 +51,7 @@ public class ReconciliationPdf {
                     var total=new ArrayList<>(List.of(msg("total",locale),"","","","",""));group.totals().forEach(n->total.add(money(n,locale)));page.row(total,true);
                 }
                 page.endTable();if(r.count()==0)page.text(msg("empty",locale));
-                page.section(msg("basis",locale));page.text(msg("coverage",locale));page.text(msg("interestBasis",locale));page.text(msg("liveBasis",locale));
+                page.section(msg("basis",locale));page.text(msg("coverage",locale));page.text(msg("interestBasis",locale));page.text(msg("liveBasis",locale));if(r.groups().stream().anyMatch(g->g.section().equals("ATTRIBUTION")))page.text(msg("attributionBasis",locale));
             }
             document.save(out);return out.toByteArray();
         } catch(IOException e) { throw new IllegalStateException("Reconciliation PDF failed",e); }

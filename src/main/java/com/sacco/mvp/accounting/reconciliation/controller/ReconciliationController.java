@@ -42,7 +42,7 @@ public class ReconciliationController {
     @ModelAttribute void headers(HttpServletResponse response) { response.setHeader("Cache-Control","no-store"); }
     @GetMapping public String screen(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("filter") Filter f,
             org.springframework.validation.BindingResult binding,Model model,HttpServletResponse response) {
-        service.authorize(actor,false);defaults(f);model.addAttribute("today",clock.today());
+        service.authorize(actor,false);defaults(f);model.addAttribute("canViewGroupAttribution",service.canViewGroupAttribution(actor));model.addAttribute("canExportReport",service.canExport(actor,f.getComponent()));model.addAttribute("today",clock.today());
         model.addAttribute("activities",service.activities(actor,"",0));
         try {
             if(binding.hasErrors())throw new IllegalArgumentException("reconciliation.error.parameters");
