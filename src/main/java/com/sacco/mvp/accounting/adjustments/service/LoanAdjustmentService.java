@@ -23,15 +23,16 @@ public class LoanAdjustmentService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
+    private final com.sacco.mvp.grouplending.service.GroupSharedLoanService shared;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal a,String action){accounting.requireActor(a,"LOAN_ADJUSTMENTS_"+action);}
-    @Transactional(readOnly=true) public Request view(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return adjustments.find(a,id);}
-    @Transactional(readOnly=true) public Context context(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");return adjustments.context(a,loan,false);}
+    @Transactional(readOnly=true) public Request view(AppUserPrincipal a,UUID id){authorize(a,"VIEW");var q=adjustments.find(a,id);shared.authorizeAdjustment(a,q.loanId(),q.kind().name(),"VIEW");return q;}
+    @Transactional(readOnly=true) public Context context(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");shared.authorizeAdjustment(a,loan,"","VIEW");return adjustments.context(a,loan,false);}
     @Transactional(readOnly=true) public Choice selectedAccount(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return adjustments.selectedAccount(a,id);}
-    @Transactional(readOnly=true) public Page list(AppUserPrincipal a,String state,String search,int page,String sort,String direction){authorize(a,"VIEW");query(search,page);check(Set.of("","PENDING","APPROVED","REJECTED").contains(state),"parameters");var rows=adjustments.list(a,state,search,page,sort,direction);return new Page(rows.stream().limit(25).toList(),page,rows.size()>25);}
-    @Transactional(readOnly=true) public List<Choice> choices(AppUserPrincipal a,String category,String search,int page){authorize(a,"VIEW");query(search,page);return switch(category){case "loans"->adjustments.loans(a,search,page);case "allowance"->adjustments.accounts(a,"ASSET","ALLOWANCE",search,page);case "expense"->adjustments.accounts(a,"EXPENSE","EXPENSE",search,page);default->throw error("parameters");};}
+    @Transactional(readOnly=true) public Page list(AppUserPrincipal a,String state,String search,int page,String sort,String direction){authorize(a,"VIEW");query(search,page);check(Set.of("","PENDING","APPROVED","REJECTED").contains(state),"parameters");var rows=adjustments.list(a,state,search,page,sort,direction,shared.canView(a));return new Page(rows.stream().limit(25).toList(),page,rows.size()>25);}
+    @Transactional(readOnly=true) public List<Choice> choices(AppUserPrincipal a,String category,String search,int page){authorize(a,"VIEW");query(search,page);return switch(category){case "loans"->adjustments.loans(a,search,page,shared.canView(a));case "allowance"->adjustments.accounts(a,"ASSET","ALLOWANCE",search,page);case "expense"->adjustments.accounts(a,"EXPENSE","EXPENSE",search,page);default->throw error("parameters");};}
     @Transactional public UUID request(AppUserPrincipal a,Form f){
-        authorize(a,"CREATE");validate(f);var hash=hash(f);adjustments.lockKey(a,f.getRequestKey());var retry=adjustments.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get().id();
+        authorize(a,"CREATE");validate(f);shared.authorizeAdjustment(a,f.getLoanId(),f.getKind().name(),"POST");var hash=hash(f);adjustments.lockKey(a,f.getRequestKey());var retry=adjustments.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get().id();
         var c=adjustments.context(a,f.getLoanId(),true);check(!adjustments.pending(c.id()),"pending");date(f,c);
         BigDecimal amount,allowanceChange=ZERO,principalChange=ZERO;UUID debit,credit,reverses=null;
         switch(f.getKind()){
@@ -64,7 +65,7 @@ public class LoanAdjustmentService {
         event(a,id,"LOAN_ADJUSTMENT_REQUESTED",Map.of("loan",c.id(),"kind",f.getKind().name(),"amount",amount));return id;
     }
     @Transactional public UUID decide(AppUserPrincipal a,UUID id,UUID key,boolean approve,String reason){
-        authorize(a,"APPROVE");check(key!=null,"parameters");text(reason);adjustments.lockKey(a,key);var q=adjustments.find(a,id);
+        authorize(a,"APPROVE");check(key!=null,"parameters");text(reason);adjustments.lockKey(a,key);var q=adjustments.find(a,id);shared.authorizeAdjustment(a,q.loanId(),q.kind().name(),"POST");
         // The loan lock also serializes concurrent decisions and repayment commands.
         var c=adjustments.context(a,q.loanId(),true);q=adjustments.find(a,id);
         if(!q.state().equals("PENDING")){check(adjustments.decisionRetry(a,id,key,approve,reason.strip()),"decided");return id;}
@@ -81,10 +82,15 @@ public class LoanAdjustmentService {
                 var lines=charges.correctFunding(a,c.id(),q.reversesJournalId(),journal,key,q.date(),q.evidence(),q.reason());adjustments.postingLines(a,q,journal,lines);adjustments.finishPosting(journal,now);
             }else adjustments.post(a,q,key,journal,period,now);
             switch(q.kind()){case WRITE_OFF->adjustments.status(c.id(),"WRITTEN_OFF",clock.now());case WRITE_BACK->adjustments.status(c.id(),"DEFAULTED",clock.now());case DISBURSEMENT_REVERSAL->adjustments.status(c.id(),"DISBURSEMENT_REVERSED",clock.now());default->{}}
+            shared.accounting(a,c.id(),id,q.kind().name(),q.amount(),q.reversesJournalId());
         }else adjustments.decide(a,id,key,false,q.date(),reason.strip(),null,clock.now());
         event(a,id,approve?"LOAN_ADJUSTMENT_APPROVED":"LOAN_ADJUSTMENT_REJECTED",Map.of("loan",c.id(),"kind",q.kind().name()));return id;
     }
-    public Request export(AppUserPrincipal a,UUID id){authorize(a,"EXPORT");return view(a,id);}
+    public Request export(AppUserPrincipal a,UUID id){authorize(a,"EXPORT");var q=view(a,id);shared.authorizeAdjustment(a,q.loanId(),q.kind().name(),"EXPORT");return q;}
+    @Transactional(readOnly=true) public List<com.sacco.mvp.grouplending.dto.GroupSharedLoanDtos.AccountingBenefit> benefits(AppUserPrincipal a,UUID id){var q=view(a,id);return q.state().equals("APPROVED")?shared.accountingBenefits(a,q.loanId(),id):List.of();}
+    @Transactional(readOnly=true) public boolean memberAccountingRequired(AppUserPrincipal a,UUID id){var q=view(a,id);return Set.of(Kind.WRITE_OFF,Kind.WRITE_BACK).contains(q.kind())&&shared.isSharedLoan(a,q.loanId());}
+    @Transactional(readOnly=true) public boolean canExport(AppUserPrincipal a,UUID id){try{export(a,id);return true;}catch(org.springframework.security.access.AccessDeniedException ignored){return false;}}
+    @Transactional(readOnly=true) public boolean canDecide(AppUserPrincipal a,UUID id){try{authorize(a,"APPROVE");var q=view(a,id);shared.authorizeAdjustment(a,q.loanId(),q.kind().name(),"POST");return true;}catch(org.springframework.security.access.AccessDeniedException ignored){return false;}}
     private void validate(Form f){check(f!=null && f.getRequestKey()!=null && f.getLoanId()!=null && f.getKind()!=null && f.getDate()!=null,"parameters");text(f.getReason());text(f.getEvidence());}
     private void date(Form f,Context c){check(f.getDate()!=null && !f.getDate().isAfter(clock.today()) && !f.getDate().isBefore(c.disbursed()) && (c.lastDate()==null || !f.getDate().isBefore(c.lastDate())),"date");}
     private static void active(Context c){check(Set.of("DISBURSED","PAR","DEFAULTED").contains(c.status()),"state");}

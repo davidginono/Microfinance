@@ -50,6 +50,7 @@ class SharedCreditExposurePostgresTest {
         assertThat(f.jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,s.loan)).isEqualByComparingTo("2.40");
         assertThat(s.count("loan_ledgers")).isEqualTo(1);assertThat(s.count("loan_applications")).isEqualTo(2); // withdrawn source plus current facility
         assertThat(f.jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=? and account_id=?",BigDecimal.class,f.institution,f.principal)).isEqualByComparingTo("880.01");
+        f.provide(s.loan,"880.01");var writeOff=f.adjustments().request(f.actor,f.adjustment(s.loan,"WRITE_OFF"));f.adjustments().decide(f.operator("B1"),writeOff,UUID.randomUUID(),true,"Synthetic joint accounting loss without debt release");assertThat(own().known()).isTrue();assertThat(own().liability()).isEqualByComparingTo("897.61");assertThat(s.shared.balances(f.actor,s.loan).getFirst().writtenOff()).isEqualByComparingTo("108.64");
     }
     @Test void sharedRiskBlocksOrdinaryGuarantorsAndRespectsTheExistingApplicantDefaultLimit(){
         policy();f.service.disburse(f.actor,s.funding());assertThat(qualification().guarantorFailureReason(f.institution,f.client)).hasValueSatisfying(reason->assertThat(reason).contains("active loans"));

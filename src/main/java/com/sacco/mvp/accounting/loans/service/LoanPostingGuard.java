@@ -16,6 +16,8 @@ public class LoanPostingGuard {
     private final LoanPostingAuthorizationRepository sources;
     public boolean recordedLoan(UUID loan) {return sources.recordedLoan(loan);}
     @Transactional(propagation=Propagation.MANDATORY)
+    public void lockRecordedLoan(UUID loan,AppUserPrincipal actor){if(sources.recordedLoan(loan)&&!sources.lockRecorded(loan,actor))throw new org.springframework.security.access.AccessDeniedException("Loan unavailable");}
+    @Transactional(propagation=Propagation.MANDATORY)
     public void disbursement(LoanApplication loan, UUID officer) {requireUnowned(loan.getId());}
     @Transactional(propagation=Propagation.MANDATORY)
     public void repayment(UUID loan, AppUserPrincipal actor, PaymentCommand command) {

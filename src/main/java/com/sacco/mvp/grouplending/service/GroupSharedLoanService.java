@@ -38,7 +38,7 @@ public class GroupSharedLoanService {
     @Transactional(propagation=Propagation.MANDATORY) public void payment(AppUserPrincipal a,UUID loan,Posting posting,String payer){
         if(!shared.shared(a,loan))return;access.requireActor(a,"GROUP_LENDING_POST");
         check(payer!=null&&!payer.isBlank()&&payer.length()<=160&&payer.chars().noneMatch(Character::isISOControl),"sharedPayer");
-        var balances=shared.balances(a,loan);check(balances.stream().allMatch(Balance::known),"sharedWaiverHistory");var principal=split(posting.principal(),balances.stream().map(Balance::remainingPrincipal).toList());
+        var balances=shared.balances(a,loan);check(balances.stream().allMatch(Balance::known),"sharedAttributionHistory");var principal=split(posting.principal(),balances.stream().map(Balance::remainingPrincipal).toList());
         var interest=split(posting.interest(),balances.stream().map(Balance::remainingInterest).toList());
         var charges=split(posting.charges(),balances.stream().map(Balance::remainingCharges).toList());
         var afterInterest=new ArrayList<BigDecimal>();for(int i=0;i<balances.size();i++)afterInterest.add(balances.get(i).remainingInterest().subtract(interest.get(i)));
@@ -57,7 +57,7 @@ public class GroupSharedLoanService {
         var evidence=preview?Map.<UUID,List<com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit>>of():shared.receiptBenefits(a,rows.stream().filter(r->sharedIds.contains(r.loanId())).map(com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow::postingId).toList());
         var result=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.LoanReceiptRow>();
         for(var row:rows){if(!sharedIds.contains(row.loanId())){result.add(row);continue;}List<com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit> benefits;
-            if(preview){var people=balances.getOrDefault(row.loanId(),List.of());check(!people.isEmpty(),"sharedAttribution");check(people.stream().allMatch(Balance::known),"sharedWaiverHistory");var principal=split(row.principal(),people.stream().map(Balance::remainingPrincipal).toList());var interest=split(row.interest(),people.stream().map(Balance::remainingInterest).toList());var charges=split(row.charges(),people.stream().map(Balance::remainingCharges).toList());benefits=new ArrayList<>();
+            if(preview){var people=balances.getOrDefault(row.loanId(),List.of());check(!people.isEmpty(),"sharedAttribution");check(people.stream().allMatch(Balance::known),"sharedAttributionHistory");var principal=split(row.principal(),people.stream().map(Balance::remainingPrincipal).toList());var interest=split(row.interest(),people.stream().map(Balance::remainingInterest).toList());var charges=split(row.charges(),people.stream().map(Balance::remainingCharges).toList());benefits=new ArrayList<>();
                 for(int i=0;i<people.size();i++){var person=people.get(i);benefits.add(new com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit(person.client(),person.number(),person.name(),payer,principal.get(i).setScale(2),interest.get(i).setScale(2),charges.get(i).setScale(2),null));}
             }else benefits=evidence.getOrDefault(row.postingId(),List.of());
             check(!benefits.isEmpty()&&benefits.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit::principal).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(row.principal())==0&&benefits.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit::interest).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(row.interest())==0&&benefits.stream().map(com.sacco.mvp.accounting.dto.VoucherDtos.SharedReceiptBenefit::charges).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(row.charges())==0,"sharedAttribution");
@@ -66,10 +66,21 @@ public class GroupSharedLoanService {
     }
     public void authorizeWaiver(AppUserPrincipal a,UUID loan,UUID reverses){if(shared.shared(a,loan)){access.requireActor(a,"GROUP_LENDING_VIEW");access.requireActor(a,reverses==null?"GROUP_LENDING_POST":"GROUP_LENDING_REVERSE");}}
     @Transactional(propagation=Propagation.MANDATORY) public void waiver(AppUserPrincipal a,UUID loan,UUID source,BigDecimal amount,UUID reverses){
-        if(!shared.shared(a,loan))return;authorizeWaiver(a,loan,reverses);check(shared.waiversComplete(a,loan,source),"sharedWaiverHistory");
+        if(!shared.shared(a,loan))return;authorizeWaiver(a,loan,reverses);check(shared.waiversComplete(a,loan,source)&&shared.accountingComplete(a,loan,null),"sharedAttributionHistory");
         List<WaiverAllocation> rows;if(reverses!=null){var original=shared.waivers(a,reverses);check(!original.isEmpty(),"sharedWaiverHistory");rows=original.stream().map(r->new WaiverAllocation(source,r.client(),r.amount(),reverses)).toList();}
         else{var people=shared.balances(a,loan);check(!people.isEmpty(),"sharedAttribution");var amounts=split(amount,people.stream().map(Balance::remainingInterest).toList());var allocated=new ArrayList<WaiverAllocation>();for(int i=0;i<people.size();i++)allocated.add(new WaiverAllocation(source,people.get(i).client(),amounts.get(i),null));rows=allocated;}
         shared.waivers(a,loan,rows);audit.logEvent("GROUP_LENDING",source,"SHARED_INTEREST_ATTRIBUTED",a.getMemberId(),AuditEventStatus.SUCCESS,"Non-cash earned-interest allocation","LOAN",loan.toString(),a.getSaccoId(),a.getStationId(),Map.of("loan",loan,"waiver",source,"amount",amount,"reverses",Objects.toString(reverses,"")));
+    }
+    public boolean isSharedLoan(AppUserPrincipal a,UUID loan){boolean found=shared.shared(a,loan);if(found)access.requireActor(a,"GROUP_LENDING_VIEW");return found;}
+    public boolean canView(AppUserPrincipal a){try{access.requireActor(a,"GROUP_LENDING_VIEW");return true;}catch(org.springframework.security.access.AccessDeniedException ignored){return false;}}
+    public void authorizeAdjustment(AppUserPrincipal a,UUID loan,String kind,String action){if(shared.shared(a,loan)){access.requireActor(a,"GROUP_LENDING_VIEW");if(action.equals("EXPORT"))access.requireActor(a,"GROUP_LENDING_EXPORT");else if(!action.equals("VIEW"))access.requireActor(a,Set.of("WRITE_BACK","DISBURSEMENT_REVERSAL").contains(kind)?"GROUP_LENDING_REVERSE":"GROUP_LENDING_POST");}}
+    @Transactional(readOnly=true) public List<AccountingBenefit> accountingBenefits(AppUserPrincipal a,UUID loan,UUID source){if(!shared.shared(a,loan))return List.of();authorizeAdjustment(a,loan,"","VIEW");return shared.accountingBenefits(a,source);}
+    @Transactional(propagation=Propagation.MANDATORY) public void accounting(AppUserPrincipal a,UUID loan,UUID source,String kind,BigDecimal amount,UUID originalJournal){
+        if(!shared.shared(a,loan)||!Set.of("WRITE_OFF","WRITE_BACK").contains(kind))return;authorizeAdjustment(a,loan,kind,"POST");check(shared.accountingComplete(a,loan,source)&&shared.waiversComplete(a,loan,null),"sharedAttributionHistory");
+        List<AccountingAllocation> rows;if(kind.equals("WRITE_BACK")){var original=shared.originalWriteOff(a,loan,originalJournal);var before=shared.accounting(a,original);check(!before.isEmpty(),"sharedAttributionHistory");rows=before.stream().map(r->new AccountingAllocation(source,r.client(),r.amount(),original)).toList();}
+        else rows=shared.balances(a,loan).stream().map(r->new AccountingAllocation(source,r.client(),r.remainingPrincipal(),null)).toList();
+        check(!rows.isEmpty()&&rows.stream().map(AccountingAllocation::amount).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(amount)==0,"sharedAttribution");shared.accounting(a,loan,rows);
+        audit.logEvent("GROUP_LENDING",source,"SHARED_ACCOUNTING_ATTRIBUTED",a.getMemberId(),AuditEventStatus.SUCCESS,"Member accounting allocation","LOAN",loan.toString(),a.getSaccoId(),a.getStationId(),Map.of("loan",loan,"adjustment",source,"kind",kind,"amount",amount));
     }
     // Cumulative cent allocation conserves the component exactly and never exceeds a remaining share.
     static List<BigDecimal> split(BigDecimal amount,List<BigDecimal> remaining){

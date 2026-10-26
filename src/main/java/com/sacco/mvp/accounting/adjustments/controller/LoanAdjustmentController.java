@@ -34,9 +34,10 @@ public class LoanAdjustmentController {
         catch(IllegalArgumentException e){response.setStatus(400);m.addAttribute("formError",key(e));return form(a,f,m);}
     }
     @GetMapping("/{id}") public String view(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){details(a,id,m);return "accounting/adjustments/details";}
-    private void details(AppUserPrincipal a,UUID id,Model m){var q=service.view(a,id);m.addAttribute("adjustment",q);m.addAttribute("loan",service.context(a,q.loanId()));m.addAttribute("decisionKey",UUID.randomUUID());m.addAttribute("independent",!q.requestedBy().equals(a.getMemberId()));}
+    private void details(AppUserPrincipal a,UUID id,Model m){var q=service.view(a,id);m.addAttribute("adjustment",q);m.addAttribute("canExportAdjustment",service.canExport(a,id));m.addAttribute("memberAccountingRequired",q.state().equals("APPROVED")&&service.memberAccountingRequired(a,id));m.addAttribute("sharedAccounting",q.state().equals("APPROVED")?service.benefits(a,id):List.of());m.addAttribute("canDecideAdjustment",q.state().equals("PENDING")&&service.canDecide(a,id));m.addAttribute("loan",service.context(a,q.loanId()));m.addAttribute("decisionKey",UUID.randomUUID());m.addAttribute("independent",!q.requestedBy().equals(a.getMemberId()));}
     @PostMapping("/{id}/decision") public String decide(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID requestKey,@RequestParam boolean approve,@RequestParam String reason,@RequestParam(defaultValue="false") boolean confirmed,Model m,HttpServletResponse response){
         service.authorize(a,"APPROVE");try{if(!confirmed)throw new IllegalArgumentException("adjustment.error.parameters");return "redirect:/finance/loan-adjustments/"+service.decide(a,id,requestKey,approve,reason);}
+        catch(org.springframework.dao.DataAccessException e){response.setStatus(400);details(a,id,m);m.addAttribute("decisionKey",requestKey);m.addAttribute("decisionReason",reason);m.addAttribute("formError","adjustment.error.financialValidation");return "accounting/adjustments/details";}
         catch(IllegalArgumentException e){response.setStatus(400);details(a,id,m);m.addAttribute("decisionKey",requestKey);m.addAttribute("decisionReason",reason);m.addAttribute("formError",key(e));return "accounting/adjustments/details";}
     }
     @GetMapping({"/{id}/pdf","/{id}/print"}) public ResponseEntity<byte[]> export(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Locale locale,jakarta.servlet.http.HttpServletRequest request){
@@ -48,11 +49,11 @@ public class LoanAdjustmentController {
         rows.add(label("recording.reason",locale)+": "+q.reason());rows.add(label("voucher.evidence",locale)+": "+q.evidence());rows.add(label("adjustment.requestedBy",locale)+": "+q.requester()+" / "+q.requestedAt());
         if(q.decidedAt()!=null){rows.add(label("adjustment.reviewedBy",locale)+": "+q.reviewer()+" / "+q.decidedAt());rows.add(label("recording.reason",locale)+": "+q.decisionReason());}
         if(q.journalId()!=null)rows.add(label("adjustment.journal",locale)+": "+q.journalId());
-        rows.add(label("adjustment.effect."+q.kind(),locale));
+        rows.add(label("adjustment.effect."+q.kind(),locale));var shares=q.state().equals("APPROVED")?service.benefits(a,id):List.<com.sacco.mvp.grouplending.dto.GroupSharedLoanDtos.AccountingBenefit>of();if(q.state().equals("APPROVED")&&shares.isEmpty()&&service.memberAccountingRequired(a,id))rows.add(label("sharedStatement.unknown",locale));if(!shares.isEmpty()){rows.add(label("sharedAdjustment.title",locale));for(var share:shares)rows.add(share.number()+" - "+share.name()+": TZS "+share.amount());}
         var bytes=pdf.render(new LoanRecordingPdfService.Document(label("adjustment.kind."+q.kind(),locale),q.institution(),q.branch(),"loan-adjustment.pdf",rows));
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).header("X-Content-Type-Options","nosniff").header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=loan-adjustment-"+q.id()+".pdf").body(bytes);
     }
     private String label(String key,Locale l){return messages.getMessage(key,null,l);}
     @ExceptionHandler(IllegalArgumentException.class) String invalid(IllegalArgumentException e,Model m,HttpServletResponse r){r.setStatus(400);m.addAttribute("formError",key(e));return "accounting/adjustments/error";}
-    private static String key(IllegalArgumentException e){if("voucher.error.period".equals(e.getMessage()))return "adjustment.error.period";return e.getMessage()!=null && e.getMessage().startsWith("adjustment.error.")?e.getMessage():"adjustment.error.parameters";}
+    private static String key(IllegalArgumentException e){if("recording.error.sharedAttributionHistory".equals(e.getMessage()))return "adjustment.error.groupHistory";if("voucher.error.period".equals(e.getMessage()))return "adjustment.error.period";return e.getMessage()!=null && e.getMessage().startsWith("adjustment.error.")?e.getMessage():"adjustment.error.parameters";}
 }

@@ -81,5 +81,5 @@ public class LoanPrepaymentController {
     private static String loanDetails(UUID id,jakarta.servlet.http.HttpServletRequest request){
         return request.getRequestURI().startsWith(request.getContextPath()+"/finance/")?"/finance/loan-records/"+id:"/repayments/loans/"+id;
     }
-    private static String error(IllegalArgumentException e){String s=e.getMessage();if("voucher.error.period".equals(s)||"recording.error.sharedWaiverHistory".equals(s))return s;return s!=null && s.matches("(?:prepayment|repayment)\\.error\\.[A-Za-z]+")?s:"prepayment.error.input";}
+    private static String error(IllegalArgumentException e){String s=e.getMessage();if("voucher.error.period".equals(s)||"recording.error.sharedWaiverHistory".equals(s)||"recording.error.sharedAttributionHistory".equals(s))return s;return s!=null && s.matches("(?:prepayment|repayment)\\.error\\.[A-Za-z]+")?s:"prepayment.error.input";}
 }

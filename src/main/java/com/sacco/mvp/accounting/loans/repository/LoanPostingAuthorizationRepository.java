@@ -14,6 +14,7 @@ public class LoanPostingAuthorizationRepository {
     public boolean recordedLoan(UUID loan) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_record where loan_id=?)",Boolean.class,loan));
     }
+    public boolean lockRecorded(UUID loan,AppUserPrincipal actor){return !jdbc.queryForList("select loan_id from accountant_loan_record where loan_id=? and sacco_id=? and station_id=? for update",loan,actor.getSaccoId(),actor.getStationId()).isEmpty();}
     public boolean recordedCommand(UUID loan, AppUserPrincipal actor, UUID key, String kind, String reference, BigDecimal amount, LocalDate date) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             select exists(select 1 from accountant_loan_post p join accountant_loan_record r on r.loan_id=p.loan_id
