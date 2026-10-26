@@ -414,7 +414,7 @@
         </div>
 </c:if>
 
-<c:if test="${organizationFundingPending}"><div class="console-message" data-message-type="info" role="status"><spring:message code="group.organizationFundingPending" /></div></c:if>
+<c:if test="${organizationFundingPending}"><div class="console-message" data-message-type="info" role="status"><spring:message code="${not empty sharedFunding?'recording.error.sharedFunding':'group.organizationFundingPending'}" /></div></c:if>
 <c:if test="${showDisbursementPermissionMessage}">
     <div class="erp-form-wrap mt-5">
         <div class="border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
@@ -448,6 +448,16 @@
                 </c:choose>
             </span>
                             </div>
+        <c:if test="${not empty sharedFunding}">
+            <section class="erp-panel"><div class="erp-panel-header"><h2><spring:message code="sharedFunding.title" /></h2></div><div class="erp-panel-body">
+                <input type="hidden" name="sharedPacketHash" value="<c:out value='${sharedFunding.hash}' />" />
+                <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="group.client" /></th><th><spring:message code="voucher.moneyAccount" /></th><th><spring:message code="group.shared.net" /> (TZS)</th><th><spring:message code="voucher.reference" /></th></tr></thead><tbody>
+                <c:forEach items="${sharedFunding.payouts}" var="payout" varStatus="payoutIndex"><tr><td><c:out value="${payout.number}" /> · <c:out value="${payout.name}" /></td><td><c:out value="${payout.destination.provider}" /> · <c:out value="${payout.destination.accountHolderName}" /> · <c:out value="${payout.destination.accountIdentifier}" /></td><td><c:out value="${payout.amount}" /></td><td><label class="sr-only" for="shared-transfer-${payoutIndex.index}"><spring:message code="voucher.reference" /> <c:out value="${payout.number}" /></label><input class="aws-control" id="shared-transfer-${payoutIndex.index}" name="sharedPayoutReferences" maxlength="100" value="<c:out value='${postingSharedPayoutReferences[payoutIndex.index]}' />" required /></td></tr></c:forEach>
+                </tbody></table></div>
+                <label class="aws-settings-checkbox-row"><input class="aws-settings-checkbox" type="checkbox" name="sharedPayoutsConfirmed" value="true" required /><span class="aws-settings-checkbox-copy"><spring:message code="sharedFunding.transfers" /></span></label>
+                <label class="aws-settings-checkbox-row"><input class="aws-settings-checkbox" type="checkbox" name="sharedAccepted" value="true" required /><span class="aws-settings-checkbox-copy"><spring:message code="sharedFunding.accept" /></span></label>
+            </div></section>
+        </c:if>
         <c:if test="${not empty organizationFunding}">
             <section class="erp-panel"><div class="erp-panel-header"><h2><spring:message code="orgFunding.lender" /></h2></div><div class="erp-panel-body">
                 <input type="hidden" name="organizationPacketHash" value="<c:out value='${organizationFunding.hash}' />" />
@@ -549,7 +559,7 @@
             </div>
         </div>
             <c:if test="${recordedLoanApplication}"><%@ include file="../fragments/staff-disbursement-posting-fields.jspf" %></c:if>
-            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${not empty organizationFunding ? organizationFunding.firstPaymentDate : (postingFirstPaymentDate ne null ? postingFirstPaymentDate : firstRepaymentDateDefault)}" ${not empty organizationFunding ? 'readonly' : ''} required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
+            <div><label for="staffFirstRepaymentDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="recording.firstPaymentDate" /></label><input type="date" id="staffFirstRepaymentDate" name="firstRepaymentDate" value="${not empty sharedFunding ? sharedFunding.firstPaymentDate : (not empty organizationFunding ? organizationFunding.firstPaymentDate : (postingFirstPaymentDate ne null ? postingFirstPaymentDate : firstRepaymentDateDefault))}" ${not empty organizationFunding or not empty sharedFunding ? 'readonly' : ''} required class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" /></div>
             <div><span class="text-sm font-medium text-slate-700"><spring:message code="loan.loanId" /></span><p><spring:message code="recording.numberAssigned" /></p></div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>

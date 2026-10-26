@@ -110,7 +110,7 @@ public class LoanRecordingRepository {
           and ((m.station_id=? and m.is_member) or exists(select 1 from accountant_loan_record r
             join loan_applications l on l.id=r.loan_id where l.applicant_member_id=m.id and r.sacco_id=? and r.station_id=?))
         union all
-        select b.party_id,b.member_no,b.full_name,b.kind from loan_borrower_directory b where b.sacco_id=? and b.group_station_id=? and b.kind='ORGANIZATION'
+        select b.party_id,b.member_no,b.full_name,b.kind from loan_borrower_directory b where b.sacco_id=? and b.group_station_id=? and b.kind in ('ORGANIZATION','JOINT_GROUP')
           and exists(select 1 from accountant_loan_record r join loan_applications l on l.id=r.loan_id
             where l.borrower_party_id=b.party_id and r.sacco_id=b.sacco_id and r.station_id=b.group_station_id)
         """;

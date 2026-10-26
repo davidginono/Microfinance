@@ -42,6 +42,7 @@ public class LoanRecordingService {
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
     private final LoanProductAccountService productAccounts;
     private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
+    private final com.sacco.mvp.grouplending.service.GroupSharedLoanService sharedLoans;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -247,10 +248,11 @@ public class LoanRecordingService {
         validateFiles(files);
         accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
         organizationFunding.lock(a,f.getLoanId());
+        sharedLoans.lock(a,f.getLoanId());
         var source=records.topUpSource(a,f.getLoanId());
         if(source.isPresent())records.lockTopUpPair(a,source.get(),f.getLoanId());
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
-        if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted()),"organizationFundingPending");
+        if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted())||Boolean.TRUE.equals(f.getSharedAccepted()),"organizationFundingPending");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
         if(Boolean.TRUE.equals(policy.get("disbursementProofRequired")))check(files.stream().anyMatch(file->!file.isEmpty()),"attachments");
@@ -277,7 +279,7 @@ public class LoanRecordingService {
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
         if(settlement==null)records.journal(a,journal,id,f,hash,period,deductions.signum()>0?"LOAN_CHARGE_FUNDING":"DISBURSEMENT",null,now);
         else records.topUpJournal(a,id,journal,f,hash,period,null,now);
-        if(loan.getApplicantMemberId()==null)organizationFunding.execute(a,f,id,journal,first,deductions);
+        if(loan.getApplicantMemberId()==null&&!sharedLoans.execute(a,f,id,journal,first,deductions))organizationFunding.execute(a,f,id,journal,first,deductions);
         records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
         var schedule=schedules.buildSchedule(loan,f.getEffectiveDate(),first,loan.getRepaymentFrequency(),null,f.getReference(),f.getNotes());
         loan.setFirstRepaymentDate(first);
@@ -321,7 +323,8 @@ public class LoanRecordingService {
         loans.flush();
         check(allocation.interest().signum()==0 || interest!=null,"interestAccount");var lines=new ArrayList<Object[]>();lines.add(new Object[]{money.id(),f.getAmount(),ZERO});
         if(allocation.principal().signum()>0)lines.add(new Object[]{principal.id(),ZERO,allocation.principal()});if(allocation.interest().signum()>0)lines.add(new Object[]{interest.id(),ZERO,allocation.interest()});lines.addAll(feeLines);
-        records.lines(a,journal,lines);records.finish(id,receipt==null?null:receipt.id(),allocation.principal(),allocation.interest(),records.loan(a,f.getLoanId(),clock.today()).outstandingPrincipal(),allocation.charges());records.postJournal(a,journal,now);
+        records.lines(a,journal,lines);records.finish(id,receipt==null?null:receipt.id(),allocation.principal(),allocation.interest(),records.loan(a,f.getLoanId(),clock.today()).outstandingPrincipal(),allocation.charges());
+        sharedLoans.payment(a,f.getLoanId(),records.posting(a,id),f.getSharedPayer());records.postJournal(a,journal,now);
         event(a,id,"LOAN_REPAYMENT_POSTED",Map.of("loan",f.getLoanId(),"amount",f.getAmount()));return records.posting(a,id);
     }
     @Transactional
@@ -350,7 +353,8 @@ public class LoanRecordingService {
         if(chargeReceipt){charges.undoCollections(a,original.journalId(),journal,id,date,original.evidence(),reason);}
         var receipt=original.transactionId()==null?null:repayments.reverseRecorded(original.loanId(),original.transactionId(),a,key,reason.strip(),date);
         loans.flush();
-        records.lines(a,journal,raw);records.finish(id,receipt==null?null:receipt.id(),original.principal(),original.interest(),records.loan(a,original.loanId(),clock.today()).outstandingPrincipal(),original.charges());records.postJournal(a,journal,now);
+        records.lines(a,journal,raw);records.finish(id,receipt==null?null:receipt.id(),original.principal(),original.interest(),records.loan(a,original.loanId(),clock.today()).outstandingPrincipal(),original.charges());
+        sharedLoans.reverse(a,original.loanId(),original.id(),id);records.postJournal(a,journal,now);
         event(a,id,"LOAN_REPAYMENT_REVERSED",Map.of("original",originalId));return records.posting(a,id);
     }
     public record LoanExport(Detail detail,List<Posting> payments,com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan charges) { public LoanExport(Detail detail,List<Posting> payments){this(detail,payments,new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan(null,"","",List.of(),true,""));} }

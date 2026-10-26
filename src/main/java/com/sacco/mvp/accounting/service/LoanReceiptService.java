@@ -62,7 +62,8 @@ public class LoanReceiptService {
         // Lock all loan sources in deterministic order before invoking their owning posting use case.
         loans.lockReceiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).sorted().toList(),f.getClientId());requirePayer(a,f);
         var result=new ArrayList<LoanReceiptRow>();var client=loans.receiptLoan(a,f.getRows().getFirst().getLoanId());int n=0;
-        for(var row:f.getRows()){var p=loans.repay(a,command(f,row,++n));result.add(new LoanReceiptRow(n,p.id(),p.loanId(),p.loanNumber(),row.getDescription(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
+        boolean sharedBorrower="JOINT_GROUP".equals(loans.receiptClient(a,f.getClientId()).purpose());
+        for(var row:f.getRows()){var request=command(f,row,++n);if(sharedBorrower)request.setSharedPayer(f.getLoanPayer());var p=loans.repay(a,request);result.add(new LoanReceiptRow(n,p.id(),p.loanId(),p.loanNumber(),row.getDescription(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
         var v=header(a,f,client.client(),total(result),null);receipts.insert(a,v,f.getRequestKey(),f.getClientId(),client.clientNumber(),hash,result,f.getLoanPayer());ordinary.consumeNumber(a,Type.RECEIPT,f.getRequestKey());event(a,v);return find(a,v.id()).orElseThrow();
     }
     @Transactional
@@ -88,7 +89,7 @@ public class LoanReceiptService {
     private void validate(Form f){check(f!=null && "LOAN_REPAYMENT".equals(f.getReceiptPurpose()) && f.getActivityId()==null && f.getRequestKey()!=null,"","request");check(f.getClientId()!=null,"clientId","loanClient");check(f.getMoneyAccountId()!=null,"moneyAccountId","moneyAccount");check(f.getEffectiveDate()!=null && !f.getEffectiveDate().isAfter(clock.today()),"effectiveDate","date");text(f.getReference(),80,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");if(f.getLoanPayer()!=null)text(f.getLoanPayer(),160,false,"loanPayer");check(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");var ids=new HashSet<UUID>();
         for(int n=0;n<f.getRows().size();n++){var r=f.getRows().get(n);String field="rows["+n+"]";check(r!=null && r.getLoanId()!=null && ids.add(r.getLoanId()),field+".loanId","loanRow");check(r.getTransactionId()==null && r.getDebitAccountId()==null && r.getCreditAccountId()==null,"","request");text(r.getDescription(),500,true,field+".description");var v=r.getAmount();check(v!=null && v.signum()>0 && v.scale()<=2 && v.precision()-v.scale()<=16,field+".amount","amount");}
     }
-    private void requirePayer(AppUserPrincipal a,Form f){if("ORGANIZATION".equals(loans.receiptClient(a,f.getClientId()).purpose()))text(f.getLoanPayer(),160,true,"loanPayer");}
+    private void requirePayer(AppUserPrincipal a,Form f){String kind=loans.receiptClient(a,f.getClientId()).purpose();if("ORGANIZATION".equals(kind)||"JOINT_GROUP".equals(kind))text(f.getLoanPayer(),160,true,"loanPayer");}
     private static void text(String s,int max,boolean required,String field){check(s!=null && s.length()<=max && (!required || !s.isBlank()) && s.chars().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t'),field,"text");}
     private static void check(boolean value,String field,String key){if(!value)throw new Invalid(field,key);}
     private String hash(Object source){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsString(source).getBytes(StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}}
