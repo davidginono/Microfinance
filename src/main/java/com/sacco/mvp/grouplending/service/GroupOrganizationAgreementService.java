@@ -30,7 +30,7 @@ public class GroupOrganizationAgreementService {
     private static final java.security.SecureRandom RANDOM=new java.security.SecureRandom();
     private static final Set<String> CLOSED=Set.of("WITHDRAWN","DISBURSED","PAR","DEFAULTED","WRITTEN_OFF","PAID","DISBURSEMENT_REVERSED",
         "MANAGER_REJECTED","LOAN_OFFICER_REJECTED","CHAIRPERSON_REJECTED","BOARD_REJECTED","CREDIT_COMMITTEE_REJECTED","ACCOUNTANT_REJECTED","REJECTED");
-    private Member authorize(AppUserPrincipal a,boolean write){
+    Member authorize(AppUserPrincipal a,boolean write){
         if(a==null || a.isStaffSession() || !a.isMemberAccess())throw new AccessDeniedException("Sign in as the named person");
         var current=members.find(a.getMemberId()).orElseThrow(()->new AccessDeniedException("Signatory unavailable"));
         if(current.getStatus()!=MemberStatus.ACTIVE || !current.isMemberAccess() || !Objects.equals(current.getSaccoId(),a.getSaccoId())
@@ -47,7 +47,7 @@ public class GroupOrganizationAgreementService {
         var schedule=schedule(snapshot);
         return new Packet(cycle,snapshot,row.hash(),row.state(),row.loanStatus(),row.signedCount(),row.signed(),row.signedAt(),open(row),signatureReady(person),
             otpSettings.requiresApprovalOtp(a.getMemberId(),a.getSaccoId(),a.getStationId()),schedule.stream().skip(page*25L).limit(25).toList(),page,schedule.size()>(page+1)*25,
-            snapshot.document()!=null&&documents.opened(a,cycle,snapshot.document().id(),row.hash()));
+            snapshot.document()!=null&&documents.opened(a,cycle,snapshot.document().id(),row.hash()),row.mayReceive());
     }
     static List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow> schedule(Snapshot snapshot){
         var f=snapshot.financial();check(f!=null && LoanAmortizationCalculator.VERSION.equals(f.calculationVersion()) && f.interestRate()!=null

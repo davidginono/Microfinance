@@ -26,9 +26,9 @@ public final class GroupOrganizationAgreementDtos {
     public record Snapshot(Organization organization,Authority authority,Loan loan,Finance financial,PaymentDetailsView payout,
         GroupOrganizationDocumentDtos.Document document) {}
     public record Row(UUID cycle,Snapshot snapshot,String hash,OffsetDateTime preparedAt,String state,String loanStatus,
-        int signedCount,boolean signed,OffsetDateTime signedAt,boolean currentAuthority) {}
+        int signedCount,boolean signed,OffsetDateTime signedAt,boolean currentAuthority,boolean mayReceive) {}
     public record Packet(UUID cycle,Snapshot snapshot,String hash,String state,String loanStatus,int signedCount,
         boolean signed,OffsetDateTime signedAt,boolean canSign,boolean signatureReady,boolean otpRequired,
-        List<ScheduleRow> schedule,int page,boolean hasNext,boolean documentOpened) {}
+        List<ScheduleRow> schedule,int page,boolean hasNext,boolean documentOpened,boolean mayReceive) {}
     public record ExportData(Row row,byte[] terms,List<GroupOrganizationDocumentDtos.Signature> signatures) {}
 }

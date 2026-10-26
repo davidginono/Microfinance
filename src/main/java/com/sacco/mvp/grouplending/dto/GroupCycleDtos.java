@@ -70,8 +70,9 @@ public final class GroupCycleDtos {
         private String reason="";
     }
     public record CycleSummary(UUID id,LocalDate date,String purpose,Model model,String state,OffsetDateTime submittedAt) {}
-    public record ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted,String state,Model model) {
-        public ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted,String state){this(id,group,submittedAt,accepted,state,Model.INDIVIDUAL);}
+    public record ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted,String state,Model model,boolean payoutOnly) {
+        public ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted,String state,Model model){this(id,group,submittedAt,accepted,state,model,false);}
+        public ClientCycle(UUID id,String group,OffsetDateTime submittedAt,boolean accepted,String state){this(id,group,submittedAt,accepted,state,Model.INDIVIDUAL,false);}
     }
     public record Participant(UUID id,UUID clientId,String clientNumber,String name,BigDecimal principal,
         BigDecimal monthlyPayment,BigDecimal guaranteeCapacity,UUID loanId,String loanNumber,String loanStatus,boolean consented) {}

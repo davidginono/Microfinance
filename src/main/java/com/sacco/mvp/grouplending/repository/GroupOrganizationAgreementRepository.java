@@ -19,9 +19,9 @@ public class GroupOrganizationAgreementRepository {
         select p.*,c.state,l.status loan_status,(select count(*) from lending_group_org_signature s where s.cycle_id=p.cycle_id) signed_count
         from lending_group_org_agreement p join lending_group_cycle c on c.id=p.cycle_id join loan_applications l on l.id=p.loan_id
         where p.loan_id=? and p.sacco_id=? and p.station_id=?
-        """,(r,n)->new Row(r.getObject("cycle_id",UUID.class),json.readValue(r.getString("snapshot"),Snapshot.class),r.getString("packet_hash"),r.getObject("prepared_at",OffsetDateTime.class),r.getString("state"),r.getString("loan_status"),r.getInt("signed_count"),false,null,false),loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
+        """,(r,n)->new Row(r.getObject("cycle_id",UUID.class),json.readValue(r.getString("snapshot"),Snapshot.class),r.getString("packet_hash"),r.getObject("prepared_at",OffsetDateTime.class),r.getString("state"),r.getString("loan_status"),r.getInt("signed_count"),false,null,false,false),loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public Row own(AppUserPrincipal a,UUID cycle,LocalDate date){return jdbc.query("""
-        select p.*,c.state,l.status loan_status,own.signed_at,
+        select p.*,c.state,l.status loan_status,own.signed_at,s.may_receive,
           (select count(*) from lending_group_org_signature s where s.cycle_id=p.cycle_id) signed_count,
           g.status='ACTIVE' and h.valid_from<=?::date and h.valid_through>=?::date
           and not exists(select 1 from lending_group_authority_revocation r where r.authority_id=h.id)
@@ -32,7 +32,7 @@ public class GroupOrganizationAgreementRepository {
         join lending_group_authority_signer s on s.authority_id=p.authority_id and s.client_id=? and s.may_sign
         left join lending_group_org_signature own on own.cycle_id=p.cycle_id and own.client_id=s.client_id
         where p.cycle_id=? and p.sacco_id=? and p.station_id=?
-        """,(r,n)->new Row(cycle,json.readValue(r.getString("snapshot"),Snapshot.class),r.getString("packet_hash"),r.getObject("prepared_at",OffsetDateTime.class),r.getString("state"),r.getString("loan_status"),r.getInt("signed_count"),r.getObject("signed_at")!=null,r.getObject("signed_at",OffsetDateTime.class),r.getBoolean("current_authority")),date,date,a.getMemberId(),cycle,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Organization agreement unavailable"));}
+        """,(r,n)->new Row(cycle,json.readValue(r.getString("snapshot"),Snapshot.class),r.getString("packet_hash"),r.getObject("prepared_at",OffsetDateTime.class),r.getString("state"),r.getString("loan_status"),r.getInt("signed_count"),r.getObject("signed_at")!=null,r.getObject("signed_at",OffsetDateTime.class),r.getBoolean("current_authority"),r.getBoolean("may_receive")),date,date,a.getMemberId(),cycle,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Organization agreement unavailable"));}
     public void lock(AppUserPrincipal a,UUID cycle){
         var rows=jdbc.queryForList("""
             select c.id from lending_group_cycle c join lending_group_org_agreement p on p.cycle_id=c.id

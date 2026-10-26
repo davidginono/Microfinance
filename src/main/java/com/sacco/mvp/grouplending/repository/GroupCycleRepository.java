@@ -152,18 +152,19 @@ public class GroupCycleRepository {
     public List<ClientCycle> clientCycles(AppUserPrincipal a,int page){return jdbc.query("""
         select * from (
          select c.id,g.name,c.submitted_at,c.state,c.model,
-          exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
+          exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted,false payout_only
          from lending_group_participant x join lending_group_cycle c on c.id=x.cycle_id join lending_group g on g.id=c.group_id
          where x.sacco_id=? and x.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED')
          union all
          select c.id,g.name,c.submitted_at,c.state,c.model,
-          exists(select 1 from lending_group_org_signature s where s.cycle_id=c.id and s.client_id=x.client_id) accepted
-         from lending_group_org_agreement p join lending_group_authority_signer x on x.authority_id=p.authority_id and x.may_sign
+          case when x.may_sign then exists(select 1 from lending_group_org_signature s where s.cycle_id=c.id and s.client_id=x.client_id)
+           else exists(select 1 from lending_group_org_payout q where q.cycle_id=c.id) end accepted,not x.may_sign payout_only
+         from lending_group_org_agreement p join lending_group_authority_signer x on x.authority_id=p.authority_id and (x.may_sign or x.may_receive)
          join lending_group_cycle c on c.id=p.cycle_id join lending_group g on g.id=c.group_id
          where p.sacco_id=? and p.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED')
         ) requests order by
         """+ResourceTableSort.order("client-group-loans",Map.of("group","name","date","submitted_at","accepted","accepted","state","state"),"id","submitted_at desc,id desc")+" limit 26 offset ?",
-        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted"),r.getString("state"),Model.valueOf(r.getString("model"))),a.getSaccoId(),a.getStationId(),a.getMemberId(),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
+        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted"),r.getString("state"),Model.valueOf(r.getString("model")),r.getBoolean("payout_only")),a.getSaccoId(),a.getStationId(),a.getMemberId(),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
     public boolean participant(AppUserPrincipal a,UUID cycle){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_participant where cycle_id=? and sacco_id=? and station_id=? and client_id=?)",Boolean.class,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
     public List<Guarantee> guarantees(AppUserPrincipal a,UUID cycle){return jdbc.query("""
         select g.*,m.full_name guarantor,b.full_name borrower,coalesce(l.loan_id,l.application_number::text) loan_number
