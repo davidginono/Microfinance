@@ -31,7 +31,7 @@ class GroupCoverageMvcTest {
  MockMvc mvc;AppUserPrincipal staff,client;UUID id=UUID.randomUUID(),cycle=UUID.randomUUID();
  @BeforeEach void setup(){reset(service,pdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();staff=actor(true);client=actor(false);}
  AppUserPrincipal actor(boolean staff){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(staff?Position.ACCOUNTANT:Position.MEMBER).memberAccount(!staff).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),staff);}
- Detail detail(boolean staff){var date=LocalDate.of(2026,10,27);var amount=new BigDecimal("100.00");return new Detail(new Case(id,cycle,UUID.randomUUID(),UUID.randomUUID(),"PERSONAL",client.getMemberId(),"CLIENT-1","Named <Person>","Organization <Borrower>","LN-1",UUID.randomUUID(),date,date.plusDays(30),date.minusDays(15),amount,amount,amount,amount,amount,BigDecimal.ZERO,"CALLED",3,"Accepted terms","BOTH","HASH",1,date.atStartOfDay().atOffset(ZoneOffset.UTC)),new Page<>(List.of(),0,false),new Page<>(List.of(),0,false),staff);}
+ Detail detail(boolean staff){var date=LocalDate.of(2026,10,27);var amount=new BigDecimal("100.00");return new Detail(new Case(id,cycle,UUID.randomUUID(),UUID.randomUUID(),"PERSONAL",client.getMemberId(),"CLIENT-1","Named <Person>","Organization <Borrower>","LN-1",UUID.randomUUID(),date,date.plusDays(30),date.minusDays(15),amount,amount,amount,amount,amount,BigDecimal.ZERO,"CALLED",3,"Accepted terms","BOTH","HASH",1,date.atStartOfDay().atOffset(ZoneOffset.UTC)),new Page<>(List.of(),0,false),new Page<>(List.of(),0,false),staff,new Policy(UUID.randomUUID(),1,14,30,7,"Policy",true),new NoticeFacts(date,date,"","","notice.pdf"),date);}
  String staffPath(){return "/finance/groups/coverage/"+id;}String ownPath(){return "/app/group-coverage/"+id;}
  @Test void allCoverageMutationsRequireCsrf()throws Exception{
   for(String path:List.of("/finance/groups/coverage?cycle="+cycle,"/finance/groups/coverage/policy?cycle="+cycle,staffPath()+"/close",staffPath()+"/link",staffPath()+"/correct",ownPath()+"/respond"))mvc.perform(post(path).with(user(path.startsWith("/app")?client:staff))).andExpect(status().isForbidden());verifyNoInteractions(service);
@@ -41,15 +41,15 @@ class GroupCoverageMvcTest {
   verify(service).link(eq(staff),eq(id),argThat(x->x.getPostingId().equals(posting)&&x.getContributionId().equals(contribution)&&x.getRequestKey().equals(key)&&x.isPayerVerified()));
  }
  @Test void ownResponseRetainsTextKeyAndOriginalSequenceAfterFailure()throws Exception{
-  when(service.detail(client,id,0,0,true)).thenReturn(detail(false));when(service.actions(client,true)).thenReturn(Set.of("RESPOND"));when(service.respond(eq(client),eq(id),any())).thenThrow(new IllegalArgumentException("coverage.error.promise"));UUID key=UUID.randomUUID();
-  var result=mvc.perform(post(ownPath()+"/respond").with(user(client)).with(csrf()).param("requestKey",key.toString()).param("expectedSequence","2").param("kind","PROMISED").param("amount","12.34").param("promiseOn","2026-11-02").param("reason","Keep my explanation <safe>").param("confirmed","true")).andExpect(view().name("groups/coverage-detail")).andExpect(model().attributeHasErrors("coverageResponse")).andReturn();
-  var form=(ResponseForm)result.getModelAndView().getModel().get("coverageResponse");assertThat(form.getRequestKey()).isEqualTo(key);assertThat(form.getExpectedSequence()).isEqualTo(2);assertThat(form.getReason()).isEqualTo("Keep my explanation <safe>");assertThat(form.getAmount()).isEqualByComparingTo("12.34");
+  when(service.caseContext(client,id,true,"RESPOND")).thenReturn(new CaseContext(detail(false).header(),detail(false).policy(),detail(false).notice(),detail(false).today()));when(service.actions(client,true)).thenReturn(Set.of("RESPOND"));when(service.respond(eq(client),eq(id),any())).thenThrow(new IllegalArgumentException("coverage.error.promise"));UUID key=UUID.randomUUID();
+  var result=mvc.perform(post(ownPath()+"/respond").with(user(client)).with(csrf()).param("requestKey",key.toString()).param("expectedSequence","2").param("kind","PROMISED").param("amount","12.34").param("promiseOn","2026-11-02").param("reason","Keep my explanation <safe>").param("confirmed","true")).andExpect(view().name("groups/coverage-form")).andExpect(model().attributeHasErrors("coverageResponseForm")).andReturn();
+  var form=(ResponseForm)result.getModelAndView().getModel().get("coverageResponseForm");assertThat(form.getRequestKey()).isEqualTo(key);assertThat(form.getExpectedSequence()).isEqualTo(2);assertThat(form.getReason()).isEqualTo("Keep my explanation <safe>");assertThat(form.getAmount()).isEqualByComparingTo("12.34");
  }
  @Test void staffCannotSubmitPromiseFieldsThroughClosureBinder()throws Exception{
   mvc.perform(post(staffPath()+"/close").with(user(staff)).with(csrf()).param("kind","CLOSED").param("expectedSequence","3").param("reason","Close supported case").param("amount","1.00").param("promiseOn","2027-01-01").param("confirmed","true")).andExpect(redirectedUrl(staffPath()));verify(service).close(eq(staff),eq(id),argThat(x->x.getAmount()==null&&x.getPromiseOn()==null&&x.getKind().equals("CLOSED")));
  }
  @Test void ownershipDenialAndScopedDocumentsUseDistinctServiceModes()throws Exception{
-  when(service.detail(client,id,0,0,true)).thenThrow(new AccessDeniedException("Unavailable"));mvc.perform(get(ownPath()).with(user(client))).andExpect(status().isForbidden());
+  when(service.detail(client,id,0,0,"newest","newest",true)).thenThrow(new AccessDeniedException("Unavailable"));mvc.perform(get(ownPath()).with(user(client))).andExpect(status().isForbidden());
   var own=detail(false);when(service.document(client,id,true)).thenReturn(own);when(pdf.render(eq(own),any())).thenReturn("%PDF-test".getBytes());mvc.perform(get(ownPath()+"/pdf").with(user(client))).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(content().contentType("application/pdf"));verify(service).document(client,id,true);
   when(service.notice(staff,id,false)).thenReturn("%PDF-notice".getBytes());mvc.perform(get(staffPath()+"/notice").with(user(staff))).andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options","nosniff"));verify(service).notice(staff,id,false);
  }
@@ -63,8 +63,8 @@ class GroupCoverageMvcTest {
  @Configuration @EnableWebMvc static class Config {
   @Bean GroupCoverageService coverage(){return mock(GroupCoverageService.class);}
   @Bean GroupCoveragePdf pdf(){return mock(GroupCoveragePdf.class);}
-  @Bean GroupCoverageController staff(GroupCoverageService s){return new GroupCoverageController(s);}
-  @Bean GroupCoverageClientController client(GroupCoverageService s){return new GroupCoverageClientController(s);}
+  @Bean GroupCoverageLegacyController staff(GroupCoverageService s){return new GroupCoverageLegacyController(s);}
+  @Bean GroupCoverageController client(GroupCoverageService s){return new GroupCoverageController(s);}
   @Bean GroupCoverageDocumentController document(GroupCoverageService s,GroupCoveragePdf p){return new GroupCoverageDocumentController(s,p);}
  }
 }

@@ -425,7 +425,8 @@
             }
             // Explicit server sort values; never infer ordering from translated labels.
             if (header.dataset.tableSortAsc || header.dataset.tableSortDesc) {
-                const sort = filters?.querySelector('[name=sort]');
+                const sortName = filters?.dataset.tableSortParam || 'sort';
+                const sort = filters instanceof HTMLFormElement ? filters.elements.namedItem(sortName) : null;
                 if (sort && filters instanceof HTMLFormElement) {
                     const asc = header.dataset.tableSortAsc, desc = header.dataset.tableSortDesc;
                     const direction = filters.querySelector('[name=direction]');
@@ -434,7 +435,7 @@
                     header.setAttribute('aria-sort', active ? ascending ? 'ascending' : 'descending' : 'none');
                     const url = new URL(filters.action || location.href, location.href);
                     new FormData(filters).forEach((value,key) => { if (typeof value === 'string') url.searchParams.set(key,value); });
-                    url.searchParams.set('sort', direction ? header.dataset.tableSortKey : ascending ? desc || asc : asc || desc);
+                    url.searchParams.set(sortName, direction ? header.dataset.tableSortKey : ascending ? desc || asc : asc || desc);
                     if (direction) url.searchParams.set('direction', ascending ? 'desc' : 'asc');
                     url.searchParams.set(pageParam,'0');
                     if (!link) {link = node('a');link.dataset.tableSort = '';link.append(...header.childNodes);header.append(link);}

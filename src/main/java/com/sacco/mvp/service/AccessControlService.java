@@ -137,6 +137,7 @@ public class AccessControlService {
             && principal.isMemberAccess()
             && !principal.isStaffSession()
             && hasAny(principal,
+                UserClaim.GROUP_COVERAGE_OWN_VIEW,
                 UserClaim.MEMBER_SETTINGS_VIEW,
                 UserClaim.MEMBER_SETTINGS_UPDATE,
                 UserClaim.PAYMENT_DETAILS_VIEW,
