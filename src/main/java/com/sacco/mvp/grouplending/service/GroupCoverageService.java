@@ -38,6 +38,30 @@ public class GroupCoverageService {
     private void staff(AppUserPrincipal a,String action){access.requireActor(a,"GROUP_LENDING_VIEW");access.requireActor(a,"LOAN_RECORDING_VIEW");access.requireActor(a,"GROUP_COVERAGE_VIEW");if(action!=null)access.requireActor(a,"GROUP_COVERAGE_"+action);}
     private void own(AppUserPrincipal a,UserClaim... claims){if(a==null||a.isStaffSession())throw new AccessDeniedException("Named person session required");clients.authorize(a,UserClaim.GROUP_COVERAGE_OWN_VIEW);clients.authorize(a,claims);}
     private void view(AppUserPrincipal a,boolean own){if(own)own(a);else staff(a,null);}
+    public Set<String> actions(AppUserPrincipal a,boolean own){
+        view(a,own);var result=new HashSet<String>();
+        for(var action:own?List.of("RESPOND","EXPORT"):List.of("CREATE","UPDATE","CONFIGURE","LINK","REVERSE","EXPORT"))try{
+            if(own)own(a,UserClaim.valueOf("GROUP_COVERAGE_OWN_"+action));else staff(a,action);
+            result.add(action);
+        }catch(AccessDeniedException ignored){}
+        return Set.copyOf(result);
+    }
+    @Transactional(readOnly=true) public Source sourceForCall(AppUserPrincipal a,UUID cycle,UUID source,String kind){staff(a,"CREATE");return cases.source(a,cycle,source,kind,clock.today(),false);}
+    @Transactional(readOnly=true) public Page<PaymentSource> paymentChoices(AppUserPrincipal a,UUID id,int page){
+        staff(a,"LINK");page(page);var c=cases.detail(a,id,clock.today(),false);return page(cases.paymentChoices(a,c,page),page);
+    }
+    @Transactional(readOnly=true) public PaymentSource selectedPayment(AppUserPrincipal a,UUID id,UUID posting,UUID contribution){
+        staff(a,"LINK");var c=cases.detail(a,id,clock.today(),false);var p=cases.paymentSource(a,c,posting,contribution);
+        check(p.payerId()==null||p.payerId().equals(c.client()),"payer");
+        check(!p.date().isBefore(c.callDate())&&!p.recordedAt().isBefore(c.recordedAt())&&!cases.linked(p),"payment");return p;
+    }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail document(AppUserPrincipal a,UUID id,boolean own){
+        view(a,own);if(own)own(a,UserClaim.GROUP_COVERAGE_OWN_EXPORT);else staff(a,"EXPORT");
+        var c=cases.detail(a,id,clock.today(),own);var events=cases.events(c,0,501);var payments=cases.payments(c,0,501);
+        check(events.size()<=500&&payments.size()<=500,"documentRange");
+        if(own)payments=payments.stream().map(p->new Payment(p.id(),p.posting(),p.receipt(),p.reference(),p.date(),p.payer(),p.amount(),p.principal(),p.interest(),p.charges(),p.net(),p.reversedBy(),p.correctedBy(),"",p.linkedAt())).toList();
+        return new Detail(c,new Page<>(events,0,false),new Page<>(payments,0,false),!own);
+    }
     @Transactional(readOnly=true) public Optional<Policy> policy(AppUserPrincipal a,UUID cycle){staff(a,null);return cases.policy(a,cases.product(a,cycle));}
     @Transactional public UUID configure(AppUserPrincipal a,UUID cycle,PolicyForm f){
         staff(a,"CONFIGURE");check(f!=null&&f.getRequestKey()!=null&&f.isVerified(),"policy");range(f.getNoticeDays(),14,365);range(f.getCaseDays(),1,365);range(f.getPromiseDays(),1,365);text(f.getReference());

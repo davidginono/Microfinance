@@ -69,5 +69,27 @@ class GroupCoveragePostgresTest {
     @Test void immutableCasesAndEventsAndFailedAuditPreserveHistoryAtomically(){
         UUID id=call();coverage.respond(p.s.signer,id,response("DISPUTED",0));for(var sql:List.of("delete from lending_group_coverage_case where id=?","update lending_group_coverage_case set requested=1 where id=?","delete from lending_group_coverage_event where case_id=?"))assertThatThrownBy(()->f.jdbc.update(sql,id)).isInstanceOf(DataAccessException.class);doThrow(new IllegalStateException("Synthetic audit failure")).when(f.context.getBean(AuditService.class)).logEvent(eq("GROUP_LENDING"),eq(id),eq("COVERAGE_CLOSED"),any(),any(),any(),any(),any(),any(),any(),any());assertThatThrownBy(()->coverage.close(f.actor,id,response("CLOSED",1))).hasMessage("Synthetic audit failure");assertThat(detail(id).events().rows()).hasSize(1);
     }
+    @Test void receiptDiscoveryExcludesLinkedReversedAndForeignSourcesAndExportRedactsVerification(){
+        UUID id=call(),payment=receipt("50.00");
+        assertThat(coverage.paymentChoices(f.actor,id,0).rows()).singleElement().satisfies(x->{assertThat(x.posting()).isEqualTo(payment);assertThat(x.contribution()).isNull();assertThat(x.amount()).isEqualByComparingTo("50.00");});
+        assertThat(coverage.selectedPayment(f.actor,id,payment,null).posting()).isEqualTo(payment);
+        assertThatThrownBy(()->coverage.paymentChoices(f.operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->coverage.paymentChoices(p.s.signer,id,0)).isInstanceOf(AccessDeniedException.class);
+        UUID link=coverage.link(f.actor,id,linkForm(payment));assertThat(coverage.paymentChoices(f.actor,id,0).rows()).isEmpty();
+        assertThat(coverage.document(f.actor,id,false).payments().rows().getFirst().evidence()).contains("verified identity");
+        assertThat(coverage.document(p.s.signer,id,true).payments().rows().getFirst().evidence()).isEmpty();
+        assertThatThrownBy(()->coverage.selectedPayment(f.actor,id,payment,null)).hasMessage("coverage.error.payment");
+        coverage.correct(f.operator("B1"),id,link,UUID.randomUUID(),"Synthetic wrong attribution");
+        assertThat(coverage.paymentChoices(f.actor,id,0).rows()).hasSize(1);
+        f.service.reverse(f.operator("B1"),payment,UUID.randomUUID(),day,"Synthetic independent receipt correction");
+        assertThat(coverage.paymentChoices(f.actor,id,0).rows()).isEmpty();
+        assertThatThrownBy(()->coverage.paymentChoices(f.actor,id,-1)).hasMessage("coverage.error.query");
+    }
+    @Test void documentIncludesHistoryBeyondScreenPageWithoutChangingCaseState(){
+        UUID id=call();for(int n=0;n<27;n++)coverage.respond(p.s.signer,id,response("ACKNOWLEDGED",n));
+        assertThat(detail(id).events().rows()).hasSize(25);assertThat(detail(id).events().hasNext()).isTrue();
+        var document=coverage.document(p.s.signer,id,true);assertThat(document.events().rows()).hasSize(27);assertThat(document.events().hasNext()).isFalse();assertThat(document.header().received()).isZero();
+        assertThatThrownBy(()->coverage.document(p.w.p.person(),id,true)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void coverageClaimsAreNeverDefaultRoleAssignments(){for(var role:Position.values())for(boolean client:List.of(false,true))assertThat(UserClaim.defaultClaims(List.of(role),client)).noneMatch(x->x.name().startsWith("GROUP_COVERAGE"));}
 }

@@ -49,15 +49,37 @@ public class GroupCoverageRepository {
  public Optional<UUID> eventRetry(Case c,UUID key,String hash,UUID actor){return jdbc.query("select id,payload_hash,actor_id from lending_group_coverage_event where case_id=? and request_key=?",(r,n)->{if(!hash.equals(r.getString(2))||!actor.equals(r.getObject(3,UUID.class)))throw new IllegalArgumentException("group.error.retry");return r.getObject(1,UUID.class);},c.id(),key).stream().findFirst();}
  public Policy frozenPolicy(Case c){return jdbc.queryForObject("select id,revision,notice_days,case_days,promise_days,reference,enabled from lending_group_coverage_policy where id=?",(r,n)->new Policy(r.getObject(1,UUID.class),r.getInt(2),r.getInt(3),r.getInt(4),r.getInt(5),r.getString(6),r.getBoolean(7)),c.policy());}
  public UUID event(AppUserPrincipal a,Case c,ResponseForm f,String hash,OffsetDateTime at){UUID id=UUID.randomUUID();jdbc.update("insert into lending_group_coverage_event(id,case_id,sequence,kind,amount,promise_on,reason,request_key,payload_hash,actor_id,recorded_at) values(?,?,?,?,?,?,?,?,?,?,?)",id,c.id(),c.sequence()+1,f.getKind(),f.getAmount(),f.getPromiseOn(),f.getReason().strip(),f.getRequestKey(),hash,a.getMemberId(),at);return id;}
- public List<Event> events(Case c,int page){return jdbc.query("select id,sequence,kind,amount,promise_on,reason,recorded_at from lending_group_coverage_event where case_id=? order by sequence desc limit 26 offset ?",(r,n)->new Event(r.getObject(1,UUID.class),r.getInt(2),r.getString(3),r.getBigDecimal(4),r.getObject(5,LocalDate.class),r.getString(6),r.getObject(7,OffsetDateTime.class)),c.id(),page*25);}
+ public List<Event> events(Case c,int page){return events(c,page,26);}
+ public List<Event> events(Case c,int page,int limit){return jdbc.query("select id,sequence,kind,amount,promise_on,reason,recorded_at from lending_group_coverage_event where case_id=? order by sequence desc limit ? offset ?",(r,n)->new Event(r.getObject(1,UUID.class),r.getInt(2),r.getString(3),r.getBigDecimal(4),r.getObject(5,LocalDate.class),r.getString(6),r.getObject(7,OffsetDateTime.class)),c.id(),limit,page*25);}
  public byte[] notice(Case c){return jdbc.queryForObject("select notice_pdf from lending_group_coverage_case where id=?",byte[].class,c.id());}
- public List<Payment> payments(Case c,int page){return jdbc.query("""
+ public List<Payment> payments(Case c,int page){return payments(c,page,26);}
+ public List<Payment> payments(Case c,int page,int limit){return jdbc.query("""
  select x.*,coalesce(r.id,g.id,p.id) receipt,coalesce(r.number,g.number,p.reference) number
  from lending_group_coverage_cash x join accountant_loan_post p on p.id=x.posting_id
  left join accountant_loan_receipt_row rr on rr.posting_id=p.id left join accountant_loan_receipt r on r.id=rr.receipt_id
  left join lending_group_receipt_loan gr on gr.posting_id=p.id left join lending_group_receipt g on g.id=gr.receipt_id
- where x.case_id=? order by x.recorded_at desc,x.id desc limit 26 offset ?
- """,(r,n)->new Payment(r.getObject("id",UUID.class),r.getObject("posting_id",UUID.class),r.getObject("receipt",UUID.class),r.getString("number"),r.getObject("effective_date",LocalDate.class),r.getString("payer_text"),r.getBigDecimal("amount"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("net_amount"),r.getObject("reversed_by",UUID.class),r.getObject("corrected_by",UUID.class),r.getString("evidence"),r.getObject("recorded_at",OffsetDateTime.class)),c.id(),page*25);}
+ where x.case_id=? order by x.recorded_at desc,x.id desc limit ? offset ?
+ """,(r,n)->new Payment(r.getObject("id",UUID.class),r.getObject("posting_id",UUID.class),r.getObject("receipt",UUID.class),r.getString("number"),r.getObject("effective_date",LocalDate.class),r.getString("payer_text"),r.getBigDecimal("amount"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("net_amount"),r.getObject("reversed_by",UUID.class),r.getObject("corrected_by",UUID.class),r.getString("evidence"),r.getObject("recorded_at",OffsetDateTime.class)),c.id(),limit,page*25);}
+ public List<PaymentSource> paymentChoices(AppUserPrincipal a,Case c,int page){return jdbc.query("""
+ select p.id posting,x.id contribution,coalesce(r.id,g.id,p.id) receipt,coalesce(r.number,g.number,p.reference) reference,
+ p.effective_date,p.recorded_at,x.payer_id,
+ case when x.id is not null then x.payer_number||' - '||x.payer_name else
+ coalesce(nullif(r.payer_name,''),(select min(payer) from lending_group_shared_movement where posting_id=p.id),p.notes,'') end payer,
+ case when x.id is not null then x.amount else p.amount end amount,
+ case when x.id is not null then x.principal else p.principal_amount end principal,
+ case when x.id is not null then x.interest else p.interest_amount end interest,
+ case when x.id is not null then x.charges else p.charge_amount end charges
+ from accountant_loan_post p
+ left join accountant_loan_receipt_row rr on rr.posting_id=p.id left join accountant_loan_receipt r on r.id=rr.receipt_id
+ left join lending_group_receipt_loan gr on gr.posting_id=p.id left join lending_group_receipt g on g.id=gr.receipt_id
+ left join lending_group_contribution x on x.receipt_id=g.id and x.loan_id=p.loan_id and x.payer_id=?
+ where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='PAYMENT' and p.state='POSTED'
+ and p.effective_date>=? and p.recorded_at>=? and (g.id is null or x.id is not null)
+ and not exists(select 1 from accountant_loan_post where reverses_id=p.id)
+ and not exists(select 1 from lending_group_coverage_payment z where z.posting_id=p.id and z.contribution_id is not distinct from x.id
+ and not exists(select 1 from lending_group_coverage_payment_correction where payment_id=z.id))
+ order by p.recorded_at desc,p.id desc,x.id limit 26 offset ?
+ """,(r,n)->new PaymentSource(r.getObject("posting",UUID.class),r.getObject("contribution",UUID.class),r.getObject("receipt",UUID.class),r.getString("reference"),r.getObject("effective_date",LocalDate.class),r.getString("payer"),r.getObject("payer_id",UUID.class),r.getBigDecimal("amount"),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getObject("recorded_at",OffsetDateTime.class)),c.client(),c.loan(),a.getSaccoId(),a.getStationId(),c.callDate(),c.recordedAt(),page*25);}
  public PaymentSource paymentSource(AppUserPrincipal a,Case c,UUID posting,UUID contribution){return jdbc.query("""
  select p.*,x.id contribution,x.payer_id,x.payer_number||' - '||x.payer_name contribution_payer,x.amount contribution_amount,x.principal contribution_principal,x.interest contribution_interest,x.charges contribution_charges,
  g.id group_receipt,coalesce(r.id,g.id,p.id) receipt,coalesce(r.number,g.number,p.reference) number,
