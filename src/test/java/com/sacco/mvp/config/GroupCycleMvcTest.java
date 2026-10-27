@@ -33,6 +33,20 @@ class GroupCycleMvcTest {
         actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
         when(groups.detail(actor,group)).thenReturn(new Group(group,"GRP-1","Synthetic group","INFORMAL","Evidence","ACTIVE",0,2));
         when(cycles.policies(actor,0)).thenReturn(new Page<>(List.of(),0,false));when(cycles.memberLabels(eq(actor),eq(group),any())).thenReturn(Map.of(client,"C31 · Synthetic participant"));}
+    @Test void policyAndParticipantDisclosuresUseAllowedFields()throws Exception{
+        mvc.perform(post("/finance/groups/product-rules").with(user(actor)).with(csrf()).param("releaseRules.annualCostRequired","true").param("releaseRules.approved","true").param("releaseRules.maximumAnnualCostPercent","39.123456").param("releaseRules.methodologyReference","Approved method").param("releaseRules.agreementLanguage","BOTH").param("saccoId","FOREIGN"))
+            .andExpect(status().is3xxRedirection());verify(cycles).configure(eq(actor),argThat(f->f.getReleaseRules().isApproved()&&f.getReleaseRules().isAnnualCostRequired()&&f.getReleaseRules().getMaximumAnnualCostPercent().toPlainString().equals("39.123456")));
+        when(cycles.create(eq(actor),eq(group),any())).thenReturn(cycle);
+        mvc.perform(post("/finance/groups/"+group+"/cycles").with(user(actor)).with(csrf()).param("participants[0].disclosure.annualCostPercent","27.123456").param("participants[0].disclosure.costEvidence","Checked method").param("participants[0].disclosure.costVerified","true").param("participants[0].disclosure.policyId",UUID.randomUUID().toString()))
+            .andExpect(status().is3xxRedirection());verify(cycles).create(eq(actor),eq(group),argThat(f->f.getParticipants().getFirst().getDisclosure().isCostVerified()&&f.getParticipants().getFirst().getDisclosure().getAnnualCostPercent().toPlainString().equals("27.123456")));
+    }
+    @Test void contractLanguageIsRetainedAfterAValidationFailure()throws Exception{
+        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        when(consents.accept(principal,cycle,true,"","SW")).thenReturn("group.error.disclosureLanguage");
+        mvc.perform(post("/app/group-loans/"+cycle+"/accept").with(user(principal)).with(csrf()).param("accepted","true").param("preferredLanguage","SW"))
+            .andExpect(status().is3xxRedirection()).andExpect(flash().attribute("preferredLanguage","SW")).andExpect(flash().attribute("consentError","group.error.disclosureLanguage"));
+        verify(consents).accept(principal,cycle,true,"","SW");
+    }
     @Test void cycleCreationRequiresCsrfAndCannotBindScopeOrLoanIdentity()throws Exception{
         String path="/finance/groups/"+group+"/cycles";mvc.perform(post(path).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(cycles);
         when(cycles.create(eq(actor),eq(group),any())).thenReturn(cycle);
@@ -56,6 +70,7 @@ class GroupCycleMvcTest {
         mvc.perform(post(path).with(user(actor)).param("action","previewShared")).andExpect(status().isForbidden());verifyNoInteractions(cycles);
         var f=new CycleForm();var policy=UUID.randomUUID();f.setPolicyId(policy);
         when(cycles.detail(actor,cycle)).thenReturn(new Cycle(cycle,group,"Synthetic group",policy,UUID.randomUUID(),com.sacco.mvp.grouplending.dto.GroupCycleDtos.Model.SHARED,"DRAFT",0,f,null));
+        when(cycles.policy(actor,policy)).thenReturn(new Policy(policy,UUID.randomUUID(),"Synthetic product",com.sacco.mvp.grouplending.dto.GroupCycleDtos.Model.SHARED,2,5,java.math.BigDecimal.TEN,java.math.BigDecimal.TEN,1,false,true,"Policy","Agreement",java.time.OffsetDateTime.now(),1));
         mvc.perform(post(path).with(user(actor)).with(csrf()).param("action","previewShared").param("policyId",policy.toString()).param("purpose","Retained shared purpose")
             .param("participants[0].clientId",client.toString()).param("participants[0].principal","123.45").param("stationId","FOREIGN"))
             .andExpect(status().isOk()).andExpect(view().name("groups/cycle-form"));

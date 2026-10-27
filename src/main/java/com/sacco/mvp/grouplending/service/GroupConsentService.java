@@ -28,7 +28,8 @@ public class GroupConsentService {
     private final PasswordEncoder passwords;
     private final org.springframework.core.env.Environment configuration;
     private static final java.security.SecureRandom RANDOM=new java.security.SecureRandom();
-    public record Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination,SharedObligation shared) {
+    public record Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination,SharedObligation shared,String preferredLanguage) {
+        public Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination,SharedObligation shared){this(id,group,policy,borrower,terms,guarantees,accepted,otpRequired,signatureReady,termination,shared,null);}
         public Packet(UUID id,String group,Policy policy,Participant borrower,Terms terms,List<Guarantee> guarantees,boolean accepted,boolean otpRequired,boolean signatureReady,TerminationNotice termination){this(id,group,policy,borrower,terms,guarantees,accepted,otpRequired,signatureReady,termination,null);}
     }
     Member authorize(AppUserPrincipal actor,UserClaim... required){
@@ -53,7 +54,8 @@ public class GroupConsentService {
         if(!cycles.participant(a,id))throw new AccessDeniedException("Group agreement unavailable");var c=cycles.cycle(a,id,false);
         if(!Set.of("SUBMITTED","CANCELLED").contains(c.state()))throw new AccessDeniedException("Group agreement unavailable");
         var own=cycles.participants(a,id).stream().filter(p->p.clientId().equals(a.getMemberId())).findFirst().orElseThrow();
-        return new Packet(id,c.groupName(),cycles.policy(a,c.policyId()),own,cycles.ownTerms(a,id),cycles.guarantees(a,id),cycles.consented(a,id),otpSettings.requiresApprovalOtp(a.getMemberId(),a.getSaccoId(),a.getStationId()),signatureReady(current),cycles.termination(a,id).map(t->new TerminationNotice(t.kind(),t.recordedAt())).orElse(null),c.model()==Model.SHARED?cycles.sharedObligation(a,id).orElseThrow():null);
+        var evidence=cycles.acceptance(a,id);
+        return new Packet(id,c.groupName(),cycles.policy(a,c.policyId()),own,cycles.ownTerms(a,id),cycles.guarantees(a,id),evidence.isPresent(),otpSettings.requiresApprovalOtp(a.getMemberId(),a.getSaccoId(),a.getStationId()),signatureReady(current),cycles.termination(a,id).map(t->new TerminationNotice(t.kind(),t.recordedAt())).orElse(null),c.model()==Model.SHARED?cycles.sharedObligation(a,id).orElseThrow():null,evidence.map(com.sacco.mvp.grouplending.dto.GroupConsentDtos.Acceptance::preferredLanguage).orElse(null));
     }
     private Member signer(AppUserPrincipal a,UUID id){var current=authorize(a,UserClaim.MEMBER_LOANS_VIEW,UserClaim.MEMBER_LOANS_UPDATE);if(cycles.cycle(a,id,false).model()!=Model.SHARED)authorize(a,UserClaim.GUARANTOR_REQUESTS_APPROVE);return current;}
     /** Returns a validation key without rolling back failed-code attempt accounting. */

@@ -219,6 +219,7 @@ public class GroupCycleRepository {
     public void challengeAttempt(UUID id){jdbc.update("update lending_group_consent_challenge set attempts=attempts+1 where id=? and attempts<5 and consumed_at is null",id);}
     public void challengeConsumed(UUID id,OffsetDateTime now){jdbc.update("update lending_group_consent_challenge set consumed_at=? where id=? and consumed_at is null",now,id);}
     public boolean consented(AppUserPrincipal a,UUID cycle){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_consent_evidence where cycle_id=? and sacco_id=? and station_id=? and client_id=?)",Boolean.class,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
+    public Optional<com.sacco.mvp.grouplending.dto.GroupConsentDtos.Acceptance> acceptance(AppUserPrincipal a,UUID cycle){return jdbc.query("select preferred_language from lending_group_consent_evidence where cycle_id=? and sacco_id=? and station_id=? and client_id=?",(r,n)->new com.sacco.mvp.grouplending.dto.GroupConsentDtos.Acceptance(r.getString(1)),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst();}
     public Terms ownTerms(AppUserPrincipal a,UUID cycle){return jdbc.query("""
         select l.amount,(l.financial_snapshot->>'interestRate')::numeric rate,(l.financial_snapshot->>'interestAmount')::numeric interest,
         l.installment_amount,l.repayment_frequency,l.financial_snapshot->>'tenureUnit' tenure_unit,(l.financial_snapshot->>'tenureValue')::integer tenure_value,

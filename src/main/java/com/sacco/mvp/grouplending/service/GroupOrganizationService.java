@@ -40,7 +40,8 @@ public class GroupOrganizationService {
         authorize(a,"VIEW");var c=cycles.cycle(a,id,false);check(c.model()==Model.ORGANIZATION,"request");var f=submitted==null?c.form():submitted;
         if(submitted==null){f.setExpectedVersion(c.version());if(f.getOrganization()==null){f.setOrganization(new OrganizationForm());f.setParticipants(new ArrayList<>());f.getOrganization().setAuthorityId(authorities.latest(a,c.groupId()).orElse(null));}}
         var org=f.getOrganization();var authority=org==null || org.getAuthorityId()==null?null:authorities.authority(a,c.groupId(),org.getAuthorityId(),clock.today());
-        return new Workspace(c,cycles.policy(a,c.policyId()),authority,organizations.loan(a,id).orElse(null),f,organizations.enabled(a,c.policyId()),documents.latest(a,id).orElse(null));
+        var policy=cycles.policy(a,c.policyId());if(policy.releaseRules()!=null&&f.getDisclosure()==null&&"DRAFT".equals(c.state()))f.setDisclosure(new com.sacco.mvp.grouplending.dto.GroupDisclosureDtos.Declaration());
+        return new Workspace(c,policy,authority,organizations.loan(a,id).orElse(null),f,organizations.enabled(a,c.policyId()),documents.latest(a,id).orElse(null));
     }
     @Transactional public void save(AppUserPrincipal a,UUID id,CycleForm f){
         authorize(a,"UPDATE");draft(f);var c=cycles.cycle(a,id,true);check(c.model()==Model.ORGANIZATION && "DRAFT".equals(c.state()) && c.policyId().equals(f.getPolicyId()),"changed");

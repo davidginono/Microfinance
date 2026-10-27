@@ -1,0 +1,7 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:if test="${not empty groupDisclosure}"><section class="erp-resource-section"><h2><spring:message code="groupDisclosure.title" /></h2><dl class="erp-detail-facts">
+<div><dt><spring:message code="authority.revision" /></dt><dd><c:out value="${groupDisclosure.revision}" /></dd></div><div><dt><spring:message code="groupDisclosure.methodology" /></dt><dd><c:out value="${groupDisclosure.rules.methodologyReference}" /></dd></div>
+<c:if test="${not empty groupDisclosure.annualCostPercent}"><div><dt><spring:message code="groupDisclosure.annualCost" /></dt><dd><fmt:formatNumber value="${groupDisclosure.annualCostPercent}" maxFractionDigits="6" />%</dd></div><div><dt><spring:message code="groupDisclosure.costEvidence" /></dt><dd><c:out value="${groupDisclosure.costEvidence}" /></dd></div></c:if>
+<c:if test="${not empty groupDisclosure.datedFeesEvidence}"><div><dt><spring:message code="groupDisclosure.feeEvidence" /></dt><dd><c:out value="${groupDisclosure.datedFeesEvidence}" /></dd></div></c:if>
+<div><dt><spring:message code="groupDisclosure.allowedLanguages" /></dt><dd><spring:message code="orgDocument.language.${groupDisclosure.rules.agreementLanguage}" /></dd></div>
+</dl></section></c:if>

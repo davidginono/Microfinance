@@ -32,6 +32,9 @@ class GroupDisclosurePostgresTest {
         var packet=g.consents.packet(g.client(g.f.client),id);var snap=packet.terms().groupDisclosure();assertThat(snap.policyId()).isEqualTo(g.policy);assertThat(snap.annualCostPercent()).isEqualByComparingTo("26.1234");
         assertThat(g.f.jdbc.queryForObject("select lending_group_disclosure_valid(?,?::jsonb)",Boolean.class,g.policy,g.f.context.getBean(tools.jackson.databind.ObjectMapper.class).writeValueAsString(snap))).isTrue();
         assertThat(g.f.jdbc.queryForObject("select lending_group_disclosure_valid(?,null)",Boolean.class,g.policy)).isFalse();
+        var facility=g.cycles.participants(g.f.actor,id).getFirst().loanId();
+        assertThatThrownBy(()->g.f.jdbc.update("update loan_applications set financial_snapshot=financial_snapshot-'groupDisclosure' where id=?",facility)).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(()->g.f.jdbc.update("update loan_applications set financial_snapshot=jsonb_set(financial_snapshot,'{groupDisclosure,annualCostPercent}','1'::jsonb) where id=?",facility)).isInstanceOf(DataAccessException.class);
         var revision=g.policy();revision.setModel(model);if(model==Model.SHARED)revision.setSharedLiability(SharedLiability.PROPORTIONAL);g.cycles.configure(g.f.actor,revision);
         assertThat(g.consents.packet(g.client(g.f.client),id).terms().groupDisclosure()).isEqualTo(snap);
         assertThatThrownBy(()->g.f.jdbc.update("update lending_group_policy set release_rules=null where id=?",g.policy)).isInstanceOf(DataAccessException.class);

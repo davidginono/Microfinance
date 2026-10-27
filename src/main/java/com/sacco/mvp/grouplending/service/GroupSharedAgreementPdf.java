@@ -30,7 +30,7 @@ public class GroupSharedAgreementPdf {
                 field(page,"group.sharedLiability",label("group.sharedLiability."+r.obligation().liability(),locale),locale);field(page,"group.sharedCap",n.format(r.obligation().cap()),locale);
                 field(page,"orgDocument.reference",d.reference(),locale);field(page,"orgDocument.address",d.institutionAddress(),locale);
                 field(page,"orgDocument.contact",d.contactPhone()+" / "+d.contactEmail(),locale);field(page,"orgDocument.complaints",d.complaintPhone()+" / "+d.complaintEmail()+" / "+d.complaintAddress(),locale);page.endTable();
-                page.section(label("group.sharedObligation",locale));page.text(label("group.sharedDisclosure."+r.obligation().liability(),locale));page.text(label("sharedAgreement.repaymentRule",locale));
+                GroupDisclosurePdf.render(page,t.groupDisclosure(),messages,locale);page.section(label("group.sharedObligation",locale));page.text(label("group.sharedDisclosure."+r.obligation().liability(),locale));page.text(label("sharedAgreement.repaymentRule",locale));
                 page.columns(List.of(label("orgDocument.field",locale),label("orgDocument.value",locale)),new float[]{.34f,.66f},new boolean[]{false,false});
                 field(page,"group.principal",n.format(r.obligation().allocation().principal()),locale);field(page,"group.contractualInterest",n.format(r.obligation().allocation().interest()),locale);
                 field(page,"group.chargeTotal",n.format(r.obligation().allocation().charges()),locale);field(page,"group.deductions",n.format(r.obligation().allocation().deductions()),locale);field(page,"group.shared.net",n.format(r.obligation().allocation().net()),locale);
@@ -41,6 +41,7 @@ public class GroupSharedAgreementPdf {
                 for(var due:data.schedule())page.row(List.of(Integer.toString(due.number()),com.sacco.mvp.service.ApplicationTimestamps.date(due.date()),n.format(due.principal()),n.format(due.interest())),false);page.endTable();
                 page.section(label("orgDocument.evidence",locale));page.text(label("orgDocument.packetHash",locale)+": "+r.hash());page.text(label("orgDocument.fileHash",locale)+": "+d.sha256());
                 if(r.confirmation()!=null)page.text(label("sharedAgreement.signed",locale)+": "+r.clientNumber()+" - "+r.clientName()+" / "+com.sacco.mvp.service.ApplicationTimestamps.format(r.confirmation().at())+" / "+label(r.confirmation().otpRequired()?"orgDocument.signatureOtp":"orgDocument.signature",locale));
+                if(r.confirmation()!=null&&r.confirmation().preferredLanguage()!=null)page.text(label("groupDisclosure.preferredLanguage",locale)+": "+label("orgDocument.language."+r.confirmation().preferredLanguage(),locale));
                 page.text(label("orgDocument.appended",locale));
             }
             new PDFMergerUtility().appendDocument(pdf,original);pdf.getDocumentInformation().setTitle(label("sharedAgreement.title",locale));pdf.save(out);return out.toByteArray();

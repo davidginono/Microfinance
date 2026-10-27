@@ -16,5 +16,11 @@
 <label><spring:message code="group.policyReference" /><form:input path="policyReference" maxlength="500" cssClass="aws-control" required="required" /></label>
 <label><spring:message code="group.agreement" /><form:input path="agreementReference" maxlength="500" cssClass="aws-control" required="required" /></label>
 <label><form:checkbox path="enabled" /><spring:message code="group.enabled" /></label>
-</div><p><spring:message code="group.policyPeople" /></p></section><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/groups/product-rules' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="group.saveRules" /></button></div></form:form></div>
+</div><p><spring:message code="group.policyPeople" /></p></section><section class="accounting-form accounting-create-card"><h2><spring:message code="groupDisclosure.rules" /></h2><div class="accounting-grid erp-panel-body">
+<c:forEach items="${['annualCostRequired','datedFeesRequired','languageChoiceRequired']}" var="field"><label><form:checkbox path="releaseRules.${field}" /><spring:message code="groupDisclosure.${field}" /></label></c:forEach>
+<label><spring:message code="groupDisclosure.methodology" /><form:input path="releaseRules.methodologyReference" maxlength="500" cssClass="aws-control" /></label>
+<label><spring:message code="groupDisclosure.maximum" /><form:input path="releaseRules.maximumAnnualCostPercent" type="number" min="0" max="100000" step="0.000001" cssClass="aws-control" /></label>
+<label><spring:message code="groupDisclosure.allowedLanguages" /><form:select path="releaseRules.agreementLanguage" cssClass="aws-control"><c:forEach items="${['SW','EN','BOTH']}" var="language"><form:option value="${language}"><spring:message code="orgDocument.language.${language}" /></form:option></c:forEach></form:select></label>
+<label><form:checkbox path="releaseRules.approved" /><spring:message code="groupDisclosure.approved" /></label>
+</div></section><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/groups/product-rules' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="group.saveRules" /></button></div></form:form></div>
 <script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../accounting/accounting-form-support.jspf" %><%@ include file="../fragments/footer.jspf" %>

@@ -8,7 +8,7 @@ import java.util.*;
 
 public final class GroupSharedAgreementDtos {
     private GroupSharedAgreementDtos() {}
-    public record Confirmation(OffsetDateTime at,boolean otpRequired) {}
+    public record Confirmation(OffsetDateTime at,boolean otpRequired,String preferredLanguage) {public Confirmation(OffsetDateTime at,boolean otpRequired){this(at,otpRequired,null);}}
     public record Row(UUID cycle,UUID loan,String number,String group,String clientName,String clientNumber,String hash,String state,String loanStatus,
         Document document,SharedObligation obligation,PaymentDetailsView destination,boolean consented,boolean opened,Confirmation confirmation) {
         public boolean ready(){return document!=null && consented && destination.available() && destination.destinationType()!=null
