@@ -34,6 +34,14 @@ class AppUserDetailsServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private MemberAccessClaimRepository memberAccessClaimRepository;
 
+    @Test void clientPasswordLoginCarriesExplicitOwnCoverageClaimsWithoutStaffClaims(){
+        var id=UUID.randomUUID();var member=Member.builder().id(id).saccoId("SACCO-01").stationId("AR704").memberNo("MEM001").fullName("Client").memberAccount(true).status(MemberStatus.ACTIVE).passwordHash("test-only").build();
+        when(memberRepository.findByMemberNo("MEM001")).thenReturn(Optional.of(member));when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
+        when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(new com.sacco.mvp.domain.MemberAccessClaim(new com.sacco.mvp.domain.MemberAccessClaimId(id,"GROUP_COVERAGE_OWN_VIEW")),new com.sacco.mvp.domain.MemberAccessClaim(new com.sacco.mvp.domain.MemberAccessClaimId(id,"GROUP_COVERAGE_LINK"))));
+        var service=new AppUserDetailsService(new com.sacco.mvp.service.MemberDirectoryService(memberRepository),new com.sacco.mvp.service.StationAccessService(saccoStationRepository),new UserClaimService(memberAccessClaimRepository,userSettingsRepository,new ObjectMapper()));
+        var principal=(AppUserPrincipal)service.loadMemberByMemberNo("MEM001");assertThat(principal.isStaffSession()).isFalse();assertThat(principal.getClaims()).contains("GROUP_COVERAGE_OWN_VIEW").doesNotContain("GROUP_COVERAGE_LINK");
+    }
+
     @Test
     void suspendedSaccoBlocksWorkspaceUserLogin() {
         Member member = Member.builder()

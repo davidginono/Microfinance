@@ -374,7 +374,7 @@ public class SecurityConfig {
                         ssoMember,
                         ssoStaffSession
                             ? userClaimService.effectiveClaims(ssoMember.getId(), ssoMember.getActiveStaffRolesResolved(), ssoMember.isMemberAccess())
-                            : userClaimService.defaultClaims(java.util.List.of(), true),
+                            : userClaimService.clientSessionClaims(ssoMember.getId()),
                         ssoStaffSession
                     );
 

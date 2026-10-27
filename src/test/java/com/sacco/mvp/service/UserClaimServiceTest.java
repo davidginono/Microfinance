@@ -33,6 +33,13 @@ class UserClaimServiceTest {
 
     private UserClaimService userClaimService;
 
+    @Test void clientSessionsUseOnlyExplicitOwnCoverageGrantsAndNeverStaffPrivileges(){
+        UUID id=UUID.randomUUID();when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(accessClaim(id,"GROUP_COVERAGE_OWN_VIEW"),accessClaim(id,"GROUP_COVERAGE_OWN_RESPOND"),accessClaim(id,"GROUP_COVERAGE_LINK"),accessClaim(id,"LOAN_RECORDING_POST")));
+        assertThat(userClaimService.clientSessionClaims(id)).contains(UserClaim.GROUP_COVERAGE_OWN_VIEW,UserClaim.GROUP_COVERAGE_OWN_RESPOND,UserClaim.MEMBER_LOANS_VIEW).doesNotContain(UserClaim.GROUP_COVERAGE_OWN_EXPORT,UserClaim.GROUP_COVERAGE_LINK,UserClaim.LOAN_RECORDING_POST);
+        when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(accessClaim(id,"MEMBER_LOANS_VIEW")));
+        assertThat(userClaimService.clientSessionClaims(id)).noneMatch(c->c.name().startsWith("GROUP_COVERAGE"));
+    }
+
     @Test
     void retiredStructuredAndLegacyJsonGrantsCannotRestoreRoleDefaults() {
         UUID member = UUID.randomUUID();

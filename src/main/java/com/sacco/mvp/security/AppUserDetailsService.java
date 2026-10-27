@@ -37,7 +37,7 @@ public class AppUserDetailsService implements UserDetailsService {
             member,
             staffSession
                 ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
-                : userClaimService.defaultClaims(List.of(), true),
+                : userClaimService.clientSessionClaims(member.getId()),
             staffSession
         );
     }
@@ -50,7 +50,7 @@ public class AppUserDetailsService implements UserDetailsService {
             .map(member -> ensureStationAllowed(member, false))
             .map(member -> new AppUserPrincipal(
                 member,
-                userClaimService.defaultClaims(List.of(), true),
+                userClaimService.clientSessionClaims(member.getId()),
                 false
             ))
             .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));

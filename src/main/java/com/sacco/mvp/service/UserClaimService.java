@@ -48,6 +48,15 @@ public class UserClaimService {
             .orElse(defaults);
     }
 
+    /** Keep existing client defaults while admitting only explicitly assigned own-coverage powers. */
+    public Set<UserClaim> clientSessionClaims(UUID memberId) {
+        var claims=EnumSet.copyOf(defaultClaims(List.of(),true));
+        effectiveClaims(memberId,List.of(),true).stream()
+            .filter(claim->claim.getFeature()==com.sacco.mvp.domain.AccessFeature.GROUP_COVERAGE_OWN)
+            .forEach(claims::add);
+        return Collections.unmodifiableSet(claims);
+    }
+
     /**
      * Batched form of {@link #effectiveClaims(UUID, Collection, boolean)}: resolves a whole
      * candidate set with two queries instead of two per member.

@@ -258,7 +258,7 @@ public class StaffMfaService {
             member,
             staffLogin
                 ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
-                : userClaimService.defaultClaims(java.util.List.of(), true),
+                : userClaimService.clientSessionClaims(member.getId()),
             staffLogin
         );
     }

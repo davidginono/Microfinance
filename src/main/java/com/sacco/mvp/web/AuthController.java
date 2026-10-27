@@ -470,7 +470,7 @@ public class AuthController {
         ensureSaccoAccessAllowed(member);
         AppUserPrincipal principal = new AppUserPrincipal(
             member,
-            userClaimService.defaultClaims(java.util.List.of(), true),
+            userClaimService.clientSessionClaims(member.getId()),
             false
         );
         signInPrincipal(principal, request);
