@@ -241,6 +241,8 @@ public class LoanRecordingService {
             .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,null));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
+        String clientKycError=loans.kycError(id,a.getSaccoId(),a.getStationId(),clock.today());
+        if(clientKycError!=null)throw new IllegalArgumentException(clientKycError);
         charges.freeze(a,id,chargePlan);
         if(borrowerParty!=null && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
         else routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);
@@ -277,6 +279,8 @@ public class LoanRecordingService {
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
         if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted())||Boolean.TRUE.equals(f.getSharedAccepted()),"organizationFundingPending");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
+        String kycError=loans.kycError(loan.getId(),a.getSaccoId(),a.getStationId(),clock.today());
+        if(kycError!=null)throw new IllegalArgumentException(kycError);
         String collateralError=loans.collateralError(loan.getId(),a.getSaccoId(),a.getStationId(),clock.today());
         if(collateralError!=null)throw new IllegalArgumentException(collateralError);
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
@@ -524,6 +528,8 @@ public class LoanRecordingService {
     @Transactional
     public void submitRecordedApplication(AppUserPrincipal actor,UUID id) {
         authorize(actor,"CREATE");var record=records.record(actor,id,true);var application=loans.findForDisbursement(id).orElseThrow();
+        String kycError=loans.kycError(id,actor.getSaccoId(),actor.getStationId(),clock.today());
+        if(kycError!=null)throw new IllegalArgumentException(kycError);
         if(application.getStatus()!=LoanStatus.RECORDED){check("STAFF_REVIEW_V1".equals(schedules.parseSummary(application.getPolicySnapshot()).get("recordingWorkflowVersion")),"state");return;}
         var form=read(record.get("metadata").toString(),RecordForm.class);
         var product="CUSTOM".equals(form.getLoanMode())?products.findBySaccoIdAndCustomRecordingConfigurationTrue(actor.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration")):

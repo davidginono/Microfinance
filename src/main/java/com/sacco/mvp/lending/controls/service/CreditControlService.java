@@ -41,7 +41,7 @@ public class CreditControlService {
     @Transactional(readOnly=true) public List<Choice> officerChoices(AppUserPrincipal a,String search,int page){authorize(a,"COLLECTIONS","VIEW");query(search,page);return records.officers(a,search,page);}
     @Transactional(readOnly=true) public Choice officerChoice(AppUserPrincipal a,UUID id){authorize(a,"COLLECTIONS","VIEW");return id==null?null:records.officerChoice(a,id).orElse(null);}
     @Transactional(readOnly=true) public List<Choice> loanChoices(AppUserPrincipal a,String feature,String search,int page){check(Set.of("COLLATERAL","COLLECTIONS").contains(feature),"query");authorize(a,feature,"VIEW");query(search,page);return records.loanChoices(a,search,page);}
-    @Transactional(readOnly=true) public Policy policy(AppUserPrincipal a){authorize(a,"CREDIT_CONTROLS","VIEW");return records.policy(a).orElse(new Policy(null,0,false,false,"",false,null,null));}
+    @Transactional(readOnly=true) public Policy policy(AppUserPrincipal a){authorize(a,"CREDIT_CONTROLS","VIEW");return records.policy(a).orElse(new Policy(null,0,false,false,"",false,null,null,false));}
     @Transactional(timeout=15) public UUID configure(AppUserPrincipal a,PolicyForm f){
         authorize(a,"CREDIT_CONTROLS","CONFIGURE");check(f.isVerified(),"verified");text(f.getReference(),500,"reference");
         if(f.isRemindersEnabled()){check(f.getReminderDaysBefore()!=null&&f.getReminderDaysBefore()>=0&&f.getReminderDaysBefore()<=30,"reminderDaysBefore");check(f.getReminderEveryDays()!=null&&f.getReminderEveryDays()>0&&f.getReminderEveryDays()<=30,"reminderEveryDays");}

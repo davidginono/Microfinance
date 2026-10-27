@@ -797,6 +797,8 @@ public class LoanWorkflowService {
     }
 
     private void recheckSharedCreditAtSubmission(LoanApplication app,LoanProductSetting product){
+        String kycError=loanApplicationRepository.kycError(app.getId(),app.getSaccoId(),app.getStationId(),applicationClock.today());
+        if(kycError!=null)throw new IllegalArgumentException(kycError);
         loanQualificationPolicyService.lockGuarantorCapacity(app.getSaccoId(),app.getStationId(),app.getApplicantMemberId());
         long shared=loanQualificationPolicyService.sharedApplicantExposure(app.getSaccoId(),app.getApplicantMemberId(),product);
         if(shared==0)return;

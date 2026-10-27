@@ -1,0 +1,2 @@
+[data-kyc-verify] { grid-column: 1 / -1; }
+[data-kyc-verify][hidden] { display: none !important; }

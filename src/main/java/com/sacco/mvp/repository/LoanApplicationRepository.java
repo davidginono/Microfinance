@@ -17,6 +17,8 @@ import java.util.UUID;
 import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
+    @Query(value="select client_kyc_loan_check(:loan,:institution,:branch,:day)",nativeQuery=true)
+    String kycError(@Param("loan") UUID loan,@Param("institution") String institution,@Param("branch") String branch,@Param("day") LocalDate day);
     @Query(value="select lending_collateral_check(:loan,:institution,:branch,:day)",nativeQuery=true)
     String collateralError(@Param("loan") UUID loan,@Param("institution") String institution,@Param("branch") String branch,@Param("day") LocalDate day);
     @Query("""

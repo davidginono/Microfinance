@@ -36,36 +36,49 @@ public class MemberRegistrationService {
 
     @Transactional
     public Member register(MemberRegistrationForm form) {
-        log.info("Client registration requested: memberNo={}, email={}, saccoId={}",
-            form.getMemberNo(), form.getEmail(), form.getSaccoId());
         VerifiedExternalMember verified = verifyExternalMember(form);
+        return registerKnown(form,verified,false);
+    }
+
+    /** The onboarding service supplies an authorized, existing scope; no policy defaults or signature are invented. */
+    @Transactional
+    public Member registerAssisted(MemberRegistrationForm form,String institution,String branch) {
+        var registered=resolveRegisteredSacco(institution);
+        requireRegisteredStation(institution,branch);
+        var verified=new VerifiedExternalMember(normalizeMemberNo(form.getMemberNo()),normalizeEmail(form.getEmail()),
+            nameSignatureService.requireFullName(form.getFullName(),"Enter your full names."),institution,branch,registered.getSaccoName());
+        return registerKnown(form,verified,true);
+    }
+
+    private Member registerKnown(MemberRegistrationForm form,VerifiedExternalMember verified,boolean assisted) {
+        log.info("Client registration requested: saccoId={}", verified.saccoId());
         String normalizedPhone = normalizePhone(form.getPhone());
         String employeeNumber = EmployeeNumber.normalize(form.getEmployeeNumber());
         ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone,
             employeeNumber, verified.saccoId(), verified.stationId());
-        SaccoSettings sacco = resolveLocalSacco(verified);
+        if(!assisted)resolveLocalSacco(verified);
         OffsetDateTime now = OffsetDateTime.now();
         Member member = Member.builder()
             .id(UUID.randomUUID())
-            .saccoId(sacco.getSaccoId())
+            .saccoId(verified.saccoId())
             .memberNo(verified.memberNo())
             .employeeNumber(employeeNumber)
             .stationId(verified.stationId())
             .fullName(verified.fullName())
             .phone(normalizedPhone)
             .email(verified.email())
-            .signatureText(nameSignatureService.signatureFromFullName(verified.fullName()))
-            .signatureRegisteredAt(now)
+            .signatureText(assisted?null:nameSignatureService.signatureFromFullName(verified.fullName()))
+            .signatureRegisteredAt(assisted?null:now)
             .memberAccount(true)
             .status(MemberStatus.ACTIVE)
             .position(Position.MEMBER)
-            .rank(nextMemberRank(sacco.getSaccoId()))
+            .rank(nextMemberRank(verified.saccoId()))
             .passwordHash(passwordEncoder.encode(form.getPassword()))
             .createdAt(now)
             .profileLastSyncedAt(now)
             .build();
 
-        Member savedMember = memberRepository.save(member);
+        Member savedMember = memberRepository.saveAndFlush(member);
 
         userSettingsRepository.save(UserSettings.builder()
             .memberId(savedMember.getId())
@@ -75,8 +88,8 @@ public class MemberRegistrationService {
             .updatedAt(now)
             .build());
 
-        log.info("Client registration completed successfully: memberNo={}, localMemberId={}, saccoId={}",
-            savedMember.getMemberNo(), savedMember.getId(), savedMember.getSaccoId());
+        log.info("Client registration completed successfully: localMemberId={}, saccoId={}",
+            savedMember.getId(), savedMember.getSaccoId());
         return savedMember;
     }
 
@@ -102,21 +115,21 @@ public class MemberRegistrationService {
                                       String employeeNumber, String saccoId, String stationId) {
         String normalizedPhone = normalizePhone(phone);
         if (memberRepository.findByMemberNo(memberNo).isPresent()) {
-            log.info("Client registration blocked because client number already exists locally: {}", memberNo);
+            log.info("Client registration blocked: client number already registered");
             throw new IllegalStateException("That client number is already registered in this system.");
         }
         if (memberRepository.existsByEmailIgnoreCase(email)) {
-            log.info("Client registration blocked because email already exists locally: {}", email);
+            log.info("Client registration blocked: email already registered");
             throw new IllegalStateException("That email address is already registered in this system.");
         }
         if (memberRepository.existsByPhone(normalizedPhone)) {
-            log.info("Client registration blocked because phone already exists locally: {}", normalizedPhone);
+            log.info("Client registration blocked: phone already registered");
             throw new IllegalStateException("That phone number is already registered in this system.");
         }
         String normalizedEmployeeNumber = EmployeeNumber.normalize(employeeNumber);
         if (normalizedEmployeeNumber != null && memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase(
             normalizeSaccoId(saccoId), normalizeStationId(stationId), normalizedEmployeeNumber)) {
-            log.info("Client registration blocked because employee number already exists locally: {}", normalizedEmployeeNumber);
+            log.info("Client registration blocked: employee number already registered");
             throw new IllegalStateException("That employee number is already registered in this branch.");
         }
     }

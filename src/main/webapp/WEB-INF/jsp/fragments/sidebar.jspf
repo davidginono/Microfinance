@@ -12,10 +12,6 @@
                 <span class="shell-sidebar-toggle-label"><spring:message code="menu.main" text="Main Menu" /></span>
             </c:if>
             <c:if test="${staffWorkspace}">
-                <sec:authorize access="@access.has(principal,'GUARANTOR_CAPACITY_VIEW')"><a href="<c:url value='/finance/credit/guarantors'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/guarantors')?'shell-nav-active':''}"><spring:message code="credit.title.guarantors"/></a></sec:authorize>
-                <sec:authorize access="@access.has(principal,'COLLATERAL_VIEW')"><a href="<c:url value='/finance/credit/collateral'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/collateral')?'shell-nav-active':''}"><spring:message code="credit.title.collateral"/></a></sec:authorize>
-                <sec:authorize access="@access.has(principal,'COLLECTIONS_VIEW')"><a href="<c:url value='/finance/credit/collections'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/collections')?'shell-nav-active':''}"><spring:message code="credit.title.collections"/></a></sec:authorize>
-                <sec:authorize access="@access.has(principal,'CREDIT_CONTROLS_VIEW')"><a href="<c:url value='/finance/credit/policy'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/finance/credit/policy'?'shell-nav-active':''}"><spring:message code="credit.form.policy"/></a></sec:authorize>
                 <sec:authorize access="@access.isAdminScope(principal)">
                     <span class="shell-sidebar-toggle-label"><spring:message code="admin.tools" text="Admin Tools" /></span>
                 </sec:authorize>
@@ -36,6 +32,12 @@
         </div>
         <nav id="shellSidebarNavigation" class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0" data-view-position-key="sidebar-navigation">
             <c:if test="${staffWorkspace}">
+                <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_VIEW')"><a href="<c:url value='/finance/clients/onboarding'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/clients/onboarding')?'shell-nav-active':''}"><spring:message code="kyc.title"/></a></sec:authorize>
+                <sec:authorize access="@access.has(principal,'GUARANTOR_CAPACITY_VIEW')"><a href="<c:url value='/finance/credit/guarantors'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/guarantors')?'shell-nav-active':''}"><spring:message code="credit.title.guarantors"/></a></sec:authorize>
+                <sec:authorize access="@access.has(principal,'COLLATERAL_VIEW')"><a href="<c:url value='/finance/credit/collateral'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/collateral')?'shell-nav-active':''}"><spring:message code="credit.title.collateral"/></a></sec:authorize>
+                <sec:authorize access="@access.has(principal,'COLLECTIONS_VIEW')"><a href="<c:url value='/finance/credit/collections'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/collections')?'shell-nav-active':''}"><spring:message code="credit.title.collections"/></a></sec:authorize>
+                <sec:authorize access="@access.has(principal,'CREDIT_CONTROLS_VIEW')"><a href="<c:url value='/finance/credit/policy'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/finance/credit/policy'?'shell-nav-active':''}"><spring:message code="credit.form.policy"/></a></sec:authorize>
+
                 <sec:authorize access="@access.has(principal, 'LOAN_REPAYMENTS_VIEW')">
                     <a href="<c:url value='/repayments' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/repayments') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                         <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7"><i data-lucide="receipt" aria-hidden="true"></i></span>
@@ -46,6 +48,7 @@
             <c:if test="${memberWorkspace}"><sec:authorize access="@access.has(principal,'GROUP_COVERAGE_OWN_VIEW')"><a href="<c:url value='/app/group-coverage'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/app/group-coverage')?'shell-nav-active':''}"><spring:message code="coverage.title"/></a></sec:authorize></c:if>
             <c:if test="${memberWorkspace}">
                 <sec:authorize access="@access.canAccessMemberArea(principal)">
+                <a href="<c:url value='/app/onboarding'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/app/onboarding'?'shell-nav-active':''}"><spring:message code="kyc.ownTitle"/></a>
                 <div class="shell-sidebar-nav-heading"><span>Overview</span></div>
                 <a href="/app/dashboard" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                     <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">

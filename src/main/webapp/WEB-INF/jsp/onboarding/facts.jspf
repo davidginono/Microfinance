@@ -1,0 +1,5 @@
+<section class="erp-resource-section"><h2><spring:message code="kyc.client"/></h2><dl class="erp-detail-facts">
+    <c:forEach items="${['number','name','phone','email']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:out value="${client[field]}"/></dd></div></c:forEach>
+    <div><dt><spring:message code="kyc.field.state"/></dt><dd><spring:message code="kyc.state.${empty viewState?client.state:viewState}"/></dd></div>
+    <div><dt><spring:message code="kyc.field.due"/></dt><dd><c:out value="${appTime:display(historical?viewReviewDue:client.reviewDue)}"/></dd></div>
+</dl></section>

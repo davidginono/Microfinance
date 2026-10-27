@@ -408,6 +408,8 @@ public class ManagerService {
         app.setInstallmentAmount(schedule.installmentAmount());
         app.setFinalDueDate(schedule.finalDueDate());
         app.setRepaymentScheduleJson(schedule.scheduleJson());
+        String kycError=loanApplicationRepository.kycError(app.getId(),app.getSaccoId(),app.getStationId(),applicationClock.today());
+        if(kycError!=null)throw new IllegalArgumentException(kycError);
         String collateralError=loanApplicationRepository.collateralError(app.getId(),app.getSaccoId(),app.getStationId(),applicationClock.today());
         if(collateralError!=null)throw new IllegalArgumentException(collateralError);
         accountingGuard.disbursement(app, disbursementOfficerId);

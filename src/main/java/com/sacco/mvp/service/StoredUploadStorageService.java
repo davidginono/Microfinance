@@ -67,7 +67,7 @@ public class StoredUploadStorageService {
             .build();
         StoredUpload saved;
         try {
-            saved = repository.save(upload);
+            saved = repository.saveAndFlush(upload);
         } catch (RuntimeException ex) {
             deleteLocalFile(storageKey);
             throw ex;

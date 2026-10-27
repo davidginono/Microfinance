@@ -1,0 +1,10 @@
+<section class="erp-resource-section"><h2><spring:message code="kyc.documents"/></h2>
+    <c:if test="${empty documents}"><p><spring:message code="kyc.noDocuments"/></p></c:if>
+    <c:forEach items="${documents}" var="doc"><dl class="erp-detail-facts">
+        <div><dt><spring:message code="kyc.category.${doc.category}"/></dt><dd>
+            <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_DOCUMENTS')" var="canReadKycDocuments"/>
+            <c:choose><c:when test="${canReadKycDocuments}"><a class="resource-table-id-link" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/${doc.id}'/>"><c:out value="${doc.name}"/></a></c:when><c:otherwise><c:out value="${doc.name}"/></c:otherwise></c:choose>
+        </dd></div><div><dt><spring:message code="kyc.field.expiresOn"/></dt><dd><c:out value="${appTime:display(doc.expiresOn)}"/></dd></div>
+        <div><dt><spring:message code="kyc.recordedBy"/></dt><dd><c:out value="${doc.actor}"/> · <c:out value="${appTime:display(doc.recordedAt)}"/></dd></div>
+    </dl></c:forEach>
+</section>

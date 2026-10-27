@@ -1,6 +1,7 @@
 package com.sacco.mvp.domain;
 
 public enum AccessFeature {
+    CLIENT_ONBOARDING("Client onboarding"),
     CREDIT_CONTROLS("Branch credit controls"),
     GUARANTOR_CAPACITY("Guarantor capacity"),
     COLLATERAL("Collateral"),

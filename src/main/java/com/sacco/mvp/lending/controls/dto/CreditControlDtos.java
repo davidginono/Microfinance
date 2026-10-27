@@ -13,7 +13,7 @@ public final class CreditControlDtos {
     public record Page<T>(List<T> rows,int page,boolean hasNext) {}
     public record Choice(UUID id,String label) {}
     public record Policy(UUID id,int revision,boolean capacityRequired,boolean collateralRequired,String reference,
-                         boolean remindersEnabled,Integer reminderDaysBefore,Integer reminderEveryDays) {}
+                         boolean remindersEnabled,Integer reminderDaysBefore,Integer reminderEveryDays,boolean kycRequired) {}
     public record Loan(UUID id,String number,String borrower,String status,BigDecimal principal,BigDecimal dueInterest,
                        BigDecimal futureInterest,BigDecimal charges,BigDecimal arrears,LocalDate oldestDue,LocalDate nextDue,boolean tracked) {}
     public record Guarantee(UUID id,UUID loanId,String loanNumber,String borrower,String guarantor,String status,
@@ -31,7 +31,7 @@ public final class CreditControlDtos {
                                   LocalDate effectiveDate,String evidence,String actor,OffsetDateTime recordedAt) {}
     @Data public static class PolicyForm {
         private UUID requestKey=UUID.randomUUID();private int expectedRevision;
-        private boolean capacityRequired,collateralRequired,verified,remindersEnabled;private String reference="";
+        private boolean capacityRequired,collateralRequired,verified,remindersEnabled,kycRequired;private String reference="";
         private Integer reminderDaysBefore,reminderEveryDays;
     }
     @Data public static class AssessmentForm {

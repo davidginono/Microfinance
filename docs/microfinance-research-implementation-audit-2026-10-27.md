@@ -1,5 +1,7 @@
 # Microfinance research: current implementation gaps and delivery plan
 
+KYC implementation update (27 October 2026): G01 now has staff-assisted individual-client onboarding, scoped versioned evidence, independent review, duplicate identity checks and branch-configured submission/funding enforcement. See [activation, supported scope and verification](client-onboarding-kyc.md). This does not establish live identity-provider verification or complete organization due diligence, privacy-request handling, retention disposal or underwriting.
+
 Implementation update (27 October 2026): ordinary/external guarantor assessments, registered collateral and ledger-backed collections now have scoped implementations. See [activation, supported boundaries and verification](credit-capacity-collateral-collections.md). The findings below remain the preceding audit record; other underwriting, legacy cutover, document automation and recovery gates are not marked complete by this increment.
 
 Reviewed: 27 October 2026. Final source baseline: `129cb547`.

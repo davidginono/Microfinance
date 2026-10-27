@@ -23,7 +23,7 @@ class StoredUploadStorageServiceTest {
     @Test
     void storesContentOutsideDatabaseWithSizeAndSha256() {
         StoredUploadRepository repository = mock(StoredUploadRepository.class);
-        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         StoredUploadStorageService service = new StoredUploadStorageService(repository);
         ReflectionTestUtils.setField(service, "uploadsRoot", tempDir.toString());
 
@@ -56,7 +56,7 @@ class StoredUploadStorageServiceTest {
     @Test
     void loadsFileBackedContentForTheRequestedOwner() {
         StoredUploadRepository repository = mock(StoredUploadRepository.class);
-        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         StoredUploadStorageService service = new StoredUploadStorageService(repository);
         ReflectionTestUtils.setField(service, "uploadsRoot", tempDir.toString());
         UUID id = UUID.randomUUID();

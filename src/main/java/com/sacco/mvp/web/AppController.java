@@ -1511,7 +1511,7 @@ public class AppController {
             ra.addFlashAttribute("message", "Application status updated successfully.");
             return "redirect:/app/loan-applications/" + id;
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("error", ex.getMessage()!=null&&ex.getMessage().startsWith("kyc.error.")?message(ex.getMessage()):ex.getMessage());
             if (isGuarantorSelectionCountError(ex.getMessage())) {
                 return "redirect:/app/loan-applications/" + id + "/edit?step=3";
             }
