@@ -1,0 +1,1 @@
+<%@ include file="head.jspf" %><section class="erp-resource-section"><h2><spring:message code="credit.error.title"/></h2><p role="alert"><spring:message code="${creditError}"/></p></section><%@ include file="../fragments/footer.jspf" %>

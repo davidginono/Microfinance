@@ -1,5 +1,7 @@
 # Microfinance research: current implementation gaps and delivery plan
 
+Implementation update (27 October 2026): ordinary/external guarantor assessments, registered collateral and ledger-backed collections now have scoped implementations. See [activation, supported boundaries and verification](credit-capacity-collateral-collections.md). The findings below remain the preceding audit record; other underwriting, legacy cutover, document automation and recovery gates are not marked complete by this increment.
+
 Reviewed: 27 October 2026. Final source baseline: `129cb547`.
 
 This source review compares the supplied **Research Summary: Microfinance Activities** with current Java/JSP code, migrations, tests and maintained delivery notes. It updates the findings in [the 23 October audit](microfinance-research-implementation-audit-2026-10-23.md), especially group lending. It proposes implementation work; it does not implement features or certify institutional compliance or production readiness.

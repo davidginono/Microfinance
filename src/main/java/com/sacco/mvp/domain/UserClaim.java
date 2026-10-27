@@ -11,6 +11,18 @@ import java.util.Optional;
 import java.util.Set;
 
 public enum UserClaim {
+    CREDIT_CONTROLS_VIEW(AccessFeature.CREDIT_CONTROLS, AccessAction.VIEW),
+    CREDIT_CONTROLS_CONFIGURE(AccessFeature.CREDIT_CONTROLS, AccessAction.CONFIGURE),
+    GUARANTOR_CAPACITY_VIEW(AccessFeature.GUARANTOR_CAPACITY, AccessAction.VIEW),
+    GUARANTOR_CAPACITY_CREATE(AccessFeature.GUARANTOR_CAPACITY, AccessAction.CREATE),
+    COLLATERAL_VIEW(AccessFeature.COLLATERAL, AccessAction.VIEW),
+    COLLATERAL_CREATE(AccessFeature.COLLATERAL, AccessAction.CREATE),
+    COLLATERAL_UPDATE(AccessFeature.COLLATERAL, AccessAction.UPDATE),
+    COLLATERAL_RELEASE(AccessFeature.COLLATERAL, AccessAction.APPROVE),
+    COLLATERAL_RECOVERY(AccessFeature.COLLATERAL, AccessAction.INITIATE),
+    COLLECTIONS_VIEW(AccessFeature.COLLECTIONS, AccessAction.VIEW),
+    COLLECTIONS_CREATE(AccessFeature.COLLECTIONS, AccessAction.CREATE),
+    COLLECTIONS_UPDATE(AccessFeature.COLLECTIONS, AccessAction.UPDATE),
     GROUP_COVERAGE_VIEW(AccessFeature.GROUP_COVERAGE, AccessAction.VIEW),
     GROUP_COVERAGE_CREATE(AccessFeature.GROUP_COVERAGE, AccessAction.CREATE),
     GROUP_COVERAGE_UPDATE(AccessFeature.GROUP_COVERAGE, AccessAction.UPDATE),

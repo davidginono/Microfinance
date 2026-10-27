@@ -27,12 +27,13 @@ class ChartOfAccountsJspCompilationTest {
             var expanded=new java.util.LinkedHashSet<>(java.util.List.of(pages));
             expanded.add("vouchers/loan-details.jsp");
             // Compile every accountant resource view changed by the shared table rollout.
-            String[] folders = {"accounting", "accountant", "reporting", "reports", "app", "admin", "manager", "board", "chairperson", "disbursement", "loan-officer", "staff", "repayments", "account"};
+            String[] folders = {"accounting", "accountant", "reporting", "reports", "app", "admin", "manager", "board", "chairperson", "disbursement", "loan-officer", "staff", "repayments", "account", "credit"};
             if (Boolean.getBoolean("microfinance.workspace.jsp-only")) expanded.clear();
             for (String folder : folders) {
+                if(!java.nio.file.Files.isDirectory(Path.of("src/main/webapp/WEB-INF/jsp",folder)))continue;
                 try (var files=java.nio.file.Files.walk(Path.of("src/main/webapp/WEB-INF/jsp",folder))) {
                     for (var file:files.filter(path -> path.toString().endsWith(".jsp")).toList()) {
-                        if (Boolean.getBoolean("microfinance.workspace.jsp-only") || java.nio.file.Files.readString(file).contains("data-resource-table="))
+                        if (folder.equals("credit") || Boolean.getBoolean("microfinance.workspace.jsp-only") || java.nio.file.Files.readString(file).contains("data-resource-table="))
                             expanded.add("../"+Path.of("src/main/webapp/WEB-INF/jsp").relativize(file).toString().replace('\\','/'));
                     }
                 }

@@ -115,6 +115,15 @@ public class LoanWorkflowService {
     private final PlatformTransactionManager transactionManager;
     private final ApplicationClock applicationClock;
 
+    private Map<String,Object> applicationPolicy(String institution,LoanProductSetting product){
+        var policy=new LinkedHashMap<String,Object>(loanProductWorkflowService.snapshotData(loanProductWorkflowService.resolveForProduct(institution,product)));
+        if(product!=null){
+            policy.put("collateralRequired",product.isCollateralRequired());
+            policy.put("collateralCoverageRatio",product.getResolvedMinCollateralCoverageRatio());
+        }
+        return policy;
+    }
+
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
         if (!products.isEmpty()) {
@@ -460,9 +469,7 @@ public class LoanWorkflowService {
         String snapshot = eligibilityService.policySnapshotJson(
             eligibility,
             product.getGuarantorsRequired(),
-            loanProductWorkflowService.snapshotData(
-                loanProductWorkflowService.resolveForProduct(saccoId, product)
-            )
+            applicationPolicy(saccoId,product)
         );
 
         LoanApplication application = existingDraft == null
@@ -700,9 +707,7 @@ public class LoanWorkflowService {
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(
             result,
             app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
-            loanProductWorkflowService.snapshotData(
-                loanProductWorkflowService.resolveForProduct(app.getSaccoId(), product)
-            )
+            applicationPolicy(app.getSaccoId(),product)
         ));
         capturePaymentDetailsIfMissing(app);
         List<GuarantorSelection> selectedGuarantors = app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0
@@ -772,9 +777,7 @@ public class LoanWorkflowService {
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(
             result,
             app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
-            loanProductWorkflowService.snapshotData(
-                loanProductWorkflowService.resolveForProduct(app.getSaccoId(), product)
-            )
+            applicationPolicy(app.getSaccoId(),product)
         ));
 
         capturePaymentDetailsIfMissing(app);
@@ -802,7 +805,7 @@ public class LoanWorkflowService {
             throw new IllegalStateException("This product allows applications with at most "+maximum+" existing active loans.");
         var result=checkApplicantCreditEligibility(app,product);
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(result,Math.max(0,app.getRequiredGuarantors()),
-            loanProductWorkflowService.snapshotData(loanProductWorkflowService.resolveForProduct(app.getSaccoId(),product))));
+            applicationPolicy(app.getSaccoId(),product)));
     }
 
     private void validateTopUpSourceForApplication(LoanApplication app) {
@@ -1203,6 +1206,7 @@ public class LoanWorkflowService {
         LoanApplication application = loanApplicationRepository.findForGuarantorDecision(request.getLoanApplicationId(),guarantorId)
             .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Guarantor request unavailable"));
         guardGuarantorCapacity(application,guarantorId);
+        loanQualificationPolicyService.assertVerifiedCapacity(request.getId(),application.getSaccoId(),application.getStationId(),applicationClock.today());
         request.setStatus(GuarantorRequestStatus.APPROVED);
         request.setCommittedAmount(null);
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
@@ -1249,6 +1253,7 @@ public class LoanWorkflowService {
             throw new IllegalStateException("Request already decided");
         }
         guardGuarantorTarget(app);if(request.getGuarantorMemberId()!=null)guardGuarantorCapacity(app,request.getGuarantorMemberId());
+        loanQualificationPolicyService.assertVerifiedCapacity(request.getId(),app.getSaccoId(),app.getStationId(),applicationClock.today());
         request.setStatus(GuarantorRequestStatus.APPROVED);
         request.setCommittedAmount(null);
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());

@@ -17,6 +17,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface GuarantorRequestRepository extends JpaRepository<GuarantorRequest, UUID> {
+    @Query(value="select lending_capacity_lock(:request,:institution,:branch)",nativeQuery=true)
+    Boolean lockVerifiedCapacity(@Param("request") UUID request,@Param("institution") String institution,@Param("branch") String branch);
+    @Query(value="select lending_capacity_error(:request,:institution,:branch,:day)",nativeQuery=true)
+    String verifiedCapacityError(@Param("request") UUID request,@Param("institution") String institution,@Param("branch") String branch,@Param("day") java.time.LocalDate day);
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from GuarantorRequest g where g.id=:id and g.guarantorMemberId=:client")
     Optional<GuarantorRequest> findForClientDecision(@Param("id") UUID id,@Param("client") UUID client);

@@ -1963,7 +1963,7 @@ public class AppController {
             }
             ra.addFlashAttribute("message", "Guarantee request approved");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("error", ex.getMessage()!=null&&ex.getMessage().startsWith("credit.error.")?message(ex.getMessage()):ex.getMessage());
         }
         return "redirect:/app/guarantee-requests";
     }
@@ -2229,7 +2229,7 @@ public class AppController {
             notifyDirectGuarantorOtpConfirmed(application, recipient);
             ra.addFlashAttribute("message", "Guarantor approval confirmed.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("error", ex.getMessage()!=null&&ex.getMessage().startsWith("credit.error.")?message(ex.getMessage()):ex.getMessage());
         }
         return "redirect:/app/loan-applications/" + loanId;
     }

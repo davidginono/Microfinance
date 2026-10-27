@@ -528,7 +528,7 @@ public class DisbursementController {
             ra.addFlashAttribute("message", message("recording.disbursedSuccess"));
             return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage()!=null && (ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("charges.error."))?message(ex.getMessage()):ex.getMessage());
+            ra.addFlashAttribute("error", ex.getMessage()!=null && (ex.getMessage().startsWith("credit.error.") || ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("charges.error."))?message(ex.getMessage()):ex.getMessage());
             ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);ra.addFlashAttribute("postingInterestAccountId",interestAccountId);ra.addFlashAttribute("postingSettlementEvidence",settlementEvidence);
             ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
             ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);

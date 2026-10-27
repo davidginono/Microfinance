@@ -47,6 +47,7 @@ public class ManagerService {
     private final LoanRepaymentLedgerService loanRepaymentLedgerService;
     private final com.sacco.mvp.accounting.loans.service.LoanPostingGuard accountingGuard;
     private final com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService disbursementNumbers;
+    private final ApplicationClock applicationClock;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -407,6 +408,8 @@ public class ManagerService {
         app.setInstallmentAmount(schedule.installmentAmount());
         app.setFinalDueDate(schedule.finalDueDate());
         app.setRepaymentScheduleJson(schedule.scheduleJson());
+        String collateralError=loanApplicationRepository.collateralError(app.getId(),app.getSaccoId(),app.getStationId(),applicationClock.today());
+        if(collateralError!=null)throw new IllegalArgumentException(collateralError);
         accountingGuard.disbursement(app, disbursementOfficerId);
         if (hasUploadedProof) {
             app.setAttachmentsJson(loanAttachmentService.store(

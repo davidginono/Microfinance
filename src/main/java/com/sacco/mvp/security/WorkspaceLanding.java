@@ -80,6 +80,10 @@ public final class WorkspaceLanding {
         if (hasClaim(claims, UserClaim.GROUP_LENDING_VIEW)) {
             return "/finance/groups";
         }
+        if(hasClaim(claims,UserClaim.GUARANTOR_CAPACITY_VIEW))return "/finance/credit/guarantors";
+        if(hasClaim(claims,UserClaim.COLLATERAL_VIEW))return "/finance/credit/collateral";
+        if(hasClaim(claims,UserClaim.COLLECTIONS_VIEW))return "/finance/credit/collections";
+        if(hasClaim(claims,UserClaim.CREDIT_CONTROLS_VIEW))return "/finance/credit/policy";
         return null;
     }
 

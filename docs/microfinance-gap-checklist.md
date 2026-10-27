@@ -1,5 +1,7 @@
 # Microfinance Conversion Gap Checklist
 
+2026-10-27 credit-control increment: scoped ordinary/external guarantor capacity assessments, collateral valuation/pledge/custody/release history, collections cases and configured instalment reminders are implemented. See [activation, boundaries and verification](credit-capacity-collateral-collections.md). This does not complete verified borrower underwriting, legacy openings, legal enforcement, statutory submissions or the accounting backlog.
+
 2026-10-16 lending adjustment increment: scoped provision targets, fully provided principal write-offs, linked write-backs and untouched disbursement reversals are implemented for verified ordinary recorded loans. See [scope and verification](loan-provisions-and-corrections.md). This does not complete restructuring, impairment policy approval, recovery/settlement coverage or the broader accounting backlog.
 
 Audit date: 2026-10-01. Baseline: `184b3de` (Transform loan workflow to microfinance).

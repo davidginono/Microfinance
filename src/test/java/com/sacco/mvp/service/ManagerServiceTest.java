@@ -62,6 +62,7 @@ class ManagerServiceTest {
     @Mock private LoanRepaymentLedgerService loanRepaymentLedgerService;
     @Mock private com.sacco.mvp.accounting.loans.service.LoanPostingGuard accountingGuard;
     @Mock private com.sacco.mvp.accounting.loans.service.LoanDisbursementNumberService disbursementNumbers;
+    @Spy private ApplicationClock applicationClock=new ApplicationClock("Africa/Dar_es_Salaam");
     @Spy private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @InjectMocks

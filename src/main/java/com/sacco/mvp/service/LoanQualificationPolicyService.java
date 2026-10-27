@@ -20,6 +20,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class LoanQualificationPolicyService {
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void assertVerifiedCapacity(UUID request,String institution,String branch,java.time.LocalDate day){
+        if(!Boolean.TRUE.equals(guarantorRequestRepository.lockVerifiedCapacity(request,institution,branch)))throw new org.springframework.security.access.AccessDeniedException("Guarantor capacity unavailable");
+        String error=guarantorRequestRepository.verifiedCapacityError(request,institution,branch,day);
+        if(error!=null)throw new IllegalArgumentException(error);
+    }
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final MemberRepository memberRepository;

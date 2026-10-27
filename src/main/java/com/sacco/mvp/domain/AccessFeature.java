@@ -1,6 +1,10 @@
 package com.sacco.mvp.domain;
 
 public enum AccessFeature {
+    CREDIT_CONTROLS("Branch credit controls"),
+    GUARANTOR_CAPACITY("Guarantor capacity"),
+    COLLATERAL("Collateral"),
+    COLLECTIONS("Collections"),
     GROUP_COVERAGE("Group coverage cases"),
     GROUP_COVERAGE_OWN("My coverage cases"),
     GROUP_LENDING("Group lending"),

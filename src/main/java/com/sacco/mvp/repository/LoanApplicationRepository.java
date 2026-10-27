@@ -17,6 +17,8 @@ import java.util.UUID;
 import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
+    @Query(value="select lending_collateral_check(:loan,:institution,:branch,:day)",nativeQuery=true)
+    String collateralError(@Param("loan") UUID loan,@Param("institution") String institution,@Param("branch") String branch,@Param("day") LocalDate day);
     @Query("""
         select l from LoanApplication l where l.saccoId=:institution and l.stationId=:branch and l.id<>:reference
           and l.status in :statuses and exists(select r.id from LoanApplication r where r.id=:reference

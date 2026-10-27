@@ -277,6 +277,8 @@ public class LoanRecordingService {
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
         if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted())||Boolean.TRUE.equals(f.getSharedAccepted()),"organizationFundingPending");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
+        String collateralError=loans.collateralError(loan.getId(),a.getSaccoId(),a.getStationId(),clock.today());
+        if(collateralError!=null)throw new IllegalArgumentException(collateralError);
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
         if(Boolean.TRUE.equals(policy.get("disbursementProofRequired")))check(files.stream().anyMatch(file->!file.isEmpty()),"attachments");
         check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");LocalDate first=f.getFirstPaymentDate()!=null?f.getFirstPaymentDate():loan.getFirstRepaymentDate();
@@ -509,6 +511,7 @@ public class LoanRecordingService {
 
     private Map<String,Object> recordedPolicy(AppUserPrincipal a,LoanProductSetting selectedProduct,String label,Integer guarantors) {
         var policy=new LinkedHashMap<String,Object>(workflows.snapshotData(workflows.resolveForProduct(a.getSaccoId(),selectedProduct)));
+        policy.put("collateralRequired",selectedProduct.isCollateralRequired());policy.put("collateralCoverageRatio",selectedProduct.getResolvedMinCollateralCoverageRatio());
         policy.put("source","ACCOUNTANT_DIRECT");policy.put("product",label);policy.put("guarantorsRequired",guarantors);policy.put("disbursementProofRequired",selectedProduct.isDisbursementProofRequired());policy.put("recordingWorkflowVersion","STAFF_REVIEW_V1");
         if(selectedProduct.isCustomRecordingConfiguration()) {
             var tellers=productReviewers.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(selectedProduct.getId(),ApprovalWorkflowStage.DISBURSEMENT_OFFICER).stream().map(LoanProductBoardReviewer::getBoardMemberId).toList();
