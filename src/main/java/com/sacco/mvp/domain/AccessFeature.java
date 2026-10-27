@@ -1,6 +1,8 @@
 package com.sacco.mvp.domain;
 
 public enum AccessFeature {
+    GROUP_COVERAGE("Group coverage cases"),
+    GROUP_COVERAGE_OWN("My coverage cases"),
     GROUP_LENDING("Group lending"),
     GROUP_AUTHORITY("Group borrowing authority"),
     PAYROLL_DEDUCTIONS("Payroll deductions"),
