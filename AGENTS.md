@@ -127,7 +127,7 @@ Default local URL:
 
 ## Spring Boot Backend Skill
 
-- Read and follow the installed [`springboot-1k-rps-optimization` skill](C:/Users/USER/.codex/skills/springboot-1k-rps-optimization/SKILL.md) for backend implementation or review: controllers, services, DTOs, repositories, models, database queries/migrations, transactions, authorization, concurrency and performance.
+- Read and follow the project-local [`springboot-1k-rps-optimization` skill](.agents/skills/springboot-1k-rps-optimization/SKILL.md) for backend implementation or review: controllers, services, DTOs, repositories, models, database queries/migrations, transactions, authorization, concurrency and performance.
 - Keep feature-first Controller → Service → Repository → Model responsibilities, with DTOs at request/view boundaries. Only the owning service layer may call persistence; enforce institution, branch and record scope there.
 - Use bounded queries, exact decimal money, short transactions, explicit claims and tested idempotency/concurrency controls. Follow the skill's verification requirements for the affected work.
 - Treat 1,000 requests/second as a measured workload target. Document the workload, environment, latency/error criteria and results before claiming that capacity; compilation or correctness tests are not throughput evidence.

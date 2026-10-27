@@ -1,0 +1,7 @@
+interface:
+  display_name: "Spring Boot 1K-RPS Optimization"
+  short_description: "Optimize Spring Boot routes for measured 1K RPS"
+  default_prompt: "Use $springboot-1k-rps-optimization to review and optimize this Spring Boot route for a measured 1,000 RPS target."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,40 @@
+Component: <name>
+Use case: <operation>
+Route: <method> <path>
+Authorization scope: <required claim + tenant/SACCO/branch/owner>
+
+Files:
+- controller/<Name>Controller.java
+- dto/request/<Operation><Name>Request.java
+- dto/response/<Name>Response.java
+- service/<Name>Service.java
+- repository/<Name>Repository.java
+- model/<Name>.java
+- mapper/<Name>Mapper.java
+- migration/<version>__<change>.sql
+- tests/controller/...
+- tests/service/...
+- tests/repository/...
+
+Performance contract:
+- SQL/request budget:
+- maximum page size:
+- latency target:
+- cache policy:
+- async/executor policy:
+
+Security contract:
+- required claims:
+- default role claim bundles:
+- custom per-user claim behavior:
+- object scope:
+- mutable fields:
+- visible fields:
+- rate limit:
+- audit event:
+
+Concurrency contract:
+- transaction boundary:
+- optimistic/pessimistic/atomic strategy:
+- idempotency strategy:
+- retry policy:
