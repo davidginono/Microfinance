@@ -76,13 +76,8 @@ class AwsConsoleViewContractTest {
         for (Path path : routeViews()) {
             String view = read(path);
             if (usesConsoleShell(path, new HashSet<>()) && !path.getFileName().toString().equals("error.jsp")) {
-                assertThat(view)
-                    .as(path.toString())
-                    .satisfiesAnyOf(
-                        content -> assertThat(content).contains("data-aws-page-header"),
-                        content -> assertThat(content).contains("staff-loan-detail-header.jspf"),
-                        content -> assertThat(content).containsPattern("<h1\\b")
-                    );
+                assertThat(hasWorkspaceHeader(path,new HashSet<>()))
+                    .as("Workspace header for %s",path).isTrue();
             }
             if (view.contains("<table") && !isStandalonePrintView(path) && !isStatementDocumentPreview(path)) {
                 assertThat(view)
@@ -107,6 +102,8 @@ class AwsConsoleViewContractTest {
                         content -> assertThat(content).contains("data-aws-filter-toolbar"),
                         content -> assertThat(content).contains("erp-table-toolbar"),
                         content -> assertThat(content).contains("voucher-filters"),
+                        content -> assertThat(content).contains("data-table-filter-for="),
+                        content -> assertThat(content).contains("approval-type-filter"),
                         content -> assertThat(content).containsPattern("class=\"[^\"]*\\b(?:accounting-create-form|approval-config-context|approval-filters|management-parameters)\\b[^\"]*\"")
                     );
             }
@@ -258,7 +255,8 @@ class AwsConsoleViewContractTest {
                     .as(path + " GET form")
                     .satisfiesAnyOf(
                         content -> assertThat(content).contains("data-aws-filter-toolbar"),
-                        content -> assertThat(content).containsPattern("class=[\"'][^\"']*\\b(?:aws-filter-toolbar|erp-table-toolbar|voucher-filters|approval-config-context|approval-filters|management-parameters)\\b[^\"']*[\"']")
+                        content -> assertThat(content).contains("data-table-filter-for="),
+                        content -> assertThat(content).containsPattern("class=[\"'][^\"']*\\b(?:aws-filter-toolbar|erp-table-toolbar|voucher-filters|approval-config-context|approval-type-filter|approval-filters|management-parameters)\\b[^\"']*[\"']")
                     );
             }
         }
@@ -1321,6 +1319,18 @@ class AwsConsoleViewContractTest {
                 .sorted()
                 .toList();
         }
+    }
+
+    private static boolean hasWorkspaceHeader(Path path,Set<Path> visited) {
+        path=path.normalize();
+        if(!path.startsWith(JSP_ROOT.normalize()) || !visited.add(path)
+            || Set.of("header.jspf","sidebar.jspf","footer.jspf").contains(path.getFileName().toString()))return false;
+        String view=read(path);
+        if(view.contains("data-aws-page-header") || Pattern.compile("<h1\\b").matcher(view).find()
+            || Pattern.compile("(?s)data-resource-table=[\"'][^\"']+[\"'].*?<h2\\b").matcher(view).find())return true;
+        var includes=Pattern.compile("<%@\\s*include\\s+file=[\"']([^\"']+)[\"']\\s*%>").matcher(view);
+        while(includes.find())if(hasWorkspaceHeader(path.getParent().resolve(includes.group(1)),visited))return true;
+        return false;
     }
 
     private static boolean usesConsoleShell(Path path, Set<Path> visited) {

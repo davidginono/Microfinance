@@ -97,6 +97,8 @@ After the final missing-collateral-ratio safeguard, the migration was reapplied 
 
 The final `mvn -q test` selected **1,867 tests: three failures, zero errors, 590 skipped**. The remaining failures are existing contracts outside the credit workspaces: `AwsConsoleViewContractTest.authenticatedPagesExposeAwsHeadersAndRegisterContracts` (account versions header), `AwsConsoleViewContractTest.workspaceLabelsAndFiltersUseTheSharedResponsiveLayoutContract` (approval configuration filter), and `TableSortingCoverageTest.everyColumnHeaderTableDeclaresWorkingSortingOrItsFixedOrderPurpose` (existing tables elsewhere). They are not a passing full-suite result. Two stale test-harness assumptions were repaired: a removed JSP directory and the existing ninth group permission.
 
+Follow-up: the reported failures and fixture error are resolved. The new full run passed with zero failures/errors; see [UI-contract and borrower identity regression fixes](ui-contract-regression-fixes.md) for counts, changes and remaining validation limits.
+
 `mvn -q -DskipTests package`, JavaScript syntax validation and `git diff --check` passed. The packaged WAR started against the disposable database on loopback port 8089; the login form and new JS/CSS returned HTTP 200, and the protected credit route redirected unauthenticated requests to login. The temporary app process was stopped after this check. Browser-session acquisition timed out; no authenticated browser, mobile rendering, provider delivery or screenshot acceptance is claimed. Both-language label coverage and actual Jasper compilation are distinct from rendered interaction testing.
 
 ## 8. Measured results

@@ -30,6 +30,14 @@ class GroupOrganizationAccountPostgresTest {
     @BeforeEach void fixture(){w.fixture();}
     UUID grant(){var form=o.authorityForm();form.getSigners().getFirst().setMayViewAccount(true);return o.authorities.record(f.actor,o.group,form);}
     com.sacco.mvp.grouplending.dto.GroupCycleStatementDtos.Statement read(){return service.statement(s.signer,s.cycle,null,null,0,false);}
+    @Test void accountRegisterSupportsEveryColumnWithoutExpandingViewingAuthority(){
+        grant();try {
+            for(String key:List.of("group","loan","state"))for(String direction:List.of("asc","desc")){
+                var request=new org.springframework.mock.web.MockHttpServletRequest("GET","/");request.setParameter("tableSort[organization-accounts]",key);request.setParameter("tableDirection[organization-accounts]",direction);org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+                assertThat(service.list(s.signer,0).rows()).hasSize(1);assertThat(service.list(s.signer,1).rows()).isEmpty();
+            }
+        } finally {org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();}
+    }
     @Test void signingReceivingAndMembershipNeverImplyAccountViewing(){
         assertThat(service.list(s.signer,0).rows()).isEmpty();assertThatThrownBy(this::read).isInstanceOf(AccessDeniedException.class);
         var mandate=grant();var row=read();assertThat(row.context().model()).isEqualTo("ORGANIZATION");assertThat(row.allocations()).isEmpty();assertThat(row.loanLinks()).isFalse();assertThat(row.receiptLinks()).isFalse();assertThat(row.totals().funded()).isZero();assertThat(service.list(s.signer,0).rows()).singleElement().satisfies(a->assertThat(a.cycle()).isEqualTo(s.cycle));

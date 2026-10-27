@@ -21,7 +21,12 @@ class BorrowerIdentityPostgresTest {
     UUID identity(UUID loan){return f.jdbc.queryForObject("select borrower_party_id from loan_applications where id=?",UUID.class,loan);}
     void rejected(String sql,String reason,Object... args){assertThatThrownBy(()->f.jdbc.update(sql,args)).isInstanceOf(DataAccessException.class).satisfies(failure->assertThat(((DataAccessException)failure).getMostSpecificCause().getMessage()).contains(reason));}
     @Test void recordedAndGroupIndividualLoansReuseOneIdentityPerClient(){
-        var ordinary=f.service.save(f.actor,f.form());var cycle=setup.submitted();
+        var ordinary=f.service.save(f.actor,f.form());var form=setup.form();var cycle=setup.cycles.create(f.actor,setup.group,form);
+        assertThatThrownBy(()->setup.cycles.submit(f.actor,cycle,form)).hasMessage("group.error.sharedApplicationPending");
+        f.service.disburse(f.actor,f.post(ordinary,"1000.00","D-IDENTITY-REUSE"));
+        f.service.repay(f.actor,f.post(ordinary,"1020.00","R-IDENTITY-REUSE"));
+        assertThat(f.service.detail(f.actor,ordinary).loan().status()).isEqualTo("PAID");
+        setup.cycles.submit(f.actor,cycle,form);
         assertThat(identity(ordinary)).isEqualTo(f.client);assertThat(f.context.getBean(LoanApplicationRepository.class).findById(ordinary).orElseThrow().getBorrowerPartyId()).isEqualTo(f.client);
         for(var participant:setup.cycles.participants(f.actor,cycle))assertThat(identity(participant.loanId())).isEqualTo(participant.clientId());
         assertThat(f.jdbc.queryForObject("select count(*) from loan_borrower_party where sacco_id=?",Integer.class,f.institution)).isEqualTo(2);

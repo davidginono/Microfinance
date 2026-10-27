@@ -42,6 +42,16 @@ class GroupCoveragePostgresTest {
     LinkForm linkForm(UUID posting){var x=new LinkForm();x.setPostingId(posting);x.setPayerEvidence("Synthetic verified identity of actual guarantor payer");x.setPayerVerified(true);return x;}
     UUID receipt(String amount){var x=f.post(p.s.loan,amount,"COVERAGE-"+UUID.randomUUID());x.setEffectiveDate(day);x.setNotes("Synthetic actual guarantor payer");return f.service.repay(f.actor,x).id();}
     long count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Long.class,f.institution);}
+    @Test void legacyCaseAndObligationRegistersSupportTheirDisplayedColumnOrders(){
+        UUID id=call();try {
+            for(String table:List.of("coverage-cases","coverage-obligations"))for(String key:table.equals("coverage-cases")?List.of("loan","person","kind","date","amount","received","state"):List.of("loan","person","kind","cap","arrears"))for(String direction:List.of("asc","desc")){
+                var request=new org.springframework.mock.web.MockHttpServletRequest("GET","/");request.setParameter("tableSort["+table+"]",key);request.setParameter("tableDirection["+table+"]",direction);org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+                if(table.equals("coverage-cases")){assertThat(coverage.list(f.actor,p.s.cycle,0,false).rows()).extracting(Case::id).containsExactly(id);assertThat(coverage.list(f.actor,p.s.cycle,1,false).rows()).isEmpty();}
+                else {assertThat(coverage.sources(f.actor,p.s.cycle,0).rows()).isNotEmpty();assertThat(coverage.sources(f.actor,p.s.cycle,1).rows()).isEmpty();}
+            }
+            assertThatThrownBy(()->coverage.sources(f.operator("B2"),p.s.cycle,0)).isInstanceOf(AccessDeniedException.class);
+        } finally {org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();}
+    }
     @Test void casesAndPromisesRetainServedEvidenceAndNeverPostMoney()throws Exception{
         long journals=count("gl_journal");var form=callForm();var pdf=GroupOrganizationPostgresTest.documentFile();UUID id=coverage.call(f.actor,p.s.cycle,form,pdf);assertThat(coverage.call(f.actor,p.s.cycle,form,pdf)).isEqualTo(id);var c=detail(id).header();assertThat(c.sourceKind()).isEqualTo("PERSONAL");assertThat(c.borrower()).isEqualTo("Synthetic organization <Company>");assertThat(c.requested()).isEqualByComparingTo("100.00");assertThat(coverage.notice(p.s.signer,id,true)).isEqualTo(pdf.getBytes());
         var promise=response("PROMISED",0);promise.setAmount(new BigDecimal("70.00"));promise.setPromiseOn(day.plusDays(5));UUID event=coverage.respond(p.s.signer,id,promise);assertThat(coverage.respond(p.s.signer,id,promise)).isEqualTo(event);assertThat(detail(id).header().state()).isEqualTo("PROMISED");assertThat(detail(id).header().received()).isZero();assertThat(detail(id).events().rows()).hasSize(1);assertThat(count("gl_journal")).isEqualTo(journals);assertThat(count("loan_ledgers")).isEqualTo(1);form.setAmount(new BigDecimal("90.00"));assertThatThrownBy(()->coverage.call(f.actor,p.s.cycle,form,pdf)).hasMessage("group.error.retry");

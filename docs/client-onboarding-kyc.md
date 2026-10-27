@@ -76,6 +76,8 @@ The focused command used `mvn -q -Dtest=ClientOnboardingPostgresTest,ClientOnboa
 
 The full run selected **1,888 tests: three failures, two errors, 129 skipped**. It is not a passing full suite. Remaining findings outside onboarding are the existing account-version header and voucher-configuration filter assertions in `AwsConsoleViewContractTest`, the existing table-sorting coverage assertions elsewhere, and `BorrowerIdentityPostgresTest.recordedAndGroupIndividualLoansReuseOneIdentityPerClient`, whose fixture attempts another application while its recorded application is pending (`group.error.sharedApplicationPending`). The fifth finding was an encoding error in the newly added label section; those sections were corrected to UTF-8 and the affected assertion was rerun separately.
 
+Follow-up: the reported failures and fixture error are resolved. The new full run passed with zero failures/errors; see [UI-contract and borrower identity regression fixes](ui-contract-regression-fixes.md) for counts, changes and remaining validation limits.
+
 After the final contact and self-review safeguards, a fresh migration and the final focused selection passed **27 tests**: ten PostgreSQL cases, seven MVC cases, the component architecture check, Jasper compilation, four registration checks and four shared-storage checks. This includes rejection of a missing client phone and of a staff client's attempt to verify their own profile.
 
 The separate UTF-8 assertion and repeated MVC/architecture checks passed (nine checks). Both full message files decode as UTF-8. JavaScript syntax validation and `git diff --check` passed. `mvn -q -DskipTests package` produced the WAR successfully.

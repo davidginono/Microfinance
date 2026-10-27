@@ -23,6 +23,6 @@ public class GroupOrganizationAccountRepository {
           and not exists(select 1 from lending_group_authority_revocation r where r.authority_id=h.id)
           and not exists(select 1 from lending_group_authority n where n.group_id=h.group_id and n.revision>h.revision)
         """;
-    public List<Account> list(AppUserPrincipal a,LocalDate date,int page){return jdbc.query("select c.id,g.code||' - '||g.name name,coalesce(l.loan_id,l.application_number::text) loan,l.status "+SOURCE+" order by c.submitted_at desc,c.id desc limit 26 offset ?",(r,n)->new Account(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4)),a.getMemberId(),a.getSaccoId(),a.getStationId(),date,date,page*25);}
+    public List<Account> list(AppUserPrincipal a,LocalDate date,int page){return jdbc.query("select c.id,g.code||' - '||g.name name,coalesce(l.loan_id,l.application_number::text) loan,l.status "+SOURCE+" order by "+com.sacco.mvp.support.ResourceTableSort.order("organization-accounts",Map.of("group","name","loan","loan","state","l.status"),"c.id","c.submitted_at desc,c.id desc")+" limit 26 offset ?",(r,n)->new Account(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4)),a.getMemberId(),a.getSaccoId(),a.getStationId(),date,date,page*25);}
     public boolean permitted(AppUserPrincipal a,UUID cycle,LocalDate date){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 "+SOURCE+" and c.id=?)",Boolean.class,a.getMemberId(),a.getSaccoId(),a.getStationId(),date,date,cycle));}
 }

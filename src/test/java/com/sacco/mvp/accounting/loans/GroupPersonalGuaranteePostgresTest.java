@@ -39,6 +39,19 @@ class GroupPersonalGuaranteePostgresTest {
     void accept(UUID id){var p=own(id);guarantees.clientDocument(s.signer,id);assertThat(guarantees.accept(s.signer,id,p.offer().hash(),true,"")).isNull();}
     void fund(UUID id){accept(id);guarantees.startReview(f.actor,s.cycle);w.p.ready();assertThat(w.p.service.confirm(s.signer,s.cycle,s.hash,true,"")).isNull();f.service.disburse(f.actor,w.funding());}
     long count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Long.class,f.institution);}
+    @Test void staffAndClientRegistersSortTheirScopedRowsBeforePagination(){
+        UUID first=offer();guarantees.cancel(f.actor,s.cycle,first,"Synthetic replacement");UUID second=offer();
+        try {
+            for(String table:List.of("personal-guarantees","my-group-guarantees"))for(String key:table.equals("personal-guarantees")?List.of("code","guarantor","cap","state","date"):List.of("code","loan","borrower","cap","state"))for(String direction:List.of("asc","desc")){
+                var request=new org.springframework.mock.web.MockHttpServletRequest("GET","/");request.setParameter("tableSort["+table+"]",key);request.setParameter("tableDirection["+table+"]",direction);org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+                var rows=table.equals("personal-guarantees")?guarantees.workspace(f.actor,s.cycle,0,null).offers().rows():guarantees.list(s.signer,0).rows();assertThat(rows).hasSize(2);
+                if(key.equals("code"))assertThat(rows.stream().map(Offer::code).toList()).isSortedAccordingTo(direction.equals("asc")?Comparator.naturalOrder():Comparator.reverseOrder());
+                if(key.equals("state"))assertThat(rows.getFirst().id()).isEqualTo(direction.equals("asc")?first:second);
+            }
+            assertThat(guarantees.list(s.signer,1).rows()).isEmpty();
+            assertThatThrownBy(()->guarantees.workspace(f.operator("B2"),s.cycle,0,null)).isInstanceOf(AccessDeniedException.class);
+        } finally {org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();}
+    }
     @Test void organizationAuthorityAndLoanSignatureDoNotApprovePersonalGuarantees(){
         assertThat(o.status(s.loan)).isEqualTo("AWAITING_GUARANTORS");w.p.ready();assertThatThrownBy(()->guarantees.startReview(f.actor,s.cycle)).hasMessage("recording.error.personalGuarantees");assertThatThrownBy(()->f.jdbc.update("update loan_applications set status='READY_FOR_DISBURSEMENT' where id=?",s.loan)).isInstanceOf(DataAccessException.class);assertThat(count("loan_ledgers")).isZero();
         UUID id=offer();var p=own(id);assertThat(p.source().borrower()).isEqualTo("Synthetic organization <Company>");assertThat(p.offer().cap()).isEqualByComparingTo("1020.00");assertThat(guarantees.accept(s.signer,id,p.offer().hash(),true,"")).isEqualTo("group.error.documentOpen");guarantees.clientDocument(s.signer,id);assertThat(guarantees.accept(s.signer,id,p.offer().hash(),true,"")).isNull();assertThat(o.status(s.loan)).isEqualTo("AWAITING_GUARANTORS");guarantees.startReview(f.actor,s.cycle);assertThat(o.status(s.loan)).isEqualTo("READY_FOR_DISBURSEMENT");guarantees.startReview(f.actor,s.cycle);assertThat(count("loan_ledgers")).isZero();assertThat(count("lending_group_personal_guarantee")).isEqualTo(1);
