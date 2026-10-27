@@ -25,10 +25,15 @@ public final class GroupCycleDtos {
         private String agreementReference="";
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private SharedLiability sharedLiability;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private GroupDisclosureDtos.Rules releaseRules;
     }
     public record Policy(UUID id,UUID productId,String product,Model model,int minMembers,int maxMembers,
         BigDecimal maxPrincipal,BigDecimal maxGuarantee,int maxActiveCycles,boolean ownLoanGuarantors,
-        boolean enabled,String policyReference,String agreementReference,OffsetDateTime createdAt,long revision) {}
+        boolean enabled,String policyReference,String agreementReference,OffsetDateTime createdAt,long revision,
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) GroupDisclosureDtos.Rules releaseRules) {
+        public Policy(UUID id,UUID productId,String product,Model model,int minMembers,int maxMembers,BigDecimal maxPrincipal,BigDecimal maxGuarantee,int maxActiveCycles,boolean ownLoanGuarantors,boolean enabled,String policyReference,String agreementReference,OffsetDateTime createdAt,long revision){this(id,productId,product,model,minMembers,maxMembers,maxPrincipal,maxGuarantee,maxActiveCycles,ownLoanGuarantors,enabled,policyReference,agreementReference,createdAt,revision,null);}
+    }
     @Data public static class CycleForm {
         private UUID requestKey=UUID.randomUUID();
         private UUID policyId;
@@ -41,6 +46,8 @@ public final class GroupCycleDtos {
         private List<ParticipantForm> participants=new ArrayList<>();
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private OrganizationForm organization;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private GroupDisclosureDtos.Declaration disclosure;
     }
     @Data public static class OrganizationForm {
         private UUID authorityId;
@@ -63,6 +70,8 @@ public final class GroupCycleDtos {
         private BigDecimal collateralValue;
         private BigDecimal insurancePremium;
         private String insuranceEvidence="";
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private GroupDisclosureDtos.Declaration disclosure;
     }
     public record Cycle(UUID id,UUID groupId,String groupName,UUID policyId,UUID productId,Model model,
         String state,int version,CycleForm form,OffsetDateTime submittedAt) {}
@@ -97,5 +106,8 @@ public final class GroupCycleDtos {
     public record Terms(BigDecimal principal,BigDecimal annualRate,BigDecimal contractualInterest,BigDecimal instalment,
         String frequency,String tenureUnit,int tenureValue,LocalDate firstPaymentDate,String purpose,
         BigDecimal maximumInstalment,BigDecimal chargeTotal,BigDecimal deductions,BigDecimal netCash,BigDecimal totalPayable,
-        com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan charges) {}
+        com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan charges,
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) GroupDisclosureDtos.Snapshot groupDisclosure) {
+        public Terms(BigDecimal principal,BigDecimal annualRate,BigDecimal contractualInterest,BigDecimal instalment,String frequency,String tenureUnit,int tenureValue,LocalDate firstPaymentDate,String purpose,BigDecimal maximumInstalment,BigDecimal chargeTotal,BigDecimal deductions,BigDecimal netCash,BigDecimal totalPayable,com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan charges){this(principal,annualRate,contractualInterest,instalment,frequency,tenureUnit,tenureValue,firstPaymentDate,purpose,maximumInstalment,chargeTotal,deductions,netCash,totalPayable,charges,null);}
+    }
 }

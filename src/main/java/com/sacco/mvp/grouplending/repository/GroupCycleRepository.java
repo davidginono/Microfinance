@@ -18,9 +18,9 @@ import java.util.*;
 public class GroupCycleRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
-    private static final RowMapper<Policy> POLICY=(r,n)->new Policy(r.getObject("id",UUID.class),r.getObject("product_id",UUID.class),r.getString("product_name"),
+    private Policy policyRow(java.sql.ResultSet r,int n)throws java.sql.SQLException{return new Policy(r.getObject("id",UUID.class),r.getObject("product_id",UUID.class),r.getString("product_name"),
         Model.valueOf(r.getString("model")),r.getInt("min_members"),r.getInt("max_members"),r.getBigDecimal("max_principal"),r.getBigDecimal("max_guarantee"),
-        r.getInt("max_active_cycles"),r.getBoolean("own_loan_guarantors"),r.getBoolean("enabled"),r.getString("policy_reference"),r.getString("agreement_reference"),r.getObject("created_at",OffsetDateTime.class),r.getLong("revision"));
+        r.getInt("max_active_cycles"),r.getBoolean("own_loan_guarantors"),r.getBoolean("enabled"),r.getString("policy_reference"),r.getString("agreement_reference"),r.getObject("created_at",OffsetDateTime.class),r.getLong("revision"),r.getString("release_rules")==null?null:json.readValue(r.getString("release_rules"),com.sacco.mvp.grouplending.dto.GroupDisclosureDtos.Rules.class));}
     private static final String POLICIES="""
         select p.*,coalesce(l.product_name,l.loan_type) product_name from lending_group_policy p join loan_product_settings l on l.id=p.product_id
         where p.sacco_id=? and p.station_id=?
@@ -48,10 +48,10 @@ public class GroupCycleRepository {
     }
     public UUID policy(AppUserPrincipal a,PolicyForm f,String hash,OffsetDateTime now){UUID id=UUID.randomUUID();jdbc.update("""
         insert into lending_group_policy(id,sacco_id,station_id,product_id,model,min_members,max_members,max_principal,max_guarantee,max_active_cycles,
-          own_loan_guarantors,policy_reference,agreement_reference,enabled,request_key,payload_hash,created_by,created_at,capability_version,shared_liability)
-        values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          own_loan_guarantors,policy_reference,agreement_reference,enabled,request_key,payload_hash,created_by,created_at,capability_version,shared_liability,release_rules)
+        values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb)
         """,id,a.getSaccoId(),a.getStationId(),f.getProductId(),f.getModel().name(),f.getMinMembers(),f.getMaxMembers(),f.getMaxPrincipal(),f.getMaxGuarantee(),f.getMaxActiveCycles(),
-        f.isOwnLoanGuarantors(),f.getPolicyReference().strip(),f.getAgreementReference().strip(),f.isEnabled(),f.getRequestKey(),hash,a.getMemberId(),now,f.getModel()==Model.ORGANIZATION?1:f.getModel()==Model.SHARED?2:0,f.getSharedLiability()==null?null:f.getSharedLiability().name());return id;}
+        f.isOwnLoanGuarantors(),f.getPolicyReference().strip(),f.getAgreementReference().strip(),f.isEnabled(),f.getRequestKey(),hash,a.getMemberId(),now,f.getModel()==Model.ORGANIZATION?1:f.getModel()==Model.SHARED?2:0,f.getSharedLiability()==null?null:f.getSharedLiability().name(),f.getReleaseRules()==null?null:json.writeValueAsString(f.getReleaseRules()));return id;}
     public Optional<SharedLiability> sharedLiability(AppUserPrincipal a,UUID policy){return jdbc.query("select shared_liability from lending_group_policy where id=? and sacco_id=? and station_id=? and model='SHARED' and capability_version=2",(r,n)->SharedLiability.valueOf(r.getString(1)),policy,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public UUID sharedParty(AppUserPrincipal a,UUID group){
         jdbc.update("insert into loan_borrower_party(id,sacco_id,kind,group_id,group_station_id) values(?,?,'JOINT_GROUP',?,?) on conflict(sacco_id,group_id,kind) do nothing",UUID.randomUUID(),a.getSaccoId(),group,a.getStationId());
@@ -69,10 +69,10 @@ public class GroupCycleRepository {
     }
     public Optional<SharedFacility> sharedFacility(AppUserPrincipal a,UUID cycle){return jdbc.query("select f.*,coalesce(l.loan_id,l.application_number::text) number,l.status from lending_group_shared_facility f join loan_applications l on l.id=f.loan_id where f.cycle_id=? and f.sacco_id=? and f.station_id=?",(r,n)->new SharedFacility(r.getObject("loan_id",UUID.class),r.getString("number"),r.getString("status"),SharedLiability.valueOf(r.getString("liability_rule")),json.readValue(r.getString("snapshot"),SharedQuote.class)),cycle,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public Optional<SharedObligation> sharedObligation(AppUserPrincipal a,UUID cycle){return jdbc.query("select f.liability_rule,s.* from lending_group_shared_facility f join lending_group_shared_allocation s on s.cycle_id=f.cycle_id where f.cycle_id=? and f.sacco_id=? and f.station_id=? and s.client_id=?",(r,n)->new SharedObligation(SharedLiability.valueOf(r.getString("liability_rule")),r.getBigDecimal("liability_cap"),new SharedShare(a.getMemberId(),r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("charges"),r.getBigDecimal("deductions"),r.getBigDecimal("net"),r.getBigDecimal("monthly_payment"))),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst();}
-    public Policy policy(AppUserPrincipal a,UUID id){return jdbc.query(POLICIES+" and p.id=?",POLICY,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Group product unavailable"));}
+    public Policy policy(AppUserPrincipal a,UUID id){return jdbc.query(POLICIES+" and p.id=?",this::policyRow,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Group product unavailable"));}
     public List<Policy> policies(AppUserPrincipal a,int page){return policies(a,"",page);}
     public List<Policy> policies(AppUserPrincipal a,String search,int page){return jdbc.query(POLICIES+" and strpos(lower(coalesce(l.product_name,l.loan_type)),?)>0 and not exists(select 1 from lending_group_policy newer where newer.sacco_id=p.sacco_id and newer.station_id=p.station_id and newer.product_id=p.product_id and newer.model=p.model and newer.revision>p.revision) order by "+
-        ResourceTableSort.order("group-product-rules",Map.of("product","product_name","model","p.model","members","row(p.min_members,p.max_members)","principal","p.max_principal","guarantee","p.max_guarantee","agreement","p.agreement_reference","enabled","p.enabled"),"p.id","product_name,p.model,p.id")+" limit 26 offset ?",POLICY,a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
+        ResourceTableSort.order("group-product-rules",Map.of("product","product_name","model","p.model","members","row(p.min_members,p.max_members)","principal","p.max_principal","guarantee","p.max_guarantee","agreement","p.agreement_reference","enabled","p.enabled"),"p.id","product_name,p.model,p.id")+" limit 26 offset ?",this::policyRow,a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
     public List<Choice> memberChoices(AppUserPrincipal a,UUID group,String search,int page){return jdbc.query("""
         select m.id,m.member_no||' - '||m.full_name label from lending_group_member gm join members m on m.id=gm.client_id
         where gm.sacco_id=? and gm.station_id=? and gm.group_id=? and gm.ends_on is null and m.status='ACTIVE'
@@ -207,9 +207,10 @@ public class GroupCycleRepository {
         from lending_group_guarantee g join members m on m.id=g.guarantor_id join members b on b.id=g.borrower_id join loan_applications l on l.id=g.loan_id
         where g.cycle_id=? and g.sacco_id=? and g.station_id=? and g.guarantor_id=? order by
         """+ResourceTableSort.order("group-personal-guarantees",Map.of("borrower","b.full_name","loan","loan_number","cap","g.amount_cap","agreement","g.terms_reference"),"g.id","b.member_no,g.id")+" limit 49",(r,n)->new Guarantee(r.getObject("id",UUID.class),r.getObject("guarantor_id",UUID.class),r.getString("guarantor"),r.getObject("borrower_id",UUID.class),r.getString("borrower"),r.getString("loan_number"),r.getBigDecimal("amount_cap"),r.getString("terms_reference")),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId());}
-    public void consent(AppUserPrincipal a,UUID cycle,UUID policy,String signature,UUID challenge,OffsetDateTime now){
+    public void consent(AppUserPrincipal a,UUID cycle,UUID policy,String signature,UUID challenge,OffsetDateTime now){consent(a,cycle,policy,signature,challenge,now,null);}
+    public void consent(AppUserPrincipal a,UUID cycle,UUID policy,String signature,UUID challenge,OffsetDateTime now,String language){
         jdbc.update("insert into lending_group_consent(cycle_id,sacco_id,station_id,client_id,accepted_at) values(?,?,?,?,?) on conflict(cycle_id,client_id) do nothing",cycle,a.getSaccoId(),a.getStationId(),a.getMemberId(),now);
-        jdbc.update("insert into lending_group_consent_evidence(cycle_id,sacco_id,station_id,client_id,policy_id,signature_text,signed_at,otp_required,challenge_id) values(?,?,?,?,?,?,?,?,?)",cycle,a.getSaccoId(),a.getStationId(),a.getMemberId(),policy,signature,now,challenge!=null,challenge);
+        jdbc.update("insert into lending_group_consent_evidence(cycle_id,sacco_id,station_id,client_id,policy_id,signature_text,signed_at,otp_required,challenge_id,preferred_language) values(?,?,?,?,?,?,?,?,?,?)",cycle,a.getSaccoId(),a.getStationId(),a.getMemberId(),policy,signature,now,challenge!=null,challenge,language);
     }
     public List<Challenge> challenges(AppUserPrincipal a,UUID cycle){return jdbc.query("select * from lending_group_consent_challenge where cycle_id=? and sacco_id=? and station_id=? and client_id=? order by issued_at desc,id desc limit 4 for update",
         (r,n)->new Challenge(r.getObject("id",UUID.class),r.getString("code_hash"),r.getObject("issued_at",OffsetDateTime.class),r.getObject("expires_at",OffsetDateTime.class),r.getObject("delivered_at",OffsetDateTime.class),r.getObject("consumed_at",OffsetDateTime.class),r.getInt("attempts")),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId());}
@@ -227,8 +228,8 @@ public class GroupCycleRepository {
         (l.financial_snapshot->>'recordedChargeDeductions')::numeric deductions,
         (l.financial_snapshot->>'recordedNetCashEstimate')::numeric net_cash,
         (l.financial_snapshot->>'recordedTotalPayable')::numeric total_payable,
-        l.financial_snapshot->'recordedCharges' charges from lending_group_participant x left join lending_group_shared_facility sf on sf.cycle_id=x.cycle_id join loan_applications l on l.id=coalesce(x.loan_id,sf.loan_id)
+        l.financial_snapshot->'groupDisclosure' group_disclosure,l.financial_snapshot->'recordedCharges' charges from lending_group_participant x left join lending_group_shared_facility sf on sf.cycle_id=x.cycle_id join loan_applications l on l.id=coalesce(x.loan_id,sf.loan_id)
         join lending_group_cycle c on c.id=x.cycle_id where x.cycle_id=? and x.sacco_id=? and x.station_id=? and x.client_id=?
         """,(r,n)->new Terms(r.getBigDecimal("amount"),r.getBigDecimal("rate"),r.getBigDecimal("interest"),r.getBigDecimal("installment_amount"),r.getString("repayment_frequency"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("first_repayment_date",LocalDate.class),r.getString("purpose"),
-            r.getBigDecimal("maximum_instalment"),r.getBigDecimal("charge_total"),r.getBigDecimal("deductions"),r.getBigDecimal("net_cash"),r.getBigDecimal("total_payable"),json.readValue(r.getString("charges"),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan.class)),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Own agreement unavailable"));}
+            r.getBigDecimal("maximum_instalment"),r.getBigDecimal("charge_total"),r.getBigDecimal("deductions"),r.getBigDecimal("net_cash"),r.getBigDecimal("total_payable"),json.readValue(r.getString("charges"),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan.class),r.getString("group_disclosure")==null?null:json.readValue(r.getString("group_disclosure"),com.sacco.mvp.grouplending.dto.GroupDisclosureDtos.Snapshot.class)),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Own agreement unavailable"));}
 }

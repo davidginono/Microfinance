@@ -22,7 +22,8 @@ public final class GroupOrganizationAgreementDtos {
         String repaymentFrequency,String tenureUnit,Integer tenureValue,Integer numberOfPayments,
         BigDecimal periodicRepaymentAmount,BigDecimal maximumInstallmentAmount,BigDecimal interestAmount,
         Plan recordedCharges,BigDecimal recordedChargeTotal,BigDecimal recordedChargeDeductions,
-        BigDecimal recordedNetCashEstimate,BigDecimal recordedTotalPayable,Map<String,Object> prepaymentTerms) {}
+        BigDecimal recordedNetCashEstimate,BigDecimal recordedTotalPayable,Map<String,Object> prepaymentTerms,
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) GroupDisclosureDtos.Snapshot groupDisclosure) {}
     public record Snapshot(Organization organization,Authority authority,Loan loan,Finance financial,PaymentDetailsView payout,
         GroupOrganizationDocumentDtos.Document document) {}
     public record Row(UUID cycle,Snapshot snapshot,String hash,OffsetDateTime preparedAt,String state,String loanStatus,

@@ -10,6 +10,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 public final class LoanRecordingDtos {
     private LoanRecordingDtos() {}
     @Data public static class RecordForm {
+        /** Internal group-origination evidence; deliberately excluded from every browser binder. */
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private com.sacco.mvp.grouplending.dto.GroupDisclosureDtos.Snapshot groupDisclosure;
         private UUID requestKey = UUID.randomUUID();
         private UUID clientId;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)

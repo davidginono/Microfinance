@@ -57,10 +57,11 @@ public class GroupConsentService {
     }
     private Member signer(AppUserPrincipal a,UUID id){var current=authorize(a,UserClaim.MEMBER_LOANS_VIEW,UserClaim.MEMBER_LOANS_UPDATE);if(cycles.cycle(a,id,false).model()!=Model.SHARED)authorize(a,UserClaim.GUARANTOR_REQUESTS_APPROVE);return current;}
     /** Returns a validation key without rolling back failed-code attempt accounting. */
-    @Transactional public String accept(AppUserPrincipal a,UUID id,boolean accepted,String code){
+    @Transactional public String accept(AppUserPrincipal a,UUID id,boolean accepted,String code){return accept(a,id,accepted,code,null);}
+    @Transactional public String accept(AppUserPrincipal a,UUID id,boolean accepted,String code,String preferredLanguage){
         var current=signer(a,id);if(!accepted)throw new AccessDeniedException("Personal acceptance required");
         consentLock(a,id);var packet=loadPacket(a,id,current);if(packet.termination()!=null)return "group.error.endedCycle";if(packet.accepted())return null;
-        if(!packet.signatureReady())return "group.error.signature";UUID challengeId=null;var signedAt=clock.now();
+        if(!packet.signatureReady())return "group.error.signature";String language;try{language=GroupDisclosure.language(packet.terms().groupDisclosure(),preferredLanguage,null);}catch(IllegalArgumentException e){return e.getMessage();}UUID challengeId=null;var signedAt=clock.now();
         if(packet.otpRequired()){
             var challenges=cycles.challenges(a,id);if(challenges.isEmpty())return "group.error.otpRequired";var challenge=challenges.getFirst();
             if(challenge.delivered()==null || challenge.consumed()!=null || !challenge.expires().isAfter(clock.now()) || challenge.attempts()>=5)return "group.error.otpExpired";
@@ -68,7 +69,7 @@ public class GroupConsentService {
             if(code==null || !code.matches("[0-9]{6}") || !passwords.matches(code,challenge.hash()))return "group.error.otpInvalid";
             challengeId=challenge.id();cycles.challengeConsumed(challengeId,signedAt);
         }
-        cycles.consent(a,id,packet.policy().id(),current.getSignatureText(),challengeId,signedAt);audit.logEvent("GROUP_LENDING",id,"GROUP_TERMS_ACCEPTED",a.getMemberId(),AuditEventStatus.SUCCESS,
+        cycles.consent(a,id,packet.policy().id(),current.getSignatureText(),challengeId,signedAt,language);audit.logEvent("GROUP_LENDING",id,"GROUP_TERMS_ACCEPTED",a.getMemberId(),AuditEventStatus.SUCCESS,
             "Group loan and guarantee terms accepted","GROUP_CYCLE",id.toString(),a.getSaccoId(),a.getStationId(),Map.of("policy",packet.policy().id(),"client",a.getMemberId()));
         return null;
     }

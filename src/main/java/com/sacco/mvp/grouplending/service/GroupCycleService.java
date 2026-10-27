@@ -45,6 +45,7 @@ public class GroupCycleService {
         text(f.getPolicyReference(),500);text(f.getAgreementReference(),500);
         check(f.getModel()!=Model.INDIVIDUAL || f.isOwnLoanGuarantors(),"ownLoanGuarantors");
         check((f.getModel()==Model.SHARED)==(f.getSharedLiability()!=null),"sharedLiability");
+        f.setReleaseRules(GroupDisclosure.rules(f.getReleaseRules()));
         String hash=hash(f);cycles.lock(a,"GROUP_POLICY",f.getRequestKey());var retry=cycles.retry(a,f.getRequestKey(),hash,false);if(retry.isPresent())return retry.get();
         check(cycles.product(a,f.getProductId()),"product");cycles.lock(a,"GROUP_PRODUCT",f.getProductId());
         UUID id=cycles.policy(a,f,hash,clock.now());event(a,id,"GROUP_PRODUCT_RULES_SAVED",Map.of("product",f.getProductId(),"model",f.getModel(),"enabled",f.isEnabled()));return id;
@@ -137,7 +138,7 @@ public class GroupCycleService {
         var ids=f.getParticipants().stream().map(ParticipantForm::getClientId).toList();check(!ids.isEmpty() && ids.stream().allMatch(Objects::nonNull),"members");cycles.lockClients(a,ids);
         var quote=assessShared(a,c.id(),f);var rule=cycles.sharedLiability(a,c.policyId()).orElseThrow(()->new IllegalArgumentException("group.error.sharedLiability"));
         var guaranteeRules=cycles.rules(a,c.productId());check(guaranteeRules.guarantors()>=0 && guaranteeRules.guarantors()<=50,"guarantees");
-        UUID party=cycles.sharedParty(a,c.groupId());UUID loan=loans.saveShared(a,sharedCommand(c,f,quote.principal()),party);
+        UUID party=cycles.sharedParty(a,c.groupId());var command=sharedCommand(c,f,quote.principal());command.setGroupDisclosure(GroupDisclosure.snapshot(cycles.policy(a,c.policyId()),f.getDisclosure()));UUID loan=loans.saveShared(a,command,party);
         cycles.sharedParticipants(a,c,f,quote,cycles.memberships(a,c.groupId(),ids));cycles.sharedFacility(a,c,loan,rule,quote,clock.now());cycles.save(c,f,true,clock.now());
         event(a,c.id(),"SHARED_LOAN_SUBMITTED",Map.of("loan",loan,"principal",quote.principal(),"participants",ids.size(),"liability",rule));
     }
@@ -165,7 +166,7 @@ public class GroupCycleService {
             check(branchPolicy.guaranteeCountLimit()==null || exposure.guaranteeCount()+ids.size()-1<=branchPolicy.guaranteeCountLimit(),"guaranteeCount");
             int existing=exposure.activeLoans();check(existing==0 || (rules.activeLoanAllowed() && existing<rules.maximumActiveLoans()),"activeLoans");
             if(rules.collateralRequired()){text(row.getCollateral(),500);money(row.getCollateralValue(),false);check(row.getCollateralValue().compareTo(row.getPrincipal().multiply(rules.collateralRatio()))>=0,"collateral");}
-            var command=new RecordForm();command.setRequestKey(key(c.id(),row.getClientId()));command.setClientId(row.getClientId());command.setProductId(c.productId());
+            var command=new RecordForm();command.setGroupDisclosure(GroupDisclosure.snapshot(p,row.getDisclosure()));command.setRequestKey(key(c.id(),row.getClientId()));command.setClientId(row.getClientId());command.setProductId(c.productId());
             command.setApplicationDate(f.getApplicationDate());command.setPrincipal(row.getPrincipal());command.setTenureUnit(tenure.unit());command.setTenureValue(tenure.value());
             command.setFirstPaymentDate(f.getFirstPaymentDate());
             command.setPurpose(f.getPurpose());command.setIncome(row.getIncome());command.setExpenses(row.getExpenses());command.setOtherDebt(row.getOtherDebt());command.setInformationSource("DOCUMENTED");

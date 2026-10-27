@@ -68,17 +68,19 @@ public class GroupOrganizationAgreementService {
         return List.copyOf(schedule);
     }
     /** A failed code returns a validation key so attempt counting commits. */
-    @Transactional public String sign(AppUserPrincipal a,UUID cycle,String hash,boolean accepted,String code){
+    @Transactional public String sign(AppUserPrincipal a,UUID cycle,String hash,boolean accepted,String code){return sign(a,cycle,hash,accepted,code,null);}
+    @Transactional public String sign(AppUserPrincipal a,UUID cycle,String hash,boolean accepted,String code,String preferredLanguage){
         var person=authorize(a,true);if(!accepted)throw new AccessDeniedException("Organization acceptance required");agreements.lock(a,cycle);var row=agreements.own(a,cycle,clock.today());
         check(Objects.equals(row.hash(),hash),"changed");if(row.signed())return null;if(!open(row))return "group.error.organizationSigningClosed";
         requireDocumentPermission(a,person);String documentError=documentError(a,row);if(documentError!=null)return documentError;if(!signatureReady(person))return "group.error.signature";
+        String language;try{language=GroupDisclosure.language(row.snapshot().financial().groupDisclosure(),preferredLanguage,row.snapshot().document().language());}catch(IllegalArgumentException e){return e.getMessage();}
         UUID challenge=null;var at=clock.now();if(otpSettings.requiresApprovalOtp(a.getMemberId(),a.getSaccoId(),a.getStationId())){
             var recent=agreements.challenges(a,cycle);if(recent.isEmpty())return "group.error.otpRequired";var c=recent.getFirst();
             if(c.delivered()==null || c.consumed()!=null || !c.expires().isAfter(at) || c.attempts()>=5)return "group.error.otpExpired";
             agreements.attempt(c.id());if(code==null || !code.matches("[0-9]{6}") || !passwords.matches(code,c.hash()))return "group.error.otpInvalid";
             challenge=c.id();agreements.consumed(challenge,at);
         }
-        agreements.sign(a,cycle,row.hash(),person.getSignatureText(),challenge,at);audit.logEvent("GROUP_LENDING",cycle,"ORGANIZATION_AGREEMENT_SIGNED",a.getMemberId(),AuditEventStatus.SUCCESS,
+        agreements.sign(a,cycle,row.hash(),person.getSignatureText(),challenge,at,language);audit.logEvent("GROUP_LENDING",cycle,"ORGANIZATION_AGREEMENT_SIGNED",a.getMemberId(),AuditEventStatus.SUCCESS,
             "Organization agreement signed by its named representative","GROUP_CYCLE",cycle.toString(),a.getSaccoId(),a.getStationId(),Map.of("loan",row.snapshot().loan().id(),"authority",row.snapshot().authority().id(),"packet",row.hash()));return null;
     }
     @Transactional public Delivery prepareCode(AppUserPrincipal a,UUID cycle,String hash){

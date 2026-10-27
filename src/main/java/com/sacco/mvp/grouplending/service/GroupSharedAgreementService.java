@@ -68,16 +68,18 @@ public class GroupSharedAgreementService {
         }finally{pdfSlots.release();}
     }
     @Transactional public byte[] original(AppUserPrincipal a,UUID cycle,UUID document){staff(a,"VIEW");access.requireActor(a,"LOAN_DOCUMENTS_VIEW");access.requireActor(a,"LOAN_DOCUMENTS_EXPORT");cycles.cycle(a,cycle,false);var bytes=agreements.body(a,cycle,document);event(a,cycle,"SHARED_DOCUMENT_EXPORTED",Map.of("document",document));return bytes;}
-    @Transactional public String confirm(AppUserPrincipal a,UUID cycle,String hash,boolean accepted,String code){
+    @Transactional public String confirm(AppUserPrincipal a,UUID cycle,String hash,boolean accepted,String code){return confirm(a,cycle,hash,accepted,code,null);}
+    @Transactional public String confirm(AppUserPrincipal a,UUID cycle,String hash,boolean accepted,String code,String preferredLanguage){
         var m=client(a,true);if(!accepted)throw new AccessDeniedException("Shared agreement and payout acceptance required");agreements.lock(a,cycle);var packet=load(a,cycle,m);var p=packet.row();check(Objects.equals(p.hash(),hash),"changed");if(p.confirmation()!=null)return null;
         if(!p.ready())return "group.error.payoutClosed";if(!p.opened())return "group.error.sharedReadDocument";if(!packet.signatureReady())return "group.error.signature";
+        String language;try{language=GroupDisclosure.language(packet.terms().groupDisclosure(),preferredLanguage,p.document().language());}catch(IllegalArgumentException e){return e.getMessage();}
         var at=clock.now();UUID challenge=null;if(packet.otpRequired()){
             var recent=agreements.challenges(a,cycle);if(recent.isEmpty())return "group.error.otpRequired";var q=recent.getFirst();
             if(!Objects.equals(q.packetHash(),hash))return "group.error.changed";
             if(q.delivered()==null||q.consumed()!=null||!q.expires().isAfter(at)||q.attempts()>=5)return "group.error.otpExpired";
             agreements.attempted(q.id());if(code==null||!code.matches("[0-9]{6}")||!passwords.matches(code,q.hash()))return "group.error.otpInvalid";challenge=q.id();agreements.consumed(challenge,at);
         }
-        agreements.confirm(a,p,m.getSignatureText(),challenge,at);event(a,cycle,"SHARED_PAYOUT_AUTHORIZED",Map.of("packet",p.hash(),"net",p.obligation().allocation().net(),"document",p.document().id()));return null;
+        agreements.confirm(a,p,m.getSignatureText(),challenge,at,language);event(a,cycle,"SHARED_PAYOUT_AUTHORIZED",Map.of("packet",p.hash(),"net",p.obligation().allocation().net(),"document",p.document().id()));return null;
     }
     @Transactional public Delivery prepareCode(AppUserPrincipal a,UUID cycle,String hash){
         var m=client(a,true);agreements.lock(a,cycle);var packet=load(a,cycle,m);var p=packet.row();

@@ -227,6 +227,7 @@ public class LoanRecordingService {
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
         snapshot.put("prepaymentTerms",LoanPrepaymentTerms.product(selectedProduct).snapshot());
+        if(f.getGroupDisclosure()!=null)snapshot.put("groupDisclosure",f.getGroupDisclosure());
         if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
         if(shared.active()>0)policy.put("sharedCredit",Map.of("active",shared.active(),"maximumLiability",shared.liability(),"monthlyPayment",shared.monthlyPayment(),"assessedAt",now));
