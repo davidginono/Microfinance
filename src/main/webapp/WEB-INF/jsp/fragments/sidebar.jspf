@@ -39,6 +39,7 @@
                     </a>
                 </sec:authorize>
             </c:if>
+            <c:if test="${memberWorkspace}"><sec:authorize access="@access.has(principal,'GROUP_COVERAGE_OWN_VIEW')"><a href="<c:url value='/app/group-coverage'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/app/group-coverage')?'shell-nav-active':''}"><spring:message code="coverage.title"/></a></sec:authorize></c:if>
             <c:if test="${memberWorkspace}">
                 <sec:authorize access="@access.canAccessMemberArea(principal)">
                 <div class="shell-sidebar-nav-heading"><span>Overview</span></div>
