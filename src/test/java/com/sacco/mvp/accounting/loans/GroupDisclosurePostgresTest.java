@@ -47,10 +47,11 @@ class GroupDisclosurePostgresTest {
         assertThatThrownBy(()->tx.executeWithoutResult(t->repo.consent(a,id,g.policy,"Synthetic personal signature",null,g.f.context.getBean(com.sacco.mvp.service.ApplicationClock.class).now()))).isInstanceOf(DataAccessException.class);
         assertThat(g.consents.accept(a,id,true,"","SW")).isNull();assertThat(g.f.jdbc.queryForObject("select preferred_language from lending_group_consent_evidence where cycle_id=? and client_id=?",String.class,id,g.f.client)).isEqualTo("SW");
     }
-    @Test void sharedFinalAcceptanceChecksTheActualDocumentLanguage(){var f=configured(Model.SHARED);declare(f,Model.SHARED);var id=g.cycles.create(g.f.actor,g.group,f);g.cycles.submit(g.f.actor,id,f);var a=g.client(g.f.client);assertThat(g.consents.accept(a,id,true,"","SW")).isNull();
+    @Test void sharedFinalAcceptanceChecksTheActualDocumentLanguage()throws Exception{var f=configured(Model.SHARED);declare(f,Model.SHARED);var id=g.cycles.create(g.f.actor,g.group,f);g.cycles.submit(g.f.actor,id,f);var a=g.client(g.f.client);assertThat(g.consents.accept(a,id,true,"","SW")).isNull();
         g.f.jdbc.update("insert into member_payment_details(member_id,destination_type,provider,account_holder_name,account_identifier,created_at,updated_at) values(?,'BANK_ACCOUNT','Synthetic bank','Synthetic holder','QA-ACCOUNT',now(),now())",g.f.client);
         var svc=g.f.context.getBean(GroupSharedAgreementService.class);var document=new GroupOrganizationPostgresTest().documentForm();svc.record(g.f.actor,id,document,GroupOrganizationPostgresTest.documentFile());svc.exportClient(a,id,Locale.ENGLISH);var hash=svc.packet(a,id).row().hash();
         assertThat(svc.confirm(a,id,hash,true,"","SW")).isEqualTo("group.error.disclosureLanguage");assertThat(svc.confirm(a,id,hash,true,"","EN")).isNull();
         assertThat(g.f.jdbc.queryForObject("select preferred_language from lending_group_shared_payout where cycle_id=?",String.class,id)).isEqualTo("EN");
+        try(var pdf=org.apache.pdfbox.Loader.loadPDF(svc.exportClient(a,id,Locale.ENGLISH))){assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(pdf)).contains("26.1234%","Synthetic institution-approved method v1","My contract language: English");}
     }
 }

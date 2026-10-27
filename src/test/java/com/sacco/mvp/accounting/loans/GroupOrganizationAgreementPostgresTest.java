@@ -32,7 +32,7 @@ class GroupOrganizationAgreementPostgresTest {
         o.f.context.getBean(org.springframework.mock.env.MockEnvironment.class).setProperty("app.auth.otp.ttl-minutes","10");
         var form=o.form();cycle=o.create(form);loan=o.service.submit(o.f.actor,cycle,form);signer=client(o.f.client);
         hash=service.packet(signer,cycle,0).hash();openDocument(signer,cycle);}
-    @Test void configuredOrganizationDisclosuresAndLanguageAreBoundToTheSignedPacket(){
+    @Test void configuredOrganizationDisclosuresAndLanguageAreBoundToTheSignedPacket()throws Exception{
         o.fixture();var policy=o.policyForm();policy.setReleaseRules(GroupDisclosurePostgresTest.rules());o.policy=o.cycles.configure(o.f.actor,policy);
         var f=o.form();var id=o.create(f);assertThatThrownBy(()->o.service.submit(o.f.actor,id,f)).hasMessage("group.error.disclosureEvidence");
         f.setDisclosure(GroupDisclosurePostgresTest.declaration());var facility=o.service.submit(o.f.actor,id,f);var person=client(o.f.client);openDocument(person,id);var packet=service.packet(person,id,0);
@@ -41,6 +41,7 @@ class GroupOrganizationAgreementPostgresTest {
         assertThat(service.sign(person,id,packet.hash(),true,"","SW")).isEqualTo("group.error.disclosureLanguage");
         assertThat(service.sign(person,id,packet.hash(),true,"","EN")).isNull();
         assertThat(o.f.jdbc.queryForObject("select preferred_language from lending_group_org_signature where cycle_id=?",String.class,id)).isEqualTo("EN");
+        try(var pdf=org.apache.pdfbox.Loader.loadPDF(o.f.context.getBean(GroupOrganizationAgreementExportService.class).client(person,id,Locale.ENGLISH))){assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("26.1234%","Synthetic institution-approved method v1","My contract language: English");}
         assertThat(o.f.jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,o.f.institution)).isZero();
     }
     void openDocument(AppUserPrincipal person,UUID id){o.f.context.getBean(GroupOrganizationAgreementExportService.class).client(person,id,Locale.ENGLISH);}
