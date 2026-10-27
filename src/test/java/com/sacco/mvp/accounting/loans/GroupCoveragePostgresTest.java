@@ -25,6 +25,7 @@ class GroupCoveragePostgresTest {
     final LoanRecordingPostgresTest f=p.f;
     GroupCoverageService coverage;UUID obligation,policy;LocalDate day;
     static GroupCoverageService register(LoanRecordingPostgresTest f){
+        var existing=f.context.getBeansOfType(GroupCoverageService.class);if(!existing.isEmpty())return existing.values().iterator().next();
         f.context.registerBean(GroupCoverageRepository.class,()->new GroupCoverageRepository(f.jdbc));
         f.context.registerBean(GroupCoverageService.class,()->new GroupCoverageService(f.context.getBean(GroupCoverageRepository.class),f.context.getBean(com.sacco.mvp.accounting.service.GeneralLedgerService.class),f.context.getBean(GroupConsentService.class),f.context.getBean(ApplicationClock.class),f.context.getBean(AuditService.class),f.context.getBean(tools.jackson.databind.ObjectMapper.class),f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class),new ReportExportLimiter(2)));
         return f.context.getBean(GroupCoverageService.class);

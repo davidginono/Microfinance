@@ -28,7 +28,7 @@ class GroupMemberStatementMvcTest {
     MockMvc mvc;AppUserPrincipal client;UUID cycle=UUID.randomUUID();
     @BeforeEach void setup(){reset(statements,pdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).memberAccount(true).position(Position.MEMBER).build(),EnumSet.allOf(UserClaim.class),false);}
     @Test void personalRouteUsesAuthenticatedOwnerAndExplicitDateParameters()throws Exception{
-        mvc.perform(get("/app/group-loans/"+cycle+"/statement").with(user(client)).param("clientId",UUID.randomUUID().toString()).param("from","2026-10-01").param("through","2026-10-08").param("page","1").param("schedulePage","2")).andExpect(status().isOk()).andExpect(view().name("groups/member-statement"));verify(statements).client(client,cycle,LocalDate.of(2026,10,1),LocalDate.of(2026,10,8),1,2,false);
+        mvc.perform(get("/app/group-loans/"+cycle+"/statement").with(user(client)).param("clientId",UUID.randomUUID().toString()).param("from","2026-10-01").param("through","2026-10-08").param("page","1").param("schedulePage","2").param("coveragePage","3")).andExpect(status().isOk()).andExpect(view().name("groups/member-statement"));verify(statements).client(client,cycle,LocalDate.of(2026,10,1),LocalDate.of(2026,10,8),1,2,3,false);
         mvc.perform(get("/app/group-loans/"+cycle+"/statement")).andExpect(status().is3xxRedirection());
     }
     @Test void pdfAndPrintUseAuthorizedCompleteExportAndPrivateHeaders()throws Exception{
@@ -37,7 +37,7 @@ class GroupMemberStatementMvcTest {
     }
     @Test void malformedDateAndExcessiveRangeFailRecoverably()throws Exception{
         mvc.perform(get("/app/group-loans/"+cycle+"/statement").with(user(client)).param("from","not-a-date")).andExpect(status().isBadRequest());verifyNoInteractions(statements);
-        when(statements.client(client,cycle,null,null,0,0,false)).thenThrow(new IllegalArgumentException("group.error.statementRange"));mvc.perform(get("/app/group-loans/"+cycle+"/statement").with(user(client))).andExpect(status().isBadRequest()).andExpect(model().attribute("groupError","group.error.statementRange"));
+        when(statements.client(client,cycle,null,null,0,0,0,false)).thenThrow(new IllegalArgumentException("group.error.statementRange"));mvc.perform(get("/app/group-loans/"+cycle+"/statement").with(user(client))).andExpect(status().isBadRequest()).andExpect(model().attribute("groupError","group.error.statementRange"));
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean GroupMemberStatementService statements(){return mock(GroupMemberStatementService.class);}
