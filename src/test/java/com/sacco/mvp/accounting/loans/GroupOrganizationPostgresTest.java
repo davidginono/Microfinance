@@ -96,7 +96,7 @@ class GroupOrganizationPostgresTest {
         assertThatThrownBy(()->service.submit(f.actor,cycle,form)).hasMessage("group.error.organizationPolicy");assertThat(count("loan_applications")).isZero();
     }
     @Test void mandatoryPersonalGuaranteesCannotBeReplacedByOrganizationSignatories(){
-        f.jdbc.update("update loan_product_settings set guarantors_required=1 where id=?",f.product);var form=form();var cycle=create(form);assertThatThrownBy(()->service.submit(f.actor,cycle,form)).hasMessage("group.error.organizationGuarantors");assertThat(count("loan_applications")).isZero();
+        f.jdbc.update("update loan_product_settings set guarantors_required=1 where id=?",f.product);var form=form();var cycle=create(form);var loan=service.submit(f.actor,cycle,form);assertThat(status(loan)).isEqualTo("AWAITING_GUARANTORS");assertThat(count("loan_applications")).isEqualTo(1);assertThat(count("loan_ledgers")).isZero();assertThat(f.jdbc.queryForObject("select coalesce(lending_personal_guarantees_ready(?),false)",Boolean.class,loan)).isFalse();
     }
     @Test void backdatingBeforeAuthorityVerificationAndExceedingLimitsAreRejected(){
         var form=form();var cycle=create(form);form.setApplicationDate(LoanRecordingPostgresTest.TODAY.minusDays(1));assertThatThrownBy(()->service.submit(f.actor,cycle,form)).hasMessage("group.error.date");form.setApplicationDate(LoanRecordingPostgresTest.TODAY);form.getOrganization().setPrincipal(new BigDecimal("10000.01"));assertThatThrownBy(()->service.submit(f.actor,cycle,form)).hasMessage("group.error.principalLimit");

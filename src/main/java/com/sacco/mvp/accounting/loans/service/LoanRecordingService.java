@@ -241,8 +241,16 @@ public class LoanRecordingService {
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,null));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
         charges.freeze(a,id,chargePlan);
-        routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);
+        if(borrowerParty!=null && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
+        else routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);
         event(a,id,"LOAN_APPLICATION_RECORDED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
+    }
+    /** Personal guarantees precede the product-selected review path. */
+    @Transactional public void startGuaranteedGroupReview(AppUserPrincipal a,UUID id){
+        authorize(a,"CREATE");accounting.requireActor(a,"GROUP_LENDING_SUBMIT");records.record(a,id,false);var loan=loans.findForDisbursement(id).orElseThrow();
+        check(loan.getApplicantMemberId()==null && loan.getRequiredGuarantors()!=null && loan.getRequiredGuarantors()>0 && records.personalGuaranteesReady(a,id),"personalGuarantees");
+        if(loan.getStatus()!=LoanStatus.AWAITING_GUARANTORS)return;
+        routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);event(a,id,"PERSONAL_GUARANTEES_REVIEW_STARTED",Map.of("status",loan.getStatus().name()));
     }
     @Transactional(readOnly=true)
     public Detail detail(AppUserPrincipal a,UUID id){

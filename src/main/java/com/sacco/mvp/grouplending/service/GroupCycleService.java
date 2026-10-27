@@ -136,7 +136,7 @@ public class GroupCycleService {
         cycles.lockProductPolicy(a,c.productId());check("ACTIVE".equals(groups.group(a,c.groupId(),true).status()),"inactive");
         var ids=f.getParticipants().stream().map(ParticipantForm::getClientId).toList();check(!ids.isEmpty() && ids.stream().allMatch(Objects::nonNull),"members");cycles.lockClients(a,ids);
         var quote=assessShared(a,c.id(),f);var rule=cycles.sharedLiability(a,c.policyId()).orElseThrow(()->new IllegalArgumentException("group.error.sharedLiability"));
-        check(cycles.rules(a,c.productId()).guarantors()==0,"sharedGuarantors");
+        var guaranteeRules=cycles.rules(a,c.productId());check(guaranteeRules.guarantors()>=0 && guaranteeRules.guarantors()<=50,"guarantees");
         UUID party=cycles.sharedParty(a,c.groupId());UUID loan=loans.saveShared(a,sharedCommand(c,f,quote.principal()),party);
         cycles.sharedParticipants(a,c,f,quote,cycles.memberships(a,c.groupId(),ids));cycles.sharedFacility(a,c,loan,rule,quote,clock.now());cycles.save(c,f,true,clock.now());
         event(a,c.id(),"SHARED_LOAN_SUBMITTED",Map.of("loan",loan,"principal",quote.principal(),"participants",ids.size(),"liability",rule));

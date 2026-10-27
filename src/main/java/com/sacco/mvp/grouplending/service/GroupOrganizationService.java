@@ -67,7 +67,7 @@ public class GroupOrganizationService {
         check(f.getTenureValue()!=null,"terms");var tenure=new LoanTenure(f.getTenureUnit(),f.getTenureValue());
         text(f.getPurpose(),500,true);text(o.getBusiness(),1000,true);text(o.getAssessmentEvidence(),500,true);money(o.getPrincipal(),true);money(o.getIncome(),true);money(o.getExpenses(),false);money(o.getOtherDebt(),false);
         check(o.getPrincipal().compareTo(p.maxPrincipal().min(h.maxPrincipal()))<=0,"principalLimit");var rules=cycles.rules(a,c.productId());
-        check(rules.guarantors()==0,"organizationGuarantors");check(rules.affordabilityRatio().signum()>0 && rules.affordabilityRatio().compareTo(BigDecimal.ONE)<=0,"product");
+        check(rules.guarantors()>=0 && rules.guarantors()<=50,"guarantees");check(rules.affordabilityRatio().signum()>0 && rules.affordabilityRatio().compareTo(BigDecimal.ONE)<=0,"product");
         if(rules.collateralRequired()){text(o.getCollateral(),500,true);money(o.getCollateralValue(),false);check(o.getCollateralValue().compareTo(o.getPrincipal().multiply(rules.collateralRatio()))>=0,"collateral");}
         UUID party=organizations.party(a,c.groupId());var exposure=organizations.exposure(a,party);check(exposure.missingHistory()==0,"historyMissing");check(exposure.activeCycles()<p.maxActiveCycles(),"activeCycles");
         check(exposure.activeLoans()==0 || (rules.activeLoanAllowed() && exposure.activeLoans()<rules.maximumActiveLoans()),"activeLoans");var branch=qualification.groupPolicy(a.getSaccoId(),a.getStationId());

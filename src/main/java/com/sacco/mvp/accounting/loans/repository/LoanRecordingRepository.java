@@ -13,6 +13,7 @@ import java.util.*;
 
 @Repository @RequiredArgsConstructor
 public class LoanRecordingRepository {
+    public boolean personalGuaranteesReady(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select coalesce(lending_personal_guarantees_ready(id),false) from loan_applications where id=? and sacco_id=? and station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     public boolean sharedParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='JOINT_GROUP' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     public boolean organizationParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='ORGANIZATION' and g.legal_form='ORGANIZATION' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     private final JdbcTemplate jdbc;

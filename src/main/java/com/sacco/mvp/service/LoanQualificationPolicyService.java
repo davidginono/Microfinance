@@ -54,10 +54,12 @@ public class LoanQualificationPolicyService {
         if(settings==null)return new GroupQualificationPolicy(null,null,null);
         var policy=resolvePolicy(settings,stationId);
         return new GroupQualificationPolicy(positive(policy.applicantMaxDefaultedLoans()),
-            positive(policy.guarantorMaxDefaultedLoans()),positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount()));
+            positive(policy.guarantorMaxDefaultedLoans()),positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount()),policy.guarantorWithActiveLoanAllowed());
     }
 
-    public record GroupQualificationPolicy(Integer applicantDefaultLimit,Integer guarantorDefaultLimit,Integer guaranteeCountLimit) {}
+    public record GroupQualificationPolicy(Integer applicantDefaultLimit,Integer guarantorDefaultLimit,Integer guaranteeCountLimit,boolean guarantorActiveLoanAllowed) {
+        public GroupQualificationPolicy(Integer applicantDefaultLimit,Integer guarantorDefaultLimit,Integer guaranteeCountLimit){this(applicantDefaultLimit,guarantorDefaultLimit,guaranteeCountLimit,true);}
+    }
 
     public Optional<String> applicantFailureReason(String saccoId, UUID memberId) {
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);

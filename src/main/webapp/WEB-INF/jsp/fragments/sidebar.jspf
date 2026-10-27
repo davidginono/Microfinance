@@ -103,6 +103,7 @@
                         </span>
                         <spring:message code="menu.grequests" />
                     </a>
+                    <a href="<c:url value='/app/group-guarantees'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/app/group-guarantees')?'shell-nav-active':''}"><spring:message code="personalGuarantee.menu"/></a>
                     <a href="/app/guaranteed-loans" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/guaranteed-loans' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                         <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/guaranteed-loans' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l6 3v4c0 3.4-2.1 6.6-6 9-3.9-2.4-6-5.6-6-9V5l6-3zm-1 10.5l5-5-1.4-1.4L9 9.7 7.4 8.1 6 9.5l3 3z"/></svg>

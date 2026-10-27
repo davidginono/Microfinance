@@ -146,8 +146,8 @@ public class GroupCycleRepository {
               count(*) filter(where o.missing_history) missing_history,coalesce(sum(o.monthly_payment) filter(where o.funded),0) monthly_debt,
               coalesce(sum(greatest(0,o.maximum_liability-o.allocated_obligation)),0) contingent
               from lending_shared_credit_obligation o join scoped l on l.id=o.loan_id join selected s on s.client=o.client_id group by o.client_id),
-            off_branch_shared as (select o.client_id client,count(*) missing from lending_shared_credit_obligation o join selected s on s.client=o.client_id
-              where o.sacco_id=? and o.station_id<>? group by o.client_id),
+            off_branch_shared as (select o.client,count(*) missing from (select client_id client,sacco_id,station_id from lending_shared_credit_obligation union all select client_id,sacco_id,station_id from lending_group_personal_commitment) o join selected s on s.client=o.client
+              where o.sacco_id=? and o.station_id<>? group by o.client),
             cycles as (select x.client_id client,count(distinct x.cycle_id) active_cycles from lending_group_participant x
               join selected s on s.client=x.client_id where exists(select 1 from lending_group_participant peer join pending p on p.id=peer.loan_id where peer.cycle_id=x.cycle_id)
                 or exists(select 1 from lending_group_shared_facility sf join pending p on p.id=sf.loan_id where sf.cycle_id=x.cycle_id) group by x.client_id),
