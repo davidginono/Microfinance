@@ -62,6 +62,12 @@ public class GroupCoverageService {
         if(own)payments=payments.stream().map(p->new Payment(p.id(),p.posting(),p.receipt(),p.reference(),p.date(),p.payer(),p.amount(),p.principal(),p.interest(),p.charges(),p.net(),p.reversedBy(),p.correctedBy(),"",p.linkedAt())).toList();
         return new Detail(c,new Page<>(events,0,false),new Page<>(payments,0,false),!own);
     }
+    @Transactional(readOnly=true) public Trace trace(AppUserPrincipal a,UUID cycle,UUID client,LocalDate from,LocalDate through,int page,boolean own,boolean export){
+        try{view(a,own);if(export){if(own)own(a,UserClaim.GROUP_COVERAGE_OWN_EXPORT);else staff(a,"EXPORT");}}catch(AccessDeniedException denied){return null;}
+        page(page);if(cycle==null||through==null||through.isAfter(clock.today())||through.getYear()<1||from!=null&&(from.getYear()<1||from.isAfter(through)))throw new IllegalArgumentException("group.error.query");
+        var rows=cases.trace(a,cycle,own?a.getMemberId():client,clock.today(),from,through,export?0:page*25,export?501:26);
+        check(!export||rows.size()<=500,"documentRange");return new Trace(export?rows:rows.stream().limit(25).toList(),page,!export&&rows.size()>25,own);
+    }
     @Transactional(readOnly=true) public Optional<Policy> policy(AppUserPrincipal a,UUID cycle){staff(a,null);return cases.policy(a,cases.product(a,cycle));}
     @Transactional public UUID configure(AppUserPrincipal a,UUID cycle,PolicyForm f){
         staff(a,"CONFIGURE");check(f!=null&&f.getRequestKey()!=null&&f.isVerified(),"policy");range(f.getNoticeDays(),14,365);range(f.getCaseDays(),1,365);range(f.getPromiseDays(),1,365);text(f.getReference());

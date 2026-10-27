@@ -21,7 +21,7 @@ import static org.mockito.ArgumentMatchers.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GroupCycleStatementPostgresTest {
     final GroupSharedWaiverPostgresTest w=new GroupSharedWaiverPostgresTest();final GroupSharedLoanPostgresTest s=w.s;final LoanRecordingPostgresTest f=w.f;GroupCycleStatementService service;
-    static GroupCycleStatementService register(LoanRecordingPostgresTest f){f.context.registerBean(GroupCycleStatementRepository.class,()->new GroupCycleStatementRepository(new NamedParameterJdbcTemplate(f.jdbc)));f.context.registerBean(GroupCycleStatementService.class,()->new GroupCycleStatementService(f.context.getBean(GroupCycleStatementRepository.class),f.context.getBean(GeneralLedgerService.class),f.context.getBean(GroupSharedLoanService.class),f.context.getBean(ApplicationClock.class),new ReportExportLimiter(2)));return f.context.getBean(GroupCycleStatementService.class);}
+    static GroupCycleStatementService register(LoanRecordingPostgresTest f){if(!f.context.containsBean("groupCoverageService"))GroupCoveragePostgresTest.register(f);f.context.registerBean(GroupCycleStatementRepository.class,()->new GroupCycleStatementRepository(new NamedParameterJdbcTemplate(f.jdbc)));f.context.registerBean(GroupCycleStatementService.class,()->new GroupCycleStatementService(f.context.getBean(GroupCycleStatementRepository.class),f.context.getBean(GeneralLedgerService.class),f.context.getBean(GroupSharedLoanService.class),f.context.getBean(ApplicationClock.class),new ReportExportLimiter(2),f.context.getBean(GroupCoverageService.class)));return f.context.getBean(GroupCycleStatementService.class);}
     @BeforeAll void start(){w.start();service=register(f);}
     @AfterAll void stop(){w.stop();}
     @BeforeEach void fixture(){w.setup();}

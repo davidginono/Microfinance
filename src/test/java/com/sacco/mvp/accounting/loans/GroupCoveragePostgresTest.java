@@ -91,5 +91,21 @@ class GroupCoveragePostgresTest {
         var document=coverage.document(p.s.signer,id,true);assertThat(document.events().rows()).hasSize(27);assertThat(document.events().hasNext()).isFalse();assertThat(document.header().received()).isZero();
         assertThatThrownBy(()->coverage.document(p.w.p.person(),id,true)).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void cycleStatementTraceDoesNotCountPromisesOrReceiptsTwiceAndRespectsFreshCoverageClaims()throws Exception{
+        UUID id=call();var promise=response("PROMISED",0);promise.setAmount(new BigDecimal("70.00"));promise.setPromiseOn(day.plusDays(1));coverage.respond(p.s.signer,id,promise);
+        var statements=GroupCycleStatementPostgresTest.register(f);var before=statements.statement(f.actor,p.s.cycle,null,null,0,0,0,0,false);
+        assertThat(before.coverage().rows()).singleElement().satisfies(x->{assertThat(x.id()).isEqualTo(id);assertThat(x.state()).isEqualTo("PROMISED");assertThat(x.received()).isZero();});
+        assertThat(coverage.trace(p.s.signer,p.s.cycle,null,null,day,0,true,false).rows()).hasSize(1);
+        UUID payment=receipt("50.00");coverage.link(f.actor,id,linkForm(payment));var paid=statements.statement(f.actor,p.s.cycle,null,null,0,0,0,0,false);
+        assertThat(paid.coverage().rows().getFirst().received()).isEqualByComparingTo("50.00");
+        assertThat(paid.totals().outstanding()).isEqualByComparingTo(before.totals().outstanding().subtract(new BigDecimal("50.00")));
+        f.service.reverse(f.operator("B1"),payment,UUID.randomUUID(),day,"Synthetic statement correction");
+        var reversed=statements.statement(f.actor,p.s.cycle,null,null,0,0,0,0,true);assertThat(reversed.totals()).isEqualTo(before.totals());assertThat(reversed.coverage().rows().getFirst().received()).isZero();
+        var messages=new org.springframework.context.support.ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");var pdf=new GroupCycleStatementPdf(new com.sacco.mvp.accounting.loans.service.LoanRecordingPdfService(new ReportExportLimiter(1)),messages);
+        for(var locale:List.of(Locale.ENGLISH,Locale.of("sw")))try(var doc=org.apache.pdfbox.Loader.loadPDF(pdf.render(reversed,locale))){var text=new org.apache.pdfbox.text.PDFTextStripper().getText(doc);assertThat(text.toLowerCase(locale).replaceAll("\\s+", "")).contains(messages.getMessage("coverage.title",null,locale).toLowerCase(locale).replaceAll("\\s+", ""));assertThat(text).doesNotContain("Synthetic verified identity of actual guarantor payer");}
+        var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.GROUP_COVERAGE_VIEW);when(f.context.getBean(UserClaimService.class).effectiveClaims(eq(f.actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(claims);
+        assertThat(statements.statement(f.actor,p.s.cycle,null,null,0,0,0,0,false).coverage()).isNull();
+        assertThat(coverage.trace(p.w.p.person(),p.s.cycle,null,null,day,0,true,false).rows()).isEmpty();
+    }
     @Test void coverageClaimsAreNeverDefaultRoleAssignments(){for(var role:Position.values())for(boolean client:List.of(false,true))assertThat(UserClaim.defaultClaims(List.of(role),client)).noneMatch(x->x.name().startsWith("GROUP_COVERAGE"));}
 }

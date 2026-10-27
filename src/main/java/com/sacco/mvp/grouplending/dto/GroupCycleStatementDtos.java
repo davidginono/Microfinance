@@ -21,5 +21,5 @@ public final class GroupCycleStatementDtos {
         BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal charges,boolean reversal) {}
     public record Statement(Context context,LocalDate asOf,OffsetDateTime generatedAt,LocalDate from,LocalDate through,Totals totals,
         List<Loan> loans,List<GroupSharedLoanDtos.Balance> allocations,List<Movement> movements,List<Contribution> contributions,int loanPage,boolean moreLoans,int allocationPage,boolean moreAllocations,int page,boolean moreMovements,
-        int contributionPage,boolean moreContributions,boolean loanLinks,boolean receiptLinks) {}
+        int contributionPage,boolean moreContributions,boolean loanLinks,boolean receiptLinks,GroupCoverageDtos.Trace coverage) {}
 }

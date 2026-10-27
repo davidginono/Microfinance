@@ -30,6 +30,10 @@ public class GroupCycleStatementPdf {
             var allocations=s.allocations().stream().map(x->List.of(x.number()+" - "+x.name(),money(x.principal(),l),x.known()?money(x.remainingPrincipal(),l):"—",x.known()?money(x.remainingInterest(),l):"—",x.known()?money(x.remainingCharges(),l):"—",x.known()?money(x.excludedInterest(),l):"—",x.known()?money(x.waivedInterest(),l):"—",x.known()?money(x.writtenOff(),l):"—")).toList();
             sections.add(1,new StatementSection(List.of(field("cycleStatement.allocations",text("cycleStatement.allocationNote",l),l)),List.of("group.client","group.principal","sharedStatement.principal","sharedStatement.interest","sharedStatement.charges","sharedStatement.excluded","memberStatement.waived","memberStatement.writtenOff").stream().map(k->text(k,l)).toList(),allocations,List.of(160f,100f,100f,100f,100f,100f,100f,100f),1));
         }
+        if(s.coverage()!=null){
+            var rows=s.coverage().rows().stream().map(x->List.of(x.loanNumber(),x.number()+" - "+x.name(),text("coverage.kind."+x.sourceKind(),l),text("coverage.state."+x.state(),l),date(x.callDate()),money(x.requested(),l),money(x.received(),l),money(x.unpaid(),l))).toList();
+            sections.add(new StatementSection(List.of(field("coverage.title",text("coverage.statementNote",l),l)),List.of("group.loan","coverage.person","coverage.kind","group.status","coverage.called","coverage.requested","coverage.received","coverage.unpaid").stream().map(k->text(k,l)).toList(),rows,List.of(75f,160f,120f,120f,90f,90f,90f,90f),8));
+        }
         return renderer.renderStatement(new StatementDocument(text("cycleStatement.title",l),fields,sections,text("memberStatement.empty",l),text("cycleStatement.note",l)));
     }
     private StatementSection section(String title,List<String> headers,List<List<String>> rows,List<Float> widths,int moneyStart,Locale l){return new StatementSection(List.of(field(title,"",l)),headers.stream().map(k->text(k,l)).toList(),rows,widths,moneyStart);}

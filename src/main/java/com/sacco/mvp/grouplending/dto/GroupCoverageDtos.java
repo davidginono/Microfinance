@@ -16,5 +16,6 @@ public final class GroupCoverageDtos {
  public record Event(UUID id,int sequence,String kind,BigDecimal amount,LocalDate promiseOn,String reason,OffsetDateTime at){}
  public record PaymentSource(UUID posting,UUID contribution,UUID receipt,String reference,LocalDate date,String payer,UUID payerId,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal charges,OffsetDateTime recordedAt){}
  public record Payment(UUID id,UUID posting,UUID receipt,String reference,LocalDate date,String payer,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal charges,BigDecimal net,UUID reversedBy,UUID correctedBy,String evidence,OffsetDateTime linkedAt){}
+ public record Trace(List<Case> rows,int page,boolean hasNext,boolean own){}
  public record Detail(Case header,GroupLendingDtos.Page<Event> events,GroupLendingDtos.Page<Payment> payments,boolean staff){}
 }
