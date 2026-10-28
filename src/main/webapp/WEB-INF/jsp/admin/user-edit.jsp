@@ -13,7 +13,7 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.workspace.userBreadcrumb" /></p>
-    <h1 class="erp-page-title" id="admin-user-edit-title"><spring:message code="admin.workspace.editAccess" /></h1>
+    <h1 class="erp-page-title" id="admin-user-edit-title"><c:out value="${user.fullName}" /></h1>
 </div>
 
 <template data-resource-details-page></template>
@@ -64,7 +64,7 @@
     <c:set var="matrixColumns" value="${['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE','CREATE','VALIDATE','POST','INITIATE','WITHDRAW','HOLD','FORCE_APPROVE','ESCALATED_APPROVE','WAIVE','REJECT','ASSIGN','EXPORT','IMPORT','DISBURSE','REVERSE']}" />
     <section id="user-access-claims" class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true" data-access-matrix>
         <div class="app-table-titlebar admin-user-section-header admin-user-section-header--actions">
-            <h2><spring:message code="access.matrix.title" /> — <c:out value="${user.fullName}" /> <span class="app-table-count" data-access-count></span></h2>
+            <h2><spring:message code="access.matrix.title" /> <span class="app-table-count" data-access-count></span></h2>
             <div class="app-table-toolbar admin-user-section-actions">
                 <button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims data-table-command><spring:message code="access.matrix.restore" /></button>
                 <button type="button" class="app-btn btn-neutral" data-access-discard disabled><spring:message code="access.matrix.discard" /></button>
@@ -77,7 +77,7 @@
             <tbody><c:forEach items="${accessMatrixRows}" var="row"><spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" /><c:forEach items="${accessActions}" var="action"><c:set var="matrixClaim" value="${row.claimsByAction[action]}" /><c:if test="${not empty matrixClaim}">
                 <spring:message code="access.action.${action}" text="${action.displayName}" var="matrixActionLabel" />
                 <tr data-claim-row data-claim-key="${matrixClaim}">
-                    <th scope="row"><code><c:out value="${matrixClaim}" /></code><span class="access-matrix-description"><c:out value="${matrixFeatureLabel}" /> · <c:out value="${matrixActionLabel}" /></span></th>
+                    <th scope="row"><span class="access-matrix-name"><c:out value="${matrixFeatureLabel}" /> — <c:out value="${matrixActionLabel}" /></span></th>
                     <c:forEach items="${matrixColumns}" var="column"><td data-claim-action="${column}"><c:choose><c:when test="${action.name()==column}"><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${action}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) ? 'checked' : ''} class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td></c:forEach>
                 </tr>
             </c:if></c:forEach></c:forEach></tbody>
