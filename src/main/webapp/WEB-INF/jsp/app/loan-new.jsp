@@ -147,7 +147,7 @@
                 </c:when>
                 <c:when test="${field.type eq 'number'}">
                     <input class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                           type="number" name="${field.name}" step="0.01"
+                           type="number" data-amount-input="${['monthlyIncome','income','declaredMonthlyIncome','monthlyExpenses','expenses','declaredMonthlyExpenses','otherDebtRepayments','monthlyDebtRepayments','debtRepayments','collateralEstimatedValue'].contains(field.name)}" name="${field.name}" step="0.01"
                            value="${fieldValue}" placeholder="<spring:message code='newloan.number.placeholder' text='e.g. 100000' />"
                            <c:if test="${field.required}">required</c:if> />
                 </c:when>

@@ -31,8 +31,8 @@
 <section class="erp-resource-section" data-rule><h2><spring:message code="approval.rule" /> <span data-rule-number>${n.index+1}</span><button type="button" class="erp-icon-btn" data-rule-remove aria-label="<spring:message code='approval.removeRule' />">×</button></h2>
 <div class="approval-rule-fields">
 <label><spring:message code="approval.level" /><form:select path="rules[${n.index}].scope" cssClass="aws-control" data-native-select="true"><form:option value="SINGLE"><spring:message code="approval.scope.SINGLE" /></form:option><form:option value="BATCH"><spring:message code="approval.scope.BATCH" /></form:option></form:select></label>
-<label><spring:message code="approval.fromAmount" /><form:input path="rules[${n.index}].minimum" type="number" min="0" step="0.01" required="required" cssClass="aws-control" /></label>
-<label><spring:message code="approval.belowAmount" /><form:input path="rules[${n.index}].maximum" type="number" min="0.01" step="0.01" cssClass="aws-control" placeholder="${noLimit}" /></label>
+<label><spring:message code="approval.fromAmount" /><form:input path="rules[${n.index}].minimum" type="number" data-amount-input="true" min="0" step="0.01" required="required" cssClass="aws-control" /></label>
+<label><spring:message code="approval.belowAmount" /><form:input path="rules[${n.index}].maximum" type="number" data-amount-input="true" min="0.01" step="0.01" cssClass="aws-control" placeholder="${noLimit}" /></label>
 </div>
 <div class="approval-steps" data-steps><c:forEach items="${row.stages}" var="step" varStatus="j"><div class="approval-step" data-step>
 <span data-step-number>${j.index+1}</span><label><spring:message code="approval.role" /><form:select path="rules[${n.index}].stages[${j.index}].role" cssClass="aws-control" data-native-select="true"><c:forEach items="${roles}" var="role"><form:option value="${role}"><spring:message code="admin.role.${role}" /></form:option></c:forEach></form:select></label>

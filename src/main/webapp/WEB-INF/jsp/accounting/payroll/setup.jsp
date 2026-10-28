@@ -26,7 +26,7 @@
                 <span data-choice-error role="status" data-search-label="<spring:message code='common.search' />" data-error="<spring:message code='payroll.error.lookup' />"></span>
             </div>
             <p><spring:message code="payroll.instructionHelp" /></p>
-            <label class="grid gap-2"><spring:message code="payroll.column.limit" /><form:input path="monthlyLimit" type="number" min="0.01" step="0.01" cssClass="aws-control" required="required" /><form:errors path="monthlyLimit" cssClass="coa-error" /></label>
+            <label class="grid gap-2"><spring:message code="payroll.column.limit" /><form:input path="monthlyLimit" type="number" data-amount-input="true" min="0.01" step="0.01" cssClass="aws-control" required="required" /><form:errors path="monthlyLimit" cssClass="coa-error" /></label>
             <div class="grid gap-4 md:grid-cols-2"><label class="grid gap-2"><spring:message code="payroll.column.from" /><form:input path="effectiveFrom" type="date" cssClass="aws-control" required="required" /><form:errors path="effectiveFrom" cssClass="coa-error" /></label><label class="grid gap-2"><spring:message code="payroll.column.to" /><form:input path="effectiveTo" type="date" cssClass="aws-control" required="required" /><form:errors path="effectiveTo" cssClass="coa-error" /></label></div>
             <label class="grid gap-2"><spring:message code="payroll.evidence" /><form:textarea path="evidence" cssClass="aws-control" maxlength="500" rows="3" required="required" /><form:errors path="evidence" cssClass="coa-error" /></label>
         </div></section>

@@ -1,0 +1,4 @@
+.erp-amount-control{display:inline-block;position:relative;min-width:0;max-width:100%;width:100%;vertical-align:middle}
+.erp-amount-control>input[data-amount-display]{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
+.erp-amount-control>.erp-amount-native{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:0!important;opacity:0;pointer-events:none;clip-path:inset(50%)}
+@media print{.erp-amount-native{display:none!important}}

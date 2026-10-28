@@ -41,7 +41,7 @@
             breakdown.hidden=true;summary.append(link,amount,age,open);body.append(summary,breakdown);const criteria=node('footer','dashboard-infolet-criteria');front.append(heading,body,criteria);
             const backHeader=node('header'),backTitle=node('h3','',l('filters')),cancel=button(l('back'),'dashboard-infolet-command');backHeader.append(backTitle,cancel);
             const fields=node('div','dashboard-infolet-fields'),daysLabel=node('label','',l('minimumDays')),days=node('input'),amountLabel=node('label','',l('minimumAmount')),minimum=node('input');
-            days.type=minimum.type='number';days.min=minimum.min='0';days.max='3650';minimum.max='9999999999999999.99';days.step='1';minimum.step='0.01';days.value=minimum.value='0';days.required=minimum.required=true;
+            days.type=minimum.type='number';minimum.dataset.amountInput='true';days.min=minimum.min='0';days.max='3650';minimum.max='9999999999999999.99';days.step='1';minimum.step='0.01';days.value=minimum.value='0';days.required=minimum.required=true;
             if(data.id==='guarantees'){amountLabel.hidden=true;minimum.disabled=true;}
             daysLabel.append(days);amountLabel.append(minimum);fields.append(daysLabel,amountLabel);const footer=node('footer'),reset=button(l('reset')),apply=button(l('apply'),'app-btn btn-launch');apply.type='submit';footer.append(reset,apply);back.append(backHeader,fields,footer);inner.append(front,back);widget.append(inner);canvas.append(widget);
             const e={widget,front,back,title,link,open,amount,age,breakdown,filter,days,minimum,criteria,minimumDays:0,minimumAmount:0,version:0,request:null};entries.set(data.id,e);update(e,data);

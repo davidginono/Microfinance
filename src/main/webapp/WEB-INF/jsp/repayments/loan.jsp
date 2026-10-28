@@ -26,7 +26,7 @@
                 <c:url var="postUrl" value="/repayments/loans/${ledger.id}/payments" />
                 <form:form method="post" action="${postUrl}" modelAttribute="paymentForm" cssClass="repayment-form" data-repayment-form="true">
                     <form:hidden path="requestKey" />
-                    <label for="amount"><spring:message code="common.amount" /> (TZS)<form:input path="amount" id="amount" type="number" min="0.01" step="0.01" required="required" cssClass="aws-control" /></label>
+                    <label for="amount"><spring:message code="common.amount" /> (TZS)<form:input path="amount" id="amount" type="number" data-amount-input="true" min="0.01" step="0.01" required="required" cssClass="aws-control" /></label>
                     <label for="paymentDate"><spring:message code="repayment.paymentDate" /><form:input path="paymentDate" id="paymentDate" type="date" max="${today}" required="required" cssClass="aws-control" /></label>
                     <label for="channel"><spring:message code="repayment.channel" /><form:select path="channel" id="channel" required="required" cssClass="aws-control"><form:option value=""><spring:message code="repayment.selectChannel" /></form:option><form:option value="CASH"><spring:message code="repayment.channel.CASH" /></form:option><form:option value="BANK"><spring:message code="repayment.channel.BANK" /></form:option><form:option value="MOBILE_MONEY"><spring:message code="repayment.channel.MOBILE_MONEY" /></form:option></form:select></label>
                     <label for="reference"><spring:message code="repayment.channelReference" /><form:input path="reference" id="reference" maxlength="100" required="required" cssClass="aws-control" /></label>

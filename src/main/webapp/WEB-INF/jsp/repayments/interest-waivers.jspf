@@ -11,7 +11,7 @@
 <details class="accounting-section accounting-form" ${not empty prepaymentError?'open':''}><summary><spring:message code="prepayment.waive" /></summary>
 <form:hidden path="requestKey" /><div class="accounting-grid">
 <label><spring:message code="voucher.date" /><form:input path="effectiveDate" cssClass="aws-control" type="date" max="${waiverToday}" required="required" /></label>
-<label><spring:message code="voucher.amount" /> (TZS)<form:input path="amount" cssClass="aws-control" type="number" min="0.01" step="0.01" required="required" /></label>
+<label><spring:message code="voucher.amount" /> (TZS)<form:input path="amount" cssClass="aws-control" type="number" data-amount-input="true" min="0.01" step="0.01" required="required" /></label>
 <label><spring:message code="prepayment.reason" /><form:textarea path="reason" cssClass="aws-control" rows="3" maxlength="500" required="required" /></label>
 </div><p><spring:message code="prepayment.waiverHelp" /></p>
 <label class="accounting-servicing-confirm"><input type="checkbox" name="confirmed" value="true" required /><span><spring:message code="prepayment.confirmWaiver" /></span></label>

@@ -17,7 +17,7 @@
 <section class="accounting-form-section"><div class="accounting-grid loan-form-grid">
 <label><spring:message code="voucher.date" /><form:input path="date" type="date" min="${loan.disbursed}" max="${today}" required="required" cssClass="aws-control" /></label>
 <c:if test="${adjustmentForm.kind=='PROVISION'}">
-<label><spring:message code="adjustment.target" /> (TZS)<form:input path="targetAllowance" type="number" min="0" step="0.01" max="${loan.outstanding}" required="required" cssClass="aws-control" /></label>
+<label><spring:message code="adjustment.target" /> (TZS)<form:input path="targetAllowance" type="number" data-amount-input="true" min="0" step="0.01" max="${loan.outstanding}" required="required" cssClass="aws-control" /></label>
 <c:forEach items="${['allowance','expense']}" var="category"><label data-loan-choice data-choice-url="<c:url value='/finance/loan-adjustments/choices/${category}' />"><spring:message code="adjustment.${category}Account" /><form:select path="${category}AccountId" required="required" cssClass="aws-control" data-choice-select="true" data-searchable="true"><form:option value=""><spring:message code="recording.choose" /></form:option><c:if test="${not empty adjustmentForm[category.concat('AccountId')]}"><form:option value="${adjustmentForm[category.concat('AccountId')]}"><c:out value="${category=='allowance'?selectedAllowance.label:selectedExpense.label}" /></form:option></c:if></form:select><%@ include file="../loans/choice-search.jspf" %></label></c:forEach>
 </c:if>
 <label><spring:message code="recording.reason" /><form:textarea path="reason" maxlength="500" required="required" cssClass="aws-control" rows="3" /></label>

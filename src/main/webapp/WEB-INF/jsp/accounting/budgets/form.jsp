@@ -22,7 +22,7 @@
   </div></section>
   <section class="accounting-section budget-months"><h2 id="budget-months-title"><spring:message code="management.budget.months" /> (TZS)</h2>
   <div class="erp-table-scroll"><table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table" aria-labelledby="budget-months-title"><thead><tr><th scope="col"><spring:message code="management.month" /></th><th scope="col"><spring:message code="management.amount" /> (TZS)</th></tr></thead><tbody>
-  <c:forEach begin="0" end="11" var="month"><tr><td><label for="budget-month-${month}"><spring:message code="management.month.${month+1}" /></label></td><td><form:input path="amounts[${month}]" id="budget-month-${month}" type="number" min="0" max="9999999999999999.99" step="0.01" required="required" cssClass="aws-control" /></td></tr></c:forEach>
+  <c:forEach begin="0" end="11" var="month"><tr><td><label for="budget-month-${month}"><spring:message code="management.month.${month+1}" /></label></td><td><form:input path="amounts[${month}]" id="budget-month-${month}" type="number" data-amount-input="true" min="0" max="9999999999999999.99" step="0.01" required="required" cssClass="aws-control" /></td></tr></c:forEach>
   </tbody></table></div></section>
   <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/budgets' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="management.budget.save" /></button></div>
 </form:form>

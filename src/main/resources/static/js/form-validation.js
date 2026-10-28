@@ -7,9 +7,11 @@
     let serial = 0, firstInvalid = null;
     const labels = () => document.getElementById('form-validation-labels')?.dataset || {};
     const proxy = control => control.closest('.erp-date-control')?.querySelector('[data-date-display]')
+        || control.closest('.erp-amount-control')?.querySelector('[data-amount-display]')
         || control.closest('.neo-select')?.querySelector('.neo-select-button') || control;
     const native = target => target?.closest?.('.neo-select')?.querySelector('select')
-        || target?.closest?.('.erp-date-control')?.querySelector('[data-date-native]') || target;
+        || target?.closest?.('.erp-date-control')?.querySelector('[data-date-native]')
+        || target?.closest?.('.erp-amount-control')?.querySelector('.erp-amount-native') || target;
     const eligible = control => control?.matches?.('input,select,textarea') && control.form
         && control.type !== 'hidden' && !control.disabled && !control.readOnly && control.willValidate;
     const members = control => control.type === 'radio' && control.name
@@ -46,7 +48,7 @@
             .replace('{1}', source.min || source.minLength).replace('{2}', source.max || source.maxLength);
     }
     function place(control, error) {
-        const visible = proxy(control), wrapper = visible.closest('.neo-select,.erp-date-control');
+        const visible = proxy(control), wrapper = visible.closest('.neo-select,.erp-date-control,.erp-amount-control');
         const anchor = wrapper || (control.type === 'checkbox' || control.type === 'radio' ? control.closest('label') : control) || control;
         if (control.type === 'radio' && control.closest('fieldset')) control.closest('fieldset').append(error);
         else anchor.after(error);
