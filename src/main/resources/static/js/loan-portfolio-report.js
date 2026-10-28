@@ -14,8 +14,11 @@
         panel.setAttribute('role', 'tabpanel');
         panel.tabIndex = 0;
     });
+    const storageKey='workspace-detail-tab:v1:'+location.pathname;
+    const saved=()=>{try{return sessionStorage.getItem(storageKey);}catch{return '';}};
     const activate = (hash, focus = false) => {
         const selected = links.find(link => link.hash === hash) || links[0];
+        try{sessionStorage.setItem(storageKey,selected.hash);}catch{/* Optional presentation state. */}
         links.forEach(link => {
             const active = link === selected;
             link.setAttribute('aria-selected', String(active));
@@ -42,7 +45,7 @@
             activate(links[target].hash, true);
         });
     });
-    window.addEventListener('hashchange', () => activate(location.hash));
-    window.addEventListener('pageshow', () => activate(location.hash));
-    activate(location.hash);
+    window.addEventListener('hashchange', () => activate(location.hash || saved()));
+    window.addEventListener('pageshow', () => activate(location.hash || saved()));
+    activate(location.hash || saved());
 })();

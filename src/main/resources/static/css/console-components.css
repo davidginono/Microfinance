@@ -567,40 +567,13 @@
         cursor: pointer;
     }
 
-    .admin-access-matrix {
-        --erp-table-height: min(38rem, 68vh);
-        max-height: var(--erp-table-height);
-        border: 1px solid var(--aws-line);
-        border-radius: 2px;
-        background: #ffffff;
-        overflow: auto;
-    }
-
-    .admin-access-matrix .erp-table {
-        min-width: max(100%, 64rem);
-    }
-
-    .admin-access-matrix input[type="checkbox"]:disabled {
-        cursor: not-allowed;
-        opacity: 0.35;
-    }
-
-    .admin-matrix-toggle {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        white-space: nowrap;
-    }
-
-    .admin-matrix-feature-cell {
-        white-space: nowrap;
-    }
-
-    .admin-matrix-action-cell {
-        text-align: center;
-        white-space: nowrap;
-    }
+    .admin-claims-scroll { --erp-table-height: min(38rem, 68vh); }
+    [data-access-matrix] .erp-table { min-width: 640px; }
+    [data-access-matrix] .erp-table td { vertical-align: middle; }
+    [data-access-matrix] .erp-table code { font-size: 12px; overflow-wrap: anywhere; }
+    [data-access-matrix] .resource-table-search { max-width: 38rem; }
+    [data-access-matrix] [data-access-claim] { margin-right: 6px; }
+    [data-access-matrix] .resource-split-panel { min-width: 0; }
 
     .admin-access-matrix-restore {
         align-self: flex-start;

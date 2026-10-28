@@ -113,11 +113,17 @@
         const host=document.createElement('div');host.className='console-detail-panels';
         const anchor=summary || panels[0];anchor[summary?'after':'before'](tabs,host);
         const buttons=[];let active;
-        const activate=(id,focus=false,remember=true)=>{
-            const index=panels.findIndex(panel=>panel.id===id);if(index<0)return;active=index;
+        // Tab IDs are presentation state only. Keep them per route and browser tab,
+        // without storing form values or carrying a selection to another record.
+        const storageKey='workspace-detail-tab:v1:'+location.pathname;
+        const saved=()=>{try{return sessionStorage.getItem(storageKey);}catch{return null;}};
+        const remember=id=>{try{sessionStorage.setItem(storageKey,id);}catch{/* The URL remains the fallback. */}};
+
+        const activate=(id,focus=false,syncUrl=true)=>{
+            const index=panels.findIndex(panel=>panel.id===id);if(index<0)return;active=index;remember(id);
             panels.forEach((panel,i)=>{panel.hidden=i!==index;buttons[i].setAttribute('aria-selected',String(i===index));buttons[i].tabIndex=i===index?0:-1;});
             if(focus)buttons[index].focus();
-            if(remember){const url=new URL(location.href);url.searchParams.set('detailTab',id);history.replaceState(history.state,'',url.href);document.dispatchEvent(new Event('resource-table:query'));}
+            if(syncUrl){const url=new URL(location.href);url.searchParams.set('detailTab',id);history.replaceState(history.state,'',url.href);document.dispatchEvent(new Event('resource-table:query'));}
             window.dispatchEvent(new Event('resize'));
         };
         panels.forEach((panel,index)=>{
@@ -133,10 +139,12 @@
             });
             tabs.append(button);buttons.push(button);host.append(panel);
         });
-        const selected=new URL(location.href).searchParams.get('detailTab');
-        activate(panels.find(panel=>panel.id===selected || panel.querySelector('[aria-invalid=true],.field-error,[data-detail-error]'))?.id || panels[0].id,false,false);
+        const selected=new URL(location.href).searchParams.get('detailTab') || saved();
+        const invalid=panels.find(panel=>panel.querySelector('[aria-invalid=true],[data-detail-error]') || [...panel.querySelectorAll('.field-error')].some(error=>error.textContent.trim()));
+        activate(invalid?.id || panels.find(panel=>panel.id===selected)?.id || panels[0].id,false,false);
+        scope.addEventListener('submit',()=>remember(panels[active].id),true);
         scope.addEventListener('invalid',event=>{const panel=panels.find(panel=>panel.contains(event.target));if(panel)activate(panel.id);},true);
-        window.addEventListener('popstate',()=>activate(new URL(location.href).searchParams.get('detailTab') || panels[0].id,false,false));
+        window.addEventListener('popstate',()=>activate(new URL(location.href).searchParams.get('detailTab') || saved() || panels[0].id,false,false));
     }
     function init(scope=document) {
         scope.querySelectorAll('.loan-status-badge,.voucher-status,.staff-recent-disbursements-status').forEach(node=>{

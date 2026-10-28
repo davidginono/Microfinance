@@ -52,3 +52,25 @@ test('copy has a localized accessible name, copies the value once and preserves 
  const {dom,w,d}=await setup('<section class="accounting-section"><h2>Details</h2><dl class="erp-detail-facts"><div><dt>Client</dt><dd><a href="/clients/1" target="_blank">CL001</a></dd></div><div><dt>Status</dt><dd><span data-resource-status="ACTIVE">Active</span></dd></div></dl></section>');let copied=[];Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async text=>copied.push(text)}});
  const button=d.querySelector('button.console-copy');assert.equal(button.getAttribute('aria-label'),'Copy: Client');button.click();await settle();assert.deepEqual(copied,['CL001']);assert.equal(d.querySelector('#console-copy-feedback').textContent,'Copied');assert.equal(d.querySelector('a').getAttribute('href'),'/clients/1');assert.equal(d.querySelector('a').querySelectorAll('svg').length,1);assert.equal(d.querySelectorAll('.console-copy').length,1);w.ConsoleResourceDetails.init();assert.equal(d.querySelectorAll('.console-copy').length,1);dom.window.close();
 });
+
+test('detail tabs survive a POST redirect and reload without retaining form values or leaking into another record',async()=>{
+ const {dom,w,d}=await setup(sections);const scope=d.querySelector('.shell-content-frame');w.WorkspaceNavigation={onReady:callback=>callback()};
+ try{
+  d.querySelector('[aria-controls=history]').click();d.querySelector('#schedule form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  assert.equal(w.sessionStorage.getItem('workspace-detail-tab:v1:/details'),'history');
+  // A server redirect strips the detailTab parameter and replaces the resource markup.
+  w.history.replaceState({},'', '/details');delete scope.dataset.detailsReady;scope.innerHTML=sections;w.eval(source);await settle();
+  assert.equal(d.querySelector('#history').hidden,false);assert.equal(d.querySelector('[aria-controls=history]').getAttribute('aria-selected'),'true');
+  assert.equal(d.querySelector('#schedule input').value,'draft');
+  // An explicit destination takes priority over remembered presentation state.
+  w.history.replaceState({},'', '/details?detailTab=schedule');delete scope.dataset.detailsReady;scope.innerHTML=sections;w.eval(source);await settle();assert.equal(d.querySelector('#schedule').hidden,false);
+  w.history.replaceState({},'', '/another-record');delete scope.dataset.detailsReady;scope.innerHTML=sections;w.eval(source);await settle();assert.equal(d.querySelector('#schedule').hidden,false);
+ }finally{dom.window.close();}
+});
+test('unavailable remembered tabs fall back safely and real errors reveal their own panel',async()=>{
+ const {dom,w,d}=await setup(sections);const scope=d.querySelector('.shell-content-frame');w.WorkspaceNavigation={onReady:callback=>callback()};
+ try{
+  w.sessionStorage.setItem('workspace-detail-tab:v1:/details','removed-tab');delete scope.dataset.detailsReady;scope.innerHTML=sections;w.eval(source);await settle();assert.equal(d.querySelector('#schedule').hidden,false);
+  w.sessionStorage.setItem('workspace-detail-tab:v1:/details','history');delete scope.dataset.detailsReady;scope.innerHTML=sections.replace('value="draft"','value="bad" aria-invalid="true"');w.eval(source);await settle();assert.equal(d.querySelector('#schedule').hidden,false);
+ }finally{dom.window.close();}
+});

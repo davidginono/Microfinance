@@ -62,6 +62,7 @@
         };
         const open=()=>{panel.hidden=false;layout.classList.add('resource-split-open');show.setAttribute('aria-expanded','true');render();apply();};
         const sync=()=>{if(!panel.hidden)render();};
+        region.addEventListener('resource-split:refresh',sync);
         show.addEventListener('click',()=>{open();close.focus();});
         close.addEventListener('click',()=>{panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');apply();show.focus();});
         gear.setAttribute('aria-expanded','false'); gear.addEventListener('click',()=>{positions.hidden=!positions.hidden;gear.setAttribute('aria-expanded',String(!positions.hidden));if(!positions.hidden)position.focus();});
