@@ -4,16 +4,44 @@ const qs=(selector,root=document)=>root.querySelector(selector);
 const all=(selector,root=document)=>[...root.querySelectorAll(selector)];
 const typePicker=qs('[data-voucher-type-picker]');
 if(typePicker){
- typePicker.addEventListener('change',event=>{
-  const choice=event.target;if(!choice.matches('input[type=radio][name=type]'))return;
-  const selected=choice.value,current=typePicker.dataset.currentType;
-  // Keep the mounted rules selected if navigation is cancelled or fails.
-  all('input[name=type]',typePicker).forEach(input=>input.checked=input.value===current);
-  if(selected===current)return;
+ const rules=qs('[data-approval-rules]');let request,version=0;
+ rules.setAttribute('data-ui-loading-region','');
+ const select=type=>all('input[name=type]',typePicker).forEach(input=>input.checked=input.value===type);
+ async function load(selected){
+  const current=++version;request?.abort();const controller=request=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
   const url=new URL(typePicker.action,location.href);url.searchParams.set('type',selected);
-  window.WorkspaceNavigation.navigate(url.href);
+  window.AppLoading?.end(rules);window.AppLoading?.begin(rules,{table:false,replace:true});rules.inert=true;
+  try{
+   const response=await fetch(url.href,{credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:controller.signal});
+   if(!response.ok||response.redirected||!response.headers.get('Content-Type')?.includes('text/html'))throw new Error('Rules unavailable');
+   const page=new DOMParser().parseFromString(await response.text(),'text/html'),next=qs('[data-approval-rules]',page);
+   if(!next||qs('[data-voucher-type-picker]',page)?.dataset.currentType!==selected||qs('input[name=type]',next)?.value!==selected)throw new Error('Rules unavailable');
+   if(current!==version)return;
+   window.AppLoading?.end(rules);rules.replaceChildren(...Array.from(next.childNodes,node=>document.importNode(node,true)));
+   initializeRules(rules);window.AmountInputs?.refresh(rules);window.FormValidation?.refresh(rules);
+   rules.dispatchEvent(new CustomEvent('accounting:form-refreshed',{bubbles:true}));
+   typePicker.dataset.currentType=selected;select(selected);
+   history.replaceState(history.state,'',url.href);
+  }catch(error){
+   if(current!==version)return;
+   select(typePicker.dataset.currentType);
+   window.AppLoading?.fail(rules,{label:document.body.dataset.navigationError,retry:()=>choose(selected)});
+  }finally{clearTimeout(timeout);if(current===version){window.AppLoading?.end(rules);rules.inert=false;rules.dispatchEvent(new CustomEvent('accounting:form-refresh-end',{bubbles:true}));}}
+ }
+ function choose(selected){
+  const current=typePicker.dataset.currentType;
+  select(current);
+  if(selected===current){++version;request?.abort();window.AppLoading?.end(rules);rules.inert=false;rules.dispatchEvent(new CustomEvent('accounting:form-refresh-end',{bubbles:true}));return;}
+  // Reuse the existing discard dialog without invoking workspace navigation.
+  const resume=()=>load(selected);
+  if(document.dispatchEvent(new CustomEvent('workspace:before-navigate',{cancelable:true,detail:{resume}})))resume();
+ }
+ typePicker.addEventListener('change',event=>{
+  const choice=event.target;if(choice.matches('input[type=radio][name=type]'))choose(choice.value);
  });
  typePicker.addEventListener('submit',event=>event.preventDefault());
+ window.addEventListener('pagehide',()=>{++version;request?.abort();window.AppLoading?.end(rules);rules.inert=false;});
 }
 document.querySelectorAll('form').forEach(form=>{const command=form.querySelector('[data-approval-command]');if(command)form.addEventListener('submit',event=>{command.value=event.submitter?.dataset.formCommand||command.value;});});
 // Native dialogs provide keyboard trapping; body placement covers the entire workspace.
@@ -70,7 +98,8 @@ if(editor){const rows=qs('[data-editor-lines]',editor),template=rows.firstElemen
  if(location.hash.startsWith('#field-')){let name;try{name=decodeURIComponent(location.hash.slice(7));}catch{}const field=editor.elements.namedItem(name);if(field){const visible=visibleField(field);visible?.focus();const row=visible?.closest('[data-editor-line]');if(row){selectedLine=row;row.classList.add('is-selected');qs('[data-line-select]',row).checked=true;refreshLines();}}}
 }
 const rules=qs('[data-approval-rules]');
-if(rules){
+if(rules)initializeRules(rules);
+function initializeRules(rules){
  const list=qs('[data-rule-list]',rules),ruleTemplate=qs('[data-rule]',list).cloneNode(true),stepTemplate=qs('[data-step]',ruleTemplate).cloneNode(true);
  const update=()=>{
   all('[data-rule]',list).forEach((rule,n)=>{

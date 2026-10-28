@@ -20,6 +20,14 @@
     window.addEventListener('pageshow', () => queueMicrotask(() => initialize(true)), {once:true});
     if (document.readyState === 'complete' && !window.WorkspaceNavigation?.restoring) queueMicrotask(() => initialize(true));
     states.forEach(state => ['input','change'].forEach(type => state.form.addEventListener(type, () => state.edited = true)));
+    document.addEventListener('accounting:form-refreshed', event => {
+        const state = states.find(state => state.form === event.target); if (!state) return;
+        state.initial = values(state.form); state.edited = false; state.restoredErrors = false;
+        discarding = false;
+    });
+    document.addEventListener('accounting:form-refresh-end', event => {
+        if (states.some(state => state.form === event.target)) discarding = false;
+    });
     const close = () => {
         modal.hidden = true; modal.classList.remove('is-open');
         document.body.style.overflow = previousOverflow;
