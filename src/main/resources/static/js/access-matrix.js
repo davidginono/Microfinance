@@ -15,7 +15,7 @@
         const syncActions=()=>{const clean=signature()===initial;save.disabled=discard.disabled=clean;};
         function render(){
             const query=search.value.trim().toLocaleLowerCase();
-            const matches=rows.filter(row=>(row.dataset.claimKey+' '+row.cells[0].textContent).toLocaleLowerCase().includes(query));
+            const matches=rows.filter(row=>(row.dataset.claimKey+' '+row.cells[0].textContent+' '+[...row.querySelectorAll('[data-access-claim]')].map(input=>input.value+' '+input.getAttribute('aria-label')).join(' ')).toLocaleLowerCase().includes(query));
             const value=row=>sort==='claim'?row.cells[0].textContent.trim():row.querySelector(`[data-claim-action="${sort}"] input`)?.checked?2:row.querySelector(`[data-claim-action="${sort}"] input`)?1:0;
             matches.sort((a,b)=>{const result=sort==='claim'?collator.compare(value(a),value(b)):value(a)-value(b);return (descending?-result:result)||collator.compare(a.dataset.claimKey,b.dataset.claimKey);});
             const totalPages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,totalPages-1));

@@ -74,13 +74,14 @@
         <div class="aws-filter-toolbar resource-table-search"><label><span class="sr-only"><spring:message code="access.matrix.search" /></span><span class="access-matrix-search"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.5" cy="6.5" r="4.5" /><path d="m10 10 4 4" /></svg><input type="search" class="aws-control" data-access-search placeholder="<spring:message code='access.matrix.search' />" autocomplete="off" /></span></label></div>
         <div class="erp-table-scroll admin-claims-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="editor">
             <thead><tr><th scope="col" data-table-identifier data-access-sort="claim"><spring:message code="access.matrix.permissionClaim" /></th><c:forEach items="${matrixColumns}" var="column"><th scope="col" data-table-column-locked data-access-sort="${column}"><spring:message code="${column=='UPDATE'?'access.matrix.edit':'access.action.'.concat(column)}" /></th></c:forEach></tr></thead>
-            <tbody><c:forEach items="${accessMatrixRows}" var="row"><spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" /><c:forEach items="${accessActions}" var="action"><c:set var="matrixClaim" value="${row.claimsByAction[action]}" /><c:if test="${not empty matrixClaim}">
-                <spring:message code="access.action.${action}" text="${action.displayName}" var="matrixActionLabel" />
-                <tr data-claim-row data-claim-key="${matrixClaim}">
-                    <th scope="row"><span class="access-matrix-name"><c:out value="${matrixFeatureLabel}" /> — <c:out value="${matrixActionLabel}" /></span></th>
-                    <c:forEach items="${matrixColumns}" var="column"><td data-claim-action="${column}"><c:choose><c:when test="${action.name()==column}"><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${action}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) ? 'checked' : ''} class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td></c:forEach>
+            <tbody><c:forEach items="${accessMatrixRows}" var="row"><spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" />
+                <tr data-claim-row data-claim-key="${row.feature}">
+                    <th scope="row"><span class="access-matrix-name"><c:out value="${matrixFeatureLabel}" /></span></th>
+                    <c:forEach items="${matrixColumns}" var="column"><c:set var="matrixClaim" value="${null}" /><c:forEach items="${row.claimsByAction}" var="entry"><c:if test="${entry.key.name()==column}"><c:set var="matrixClaim" value="${entry.value}" /></c:if></c:forEach>
+                        <td data-claim-action="${column}"><c:choose><c:when test="${not empty matrixClaim}"><spring:message code="access.action.${column}" var="matrixActionLabel" /><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${column}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) ? 'checked' : ''} class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td>
+                    </c:forEach>
                 </tr>
-            </c:if></c:forEach></c:forEach></tbody>
+            </c:forEach></tbody>
         </table></div>
         <p data-access-empty hidden role="status"><spring:message code="access.matrix.empty" /></p>
     </section>
