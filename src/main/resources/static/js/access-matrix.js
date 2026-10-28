@@ -12,12 +12,20 @@
         const signature=()=>JSON.stringify(controls.map(control=>[control.value,control.checked]));
         const initial=signature();let page=0,size=Number(matrix.dataset.tablePageSize)||10,sort='claim',descending=false;
         const collator=new Intl.Collator(document.documentElement.lang||'en',{numeric:true,sensitivity:'base'});
+        const normalize=text=>text.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+        const searchable=new Map(rows.map(row=>[row,{name:normalize(row.cells[0].textContent),codes:normalize(row.dataset.claimKey+' '+[...row.querySelectorAll('[data-access-claim]')].map(input=>input.value).join(' '))}]));
         const syncActions=()=>{const clean=signature()===initial;save.disabled=discard.disabled=clean;};
         function render(){
-            const query=search.value.trim().toLocaleLowerCase();
-            const matches=rows.filter(row=>(row.dataset.claimKey+' '+row.cells[0].textContent+' '+[...row.querySelectorAll('[data-access-claim]')].map(input=>input.value+' '+input.getAttribute('aria-label')).join(' ')).toLocaleLowerCase().includes(query));
+            const query=normalize(search.value),terms=query.split(' '),byCode=search.value.includes('_');
+            const relevance=new Map();
+            const matches=rows.filter(row=>{
+                // Ordinary searches describe the claim name, not every action it supports.
+                const text=searchable.get(row)[byCode?'codes':'name'],words=text.split(' ');
+                if(query && !terms.every(term=>words.some(word=>word.startsWith(term))))return false;
+                relevance.set(row,!query||text===query?0:text.startsWith(query)?1:text.includes(query)?2:3);return true;
+            });
             const value=row=>sort==='claim'?row.cells[0].textContent.trim():row.querySelector(`[data-claim-action="${sort}"] input`)?.checked?2:row.querySelector(`[data-claim-action="${sort}"] input`)?1:0;
-            matches.sort((a,b)=>{const result=sort==='claim'?collator.compare(value(a),value(b)):value(a)-value(b);return (descending?-result:result)||collator.compare(a.dataset.claimKey,b.dataset.claimKey);});
+            matches.sort((a,b)=>{const rank=relevance.get(a)-relevance.get(b);if(rank)return rank;const result=sort==='claim'?collator.compare(value(a),value(b)):value(a)-value(b);return (descending?-result:result)||collator.compare(a.dataset.claimKey,b.dataset.claimKey);});
             const totalPages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,totalPages-1));
             rows.forEach(row=>row.hidden=true);matches.slice(page*size,(page+1)*size).forEach(row=>row.hidden=false);
             // Move existing nodes only; hidden pages remain successful controls when Save submits.

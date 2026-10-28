@@ -2,10 +2,10 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),{readFile
 const jsp=readFileSync('src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp','utf8'),editor=jsp.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 const shared=readFileSync('src/main/resources/static/js/resource-table.js','utf8'),matrix=readFileSync('src/main/resources/static/js/access-matrix.js','utf8');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
-async function setup(){
+async function setup(extraClaims=[]){
  const actions=['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE'];
  const row=(feature,key,claims)=>`<tr data-claim-row data-claim-key="${key}"><th scope="row"><span class="access-matrix-name">${feature}</span></th>${actions.map(column=>`<td data-claim-action="${column}">${claims[column]?`<input type="checkbox" name="claims" data-access-claim="${claims[column].key}" value="${claims[column].key}" ${claims[column].allowed?'checked':''}>`:'<span aria-disabled="true">Not applicable</span>'}</td>`).join('')}</tr>`;
- const rows=[row('Voucher approval actions','VOUCHER_APPROVAL',{APPROVE:{key:'VOUCHER_APPROVAL_APPROVE',allowed:false}}),row('Repayments','LOAN_REPAYMENTS',{VIEW:{key:'LOAN_REPAYMENTS_VIEW',allowed:true},UPDATE:{key:'LOAN_REPAYMENTS_UPDATE',allowed:false}}),...Array.from({length:25},(_,n)=>row('Feature '+n,'EXAMPLE_'+String(n).padStart(2,'0'),{CONFIGURE:{key:'EXAMPLE_'+String(n).padStart(2,'0'),allowed:n%2===0}}))].join('');
+ const rows=[row('Voucher approval actions','VOUCHER_APPROVAL',{APPROVE:{key:'VOUCHER_APPROVAL_APPROVE',allowed:false}}),row('Repayments','LOAN_REPAYMENTS',{VIEW:{key:'LOAN_REPAYMENTS_VIEW',allowed:true},UPDATE:{key:'LOAN_REPAYMENTS_UPDATE',allowed:false}}),...Array.from({length:25},(_,n)=>row('Feature '+n,'EXAMPLE_'+String(n).padStart(2,'0'),{CONFIGURE:{key:'EXAMPLE_'+String(n).padStart(2,'0'),allowed:n%2===0}})),...extraClaims.map(claim=>row(claim.name,claim.key,claim.actions))].join('');
  const labels=`<template id="resource-table-labels" data-search-page="Search claims" data-no-matches="No matching claims" data-select="Select" data-preferences="Preferences" data-pagination="Pagination" data-page="Page" data-previous="Previous" data-next="Next" data-actions="Actions" data-page-size="Page size" data-records="Records" data-display="Display" data-wrap="Wrap" data-striped="Striped" data-compact="Compact" data-sticky="Sticky" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-columns="Columns" data-reorder="Reorder" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
  const markup=`${labels}<script type="application/json" id="role-default-claims-json">{"MANAGER":["VOUCHER_APPROVAL_APPROVE"]}</script><script type="application/json" id="Member-default-claims-json">[]</script><form data-access-edit-form data-form-unordered-fields="claims" data-member-access="false" method="post"><input type="hidden" name="_csrf" value="kept"><input type="checkbox" name="positions" data-staff-role-checkbox="edit-user" value="MANAGER" checked><select name="status"><option selected>ACTIVE</option><option>INACTIVE</option></select><section data-access-matrix data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true"><div class="app-table-titlebar"><h2>Access matrix — Joseph <span class="app-table-count" data-access-count></span></h2><div class="app-table-toolbar"><button type="button" data-restore-default-claims data-table-command>Restore defaults</button><button type="button" data-access-discard disabled>Discard</button><button type="submit" data-access-save disabled>Save</button></div></div><div class="aws-filter-toolbar"><input type="search" data-access-search></div><div class="erp-table-scroll"><table data-table-sort-mode="none"><thead><tr><th data-table-identifier data-access-sort="claim">Permission claim</th>${actions.map(action=>`<th data-table-column-locked data-access-sort="${action}">${action}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div><p data-access-empty hidden>No matching permission claims.</p></section></form>`;
  const dom=new JSDOM(markup,{url:'http://localhost/admin/users/1/edit',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
@@ -13,6 +13,20 @@ async function setup(){
  w.eval(editor);w.eval(shared);w.eval(matrix);await settle();return {dom,w,d:w.document};
 }
 function search(w,d,value){const input=d.querySelector('[data-access-search]');input.value=value;input.dispatchEvent(new w.Event('input',{bubbles:true}));}
+test('search matches claim-name words and ranks close names without matching generic action labels',async()=>{
+ const {dom,w,d}=await setup([
+  {name:'Approval Flow',key:'APPROVAL_FLOW',actions:{VIEW:{key:'APPROVAL_FLOW_VIEW'}}},
+  {name:'Accountant Queue',key:'ACCOUNTANT_QUEUE',actions:{APPROVE:{key:'ACCOUNTANT_QUEUE_APPROVE'}}},
+  {name:'Ínstitution account approvals',key:'ACCOUNT_APPROVAL',actions:{VIEW:{key:'ACCOUNT_APPROVAL_VIEW'}}}
+ ]);try{
+  const visible=()=>[...d.querySelectorAll('[data-claim-row]:not([hidden])')].map(row=>row.dataset.claimKey),before=[...new w.FormData(d.querySelector('form')).getAll('claims')].sort();
+  search(w,d,'APPRO');assert.deepEqual(visible(),['APPROVAL_FLOW','ACCOUNT_APPROVAL','VOUCHER_APPROVAL']);
+  search(w,d,'actions voucher');assert.deepEqual(visible(),['VOUCHER_APPROVAL']);
+  search(w,d,'institution appro');assert.deepEqual(visible(),['ACCOUNT_APPROVAL']);
+  search(w,d,'ACCOUNTANT_QUEUE_APPROVE');assert.deepEqual(visible(),['ACCOUNTANT_QUEUE']);
+  search(w,d,'');assert.equal(d.querySelector('[data-access-count]').textContent,'(30)');assert.deepEqual([...new w.FormData(d.querySelector('form')).getAll('claims')].sort(),before);assert.equal(d.querySelector('[data-access-save]').disabled,true);
+ }finally{dom.window.close();}
+});
 test('matrix has action columns, bounded native paging and no row-selection or split panel',async()=>{
  const {dom,w,d}=await setup();try{const form=d.querySelector('form'),before=[...new w.FormData(form).getAll('claims')];assert.equal(d.querySelectorAll('[data-claim-row]:not([hidden])').length,10);assert.equal(d.querySelector('[data-access-count]').textContent,'(27)');assert.equal(d.querySelectorAll('[data-claim-select],.resource-split-panel').length,0);
  d.querySelector('.resource-table-page[aria-label="Page 2"]').click();assert.equal(d.querySelector('.resource-table-pagination [aria-current]').textContent,'2');assert.equal(d.querySelectorAll('[data-claim-row]:not([hidden])').length,10);assert.deepEqual([...new w.FormData(form).getAll('claims')],before);assert.equal(d.querySelector('[data-access-save]').disabled,true);
