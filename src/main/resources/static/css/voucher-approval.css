@@ -29,5 +29,14 @@
 .approval-account>[hidden]{display:none!important}
 .approval-account>.neo-select{flex:1 1 0;min-width:0;max-width:100%}
 
+/* Native voucher choices follow the supplied console card selector. */
+.approval-simple-rules .approval-voucher-types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.approval-simple-rules .approval-voucher-type{display:flex;flex-direction:row;align-items:flex-start;gap:10px;min-height:84px;padding:20px;border:1px solid #879596;border-radius:2px;background:#fff;cursor:pointer;font-size:16px;line-height:22px;font-weight:600;overflow-wrap:anywhere}
+.approval-simple-rules .approval-voucher-type:has(input:checked){border-color:#0972d3;background:#f1faff;box-shadow:inset 0 0 0 1px #0972d3}
+.approval-simple-rules .approval-voucher-type:has(input:focus-visible){outline:2px solid #0972d3;outline-offset:3px}
+.approval-simple-rules .approval-voucher-type input[type=radio]{appearance:auto;flex:0 0 18px;width:18px;height:18px;margin:2px 0 0;padding:0;border:0;accent-color:#0972d3;cursor:pointer}
+.approval-type-filter>.accounting-actions{justify-content:flex-end;margin-top:16px}
+@media(max-width:600px){.approval-simple-rules .approval-voucher-types{grid-template-columns:minmax(0,1fr);gap:12px}.approval-simple-rules .approval-voucher-type{min-height:64px;padding:16px}}
+
 /* Simple role rules: controls stay readable and stack on narrow screens. */
 .approval-simple-rules{max-width:960px}.approval-simple-rules fieldset{border:0;padding:0;margin:0;min-width:0}.approval-simple-rules .erp-resource-section{margin:0 0 16px}.approval-simple-rules h2{display:flex;align-items:center;gap:5px}.approval-simple-rules h2 [data-rule-remove]{margin-left:auto}.approval-type-filter .accounting-actions{padding:0}.approval-type-filter label{min-width:0}.approval-rule-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:0}.approval-simple-rules label{display:flex;flex-direction:column;gap:6px;min-width:0}.approval-simple-rules input,.approval-simple-rules select{width:100%;min-width:0;box-sizing:border-box}.approval-steps{padding:16px 0;display:grid;gap:12px}.approval-step{display:grid;grid-template-columns:20px minmax(120px,1fr) minmax(80px,120px) 32px;align-items:end;gap:12px}.approval-step>[data-step-number]{align-self:end;padding-bottom:8px}.approval-rule-bottom{display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:16px;padding:0}.approval-rule-bottom label{min-width:220px}.approval-simple-rules .accounting-error-summary:empty{display:none}@media(max-width:600px){.approval-rule-fields{grid-template-columns:1fr;padding:0}.approval-steps{padding:16px 0}.approval-step{grid-template-columns:18px minmax(90px,1fr) 78px 28px;gap:6px}.approval-rule-bottom{padding:0}.approval-rule-bottom label{width:100%;min-width:0}.approval-type-filter .accounting-actions{padding:0}}
