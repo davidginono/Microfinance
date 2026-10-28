@@ -283,7 +283,7 @@
         const pager = region.querySelector('[data-table-pagination]') || [...document.querySelectorAll('[data-table-pagination][data-table-for]')].find(candidate => candidate.dataset.tableFor.split(' ').includes(region.dataset.resourceTable));
         const navigation = node('nav', 'resource-table-pagination'); navigation.setAttribute('aria-label', l.pagination);
         const externalPaging = region.dataset.tablePaginationMode === 'external';
-        let externalPage = {page:0,hasNext:false,loading:false};
+        let externalPage = {page:0,hasNext:false,loading:false,totalPages:0};
         const renderPager = source => {
         navigation.replaceChildren();
         const page = (externalPaging ? externalPage.page : Number(source?.dataset.page || 0)) + 1;
@@ -300,13 +300,27 @@
                 const url = new URL(control.href, location.href);url.searchParams.set('size',region.dataset.tablePageSize);control.href=url.href;
             }
             if (control.hasAttribute('href') && [...queryUrl.searchParams.keys()].some(isOrder)) control.href=retainOrder(new URL(control.href,location.href)).href;
-            if (direction === 'next') { const current = node('span', 'resource-table-page-number', String(page)); current.setAttribute('aria-current', 'page'); current.setAttribute('aria-label', l.page + ' ' + page); navigation.append(current); }
+            if (direction === 'next') {
+                if(externalPaging && externalPage.totalPages){
+                    const total=externalPage.totalPages,windowSize=window.matchMedia?.('(max-width:600px)').matches?3:7;
+                    const start=Math.max(1,Math.min(page-Math.floor(windowSize/2),total-windowSize+1)),end=Math.min(total,start+windowSize-1);
+                    const pages=[...new Set([1,...Array.from({length:end-start+1},(_,n)=>start+n),total])].sort((a,b)=>a-b);
+                    let previous=0;
+                    for(const number of pages){
+                        if(previous && number-previous>1){const gap=node('span','resource-table-page-gap','…');gap.setAttribute('aria-hidden','true');navigation.append(gap);}
+                        const choice=node('button','resource-table-page resource-table-page-number',String(number));choice.type='button';choice.disabled=externalPage.loading;
+                        choice.setAttribute('aria-label',l.page+' '+number);if(number===page)choice.setAttribute('aria-current','page');
+                        choice.addEventListener('click',()=>{if(number!==page)region.dispatchEvent(new CustomEvent('resource-table:page',{detail:{page:number-1}}));});navigation.append(choice);previous=number;
+                    }
+                }else{const current = node('span', 'resource-table-page-number', String(page)); current.setAttribute('aria-current', 'page'); current.setAttribute('aria-label', l.page + ' ' + page); navigation.append(current);}
+            }
             navigation.append(control);
         });
         };
         renderPager(pager);
+        window.addEventListener('resize',()=>{if(externalPaging && externalPage.totalPages)renderPager(pager);},{signal});
         if (externalPaging) lifetime.setPage = state => {
-            if (externalPage.page === state.page && externalPage.hasNext === state.hasNext && externalPage.loading === state.loading) return;
+            if (externalPage.page === state.page && externalPage.hasNext === state.hasNext && externalPage.loading === state.loading && externalPage.totalPages === state.totalPages) return;
             externalPage = state;renderPager();
         };
         if (pager) pager.dataset.tablePaginationUsed = 'true';
@@ -615,7 +629,7 @@
         const lockedColumns = () => {
             const rows=[...table.rows].filter(row=>row!==head);
             const hasGroupedCells=rows.some(row=>row.cells.length>1 && [...row.cells].some(cell=>cell.colSpan>1 || cell.rowSpan>1));
-            return new Set(headers.flatMap((header, index) => hasGroupedCells || header.hasAttribute('data-table-identifier') || index <= (selectable ? 1 : 0) || rows.some(row => originalCells(row)[index]?.querySelector('input,select,textarea')) ? [index] : []));
+            return new Set(headers.flatMap((header, index) => hasGroupedCells || header.hasAttribute('data-table-identifier') || header.hasAttribute('data-table-column-locked') || index <= (selectable ? 1 : 0) || rows.some(row => originalCells(row)[index]?.querySelector('input,select,textarea')) ? [index] : []));
         };
         const key = 'resource-table:v1:' + (region.dataset.resourceTable || scroller.dataset.viewPositionKey || location.pathname + ':' + [...document.querySelectorAll('[data-resource-table]')].indexOf(region));
         const defaultOrder = headers.map((_, index) => index);
@@ -738,7 +752,10 @@
                 clearSelection(); apply(); try { localStorage.setItem(key, JSON.stringify(settings)); } catch { /* Preferences still apply for this view. */ }
                 dialog.close();
                 const size = pageSize.find(input => input.checked)?.value;
-                if (size && size !== region.dataset.tablePageSize) { const url = new URL(queryUrl); url.searchParams.set('size',size); url.searchParams.set(pageParam,'0'); void updateTable(url); }
+                if (size && size !== region.dataset.tablePageSize) {
+                    if(externalPaging){region.dataset.tablePageSize=size;region.dispatchEvent(new CustomEvent('resource-table:page-size',{detail:{size:Number(size)}}));}
+                    else{const url = new URL(queryUrl); url.searchParams.set('size',size); url.searchParams.set(pageParam,'0'); void updateTable(url);}
+                }
             });
             dialog.showModal(); close.focus();
         });
@@ -747,7 +764,7 @@
     window.ResourceTable = {setPage: (region, state) => {
         if (region?.dataset.tablePaginationMode !== 'external') return;
         init(region);
-        lifetimes.get(region)?.setPage({page:Math.max(0,Math.trunc(state.page)),hasNext:!!state.hasNext,loading:!!state.loading});
+        lifetimes.get(region)?.setPage({page:Math.max(0,Math.trunc(state.page)),hasNext:!!state.hasNext,loading:!!state.loading,totalPages:Number.isFinite(state.totalPages)?Math.max(1,Math.min(10000,Math.trunc(state.totalPages))):0});
     }, refresh: control => {
         const region=control.closest('[data-resource-table]');if(!region)return false;
         region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));return true;

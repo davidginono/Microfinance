@@ -568,12 +568,25 @@
     }
 
     .admin-claims-scroll { --erp-table-height: min(38rem, 68vh); }
-    [data-access-matrix] .erp-table { min-width: 640px; }
-    [data-access-matrix] .erp-table td { vertical-align: middle; }
-    [data-access-matrix] .erp-table code { font-size: 12px; overflow-wrap: anywhere; }
-    [data-access-matrix] .resource-table-search { max-width: 38rem; }
-    [data-access-matrix] [data-access-claim] { margin-right: 6px; }
-    [data-access-matrix] .resource-split-panel { min-width: 0; }
+    [data-access-matrix] .erp-table { width: max-content !important; min-width: 100%; table-layout: fixed; }
+    [data-access-matrix] .erp-table :is(th,td) { min-width: 128px; width: 128px; vertical-align: middle; }
+    [data-access-matrix] .erp-table :is(th,td):first-child { min-width: 310px; width: 310px; }
+    .aws-console [data-access-matrix] .erp-table tbody th { background: #fff !important; color: #16191f !important; font-weight: 400; }
+    [data-access-matrix] .erp-table code { display: block; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; white-space: normal; }
+    .access-matrix-description { display: block; margin-top: 5px; color: #545b64; font-size: 12px; font-weight: 400; line-height: 18px; white-space: normal; }
+    [data-access-matrix] .resource-table-search { max-width: none; }
+    .access-matrix-search { display: block; position: relative; min-width: 0; width: 100%; }
+    .access-matrix-search > svg { position: absolute; top: 8px; left: 10px; width: 16px; height: 16px; fill: none; stroke: #687078; stroke-width: 2; pointer-events: none; }
+    .access-matrix-search > input { padding-left: 34px !important; }
+    .access-matrix-unavailable { color: #687078; font-size: 13px; font-weight: 400; white-space: nowrap; }
+    [data-access-empty] { padding: 20px; text-align: center; color: #545b64; }
+    [data-access-matrix] .access-matrix-sort { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+    .access-matrix-sort svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }
+    [aria-sort="ascending"] .access-matrix-sort svg { transform: rotate(180deg); fill: currentColor; }
+    [aria-sort="descending"] .access-matrix-sort svg { fill: currentColor; }
+    [data-access-matrix] .resource-table-page[aria-current="page"] { color: #16191f; font-weight: 700; }
+    [data-access-matrix] .resource-table-page-gap { padding: 0 4px; color: #545b64; }
+    @media(max-width:767px) { [data-access-matrix] .resource-table-tools { align-items: stretch; } [data-access-matrix] .resource-table-utilities { max-width: 100%; flex-wrap: wrap; } [data-access-matrix] .resource-table-pagination { flex-wrap: wrap; } }
 
     .admin-access-matrix-restore {
         align-self: flex-start;

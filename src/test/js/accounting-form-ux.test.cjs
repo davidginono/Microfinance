@@ -4,6 +4,14 @@ const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 
 const source = fs.readFileSync('src/main/resources/static/js/accounting-form-ux.js', 'utf8');
+test('reordering set-valued claims stays clean while changing a permission remains protected', async () => {
+    const {dom,w,d,navigate} = fixture('<form class="accounting-create-form" data-form-unordered-fields="claims"><input type="checkbox" name="claims" value="VIEW" checked><input type="checkbox" name="claims" value="APPROVE"><button type="submit">Save</button></form>');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const form=d.querySelector('form'),claim=form.querySelector('[value="VIEW"]');form.append(claim);
+    assert.equal(navigate(),true);
+    claim.checked=false;claim.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(navigate(),false);
+    dom.window.close();
+});
 function fixture(forms = '<form method="post" class="accounting-create-form"><input name="name" value="Saved"><button type="submit">Save</button></form>') {
   const dom = new JSDOM(`${forms}<a href="#leave">Leave</a>
     <div id="accounting-discard-modal" hidden><div role="dialog"><button data-accounting-keep>Close</button>

@@ -1,3 +1,4 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
@@ -22,6 +23,7 @@
       method="post"
       class="admin-user-edit-shell accounting-create-form"
       data-access-edit-form
+      data-form-unordered-fields="claims"
       data-member-access="${user.memberAccess}">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
@@ -59,23 +61,28 @@
         </div>
     </section>
 
-    <section id="user-access-claims" class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-claims" data-table-selection="single" data-resource-split data-aws-no-refresh="true" data-access-matrix>
+    <c:set var="matrixColumns" value="${['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE','CREATE','VALIDATE','POST','INITIATE','WITHDRAW','HOLD','FORCE_APPROVE','ESCALATED_APPROVE','WAIVE','REJECT','ASSIGN','EXPORT','IMPORT','DISBURSE','REVERSE']}" />
+    <section id="user-access-claims" class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true" data-access-matrix>
         <div class="app-table-titlebar admin-user-section-header admin-user-section-header--actions">
-            <h2><spring:message code="access.matrix.title" /></h2>
-            <div class="app-table-toolbar admin-user-section-actions"><button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims><spring:message code="access.matrix.restore" /></button></div>
+            <h2><spring:message code="access.matrix.title" /> — <c:out value="${user.fullName}" /> <span class="app-table-count" data-access-count></span></h2>
+            <div class="app-table-toolbar admin-user-section-actions">
+                <button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims data-table-command><spring:message code="access.matrix.restore" /></button>
+                <button type="button" class="app-btn btn-neutral" data-access-discard disabled><spring:message code="access.matrix.discard" /></button>
+                <button type="submit" class="app-btn btn-neutral" data-access-save disabled><spring:message code="common.save" /></button>
+            </div>
         </div>
-        <div class="aws-filter-toolbar resource-table-search"><label><span class="sr-only"><spring:message code="access.matrix.search" /></span><input type="search" class="aws-control" data-aws-table-search placeholder="<spring:message code='access.matrix.search' />" autocomplete="off" /></label></div>
+        <div class="aws-filter-toolbar resource-table-search"><label><span class="sr-only"><spring:message code="access.matrix.search" /></span><span class="access-matrix-search"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.5" cy="6.5" r="4.5" /><path d="m10 10 4 4" /></svg><input type="search" class="aws-control" data-access-search placeholder="<spring:message code='access.matrix.search' />" autocomplete="off" /></span></label></div>
         <div class="erp-table-scroll admin-claims-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="editor">
-            <thead><tr><th><spring:message code="voucher.select" /></th><th><spring:message code="access.matrix.feature" /></th><th><spring:message code="access.matrix.action" /></th><th><spring:message code="access.matrix.claim" /></th><th><spring:message code="access.matrix.allowed" /></th></tr></thead>
+            <thead><tr><th scope="col" data-table-identifier data-access-sort="claim"><spring:message code="access.matrix.permissionClaim" /></th><c:forEach items="${matrixColumns}" var="column"><th scope="col" data-table-column-locked data-access-sort="${column}"><spring:message code="${column=='UPDATE'?'access.matrix.edit':'access.action.'.concat(column)}" /></th></c:forEach></tr></thead>
             <tbody><c:forEach items="${accessMatrixRows}" var="row"><spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" /><c:forEach items="${accessActions}" var="action"><c:set var="matrixClaim" value="${row.claimsByAction[action]}" /><c:if test="${not empty matrixClaim}">
                 <spring:message code="access.action.${action}" text="${action.displayName}" var="matrixActionLabel" />
-                <tr data-claim-row>
-                    <td><input type="checkbox" data-claim-select aria-label="<spring:message code='voucher.select' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" /></td>
-                    <td><c:out value="${matrixFeatureLabel}" /></td><td><c:out value="${matrixActionLabel}" /></td><td><code><c:out value="${matrixClaim}" /></code></td>
-                    <td><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${action}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) ? 'checked' : ''} class="admin-cloud-checkbox" /><span data-claim-state data-allowed="<spring:message code='access.matrix.allowed' />" data-denied="<spring:message code='access.matrix.notAllowed' />"><spring:message code="${user.claims.contains(matrixClaim)?'access.matrix.allowed':'access.matrix.notAllowed'}" /></span></td>
+                <tr data-claim-row data-claim-key="${matrixClaim}">
+                    <th scope="row"><code><c:out value="${matrixClaim}" /></code><span class="access-matrix-description"><c:out value="${matrixFeatureLabel}" /> · <c:out value="${matrixActionLabel}" /></span></th>
+                    <c:forEach items="${matrixColumns}" var="column"><td data-claim-action="${column}"><c:choose><c:when test="${action.name()==column}"><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${action}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) ? 'checked' : ''} class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td></c:forEach>
                 </tr>
             </c:if></c:forEach></c:forEach></tbody>
         </table></div>
+        <p data-access-empty hidden role="status"><spring:message code="access.matrix.empty" /></p>
     </section>
 
     <section id="user-access-status" class="erp-panel admin-user-edit-panel">
@@ -126,7 +133,6 @@
             </button>
         </c:if>
         <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
-        <button type="submit" class="app-btn btn-launch"><spring:message code="common.save" /></button>
     </div>
 </form>
 
@@ -224,11 +230,7 @@
             return Array.from(root.querySelectorAll(selector + ':not(:disabled)'));
         }
         function syncMatrixState(editForm) {
-            editForm.querySelectorAll('[data-access-claim]').forEach(input => {
-                const state=input.parentElement.querySelector('[data-claim-state]');
-                if(state)state.textContent=input.checked?state.dataset.allowed:state.dataset.denied;
-            });
-            editForm.querySelector('[data-access-matrix]')?.dispatchEvent(new Event('resource-split:refresh'));
+            editForm.querySelector('[data-access-matrix]')?.dispatchEvent(new Event('access-matrix:changed'));
         }
         function allRoleDefaultClaims() {
             const defaults = new Set();
@@ -285,19 +287,6 @@
                 });
             }
 
-            const matrix=form.querySelector('[data-access-matrix]');
-            matrix?.addEventListener('click',event=>{
-                const row=event.target.closest('[data-claim-row]');
-                if(!row || event.target.closest('a,button,select,textarea') || event.target.matches('[data-access-claim]'))return;
-                if(event.target.matches('input') && !event.target.matches('[data-claim-select]'))return;
-                const input=row.querySelector('[data-claim-select]');
-                const selected=event.target===input?input.checked:!input.checked;
-                matrix.querySelectorAll('[data-claim-row]').forEach(candidate=>{
-                    candidate.classList.toggle('resource-table-selected',candidate===row && selected);
-                    candidate.querySelector('[data-claim-select]').checked=candidate===row && selected;
-                });
-            });
-            matrix?.addEventListener('resource-table:reset',()=>matrix.querySelectorAll('.resource-table-selected').forEach(row=>row.classList.remove('resource-table-selected')));
             syncMatrixState(form);
         }
 
@@ -337,6 +326,7 @@
         }
     })();
 </script>
+<script src="<c:url value='/js/access-matrix.js' />" defer></script>
 
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

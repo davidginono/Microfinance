@@ -6,7 +6,11 @@
     const panel = modal.querySelector('[role="dialog"]');
     let submitting = false, discarding = false, submitted, initialized = false, pending, previousFocus, previousOverflow, previousRootOverflow;
     const disabledOnSubmit = new Set();
-    const values = form => JSON.stringify(Array.from(form.elements).filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action').map(el => [el.name, el.value, el.checked]));
+    const values = form => {
+        const fields = Array.from(form.elements).filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action').map(el => [el.name, el.value, el.checked]);
+        const unordered = new Set((form.dataset.formUnorderedFields || '').split(/\s+/));
+        return JSON.stringify([...fields.filter(([name]) => !unordered.has(name)), ...fields.filter(([name]) => unordered.has(name)).sort(([an,av],[bn,bv]) => an.localeCompare(bn) || av.localeCompare(bv))]);
+    };
     const states = forms.map(form => ({form, initial:values(form), edited:false,
         restoredErrors:Boolean(form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary')) || form.dataset.unsavedFinancialForm === 'true'}));
     const dirty = except => states.some(state => state !== except && (state.restoredErrors || values(state.form) !== state.initial));
