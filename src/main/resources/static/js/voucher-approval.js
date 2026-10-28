@@ -2,6 +2,19 @@
 'use strict';
 const qs=(selector,root=document)=>root.querySelector(selector);
 const all=(selector,root=document)=>[...root.querySelectorAll(selector)];
+const typePicker=qs('[data-voucher-type-picker]');
+if(typePicker){
+ typePicker.addEventListener('change',event=>{
+  const choice=event.target;if(!choice.matches('input[type=radio][name=type]'))return;
+  const selected=choice.value,current=typePicker.dataset.currentType;
+  // Keep the mounted rules selected if navigation is cancelled or fails.
+  all('input[name=type]',typePicker).forEach(input=>input.checked=input.value===current);
+  if(selected===current)return;
+  const url=new URL(typePicker.action,location.href);url.searchParams.set('type',selected);
+  window.WorkspaceNavigation.navigate(url.href);
+ });
+ typePicker.addEventListener('submit',event=>event.preventDefault());
+}
 document.querySelectorAll('form').forEach(form=>{const command=form.querySelector('[data-approval-command]');if(command)form.addEventListener('submit',event=>{command.value=event.submitter?.dataset.formCommand||command.value;});});
 // Native dialogs provide keyboard trapping; body placement covers the entire workspace.
 all('dialog.approval-dialog').forEach((dialog,index)=>{document.body.append(dialog);const heading=qs('h2',dialog);heading.id=`approval-dialog-title-${index}`;dialog.setAttribute('aria-labelledby',heading.id);let opener;dialog.addEventListener('close',()=>{const frame=qs('iframe',dialog);if(frame)frame.removeAttribute('src');opener?.focus();});dialog.addEventListener('approval:open',()=>{opener=document.activeElement;dialog.showModal();});all('[data-dialog-close]',dialog).forEach(b=>b.addEventListener('click',()=>dialog.close()));});

@@ -13,14 +13,13 @@
 <h1 class="erp-page-title"><spring:message code="approval.configuration" /></h1>
 <sec:authorize access="@access.has(principal, 'VOUCHER_RULE_CONFIGURE')" var="canConfigure" />
 <c:if test="${configurationSaved}"><p role="status" class="console-message" data-message-type="success"><spring:message code="approval.saved" /></p></c:if>
-<form method="get" class="erp-resource-section approval-type-filter">
+<form method="get" action="<c:url value='/finance/approval/configuration' />" class="erp-resource-section approval-type-filter" data-voucher-type-picker data-current-type="${ruleForm.type}">
 <h2 id="approval-voucher-type-heading"><spring:message code="approval.voucherType" /></h2>
 <fieldset class="approval-voucher-types" aria-labelledby="approval-voucher-type-heading">
 <c:forEach items="${['RECEIPT','PAYMENT','JOURNAL']}" var="t">
 <label class="approval-voucher-type"><input type="radio" name="type" value="${t}" ${ruleForm.type==t?'checked':''} /><span><spring:message code="approval.type.${t}" /></span></label>
 </c:forEach>
 </fieldset>
-<div class="accounting-actions"><button class="app-btn btn-neutral"><spring:message code="approval.show" /></button></div>
 </form>
 <spring:message code="approval.noLimit" var="noLimit" /><c:url value="/finance/approval/configuration" var="saveUrl" />
 <form:form modelAttribute="ruleForm" action="${saveUrl}" method="post" id="approval-rule-form" cssClass="accounting-create-form" data-voucher-form="true" data-approval-rules="true">

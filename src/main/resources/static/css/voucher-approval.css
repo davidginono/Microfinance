@@ -35,7 +35,7 @@
 .approval-simple-rules .approval-voucher-type:has(input:checked){border-color:#0972d3;background:#f1faff;box-shadow:inset 0 0 0 1px #0972d3}
 .approval-simple-rules .approval-voucher-type:has(input:focus-visible){outline:2px solid #0972d3;outline-offset:3px}
 .approval-simple-rules .approval-voucher-type input[type=radio]{appearance:auto;flex:0 0 18px;width:18px;height:18px;margin:2px 0 0;padding:0;border:0;accent-color:#0972d3;cursor:pointer}
-.approval-type-filter>.accounting-actions{justify-content:flex-end;margin-top:16px}
+.approval-simple-rules .approval-voucher-type input[type=radio]:focus{outline:none!important;box-shadow:none!important}
 @media(max-width:600px){.approval-simple-rules .approval-voucher-types{grid-template-columns:minmax(0,1fr);gap:12px}.approval-simple-rules .approval-voucher-type{min-height:64px;padding:16px}}
 
 /* Simple role rules: controls stay readable and stack on narrow screens. */
