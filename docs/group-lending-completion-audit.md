@@ -25,3 +25,15 @@ Performance capacity remains unproven: there was no load, spike or soak benchmar
 Phase 6 provider confirmations, unmatched/excess funds, refunds, seasonal schedules and new fees remain separate approved designs. They are disabled rather than inferred from this implementation. The supported channel is confirmed manual money that can be attributed exactly to existing obligations.
 
 Cleanup completed: eight temporary synthetic authentication profiles, exact settings/claims, payment profile and local mail configuration were restored and verified. Temporary credentials/checkpoints were removed; the owned QA runtime stopped. Permanent synthetic consent/coverage/correction evidence remains intact.
+
+## Coverage workspace follow-up — 28 October 2026
+
+The desktop review found remaining presentation regressions in the newer cycle-scoped workspace. Case PDF/print actions are restored for explicitly authorized staff and clients; the new staff document URL also verifies the cycle before rendering and preserves existing URLs. A stale selected receipt disables submission while retaining the verification form. Statement case links use the current workspace, and borrower payment/schedule paging retains the independently selected coverage page.
+
+English/Kiswahili notices explicitly distinguish coverage from new debt or cash. PDFs retain TZS, the recorded ceiling, presentation dates, both reversal and attribution-correction references, and liability limitations. Client verification evidence remains private. Missing-source errors now belong to the owning service; its primary-key-bounded lookup filters invalid contribution choices in SQL. Coverage pages/fragments explicitly declare UTF-8. No financial posting rule, schema, permission default, lock or worker changed.
+
+The affected 64-test run passed without failures/errors/skips, followed by 20 passing MVC/PDF/Jasper checks and packaging after the bilingual notice change. The final borrower-paging JSP compiled and the WAR packaged again. See the [desktop delivery evidence](group-lending-delivery.md#coverage-workspace-completion-follow-up-desktop-28-october-2026) for commands and logs. These checks do not establish sustained workload capacity.
+
+The final affected regression, including the new PostgreSQL missing/reversed-source recovery check and UTF-8 JSPs, passed all 65 tests without failures/errors/skips and packaged successfully (`target/coverage-completion-verified-package.log`). The exact-source query plan remains primary-key-bounded; the small synthetic execution sample was 0.389 ms, not a capacity benchmark.
+
+Final native acceptance passed 54 checks across staff/client sessions, both saved languages and four widths (360–1920 px). It covered UTF-8 text, case/member PDF/print, scoped case links, independent borrower paging, stale-source recovery with disabled submission, client privacy and logout protection. Payment counts were unchanged; no page errors or overflow occurred. Final screenshots were inspected. Synthetic authentication/claim/settings changes were restored and verified, temporary credentials removed, and the QA application stopped.

@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <%@ include file="coverage-head.jspf" %>
 <c:set var="pickerTitle" value="${picker=='source'?'coverage.choosePerson':'coverage.chooseReceipt'}"/><c:choose><c:when test="${picker=='source'}"><c:set var="pickerPath" value="${coverageUrl}/new"/></c:when><c:otherwise><c:set var="pickerPath" value="${coverageUrl}/${caseHeader.id}/link"/></c:otherwise></c:choose>
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="${coverageUrl}"><spring:message code="coverage.title"/></a><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="${pickerTitle}"/></span></nav><div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="${pickerTitle}"/></h1></div>

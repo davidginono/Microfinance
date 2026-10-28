@@ -1,6 +1,6 @@
 # Group coverage cases
 
-The backend increment adds an owning service and append-only PostgreSQL history, verified by thirteen focused PostgreSQL checks. Staff/client workspaces, statement trace and final cross-model acceptance remain open. Do not describe the complete coverage lifecycle as delivered until those gates pass.
+Coverage uses an owning service and append-only PostgreSQL history, localized staff/client workspaces, exact posted-receipt selection, case PDF/print and scoped statement traces. The [completion audit](group-lending-completion-audit.md) records the current supported boundaries and verification; the backend evidence below describes the original increment.
 
 A case refers to an accepted directed reciprocal guarantee, an accepted separate personal guarantee, or a signed shared allocation. JOINT cases retain the recorded joint-and-several ceiling. PROPORTIONAL shared allocations produce VOLUNTARY requests; they do not become guarantees for other participants. An organization remains the debtor on its own account. No case, acknowledgement, dispute or promise creates another receivable, posts cash or releases the original guarantee/debt.
 
@@ -24,4 +24,4 @@ V128 and corrective V129 applied and validated in the disposable PostgreSQL data
 
 A rollback-only V129 source probe admitted the exact 50.00 ordinary payment and 30.00 identified contribution without retaining either probe link (target/group-coverage-guard-probe.sql/.log). Bounded staff/client/source-page EXPLAIN ANALYZE plans are in target/group-coverage-query-plans.txt: execution 1.501/1.692/1.377 ms on the small synthetic data, with planning 5.696/5.643/13.571 ms. These are single-query observations, not workload or capacity evidence.
 
-Pending: broader cross-model financial regressions; localized staff/client UI, safe receipt selection, case PDF/print and bounded statement traces; native browser acceptance (currently disabled in Work settings); full package/regression and measured workload acceptance. Correctness checks do not prove 1,000 requests per second.
+The [delivery log](group-lending-delivery.md) records the subsequent cross-model regressions, workspaces, native browser acceptance and packaging. Measured workload acceptance remains open. Correctness and rendering checks do not prove 1,000 requests per second.

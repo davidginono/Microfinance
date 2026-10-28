@@ -76,7 +76,7 @@ public class GroupCoverageRepository {
  left join lending_group_receipt_loan gr on gr.posting_id=p.id left join lending_group_receipt g on g.id=gr.receipt_id
  where x.case_id=? order by
  """+com.sacco.mvp.accounting.dto.RegisterSort.order(sort,PAYMENT_SORT,"x.id")+" limit ? offset ?",PAYMENT,c.id(),limit,page*25);}
- public PaymentSource paymentSource(AppUserPrincipal a,Case c,UUID posting,UUID contribution){return jdbc.query("""
+ public Optional<PaymentSource> paymentSource(AppUserPrincipal a,Case c,UUID posting,UUID contribution){return jdbc.query("""
  select p.*,x.id contribution,x.payer_id,x.payer_number||' - '||x.payer_name contribution_payer,x.amount contribution_amount,x.principal contribution_principal,x.interest contribution_interest,x.charges contribution_charges,
  g.id group_receipt,coalesce(r.id,g.id,p.id) receipt,coalesce(r.number,g.number,p.reference) number,
  coalesce(nullif(r.payer_name,''),g.remitter,(select min(payer) from lending_group_shared_movement where posting_id=p.id),p.notes,'') payer
@@ -85,7 +85,8 @@ public class GroupCoverageRepository {
  left join lending_group_contribution x on x.id=? and x.receipt_id=g.id and x.loan_id=p.loan_id
  where p.id=? and p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='PAYMENT' and p.state='POSTED'
  and not exists(select 1 from accountant_loan_post where reverses_id=p.id)
- """,(r,n)->{boolean split=r.getObject("contribution")!=null;if(!Objects.equals(contribution,r.getObject("contribution",UUID.class))||!split&&r.getObject("group_receipt")!=null)throw new IllegalArgumentException("coverage.error.payment");return new PaymentSource(posting,r.getObject("contribution",UUID.class),r.getObject("receipt",UUID.class),r.getString("number"),r.getObject("effective_date",LocalDate.class),r.getString(split?"contribution_payer":"payer"),r.getObject("payer_id",UUID.class),r.getBigDecimal(split?"contribution_amount":"amount"),r.getBigDecimal(split?"contribution_principal":"principal_amount"),r.getBigDecimal(split?"contribution_interest":"interest_amount"),r.getBigDecimal(split?"contribution_charges":"charge_amount"),r.getObject("recorded_at",OffsetDateTime.class));},contribution,posting,c.loan(),a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new IllegalArgumentException("coverage.error.payment"));}
+ and ((g.id is null and ?::uuid is null) or x.id is not null)
+ """,(r,n)->{boolean split=r.getObject("contribution")!=null;return new PaymentSource(posting,r.getObject("contribution",UUID.class),r.getObject("receipt",UUID.class),r.getString("number"),r.getObject("effective_date",LocalDate.class),r.getString(split?"contribution_payer":"payer"),r.getObject("payer_id",UUID.class),r.getBigDecimal(split?"contribution_amount":"amount"),r.getBigDecimal(split?"contribution_principal":"principal_amount"),r.getBigDecimal(split?"contribution_interest":"interest_amount"),r.getBigDecimal(split?"contribution_charges":"charge_amount"),r.getObject("recorded_at",OffsetDateTime.class));},contribution,posting,c.loan(),a.getSaccoId(),a.getStationId(),contribution).stream().findFirst();}
  public List<PaymentSource> paymentChoices(AppUserPrincipal a,Case c,int page){return paymentChoices(a,c,"",page);}
  public List<PaymentSource> paymentChoices(AppUserPrincipal a,Case c,String search,int page){return jdbc.query("""
  select p.id posting,x.id contribution,x.payer_id,p.effective_date,p.recorded_at,

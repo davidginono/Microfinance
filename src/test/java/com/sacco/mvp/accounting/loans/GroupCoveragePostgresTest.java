@@ -42,6 +42,17 @@ class GroupCoveragePostgresTest {
     LinkForm linkForm(UUID posting){var x=new LinkForm();x.setPostingId(posting);x.setPayerEvidence("Synthetic verified identity of actual guarantor payer");x.setPayerVerified(true);return x;}
     UUID receipt(String amount){var x=f.post(p.s.loan,amount,"COVERAGE-"+UUID.randomUUID());x.setEffectiveDate(day);x.setNotes("Synthetic actual guarantor payer");return f.service.repay(f.actor,x).id();}
     long count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Long.class,f.institution);}
+    @Test void unavailablePaymentSourcesRemainRecoverableDomainErrorsWithoutNewCashOrLinks(){
+        UUID id=call(),posting=receipt("40.00"),missing=UUID.randomUUID();long journals=count("gl_journal"),payments=count("accountant_loan_post");
+        assertThat(coverage.selectedPayment(f.actor,id,posting,null).amount()).isEqualByComparingTo("40.00");
+        assertThatThrownBy(()->coverage.selectedPayment(f.actor,id,missing,null)).isExactlyInstanceOf(IllegalArgumentException.class).hasMessage("coverage.error.payment");
+        assertThatThrownBy(()->coverage.link(f.actor,id,linkForm(missing))).isExactlyInstanceOf(IllegalArgumentException.class).hasMessage("coverage.error.payment");
+        assertThatThrownBy(()->coverage.selectedPayment(f.actor,id,posting,UUID.randomUUID())).isExactlyInstanceOf(IllegalArgumentException.class).hasMessage("coverage.error.payment");
+        f.service.reverse(f.operator("B1"),posting,UUID.randomUUID(),day,"Synthetic independent receipt reversal");long reversedJournals=count("gl_journal"),reversedPayments=count("accountant_loan_post");
+        assertThatThrownBy(()->coverage.selectedPayment(f.actor,id,posting,null)).isExactlyInstanceOf(IllegalArgumentException.class).hasMessage("coverage.error.payment");
+        assertThatThrownBy(()->coverage.link(f.actor,id,linkForm(posting))).isExactlyInstanceOf(IllegalArgumentException.class).hasMessage("coverage.error.payment");
+        assertThat(detail(id).payments().rows()).isEmpty();assertThat(count("gl_journal")).isEqualTo(reversedJournals);assertThat(count("accountant_loan_post")).isEqualTo(reversedPayments);assertThat(reversedJournals).isGreaterThan(journals);assertThat(reversedPayments).isGreaterThan(payments);
+    }
     @Test void legacyCaseAndObligationRegistersSupportTheirDisplayedColumnOrders(){
         UUID id=call();try {
             for(String table:List.of("coverage-cases","coverage-obligations"))for(String key:table.equals("coverage-cases")?List.of("loan","person","kind","date","amount","received","state"):List.of("loan","person","kind","cap","arrears"))for(String direction:List.of("asc","desc")){
