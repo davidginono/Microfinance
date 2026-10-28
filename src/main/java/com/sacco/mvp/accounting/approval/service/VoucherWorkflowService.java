@@ -41,7 +41,7 @@ public class VoucherWorkflowService {
         authorize(a,"VOUCHER_WORKSPACE_VIEW");require(search!=null && search.length()<=100 && page>=0 && page<=10000 && Set.of(10,30,50).contains(size) && Set.of(0,7,30,90).contains(days),"input");
         var types=Arrays.stream(Type.values()).filter(t->type==null||type==t).filter(t->a.getClaims().contains(t==Type.JOURNAL?"ACCOUNTING_JOURNALS_VIEW":"ACCOUNTING_BUSINESS_VIEW")).toList();
         if(types.isEmpty())throw new AccessDeniedException("Voucher type unavailable");for(var t:types)vouchers.authorize(a,t,"VIEW");
-        require(category!=null && (category.isEmpty() || Set.of("OTHERS","INCOMPLETE","NOT_VALIDATED","VALIDATED","ERROR","NOT_POSTED","FAILED","POSTED","RECENT_CREATED","RECENT_UPDATED","READY","ACCOUNT_ERRORS","MISSING_DETAILS","UNBALANCED").contains(category) || Arrays.stream(Approval.values()).anyMatch(v->v.name().equals(category))),"input");
+        require(category!=null && (category.isEmpty() || Set.of("AGE_0_7","AGE_8_14","AGE_15_PLUS","OTHERS","INCOMPLETE","NOT_VALIDATED","VALIDATED","ERROR","NOT_POSTED","FAILED","POSTED","RECENT_CREATED","RECENT_UPDATED","READY","ACCOUNT_ERRORS","MISSING_DETAILS","UNBALANCED").contains(category) || Arrays.stream(Approval.values()).anyMatch(v->v.name().equals(category))),"input");
         var rows=repository.register(a,types,search,category,sort,days,page,size,clock.now());var counts=repository.registerCounts(a,types,clock.now());counts.putAll(repository.warningCounts(a,types));return new Page(rows.stream().limit(size).toList(),page,size,rows.size()>size,counts);
     }
     @Transactional(readOnly=true)

@@ -59,8 +59,17 @@ public class VoucherWorkflowRepository {
     public List<Workflow> register(AppUserPrincipal a,List<Type> types,String search,String category,String sort,int days,int page,int size,OffsetDateTime now) {
         String placeholders=String.join(",",Collections.nCopies(types.size(),"?"));
         var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId()));types.forEach(t->args.add(t.name()));
-        args.add(search.toLowerCase(Locale.ROOT));args.add(search.toLowerCase(Locale.ROOT));String dateFilter="true",categoryFilter=categorySql(category);
+        args.add(search.toLowerCase(Locale.ROOT));args.add(search.toLowerCase(Locale.ROOT));String dateFilter="true",categoryFilter;
         if(days>0){dateFilter="updated_at>=?";args.add(now.minusDays(days));}
+        categoryFilter=switch(category){
+            case "AGE_0_7" -> "validation<>'VALIDATED' and created_at>=?";
+            case "AGE_8_14" -> "validation<>'VALIDATED' and created_at>=? and created_at<?";
+            case "AGE_15_PLUS" -> "validation<>'VALIDATED' and created_at<?";
+            default -> categorySql(category);
+        };
+        if(category.equals("AGE_0_7"))args.add(now.minusDays(7));
+        if(category.equals("AGE_8_14")){args.add(now.minusDays(14));args.add(now.minusDays(7));}
+        if(category.equals("AGE_15_PLUS"))args.add(now.minusDays(14));
         if(category.equals("RECENT_CREATED") || category.equals("RECENT_UPDATED")){categoryFilter=category.equals("RECENT_CREATED")?"created_at>=?":"updated_at>=? and updated_at>created_at";args.add(now.minusDays(7));}
         args.add(size+1);args.add(page*size);
         return jdbc.query("select * from voucher_workflow where sacco_id=? and station_id=? and type in ("+placeholders+") and (strpos(lower(title),?)>0 or strpos(lower(number),?)>0) and "+dateFilter+" and "+categoryFilter+" order by "+sortSql(sort)+",id limit ? offset ?",this::workflow,args.toArray());
@@ -74,7 +83,7 @@ public class VoucherWorkflowRepository {
             out.merge("ALL",r.getLong("n"),Long::sum);if(!Set.of("INITIATED","REJECTED").contains(r.getString("approval")))out.merge("OTHERS",r.getLong("n"),Long::sum);
             for(String key:List.of("age7","age14","recent_created","recent_updated","recent_total"))out.merge(key,r.getLong(key),Long::sum);
             if(!r.getString("validation").equals("VALIDATED"))out.merge("unfinished",r.getLong("n"),Long::sum);
-        }out.put("age15",out.getOrDefault("unfinished",0L)-out.getOrDefault("age7",0L)-out.getOrDefault("age14",0L));return out;},args.toArray());
+        }out.put("age15",out.getOrDefault("unfinished",0L)-out.getOrDefault("age7",0L)-out.getOrDefault("age14",0L));out.put("AGE_0_7",out.getOrDefault("age7",0L));out.put("AGE_8_14",out.getOrDefault("age14",0L));out.put("AGE_15_PLUS",out.getOrDefault("age15",0L));out.put("RECENT_CREATED",out.getOrDefault("recent_created",0L));out.put("RECENT_UPDATED",out.getOrDefault("recent_updated",0L));return out;},args.toArray());
     }
     public Map<String,Long> warningCounts(AppUserPrincipal a,List<Type> types) {
         var args=new ArrayList<Object>(List.<Object>of(a.getSaccoId(),a.getStationId()));types.forEach(t->args.add(t.name()));

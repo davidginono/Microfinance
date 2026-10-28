@@ -758,3 +758,20 @@ test('page exit aborts table requests and discards their late responses',async()
  complete({ok:true,redirected:false,text:async()=>table('leave','<tr><td>STALE</td><td>0</td><td>Posted</td></tr>')});await settle();await settle();
  assert.match(d.querySelector('tbody').textContent,/V001/);assert.doesNotMatch(d.querySelector('tbody').textContent,/STALE/);assert.equal(d.querySelector('.resource-table-load-error'),null);dom.window.close();
 });
+
+test('approval status cards refresh counts and active groups while preserving the mounted shell and filters',async()=>{
+    const approvalSource=readFileSync('src/main/resources/static/js/voucher-approval.js','utf8');
+    const cards=`<div data-table-query-state-for="voucher-approval-register"><section class="approval-tile"><a href="/finance/test?category=AGE_0_7" data-table-query-for="voucher-approval-register" data-table-query-param="category"><strong data-table-query-value="AGE_0_7">1</strong> Incomplete</a></section><section class="approval-tile"><a href="/finance/test?category=READY" data-table-query-for="voucher-approval-register" data-table-query-param="category"><strong data-table-query-value="READY">2</strong> Ready</a></section></div>`;
+    const markup=`<div data-approval-register>${cards}${table('voucher-approval-register',row,'data-table-sync-query="true"').replace('<input name="search">','<input name="search" value="cash"><input name="type" value="JOURNAL"><input name="days" value="30"><input name="sort" value="number_asc"><select name="category"><option value=""></option><option value="AGE_0_7">Incomplete</option><option value="READY">Ready</option></select>')}</div>`;
+    const {dom,window:w,document:d}=await setup(markup,approvalSource);
+    try{
+        const page=d.documentElement,region=d.querySelector('[data-resource-table]'),form=d.querySelector('form'),card=d.querySelector('.approval-tile'),search=d.querySelector('[name=search]');
+        let requested;
+        w.fetch=async(url)=>{requested=new URL(url);return {ok:true,redirected:false,text:async()=>markup.replace('value="AGE_0_7">Incomplete','value="AGE_0_7" selected>Incomplete').replace('>1</strong>','>7</strong>').replace('V001','V009')};};
+        card.querySelector('a').click();await settle();await settle();
+        assert.equal(d.documentElement,page);assert.equal(d.querySelector('[data-resource-table]'),region);assert.equal(d.querySelector('form'),form);assert.equal(d.querySelector('[name=search]'),search);
+        for(const [key,value] of Object.entries({category:'AGE_0_7',search:'cash',type:'JOURNAL',days:'30',sort:'number_asc',page:'0'}))assert.equal(requested.searchParams.get(key),value);
+        assert.equal(card.querySelector('strong').textContent,'7');assert.equal(card.classList.contains('is-active'),true);assert.equal(card.querySelector('a').getAttribute('aria-current'),'page');assert.equal(d.querySelectorAll('.approval-tile.is-active').length,1);
+        assert.match(d.querySelector('tbody').textContent,/V009/);
+    }finally{dom.window.close();}
+});

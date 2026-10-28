@@ -60,6 +60,24 @@ class VoucherPostgresTest {
   documents=transactional(new com.sacco.mvp.accounting.approval.service.VoucherDocumentService(workflowRepository,workflows,clock,audit),manager);
 
  }
+ @Test void statusCardAgeBucketsMatchScopedRowsAndCountsAtBoundaries(){
+  java.util.function.Function<OffsetDateTime,UUID> draft=date->tx.execute(status->workflowRepository.create(actor,UUID.randomUUID(),Type.JOURNAL,"SINGLE","Card filter fixture",date).id());
+  UUID fresh=draft.apply(now),seven=draft.apply(now.minusDays(7)),eight=draft.apply(now.minusDays(7).minusSeconds(1)),fourteen=draft.apply(now.minusDays(14)),older=draft.apply(now.minusDays(14).minusSeconds(1));
+  var foreign=operator("B2");tx.execute(status->workflowRepository.create(foreign,UUID.randomUUID(),Type.JOURNAL,"SINGLE","Other branch",now));
+  tx.execute(status->workflowRepository.create(actor,UUID.randomUUID(),Type.RECEIPT,"SINGLE","Other type",now));
+  var buckets=Map.of("AGE_0_7",Set.of(fresh,seven),"AGE_8_14",Set.of(eight,fourteen),"AGE_15_PLUS",Set.of(older));
+  for(var entry:buckets.entrySet()){
+   var result=workflows.register(actor,Type.JOURNAL,"",entry.getKey(),"updated_desc",0,0,30);
+   assertThat(result.rows()).extracting(w->w.id()).containsExactlyInAnyOrderElementsOf(entry.getValue());
+   assertThat(result.counts().get(entry.getKey())).isEqualTo((long)entry.getValue().size());
+  }
+  var filtered=workflows.register(actor,Type.JOURNAL,"no match","AGE_0_7","number_asc",7,0,10);assertThat(filtered.rows()).isEmpty();
+  assertThat(workflows.register(actor,Type.JOURNAL,"","AGE_15_PLUS","number_asc",7,0,10).rows()).isEmpty();
+  var recent=workflows.register(actor,Type.JOURNAL,"","RECENT_CREATED","updated_desc",0,0,30);
+  assertThat(recent.rows()).extracting(w->w.id()).containsExactlyInAnyOrder(fresh,seven);
+  assertThat(recent.counts().get("RECENT_CREATED")).isEqualTo(2L);
+  assertThat(recent.counts().get("RECENT_UPDATED")).isZero();
+ }
  @AfterAll void stop(){if(dataSource!=null)dataSource.close();}
  @BeforeEach void fixture(){
   reset(audit,claims,directory,institutions);institution="V-"+UUID.randomUUID();
