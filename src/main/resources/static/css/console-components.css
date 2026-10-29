@@ -918,64 +918,38 @@
 
 /* Source: src/main/webapp/WEB-INF/jsp/admin/minor-admins.jsp */
 .minor-admin-create-form {
-        display: block;
-    }
-
-    .minor-admin-create-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        max-width: 728px;
-        gap: 1rem;
-        align-items: start;
-    }
-
-    .minor-admin-create-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 0.75rem;
-        padding: 16px 0;
-    }
-
-    .minor-admin-create-actions .app-btn {
-        flex: 0 0 auto;
-        width: auto;
-    }
-
-    .minor-admin-list-panel {
-        margin-top: 12px;
-    }
-
-[data-minor-admin-form] input,
-    [data-minor-admin-form] select,
-    [data-minor-admin-form] .app-btn {
-        height: 3rem;
-        min-height: 3rem;
-    }
-
-    [data-minor-admin-form] input,
-    [data-minor-admin-form] select {
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-
-    [data-minor-admin-form] .app-btn {
-        align-items: center;
-        justify-content: center;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-
-    @media (max-width: 640px) {
-        .minor-admin-create-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .minor-admin-create-actions {
-            justify-content: flex-end;
-        }
-    }
+    width: 100%;
+    max-width: 960px;
+    min-width: 0;
+}
+.minor-admin-create-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 728px;
+    gap: 20px;
+    align-items: start;
+}
+.aws-console [data-minor-admin-form] .erp-panel-body { padding: 20px !important; }
+.minor-admin-create-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 0;
+}
+.minor-admin-create-actions .app-btn { flex: 0 0 auto; width: auto; }
+.minor-admin-empty > p { margin: 0; text-align: left; }
+[data-minor-admin-form] :is(input:not([type=hidden]),select,.neo-select-button,.app-btn) {
+    height: 32px;
+    min-height: 32px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+[data-minor-admin-form] .app-btn { align-items: center; justify-content: center; }
+@media (max-width: 767px) {
+    .aws-console [data-minor-admin-form] .erp-panel-body { padding: 16px !important; }
+}
 
 /* Source: src/main/webapp/WEB-INF/jsp/admin/loan-product-edit.jsp */
 .product-builder-form {

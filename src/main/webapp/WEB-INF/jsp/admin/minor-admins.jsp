@@ -4,16 +4,20 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <c:set var="suppressToastMessages" value="${createMode}" />
-<%@ include file="../fragments/alerts.jspf" %>
 
 <c:if test="${createMode}">
 <template data-resource-form-page></template>
 <spring:message code="${changeAdmin ? 'admin.minorAdmins.changeAdmin' : 'admin.minorAdmins.create'}" var="adminFormTitle" />
+<spring:message code="admin.minorAdmins.confirmChange" var="changeAdminConfirmation" />
 <nav class="erp-page-path"><a href="/admin/saccos/minor-admins"><spring:message code="admin.minorAdmins.registered" /></a><span>/</span><span aria-current="page"><c:out value="${adminFormTitle}" /></span></nav>
 <div class="erp-page-header" data-aws-page-header>
     <h1 class="erp-page-title" id="admin-minor-admins-title"><c:out value="${adminFormTitle}" /></h1>
 </div>
 </c:if>
+<c:if test="${not createMode}">
+<nav class="erp-page-path"><a href="/admin/dashboard"><spring:message code="admin.tools" /></a><span>/</span><span aria-current="page"><spring:message code="admin.minorAdmins.registered" /></span></nav>
+</c:if>
+<%@ include file="../fragments/alerts.jspf" %>
 
 <c:if test="${createMode}">
 <c:choose>
@@ -28,12 +32,14 @@
         </div>
     </c:when>
     <c:otherwise>
-            <form action="${changeAdmin ? '/admin/saccos/minor-admins/change' : '/admin/saccos/minor-admins'}" method="post" class="minor-admin-create-form" data-minor-admin-form>
+            <form action="${changeAdmin ? '/admin/saccos/minor-admins/change' : '/admin/saccos/minor-admins'}" method="post" class="minor-admin-create-form" data-minor-admin-form
+                  data-confirm-title="${fn:escapeXml(adminFormTitle)}" data-confirm-proceed="${fn:escapeXml(adminFormTitle)}"
+                  data-confirm-message="${changeAdmin ? fn:escapeXml(changeAdminConfirmation) : ''}">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <section class="erp-panel">
                 <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.create.adminDetails" /></h2></div>
                 <div class="erp-panel-body minor-admin-create-grid">
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label class="block">
                         <spring:message code="common.sacco" text="Institution" />
                         <select id="minorAdminSaccoSelect" name="saccoId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
                             <c:forEach items="${registeredSaccos}" var="sacco" varStatus="status">
@@ -50,25 +56,25 @@
                         </select>
                     </label>
 
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label class="block">
                         <spring:message code="admin.saccoRegistry.station" text="Branch" />
                         <select id="minorAdminStationSelect" name="stationId" data-current-station="${fn:escapeXml(registrationForm.stationId)}" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"></select>
                     </label>
 
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label class="block">
                         <spring:message code="member.fullName" text="Full Name" />
                         <input name="fullName" type="text" value="${fn:escapeXml(registrationForm.fullName)}" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                     </label>
 
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label class="block">
                         <spring:message code="register.member.email" text="Email" />
                         <input name="email" type="email" value="${fn:escapeXml(registrationForm.email)}" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                     </label>
 
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label class="block">
                         <spring:message code="register.member.phone" text="Phone" />
                         <input name="phone" type="tel" value="${fn:escapeXml(registrationForm.phone)}" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-                        <span class="mt-1 block text-[11px] font-medium normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
+                        <span class="mt-1 block text-sm text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
                     </label>
                 </div>
                 </section>
@@ -77,8 +83,7 @@
                     <a href="/admin/saccos/minor-admins" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
                     <c:choose><c:when test="${changeAdmin}">
                     <button type="submit"
-                            class="app-btn btn-launch"
-                            onclick="return confirm('<spring:message code='admin.minorAdmins.confirmChange' text='Change the Institution Admin for the selected branch to the person entered in this form?' javaScriptEscape='true' />');">
+                            class="app-btn btn-launch">
                         <spring:message code="admin.minorAdmins.changeAdmin" text="Change Institution Admin" />
                     </button>
                     </c:when><c:otherwise>
@@ -91,17 +96,14 @@
 </c:if>
 
 <c:if test="${not createMode}">
-<div class="erp-panel overflow-hidden minor-admin-list-panel">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div data-resource-header-source>
-                <h2 class="erp-panel-title" data-table-heading-for="admin-minor-admins-1"><spring:message code="admin.minorAdmins.registered" text="Registered Institution Admins" /></h2>
-            </div>
-            <div class="platform-settings-section-actions"><sec:authorize access="@access.has(principal, 'USER_ACCESS_CREATE') and @access.has(principal, 'USER_ACCESS_UPDATE')"><a href="/admin/saccos/minor-admins/change" class="app-btn btn-neutral"><spring:message code="admin.minorAdmins.changeAdmin" /></a></sec:authorize><sec:authorize access="@access.has(principal, 'USER_ACCESS_CREATE')"><a href="/admin/saccos/minor-admins/new" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.create" /></a></sec:authorize></div>
+<section class="erp-table-wrap" data-aws-table-region data-resource-table="admin-minor-admins-1" data-table-selection="single" data-resource-split>
+    <div class="app-table-titlebar">
+        <h2 class="erp-panel-title" id="admin-minor-admins-title"><spring:message code="admin.minorAdmins.registered" /></h2>
+        <div class="app-table-toolbar">
+            <sec:authorize access="@access.has(principal, 'USER_ACCESS_CREATE') and @access.has(principal, 'USER_ACCESS_UPDATE')"><a href="/admin/saccos/minor-admins/change" class="app-btn btn-neutral"><spring:message code="admin.minorAdmins.changeAdmin" /></a></sec:authorize>
+            <sec:authorize access="@access.has(principal, 'USER_ACCESS_CREATE')"><a href="/admin/saccos/minor-admins/new" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.create" /></a></sec:authorize>
         </div>
     </div>
-
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-minor-admins-1" data-resource-split>
         <div class="erp-table-scroll">
         <table class="erp-table min-w-[1120px]">
             <thead>
@@ -112,32 +114,32 @@
                 <th data-table-order="institution"><spring:message code="common.sacco" text="Institution" /></th>
                 <th data-table-order="branch"><spring:message code="admin.saccoRegistry.station" text="Branch" /></th>
                 <th data-table-order="activation"><spring:message code="admin.minorAdmins.activation" text="Activation" /></th>
-                <th class="text-right" data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
+                <th data-table-actions-header><spring:message code="common.actions" text="Actions" /></th>
             </tr>
             </thead>
             <tbody>
             <c:choose>
                 <c:when test="${empty minorAdmins}">
                     <tr>
-                        <td colspan="7" class="text-slate-500"><spring:message code="admin.minorAdmins.empty" text="No Institution Admins have been registered yet." /></td>
+                        <td colspan="7" class="minor-admin-empty"><p><spring:message code="admin.minorAdmins.empty" text="No Institution Admins have been registered yet." /></p></td>
                     </tr>
                 </c:when>
                 <c:otherwise>
                     <c:forEach items="${minorAdmins}" var="minorAdmin">
                         <tr>
                             <td class="align-top">
-                                <div class="font-semibold text-slate-900">${minorAdmin.fullName}</div>
-                                <div class="text-xs text-slate-500">${minorAdmin.loginId}</div>
+                                <div class="font-semibold text-slate-900"><c:out value="${minorAdmin.fullName}" /></div>
+                                <div class="text-slate-500"><c:out value="${minorAdmin.loginId}" /></div>
                             </td>
-                            <td class="align-top whitespace-nowrap">${minorAdmin.email}</td>
+                            <td class="align-top whitespace-nowrap"><c:out value="${minorAdmin.email}" /></td>
                             <td class="align-top whitespace-nowrap">
-                                <div><c:choose><c:when test="${empty minorAdmin.phone}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise>${minorAdmin.phone}</c:otherwise></c:choose></div>
+                                <div><c:choose><c:when test="${empty minorAdmin.phone}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise><c:out value="${minorAdmin.phone}" /></c:otherwise></c:choose></div>
                                 <c:choose>
                                     <c:when test="${minorAdmin.phoneVerified}">
-                                        <div class="mt-1 text-[11px] font-semibold text-emerald-700"><spring:message code="admin.minorAdmins.smsReady" text="Ready for SMS alerts" /></div>
+                                        <div class="mt-1"><span data-resource-status="VALIDATED"><spring:message code="admin.minorAdmins.smsReady" text="Ready for SMS alerts" /></span></div>
                                     </c:when>
                                     <c:otherwise>
-                                        <div class="mt-1 text-[11px] font-semibold text-amber-700"><spring:message code="admin.minorAdmins.phoneVerificationRequired" text="Phone verification required" /></div>
+                                        <div class="mt-1"><span data-resource-status="NOT_VALIDATED"><spring:message code="admin.minorAdmins.phoneVerificationRequired" text="Phone verification required" /></span></div>
                                     </c:otherwise>
                                 </c:choose>
                             </td>
@@ -145,66 +147,62 @@
                             <td class="align-top whitespace-nowrap">
                                 <c:choose>
                                     <c:when test="${not empty minorAdminSaccoName}"><c:out value="${minorAdminSaccoName}" /></c:when>
-                                    <c:otherwise>${minorAdmin.saccoId}</c:otherwise>
+                                    <c:otherwise><c:out value="${minorAdmin.saccoId}" /></c:otherwise>
                                 </c:choose>
                             </td>
-                            <td class="align-top whitespace-nowrap"><c:choose><c:when test="${empty minorAdmin.stationId}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise>${minorAdmin.stationId}</c:otherwise></c:choose></td>
+                            <td class="align-top whitespace-nowrap"><c:choose><c:when test="${empty minorAdmin.stationId}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise><c:out value="${minorAdmin.stationId}" /></c:otherwise></c:choose></td>
                             <td class="align-top whitespace-nowrap">
                                 <c:choose>
                                     <c:when test="${minorAdmin.invitationState == 'ACTIVE'}">
-                                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"><spring:message code="admin.dashboard.active" text="Active" /></span>
+                                        <span data-resource-status="ACTIVE"><spring:message code="admin.dashboard.active" text="Active" /></span>
                                     </c:when>
                                     <c:when test="${minorAdmin.invitationState == 'INVITED'}">
-                                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800"><spring:message code="admin.minorAdmins.awaitingActivation" text="Awaiting activation" /></span>
+                                        <span data-resource-status="INVITED"><spring:message code="admin.minorAdmins.awaitingActivation" text="Awaiting activation" /></span>
                                         <c:if test="${not empty minorAdmin.invitationExpiresAt}">
-                                            <div class="text-[11px] text-slate-500"><spring:message code="admin.minorAdmins.expires" text="expires" /> <c:out value="${appTime:format(minorAdmin.invitationExpiresAt)}" /></div>
+                                            <div class="text-slate-500"><spring:message code="admin.minorAdmins.expires" text="expires" /> <c:out value="${appTime:format(minorAdmin.invitationExpiresAt)}" /></div>
                                         </c:if>
                                     </c:when>
                                     <c:when test="${minorAdmin.invitationState == 'EXPIRED'}">
-                                        <span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800"><spring:message code="admin.minorAdmins.linkExpired" text="Link expired" /></span>
+                                        <span data-resource-status="WARNING"><spring:message code="admin.minorAdmins.linkExpired" text="Link expired" /></span>
                                     </c:when>
                                     <c:otherwise>
-                                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700"><span data-resource-status="${minorAdmin.invitationState}">${minorAdmin.invitationState}</span></span>
+                                        <span data-resource-status="${minorAdmin.invitationState}"><c:out value="${minorAdmin.invitationState}" /></span>
                                     </c:otherwise>
                                 </c:choose>
                             </td>
-                            <td class="align-top whitespace-nowrap text-right">
-                                <div class="inline-flex flex-wrap justify-end gap-2">
-                                    <button type="button"
-                                            class="app-btn btn-neutral px-3 py-2 text-[0.74rem]"
-                                            data-minor-admin-modal-open="edit-${minorAdmin.accountId}">
-                                        <spring:message code="common.edit" text="Edit" />
-                                    </button>
-                                <c:choose>
-                                    <c:when test="${minorAdmin.status == 'INVITED'}">
-                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/resend-invite" method="post" class="inline">
+                            <td>
+                                <sec:authorize access="@access.has(principal, 'USER_ACCESS_UPDATE')">
+                                    <button type="button" class="app-btn btn-neutral" data-minor-admin-modal-open="edit-${minorAdmin.accountId}"><spring:message code="common.edit" /></button>
+                                    <c:choose>
+                                        <c:when test="${minorAdmin.status == 'INVITED'}">
+                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/resend-invite" method="post">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                <button type="submit" class="app-btn btn-primary px-3 py-2 text-[0.74rem]"><spring:message code="common.resend" text="Resend" /></button>
+                                                <button type="submit" class="app-btn btn-neutral"><spring:message code="common.resend" /></button>
                                             </form>
-                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/revoke-invite" method="post" class="inline" onsubmit="return confirm('<spring:message code='admin.minorAdmins.confirmRevoke' text='Revoke this invitation? The account will be marked inactive.' javaScriptEscape='true' />');">
+                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/revoke-invite" method="post" data-confirm-message="<spring:message code='admin.minorAdmins.confirmRevoke' htmlEscape='true' />" data-confirm-title="<spring:message code='common.revoke' />" data-confirm-proceed="<spring:message code='common.revoke' />">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                <button type="submit" class="app-btn btn-reject px-3 py-2 text-[0.74rem]"><spring:message code="common.revoke" text="Revoke" /></button>
+                                                <button type="submit" class="app-btn btn-reject"><spring:message code="common.revoke" /></button>
                                             </form>
-                                    </c:when>
-                                    <c:when test="${minorAdmin.status == 'ACTIVE'}">
-                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/deactivate" method="post" class="inline" onsubmit="return confirm('<spring:message code='admin.minorAdmins.confirmDeactivate' text='Deactivate this Institution Admin? They will no longer be able to sign in.' javaScriptEscape='true' />');">
+                                        </c:when>
+                                        <c:when test="${minorAdmin.status == 'ACTIVE'}">
+                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/deactivate" method="post" data-confirm-message="<spring:message code='admin.minorAdmins.confirmDeactivate' htmlEscape='true' />" data-confirm-title="<spring:message code='common.deactivate' />" data-confirm-proceed="<spring:message code='common.deactivate' />">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                <button type="submit" class="app-btn btn-reject px-3 py-2 text-[0.74rem]"><spring:message code="common.deactivate" text="Deactivate" /></button>
+                                                <button type="submit" class="app-btn btn-reject"><spring:message code="common.deactivate" /></button>
                                             </form>
-                                    </c:when>
-                                    <c:otherwise>
-                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/reinvite" method="post" class="inline">
+                                        </c:when>
+                                        <c:otherwise>
+                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/reinvite" method="post">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                <button type="submit" class="app-btn btn-primary px-3 py-2 text-[0.74rem]"><spring:message code="common.reinvite" text="Re-invite" /></button>
+                                                <button type="submit" class="app-btn btn-neutral"><spring:message code="common.reinvite" /></button>
                                             </form>
-                                            <button type="button"
-                                                    class="app-btn btn-reject px-3 py-2 text-[0.74rem]"
-                                                    data-minor-admin-modal-open="delete-${minorAdmin.accountId}">
-                                                <spring:message code="common.delete" text="Delete" />
-                                            </button>
-                                    </c:otherwise>
-                                </c:choose>
-                                </div>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </sec:authorize>
+                                <sec:authorize access="@access.has(principal, 'USER_ACCESS_DELETE')">
+                                    <c:if test="${minorAdmin.status != 'ACTIVE' and minorAdmin.status != 'INVITED'}">
+                                        <button type="button" class="app-btn btn-reject" data-minor-admin-modal-open="delete-${minorAdmin.accountId}"><spring:message code="admin.minorAdmins.delete" /></button>
+                                    </c:if>
+                                </sec:authorize>
                             </td>
                         </tr>
                     </c:forEach>
@@ -213,17 +211,16 @@
             </tbody>
         </table>
     </div>
-</div>
-                    </div>
+</section>
 
+<sec:authorize access="@access.has(principal, 'USER_ACCESS_UPDATE')">
 <c:forEach items="${minorAdmins}" var="minorAdmin">
     <div class="app-modal-overlay hidden" data-minor-admin-modal="edit-${minorAdmin.accountId}">
-        <div class="app-modal-panel app-modal-panel--compact">
+        <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="minor-admin-edit-${minorAdmin.accountId}">
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-panel-title"><spring:message code="admin.minorAdmins.edit" text="Edit Institution Admin" /></p>
-                        <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.minorAdmins.editHelp" text="Update the assigned workspace and contact details." /></p>
+                        <h2 class="erp-panel-title" id="minor-admin-edit-${minorAdmin.accountId}"><spring:message code="admin.minorAdmins.edit" /></h2>
                 </div>
                     <button type="button" class="app-modal-close" data-minor-admin-modal-close="edit-${minorAdmin.accountId}" aria-label="<spring:message code='common.close' text='Close' />">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -234,7 +231,7 @@
                 <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}" method="post" class="app-modal-body space-y-4" data-minor-admin-edit-form data-minor-admin-form>
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
-                    <label class="block text-sm font-semibold text-slate-700">
+                    <label class="block">
                         <spring:message code="common.sacco" text="Institution" />
                         <select name="saccoId"
                                 required
@@ -248,13 +245,13 @@
                                 <option value="${sacco.saccoId}"
                                         data-stations="${editStationList}"
                                         ${sacco.saccoId eq minorAdmin.saccoId ? 'selected' : ''}>
-                                    ${sacco.saccoId} - ${sacco.saccoName}
+                                    <c:out value="${sacco.saccoName}" />
                                 </option>
                             </c:forEach>
                         </select>
                     </label>
 
-                    <label class="block text-sm font-semibold text-slate-700">
+                    <label class="block">
                         <spring:message code="admin.saccoRegistry.station" text="Branch" />
                         <select name="stationId"
                                 required
@@ -263,25 +260,25 @@
                                 class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800"></select>
                     </label>
 
-                    <label class="block text-sm font-semibold text-slate-700">
+                    <label class="block">
                         <spring:message code="admin.users.userId" text="User ID" />
-                        <input type="text" readonly aria-readonly="true" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-600" value="${minorAdmin.loginId}" />
+                        <input type="text" readonly aria-readonly="true" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-600" value="${fn:escapeXml(minorAdmin.loginId)}" />
                     </label>
 
-                    <label class="block text-sm font-semibold text-slate-700">
+                    <label class="block">
                         <spring:message code="member.fullName" text="Full Name" />
-                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm uppercase text-slate-800" value="${minorAdmin.fullName}" />
+                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm uppercase text-slate-800" value="${fn:escapeXml(minorAdmin.fullName)}" />
                     </label>
 
-                    <label class="block text-sm font-semibold text-slate-700">
+                    <label class="block">
                         <spring:message code="register.member.email" text="Email" />
-                        <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.email}" />
+                        <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${fn:escapeXml(minorAdmin.email)}" />
                     </label>
 
-                    <label class="block text-sm font-semibold text-slate-700">
+                    <label class="block">
                         <spring:message code="register.member.phone" text="Phone" />
-                        <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.phone}" />
-                        <span class="mt-1 block text-[11px] font-medium text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
+                        <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${fn:escapeXml(minorAdmin.phone)}" />
+                        <span class="mt-1 block text-sm text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
                     </label>
 
                     <div class="app-modal-actions">
@@ -293,16 +290,17 @@
     </div>
                         </div>
 </c:forEach>
+</sec:authorize>
 
+<sec:authorize access="@access.has(principal, 'USER_ACCESS_DELETE')">
 <c:forEach items="${minorAdmins}" var="minorAdmin">
     <c:if test="${minorAdmin.status != 'ACTIVE' and minorAdmin.status != 'INVITED'}">
         <div class="app-modal-overlay hidden" data-minor-admin-modal="delete-${minorAdmin.accountId}">
-            <div class="app-modal-panel app-modal-panel--compact">
+            <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="minor-admin-delete-${minorAdmin.accountId}">
                 <div class="app-modal-scroll">
                     <div class="app-modal-header">
                         <div>
-                            <p class="erp-panel-title"><spring:message code="common.delete" text="Delete" /> ${minorAdmin.fullName}</p>
-                            <p class="mt-2 text-sm text-slate-500">This permanently removes the inactive Institution Admin record and its activation data.</p>
+                            <h2 class="erp-panel-title" id="minor-admin-delete-${minorAdmin.accountId}"><spring:message code="admin.minorAdmins.delete" /> <c:out value="${minorAdmin.fullName}" /></h2>
                     </div>
                         <button type="button" class="app-modal-close" data-minor-admin-modal-close="delete-${minorAdmin.accountId}" aria-label="<spring:message code='common.close' text='Close' />">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -312,16 +310,17 @@
                         </div>
                     <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/delete" method="post" class="app-modal-body space-y-4" data-minor-admin-form>
                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                        <div class="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                            Type <span class="font-semibold">delete ${minorAdmin.fullName}</span> to confirm.
+                        <div class="console-message" data-message-type="warning">
+                            <p><spring:message code="admin.minorAdmins.deleteWarning" /></p>
+                            <p><spring:message code="admin.minorAdmins.deletePrompt" htmlEscape="true"><spring:argument value="delete ${minorAdmin.fullName}" /></spring:message></p>
                         </div>
-                        <label class="block text-sm font-semibold text-slate-700">
-                            Confirmation
+                        <label class="block">
+                            <spring:message code="admin.minorAdmins.confirmation" />
                             <input name="confirmation" type="text" required autocomplete="off" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" />
                         </label>
                         <div class="app-modal-actions">
                             <button type="button" class="app-btn btn-neutral" data-minor-admin-modal-close="delete-${minorAdmin.accountId}"><spring:message code="common.cancel" text="Cancel" /></button>
-                            <button type="submit" class="app-btn btn-reject"><spring:message code="common.delete" text="Delete" /></button>
+                            <button type="submit" class="app-btn btn-reject"><spring:message code="admin.minorAdmins.delete" /></button>
                 </div>
                     </form>
             </div>
@@ -329,6 +328,7 @@
         </div>
     </c:if>
 </c:forEach>
+</sec:authorize>
 
 </c:if>
 <script>
@@ -427,4 +427,5 @@
     })();
 </script>
 
+<%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>
