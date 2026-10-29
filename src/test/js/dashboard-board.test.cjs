@@ -7,15 +7,15 @@ const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 const labels='<template id="dashboard-labels" data-left="Left" data-right="Right" data-up="Up" data-down="Down" data-scope="user|institution|branch" data-icons="/icons/" data-reset="Reset" data-add="Add widgets" data-added="Added" data-add-item="Add" data-search="Find widgets" data-close="Close" data-empty="No widgets" data-overview="Overview" data-actions="Actions" data-move="Move" data-resize="Resize" data-preferences="Preferences" data-remove="Remove" data-move-earlier="Move earlier" data-move-later="Move later" data-width="Width" data-height="Height" data-short="Short" data-medium="Medium" data-tall="Tall" data-cancel="Cancel" data-apply="Apply"></template>';
 const widget=(id,body='')=>`<section data-dashboard-widget="${id}" data-widget-width="2" data-widget-height="400" class="erp-panel"><div class="erp-panel-header"><h2>${id}</h2></div><div class="erp-panel-body">${body}</div></section>`;
 const markup=()=>`<main class="shell-content-frame"><header class="erp-page-header"><h1>Dashboard</h1></header><div data-dashboard-board="test">${widget('Clients','<input id="draft" value="initial"><form method="post"><input name="_csrf" value="token"></form>')}${widget('Activity')}${widget('Operations')}</div></main>`;
-async function setup(html=markup(),storage){const dom=new JSDOM(labels+html,{url:'http://localhost/admin/dashboard',runScripts:'outside-only',pretendToBeVisual:true});dom.window.innerWidth=1366;
- const w=dom.window;
+async function setup(html=markup(),storage,configure){const dom=new JSDOM(labels+html,{url:'http://localhost/admin/dashboard',runScripts:'outside-only',pretendToBeVisual:true});dom.window.innerWidth=1366;
+ const w=dom.window;w.scrollBy=()=>{};
  w.HTMLElement.prototype.getBoundingClientRect=function(){
   const width=w.innerWidth-100,columns=Number(w.document.querySelector('.dashboard-grid')?.style.getPropertyValue('--dashboard-columns'))||4;
   let left=0,top=0,height=Number.parseInt(this.style.minHeight)||1000,actualWidth=width;
   if(this.matches('[data-dashboard-widget]')){const column=Number.parseInt(this.style.gridColumn)||1,span=Number(this.style.gridColumn.split('span ')[1])||2;left=(column-1)*(width+20)/columns;top=(Number.parseInt(this.style.gridRow)||1)-1;actualWidth=span*(width+20)/columns-20;height=Number.parseInt(this.style.getPropertyValue('--widget-height'))||400;}
   return {left,top,width:actualWidth,height,right:left+actualWidth,bottom:top+height};
  };
- if(storage)storage(dom.window.localStorage);dom.window.eval(source);await settle();return {dom,w:dom.window,d:dom.window.document};}
+ if(storage)storage(dom.window.localStorage);configure?.(w);dom.window.eval(source);await settle();return {dom,w:dom.window,d:dom.window.document};}
 const key=(d,w)=>Object.keys(w.localStorage).find(key=>key.startsWith('dashboard-layout:'));
 
 for(const chartsFirst of [false,true])test('initial dashboard hides source cards and tables until board and charts are ready: '+(chartsFirst?'charts first':'board first'),async()=>{
@@ -75,7 +75,7 @@ test('resize pushes neighbors, snaps to the grid, persists on release and rolls 
 
 test('two dimensional dragging swaps equal widgets and preserves native fields; invalid drops and Escape restore positions',async t=>{
  const {dom,w,d}=await setup();t.after(()=>dom.window.close());const input=d.querySelector('#draft');input.value='unsaved';const a=d.querySelector('[data-dashboard-widget=Clients]'),handle=a.querySelector('.dashboard-drag'),before=positions(d),step=(1266+20)/4;
- pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step*2+20,20);assert.ok(d.querySelector('.dashboard-drop-preview'));noOverlap(d);pointer(w,w,'pointerup',step*2+20,20);
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step*2+20,20);assert.ok(d.querySelector('.dashboard-drop-preview'));assert.match(a.style.transform,/translate3d/);pointer(w,w,'pointerup',step*2+20,20);
  assert.equal(positions(d).Clients.x,2);assert.equal(positions(d).Activity.x,0);assert.equal(d.querySelector('#draft'),input);assert.equal(input.value,'unsaved');assert.equal(positions(d).Clients.height,before.Clients.height);
  const saved=positions(d);pointer(w,handle,'pointerdown',step*2+20,20);pointer(w,w,'pointermove',20,600);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));pointer(w,w,'pointerup',20,600);assert.deepEqual(positions(d),saved);assert.equal(d.querySelector('.dashboard-drop-preview'),null);
  pointer(w,handle,'pointerdown',step*2+20,20);pointer(w,w,'pointermove',-50,50);pointer(w,w,'pointerup',-50,50);assert.deepEqual(positions(d),saved);
@@ -83,7 +83,7 @@ test('two dimensional dragging swaps equal widgets and preserves native fields; 
 
 test('dragging into empty cells keeps the requested row and column after reload',async t=>{
  const {dom,w,d}=await setup();t.after(()=>dom.window.close());const handle=d.querySelector('.dashboard-drag'),step=1286/4;
- pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step+20,880);pointer(w,w,'pointerup',step+20,880);assert.equal(positions(d).Clients.x,1);assert.equal(positions(d).Clients.y,860);noOverlap(d);
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step+20,880);pointer(w,w,'pointerup',step+20,880);assert.equal(positions(d).Clients.x,1);assert.equal(positions(d).Clients.y,840);noOverlap(d);
  const savedKey=key(d,w),saved=w.localStorage.getItem(savedKey),restored=await setup(markup(),store=>store.setItem(savedKey,saved));t.after(()=>restored.dom.window.close());assert.deepEqual(positions(restored.d),positions(d));
 });
 
@@ -100,7 +100,7 @@ test('single click direction controls support moving and resizing without draggi
 
 test('palette drag adds a removed widget to a chosen cell including an empty board',async t=>{
  const {dom,w,d}=await setup();t.after(()=>dom.window.close());for(const e of d.querySelectorAll('[data-dashboard-widget]')){e.querySelector('.dashboard-widget-controls button').click();e.querySelector('.dashboard-widget-menu button:last-child').click();}
- d.querySelector('.dashboard-toolbar .btn-launch').click();const paletteHandle=d.querySelector('.dashboard-palette-item .dashboard-drag');pointer(w,paletteHandle,'pointerdown',1300,100);pointer(w,w,'pointermove',650,40);pointer(w,w,'pointerup',650,40);assert.equal(d.querySelector('[data-dashboard-widget=Clients]').hidden,false);assert.equal(positions(d).Clients.x,2);assert.equal(positions(d).Clients.y,40);assert.equal(d.querySelectorAll('.dashboard-palette-item:not([hidden])').length,2);noOverlap(d);
+ d.querySelector('.dashboard-toolbar .btn-launch').click();const paletteHandle=d.querySelector('.dashboard-palette-item .dashboard-drag');paletteHandle.closest('.dashboard-palette-item').getBoundingClientRect=()=>({left:1280,top:80,width:300,height:64});pointer(w,paletteHandle,'pointerdown',1300,100);pointer(w,w,'pointermove',650,40);pointer(w,w,'pointerup',650,40);assert.equal(d.querySelector('[data-dashboard-widget=Clients]').hidden,false);assert.equal(positions(d).Clients.x,2);assert.equal(positions(d).Clients.y,0);assert.equal(d.querySelectorAll('.dashboard-palette-item:not([hidden])').length,2);noOverlap(d);
 });
 
 test('narrow-screen palette isolates the background and restores focus and scroll styles',async()=>{const {dom,w,d}=await setup();w.innerWidth=360;d.body.style.overflow='auto';const main=d.querySelector('main'),add=d.querySelector('.dashboard-toolbar .btn-launch');add.click();assert.equal(main.inert,true);assert.equal(d.querySelector('.dashboard-palette').getAttribute('aria-modal'),'true');assert.equal(d.body.style.overflow,'hidden');d.querySelector('.dashboard-palette').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(main.inert,false);assert.equal(d.body.style.overflow,'auto');assert.equal(d.activeElement,add);dom.window.close();});
@@ -131,4 +131,33 @@ test('invalid stored coordinates cannot create off-grid widgets or excessive bla
  const first=await setup();first.d.querySelector('.dashboard-resize').dispatchEvent(new first.w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));const savedKey=key(first.d,first.w);first.dom.window.close();
  const saved={version:2,items:[null,{id:'Clients',width:2,height:400,positions:{4:{x:3,y:0}}},{id:'Activity',width:2,height:400,positions:{4:{x:-1,y:1e12}}},{id:'Operations',width:2,height:400,positions:{4:{x:0,y:0}}}]};
  const {dom,w,d}=await setup(markup(),store=>store.setItem(savedKey,JSON.stringify(saved)));t.after(()=>dom.window.close());noOverlap(d);for(const p of Object.values(positions(d))){assert.ok(p.x>=0 && p.x+p.width<=4);assert.ok(p.y<=840);}
+});
+
+
+test('header dragging moves the original widget continuously and reuses its drop marker between cells',async t=>{
+ const {dom,w,d}=await setup();t.after(()=>dom.window.close());const a=d.querySelector('[data-dashboard-widget=Clients]'),heading=a.querySelector('h2'),input=d.querySelector('#draft');input.value='edited';
+ pointer(w,heading,'pointerdown',120,30);pointer(w,w,'pointermove',550,70);const marker=d.querySelector('.dashboard-drop-preview');assert.ok(marker);assert.match(a.style.transform,/translate3d\(430px,40px,0\)/);assert.ok(a.classList.contains('is-dragging'));assert.equal(d.querySelectorAll('input#draft').length,1);
+ pointer(w,w,'pointermove',554,73);await new Promise(resolve=>w.requestAnimationFrame(resolve));assert.equal(d.querySelector('.dashboard-drop-preview'),marker);assert.match(a.style.transform,/translate3d\(434px,43px,0\)/);
+ pointer(w,w,'pointerup',554,73);assert.equal(a.style.transform,'');assert.equal(a.classList.contains('is-dragging'),false);assert.equal(d.querySelector('#draft'),input);assert.equal(input.value,'edited');noOverlap(d);
+});
+
+test('nearby row targeting swaps widgets even when the pointer misses exact alignment',async t=>{
+ const {dom,w,d}=await setup();t.after(()=>dom.window.close());const a=d.querySelector('[data-dashboard-widget=Clients]'),handle=a.querySelector('.dashboard-drag');
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',663,59);pointer(w,w,'pointerup',663,59);assert.equal(positions(d).Clients.x,2);assert.equal(positions(d).Clients.y,0);assert.equal(positions(d).Activity.x,0);assert.equal(positions(d).Activity.y,0);noOverlap(d);
+});
+
+test('Escape clears live widget movement, animations and preview without committing',async t=>{
+ const {dom,w,d}=await setup();t.after(()=>dom.window.close());const a=d.querySelector('[data-dashboard-widget=Clients]'),handle=a.querySelector('.dashboard-drag'),before=positions(d);
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',663,60);assert.ok(a.style.transform);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(a.style.transform,'');assert.equal(d.querySelector('.dashboard-drop-preview'),null);assert.deepEqual(positions(d),before);assert.equal(key(d,w),undefined);
+});
+
+test('header controls retain their own click actions without starting a drag',async t=>{
+ const {dom,w,d}=await setup();t.after(()=>dom.window.close());const menu=d.querySelector('.dashboard-widget-controls button');pointer(w,menu,'pointerdown',200,20);pointer(w,w,'pointermove',663,60);assert.equal(d.querySelector('.is-dragging'),null);menu.click();assert.equal(d.querySelector('.dashboard-widget-menu').hidden,false);
+});
+
+
+for(const reduced of [false,true])test('drag displacement respects reduced motion and cleans up on cancellation: '+reduced,async t=>{
+ let animations=0,cancellations=0;
+ const {dom,w,d}=await setup(markup(),null,w=>{w.matchMedia=()=>({matches:reduced});w.HTMLElement.prototype.animate=function(){animations++;return {cancel(){cancellations++;}};};});t.after(()=>dom.window.close());
+ const handle=d.querySelector('.dashboard-drag');pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',663,59);assert.equal(animations>0,!reduced);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(cancellations>0,!reduced);assert.equal(d.querySelector('.is-dragging'),null);assert.equal(d.querySelector('.dashboard-drop-preview'),null);
 });

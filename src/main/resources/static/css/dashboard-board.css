@@ -21,11 +21,14 @@
 .aws-console .dashboard-icon-button:disabled {color:#aab7b8;cursor:default;background:transparent;border-color:transparent;}
 .aws-console .dashboard-icon-button:focus-visible,.dashboard-palette :focus-visible {outline:2px solid #0073bb;outline-offset:2px;}
 .dashboard-drag {cursor:grab!important;touch-action:none;}
-.dashboard-widget.is-dragging {opacity:.55;}
+.aws-console .dashboard-widget.is-dragging {z-index:60;pointer-events:none;will-change:transform;border-color:#0073bb;box-shadow:0 8px 24px #0003;transition:none;}
+.dashboard-widget>.erp-panel-header {cursor:grab;touch-action:none;}
+.dashboard-widget>.erp-panel-header :is(button,a,input,select,textarea,summary) {touch-action:auto;}
+.dashboard-widget>.erp-panel-header .dashboard-drag {touch-action:none;}
 .dashboard-drop-preview {position:absolute;z-index:4;box-sizing:border-box;border:2px dashed #0073bb;background:#f1faff80;pointer-events:none;}
 .dashboard-is-moving {user-select:none;}
 .dashboard-is-moving .dashboard-drag {cursor:grabbing!important;}
-.dashboard-drag-preview {position:fixed;z-index:70;pointer-events:none;max-width:260px;padding:10px 14px;border:1px solid #0073bb;border-radius:2px;background:#f1faff;box-shadow:0 3px 8px #0002;color:#16191f;font-size:14px;font-weight:700;}
+.dashboard-palette-drag-preview {position:fixed;z-index:70;box-sizing:border-box;pointer-events:none;padding:16px;border:1px solid #0073bb;background:#fff;box-shadow:0 8px 24px #0003;color:#16191f;font-size:14px;font-weight:700;will-change:transform;}
 .aws-console .dashboard-widget>.dashboard-widget-body {flex:1;min-width:0;min-height:0;overflow:auto;padding:20px!important;}
 .aws-console .dashboard-widget>.dashboard-widget-body:has(>.erp-stat-grid) {padding:20px!important;}
 .dashboard-widget .erp-stat-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin:0!important;}
