@@ -14,7 +14,7 @@
 .aws-console .erp-resource-section,
 .aws-console .accounting-section,
 .aws-console .erp-detail-card {
-    min-width:0;max-width:100%;border:1px solid #d5dbdb;border-radius:0!important;
+    min-width:0;max-width:100%;border:1px solid #d5dbdb;border-radius:var(--sacco-container-radius,0px)!important;
     background:#fff;box-shadow:0 1px 1px #879596;
 }
 .aws-console .erp-panel-header,

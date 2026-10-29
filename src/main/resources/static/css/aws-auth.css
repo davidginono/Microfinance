@@ -11,6 +11,7 @@
     --sacco-success: #037f0c;
     --sacco-danger: #d13212;
     --sacco-radius: 2px;
+    --sacco-container-radius: 0px;
     --sacco-topbar-height: 44px;
     --sacco-control-height: 32px;
     --sacco-font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
@@ -458,7 +459,7 @@ body.auth-shell.aws-auth-shell .auth-notification-rail {
     align-items: center;
     border: 0;
     border-bottom: 1px solid rgba(0, 0, 0, .2);
-    border-radius: var(--sacco-radius, 2px) !important;
+    border-radius: var(--sacco-container-radius, 0px) !important;
     overflow: hidden;
     padding: 6px 44px 6px 12px;
     color: #ffffff !important;

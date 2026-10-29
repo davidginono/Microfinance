@@ -918,6 +918,7 @@ button:active {
     --sacco-blue: #0972d3;
     --sacco-danger: #d13212;
     --sacco-radius: 2px;
+    --sacco-container-radius: 0px;
     --sacco-shadow: 0 1px 1px rgba(0, 28, 36, 0.12);
     --sacco-topbar-height: 44px;
     --sacco-control-height: 32px;
@@ -1908,7 +1909,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     width: 100%;
     min-height: 30px;
     border: 0 !important;
-    border-radius: var(--sacco-radius, 2px) !important;
+    border-radius: var(--sacco-container-radius, 0px) !important;
     box-shadow: none !important;
     box-sizing: border-box;
     overflow: hidden !important;
@@ -1921,7 +1922,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     width: 100%;
     min-height: 30px;
     border: 0 !important;
-    border-radius: var(--sacco-radius, 2px) !important;
+    border-radius: var(--sacco-container-radius, 0px) !important;
     box-shadow: none !important;
     box-sizing: border-box;
     overflow: hidden !important;
@@ -2880,7 +2881,7 @@ body.aws-console,
     justify-content: space-between;
     gap: 6px;
     border: 1px solid var(--aws-blue);
-    border-radius: var(--sacco-radius, 2px);
+    border-radius: var(--sacco-container-radius, 0px);
     background: #f1faff;
     padding: 6px 8px;
     color: var(--aws-ink);
