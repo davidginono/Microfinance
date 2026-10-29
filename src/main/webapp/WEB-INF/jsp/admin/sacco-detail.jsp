@@ -1,554 +1,217 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
-<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ include file="../fragments/header.jspf" %>
 <template data-resource-details-page></template>
 <%@ include file="../fragments/sidebar.jspf" %>
+
+<nav class="erp-page-path">
+    <a href="/admin/dashboard"><spring:message code="admin.tools" /></a><span>/</span>
+    <a href="/admin/saccos/registry"><spring:message code="admin.saccoRegistry.saccoRegistration" /></a><span>/</span>
+    <span aria-current="page"><spring:message code="admin.institutionDetails.title" /></span>
+</nav>
+<div class="erp-page-header" data-aws-page-header>
+    <h1 class="erp-page-title" id="admin-sacco-detail-title"><spring:message code="admin.institutionDetails.title" /></h1>
+</div>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb">Admin Tools / Institutions / Detail</p>
-    <h1 class="erp-page-title" id="admin-sacco-detail-title">${saccoDetail.summary.saccoName}</h1>
-</div>
-
-<section class="erp-panel mb-4 overflow-hidden">
-    <div class="erp-panel-header">
-        <p class="erp-panel-title">Branch Scope</p>
-    </div>
-<form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-sacco-detail-1">
-        <input type="hidden" name="section" value="${selectedSection}" />
-        <label class="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Branch
-            <select name="stationId" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800">
-                <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}>All Branches</option>
-                <c:forEach items="${saccoDetail.stationOptions}" var="Station">
-                    <option value="${Station}" ${saccoDetail.selectedStationId eq Station ? 'selected' : ''}>${Station}</option>
-                </c:forEach>
-            </select>
-        </label>
-        <div class="flex flex-wrap gap-2 lg:justify-end">
-            <a href="/admin/saccos/${saccoDetail.saccoId}?section=${selectedSection}" class="app-btn btn-neutral px-5">Reset</a>
-            <button type="submit" class="app-btn btn-primary px-5">Apply Filter</button>
+<div data-institution-details data-detail-persistent
+     data-loading="<spring:message code='common.loading' />"
+     data-error="<spring:message code='admin.institutionDetails.loadError' />"
+     data-retry="<spring:message code='admin.institutionDetails.retry' />">
+    <section class="erp-panel mb-4" data-detail-summary>
+        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.summary" /></h2></div>
+        <div class="erp-panel-body">
+            <dl class="erp-detail-facts">
+                <div><dt><spring:message code="admin.saccoRegistry.saccoName" /></dt><dd><c:out value="${saccoDetail.summary.saccoName}" /></dd></div>
+                <div><dt><spring:message code="admin.institutionDetails.id" /></dt><dd><c:out value="${saccoDetail.saccoId}" /></dd></div>
+                <div><dt><spring:message code="admin.saccoRegistry.stations" /></dt><dd><c:out value="${saccoDetail.summary.stationListLabel}" /></dd></div>
+                <div><dt><spring:message code="admin.saccoRegistry.access" /></dt><dd><span data-resource-status="${saccoDetail.summary.accessStatus}"><spring:message code="admin.institutionDetails.access.${saccoDetail.summary.accessStatus}" /></span></dd></div>
+                <div><dt><spring:message code="admin.institutionDetails.paymentDue" /></dt><dd><c:choose><c:when test="${empty saccoDetail.summary.paymentDueDate}"><spring:message code="common.notSet" /></c:when><c:otherwise><c:out value="${saccoDetail.summary.paymentDueDateLabel}" /></c:otherwise></c:choose></dd></div>
+                <c:if test="${saccoDetail.summary.accessSuspended}"><div><dt><spring:message code="admin.institutionDetails.suspendedOn" /></dt><dd><c:out value="${saccoDetail.summary.accessSuspendedAtLabel}" /></dd></div></c:if>
+                <c:if test="${not empty saccoDetail.summary.accessRestrictionReason}"><div><dt><spring:message code="common.reason" /></dt><dd><c:out value="${saccoDetail.summary.accessRestrictionReason}" /></dd></div></c:if>
+            </dl>
         </div>
-    </form>
-</section>
+    </section>
 
-<section class="erp-panel">
-    <div class="erp-panel-body space-y-4">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="flex min-w-0 items-center gap-4">
+    <section class="erp-panel mb-4">
+        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.branchScope" /></h2></div>
+        <form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body institution-details-controls" data-institution-scope>
+            <input type="hidden" name="section" value="${selectedSection}" />
+            <label for="institution-branch"><spring:message code="admin.saccoRegistry.station" />
+                <select id="institution-branch" name="stationId" class="aws-control">
+                    <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}><spring:message code="admin.institutionDetails.allBranches" /></option>
+                    <c:forEach items="${saccoDetail.stationOptions}" var="station"><option value="<c:out value='${station}' />" ${saccoDetail.selectedStationId eq station ? 'selected' : ''}><c:out value="${station}" /></option></c:forEach>
+                </select>
+            </label>
+            <button type="submit" class="app-btn btn-neutral"><spring:message code="common.apply" /></button>
+            <a href="/admin/saccos/${saccoDetail.saccoId}?section=${selectedSection}" class="app-btn btn-neutral" data-institution-reset><spring:message code="common.reset" /></a>
+        </form>
+    </section>
+
+    <sec:authorize access="@access.has(principal, 'SACCO_REGISTRY_UPDATE')">
+        <c:if test="${saccoDetail.stationScoped}">
+            <section class="erp-panel mb-4">
+                <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.branchAccess" /></h2></div>
                 <c:choose>
-                    <c:when test="${saccoDetail.summary.hasLogo}">
-                        <img src="${saccoDetail.summary.logoUrl}"
-                             alt="${saccoDetail.summary.saccoName} logo"
-                             class="h-16 w-16 border border-slate-200 bg-white object-contain p-2 shadow-sm" />
+                    <c:when test="${saccoDetail.summary.accessSuspended}">
+                        <form action="/admin/saccos/${saccoDetail.saccoId}/access/restore" method="post" class="erp-panel-body">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                            <input type="hidden" name="stationId" value="<c:out value='${saccoDetail.selectedStationId}' />" />
+                            <button type="submit" class="app-btn btn-launch"><spring:message code="admin.institutionDetails.restore" /></button>
+                        </form>
                     </c:when>
                     <c:otherwise>
-                        <span class="inline-flex h-16 w-16 items-center justify-center border border-dashed border-slate-300 bg-slate-50 text-lg font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            ${saccoDetail.summary.logoFallbackText}
-                        </span>
+                        <spring:message code="admin.institutionDetails.confirmTitle" var="suspendTitle" />
+                        <spring:message code="admin.institutionDetails.confirmMessage" arguments="${saccoDetail.selectedStationId}" var="suspendMessage" />
+                        <spring:message code="admin.institutionDetails.suspend" var="suspendLabel" />
+                        <form action="/admin/saccos/${saccoDetail.saccoId}/access/suspend" method="post" class="erp-panel-body institution-details-controls"
+                              data-confirm-title="<c:out value='${suspendTitle}' />" data-confirm-message="<c:out value='${suspendMessage}' />" data-confirm-proceed="<c:out value='${suspendLabel}' />">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                            <input type="hidden" name="stationId" value="<c:out value='${saccoDetail.selectedStationId}' />" />
+                            <label for="institution-suspend-reason"><spring:message code="common.reason" /><input id="institution-suspend-reason" name="reason" required maxlength="500" class="aws-control" /></label>
+                            <label for="institution-payment-due"><spring:message code="admin.institutionDetails.paymentDue" /><input id="institution-payment-due" name="paymentDueDate" type="date" class="aws-control" /></label>
+                            <button type="submit" class="app-btn btn-reject"><c:out value="${suspendLabel}" /></button>
+                        </form>
                     </c:otherwise>
                 </c:choose>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">${saccoDetail.summary.saccoId}</p>
-                    <h2 class="mt-1 text-2xl font-semibold text-slate-900">${saccoDetail.summary.saccoName}</h2>
-                    <p class="mt-2 text-sm text-slate-600">Branches: ${saccoDetail.summary.stationListLabel}</p>
-                </div>
-            </div>
-            <span class="inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 text-sm font-semibold ${saccoDetail.summary.toneBadgeClass}">
-                <span class="h-2.5 w-2.5 rounded-full ${saccoDetail.summary.toneDotClass}"></span>
-                ${saccoDetail.summary.healthStatus}
-            </span>
-        </div>
+            </section>
+        </c:if>
+    </sec:authorize>
 
-        <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(32rem,2fr)] lg:items-start">
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Branch Access</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${saccoDetail.summary.accessBadgeClass}"><span data-resource-status="${saccoDetail.summary.accessStatus}">${saccoDetail.summary.accessStatusLabel}</span>
-                        </span>
-                        <span class="text-sm text-slate-500">Payment due: ${saccoDetail.summary.paymentDueDateLabel}</span>
-                    </div>
-                    <c:if test="${not empty saccoDetail.summary.accessRestrictionReason}">
-                        <p class="mt-2 text-sm text-slate-600">${saccoDetail.summary.accessRestrictionReason}</p>
-                    </c:if>
-                    <c:if test="${saccoDetail.summary.accessSuspended}">
-                        <p class="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-600">Suspended ${saccoDetail.summary.accessSuspendedAtLabel}</p>
-                    </c:if>
-                </div>
-                <div class="flex min-w-0 flex-col gap-2">
-                    <c:choose>
-                        <c:when test="${not saccoDetail.stationScoped}">
-                            <div class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
-                                Select one Branch above to suspend or restore access.
-                            </div>
-                        </c:when>
-                        <c:when test="${saccoDetail.summary.accessSuspended}">
-                            <form action="/admin/saccos/${saccoDetail.saccoId}/access/restore" method="post" class="flex flex-wrap justify-end gap-2">
-                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
-                                <button type="submit" class="app-btn btn-primary justify-center px-5 sm:min-w-[12rem]">Restore Access</button>
-                            </form>
-                        </c:when>
-                        <c:otherwise>
-                            <form action="/admin/saccos/${saccoDetail.saccoId}/access/suspend"
-                                  method="post"
-                                  data-confirm-eyebrow="Confirm Suspension"
-                                  data-confirm-title="Suspend Branch Access"
-                                  data-confirm-message="Suspend access for Branch ${saccoDetail.selectedStationId}? Users at this Branch will lose workspace access until it is restored."
-                                  data-confirm-proceed="Suspend Access">
-                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
-                                <div class="relative flex flex-row items-center gap-2 flex-wrap">
-                                    <label class="block min-w-[12rem] flex-[1_1_16rem] text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                        Reason
-                                        <input name="reason" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" placeholder="Suspension reason" />
-                                    </label>
-                                    <label class="block min-w-[11rem] flex-[0_1_12rem] text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                        Payment Due
-                                        <input name="paymentDueDate" type="date" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" />
-                                    </label>
-                                    <div class="flex shrink-0 items-center pt-5">
-                                        <button type="submit" class="app-btn btn-reject min-w-[12rem] justify-center px-5">Suspend Access</button>
-                                    </div>
-                                </div>
-                            </form>
-                        </c:otherwise>
-                    </c:choose>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Clients</p>
-                <p class="mt-2 text-2xl font-semibold text-slate-900">${saccoDetail.summary.totalMembers}</p>
-                <p class="mt-1 text-sm text-slate-500">Active: ${saccoDetail.summary.activeMembers} | Inactive: ${saccoDetail.summary.inactiveMembers}</p>
-            </div>
-            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Loan Applications</p>
-                <p class="mt-2 text-2xl font-semibold text-slate-900"><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></p>
-                <p class="mt-1 text-sm text-slate-500">Active loans: ${saccoDetail.summary.activeLoanCount}</p>
-            </div>
-            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Repayment / Default</p>
-                <p class="mt-2 text-2xl font-semibold text-slate-900">${saccoDetail.summary.repaymentPercentLabel}</p>
-                <p class="mt-1 text-sm text-slate-500">Default: ${saccoDetail.summary.defaultPercentLabel}</p>
-            </div>
-            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Liquidity</p>
-                <p class="mt-2 text-2xl font-semibold text-slate-900">${saccoDetail.summary.liquidityRatioLabel}</p>
-                <p class="mt-1 text-sm text-slate-500">${saccoDetail.summary.healthNote}</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<c:set var="stationTabQuery" value="${empty saccoDetail.selectedStationId ? '' : '&stationId='.concat(saccoDetail.selectedStationId)}" />
-<div class="mt-4 flex flex-wrap gap-2">
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=overview${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'overview' ? 'is-active' : ''}">Overview</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=loans${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'loans' ? 'is-active' : ''}">Loans</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'members' ? 'is-active' : ''}">Clients</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=financials${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'financials' ? 'is-active' : ''}">Financials</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=sms${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'sms' ? 'is-active' : ''}">SMS Units</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=audit${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'audit' ? 'is-active' : ''}">Audit</a>
-</div>
-
-<c:choose>
-    <c:when test="${selectedSection eq 'loans'}">
-        <section class="erp-panel mt-4">
-            <div class="erp-panel-header">
-                <p class="erp-panel-title">Loan Portfolio</p>
-            </div>
-            <div class="erp-panel-body space-y-4">
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Applied</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Disbursed Principal</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalDisbursedPrincipalFullLabel}</p>
-                    </div>
-                </div>
-                <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-1">
-                    <div class="app-table-titlebar">
-                        <div class="app-table-heading"><h2>Loan Applications by Status</h2></div>
-                    </div>
-                    <div class="erp-table-scroll">
-                        <table class="erp-table min-w-[420px]" data-table-sort-mode="local">
-                            <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th class="text-right">Applications</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <c:forEach items="${saccoDetail.loanStatusCounts}" var="statusCount">
-                                <tr>
-                                    <td class="font-semibold text-slate-900"><span data-resource-status='<c:out value="${statusCount.statusLabel}" />'>${statusCount.statusLabel}</span></td>
-                                    <td class="text-right font-semibold text-slate-900"><fmt:formatNumber value="${statusCount.count}" /></td>
-                                </tr>
-                            </c:forEach>
-                            <c:if test="${empty saccoDetail.loanStatusCounts}">
-                                <tr><td colspan="2" class="text-slate-500">No disbursed or rejected loan applications found for this institution.</td></tr>
-                            </c:if>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </c:when>
-    <c:when test="${selectedSection eq 'members'}">
-        <section class="erp-panel mt-4">
-            <div class="erp-panel-header" data-resource-header-source>
-                <h2 class="erp-panel-title" data-table-heading-for="admin-sacco-detail-2">Client Summary</h2>
-                    </div>
-            <div class="erp-panel-body space-y-4">
-                <div class="grid gap-3 sm:grid-cols-3">
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Clients</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalMembers}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Clients</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.activeMembers}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inactive Clients</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.inactiveMembers}</p>
-                </div>
-                        </div>
-                <div class="rounded border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                            <p class="erp-widget-title">Client List</p>
-                            <p class="mt-1 text-sm text-slate-500">Search by User ID, client number, or name.</p>
-                        </div>
-                        <div class="inline-flex flex-wrap items-center gap-2 border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
-                            <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Current Slice</span>
-                            <c:set var="MemberTotal" value="${saccoMembersPage.totalElements}" />
-                            <c:set var="MembersliceStart" value="${MemberTotal == 0 ? 0 : (saccoMembersPage.number * saccoMembersPage.size) + 1}" />
-                            <c:set var="MembersliceEndRaw" value="${(saccoMembersPage.number * saccoMembersPage.size) + fn:length(saccoMembers)}" />
-                            <c:set var="MembersliceEnd" value="${MemberTotal == 0 ? 0 : MembersliceEndRaw}" />
-                            <span>Showing <span class="font-semibold text-slate-800">${MembersliceStart}-${MembersliceEnd}</span> of <span class="font-semibold text-slate-800">${MemberTotal}</span> accounts</span>
-                    </div>
-                        </div>
-<form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3 aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-sacco-detail-2">
-                        <input type="hidden" name="section" value="members" />
-                        <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
-                        <label class="block min-w-[16rem] flex-[1_1_22rem]">
-                            <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search Client</span>
-                            <input type="text"
-                                   name="memberQuery"
-                                   value="${selectedMemberQuery}"
-                                   class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
-                                   placeholder="User ID, client number, or name"
-                                   title="User ID, client number, or name" />
-                        </label>
-                        <label class="block min-w-[10rem] flex-[0_1_12rem]">
-                            <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Rows Per Page</span>
-                            <select name="memberSize" class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800">
-                                <option value="25" ${selectedMemberPageSize == 25 ? 'selected' : ''}>25 rows</option>
-                                <option value="50" ${selectedMemberPageSize == 50 ? 'selected' : ''}>50 rows</option>
-                                <option value="100" ${selectedMemberPageSize == 100 ? 'selected' : ''}>100 rows</option>
-                            </select>
-                        </label>
-                        <div class="flex shrink-0 flex-wrap items-end gap-2">
-                            <button type="submit" class="app-btn btn-primary">Search</button>
-                            <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="app-btn btn-neutral">Reset</a>
-                </div>
-                    </form>
-                </div>
-                <div class="erp-table-wrap" data-resource-table="admin-sacco-detail-2" data-table-page-param="memberPage">
-                    <div class="erp-table-scroll">
-                    <table class="erp-table min-w-[1120px]">
-                        <thead>
-                        <tr>
-                            <th class="whitespace-nowrap" data-table-order="id">User ID</th>
-                            <th class="whitespace-nowrap" data-table-order="client">Client Number</th>
-                            <th class="whitespace-nowrap" data-table-order="name">Name</th>
-                            <th class="whitespace-nowrap" data-table-order="membership">Account Type</th>
-                            <th class="whitespace-nowrap" data-table-order="roles">Staff Roles</th>
-                            <th class="whitespace-nowrap" data-table-order="status">Current Status</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <c:choose>
-                            <c:when test="${empty saccoMembers}">
-                                <tr>
-                                    <td colspan="6" class="text-slate-500">
-                                        <c:choose>
-                                            <c:when test="${not empty selectedMemberQuery}">
-                                                No clients matched <span class="font-semibold text-slate-700">${selectedMemberQuery}</span>.
-                                            </c:when>
-                                            <c:otherwise>
-                                                No clients are available for this view.
-                                            </c:otherwise>
-                                        </c:choose>
-                                    </td>
-                                </tr>
-                            </c:when>
-                            <c:otherwise>
-                                <c:forEach items="${saccoMembers}" var="Member">
-                                    <tr>
-                                        <td class="align-top whitespace-nowrap font-medium text-slate-700">${Member.userIdLabel}</td>
-                                        <td class="align-top whitespace-nowrap">${Member.loginId}</td>
-                                        <td class="align-top font-semibold text-slate-900">${Member.fullName}</td>
-                                        <td class="align-top whitespace-nowrap">
-                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${Member.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
-                                                ${Member.membershipLabel}
-                                            </span>
-                                        </td>
-                                        <td class="align-top whitespace-nowrap">${empty Member.roleSummary ? '-' : Member.roleSummary}</td>
-                                        <td class="align-top whitespace-nowrap">
-                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${Member.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : Member.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}"><span data-resource-status="${Member.status}">${Member.displayStatus}</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                </c:forEach>
-                            </c:otherwise>
-                        </c:choose>
-                        </tbody>
-                    </table>
-                        </div>
-                </div>
-                <div class="flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-table-pagination-shell>
-                    <p class="text-sm text-slate-600">The table is server-paged to keep large Client Lists manageable.</p>
-                    <c:if test="${saccoMembersPage.totalPages gt 1}">
-                        <div class="flex flex-wrap items-center justify-end gap-2" data-table-pagination data-table-for="admin-sacco-detail-2" data-page="${saccoMembersPage.number}">
-                            <c:choose>
-                                <c:when test="${saccoMembersPage.first}">
-                                    <span class="app-btn btn-neutral pointer-events-none opacity-50">Previous</span>
-                                </c:when>
-                                <c:otherwise>
-                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number - 1}${saccoMembersPaginationQuery}" class="app-btn btn-neutral" data-page-direction="previous">Previous</a>
-                                </c:otherwise>
-                            </c:choose>
-                            <span class="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
-                                Page ${saccoMembersPage.number + 1} of ${saccoMembersPage.totalPages}
-                            </span>
-                            <c:choose>
-                                <c:when test="${saccoMembersPage.last}">
-                                    <span class="app-btn btn-neutral pointer-events-none opacity-50">Next</span>
-                                </c:when>
-                                <c:otherwise>
-                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number + 1}${saccoMembersPaginationQuery}" class="app-btn btn-primary" data-page-direction="next">Next</a>
-                                </c:otherwise>
-                            </c:choose>
-            </div>
-                    </c:if>
-            </div>
-                    </div>
-        </section>
-    </c:when>
-    <c:when test="${selectedSection eq 'financials'}">
-        <section class="erp-panel mt-4">
-            <div class="erp-panel-header">
-                <p class="erp-panel-title">Financial Summary</p>
-                    </div>
-            <div class="erp-panel-body">
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Exposure Total</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalSavingsFullLabel}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Exposure</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.activeExposureFullLabel}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Repayment Proxy</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.repaymentPercentLabel}</p>
-                </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Default / Liquidity</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.defaultPercentLabel}</p>
-                        <p class="mt-1 text-sm text-slate-500">Liquidity: ${saccoDetail.summary.liquidityRatioLabel}</p>
-            </div>
-                        </div>
-                    </div>
-        </section>
-    </c:when>
-    <c:when test="${selectedSection eq 'sms'}">
+    <nav class="console-detail-tabs" aria-label="<spring:message code='admin.institutionDetails.sections' />" data-institution-tabs>
+        <c:forTokens items="overview,loans,members,financials,sms,audit" delims="," var="tab">
+            <c:url value="/admin/saccos/${saccoDetail.saccoId}" var="tabUrl"><c:param name="section" value="${tab}" /><c:if test="${not empty saccoDetail.selectedStationId}"><c:param name="stationId" value="${saccoDetail.selectedStationId}" /></c:if></c:url>
+            <a id="institution-tab-${tab}" href="<c:out value='${tabUrl}' />" data-institution-tab="${tab}" role="tab" aria-selected="${selectedSection eq tab}" aria-controls="institution-section" ${selectedSection eq tab ? 'aria-current="page"' : ''}><spring:message code="admin.institutionDetails.tab.${tab}" /></a>
+        </c:forTokens>
+    </nav>
+    <div id="institution-section" data-institution-section="${selectedSection}" role="tabpanel" aria-labelledby="institution-tab-${selectedSection}" tabindex="0">
         <c:choose>
-            <c:when test="${saccoDetail.stationScoped}">
-                <section class="erp-panel mt-4">
-                    <div class="erp-panel-header">
-                        <div>
-                            <p class="erp-panel-title">SMS Units: ${saccoDetail.selectedStationId}</p>
-                            <p class="mt-1 text-sm text-slate-500">Current Branch balance and usage status.</p>
-                            </div>
-                        <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}&stationId=${saccoDetail.selectedStationId}" class="app-btn btn-neutral">Manage SMS Units</a>
-                            </div>
-                    <div class="erp-panel-body">
-                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Available Units</p>
-                                <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.availableUnits}" /></p>
-                            </div>
-                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Alert Reserve</p>
-                                <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.alertReservedUnits}" /> / 3</p>
-                            </div>
-                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Warning Baseline</p>
-                                <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.warningBaseline}" /></p>
-                        </div>
-                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">SMS Status</p>
-                                <p class="mt-3">
-                                    <span class="border px-2 py-1 text-xs font-bold ${smsAccount.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : smsAccount.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : smsAccount.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}"><span data-resource-status="${smsAccount.status}">${smsAccount.status}</span></span>
-                                </p>
-                    </div>
-                    </div>
-                            </div>
+            <c:when test="${selectedSection eq 'loans'}">
+                <section class="erp-resource-section mb-4"><h2><spring:message code="admin.institutionDetails.loanPortfolio" /></h2>
+                    <dl class="erp-detail-facts">
+                        <div><dt><spring:message code="admin.institutionDetails.applications" /></dt><dd><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.activeLoans" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.activeLoanCount}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.disbursed" /></dt><dd><c:out value="${saccoDetail.summary.totalDisbursedPrincipalFullLabel}" /></dd></div>
+                    </dl>
                 </section>
-
-                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-3" data-table-page-param="smsHistoryPage">
-                    <div class="app-table-titlebar">
-                        <div class="app-table-heading"><h2>Recent SMS Usage</h2></div>
+                <section class="erp-table-wrap" data-resource-table="admin-sacco-detail-1">
+                    <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.loanStatuses" /></h2></div>
+                    <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr><th><spring:message code="common.status" /></th><th><spring:message code="admin.institutionDetails.applications" /></th></tr></thead><tbody>
+                        <c:forEach items="${saccoDetail.loanStatusCounts}" var="statusCount"><tr><td><span data-resource-status="${statusCount.status}"><spring:message code="admin.institutionDetails.loanStatus.${statusCount.status}" /></span></td><td><fmt:formatNumber value="${statusCount.count}" /></td></tr></c:forEach>
+                        <c:if test="${empty saccoDetail.loanStatusCounts}"><tr><td colspan="2"><spring:message code="admin.institutionDetails.noLoans" /></td></tr></c:if>
+                    </tbody></table></div>
+                </section>
+            </c:when>
+            <c:when test="${selectedSection eq 'members'}">
+                <section class="erp-resource-section mb-4"><h2><spring:message code="admin.institutionDetails.clientsSummary" /></h2>
+                    <dl class="erp-detail-facts">
+                        <div><dt><spring:message code="admin.institutionDetails.clients" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.totalMembers}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.activeClients" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.activeMembers}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.inactiveClients" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.inactiveMembers}" /></dd></div>
+                    </dl>
+                </section>
+                <section class="erp-table-wrap" data-resource-table="admin-sacco-detail-2" data-table-page-param="memberPage">
+                    <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.clients" /> <span class="app-table-count">(${saccoMembersPage.totalElements})</span></h2></div>
+                    <form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="aws-filter-toolbar" data-aws-filter-toolbar>
+                        <input type="hidden" name="section" value="members" /><input type="hidden" name="stationId" value="<c:out value='${saccoDetail.selectedStationId}' />" />
+                        <label><span class="sr-only"><spring:message code="admin.institutionDetails.searchClients" /></span><input type="search" name="memberQuery" value="<c:out value='${selectedMemberQuery}' />" class="aws-control" placeholder="<spring:message code='admin.institutionDetails.searchClients' />" /></label>
+                        <label data-institution-page-size><span class="sr-only"><spring:message code="admin.institutionDetails.rows" /></span><select name="memberSize" class="aws-control" aria-label="<spring:message code='admin.institutionDetails.rows' />"><c:forTokens items="25,50,100" delims="," var="size"><option value="${size}" ${selectedMemberPageSize eq size ? 'selected' : ''}>${size}</option></c:forTokens></select></label>
+                        <button type="submit" class="app-btn btn-neutral"><spring:message code="common.search" /></button>
+                    </form>
+                    <div class="erp-table-scroll"><table class="erp-table"><thead><tr>
+                        <th><spring:message code="admin.institutionDetails.userId" /></th><th><spring:message code="admin.institutionDetails.clientNumber" /></th><th><spring:message code="admin.institutionDetails.name" /></th><th><spring:message code="admin.institutionDetails.accountType" /></th><th><spring:message code="admin.institutionDetails.roles" /></th><th><spring:message code="common.status" /></th>
+                    </tr></thead><tbody>
+                        <c:forEach items="${saccoMembers}" var="member"><tr><td><c:out value="${member.userIdLabel}" /></td><td><c:out value="${member.loginId}" /></td><td><c:out value="${member.fullName}" /></td><td><c:out value="${member.membershipLabel}" /></td><td><c:out value="${empty member.roleSummary ? '-' : member.roleSummary}" /></td><td><span data-resource-status="${member.status}"><c:out value="${member.displayStatus}" /></span></td></tr></c:forEach>
+                        <c:if test="${empty saccoMembers}"><tr><td colspan="6"><spring:message code="admin.institutionDetails.noClients" /></td></tr></c:if>
+                    </tbody></table></div>
+                    <div data-table-pagination data-table-for="admin-sacco-detail-2" data-page="${saccoMembersPage.number}">
+                        <c:if test="${not saccoMembersPage.first}"><a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number - 1}${saccoMembersPaginationQuery}" data-page-direction="previous"><spring:message code="common.previous" /></a></c:if>
+                        <c:if test="${not saccoMembersPage.last}"><a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number + 1}${saccoMembersPaginationQuery}" data-page-direction="next"><spring:message code="common.next" /></a></c:if>
                     </div>
-                    <div class="erp-table-scroll">
-                        <table class="erp-table min-w-[760px]">
-                            <thead>
-                            <tr>
-                                <th data-table-order="date">Time</th>
-                                <th data-table-order="event">Event</th>
-                                <th data-table-order="outcome">Outcome</th>
-                                <th data-table-order="units">Unit Change</th>
-                                <th data-table-order="reference">Provider Reference</th>
-                                <th data-table-order="note">Note</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <c:forEach items="${smsHistory.content}" var="entry">
-                                <tr>
-                                    <td class="whitespace-nowrap"><c:out value="${appTime:format(entry.createdAt)}" /></td>
-                                    <td>${empty entry.eventType ? '-' : entry.eventType}</td>
-                                    <td class="font-semibold text-slate-900"><span data-resource-status="${entry.outcome}">${entry.outcome}</span></td>
-                                    <td>${entry.unitChange}</td>
-                                    <td>${empty entry.providerReference ? '-' : entry.providerReference}</td>
-                                    <td>${empty entry.note ? '-' : entry.note}</td>
-                                </tr>
-                            </c:forEach>
-                            <c:if test="${empty smsHistory.content}">
-                                <tr><td colspan="6" class="text-slate-500">No SMS usage has been recorded for this Branch.</td></tr>
-                            </c:if>
-                            </tbody>
-                        </table>
-                        </div>
-                        <c:if test="${smsHistory.totalPages gt 1}">
-                        <div class="erp-table-footer flex justify-end gap-2" data-table-pagination data-table-for="admin-sacco-detail-3" data-page="${smsHistory.number}">
-                                <c:if test="${not smsHistory.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number - 1}" data-page-direction="previous">Previous</a></c:if>
-                                <c:if test="${not smsHistory.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number + 1}" data-page-direction="next">Next</a></c:if>
-                    </div>
-                        </c:if>
+                </section>
+            </c:when>
+            <c:when test="${selectedSection eq 'financials'}">
+                <div class="console-message mb-4" data-message-type="info"><spring:message code="admin.institutionDetails.estimates" /></div>
+                <section class="erp-resource-section"><h2><spring:message code="admin.institutionDetails.tab.financials" /></h2>
+                    <dl class="erp-detail-facts">
+                        <div><dt><spring:message code="admin.institutionDetails.disbursed" /></dt><dd><c:out value="${saccoDetail.summary.totalDisbursedPrincipalFullLabel}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.exposure" /></dt><dd><c:out value="${saccoDetail.summary.activeExposureFullLabel}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.legacyBalance" /></dt><dd><c:out value="${saccoDetail.summary.totalSavingsFullLabel}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.repaymentProxy" /></dt><dd><c:out value="${saccoDetail.summary.repaymentPercentLabel}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.defaultProxy" /></dt><dd><c:out value="${saccoDetail.summary.defaultPercentLabel}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.liquidityProxy" /></dt><dd><c:out value="${saccoDetail.summary.liquidityRatioLabel}" /></dd></div>
+                    </dl>
+                </section>
+            </c:when>
+            <c:when test="${selectedSection eq 'sms'}">
+                <c:choose>
+                    <c:when test="${saccoDetail.stationScoped}">
+                        <section class="erp-panel mb-4">
+                            <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.smsBalance" /></h2>
+                                <sec:authorize access="@access.has(principal, 'SMS_USAGE_VIEW')"><a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}&amp;stationId=${saccoDetail.selectedStationId}" class="app-btn btn-neutral"><spring:message code="admin.institutionDetails.manageSms" /></a></sec:authorize>
+                            </div>
+                            <div class="erp-panel-body">
+                            <dl class="erp-detail-facts">
+                                <div><dt><spring:message code="admin.institutionDetails.availableUnits" /></dt><dd><fmt:formatNumber value="${smsAccount.availableUnits}" /></dd></div>
+                                <div><dt><spring:message code="admin.institutionDetails.reserve" /></dt><dd><fmt:formatNumber value="${smsAccount.alertReservedUnits}" /> / 3</dd></div>
+                                <div><dt><spring:message code="admin.institutionDetails.baseline" /></dt><dd><fmt:formatNumber value="${smsAccount.warningBaseline}" /></dd></div>
+                                <div><dt><spring:message code="common.status" /></dt><dd><span data-resource-status="${smsAccount.status}"><spring:message code="admin.institutionDetails.smsStatus.${smsAccount.status}" /></span></dd></div>
+                            </dl></div>
+                        </section>
+                        <section class="erp-table-wrap" data-resource-table="admin-sacco-detail-3" data-table-page-param="smsHistoryPage">
+                            <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.smsHistory" /></h2></div>
+                            <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="admin.institutionDetails.time" /></th><th><spring:message code="admin.institutionDetails.event" /></th><th><spring:message code="admin.institutionDetails.outcome" /></th><th><spring:message code="admin.institutionDetails.unitChange" /></th><th><spring:message code="admin.institutionDetails.reference" /></th><th><spring:message code="admin.institutionDetails.note" /></th></tr></thead><tbody>
+                                <c:forEach items="${smsHistory.content}" var="entry"><tr><td><c:out value="${appTime:format(entry.createdAt)}" /></td><td><c:out value="${empty entry.eventType ? '-' : entry.eventType}" /></td><td><span data-resource-status="${entry.outcome}"><spring:message code="admin.institutionDetails.smsOutcome.${entry.outcome}" /></span></td><td><fmt:formatNumber value="${entry.unitChange}" /></td><td><c:out value="${empty entry.providerReference ? '-' : entry.providerReference}" /></td><td><c:out value="${empty entry.note ? '-' : entry.note}" /></td></tr></c:forEach>
+                                <c:if test="${empty smsHistory.content}"><tr><td colspan="6"><spring:message code="admin.institutionDetails.noSmsHistory" /></td></tr></c:if>
+                            </tbody></table></div>
+                            <div data-table-pagination data-table-for="admin-sacco-detail-3" data-page="${smsHistory.number}">
+                                <c:if test="${not smsHistory.first}"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&amp;stationId=${saccoDetail.selectedStationId}&amp;smsHistoryPage=${smsHistory.number - 1}" data-page-direction="previous"><spring:message code="common.previous" /></a></c:if>
+                                <c:if test="${not smsHistory.last}"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&amp;stationId=${saccoDetail.selectedStationId}&amp;smsHistoryPage=${smsHistory.number + 1}" data-page-direction="next"><spring:message code="common.next" /></a></c:if>
+                            </div>
+                        </section>
+                    </c:when>
+                    <c:otherwise>
+                        <section class="erp-table-wrap" data-resource-table="admin-sacco-detail-4" data-table-page-param="smsPage" data-table-selection="single">
+                            <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.smsBalances" /></h2><div class="app-table-toolbar"><sec:authorize access="@access.has(principal, 'SMS_USAGE_VIEW')"><a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}" class="app-btn btn-neutral"><spring:message code="admin.institutionDetails.manageSms" /></a></sec:authorize></div></div>
+                            <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><spring:message code="admin.saccoRegistry.station" /></th><th><spring:message code="admin.institutionDetails.availableUnits" /></th><th><spring:message code="admin.institutionDetails.reserve" /></th><th><spring:message code="admin.institutionDetails.baseline" /></th><th><spring:message code="common.status" /></th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead><tbody>
+                                <c:forEach items="${smsAccounts.content}" var="account"><tr>
+                                    <c:url value="/admin/saccos/${saccoDetail.saccoId}" var="smsBranchUrl"><c:param name="section" value="sms" /><c:param name="stationId" value="${account.stationId}" /></c:url>
+                                    <td><a class="resource-table-id-link" href="<c:out value='${smsBranchUrl}' />"><c:out value="${account.stationId}" /></a></td><td><fmt:formatNumber value="${account.availableUnits}" /></td><td><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td><td><fmt:formatNumber value="${account.warningBaseline}" /></td><td><span data-resource-status="${account.status}"><spring:message code="admin.institutionDetails.smsStatus.${account.status}" /></span></td><td><a href="<c:out value='${smsBranchUrl}' />" class="app-btn btn-neutral"><spring:message code="admin.saccoRegistry.viewDetails" /></a></td>
+                                </tr></c:forEach>
+                                <c:if test="${empty smsAccounts.content}"><tr><td colspan="6"><spring:message code="admin.institutionDetails.noSmsAccounts" /></td></tr></c:if>
+                            </tbody></table></div>
+                            <div data-table-pagination data-table-for="admin-sacco-detail-4" data-page="${smsAccounts.number}">
+                                <c:if test="${not smsAccounts.first}"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&amp;smsPage=${smsAccounts.number - 1}" data-page-direction="previous"><spring:message code="common.previous" /></a></c:if>
+                                <c:if test="${not smsAccounts.last}"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&amp;smsPage=${smsAccounts.number + 1}" data-page-direction="next"><spring:message code="common.next" /></a></c:if>
+                            </div>
+                        </section>
+                    </c:otherwise>
+                </c:choose>
+            </c:when>
+            <c:when test="${selectedSection eq 'audit'}">
+                <section class="erp-table-wrap" data-resource-table="admin-sacco-detail-audit">
+                    <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.auditActivity" /></h2></div>
+                    <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr><th><spring:message code="admin.institutionDetails.time" /></th><th><spring:message code="admin.institutionDetails.event" /></th><th><spring:message code="admin.institutionDetails.source" /></th><th><spring:message code="admin.institutionDetails.actor" /></th></tr></thead><tbody>
+                        <c:forEach items="${saccoDetail.recentAuditEntries}" var="entry"><tr><td><c:out value="${entry.createdAtLabel}" /></td><td><c:out value="${entry.actionLabel}" /></td><td><c:out value="${entry.sourceLabel}" /></td><td><c:out value="${entry.actorLabel}" /></td></tr></c:forEach>
+                        <c:if test="${empty saccoDetail.recentAuditEntries}"><tr><td colspan="4"><spring:message code="admin.institutionDetails.noAudit" /></td></tr></c:if>
+                    </tbody></table></div>
                 </section>
             </c:when>
             <c:otherwise>
-                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-sacco-detail-4" data-table-page-param="smsPage" data-resource-split>
-                    <div class="app-table-titlebar">
-                        <div class="app-table-heading"><h2>Branch SMS Balances</h2></div>
-                        <div class="app-table-toolbar">
-                        <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}" class="app-btn btn-neutral">Manage SMS Units</a>
-                            </div>
-                    </div>
-                    <div class="erp-table-scroll">
-                        <table class="erp-table min-w-[680px]">
-                            <thead>
-                            <tr>
-                                <th data-table-order="branch">Branch</th>
-                                <th data-table-order="available">Available Units</th>
-                                <th data-table-order="reserve">Alert Reserve</th>
-                                <th data-table-order="baseline">Warning Baseline</th>
-                                <th data-table-order="status">Status</th>
-                                <th data-table-actions-header></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <c:forEach items="${smsAccounts.content}" var="account">
-                                <tr>
-                                    <td class="font-semibold text-slate-900">${account.stationId}</td>
-                                    <td><fmt:formatNumber value="${account.availableUnits}" /></td>
-                                    <td><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td>
-                                    <td><fmt:formatNumber value="${account.warningBaseline}" /></td>
-                                    <td><span class="border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}"><span data-resource-status="${account.status}">${account.status}</span></span></td>
-                                    <td class="text-right"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${account.stationId}" class="app-btn btn-neutral">View Details</a></td>
-                                </tr>
-                            </c:forEach>
-                            <c:if test="${empty smsAccounts.content}">
-                                <tr><td colspan="6" class="text-slate-500">No Branch SMS accounts were found for this institution.</td></tr>
-                            </c:if>
-                            </tbody>
-                        </table>
-            </div>
-                        <c:if test="${smsAccounts.totalPages gt 1}">
-                        <div class="erp-table-footer flex justify-end gap-2" data-table-pagination data-table-for="admin-sacco-detail-4" data-page="${smsAccounts.number}">
-                                <c:if test="${not smsAccounts.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number - 1}" data-page-direction="previous">Previous</a></c:if>
-                                <c:if test="${not smsAccounts.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number + 1}" data-page-direction="next">Next</a></c:if>
-                                </div>
-                        </c:if>
+                <section class="erp-resource-section"><h2><spring:message code="admin.institutionDetails.tab.overview" /></h2>
+                    <dl class="erp-detail-facts">
+                        <div><dt><spring:message code="admin.institutionDetails.clients" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.totalMembers}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.activeClients" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.activeMembers}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.inactiveClients" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.inactiveMembers}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.applications" /></dt><dd><fmt:formatNumber value="${saccoDetail.totalLoanApplicationCount}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.activeLoans" /></dt><dd><fmt:formatNumber value="${saccoDetail.summary.activeLoanCount}" /></dd></div>
+                        <div><dt><spring:message code="admin.institutionDetails.disbursed" /></dt><dd><c:out value="${saccoDetail.summary.totalDisbursedPrincipalFullLabel}" /></dd></div>
+                    </dl>
                 </section>
             </c:otherwise>
         </c:choose>
-    </c:when>
-    <c:when test="${selectedSection eq 'audit'}">
-                <section class="erp-panel mt-4">
-                    <div class="erp-panel-header">
-                <p class="erp-panel-title">Recent Audit Activity</p>
-                            </div>
-                    <div class="erp-panel-body">
-                <div class="space-y-3">
-                    <c:forEach items="${saccoDetail.recentAuditEntries}" var="entry">
-                        <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                                    <p class="font-semibold text-slate-900">${entry.actionLabel}</p>
-                                    <p class="mt-1 text-sm text-slate-600">${entry.sourceLabel} | ${entry.actorLabel}</p>
-                        </div>
-                                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">${entry.createdAtLabel}</span>
-                </div>
-            </div>
-                    </c:forEach>
-                    <c:if test="${empty saccoDetail.recentAuditEntries}">
-                        <p class="text-sm text-slate-500">No recent audit entries were matched to this institution.</p>
-                    </c:if>
-            </div>
-                    </div>
-        </section>
-    </c:when>
-    <c:otherwise>
-                <section class="erp-panel mt-4">
-                    <div class="erp-panel-header">
-                <p class="erp-panel-title">Overview</p>
-                    </div>
-                    <div class="erp-panel-body">
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Branches</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.stationCount}</p>
-                        <p class="mt-1 text-sm text-slate-500">${saccoDetail.summary.stationListLabel}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Disposable Income</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalSavingsLabel}</p>
-                    </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Exposure</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.activeExposureLabel}</p>
-                </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Health Note</p>
-                        <p class="mt-2 text-sm font-medium text-slate-700">${saccoDetail.summary.healthNote}</p>
-            </div>
-                </div>
-            </div>
-        </section>
-    </c:otherwise>
-</c:choose>
-
+    </div>
+</div>
+<script src="<c:url value='/js/institution-details.js' />" defer></script>
 <%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

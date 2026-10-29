@@ -40,6 +40,18 @@
 .console-detail-panels>[role=tabpanel][hidden] {display:none!important;}
 .console-detail-panels>[role=tabpanel] {margin-top:0!important;}
 .console-detail-panels>[role=tabpanel]:focus-visible {outline:2px solid #0073bb;outline-offset:3px;}
+.aws-console .console-detail-tabs > a[role=tab] {text-decoration:none;}
+.aws-console .institution-details-controls {display:flex;flex-flow:row wrap;align-items:flex-end;gap:8px;min-width:0;}
+.institution-details-controls > label {display:grid;gap:6px;flex:0 1 320px;min-width:0;max-width:100%;}
+.institution-details-controls > .app-btn {flex:none;}
+.institution-details-controls .aws-control {width:100%;min-width:0;}
+.aws-console [data-institution-details] .erp-panel-body {padding:20px!important;}
+.aws-console [data-institution-details] .resource-table-filters > label[data-institution-page-size] {flex:0 0 80px!important;}
+@media(max-width:767px) {.aws-console [data-institution-details] .erp-panel-body {padding:16px!important;}}
+#institution-section {position:relative;min-width:0;}
+#institution-section:focus-visible {outline:2px solid #0073bb;outline-offset:3px;}
+#institution-section[aria-busy=true] > :not(.institution-section-status) {visibility:hidden;}
+#institution-section[aria-busy=true] > .institution-section-status {position:absolute;inset:0;padding:20px;}
 .aws-console .console-prerequisite {display:flex;align-items:flex-start;gap:12px;min-width:0;margin:16px 0;padding:16px 20px;border:1px solid #906806;background:#fffce9;border-radius:var(--sacco-container-radius,0px);box-shadow:none;color:#16191f;}
 .console-prerequisite>.console-icon {color:#906806;margin-top:2px;}
 .console-prerequisite-body {flex:1;min-width:0;}
