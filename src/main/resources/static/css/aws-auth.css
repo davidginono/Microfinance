@@ -374,7 +374,7 @@ body.auth-shell.aws-auth-shell .auth-notification-rail {
     align-items: center;
     border: 0;
     border-bottom: 1px solid rgba(0, 0, 0, .2);
-    border-radius: 0 !important;
+    border-radius: var(--sacco-radius, 2px) !important;
     overflow: hidden;
     padding: 6px 44px 6px 12px;
     color: #ffffff !important;

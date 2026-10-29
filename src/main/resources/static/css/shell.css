@@ -1908,7 +1908,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     width: 100%;
     min-height: 30px;
     border: 0 !important;
-    border-radius: 0 !important;
+    border-radius: var(--sacco-radius, 2px) !important;
     box-shadow: none !important;
     box-sizing: border-box;
     overflow: hidden !important;
@@ -1921,7 +1921,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     width: 100%;
     min-height: 30px;
     border: 0 !important;
-    border-radius: 0 !important;
+    border-radius: var(--sacco-radius, 2px) !important;
     box-shadow: none !important;
     box-sizing: border-box;
     overflow: hidden !important;
@@ -2880,6 +2880,7 @@ body.aws-console,
     justify-content: space-between;
     gap: 6px;
     border: 1px solid var(--aws-blue);
+    border-radius: var(--sacco-radius, 2px);
     background: #f1faff;
     padding: 6px 8px;
     color: var(--aws-ink);

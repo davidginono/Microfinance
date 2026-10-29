@@ -866,7 +866,7 @@
         }
         const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
         const toast = document.createElement('div');
-        toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm ' +
+        toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden border px-4 py-3 shadow-lg backdrop-blur-sm ' +
             (variant === 'success' ? 'app-toast-success' : variant === 'error' ? 'app-toast-error' : 'app-toast-info');
         toast.setAttribute('data-app-toast', 'true');
         toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
