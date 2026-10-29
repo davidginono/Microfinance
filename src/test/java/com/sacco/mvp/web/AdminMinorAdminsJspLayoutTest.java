@@ -4,10 +4,33 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
+import java.util.regex.Pattern;
+import org.springframework.context.support.ReloadableResourceBundleMessageSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminMinorAdminsJspLayoutTest {
+
+    @Test
+    void registrationPageResolvesRequiredMessagesInBothLanguages() throws Exception {
+        String jsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/minor-admins.jsp"));
+        var messages = new ReloadableResourceBundleMessageSource();
+        messages.setBasename(Path.of("src/main/resources/messages").toAbsolutePath().toUri().toString());
+        messages.setDefaultEncoding("UTF-8");
+        messages.setFallbackToSystemLocale(false);
+        var tags = Pattern.compile("<spring:message\\s+([^>]+?)/>").matcher(jsp);
+        while (tags.find()) {
+            String attributes = tags.group(1);
+            var code = Pattern.compile("\\bcode=([\"'])(.*?)\\1").matcher(attributes);
+            if (!code.find() || code.group(2).contains("${")) continue;
+            if (attributes.contains("text=") && !code.group(2).startsWith("admin.minorAdmins.")) continue;
+            for (Locale locale : new Locale[]{Locale.ENGLISH, Locale.of("sw")}) {
+                assertThat(messages.getMessage(code.group(2), null, locale))
+                    .as("Required administrator-page label %s in %s", code.group(2), locale).isNotBlank();
+            }
+        }
+    }
 
     @Test
     void createFormKeepsRegisterActionInItsOwnFooter() throws Exception {
