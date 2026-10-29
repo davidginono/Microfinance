@@ -4,7 +4,7 @@ Implementation date: 27 October 2026. This implements the individual-client oper
 
 ## 1. Scope, policy and activation
 
-Staff use **Client onboarding** at `/finance/clients/onboarding`. Clients see only their own outcome and next review date at `/app/onboarding`. Institution and branch scope come from the current staff session and the current client record. Historical evidence retains its original branch. Moving a client does not expose the previous branch's evidence or transfer its verification; the destination branch needs its own review.
+Staff use **Client onboarding** at `/finance/clients/onboarding`. Clients complete their own drafts, uploads, acknowledgements and submissions and view outcomes, correction messages and version history at `/app/onboarding`. The 29 October self-service extension and branch notice activation are documented in [Client self-service onboarding](client-self-onboarding.md). Staff assistance remains optional. Institution and branch scope come from the current staff session and the current client record. Historical evidence retains its original branch. Moving a client does not expose the previous branch's evidence or transfer its verification; the destination branch needs its own review.
 
 Assign these new claims explicitly using the existing access editor. No role receives them automatically:
 
@@ -36,7 +36,7 @@ Exact duplicate matching normalizes document type, issuing country and document 
 
 ## 3. Security review
 
-The owning service rechecks active staff, current explicit claims, institution and branch on every use case, including exact retries and document reads. Clients receive a small own-status DTO, without internal screening, reasons, identity numbers or files. Staff forms allowlist editable fields; client number, name/contact snapshot, actor, scope and verification state are derived on the server. Full numbers are available for authorized editing/review, not registry search or client status.
+The owning service rechecks active staff, current explicit claims, institution and branch on every staff use case, including exact retries and document reads. Client use cases separately recheck active account, institution, branch and ownership. Clients receive their own personal fields, protected document links, frozen notices, client-facing feedback and bounded history; internal screening, staff reasons and retention references remain private. Forms allowlist editable fields; client number, name/contact snapshot, actor, scope and verification state are derived on the server. Full identity numbers are available for authorized own-profile editing and staff editing/review, and remain masked in ordinary details.
 
 Uploads use protected `StoredUploadStorageService`, generated paths outside static resources, and owner/category-bound metadata. The application accepts one PDF/PNG/JPEG of at most 5 MB, inspects actual format, limits decoded image dimensions, and rejects encrypted or over-40-page PDFs. A content checksum is checked at download. Files are forced private attachments with `no-store`, `nosniff` and a sandbox policy. File parsing occurs before transactional metadata/record locks. Bounded storage writes occur before the client evidence lock, with rollback cleanup. Metadata is flushed before JDBC foreign-key links are written.
 

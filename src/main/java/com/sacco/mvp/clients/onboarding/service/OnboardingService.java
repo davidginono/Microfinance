@@ -77,23 +77,30 @@ public class OnboardingService {
     }
     @Transactional(timeout=20)
     public UUID save(AppUserPrincipal a,UUID client,ProfileForm f) {
-        authorize(a,"UPDATE");records.client(a,client,today());String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+        authorize(a,"UPDATE");return saveRevision(a,client,f,hash(List.of(client,f)));
+    }
+    private UUID saveRevision(AppUserPrincipal a,UUID client,ProfileForm f,String hash) {
+        records.client(a,client,today());var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
         records.lock(client);var c=records.client(a,client,today());check(!c.state().equals("SUBMITTED"),"state");check(c.sequence()==f.getExpectedSequence(),"changed");
         check(Set.of("DRAFT","SUBMITTED").contains(f.getAction()),"action");check(f.getProfile()!=null,"profile");var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);
+        if(p.isSelfService())records.latest(a,client).ifPresent(previous->p.setLegalHoldReference(previous.profile().getLegalHoldReference()));
         p.setFullName(c.name());p.setPhone(c.phone());p.setEmail(c.email());p.setClientNumber(c.number());validate(p,f.getAction().equals("SUBMITTED"));
         if(f.getAction().equals("SUBMITTED")) {
-            check(c.revisionId()!=null,"documents");checkDocuments(records.documents(c.revisionId()));
+            check(c.revisionId()!=null,"documents");checkDocuments(p,records.documents(c.revisionId()));
         }
         UUID id=UUID.randomUUID();records.revision(a,client,id,c.sequence()+1,f.getAction(),p,identity(p),f.getRequestKey(),hash,clock.now());records.copyDocuments(a,client,c.revisionId(),id);
         event(a,client,"CLIENT_KYC_"+f.getAction());return id;
     }
     public UUID attach(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file) {
-        authorize(a,"UPDATE");records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRequestKey()!=null,"request");check(Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT").contains(f.getCategory()),"category");
+        authorize(a,"UPDATE");return attach(a,client,f,file,false);
+    }
+    private UUID attach(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file,boolean own) {
+        records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRequestKey()!=null,"request");check(Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT").contains(f.getCategory()),"category");
         check(f.getExpiresOn()==null||!f.getExpiresOn().isBefore(today()),"documentExpiry");
         var content=prepare(file);String hash=hash(List.of(client,f,hash(content.bytes())));
         var tx=new TransactionTemplate(transactions);tx.setTimeout(20);
         return tx.execute(status->{
-            authorize(a,"UPDATE");records.client(a,client,today());var old=retry(a,"client_onboarding_document",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+            if(own)requireOwner(a);else authorize(a,"UPDATE");records.client(a,client,today());var old=retry(a,"client_onboarding_document",f.getRequestKey(),hash);if(old.isPresent())return old.get();
             UUID id=UUID.randomUUID();var upload=uploads.store(null,"CLIENT_KYC",id.toString(),f.getCategory(),content.name(),content.contentType(),content.bytes());
             records.lock(client);var c=records.client(a,client,today());check(c.state().equals("DRAFT")&&f.getRevisionId().equals(c.revisionId()),"changed");
             records.document(a,client,c.revisionId(),id,upload.getId(),f,hash,clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");return id;
@@ -106,10 +113,11 @@ public class OnboardingService {
         check(Set.of("VERIFY","RETURN","REJECT","REVOKE").contains(f.getKind()),"action");
         check(f.getKind().equals("REVOKE")?Set.of("VERIFY","EXPIRED","STALE").contains(c.state()):c.state().equals("SUBMITTED"),"state");
         text(f.getReason(),1000,"reason",true);text(f.getScreeningReference(),1000,"screeningReference",false);text(f.getPolicyReference(),500,"policyReference",false);
+        text(f.getClientMessage(),1000,"clientMessage",Set.of("RETURN","REJECT","REVOKE").contains(f.getKind()));
         check(Set.of("CLEARED","ESCALATED","UNAVAILABLE").contains(f.getScreening()),"screening");var r=records.latest(a,client).orElseThrow();
         if(f.getKind().equals("VERIFY")) {
             check(!client.equals(a.getMemberId())&&!r.maker().equals(a.getMemberId())&&!records.contributed(r.id(),a.getMemberId()),"independent");
-            validate(r.profile(),true);checkDocuments(records.documents(r.id()));
+            validate(r.profile(),true);checkDocuments(r.profile(),records.documents(r.id()));
             check(Objects.equals(c.name(),r.profile().getFullName())&&Objects.equals(c.phone(),r.profile().getPhone())&&Objects.equals(c.email(),r.profile().getEmail()),"contactChanged");
             check(f.isIdentityChecked()&&f.isAddressChecked()&&f.isActivityChecked()&&f.isContactChecked()&&f.isDuplicatesChecked(),"checks");
             check(f.getScreening().equals("CLEARED")&&!f.getScreeningReference().isBlank(),"screening");text(f.getPolicyReference(),500,"policyReference",true);
@@ -129,13 +137,79 @@ public class OnboardingService {
     }
     @Transactional(readOnly=true)
     public OwnStatus ownStatus(AppUserPrincipal a) {
+        requireOwner(a);var c=records.client(a,a.getMemberId(),today());return new OwnStatus(c.state(),c.reviewDue());
+    }
+    private void requireOwner(AppUserPrincipal a) {
         if(a==null||!a.isMemberAccess()||a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Client workspace required");
         var member=directory.find(a.getMemberId()).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
         if(!member.isMemberAccess()||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE||!Objects.equals(member.getSaccoId(),a.getSaccoId())||!Objects.equals(member.getStationId(),a.getStationId()))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
-        var c=records.client(a,a.getMemberId(),today());return new OwnStatus(c.state(),c.reviewDue());
     }
-    private void checkDocuments(List<Document> documents) {
-        check(documents.stream().map(Document::category).collect(java.util.stream.Collectors.toSet()).containsAll(Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")),"documents");
+    @Transactional(readOnly=true)
+    public OwnWorkspace ownWorkspace(AppUserPrincipal a,int page,Integer sequence) {
+        requireOwner(a);page(page);var c=records.client(a,a.getMemberId(),today());
+        var revision=sequence==null?records.latest(a,c.id()).orElse(null):records.version(a,c.id(),sequence);
+        if(sequence!=null) {
+            var decisions=records.decisions(revision.id());var decision=decisions.isEmpty()?null:decisions.getFirst();var p=revision.profile();
+            c=new Client(c.id(),p.getClientNumber(),p.getFullName(),p.getPhone(),p.getEmail(),decision==null?revision.mode():decision.kind(),revision.id(),sequence,decision==null?null:decision.reviewDue());
+        }
+        var documents=revision==null?List.<OwnDocument>of():records.documents(revision.id()).stream().map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn())).toList();
+        var history=records.history(a,c.id(),page);
+        var ownRevision=revision==null?null:new OwnRevision(revision.sequence(),personal(revision.profile()),revision.profile().getNoticeVersion(),revision.profile().getNoticeEnglish(),revision.profile().getNoticeKiswahili(),revision.profile().isNoticeAcknowledged(),revision.profile().getAcknowledgedAt());
+        return new OwnWorkspace(c,ownRevision,documents,records.feedback(a,c.id(),sequence==null?null:revision.id()),new Page<>(history.stream().limit(25).map(h->new OwnHistory(h.sequence(),h.result(),h.recordedAt())).toList(),page,history.size()>25),sequence!=null);
+    }
+    @Transactional(readOnly=true)
+    public SelfForm ownForm(AppUserPrincipal a) {
+        requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(!c.state().equals("SUBMITTED"),"state");
+        var f=new SelfForm();f.setExpectedSequence(c.sequence());records.latest(a,c.id()).ifPresent(r->f.setProfile(personal(r.profile())));records.notice(a).ifPresent(n->f.setNoticeId(n.id()));return f;
+    }
+    @Transactional(readOnly=true)
+    public Optional<Notice> ownNotice(AppUserPrincipal a) {requireOwner(a);return records.notice(a).filter(n->n.enabled()&&!n.retentionReviewOn().isBefore(today()));}
+    @Transactional(timeout=20)
+    public UUID saveOwn(AppUserPrincipal a,SelfForm f) {
+        requireOwner(a);check(f.getProfile()!=null,"profile");String hash=hash(List.of(a.getMemberId(),f));
+        var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+        records.lock(noticeLock(a));var n=records.notice(a).orElse(null);var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);p.setSelfService(true);
+        if(f.getAction().equals("SUBMITTED")) {
+            check(n!=null&&n.enabled()&&!n.retentionReviewOn().isBefore(today()),"noticeUnavailable");check(n.id().equals(f.getNoticeId()),"noticeChanged");
+            check(f.isNoticeAcknowledged()&&f.isDeclarationAccepted(),"acknowledgement");
+        }
+        if(n!=null) {
+            p.setNoticeId(n.id());p.setNoticeVersion(n.version());p.setNoticeEnglish(n.english());p.setNoticeKiswahili(n.kiswahili());p.setLawfulBasis(n.lawfulBasis());p.setRetentionReference(n.retentionReference());p.setRetentionReviewOn(n.retentionReviewOn());
+            if(n.id().equals(f.getNoticeId())&&f.isNoticeAcknowledged()&&f.isDeclarationAccepted()) {
+                p.setNoticeAcknowledged(true);p.setDeclarationAccepted(true);p.setAcknowledgedAt(clock.now());p.setConsentOn(today());p.setConsentReference("Client acknowledgement / "+n.id());
+            }
+        }
+        var command=new ProfileForm();command.setRequestKey(f.getRequestKey());command.setExpectedSequence(f.getExpectedSequence());command.setAction(f.getAction());command.setProfile(p);
+        return saveRevision(a,a.getMemberId(),command,hash);
+    }
+    public UUID attachOwn(AppUserPrincipal a,DocumentForm f,MultipartFile file) {requireOwner(a);return attach(a,a.getMemberId(),f,file,true);}
+    @Transactional(readOnly=true)
+    public DocumentForm ownDocumentForm(AppUserPrincipal a) {
+        requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(c.state().equals("DRAFT"),"state");var f=new DocumentForm();f.setRevisionId(c.revisionId());return f;
+    }
+    @Transactional(timeout=20)
+    public Download downloadOwn(AppUserPrincipal a,UUID document) {
+        requireOwner(a);var uploadId=records.upload(a,a.getMemberId(),document);var upload=uploads.load(uploadId,"CLIENT_KYC",document.toString());
+        check(upload.getContent().length<=5*1024*1024&&uploads.verify(upload,upload.getContent()),"file");event(a,a.getMemberId(),"CLIENT_KYC_DOCUMENT_READ");return new Download(upload.getContent(),upload.getContentType(),upload.getOriginalName());
+    }
+    @Transactional(readOnly=true)
+    public NoticeForm noticeForm(AppUserPrincipal a) {
+        authorize(a,"UPDATE");var f=new NoticeForm();records.notice(a).ifPresent(n->{f.setExpectedSequence(n.sequence());f.setEnabled(n.enabled());f.setVersion(n.version());f.setEnglish(n.english());f.setKiswahili(n.kiswahili());f.setLawfulBasis(n.lawfulBasis());f.setRetentionReference(n.retentionReference());f.setRetentionReviewOn(n.retentionReviewOn());});return f;
+    }
+    @Transactional(timeout=20)
+    public UUID saveNotice(AppUserPrincipal a,NoticeForm f) {
+        authorize(a,"UPDATE");String hash=hash(f);var old=retry(a,"client_onboarding_notice",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+        text(f.getVersion(),100,"noticeVersion",true);text(f.getEnglish(),12000,"noticeEnglish",true);text(f.getKiswahili(),12000,"noticeKiswahili",true);text(f.getRetentionReference(),500,"retentionReference",true);
+        check(Set.of("CONSENT","CONTRACT","LEGAL_OBLIGATION").contains(f.getLawfulBasis()),"lawfulBasis");check(f.getRetentionReviewOn()!=null&&!f.getRetentionReviewOn().isBefore(today()),"retentionReviewOn");
+        records.lock(noticeLock(a));check(records.notice(a).map(Notice::sequence).orElse(0)==f.getExpectedSequence(),"changed");UUID id=UUID.randomUUID();records.notice(a,id,f,hash,clock.now());
+        audit.logEvent("CLIENT_KYC_NOTICE",id,"CLIENT_KYC_NOTICE_PUBLISHED",a.getMemberId(),AuditEventStatus.SUCCESS,"CLIENT_KYC_NOTICE_PUBLISHED","BRANCH",a.getStationId(),a.getSaccoId(),a.getStationId(),Map.of());return id;
+    }
+    private String noticeLock(AppUserPrincipal a) {return "CLIENT_KYC_NOTICE/"+a.getSaccoId()+"/"+a.getStationId();}
+    private ClientProfile personal(Profile p) {
+        var result=new ClientProfile();result.setIdentityType(p.getIdentityType());result.setIssuingCountry(p.getIssuingCountry());result.setIdentityNumber(p.getIdentityNumber());result.setBirthDate(p.getBirthDate());result.setIdentityExpiresOn(p.getIdentityExpiresOn());result.setIdentityNoExpiry(p.isIdentityNoExpiry());result.setAddress(p.getAddress());result.setActivity(p.getActivity());result.setActivityAddress(p.getActivityAddress());result.setSourceOfFunds(p.getSourceOfFunds());return result;
+    }
+    private void checkDocuments(Profile p,List<Document> documents) {
+        check(documents.stream().map(Document::category).collect(java.util.stream.Collectors.toSet()).containsAll(p.isSelfService()?Set.of("IDENTITY","ADDRESS","ACTIVITY"):Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")),"documents");
         check(documents.stream().noneMatch(d->d.expiresOn()!=null&&d.expiresOn().isBefore(today())),"documentExpiry");
     }
     private void validate(Profile p,boolean complete) {
@@ -155,6 +229,7 @@ public class OnboardingService {
         check(p.getConsentOn()==null?!complete:!p.getConsentOn().isAfter(today())&&p.getConsentOn().getYear()>=1901,"consentOn");
         text(p.getRetentionReference(),500,"retentionReference",complete);text(p.getLegalHoldReference(),500,"legalHoldReference",false);
         if(complete)check(p.getRetentionReviewOn()!=null&&!p.getRetentionReviewOn().isBefore(today()),"retentionReviewOn");
+        if(complete&&p.isSelfService())check(p.isNoticeAcknowledged()&&p.isDeclarationAccepted()&&p.getAcknowledgedAt()!=null&&p.getNoticeId()!=null&&!p.getNoticeEnglish().isBlank()&&!p.getNoticeKiswahili().isBlank(),"acknowledgement");
     }
     private Download prepare(MultipartFile f) {
         check(f!=null&&!f.isEmpty()&&f.getSize()<=5*1024*1024,"file");

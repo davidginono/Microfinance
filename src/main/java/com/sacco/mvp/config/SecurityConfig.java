@@ -167,6 +167,11 @@ public class SecurityConfig {
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && authzService.staffAnalyticsAccess(appUser));
                 })
+                .requestMatchers("/app/onboarding", "/app/onboarding/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && appUser.isMemberAccess() && !appUser.isStaffSession());
+                })
                 .requestMatchers("/app/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser

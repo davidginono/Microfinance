@@ -1,2 +1,6 @@
 [data-kyc-verify] { grid-column: 1 / -1; }
 [data-kyc-verify][hidden] { display: none !important; }
+
+.kyc-section-body { padding: 1rem; min-width: 0; overflow-wrap: anywhere; }
+.kyc-notice-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.kyc-section-body .aws-settings-checkbox-row { align-items: flex-start; }

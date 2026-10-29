@@ -2,7 +2,7 @@
 <c:set var="returnPath" value="${empty client?'/finance/clients/onboarding':'/finance/clients/onboarding/'}${empty client?'':client.id}"/>
 <c:set var="modelName" value="${formKind=='create'?'createForm':formKind=='profile'?'profileForm':formKind=='document'?'documentForm':'reviewForm'}"/>
 <div class="accounting-workspace accounting-create">
-<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="<c:url value='${returnPath}'/>"><spring:message code="kyc.details"/></a><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="kyc.form.${formKind}"/></span></nav>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="<c:url value='${returnPath}'/>"><spring:message code="kyc.details"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="kyc.form.${formKind}"/></span></nav>
 <h1><spring:message code="kyc.form.${formKind}"/></h1>
 <c:if test="${not empty client}"><%@ include file="facts.jspf" %></c:if>
 <form:form method="post" enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="accounting-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}">
@@ -30,6 +30,7 @@
             <form:hidden path="revisionId"/>
             <label><span><spring:message code="kyc.field.decision"/></span><form:select path="kind" cssClass="aws-control" data-kyc-decision="true"><c:forEach items="${client.state=='SUBMITTED'?['VERIFY','RETURN','REJECT']:['REVOKE']}" var="kind"><form:option value="${kind}"><spring:message code="kyc.action.${kind}"/></form:option></c:forEach></form:select></label>
             <label><span><spring:message code="kyc.field.reason"/></span><form:textarea path="reason" cssClass="aws-control" rows="3" maxlength="1000" required="required"/></label>
+            <label><span><spring:message code="kyc.field.clientMessage"/></span><form:textarea path="clientMessage" cssClass="aws-control" rows="3" maxlength="1000"/></label>
             <div class="accounting-form-grid" data-kyc-verify="true">
                 <c:forEach items="${['identityChecked','addressChecked','activityChecked','contactChecked','duplicatesChecked']}" var="field"><label class="aws-settings-checkbox-row"><form:checkbox path="${field}"/><span><spring:message code="kyc.field.${field}"/></span></label></c:forEach>
                 <label><span><spring:message code="kyc.field.screening"/></span><form:select path="screening" cssClass="aws-control"><c:forEach items="${['UNAVAILABLE','ESCALATED','CLEARED']}" var="result"><form:option value="${result}"><spring:message code="kyc.screening.${result}"/></form:option></c:forEach></form:select></label>

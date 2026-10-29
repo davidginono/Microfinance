@@ -38,7 +38,7 @@ public class OnboardingRepository {
     }
     public List<Decision> decisions(UUID revision) {
         return jdbc.query("select d.*,m.full_name actor from client_onboarding_decision d join members m on m.id=d.actor_id where revision_id=? order by d.recorded_at desc,(d.kind='REVOKE') desc limit 2",
-            (r,n)->new Decision(r.getObject("id",UUID.class),r.getString("kind"),r.getString("reason"),r.getString("screening"),r.getString("screening_reference"),r.getObject("checked_on",LocalDate.class),r.getObject("review_due",LocalDate.class),r.getString("policy_reference"),r.getObject("actor_id",UUID.class),r.getString("actor"),r.getObject("recorded_at",OffsetDateTime.class)),revision);
+            (r,n)->new Decision(r.getObject("id",UUID.class),r.getString("kind"),r.getString("reason"),r.getString("client_message"),r.getString("screening"),r.getString("screening_reference"),r.getObject("checked_on",LocalDate.class),r.getObject("review_due",LocalDate.class),r.getString("policy_reference"),r.getObject("actor_id",UUID.class),r.getString("actor"),r.getObject("recorded_at",OffsetDateTime.class)),revision);
     }
     public Revision version(AppUserPrincipal a,UUID client,int sequence) {
         return jdbc.query("select r.*,m.full_name maker from client_onboarding_revision r join members m on m.id=r.actor_id where r.client_id=? and r.sacco_id=? and r.station_id=? and r.sequence=?",
@@ -54,7 +54,7 @@ public class OnboardingRepository {
     public void lock(UUID client) {lock("CLIENT_KYC/"+client);}
     public void lock(String key) {jdbc.queryForObject("select pg_advisory_xact_lock(hashtextextended(?,0))",Object.class,key);}
     public Optional<UUID> retry(AppUserPrincipal a,String table,UUID request,String hash) {
-        var rows=jdbc.query("select id,payload_hash from "+table+" where sacco_id=? and station_id=? and request_key=?",(r,n)->Map.entry(r.getObject(1,UUID.class),r.getString(2)),a.getSaccoId(),a.getStationId(),request);
+        var rows=jdbc.query("select id,case when actor_id=? then payload_hash else '' end from "+table+" where sacco_id=? and station_id=? and request_key=?",(r,n)->Map.entry(r.getObject(1,UUID.class),r.getString(2)),a.getMemberId(),a.getSaccoId(),a.getStationId(),request);
         if(rows.isEmpty())return Optional.empty();
         if(!rows.getFirst().getValue().equals(hash))throw new IllegalArgumentException("kyc.error.retry");
         return Optional.of(rows.getFirst().getKey());
@@ -101,7 +101,18 @@ public class OnboardingRepository {
             """,Boolean.class,institution,identity,client,institution,identity,client));
     }
     public void decision(AppUserPrincipal a,UUID client,UUID id,ReviewForm f,String hash,OffsetDateTime now) {
-        jdbc.update("insert into client_onboarding_decision values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,f.getRevisionId(),client,a.getSaccoId(),a.getStationId(),f.getKind(),f.getReason().strip(),f.isIdentityChecked(),f.isAddressChecked(),f.isActivityChecked(),f.isContactChecked(),f.isDuplicatesChecked(),f.getScreening(),f.getScreeningReference().strip(),f.getCheckedOn(),f.getReviewDue(),f.getPolicyReference().strip(),f.getRequestKey(),hash,a.getMemberId(),now);
+        jdbc.update("insert into client_onboarding_decision values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,f.getRevisionId(),client,a.getSaccoId(),a.getStationId(),f.getKind(),f.getReason().strip(),f.isIdentityChecked(),f.isAddressChecked(),f.isActivityChecked(),f.isContactChecked(),f.isDuplicatesChecked(),f.getScreening(),f.getScreeningReference().strip(),f.getCheckedOn(),f.getReviewDue(),f.getPolicyReference().strip(),f.getRequestKey(),hash,a.getMemberId(),now,f.getClientMessage().strip());
+    }
+    public Optional<Notice> notice(AppUserPrincipal a) {
+        return jdbc.query("select * from client_onboarding_notice where sacco_id=? and station_id=? order by sequence desc limit 1",
+            (r,n)->new Notice(r.getObject("id",UUID.class),r.getInt("sequence"),r.getBoolean("enabled"),r.getString("version"),r.getString("english"),r.getString("kiswahili"),r.getString("lawful_basis"),r.getString("retention_reference"),r.getObject("retention_review_on",LocalDate.class)),a.getSaccoId(),a.getStationId()).stream().findFirst();
+    }
+    public void notice(AppUserPrincipal a,UUID id,NoticeForm f,String hash,OffsetDateTime now) {
+        jdbc.update("insert into client_onboarding_notice values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,a.getSaccoId(),a.getStationId(),f.getExpectedSequence()+1,f.isEnabled(),f.getVersion(),f.getEnglish(),f.getKiswahili(),f.getLawfulBasis(),f.getRetentionReference(),f.getRetentionReviewOn(),f.getRequestKey(),hash,a.getMemberId(),now);
+    }
+    public Feedback feedback(AppUserPrincipal a,UUID client,UUID revision) {
+        return jdbc.query("select d.kind,d.client_message,d.recorded_at from client_onboarding_decision d join client_onboarding_revision r on r.id=d.revision_id where d.client_id=? and d.sacco_id=? and d.station_id=? and (?::uuid is null or d.revision_id=?) order by r.sequence desc,d.recorded_at desc,(d.kind='REVOKE') desc,d.id desc limit 1",
+            (r,n)->new Feedback(r.getString(1),r.getString(2),r.getObject(3,OffsetDateTime.class)),client,a.getSaccoId(),a.getStationId(),revision,revision).stream().findFirst().filter(f->!f.message().isBlank()).orElse(null);
     }
     private static String pattern(String s) {return "%"+s.replace("!","!!").replace("%","!%").replace("_","!_")+"%";}
 }
