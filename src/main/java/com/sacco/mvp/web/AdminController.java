@@ -275,31 +275,78 @@ public class AdminController {
 
     @GetMapping("/platform-settings")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_VIEW')")
-    public String platformSettings(Model model) {
+    public String platformSettings(@RequestParam(required = false) String unchanged, Model model) {
         model.addAttribute("brandingSettings", platformBrandingSettingsService.settings());
-        model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
         model.addAttribute("platformSessionSettings", platformSessionSettingsService.settings());
         model.addAttribute("supportContactSettings", platformSupportContactSettingsService.settings());
-        model.addAttribute("platformEmailSettings", platformEmailSettingsService.settings());
         model.addAttribute("emailDeliveryStatus", platformEmailSettingsService.resolvedConfig());
-        model.addAttribute("platformSmsGatewaySettings", platformSmsGatewaySettingsService.settings());
         model.addAttribute("smsGatewayStatus", platformSmsGatewaySettingsService.resolvedConfig());
-        model.addAttribute("registeredSaccos", sortInstitutions(saccoRegistryService.listRegisteredSaccosFresh()));
+        if (List.of("session-timeout", "support-contact", "email", "sms-gateway", "logo-policy", "loan-top-up").contains(unchanged == null ? "" : unchanged)) {
+            model.addAttribute("infoMessage", messages.getMessage("platform.settings.unchanged", null, org.springframework.context.i18n.LocaleContextHolder.getLocale()));
+        }
         return "admin/platform-settings";
+    }
+
+    @GetMapping("/platform-settings/{section:session-timeout|support-contact|email|sms-gateway|logo-policy}/edit")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_VIEW') and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String editPlatformSettings(@PathVariable String section, Model model) {
+        model.addAttribute("settingsSection", section);
+        switch (section) {
+            case "session-timeout" -> model.addAttribute("platformSessionSettings", platformSessionSettingsService.settings());
+            case "support-contact" -> model.addAttribute("supportContactSettings", platformSupportContactSettingsService.settings());
+            case "email" -> {
+                model.addAttribute("platformEmailSettings", platformEmailSettingsService.settings());
+            }
+            case "sms-gateway" -> {
+                model.addAttribute("platformSmsGatewaySettings", platformSmsGatewaySettingsService.settings());
+            }
+            case "logo-policy" -> model.addAttribute("brandingSettings", platformBrandingSettingsService.settings());
+            default -> throw new IllegalArgumentException("Unknown settings section");
+        }
+        return "admin/platform-settings-edit";
+    }
+
+    @GetMapping("/platform-settings/{section:email|sms-gateway}/test")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_VIEW') and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String platformDeliveryTest(@PathVariable String section, Model model) {
+        model.addAttribute("settingsSection", section);
+        return "admin/platform-settings-test";
+    }
+
+    @GetMapping("/platform-settings/loan-top-up")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_VIEW')")
+    public String platformLoanTopUp(@AuthenticationPrincipal AppUserPrincipal principal,
+                                   @RequestParam(defaultValue = "") String q,
+                                   @RequestParam(defaultValue = "0") int page,
+                                   @RequestParam(defaultValue = "25") int size,
+                                   @RequestParam(defaultValue = "false") boolean unchanged, Model model) {
+        model.addAttribute("topUpAccess", saccoRegistryService.loanTopUpAccessPage(principal, q, page, size));
+        model.addAttribute("query", q.length() > 120 ? q.substring(0, 120) : q);
+        if (unchanged) model.addAttribute("infoMessage", messages.getMessage("platform.settings.unchanged", null, org.springframework.context.i18n.LocaleContextHolder.getLocale()));
+        return "admin/platform-settings-top-up";
+    }
+
+    @GetMapping("/platform-settings/loan-top-up/{saccoId}/edit")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_VIEW') and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String editPlatformLoanTopUp(@AuthenticationPrincipal AppUserPrincipal principal, @PathVariable String saccoId, Model model) {
+        model.addAttribute("topUpInstitution", saccoRegistryService.loanTopUpAccess(principal, saccoId)
+            .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND)));
+        model.addAttribute("settingsSection", "loan-top-up");
+        return "admin/platform-settings-edit";
     }
 
     @PostMapping("/platform-settings/session-timeout")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
     public String updateSessionTimeout(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @RequestParam int timeoutMinutes,
-                                       RedirectAttributes ra) {
+                                       HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformSessionSettingsService.updateTimeout(timeoutMinutes, principal.getMemberId());
             ra.addFlashAttribute("message", "Session timeout settings updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "session-timeout", ex.getMessage());
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#session-timeout";
     }
 
     @PostMapping("/platform-settings/logo-policy")
@@ -310,7 +357,7 @@ public class AdminController {
                                    @RequestParam int maxWidthPx,
                                    @RequestParam int maxHeightPx,
                                    @RequestParam int maxFileSizeKb,
-                                   RedirectAttributes ra) {
+                                   HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformBrandingSettingsService.updateLogoPolicy(
                 minWidthPx,
@@ -322,9 +369,9 @@ public class AdminController {
             );
             ra.addFlashAttribute("message", "Logo upload rules updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "logo-policy", ex.getMessage());
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#logo-policy";
     }
 
     @PostMapping("/platform-settings/support-contact")
@@ -336,7 +383,7 @@ public class AdminController {
                                        @RequestParam(required = false) String email,
                                        @RequestParam(required = false) String officeHours,
                                        @RequestParam(required = false) String supportNote,
-                                       RedirectAttributes ra) {
+                                       HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformSupportContactSettingsService.updateContact(
                 displayName,
@@ -349,9 +396,9 @@ public class AdminController {
             );
             ra.addFlashAttribute("message", "Platform support contact updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "support-contact", ex.getMessage());
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#support-contact";
     }
 
     @PostMapping("/platform-settings/email")
@@ -369,7 +416,7 @@ public class AdminController {
                                       @RequestParam int connectionTimeoutMs,
                                       @RequestParam int readTimeoutMs,
                                       @RequestParam int writeTimeoutMs,
-                                      RedirectAttributes ra) {
+                                      HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformEmailSettingsService.updateSettings(
                 enabled,
@@ -388,25 +435,25 @@ public class AdminController {
             );
             ra.addFlashAttribute("message", "Email delivery settings updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "email", ex.getMessage());
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#email";
     }
 
     @PostMapping("/platform-settings/email/test")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
     public String sendTestEmail(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam String testRecipient,
-                                RedirectAttributes ra) {
+                                HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformEmailSettingsService.sendTestEmail(testRecipient, principal.getMemberId());
             ra.addFlashAttribute("message", "Test email sent.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "email/test", ex.getMessage());
         } catch (Exception ex) {
-            ra.addFlashAttribute("error", PlatformEmailSettingsService.describeTestSendFailure(ex));
+            return platformSettingsFailure(request, ra, "email/test", PlatformEmailSettingsService.describeTestSendFailure(ex));
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#email";
     }
 
     @PostMapping("/platform-settings/sms-gateway")
@@ -420,7 +467,7 @@ public class AdminController {
                                            @RequestParam(required = false) String senderId,
                                            @RequestParam int connectTimeoutSeconds,
                                            @RequestParam int readTimeoutSeconds,
-                                           RedirectAttributes ra) {
+                                           HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformSmsGatewaySettingsService.updateSettings(
                 enabled,
@@ -435,25 +482,25 @@ public class AdminController {
             );
             ra.addFlashAttribute("message", "SMS gateway settings updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "sms-gateway", ex.getMessage());
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#sms-gateway";
     }
 
     @PostMapping("/platform-settings/sms-gateway/test")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
     public String sendTestSms(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam String testPhone,
-                              RedirectAttributes ra) {
+                              HttpServletRequest request, RedirectAttributes ra) {
         try {
             platformSmsGatewaySettingsService.sendTestSms(testPhone, principal.getMemberId());
             ra.addFlashAttribute("message", "Test SMS sent.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "sms-gateway/test", ex.getMessage());
         } catch (Exception ex) {
-            ra.addFlashAttribute("error", PlatformSmsGatewaySettingsService.describeTestSendFailure(ex));
+            return platformSettingsFailure(request, ra, "sms-gateway/test", PlatformSmsGatewaySettingsService.describeTestSendFailure(ex));
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings#sms-gateway";
     }
 
     @PostMapping("/platform-settings/sacco-loan-top-up")
@@ -461,14 +508,50 @@ public class AdminController {
     public String updateSaccoLoanTopUp(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @RequestParam String saccoId,
                                        @RequestParam(defaultValue = "false") boolean loanTopUpEnabled,
-                                       RedirectAttributes ra) {
+                                       HttpServletRequest request, RedirectAttributes ra) {
+        if (request.getParameter("returnQuery") != null) {
+            String query = request.getParameter("returnQuery").strip();
+            ra.addAttribute("q", query.substring(0, Math.min(query.length(), 120)));
+            ra.addAttribute("page", boundedPlatformReturnNumber(request.getParameter("returnPage"), 0, 0, 100000));
+            ra.addAttribute("size", boundedPlatformReturnNumber(request.getParameter("returnSize"), 25, 1, 100));
+        }
         try {
             saccoRegistryService.updateLoanTopUpFeature(saccoId, loanTopUpEnabled, principal.getMemberId());
             ra.addFlashAttribute("message", "Loan top-up access updated for " + saccoId + ".");
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            return platformSettingsFailure(request, ra, "loan-top-up", ex.getMessage());
         }
-        return "redirect:/admin/platform-settings";
+        return "redirect:/admin/platform-settings/loan-top-up";
+    }
+
+    private int boundedPlatformReturnNumber(String value, int fallback, int minimum, int maximum) {
+        try { return Math.max(minimum, Math.min(Integer.parseInt(value), maximum)); }
+        catch (NumberFormatException ex) { return fallback; }
+    }
+
+    private String platformSettingsFailure(HttpServletRequest request, RedirectAttributes attributes, String section, String error) {
+        List<String> fields = switch (section) {
+            case "session-timeout" -> List.of("timeoutMinutes");
+            case "logo-policy" -> List.of("minWidthPx", "minHeightPx", "maxWidthPx", "maxHeightPx", "maxFileSizeKb");
+            case "support-contact" -> List.of("displayName", "displayRole", "phone", "email", "officeHours", "supportNote");
+            case "email" -> List.of("enabled", "host", "port", "username", "fromAddress", "overrideRecipient", "sslEnabled", "starttlsEnabled", "connectionTimeoutMs", "readTimeoutMs", "writeTimeoutMs");
+            case "sms-gateway" -> List.of("enabled", "baseUrl", "sendPath", "clientId", "senderId", "connectTimeoutSeconds", "readTimeoutSeconds");
+            case "email/test" -> List.of("testRecipient");
+            case "sms-gateway/test" -> List.of("testPhone");
+            case "loan-top-up" -> List.of("saccoId", "loanTopUpEnabled");
+            default -> List.of();
+        };
+        Map<String, String> draft = new LinkedHashMap<>();
+        for (String field : fields) {
+            String value = request.getParameter(field);
+            draft.put(field, value == null ? "" : value.substring(0, Math.min(value.length(), 1024)));
+        }
+        attributes.addFlashAttribute("platformSettingsDraft", draft);
+        attributes.addFlashAttribute("error", error);
+        if (section.equals("loan-top-up")) {
+            return "redirect:/admin/platform-settings/loan-top-up/" + UriUtils.encodePathSegment(draft.get("saccoId"), StandardCharsets.UTF_8) + "/edit";
+        }
+        return "redirect:/admin/platform-settings/" + section + (section.endsWith("/test") ? "" : "/edit");
     }
 
     @GetMapping(value = "/dashboard/database-utilization", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -1875,6 +1958,15 @@ public class AdminController {
         return "admin/sacco-registry";
     }
 
+    @GetMapping("/saccos/new")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_CREATE') and @access.has(principal, 'SACCO_REGISTRY_VIEW')")
+    public String newSacco(Model model) {
+        model.addAttribute("superAdmin", true);
+        model.addAttribute("createMode", true);
+        model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
+        return "admin/sacco-registry";
+    }
+
     @GetMapping("/saccos/{saccoId}")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_VIEW')")
     public String saccoDetail(@PathVariable String saccoId,
@@ -1981,6 +2073,23 @@ public class AdminController {
         return "admin/minor-admins";
     }
 
+    @GetMapping("/saccos/minor-admins/new")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_CREATE') and @access.has(principal, 'USER_ACCESS_VIEW')")
+    public String newMinorAdmin(Model model) {
+        model.addAttribute("registeredSaccos", sortInstitutions(saccoRegistryService.listRegisteredSaccosFresh()));
+        if (!model.containsAttribute("registrationForm")) model.addAttribute("registrationForm", new MinorAdminRegistrationForm());
+        model.addAttribute("superAdmin", true);
+        model.addAttribute("createMode", true);
+        return "admin/minor-admins";
+    }
+
+    @GetMapping("/saccos/minor-admins/change")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_VIEW') and @access.has(principal, 'USER_ACCESS_CREATE') and @access.has(principal, 'USER_ACCESS_UPDATE')")
+    public String changeMinorAdminForm(Model model) {
+        model.addAttribute("changeAdmin", true);
+        return newMinorAdmin(model);
+    }
+
     @PostMapping("/saccos")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_CREATE')")
     public String registerSacco(@RequestParam String saccoName,
@@ -1990,10 +2099,12 @@ public class AdminController {
                                 RedirectAttributes ra) {
         try {
             var sacco = saccoRegistryService.registerSacco(saccoName, stationIds, logoFile);
-            ra.addFlashAttribute("message", "SACCO details saved with ID " + sacco.getSaccoId() + ".");
+            ra.addFlashAttribute("message", messages.getMessage("admin.create.institutionSaved", new Object[]{sacco.getSaccoId()}, org.springframework.context.i18n.LocaleContextHolder.getLocale()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return "redirect:/admin/saccos/registry";
+            ra.addFlashAttribute("saccoNameDraft", saccoName);
+            ra.addFlashAttribute("stationIdsDraft", stationIds);
+            return "redirect:/admin/saccos/new";
         }
         return "redirect:/admin/saccos/registry";
     }
@@ -2020,6 +2131,8 @@ public class AdminController {
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("registrationForm", registrationForm);
+            return "redirect:/admin/saccos/minor-admins/new";
         }
         return "redirect:/admin/saccos/minor-admins";
     }
@@ -2046,6 +2159,8 @@ public class AdminController {
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("registrationForm", registrationForm);
+            return "redirect:/admin/saccos/minor-admins/change";
         }
         return "redirect:/admin/saccos/minor-admins";
     }

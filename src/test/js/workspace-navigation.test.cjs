@@ -30,6 +30,80 @@ async function setup({guard=false,holdNavigation=false,pageScript=init,assets={}
 }
 const until=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('Navigation did not settle');};
 
+test('recoverable platform POST keeps values on a server error, then commits only the successful destination',async()=>{
+ const {dom,w,d,requests,failures}=await setup({guard:true,holdNavigation:true});
+ try{
+  const main=d.querySelector('main'),form=d.querySelector('form'),input=form.querySelector('input'),button=form.querySelector('button');
+  form.method='post';form.action='/admin/users';form.dataset.workspaceSubmit='recover';
+  input.value='Edited platform setting';input.dispatchEvent(new w.Event('input',{bubbles:true}));
+  // The guard binds opted-in forms during page initialization (this fixture already has its shared class).
+  form.insertAdjacentHTML('beforeend','<input type="hidden" name="_csrf" value="csrf-token"><input type="password" name="password" value="still-here">');
+  button.name='command';button.value='save';
+  form.requestSubmit(button);form.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:button}));
+  await until(()=>requests.some(r=>r.options.method==='POST'));
+  const posts=()=>requests.filter(r=>r.options.method==='POST');assert.equal(posts().length,1);
+  assert.equal(posts()[0].options.body.get('_csrf'),'csrf-token');assert.equal(posts()[0].options.body.get('command'),'save');
+  posts()[0].resolve({ok:true,url:'http://localhost/admin/dashboard',headers:{get:()=> 'text/html'},text:async()=>html('Dashboard').replace('</main>','<div data-workspace-response-error>Host is unavailable</div></main>')});
+  await until(()=>!form.hasAttribute('aria-busy'));
+  assert.equal(d.querySelector('main'),main);assert.equal(form.elements.name.value,'Edited platform setting');assert.equal(form.elements.password.value,'still-here');
+  assert.match(form.querySelector('[data-workspace-form-error]').textContent,/Host is unavailable/);assert.equal(d.activeElement,form.querySelector('[data-workspace-form-error]'));
+  assert.ok(form.querySelector('[data-workspace-form-error]').compareDocumentPosition(button)&w.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.equal(button.disabled,false);assert.equal(w.location.pathname,'/admin/dashboard');assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+  form.requestSubmit(button);await until(()=>posts().length===2);
+  posts()[1].resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>html('Users')});
+  await until(()=>w.location.pathname==='/admin/users');assert.equal(d.querySelector('h1').textContent,'Users');assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
+test('a platform modal without a dialog role stays open after a failed command and retains discard protection',async()=>{
+ const {dom,w,d,requests}=await setup({guard:true,holdNavigation:true});
+ try{
+  const form=d.querySelector('form'),button=form.querySelector('button'),modal=d.createElement('div');
+  modal.className='app-modal-overlay is-open';modal.append(form);d.body.append(modal);
+  form.method='post';form.action='/admin/users';form.dataset.workspaceSubmit='recover';form.elements.name.value='Changed admin';
+  form.elements.name.dispatchEvent(new w.Event('input',{bubbles:true}));
+  form.requestSubmit(button);await until(()=>requests.some(r=>r.options.method==='POST'));
+  requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/admin/dashboard',headers:{get:()=> 'text/html'},text:async()=>html('Dashboard').replace('</main>','<div hidden data-toast-type="error" data-toast-message="Email is already used"></div></main>')});
+  await until(()=>!form.hasAttribute('aria-busy'));
+  assert.equal(form.closest('.app-modal-overlay'),modal);assert.ok(modal.classList.contains('is-open'));assert.equal(form.elements.name.value,'Changed admin');
+  let closed=false;assert.equal(d.dispatchEvent(new w.CustomEvent('resource:before-close',{cancelable:true,detail:{modal,close:()=>closed=true}})),false);
+  assert.equal(d.querySelector('#accounting-discard-modal').hidden,false);d.querySelector('.app-modal-actions [data-accounting-keep]').click();assert.equal(closed,false);assert.equal(form.elements.name.value,'Changed admin');
+ }finally{dom.window.close();}
+});
+
+test('platform multipart and uncertain responses retain the form without an automatic POST retry',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  const form=d.querySelector('form'),button=form.querySelector('button');form.method='post';form.action='/admin/users';form.enctype='multipart/form-data';form.dataset.workspaceSubmit='recover';
+  form.insertAdjacentHTML('beforeend','<input type="file" name="logoFile"><input type="hidden" name="_csrf" value="csrf-token">');
+  d.body.dataset.submissionError='Check whether the change was saved before submitting again.';
+  form.requestSubmit(button);await until(()=>requests.some(r=>r.options.method==='POST'));
+  const posts=requests.filter(r=>r.options.method==='POST');assert.ok(posts[0].options.body instanceof w.FormData);assert.equal(posts[0].options.body.get('_csrf'),'csrf-token');assert.ok(posts[0].options.body.get('logoFile') instanceof w.File);
+  posts[0].resolve({ok:false,status:500,headers:{get:()=> 'text/html'}});
+  await until(()=>!form.hasAttribute('aria-busy'));
+  assert.ok(form.isConnected);assert.equal(button.disabled,false);assert.match(form.querySelector('[data-workspace-form-error]').textContent,/Check whether/);
+  assert.equal(requests.filter(r=>r.options.method==='POST').length,1);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+ }finally{dom.window.close();}
+});
+
+test('page-edit return links retain the requested section fragment after fetching HTML',async()=>{
+ const {dom,w,d,pages}=await setup();
+ try{
+  w.HTMLElement.prototype.scrollIntoView=function(){};
+  pages.set('/admin/users',html('Settings').replace('</main>','<section id="email">Email delivery</section></main>'));
+  await w.WorkspaceNavigation.visit('/admin/users#email');assert.equal(w.location.hash,'#email');assert.ok(d.querySelector('#email'));
+ }finally{dom.window.close();}
+});
+
+test('focused form destinations enter with desktop navigation collapsed',async()=>{
+ const {dom,w,d,pages}=await setup();
+ try{
+  w.matchMedia=()=>({matches:true,addEventListener(){}});d.documentElement.classList.remove('shell-sidebar-collapsed');
+  pages.set('/admin/users',html('Edit settings').replace('</main>','<template data-resource-form-page></template></main>'));
+  await w.WorkspaceNavigation.visit('/admin/users');assert.equal(d.documentElement.classList.contains('shell-sidebar-collapsed'),true);
+ }finally{dom.window.close();}
+});
+
 const statementUrl=kind=>'/reports/financial/statements/example?kind='+kind;
 function statementPage(kind){
  return html('Reports Preview').replace('</head>','<script src="/js/financial-statements.js" defer></script><style>'+fs.readFileSync('src/main/resources/static/css/financial-statements.css','utf8')+'</style></head>')

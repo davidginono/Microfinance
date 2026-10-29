@@ -873,8 +873,8 @@
         color: #94a3b8;
     }
 
-    .platform-settings-field input:not([type="checkbox"]):not([type="radio"]):focus,
-    .platform-settings-field textarea:focus {
+    .platform-settings-field input:not([type="checkbox"]):not([type="radio"]):not(.erp-validation-invalid):not(.field-error-input):focus,
+    .platform-settings-field textarea:not(.erp-validation-invalid):not(.field-error-input):focus {
         border-color: #0284c7;
         outline: none;
         box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14);
@@ -923,7 +923,8 @@
 
     .minor-admin-create-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 728px;
         gap: 1rem;
         align-items: start;
     }
@@ -934,9 +935,7 @@
         align-items: center;
         justify-content: flex-end;
         gap: 0.75rem;
-        border-top: 1px solid #d5dbdb;
-        background: #f7f8f8;
-        padding: 10px 12px;
+        padding: 16px 0;
     }
 
     .minor-admin-create-actions .app-btn {
@@ -968,24 +967,13 @@
         padding-bottom: 0;
     }
 
-    @media (max-width: 1023px) {
-        .minor-admin-create-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-
     @media (max-width: 640px) {
         .minor-admin-create-grid {
             grid-template-columns: 1fr;
         }
 
         .minor-admin-create-actions {
-            justify-content: stretch;
-            padding: 10px;
-        }
-
-        .minor-admin-create-actions .app-btn {
-            width: 100%;
+            justify-content: flex-end;
         }
     }
 
@@ -2446,6 +2434,8 @@
     }
     .aws-file-paste-target {
         display: flex;
+        white-space: normal;
+        overflow-wrap: anywhere;
         width: 100%;
         min-width: 0;
         align-items: center;
@@ -2500,6 +2490,10 @@
         gap: 12px;
         margin-top: 10px;
     }
+    .sacco-logo-upload-layout > :last-child {
+        min-width: 0;
+        max-width: 100%;
+    }
     .sacco-logo-preview-shell {
         display: inline-flex;
         width: 64px;
@@ -2541,6 +2535,9 @@
         }
         .sacco-logo-upload-layout {
             flex-direction: column;
+        }
+        .sacco-logo-upload-layout > :last-child {
+            width: 100%;
         }
         .sacco-logo-preview-shell {
             width: 72px;

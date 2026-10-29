@@ -18,17 +18,16 @@ class AdminMinorAdminsJspLayoutTest {
             .contains("class=\"minor-admin-create-form\"")
             .contains("class=\"erp-panel-body minor-admin-create-grid\"")
             .contains("class=\"minor-admin-create-actions\" data-aws-action-pin=\"true\"")
-            .contains("formaction=\"/admin/saccos/minor-admins/change\"")
+            .contains("href=\"/admin/saccos/minor-admins/change\"")
             .contains("Change Institution Admin")
             .contains("class=\"erp-panel overflow-hidden minor-admin-list-panel\"")
             .doesNotContain("md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3");
         assertThat(componentCss)
             .contains(".minor-admin-create-grid")
-            .contains("grid-template-columns: repeat(3, minmax(0, 1fr))")
+            .contains("grid-template-columns: minmax(0, 1fr)")
             .contains(".minor-admin-create-actions")
             .contains("justify-content: flex-end")
             .contains(".minor-admin-list-panel")
-            .contains("@media (max-width: 1023px)")
             .contains("@media (max-width: 640px)");
     }
 }

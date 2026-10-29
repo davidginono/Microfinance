@@ -7,6 +7,10 @@ import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
+import com.sacco.mvp.security.AppUserPrincipal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -57,6 +61,37 @@ public class SaccoRegistryService {
         return registeredSaccoRepository.findById(normalizeSaccoId(saccoId))
             .filter(RegisteredSacco::isActive)
             .map(this::toRegisteredSaccoView);
+    }
+
+    public record LoanTopUpAccessView(String saccoId, String saccoName, boolean loanTopUpEnabled) {
+        public String getSaccoId() { return saccoId; }
+        public String getSaccoName() { return saccoName; }
+        public boolean isLoanTopUpEnabled() { return loanTopUpEnabled; }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<LoanTopUpAccessView> loanTopUpAccessPage(
+            AppUserPrincipal actor, String query, int page, int size) {
+        requirePlatformSettingsView(actor);
+        String search = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
+        search = search.substring(0, Math.min(search.length(), 120));
+        return registeredSaccoRepository.loanTopUpAccess(null, search,
+                PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))))
+            .map(row -> new LoanTopUpAccessView(row.getSaccoId(), row.getSaccoName(), row.isLoanTopUpEnabled()));
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<LoanTopUpAccessView> loanTopUpAccess(AppUserPrincipal actor, String saccoId) {
+        requirePlatformSettingsView(actor);
+        return registeredSaccoRepository.loanTopUpAccess(normalizeSaccoId(saccoId), "", PageRequest.of(0, 1))
+            .stream().findFirst()
+            .map(row -> new LoanTopUpAccessView(row.getSaccoId(), row.getSaccoName(), row.isLoanTopUpEnabled()));
+    }
+
+    private void requirePlatformSettingsView(AppUserPrincipal actor) {
+        if (actor == null || !actor.isPlatformIdentity() || !actor.getClaims().contains("PLATFORM_SETTINGS_VIEW")) {
+            throw new AccessDeniedException("Platform settings access required");
+        }
     }
 
     private List<RegisteredSaccoView> loadRegisteredSaccos() {

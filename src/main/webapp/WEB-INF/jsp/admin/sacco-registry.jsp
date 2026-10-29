@@ -2,6 +2,7 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
+<c:set var="suppressToastMessages" value="${createMode}" />
 <%@ include file="../fragments/alerts.jspf" %>
 
 <spring:message code="admin.saccoRegistry.saccoRegistration" text="Institution Registry" var="SaccoRegistrationLabel" />
@@ -16,6 +17,7 @@
 <spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" var="saveChangesLabel" />
 <spring:message code="admin.saccoRegistry.saveStations" text="Save Branches" var="saveStationsLabel" />
 
+<c:if test="${not createMode}">
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.tools" text="Admin Tools" /> / ${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</p>
     <h1 class="erp-page-title" id="admin-sacco-registry-title">${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</h1>
@@ -29,7 +31,7 @@
             </div>
             <c:if test="${superAdmin}">
                 <div class="flex flex-wrap gap-2" data-table-toolbar-for="admin-sacco-registry-1" data-resource-header-source>
-                    <button type="button" class="app-btn btn-launch" data-sacco-modal-open="create-Sacco"><spring:message code="admin.saccoRegistry.addSacco" text="Add Institution" /></button>
+                    <sec:authorize access="@access.has(principal, 'SACCO_REGISTRY_CREATE')"><a href="/admin/saccos/new" class="app-btn btn-launch"><spring:message code="admin.create.institution" /></a></sec:authorize>
                 </div>
             </c:if>
         </div>
@@ -133,45 +135,39 @@
 </div>
                 </div>
 
-<c:if test="${superAdmin}">
-<div class="app-modal-overlay hidden" data-sacco-modal="create-Sacco">
-    <div class="app-modal-panel app-modal-panel--compact">
-        <div class="app-modal-scroll">
-            <div class="app-modal-header">
-                <div>
-                    <p class="erp-panel-title"><spring:message code="admin.saccoRegistry.addSacco" text="Add Institution" /></p>
-                    <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.saccoRegistry.addSaccoHelp" text="Save the institution and its branch IDs." /></p>
-            </div>
-                <button type="button" class="app-modal-close" data-sacco-modal-close="create-Sacco" aria-label="Close modal">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
-                </div>
-            <form action="/admin/saccos" method="post" enctype="multipart/form-data" class="app-modal-body space-y-4">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                    <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Institution ID</span>
-                    <span class="mt-1 block font-medium text-slate-700">Generated automatically after saving.</span>
-                        </div>
-                <label class="block text-sm font-semibold text-slate-700">
-                    <spring:message code="admin.saccoRegistry.saccoName" text="Institution Name" />
-                    <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. IAA Microfinance LTD" />
-                </label>
-                <label class="block text-sm font-semibold text-slate-700">
-                    Branch IDs
-                    <textarea name="stationIds" rows="5" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="Enter one or more Branch IDs, separated by commas or new lines.&#10;Example:&#10;STN789&#10;STN790"></textarea>
-                </label>
+</c:if>
+
+<c:if test="${createMode}">
+<template data-resource-form-page></template>
+<nav class="erp-page-path"><a href="/admin/saccos/registry"><spring:message code="admin.saccoRegistry.saccoRegistration" /></a><span>/</span><span aria-current="page"><spring:message code="admin.create.institution" /></span></nav>
+<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="admin.create.institution" /></h1></div>
+<form action="/admin/saccos" method="post" enctype="multipart/form-data" class="platform-create-form">
+    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+    <section class="erp-panel">
+        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.create.institutionDetails" /></h2></div>
+        <div class="erp-panel-body platform-create-fields">
+            <label class="platform-settings-field"><spring:message code="admin.saccoRegistry.saccoName" />
+                <input name="saccoName" type="text" required value="${fn:escapeXml(saccoNameDraft)}" class="fcms-control" />
+            </label>
+            <label class="platform-settings-field"><spring:message code="admin.create.branches" />
+                <textarea name="stationIds" rows="5" required class="fcms-control" aria-describedby="institution-branches-hint"><c:out value="${stationIdsDraft}" /></textarea>
+                <span id="institution-branches-hint" class="aws-settings-help"><spring:message code="admin.create.branchesHint" /></span>
+            </label>
+        </div>
+    </section>
+    <section class="erp-panel">
+        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.create.logo" /></h2></div>
+        <div class="erp-panel-body">
                 <div class="sacco-logo-upload-card" data-logo-upload-card>
-                    <p class="aws-file-card-kicker">Institution Logo</p>
+
                     <div class="sacco-logo-upload-layout">
                         <div data-logo-preview-shell class="sacco-logo-preview-shell is-empty">
-                            <img data-logo-preview-image src="" alt="New institution logo preview" class="hidden h-full w-full object-contain p-2" />
+                            <img data-logo-preview-image src="" alt="<spring:message code='admin.create.logoPreview' />" class="hidden h-full w-full object-contain p-2" />
                             <span data-logo-preview-fallback class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Auto</span>
                         </div>
                         <div class="min-w-0 flex-1">
                             <label class="aws-file-picker">
-                                <span class="aws-file-picker-label">Optional logo image</span>
+                                <span class="aws-file-picker-label"><spring:message code="admin.create.logoImage" /></span>
                                 <span class="aws-file-picker-control">
                                 <input name="logoFile"
                                        type="file"
@@ -179,37 +175,33 @@
                                        data-logo-file-input
                                        data-file-picker-input
                                        class="aws-file-picker-input" />
-                                    <span class="aws-file-picker-button">Choose File</span>
-                                    <span class="aws-file-picker-name" data-file-picker-name>No file chosen</span>
+                                    <span class="aws-file-picker-button"><spring:message code="admin.create.chooseFile" /></span>
+                                    <span class="aws-file-picker-name" data-file-picker-name><spring:message code="admin.create.noFile" /></span>
                                 </span>
                             </label>
                             <button type="button"
                                     data-logo-paste-target
                                     class="aws-file-paste-target">
                                 <span class="min-w-0">
-                                    <span class="block text-sm font-semibold text-slate-700">Paste image</span>
-                                    <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500">Click here and press Ctrl+V to paste a PNG or JPEG from your clipboard.</span>
+                                    <span class="block text-sm font-semibold text-slate-700"><spring:message code="admin.create.pasteImage" /></span>
+                                    <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500"><spring:message code="admin.create.pasteHint" /></span>
                                 </span>
                                 <span class="aws-file-paste-shortcut">Ctrl+V</span>
                             </button>
                             <span class="aws-file-help">
-                                Optional. ${logoUploadPolicy.helpText} If you skip this, the navbar will use the institution initials.
+                                <c:out value="${logoUploadPolicy.helpText}" />
                             </span>
                             <span class="aws-file-meta hidden" data-logo-file-meta></span>
                     </div>
                 </div>
                 </div>
-                <div class="app-modal-section text-sm text-slate-600">
-                    <spring:message code="admin.saccoRegistry.stationHelp" text="Add at least one branch ID for every institution. Admin selection and client registration will use these values." />
-                </div>
-                <div class="app-modal-actions">
-                    <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="create-Sacco"><spring:message code="common.cancel" text="Cancel" /></button>
-                    <button type="submit" class="app-btn btn-launch"><spring:message code="admin.saccoRegistry.saveSacco" text="Save Institution" /></button>
-        </div>
-            </form>
+    </section>
+    <c:if test="${not empty error}"><div class="console-message" data-message-type="error" data-workspace-form-error role="alert" tabindex="-1"><c:out value="${error}" /></div></c:if>
+    <div class="platform-form-actions" data-form-actions>
+        <a href="/admin/saccos/registry" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
+        <button type="submit" class="app-btn btn-launch"><spring:message code="admin.create.institution" /></button>
     </div>
-</div>
-                    </div>
+</form>
 </c:if>
 
 <c:if test="${superAdmin}">
@@ -481,7 +473,9 @@
             document.body.appendChild(modal);
         });
 
-        function closeSaccoModal() {
+        function closeSaccoModal(force) {
+            const modal=document.querySelector('[data-sacco-modal].is-open');
+            if(force!==true && modal && !document.dispatchEvent(new CustomEvent('resource:before-close',{cancelable:true,detail:{modal,close:()=>closeSaccoModal(true)}})))return;
             document.querySelectorAll('[data-sacco-modal]').forEach((modal) => {
                 modal.classList.add('hidden');
                 modal.classList.remove('is-open');
@@ -506,7 +500,7 @@
         });
 
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && !event.defaultPrevented) {
                 closeSaccoModal();
             }
         });

@@ -81,3 +81,28 @@
 .aws-console .console-message[hidden],.aws-console .console-message.hidden {display:none!important;}
 .aws-console .console-message a {color:#0972d3;}
 @media(max-width:600px) {.aws-console .console-message {padding:12px 12px 12px 40px!important;}.aws-console .console-message > .console-message-icon {left:12px;top:14px;width:18px;height:18px;}}
+
+/* Persistent command results stay in the workspace and use the shared toast lifecycle. */
+.workspace-flashbar:empty {display:none;}
+.workspace-flashbar {display:grid;gap:8px;min-width:0;margin-bottom:16px;scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
+.aws-console .workspace-flashbar > [data-app-toast] {
+    position:relative;width:100%;box-sizing:border-box;padding:14px 16px!important;
+    border:1px solid #037f0c!important;border-radius:var(--sacco-radius,2px)!important;
+    background:#f2fcf3!important;color:#037f0c!important;box-shadow:none!important;
+}
+.workspace-flashbar [data-toast-text] {margin:0;font-size:14px!important;line-height:1.5;overflow-wrap:anywhere;}
+.aws-console .workspace-flashbar > .app-toast-info {border-color:#0972d3!important;background:#f2f8fd!important;color:#0972d3!important;}
+.aws-console .workspace-flashbar .app-toast-close {position:absolute;right:12px;top:12px;width:28px;height:28px;padding:6px;background:transparent;color:inherit;border:0;}
+.workspace-flashbar .app-toast-close:focus-visible {outline:2px solid #0972d3;outline-offset:2px;}
+form[data-workspace-submit="recover"] {scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
+[data-workspace-form-error] {flex-basis:100%;min-width:0;scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
+.platform-create-form,.minor-admin-create-form {width:100%;max-width:960px;min-width:0;}
+.platform-create-fields {display:grid;gap:20px;max-width:728px;}
+.platform-form-actions {display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;padding:16px 0;}
+.platform-settings-overview {display:grid;gap:16px;max-width:1100px;min-width:0;}
+.platform-create-form > .erp-panel + .erp-panel {margin-top:16px;}
+.platform-settings-overview > section {scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
+.platform-settings-section-header,.platform-settings-section-actions {display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;}
+.platform-settings-section-header {justify-content:space-between;}
+.platform-settings-editor .platform-settings-grid {grid-template-columns:minmax(0,1fr);max-width:728px;}
+.platform-settings-editor .platform-settings-field--wide {grid-column:auto;}

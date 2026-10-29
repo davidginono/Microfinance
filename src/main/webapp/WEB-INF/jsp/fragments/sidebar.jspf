@@ -129,8 +129,8 @@
                     <c:choose>
                         <c:when test="${isPlatformAdminIdentity}">
                         <c:set var="platformSaccosActive" value="${requestUri eq '/admin/saccos' or (fn:startsWith(requestUri, '/admin/saccos/') and requestUri ne '/admin/saccos/registry' and not fn:startsWith(requestUri, '/admin/saccos/minor-admins'))}" />
-                        <c:set var="platformSettingsActive" value="${requestUri eq '/admin/platform-settings'}" />
-                        <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
+                        <c:set var="platformSettingsActive" value="${fn:startsWith(requestUri, '/admin/platform-settings')}" />
+                        <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or requestUri eq '/admin/saccos/new' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
                         <div class="shell-sidebar-nav-heading"><span>Overview</span></div>
                         <a href="/admin/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 4v6l-7 4-7-4V7l7-4z"/></svg></span>
@@ -154,7 +154,7 @@
                                 </svg>
                             </button>
                             <div id="adminSaccoPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                                <a href="/admin/saccos/registry" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/saccos/registry' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                                <a href="/admin/saccos/registry" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/saccos/registry' or requestUri eq '/admin/saccos/new' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                     <spring:message code="admin.saccoRegistry.registration" text="Registration" />
                                 </a>
                                 <a href="/admin/saccos/minor-admins" class="block px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/admin/saccos/minor-admins') ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">

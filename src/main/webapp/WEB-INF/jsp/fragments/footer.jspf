@@ -367,5 +367,11 @@
     </div>
 </div>
 </div>
+<sec:authorize access="@authz.platformAdminIdentity(principal)">
+    <c:if test="${fn:startsWith(requestUri, '/admin/saccos') or fn:startsWith(requestUri, '/admin/platform-settings') or requestUri eq '/admin/sms-usage' or fn:startsWith(requestUri, '/admin/incidents') or requestUri eq '/admin/messages' or requestUri eq '/admin/notifications' or requestUri eq '/admin/outbox'}">
+    <script src="<c:url value='/js/platform-form-ux.js' />" defer></script>
+    <%@ include file="../accounting/accounting-form-support.jspf" %>
+    </c:if>
+</sec:authorize>
 </body>
 </html>

@@ -86,7 +86,7 @@
         return document.body.matches('.aws-console') && !!document.querySelector('.shell-main');
     }
     function handlesForm(form,submitter){
-        if(!form?.matches('form') || !document.body.matches('.aws-console') || !form.closest('.shell-main,[role="dialog"]') || form.matches('[data-native-navigation]'))return false;
+        if(!form?.matches('form') || !document.body.matches('.aws-console') || !form.closest('.shell-main,[role="dialog"],.app-modal-overlay') || form.matches('[data-native-navigation]'))return false;
         const method=(submitter?.getAttribute('formmethod') || form.method || 'get').toLowerCase();
         const target=submitter?.getAttribute('formtarget') || form.target;
         if((target && target!=='_self') || (method!=='get' && !(method==='post' && form.hasAttribute('data-workspace-submit'))))return false;
@@ -183,6 +183,23 @@
     });
     native.add.call(document,'session:logout',()=>layouts.clear());
     const allowed=(url,resume)=>document.dispatchEvent(new CustomEvent('workspace:before-navigate',{cancelable:true,detail:{url,resume}}));
+    function formError(form,message){
+        clearFeedback();
+        form.inert=false;
+        let alert=form.querySelector('[data-workspace-form-error]');
+        if(!alert){
+            alert=document.createElement('div');alert.dataset.workspaceFormError='';
+            alert.className='console-message';alert.dataset.messageType='error';
+            alert.setAttribute('role','alert');alert.tabIndex=-1;
+            const submitter=form.querySelector('button[type="submit"],input[type="submit"]');
+            const group=submitter?.parentElement;
+            const actions=form.querySelector('.platform-settings-actions,.app-modal-actions,.minor-admin-create-actions,[data-form-actions]')
+                || (group && group!==form && !group.querySelector('input:not([type="hidden"]),select,textarea') ? group : submitter);
+            if(actions)actions.before(alert);else form.append(alert);
+        }
+        alert.textContent=message;
+        alert.focus();alert.scrollIntoView?.({block:'nearest'});
+    }
     function undoPop(previous,target){reversing=true;history.go(previous.index-target.index);}
     async function prepareStyles(page,signal){
         // Body-owned page styles must be ready before their new components become visible.
@@ -265,22 +282,33 @@
         }
         request?.abort();const controller=new AbortController();request=controller;const version=++generation;
         let didCommit=false,initialized=false,staged;
-        const timeout=timers.setTimeout(()=>controller.abort(),20000);feedback(false,url.href);
+        const recover=options.submission?.form?.dataset.workspaceSubmit==='recover';
+        const timeout=timers.setTimeout(()=>controller.abort(),20000);
+        if(!recover)feedback(false,url.href);
         try{
             const response=await native.fetch(url.href,{...options.submission?.request,credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:controller.signal});
             if(version!==generation)return true;
             const finalUrl=new URL(response.url || url.href,location.href);
+            if(!finalUrl.hash && url.hash && finalUrl.pathname===url.pathname && finalUrl.search===url.search)finalUrl.hash=url.hash;
             if(finalUrl.origin!==location.origin)throw new Error('Workspace origin');
             if(/\/(?:login|auth)(?:\/|$)/i.test(finalUrl.pathname)){location.assign(finalUrl.href);return true;}
             if(!response.ok || !response.headers.get('Content-Type')?.includes('text/html'))throw new Error('Workspace response');
             const page=new DOMParser().parseFromString(await response.text(),'text/html');
             if(version!==generation)return true;
             if(!page.body.matches('.aws-console') || !page.querySelector('.shell-main') || !page.querySelector('#appSidebar'))throw new Error('Workspace shell');
+            if(recover){
+                const error=page.querySelector('[data-workspace-response-error],[data-toast-type="error"],.shell-main [data-message-type="error"]');
+                if(error){formError(options.submission.form,error.dataset.toastMessage || error.textContent.trim());return true;}
+                const anchor=options.submission.form.dataset.workspaceReturn;
+                if(anchor && finalUrl.pathname===location.pathname && finalUrl.search===location.search)finalUrl.hash=anchor;
+                if(options.submission.form.dataset.workspaceSuccessHash)finalUrl.hash=options.submission.form.dataset.workspaceSuccessHash;
+            }
             staged=await prepareStyles(page,controller.signal);
             if(version!==generation)return true;
             if(!allowed(url.href,()=>options.pop?history.go(options.pop.index-options.previous.index):visit(url.href,options))){if(options.pop)undoPop(options.previous,options.pop);return false;}
             clearFeedback();committing=true;didCommit=true;
             collapsed=window.matchMedia('(min-width: 1024px)').matches?document.documentElement.classList.contains('shell-sidebar-collapsed'):(collapsed ?? true);
+            if(page.querySelector('[data-resource-form-page]'))collapsed=true;
             const scripts=[...page.querySelectorAll('script')].filter(script=>!script.type || /^(?:text\/javascript|application\/javascript|module)$/.test(script.type));
             scripts.forEach(script=>script.remove());
             dispose();scope=createScope();booting=true;
@@ -294,7 +322,7 @@
             replaceBody(page);
             prepare(document.querySelector('.shell-main'));
             viewKey=options.pop?.key || ++serial;
-            if(options.pop || options.replace){entry={url:finalUrl.href,index:options.pop?.index ?? entry.index};native.replace(state(history.state),'',finalUrl.href);}
+            if(options.pop || options.replace || (recover && finalUrl.pathname===location.pathname && finalUrl.search===location.search)){entry={url:finalUrl.href,index:options.pop?.index ?? entry.index};native.replace(state(history.state),'',finalUrl.href);}
             else{entry={url:finalUrl.href,index:entry.index+1};native.push(state({},viewKey,entry.index),'',finalUrl.href);}
             const deferred=scripts.filter(script=>script.defer || script.type==='module');
             for(const script of scripts.filter(script=>!deferred.includes(script)))await execute(script,version);
@@ -305,11 +333,15 @@
             reveal();
             initialized=true;
             booting=false;window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
-            const title=document.querySelector('.erp-page-title,h1,[data-workspace-title]');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
-            if(!options.pop){const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));if(anchor)anchor.scrollIntoView();else window.scrollTo({top:0,left:0,behavior:'instant'});}
+            const title=document.querySelector('[data-workspace-flashbar] [data-app-toast]') || document.querySelector('.erp-page-title,h1,[data-workspace-title]');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
+            if(!options.pop){const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));if(anchor)(anchor.previousElementSibling?.matches('[data-workspace-flashbar]')?anchor.previousElementSibling:anchor).scrollIntoView();else window.scrollTo({top:0,left:0,behavior:'instant'});}
             document.dispatchEvent(new CustomEvent('workspace:navigated',{detail:{url:finalUrl.href}}));
         }catch(error){
-            if(version===generation){if(options.pop && !didCommit)undoPop(options.previous,options.pop);feedback(true,url.href,options);}
+            if(version===generation){
+                if(options.pop && !didCommit)undoPop(options.previous,options.pop);
+                if(recover && !didCommit)formError(options.submission.form,document.body.dataset.submissionError || document.body.dataset.navigationError);
+                else feedback(true,url.href,options);
+            }
         }finally{
             clearTimeout(timeout);
             if(!didCommit)staged?.forEach(link=>link.remove());
@@ -342,11 +374,19 @@
             url.search='';for(const [name,value] of data)url.searchParams.append(name,typeof value==='string'?value:value.name);
             void visit(url.href,{force:true});
         }else{
-            // Explicitly opted-in report generation retains its CSRF token and idempotency key.
-            // Mutation/financial forms keep their existing submit and confirmation controllers.
-            const body=new URLSearchParams();for(const [name,value] of data)if(typeof value==='string')body.append(name,value);
+            // Only explicitly opted-in forms use this path; native commands retain their controllers.
+            const body=form.enctype==='multipart/form-data'?data:new URLSearchParams();
+            if(body!==data)for(const [name,value] of data)if(typeof value==='string')body.append(name,value);
             submissions.add(form);
-            void visit(url.href,{force:true,submission:{form,submitter,request:{method:'POST',body}}}).finally(()=>submissions.delete(form));
+            const recover=form.dataset.workspaceSubmit==='recover';
+            const controls=recover?[...form.querySelectorAll('button[type="submit"],input[type="submit"]')].filter(control=>!control.disabled):[];
+            const finish=recover?window.AppLoading?.action(submitter):null;
+            if(recover){form.setAttribute('aria-busy','true');form.inert=true;controls.forEach(control=>control.disabled=true);}
+            void visit(url.href,{force:true,submission:{form,submitter,request:{method:'POST',body}}}).finally(()=>{
+                submissions.delete(form);finish?.();
+                if(recover){form.removeAttribute('aria-busy');form.inert=false;controls.forEach(control=>control.disabled=false);
+                    if(form.isConnected)document.dispatchEvent(new CustomEvent('workspace:form-settled',{detail:{form}}));}
+            });
         }
     });
     native.add.call(window,'popstate',event=>{

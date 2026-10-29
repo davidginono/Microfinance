@@ -2735,10 +2735,10 @@ body.aws-console,
 .aws-control:focus,
 .aws-settings-field .neo-select-button:focus-visible,
 .aws-settings-field input:focus,
-.aws-settings-field select:focus,
-.platform-settings-field input:not([type="checkbox"]):not([type="radio"]):focus,
-.platform-settings-field select:focus,
-.platform-settings-field textarea:focus {
+.aws-settings-field select:not(.erp-validation-invalid):not(.field-error-input):focus,
+.platform-settings-field input:not([type="checkbox"]):not([type="radio"]):not(.erp-validation-invalid):not(.field-error-input):focus,
+.platform-settings-field select:not(.erp-validation-invalid):not(.field-error-input):focus,
+.platform-settings-field textarea:not(.erp-validation-invalid):not(.field-error-input):focus {
     border-color: var(--aws-blue) !important;
     outline: 2px solid #00a1c9 !important;
     outline-offset: 1px;

@@ -800,6 +800,13 @@
     };
 
     const resolveToastState = function (options) {
+        if(options?.placement==='workspace'){
+            const container=document.querySelector('[data-workspace-flashbar]');
+            if(container){
+                if(!container.toastState)container.toastState={container,queue:[],visible:[]};
+                return container.toastState;
+            }
+        }
         const modal = resolveToastModal(options);
         if (!modal) {
             return pageToastState;
@@ -887,6 +894,7 @@
                 '</button>' +
             '</div>';
         toast.querySelector('[data-toast-text]').textContent = String(message);
+        if(options?.placement==='workspace')toast.querySelector('.app-toast-close').setAttribute('aria-label',document.body.dataset.dismissNotification || 'Close');
 
         const entry = { toast: toast, dismiss: null };
         const dismiss = function () {
@@ -2241,7 +2249,7 @@
             window.showToast(
                 element.getAttribute('data-toast-type') || 'info',
                 message,
-                { contextElement: element, preferModal: true }
+                { contextElement: element, preferModal: true, ...(element.dataset.toastPlacement==='workspace'?{placement:'workspace'}:{}) }
             );
         });
         const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message]')).find(function (element) {

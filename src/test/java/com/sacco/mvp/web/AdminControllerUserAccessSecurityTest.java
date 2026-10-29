@@ -192,12 +192,133 @@ class AdminControllerUserAccessSecurityTest {
     }
 
     @Test
+    void platformCreatePagesRequireTheirExplicitClaimsAndDoNotLoadTheRegisters() throws Exception {
+        var actor = platformPrincipal(Set.of(UserClaim.SACCO_REGISTRY_VIEW, UserClaim.SACCO_REGISTRY_CREATE,
+            UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_CREATE));
+        mockMvc.perform(get("/admin/saccos/new").with(authentication(authenticationFor(actor))))
+            .andExpect(status().isOk()).andExpect(view().name("admin/sacco-registry"))
+            .andExpect(model().attribute("createMode", true));
+        mockMvc.perform(get("/admin/saccos/minor-admins/new").with(authentication(authenticationFor(actor))))
+            .andExpect(status().isOk()).andExpect(view().name("admin/minor-admins"))
+            .andExpect(model().attribute("createMode", true));
+        verify(adminService, never()).minorAdmins();
+        var viewer = platformPrincipal(Set.of(UserClaim.SACCO_REGISTRY_VIEW, UserClaim.USER_ACCESS_VIEW));
+        mockMvc.perform(get("/admin/saccos/new").with(authentication(authenticationFor(viewer))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/admin/saccos/minor-admins/new").with(authentication(authenticationFor(viewer))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/admin/saccos/new").with(authentication(authenticationFor(principal(Set.of(UserClaim.SACCO_REGISTRY_CREATE, UserClaim.SACCO_REGISTRY_VIEW))))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void failedInstitutionCreationReturnsToItsFormWithEnteredValuesAndStillRequiresCsrf() throws Exception {
+        var actor = platformPrincipal(Set.of(UserClaim.SACCO_REGISTRY_CREATE, UserClaim.SACCO_REGISTRY_VIEW));
+        doThrow(new IllegalArgumentException("Branch ID is already used"))
+            .when(saccoRegistryService).registerSacco("Test institution", "BRANCH-1", (org.springframework.web.multipart.MultipartFile) null);
+        mockMvc.perform(post("/admin/saccos").param("saccoName", "Test institution").param("stationIds", "BRANCH-1")
+                .with(csrf()).with(authentication(authenticationFor(actor))))
+            .andExpect(redirectedUrl("/admin/saccos/new"))
+            .andExpect(flash().attribute("saccoNameDraft", "Test institution"))
+            .andExpect(flash().attribute("stationIdsDraft", "BRANCH-1"))
+            .andExpect(flash().attribute("error", "Branch ID is already used"));
+        mockMvc.perform(post("/admin/saccos").param("saccoName", "Test institution").param("stationIds", "BRANCH-1")
+                .with(authentication(authenticationFor(actor))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void failedAdminCreationReturnsToCreationWithItsBoundForm() throws Exception {
+        var actor = platformPrincipal(Set.of(UserClaim.USER_ACCESS_CREATE, UserClaim.USER_ACCESS_VIEW));
+        doThrow(new IllegalArgumentException("Branch already has an admin"))
+            .when(adminService).registerMinorAdmin(actor.getMemberId(), "SACCO-01", "ST-1", "TEST ADMIN", "admin@example.test", "255712345678");
+        mockMvc.perform(post("/admin/saccos/minor-admins").param("saccoId", "SACCO-01").param("stationId", "ST-1")
+                .param("fullName", "TEST ADMIN").param("email", "admin@example.test").param("phone", "255712345678")
+                .with(csrf()).with(authentication(authenticationFor(actor))))
+            .andExpect(redirectedUrl("/admin/saccos/minor-admins/new"))
+            .andExpect(flash().attributeExists("registrationForm"))
+            .andExpect(flash().attribute("error", "Branch already has an admin"));
+    }
+
+    @Test
     void platformSettingsDeniesPlatformAdminWithoutViewClaim() throws Exception {
         AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.ADMIN_DASHBOARD_VIEW));
 
         mockMvc.perform(get("/admin/platform-settings")
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void platformSettingsEditorsAreSeparateTasksWithExplicitClaims() throws Exception {
+        var editor = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW, UserClaim.PLATFORM_SETTINGS_UPDATE));
+        for (String section : List.of("session-timeout", "support-contact", "email", "sms-gateway", "logo-policy")) {
+            mockMvc.perform(get("/admin/platform-settings/" + section + "/edit").with(authentication(authenticationFor(editor))))
+                .andExpect(status().isOk()).andExpect(view().name("admin/platform-settings-edit"))
+                .andExpect(model().attribute("settingsSection", section));
+        }
+        mockMvc.perform(get("/admin/platform-settings/email/test").with(authentication(authenticationFor(editor))))
+            .andExpect(status().isOk()).andExpect(view().name("admin/platform-settings-test"));
+        var viewer = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+        mockMvc.perform(get("/admin/platform-settings/email/edit").with(authentication(authenticationFor(viewer))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/admin/platform-settings/email/test").with(authentication(authenticationFor(viewer))))
+            .andExpect(status().isForbidden());
+        verify(saccoRegistryService, never()).listRegisteredSaccosFresh();
+    }
+
+    @Test
+    void rejectedEmailEditPreservesOnlyNonSecretDraftFields() throws Exception {
+        var editor = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW, UserClaim.PLATFORM_SETTINGS_UPDATE));
+        doThrow(new IllegalArgumentException("Enter SMTP host"))
+            .when(platformEmailSettingsService).updateSettings(true, "", 465, "test-user", "synthetic-secret", "from@example.test", null, false, false, 10000, 10000, 10000, editor.getMemberId());
+        mockMvc.perform(post("/admin/platform-settings/email").with(csrf()).with(authentication(authenticationFor(editor)))
+                .param("enabled", "true").param("host", "").param("port", "465").param("username", "test-user")
+                .param("password", "synthetic-secret").param("fromAddress", "from@example.test")
+                .param("connectionTimeoutMs", "10000").param("readTimeoutMs", "10000").param("writeTimeoutMs", "10000"))
+            .andExpect(redirectedUrl("/admin/platform-settings/email/edit"))
+            .andExpect(result -> {
+                @SuppressWarnings("unchecked") var draft = (java.util.Map<String, String>) result.getFlashMap().get("platformSettingsDraft");
+                org.assertj.core.api.Assertions.assertThat(draft).containsEntry("username", "test-user").containsEntry("enabled", "true")
+                    .doesNotContainKeys("password", "apiKey", "_csrf");
+            });
+    }
+
+    @Test
+    void topUpSettingsReadOnlyRegisterAndEditorKeepSeparateClaimsAndMissingRecordHandling() throws Exception {
+        var viewer = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+        var row = new SaccoRegistryService.LoanTopUpAccessView("INST-1", "Example institution", true);
+        when(saccoRegistryService.loanTopUpAccessPage(viewer, "Example", 0, 25)).thenReturn(new PageImpl<>(List.of(row)));
+        mockMvc.perform(get("/admin/platform-settings/loan-top-up").param("q", "Example").with(authentication(authenticationFor(viewer))))
+            .andExpect(status().isOk()).andExpect(view().name("admin/platform-settings-top-up"));
+        mockMvc.perform(get("/admin/platform-settings/loan-top-up/INST-1/edit").with(authentication(authenticationFor(viewer))))
+            .andExpect(status().isForbidden());
+        var editor = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW, UserClaim.PLATFORM_SETTINGS_UPDATE));
+        when(saccoRegistryService.loanTopUpAccess(editor, "INST-1")).thenReturn(Optional.of(row));
+        mockMvc.perform(get("/admin/platform-settings/loan-top-up/INST-1/edit").with(authentication(authenticationFor(editor))))
+            .andExpect(status().isOk()).andExpect(view().name("admin/platform-settings-edit"));
+        when(saccoRegistryService.loanTopUpAccess(editor, "MISSING")).thenReturn(Optional.empty());
+        mockMvc.perform(get("/admin/platform-settings/loan-top-up/MISSING/edit").with(authentication(authenticationFor(editor))))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void replacingAnAdminHasItsOwnTaskAndRequiresBothCreateAndUpdateClaims() throws Exception {
+        var creator = platformPrincipal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_CREATE));
+        mockMvc.perform(get("/admin/saccos/minor-admins/change").with(authentication(authenticationFor(creator))))
+            .andExpect(status().isForbidden());
+        var editor = platformPrincipal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_CREATE, UserClaim.USER_ACCESS_UPDATE));
+        mockMvc.perform(get("/admin/saccos/minor-admins/change").with(authentication(authenticationFor(editor))))
+            .andExpect(status().isOk()).andExpect(model().attribute("changeAdmin", true)).andExpect(view().name("admin/minor-admins"));
+    }
+
+    @Test
+    void topUpSaveReturnsToItsBoundedRegisterContext() throws Exception {
+        var editor = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+        mockMvc.perform(post("/admin/platform-settings/sacco-loan-top-up").with(csrf()).with(authentication(authenticationFor(editor)))
+                .param("saccoId", "INST-1").param("loanTopUpEnabled", "true").param("returnQuery", "Alpha")
+                .param("returnPage", "2").param("returnSize", "25"))
+            .andExpect(redirectedUrl("/admin/platform-settings/loan-top-up?q=Alpha&page=2&size=25"));
     }
 
     @Test
@@ -209,7 +330,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"));
+            .andExpect(redirectedUrl("/admin/platform-settings#session-timeout"));
 
         verify(platformSessionSettingsService).updateTimeout(45, principal.getMemberId());
     }
@@ -245,7 +366,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"));
+            .andExpect(redirectedUrl("/admin/platform-settings#email"));
 
         verify(platformEmailSettingsService).updateSettings(
             true,
@@ -300,7 +421,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"));
+            .andExpect(redirectedUrl("/admin/platform-settings#sms-gateway"));
 
         verify(platformSmsGatewaySettingsService).updateSettings(
             true,
@@ -343,7 +464,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"));
+            .andExpect(redirectedUrl("/admin/platform-settings/loan-top-up"));
 
         verify(saccoRegistryService).updateLoanTopUpFeature("SACCO-01", true, principal.getMemberId());
     }
@@ -496,7 +617,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(redirectedUrl("/admin/platform-settings#email"))
             .andExpect(flash().attribute("message", "Test email sent."))
             .andExpect(flash().attribute("error", org.hamcrest.Matchers.nullValue()));
 
@@ -516,7 +637,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(redirectedUrl("/admin/platform-settings/email/test"))
             .andExpect(flash().attribute(
                 "error",
                 "Test email could not be sent. Connection to smtp.microfinance.local on port 465 timed out."
@@ -533,7 +654,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(redirectedUrl("/admin/platform-settings#sms-gateway"))
             .andExpect(flash().attribute("message", "Test SMS sent."))
             .andExpect(flash().attribute("error", org.hamcrest.Matchers.nullValue()));
 
@@ -551,7 +672,7 @@ class AdminControllerUserAccessSecurityTest {
                 .with(csrf())
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(redirectedUrl("/admin/platform-settings/sms-gateway/test"))
             .andExpect(flash().attribute(
                 "error",
                 "Test SMS could not be sent. The SMS gateway could not be reached."

@@ -1,5 +1,5 @@
 (() => {
-    const forms = Array.from(document.querySelectorAll('form.accounting-create-form'));
+    const forms = Array.from(document.querySelectorAll('form.accounting-create-form,form[data-workspace-submit="recover"]'));
     const modal = document.getElementById('accounting-discard-modal');
     if (!forms.length || !modal) return;
     document.body.appendChild(modal);
@@ -12,7 +12,7 @@
         return JSON.stringify([...fields.filter(([name]) => !unordered.has(name)), ...fields.filter(([name]) => unordered.has(name)).sort(([an,av],[bn,bv]) => an.localeCompare(bn) || av.localeCompare(bv))]);
     };
     const states = forms.map(form => ({form, initial:values(form), edited:false,
-        restoredErrors:Boolean(form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary')) || form.dataset.unsavedFinancialForm === 'true'}));
+        restoredErrors:Boolean(form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary, [data-workspace-form-error]')) || form.dataset.unsavedFinancialForm === 'true'}));
     const dirty = except => states.some(state => state !== except && (state.restoredErrors || values(state.form) !== state.initial));
     const initialize = (complete = false) => {
         if (initialized) return;
@@ -38,6 +38,10 @@
         document.documentElement.style.overflow = previousRootOverflow;
         previousFocus?.focus(); pending = null;
     };
+    document.addEventListener('workspace:form-settled', event => {
+        if (!states.some(state => state.form === event.detail.form)) return;
+        submitting = false; discarding = false; submitted = null;
+    });
     const confirmDiscard = action => {
         pending = action; previousFocus = document.activeElement; previousOverflow = document.body.style.overflow; previousRootOverflow = document.documentElement.style.overflow;
         modal.hidden = false; modal.classList.add('is-open'); document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden';
@@ -65,6 +69,16 @@
             state.initial = values(form); state.restoredErrors = false; discarding = false; event.detail.close();
         }); }
     });
+    document.addEventListener('resource:before-close', event => {
+        const affected=states.filter(state=>event.detail.modal.contains(state.form));
+        if(submitting){event.preventDefault();return;}
+        if(!discarding && affected.some(state=>values(state.form)!==state.initial)){
+            event.preventDefault();confirmDiscard(()=>{
+                affected.forEach(state=>{state.form.reset();state.initial=values(state.form);state.edited=false;state.restoredErrors=false;});
+                discarding=false;event.detail.close();
+            });
+        }
+    });
     document.addEventListener('click', event => {
         const link = event.target.closest('a[href]');
         if (!link || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || submitting || discarding || !dirty() || link.target === '_blank' || link.getAttribute('href').startsWith('#')) return;
@@ -81,8 +95,12 @@
         }
         if (state) {
             if (submitting) { event.preventDefault(); return; }
+            if(form.dataset.unchangedUrl && !state.restoredErrors && values(form)===state.initial){
+                event.preventDefault();discarding=true;Promise.resolve(window.WorkspaceNavigation.navigate(form.dataset.unchangedUrl)).finally(()=>discarding=false);return;
+            }
             submitted = {state, event, values:values(form)};
             submitting = true; form.setAttribute('aria-busy', 'true');
+            if(form.dataset.workspaceSubmit === 'recover') return;
             if ((form.hasAttribute('data-account-version-form') || form.hasAttribute('data-preserve-submit-command')) && event.submitter?.name) {
                 const command = document.createElement('input');
                 command.type = 'hidden'; command.name = event.submitter.name; command.value = event.submitter.value;

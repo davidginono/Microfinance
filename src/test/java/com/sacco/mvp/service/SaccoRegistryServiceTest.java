@@ -36,6 +36,29 @@ import static org.mockito.Mockito.when;
 
 class SaccoRegistryServiceTest {
 
+    @Test
+    void platformTopUpQueriesRequireExplicitClaimsAndCapPagesBeforePersistence() {
+        var repository = Mockito.mock(RegisteredSaccoRepository.class);
+        var service = new SaccoRegistryService(repository, Mockito.mock(SaccoStationRepository.class), Mockito.mock(SaccoSettingsRepository.class),
+            Mockito.mock(SaccoLogoStorageService.class), Mockito.mock(SmsUnitTransactionService.class), Mockito.mock(AuditService.class), Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class));
+        var member = com.sacco.mvp.domain.Member.builder().id(UUID.randomUUID()).saccoId("PLATFORM")
+            .position(com.sacco.mvp.domain.Position.ADMIN).staffRoles(java.util.Set.of(com.sacco.mvp.domain.Position.ADMIN))
+            .memberAccount(false).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
+        var actor = new com.sacco.mvp.security.AppUserPrincipal(member, java.util.Set.of(com.sacco.mvp.domain.UserClaim.PLATFORM_SETTINGS_VIEW), true);
+        var row = Mockito.mock(RegisteredSaccoRepository.LoanTopUpRow.class);
+        when(row.getSaccoId()).thenReturn("INST-1");when(row.getSaccoName()).thenReturn("Example institution");
+        when(repository.loanTopUpAccess(null, "example", org.springframework.data.domain.PageRequest.of(0, 100)))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(row)));
+        assertThat(service.loanTopUpAccessPage(actor, "  EXAMPLE  ", -1, 500).getContent()).singleElement()
+            .extracting(SaccoRegistryService.LoanTopUpAccessView::getSaccoId).isEqualTo("INST-1");
+        var noClaim = new com.sacco.mvp.security.AppUserPrincipal(member, java.util.Set.of(), true);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.loanTopUpAccessPage(noClaim, "", 0, 25))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.loanTopUpAccess(null, "INST-1"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(repository, times(1)).loanTopUpAccess(any(), any(), any());
+    }
+
     @TempDir
     Path tempDir;
 

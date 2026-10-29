@@ -3,20 +3,19 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
+<c:set var="suppressToastMessages" value="${createMode}" />
 <%@ include file="../fragments/alerts.jspf" %>
 
+<c:if test="${createMode}">
+<template data-resource-form-page></template>
+<spring:message code="${changeAdmin ? 'admin.minorAdmins.changeAdmin' : 'admin.minorAdmins.create'}" var="adminFormTitle" />
+<nav class="erp-page-path"><a href="/admin/saccos/minor-admins"><spring:message code="admin.minorAdmins.registered" /></a><span>/</span><span aria-current="page"><c:out value="${adminFormTitle}" /></span></nav>
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / Institution Registry / Institution Admins Registration" /></p>
-    <h1 class="erp-page-title" id="admin-minor-admins-title"><spring:message code="admin.minorAdmins.title" text="Institution Admins Registration" /></h1>
+    <h1 class="erp-page-title" id="admin-minor-admins-title"><c:out value="${adminFormTitle}" /></h1>
 </div>
-
-<c:if test="${not empty createdMinorAdminStaffNumber}">
-    <div class="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800" aria-live="polite">
-        <p class="text-xs font-semibold uppercase tracking-wide">Created Institution Admin Staff Number</p>
-        <p class="mt-1 text-sm font-semibold">${createdMinorAdminStaffNumber}</p>
-    </div>
 </c:if>
 
+<c:if test="${createMode}">
 <c:choose>
     <c:when test="${empty registeredSaccos}">
         <div class="erp-panel overflow-hidden">
@@ -29,18 +28,10 @@
         </div>
     </c:when>
     <c:otherwise>
-        <div class="erp-panel overflow-hidden">
-            <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-                <div>
-                    <p class="erp-widget-title"><spring:message code="admin.minorAdmins.registrationForm" text="Registration Form" /></p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.minorAdmins.create" text="Create Institution Admin" /></h2>
-                    <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.minorAdmins.createHelp" text="Assign the account to one institution and one active branch. They will receive an email to set their password." /></p>
-                </div>
-            </div>
-
-            <form action="/admin/saccos/minor-admins" method="post" class="minor-admin-create-form" data-minor-admin-form>
+            <form action="${changeAdmin ? '/admin/saccos/minor-admins/change' : '/admin/saccos/minor-admins'}" method="post" class="minor-admin-create-form" data-minor-admin-form>
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-
+                <section class="erp-panel">
+                <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.create.adminDetails" /></h2></div>
                 <div class="erp-panel-body minor-admin-create-grid">
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <spring:message code="common.sacco" text="Institution" />
@@ -52,8 +43,8 @@
                                 </c:forEach>
                                 <option value="${sacco.saccoId}"
                                         data-stations="${stationList}"
-                                        ${status.first ? 'selected' : ''}>
-                                    ${sacco.saccoId} - ${sacco.saccoName}
+                                        ${registrationForm.saccoId eq sacco.saccoId or (empty registrationForm.saccoId and status.first) ? 'selected' : ''}>
+                                    <c:out value="${sacco.saccoName}" />
                                 </option>
                             </c:forEach>
                         </select>
@@ -61,48 +52,52 @@
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <spring:message code="admin.saccoRegistry.station" text="Branch" />
-                        <select id="minorAdminStationSelect" name="stationId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"></select>
+                        <select id="minorAdminStationSelect" name="stationId" data-current-station="${fn:escapeXml(registrationForm.stationId)}" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"></select>
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <spring:message code="member.fullName" text="Full Name" />
-                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
+                        <input name="fullName" type="text" value="${fn:escapeXml(registrationForm.fullName)}" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <spring:message code="register.member.email" text="Email" />
-                        <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                        <input name="email" type="email" value="${fn:escapeXml(registrationForm.email)}" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <spring:message code="register.member.phone" text="Phone" />
-                        <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                        <input name="phone" type="tel" value="${fn:escapeXml(registrationForm.phone)}" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                         <span class="mt-1 block text-[11px] font-medium normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
                     </label>
                 </div>
-
-                <div class="minor-admin-create-actions" data-aws-action-pin="true" data-table-toolbar-for="admin-minor-admins-1" data-resource-header-source>
+                </section>
+                <c:if test="${not empty error}"><div class="console-message" data-message-type="error" role="alert" tabindex="-1" data-workspace-form-error><c:out value="${error}" /></div></c:if>
+                <div class="minor-admin-create-actions" data-aws-action-pin="true">
+                    <a href="/admin/saccos/minor-admins" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
+                    <c:choose><c:when test="${changeAdmin}">
                     <button type="submit"
-                            formaction="/admin/saccos/minor-admins/change"
-                            class="app-btn btn-primary"
+                            class="app-btn btn-launch"
                             onclick="return confirm('<spring:message code='admin.minorAdmins.confirmChange' text='Change the Institution Admin for the selected branch to the person entered in this form?' javaScriptEscape='true' />');">
                         <spring:message code="admin.minorAdmins.changeAdmin" text="Change Institution Admin" />
                     </button>
+                    </c:when><c:otherwise>
                     <button type="submit" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.register" text="Register Institution Admin" /></button>
+                    </c:otherwise></c:choose>
                 </div>
             </form>
-        </div>
     </c:otherwise>
 </c:choose>
+</c:if>
 
+<c:if test="${not createMode}">
 <div class="erp-panel overflow-hidden minor-admin-list-panel">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div data-resource-header-source>
                 <h2 class="erp-panel-title" data-table-heading-for="admin-minor-admins-1"><spring:message code="admin.minorAdmins.registered" text="Registered Institution Admins" /></h2>
-                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.minorAdmins.manageHelp" text="Use Users &amp; Roles for status changes or broader role updates." /></p>
             </div>
-            <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="admin.minorAdmins.manageUsers" text="Manage In Users &amp; Roles" /></a>
+            <div class="platform-settings-section-actions"><sec:authorize access="@access.has(principal, 'USER_ACCESS_CREATE') and @access.has(principal, 'USER_ACCESS_UPDATE')"><a href="/admin/saccos/minor-admins/change" class="app-btn btn-neutral"><spring:message code="admin.minorAdmins.changeAdmin" /></a></sec:authorize><sec:authorize access="@access.has(principal, 'USER_ACCESS_CREATE')"><a href="/admin/saccos/minor-admins/new" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.create" /></a></sec:authorize></div>
         </div>
     </div>
 
@@ -335,6 +330,7 @@
     </c:if>
 </c:forEach>
 
+</c:if>
 <script>
     (function () {
         const saccoSelect = document.getElementById("minorAdminSaccoSelect");
@@ -374,7 +370,7 @@
             saccoSelect.addEventListener("change", function () {
                 syncStations(saccoSelect, stationSelect);
             });
-            syncStations(saccoSelect, stationSelect);
+            syncStations(saccoSelect, stationSelect, stationSelect.dataset.currentStation);
         }
 
         document.querySelectorAll('[data-minor-admin-modal]').forEach((modal) => {
@@ -384,7 +380,9 @@
             document.body.appendChild(modal);
         });
 
-        function closeMinorAdminModal() {
+        function closeMinorAdminModal(force) {
+            const modal=document.querySelector('[data-minor-admin-modal].is-open');
+            if(force!==true && modal && !document.dispatchEvent(new CustomEvent('resource:before-close',{cancelable:true,detail:{modal,close:()=>closeMinorAdminModal(true)}})))return;
             document.querySelectorAll('[data-minor-admin-modal]').forEach((modal) => {
                 modal.classList.add('hidden');
                 modal.classList.remove('is-open');
@@ -409,7 +407,7 @@
         });
 
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && !event.defaultPrevented) {
                 closeMinorAdminModal();
             }
         });
