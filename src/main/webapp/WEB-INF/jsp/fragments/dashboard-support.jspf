@@ -13,6 +13,8 @@
  data-close="<spring:message code='common.close' />" data-clear="<spring:message code='common.clear' />" data-empty="<spring:message code='dashboard.layout.empty' />"
  data-overview="<spring:message code='dashboard.widget.overview' />" data-actions="<spring:message code='common.actions' />"
  data-move="<spring:message code='dashboard.layout.move' />" data-resize="<spring:message code='dashboard.layout.resize' />"
+ data-left="<spring:message code='dashboard.layout.left' />" data-right="<spring:message code='dashboard.layout.right' />"
+ data-up="<spring:message code='dashboard.layout.up' />" data-down="<spring:message code='dashboard.layout.down' />"
  data-move-help="<spring:message code='dashboard.layout.moveHelp' />" data-resize-help="<spring:message code='dashboard.layout.resizeHelp' />"
  data-preferences="<spring:message code='dashboard.layout.preferences' />" data-remove="<spring:message code='dashboard.layout.remove' />"
  data-removed="<spring:message code='dashboard.layout.removed' />" data-moved="<spring:message code='dashboard.layout.moved' />"
