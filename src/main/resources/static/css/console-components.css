@@ -574,7 +574,6 @@
     .aws-console [data-access-matrix] .erp-table tbody th { position: static; top: auto; z-index: auto; background: #fff !important; color: #16191f !important; font-weight: 400; }
     .aws-console [data-access-matrix] .erp-table tbody th::after { content: none; }
     .access-matrix-name { display: block; font-size: 13px; font-weight: 700; line-height: 18px; overflow-wrap: anywhere; white-space: normal; }
-    [data-access-matrix] .access-matrix-permission { display: flex; align-items: center; gap: 6px; margin: 0; min-height: 24px; font-size: 13px; font-weight: 400; }
     [data-access-matrix] .resource-table-search { max-width: none; }
     .access-matrix-search { display: block; position: relative; min-width: 0; width: 100%; }
     .access-matrix-search > svg { position: absolute; top: 8px; left: 10px; width: 16px; height: 16px; fill: none; stroke: #687078; stroke-width: 2; pointer-events: none; }

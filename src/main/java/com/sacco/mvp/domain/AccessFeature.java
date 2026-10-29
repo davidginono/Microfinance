@@ -13,7 +13,7 @@ public enum AccessFeature {
     PAYROLL_DEDUCTIONS("Payroll deductions"),
     VOUCHER_WORKSPACE("Voucher approvals"),
     VOUCHER_APPROVAL("Voucher approval actions"),
-    VOUCHER_RULES("Voucher approval configuration"),
+    VOUCHER_RULES("Voucher approval rules"),
     VOUCHER_DOCUMENTS("Voucher supporting documents"),
     ACCESS_MATRIX("Access Matrix"),
     USER_ACCESS("User Access"),

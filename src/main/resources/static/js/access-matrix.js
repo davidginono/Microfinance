@@ -24,7 +24,7 @@
                 if(query && !terms.every(term=>words.some(word=>word.startsWith(term))))return false;
                 relevance.set(row,!query||text===query?0:text.startsWith(query)?1:text.includes(query)?2:3);return true;
             });
-            const value=row=>{if(sort==='claim')return row.cells[0].textContent.trim();const inputs=[...row.querySelectorAll(`[data-claim-action="${sort}"] input`)];return inputs.length?1+inputs.filter(input=>input.checked).length/inputs.length:0;};
+            const value=row=>sort==='claim'?row.cells[0].textContent.trim():row.querySelector(`[data-claim-action="${sort}"] input`)?.checked?2:row.querySelector(`[data-claim-action="${sort}"] input`)?1:0;
             matches.sort((a,b)=>{const rank=relevance.get(a)-relevance.get(b);if(rank)return rank;const result=sort==='claim'?collator.compare(value(a),value(b)):value(a)-value(b);return (descending?-result:result)||collator.compare(a.dataset.claimKey,b.dataset.claimKey);});
             const totalPages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,totalPages-1));
             rows.forEach(row=>row.hidden=true);matches.slice(page*size,(page+1)*size).forEach(row=>row.hidden=false);

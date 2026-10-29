@@ -22,7 +22,7 @@ V89 adds posting-choice/rule-model snapshots, decision-step evidence and a bound
 
 The replacement UI uses short English/Kiswahili labels, one simple rule form, numbered role rows and compact actions. The old IF/THEN table, approver dialog, two-stage controls, force option and saved-rule test panel are removed. The approval queue has three quick filters; history is collapsed. The maintained UI skills now require minimal text, no routine explanations/subtitles and clean, accessible mobile layouts for all future UI work.
 
-The access matrix groups voucher workspace, decision and rule permissions in one Voucher approvals row. Its View cell keeps Vouchers and Rules independently selectable; all action claims and existing assignments remain separate. Supporting-document permissions retain their own row. This presentation does not grant permission, change role defaults or relax voucher-type access checks.
+The access matrix groups voucher workspace and decision permissions in one Voucher approvals row. Voucher approval rules is a separate row with its own View and Configure permissions. Supporting-document permissions retain their own row. All action claims and existing assignments remain separate; this presentation does not grant permission, change role defaults or relax voucher-type access checks.
 
 ## Verification (2026-10-23)
 

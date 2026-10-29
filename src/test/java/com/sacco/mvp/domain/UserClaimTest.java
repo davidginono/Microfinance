@@ -27,7 +27,7 @@ class UserClaimTest {
             assertThat(UserClaim.fromStoredName(claim.name())).isEmpty();
             assertThat(UserClaim.expandLegacy(java.util.List.of(claim))).isEmpty();
             assertThat(UserClaim.forFeatureAction(claim.getFeature(), claim.getAction())).isEmpty();
-            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().values().stream().anyMatch(cell -> cell.contains(claim)));
+            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().containsValue(claim));
         }
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()), true)).doesNotContainAnyElementsOf(retired);
         assertThat(UserClaim.matrixRows()).noneMatch(row -> row.feature() == AccessFeature.REPORT_BUILDER
@@ -37,7 +37,7 @@ class UserClaimTest {
             UserClaim.VOUCHER_WORKSPACE_CREATE, UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_APPROVE,
             UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_REJECT)) {
             assertThat(UserClaim.fromStoredName(active.name())).containsExactly(active);
-            assertThat(UserClaim.matrixRows()).anyMatch(row -> row.claimsByAction().values().stream().anyMatch(cell -> cell.contains(active)));
+            assertThat(UserClaim.matrixRows()).anyMatch(row -> row.claimsByAction().containsValue(active));
         }
     }
 
@@ -52,16 +52,20 @@ class UserClaimTest {
     }
 
     @Test
-    void voucherApprovalsShareOneMatrixRowWithoutMergingPermissions() {
+    void voucherApprovalsShareOneRowWhileRulesHaveIndependentPermissions() {
         var rows = UserClaim.matrixRows();
-        assertThat(rows).noneMatch(row -> row.feature() == AccessFeature.VOUCHER_APPROVAL || row.feature() == AccessFeature.VOUCHER_RULES);
+        assertThat(rows).noneMatch(row -> row.feature() == AccessFeature.VOUCHER_APPROVAL);
         var voucher = rows.stream().filter(row -> row.feature() == AccessFeature.VOUCHER_WORKSPACE).findFirst().orElseThrow();
         assertThat(voucher.claimsByAction().get(AccessAction.VIEW))
-            .containsExactly(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.VOUCHER_RULE_VIEW);
-        assertThat(voucher.claimsByAction().get(AccessAction.APPROVE)).containsExactly(UserClaim.VOUCHER_APPROVAL_APPROVE);
-        assertThat(voucher.claimsByAction().get(AccessAction.CONFIGURE)).containsExactly(UserClaim.VOUCHER_RULE_CONFIGURE);
+            .isEqualTo(UserClaim.VOUCHER_WORKSPACE_VIEW);
+        assertThat(voucher.claimsByAction().get(AccessAction.APPROVE)).isEqualTo(UserClaim.VOUCHER_APPROVAL_APPROVE);
+        assertThat(voucher.claimsByAction()).doesNotContainKey(AccessAction.CONFIGURE);
+        var rules = rows.stream().filter(row -> row.feature() == AccessFeature.VOUCHER_RULES).findFirst().orElseThrow();
+        assertThat(rules.claimsByAction()).containsOnly(
+            java.util.Map.entry(AccessAction.VIEW, UserClaim.VOUCHER_RULE_VIEW),
+            java.util.Map.entry(AccessAction.CONFIGURE, UserClaim.VOUCHER_RULE_CONFIGURE));
         java.util.List<UserClaim> displayed = new java.util.ArrayList<>();
-        for (var row : rows) for (var cell : row.claimsByAction().values()) displayed.addAll(cell);
+        for (var row : rows) displayed.addAll(row.claimsByAction().values());
         java.util.List<UserClaim> available = java.util.Arrays.stream(UserClaim.values()).filter(UserClaim::isAvailable).toList();
         assertThat(displayed).doesNotHaveDuplicates();
         assertThat(displayed).containsExactlyInAnyOrderElementsOf(available);
@@ -84,7 +88,7 @@ class UserClaimTest {
         for (var claim : retired) {
             assertThat(UserClaim.fromStoredName(claim.name())).isEmpty();
             assertThat(UserClaim.expandLegacy(java.util.List.of(claim))).isEmpty();
-            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().values().stream().anyMatch(cell -> cell.contains(claim)));
+            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().containsValue(claim));
         }
         assertThat(UserClaim.fromStoredName("ACCOUNTING_BUSINESS_CREATE")).contains(UserClaim.ACCOUNTING_BUSINESS_CREATE);
         assertThat(UserClaim.fromStoredName("ACCOUNTING_JOURNALS_CREATE")).contains(UserClaim.ACCOUNTING_JOURNALS_CREATE);
@@ -114,7 +118,7 @@ class UserClaimTest {
             .orElseThrow();
 
         assertThat(accessMatrix.claimsByAction().get(AccessAction.VIEW))
-            .containsExactly(UserClaim.LOAN_DOCUMENTS_VIEW);
+            .isEqualTo(UserClaim.LOAN_DOCUMENTS_VIEW);
         assertThat(accessMatrix.claimsByAction().get(AccessAction.ADD))
             .isNull();
         assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_DOCUMENTS, AccessAction.ADD))
