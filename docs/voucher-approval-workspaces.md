@@ -22,6 +22,8 @@ V89 adds posting-choice/rule-model snapshots, decision-step evidence and a bound
 
 The replacement UI uses short English/Kiswahili labels, one simple rule form, numbered role rows and compact actions. The old IF/THEN table, approver dialog, two-stage controls, force option and saved-rule test panel are removed. The approval queue has three quick filters; history is collapsed. The maintained UI skills now require minimal text, no routine explanations/subtitles and clean, accessible mobile layouts for all future UI work.
 
+The access matrix groups voucher workspace, decision and rule permissions in one Voucher approvals row. Its View cell keeps Vouchers and Rules independently selectable; all action claims and existing assignments remain separate. Supporting-document permissions retain their own row. This presentation does not grant permission, change role defaults or relax voucher-type access checks.
+
 ## Verification (2026-10-23)
 
 - Production compilation and the final focused run passed 62 checks: 35 PostgreSQL voucher/workflow checks, 22 MVC/CSRF/binding checks, four finance workspace security checks and one Jasper check compiling all six affected JSPs. The six JSPs compiled again after the final confirmation markup change. PostgreSQL 18 applied all 110 migrations through V89 on a disposable loopback database. Tests cover all ordinary voucher types, exact boundaries, scope, quorum, distinct people across roles, concurrent decisions/posting, old snapshots, immutable submitted contents, changed rules, incomplete batches, creator-only posting, automatic posting, revoked maker permissions, atomic rollback and retry.

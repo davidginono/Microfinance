@@ -27,7 +27,7 @@ class UserClaimTest {
             assertThat(UserClaim.fromStoredName(claim.name())).isEmpty();
             assertThat(UserClaim.expandLegacy(java.util.List.of(claim))).isEmpty();
             assertThat(UserClaim.forFeatureAction(claim.getFeature(), claim.getAction())).isEmpty();
-            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().containsValue(claim));
+            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().values().stream().anyMatch(cell -> cell.contains(claim)));
         }
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()), true)).doesNotContainAnyElementsOf(retired);
         assertThat(UserClaim.matrixRows()).noneMatch(row -> row.feature() == AccessFeature.REPORT_BUILDER
@@ -37,7 +37,7 @@ class UserClaimTest {
             UserClaim.VOUCHER_WORKSPACE_CREATE, UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_APPROVE,
             UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_REJECT)) {
             assertThat(UserClaim.fromStoredName(active.name())).containsExactly(active);
-            assertThat(UserClaim.matrixRows()).anyMatch(row -> row.claimsByAction().containsValue(active));
+            assertThat(UserClaim.matrixRows()).anyMatch(row -> row.claimsByAction().values().stream().anyMatch(cell -> cell.contains(active)));
         }
     }
 
@@ -49,6 +49,22 @@ class UserClaimTest {
         assertThat(UserClaim.forFeatureAction(AccessFeature.VOUCHER_WORKSPACE, AccessAction.POST))
             .contains(UserClaim.VOUCHER_WORKSPACE_POST);
         assertThat(UserClaim.fromStoredName("VOUCHER_APPROVAL_FORCE")).contains(UserClaim.VOUCHER_APPROVAL_FORCE);
+    }
+
+    @Test
+    void voucherApprovalsShareOneMatrixRowWithoutMergingPermissions() {
+        var rows = UserClaim.matrixRows();
+        assertThat(rows).noneMatch(row -> row.feature() == AccessFeature.VOUCHER_APPROVAL || row.feature() == AccessFeature.VOUCHER_RULES);
+        var voucher = rows.stream().filter(row -> row.feature() == AccessFeature.VOUCHER_WORKSPACE).findFirst().orElseThrow();
+        assertThat(voucher.claimsByAction().get(AccessAction.VIEW))
+            .containsExactly(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.VOUCHER_RULE_VIEW);
+        assertThat(voucher.claimsByAction().get(AccessAction.APPROVE)).containsExactly(UserClaim.VOUCHER_APPROVAL_APPROVE);
+        assertThat(voucher.claimsByAction().get(AccessAction.CONFIGURE)).containsExactly(UserClaim.VOUCHER_RULE_CONFIGURE);
+        java.util.List<UserClaim> displayed = new java.util.ArrayList<>();
+        for (var row : rows) for (var cell : row.claimsByAction().values()) displayed.addAll(cell);
+        java.util.List<UserClaim> available = java.util.Arrays.stream(UserClaim.values()).filter(UserClaim::isAvailable).toList();
+        assertThat(displayed).doesNotHaveDuplicates();
+        assertThat(displayed).containsExactlyInAnyOrderElementsOf(available);
     }
 
     @Test
@@ -68,7 +84,7 @@ class UserClaimTest {
         for (var claim : retired) {
             assertThat(UserClaim.fromStoredName(claim.name())).isEmpty();
             assertThat(UserClaim.expandLegacy(java.util.List.of(claim))).isEmpty();
-            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().containsValue(claim));
+            assertThat(UserClaim.matrixRows()).noneMatch(row -> row.claimsByAction().values().stream().anyMatch(cell -> cell.contains(claim)));
         }
         assertThat(UserClaim.fromStoredName("ACCOUNTING_BUSINESS_CREATE")).contains(UserClaim.ACCOUNTING_BUSINESS_CREATE);
         assertThat(UserClaim.fromStoredName("ACCOUNTING_JOURNALS_CREATE")).contains(UserClaim.ACCOUNTING_JOURNALS_CREATE);
@@ -98,7 +114,7 @@ class UserClaimTest {
             .orElseThrow();
 
         assertThat(accessMatrix.claimsByAction().get(AccessAction.VIEW))
-            .isEqualTo(UserClaim.LOAN_DOCUMENTS_VIEW);
+            .containsExactly(UserClaim.LOAN_DOCUMENTS_VIEW);
         assertThat(accessMatrix.claimsByAction().get(AccessAction.ADD))
             .isNull();
         assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_DOCUMENTS, AccessAction.ADD))

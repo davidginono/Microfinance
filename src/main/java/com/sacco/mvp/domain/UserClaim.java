@@ -301,12 +301,17 @@ public enum UserClaim {
     public static List<AccessMatrixRow> matrixRows() {
         List<AccessMatrixRow> rows = new ArrayList<>();
         for (AccessFeature feature : AccessFeature.values()) {
-            Map<AccessAction, UserClaim> claimsByAction = BY_FEATURE_ACTION.get(feature);
-            if (claimsByAction != null && !claimsByAction.isEmpty()) {
-                Map<AccessAction, UserClaim> available = new EnumMap<>(AccessAction.class);
-                claimsByAction.forEach((action, claim) -> {if (claim.isAvailable()) available.put(action, claim);});
-                if (!available.isEmpty()) rows.add(new AccessMatrixRow(feature, feature.getDisplayName(), available));
+            if (feature == AccessFeature.VOUCHER_APPROVAL || feature == AccessFeature.VOUCHER_RULES) continue;
+            Map<AccessAction, List<UserClaim>> available = new EnumMap<>(AccessAction.class);
+            var sources = feature == AccessFeature.VOUCHER_WORKSPACE
+                ? List.of(feature, AccessFeature.VOUCHER_APPROVAL, AccessFeature.VOUCHER_RULES) : List.of(feature);
+            for (AccessFeature source : sources) {
+                BY_FEATURE_ACTION.getOrDefault(source, Map.of()).forEach((action, claim) -> {
+                    if (claim.isAvailable()) available.computeIfAbsent(action, key -> new ArrayList<>()).add(claim);
+                });
             }
+            available.replaceAll((action, claims) -> List.copyOf(claims));
+            if (!available.isEmpty()) rows.add(new AccessMatrixRow(feature, feature.getDisplayName(), Map.copyOf(available)));
         }
         return rows;
     }
@@ -487,6 +492,6 @@ public enum UserClaim {
         return Map.copyOf(immutable);
     }
 
-    public record AccessMatrixRow(AccessFeature feature, String label, Map<AccessAction, UserClaim> claimsByAction) {
+    public record AccessMatrixRow(AccessFeature feature, String label, Map<AccessAction, List<UserClaim>> claimsByAction) {
     }
 }

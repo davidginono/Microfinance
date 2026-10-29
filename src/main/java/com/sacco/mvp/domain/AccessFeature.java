@@ -11,7 +11,7 @@ public enum AccessFeature {
     GROUP_LENDING("Group lending"),
     GROUP_AUTHORITY("Group borrowing authority"),
     PAYROLL_DEDUCTIONS("Payroll deductions"),
-    VOUCHER_WORKSPACE("Approval Voucher Workspace"),
+    VOUCHER_WORKSPACE("Voucher approvals"),
     VOUCHER_APPROVAL("Voucher approval actions"),
     VOUCHER_RULES("Voucher approval configuration"),
     VOUCHER_DOCUMENTS("Voucher supporting documents"),
