@@ -61,10 +61,11 @@
             }); content.append(list);window.ConsoleResourceDetails?.init(content);
         };
         const open=()=>{panel.hidden=false;layout.classList.add('resource-split-open');show.setAttribute('aria-expanded','true');render();apply();};
+        const collapse=(focus=false)=>{panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');apply();if(focus)show.focus();};
         const sync=()=>{if(!panel.hidden)render();};
         region.addEventListener('resource-split:refresh',sync);
         show.addEventListener('click',()=>{open();close.focus();});
-        close.addEventListener('click',()=>{panel.hidden=true;layout.classList.remove('resource-split-open');show.setAttribute('aria-expanded','false');apply();show.focus();});
+        close.addEventListener('click',()=>collapse(true));
         gear.setAttribute('aria-expanded','false'); gear.addEventListener('click',()=>{positions.hidden=!positions.hidden;gear.setAttribute('aria-expanded',String(!positions.hidden));if(!positions.hidden)position.focus();});
         position.addEventListener('change',()=>{state.position=position.value;apply();save();});
         resize.addEventListener('keydown',event=>{
@@ -93,8 +94,8 @@
         region.addEventListener('resource-table:reset',()=>queueMicrotask(sync));
         wide?.addEventListener('change',apply);
         window.addEventListener('resize',apply);
-        // The reference keeps an empty preview available on desktop. Closing is deliberate:
-        // selecting another record never reopens it. Mobile starts with the full list visible.
-        if(window.innerWidth>=768)open();else apply();
+        window.addEventListener('pageshow',event=>{if(event.persisted && region.isConnected)collapse();});
+        // Every page starts with the full list. Only Show details opens the preview.
+        apply();
     }};
 })();

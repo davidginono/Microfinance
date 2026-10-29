@@ -451,14 +451,15 @@ test('grouped financial totals retain their columns and heading order', async ()
     dom.window.close();
 });
 
-test('desktop split starts empty, follows selection, stays closed after dismissal and clears stale facts', async () => {
+test('desktop split starts closed, opens only on request and clears stale facts', async () => {
     const markup=table('split','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
     const {dom,window:w,document:d}=await setup(markup);
-    const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,false);
-    assert.equal(panel.querySelector('h2').textContent,'Select a record');
+    const panel=d.querySelector('.resource-split-panel');assert.equal(panel.hidden,true);
+    assert.equal(d.querySelector('[aria-label="Show details"]').getAttribute('aria-expanded'),'false');
     assert.equal(panel.querySelectorAll('dd').length,0);
     d.querySelector('tbody input').click();await new Promise(resolve=>w.setTimeout(resolve,0));
-    assert.equal(panel.hidden,false);
+    assert.equal(panel.hidden,true);
+    d.querySelector('[aria-label="Show details"]').click();
     assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'Details');
     assert.equal(panel.querySelector('dd').textContent,'A001');
     assert.equal(panel.querySelectorAll('dd').length,2);assert.equal(panel.querySelector('.resource-split-content a'),null);
@@ -472,6 +473,21 @@ test('desktop split starts empty, follows selection, stays closed after dismissa
     d.querySelector('.resource-table-filters input').dispatchEvent(new w.Event('input',{bubbles:true}));
     await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(panel.querySelectorAll('dd').length,0);assert.equal(panel.querySelector('h2').textContent,'Select a record');
     dom.window.close();
+});
+
+test('all viewport sizes and saved split preferences start closed, including history restoration',async()=>{
+    const markup=table('closed-default','<tr><td>A001</td><td>100</td><td><a class="app-btn" href="/record/1">View</a></td></tr>','data-resource-split').replace('<th>Status</th>','<th data-table-actions-header>Actions</th>');
+    for(const width of [360,768,1366,1920]){
+        const {dom,window:w,document:d}=await setup(markup,`window.innerWidth=${width};localStorage.setItem('resource-split:v1:closed-default',JSON.stringify({position:'side',size:400,open:true}));`);
+        try{
+            const panel=d.querySelector('.resource-split-panel'),layout=d.querySelector('.resource-split-layout'),show=d.querySelector('[aria-label="Show details"]'),scroller=layout.querySelector('.erp-table-scroll');
+            assert.equal(panel.hidden,true);assert.equal(layout.classList.contains('resource-split-open'),false);assert.equal(scroller.style.height,'');assert.equal(panel.querySelectorAll('dd').length,0);
+            d.querySelector('tbody input').click();w.innerWidth=1920;w.dispatchEvent(new w.Event('resize'));d.querySelector('[data-resource-table]').dispatchEvent(new w.Event('resource-split:refresh'));await settle();assert.equal(panel.hidden,true);
+            show.click();assert.equal(panel.hidden,false);assert.equal(panel.querySelector('h2').textContent,'Details');assert.equal(panel.querySelector('select').value,'side');
+            w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:false}));assert.equal(panel.hidden,false);
+            w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));assert.equal(panel.hidden,true);assert.equal(show.getAttribute('aria-expanded'),'false');assert.equal(scroller.style.height,'');
+        }finally{dom.window.close();}
+    }
 });
 
 test('preferences preserve editable cells and never clear form checkbox values', async () => {

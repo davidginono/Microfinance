@@ -8,6 +8,10 @@ Implemented 20 October 2026 in the shared JSP navigation runtime and shell CSS.
 - Header/sidebar roots stay connected. Resize and sidebar-width changes discard mismatched previews. A stable root scrollbar gutter avoids width changes when moving between short forms and tall dashboards. Existing editable nodes and their values survive cancellation, rejection, timeout and failure; retry remains explicit.
 - Shared localized accessible status names and reduced-motion behavior remain. Financial submissions and downloads retain their separate button-contained spinners and existing safeguards.
 
+## Row-details panes — 29 October 2026
+
+Every opted-in row-details pane starts closed, regardless of viewport width or saved position/size. Fresh workspace navigation and browser-history restoration keep the full table visible. Only Show details opens the pane; selecting a row, refreshing its facts, and resizing the window do not open it. Manual close, bottom/side placement, pointer/keyboard resizing and authorized row previews remain available. This supersedes the earlier desktop/tablet auto-open behavior.
+
 ## First paint and component preparation (21 October 2026)
 
 - All 133 JSP views using the shared header/sidebar were cross-checked through their include graph, including account/profile pages, lending roles, administration, finance, repayments and reporting. The shared preparation guard applies to first loads and in-place transitions; it preserves layout measurements while suppressing unfinished controls and sections behind a top-left spinner.
