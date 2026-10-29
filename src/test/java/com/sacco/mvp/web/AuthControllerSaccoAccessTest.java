@@ -43,14 +43,6 @@ class AuthControllerSaccoAccessTest {
     }
 
     @Test
-    void registrationAvailabilityOnlyReturnsTheAvailabilityFlag() {
-        when(memberRegistrationService.memberNoAvailable("CLIENT-100")).thenReturn(true);
-
-        assertThat(controller().memberNumberAvailability("CLIENT-100"))
-            .containsExactly(Map.entry("available", true));
-    }
-
-    @Test
     void employeeNumberAvailabilityOnlyReturnsTheAvailabilityFlag() {
         when(memberRegistrationService.employeeNumberAvailable("EMP-100", "SACCO-01", "AR704")).thenReturn(true);
 
@@ -66,6 +58,30 @@ class AuthControllerSaccoAccessTest {
     @Mock private AdminScopeService adminScopeService;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditService auditService;
+
+    @Test
+    void registrationReturnsAssignedNumberOnlyAfterOtpAndRegistrationSucceed() {
+        var form = new com.sacco.mvp.web.form.MemberRegistrationForm();
+        form.setEmail("client@example.invalid");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
+        var registered = member(true);registered.setMemberNo("CL-00000042");
+        when(memberRegistrationService.register(form)).thenReturn(registered);
+        var flash = new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
+        String view = controller().registerMemberSubmit(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm"),new org.springframework.ui.ExtendedModelMap(),flash);
+        assertThat(view).isEqualTo("redirect:/login");
+        assertThat(flash.getFlashAttributes().get("assignedClientNumber")).isEqualTo("CL-00000042");
+        var order = org.mockito.Mockito.inOrder(emailOtpService,memberRegistrationService);
+        order.verify(emailOtpService).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,"123456");
+        order.verify(memberRegistrationService).register(form);
+    }
+
+    @Test
+    void missingOtpDoesNotRegisterOrExposeAnAssignedNumber() {
+        var form = new com.sacco.mvp.web.form.MemberRegistrationForm();form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());
+        var flash = new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
+        assertThat(controller().registerMemberSubmit(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm"),new org.springframework.ui.ExtendedModelMap(),flash)).isEqualTo("register-member");
+        verify(memberRegistrationService,never()).register(org.mockito.ArgumentMatchers.any());
+        assertThat(flash.getFlashAttributes()).doesNotContainKey("assignedClientNumber");
+    }
 
     @Test
     void memberOtpRequestIsBlockedWhenSaccoIsSuspended() {

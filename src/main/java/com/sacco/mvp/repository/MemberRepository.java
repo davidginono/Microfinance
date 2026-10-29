@@ -54,6 +54,9 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Query(value = "select nextval('public.staff_number_seq')", nativeQuery = true)
     long nextStaffNumberValue();
 
+    @Query(value = "select nextval('public.client_number_seq')", nativeQuery = true)
+    long nextClientNumberValue();
+
     Optional<Member> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);

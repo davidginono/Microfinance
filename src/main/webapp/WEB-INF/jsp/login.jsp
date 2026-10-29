@@ -76,6 +76,13 @@
                         <div hidden data-toast-message="Your sign-in page was refreshed for security. Please enter your password again." data-toast-type="info"></div>
                     </c:if>
 
+                    <c:if test="${not empty assignedClientNumber}">
+                        <div class="auth-mode-card">
+                            <p id="assignedClientNumberLabel" class="auth-section-label"><spring:message code="register.member.assignedNumber" /></p>
+                            <output id="assignedClientNumber" aria-labelledby="assignedClientNumberLabel" class="block mt-2 font-bold"><c:out value="${assignedClientNumber}" /></output>
+                        </div>
+                    </c:if>
+
                     <c:choose>
                     <c:when test="${systemAdminLogin}">
                     <button type="button" hidden data-login-tab-toggle="system-admin" data-active="true" aria-hidden="true"></button>

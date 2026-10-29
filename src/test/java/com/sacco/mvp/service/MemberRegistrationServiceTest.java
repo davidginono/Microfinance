@@ -23,26 +23,6 @@ import static org.mockito.Mockito.when;
 class MemberRegistrationServiceTest {
 
     @Test
-    void memberNumberAvailabilityUsesTheNormalizedClientNumber() {
-        MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
-        MemberRegistrationService service = new MemberRegistrationService(
-            memberRepository,
-            Mockito.mock(RegisteredSaccoRepository.class),
-            Mockito.mock(SaccoStationRepository.class),
-            Mockito.mock(SaccoSettingsRepository.class),
-            Mockito.mock(UserSettingsRepository.class),
-            Mockito.mock(PasswordEncoder.class),
-            new NameSignatureService()
-        );
-
-        when(memberRepository.findByMemberNo("CLIENT-100")).thenReturn(Optional.empty());
-
-        assertThat(service.memberNoAvailable(" client-100 ")).isTrue();
-        assertThat(service.memberNoAvailable(" ")).isFalse();
-        verify(memberRepository).findByMemberNo("CLIENT-100");
-    }
-
-    @Test
     void employeeNumberAvailabilityUsesTheSelectedInstitutionAndBranch() {
         MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
@@ -120,7 +100,6 @@ class MemberRegistrationServiceTest {
         );
 
         MemberRegistrationForm form = new MemberRegistrationForm();
-        form.setMemberNo("000001");
         form.setEmail("member@example.com");
         form.setFullName("Jane Member");
         form.setSaccoId("sacco-1");

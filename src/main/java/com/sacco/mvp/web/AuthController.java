@@ -95,12 +95,6 @@ public class AuthController {
         return "register-member";
     }
 
-    @GetMapping("/register/member/member-number-availability")
-    @ResponseBody
-    public Map<String, Object> memberNumberAvailability(@RequestParam(defaultValue = "") String memberNo) {
-        return Map.of("available", memberRegistrationService.memberNoAvailable(memberNo));
-    }
-
     @GetMapping("/register/member/employee-number-availability")
     @ResponseBody
     public Map<String, Object> employeeNumberAvailability(@RequestParam(defaultValue = "") String employeeNumber,
@@ -149,13 +143,12 @@ public class AuthController {
             );
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("valid", true);
-            response.put("memberNo", verified.memberNo());
             response.put("fullName", verified.fullName());
             response.put("saccoId", verified.saccoId());
             response.put("stationId", verified.stationId());
             response.put("message", deliveryMessage(delivery, "We sent an OTP code using the station delivery policy."));
-            auditIdentityEvent(null, "OTP_REQUEST", "OTP request", "MEMBER", "Member " + verified.memberNo(),
-                verified.saccoId(), verified.stationId(), Map.of("purpose", EmailOtpPurpose.REGISTRATION.name(), "memberNo", verified.memberNo()));
+            auditIdentityEvent(null, "OTP_REQUEST", "OTP request", "MEMBER", "Client registration",
+                verified.saccoId(), verified.stationId(), Map.of("purpose", EmailOtpPurpose.REGISTRATION.name()));
             return ResponseEntity.ok(response);
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -191,6 +184,7 @@ public class AuthController {
             Member registered = memberRegistrationService.register(form);
             auditIdentityEvent(registered.getId(), "REGISTRATION", "Registration", "MEMBER", "Member " + registered.getMemberNo(),
                 registered.getSaccoId(), registered.getStationId(), Map.of("memberNo", registered.getMemberNo()));
+            ra.addFlashAttribute("assignedClientNumber", registered.getMemberNo());
             ra.addFlashAttribute("message", "Registration completed successfully. Request a sign-in code with your email to access the member workspace.");
             return "redirect:/login";
         } catch (IllegalStateException ex) {

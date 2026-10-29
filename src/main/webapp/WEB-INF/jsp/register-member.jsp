@@ -3,7 +3,7 @@
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="${pageContext.response.locale.language}">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -14,203 +14,184 @@
     <link rel="stylesheet" href="<c:url value='/css/amazon-ember.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-auth-notice-width-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-registration' />" />
+    <link rel="stylesheet" href="<c:url value='/css/form-validation.css?v=20261030-registration' />" />
+    <script defer src="<c:url value='/js/form-validation.js' />"></script>
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
-<body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
+<body class="auth-shell aws-auth-shell auth-registration-page min-h-screen font-sans text-slate-900 antialiased">
 <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
-<div class="relative flex min-h-screen items-center justify-center px-4 py-10">
-    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
-        <div class="mb-6 sm:mb-7">
-            <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading"><spring:message code="register.member.title" /></h1>
+<span id="form-validation-labels" hidden
+      data-field="<spring:message code='validation.field' htmlEscape='true' />"
+      data-required="<spring:message code='validation.required' htmlEscape='true' />"
+      data-invalid="<spring:message code='validation.invalid' htmlEscape='true' />"
+      data-minimum="<spring:message code='validation.minimum' htmlEscape='true' />"
+      data-maximum="<spring:message code='validation.maximum' htmlEscape='true' />"
+      data-short="<spring:message code='validation.short' htmlEscape='true' />"
+      data-long="<spring:message code='validation.long' htmlEscape='true' />"></span>
+<main class="auth-form-page">
+<div class="auth-form-layout registration-layout">
+    <div class="auth-title-stack registration-heading"><h1 class="auth-heading"><spring:message code="register.member.title" /></h1></div>
+    <c:if test="${not empty errors}"><div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div></c:if>
+    <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <section class="auth-form-section registration-section" aria-labelledby="registrationDetailsHeading">
+            <h2 id="registrationDetailsHeading"><spring:message code="register.member.details" /></h2>
+            <div class="registration-fields-grid">
+                <div>
+                    <spring:bind path="registrationForm.saccoId">
+                        <label for="saccoId" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
+                    </spring:bind>
+                    <form:select path="saccoId" cssClass="registration-select">
+                        <option value="" data-placeholder="true"><spring:message code="register.member.chooseInstitution" /></option>
+                        <c:forEach items="${registrationSaccos}" var="sacco">
+                            <form:option value="${sacco.saccoId}">${sacco.saccoName}</form:option>
+                        </c:forEach>
+                    </form:select>
+                    <form:errors path="saccoId" cssClass="coa-error" />
+                </div>
+                <div>
+                    <spring:bind path="registrationForm.stationId">
+                        <label for="registrationStationSelect" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
+                    </spring:bind>
+                    <form:select path="stationId" id="registrationStationSelect" cssClass="registration-select">
+                        <option value="" data-placeholder="true"><spring:message code="register.member.chooseBranch" /></option>
+                    </form:select>
+                    <form:errors path="stationId" cssClass="coa-error" />
+                </div>
+                <div class="registration-field-wide">
+                    <spring:bind path="registrationForm.fullName">
+                        <label for="fullName" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.fullName" /></label>
+                    </spring:bind>
+                    <form:input path="fullName"
+                                cssClass="registration-field uppercase"
+                                autocapitalize="characters"
+                                spellcheck="false"
+                                pattern="\s*\S+(?:\s+\S+){2}\s*"
+                                title="Enter exactly three names."
+                                data-uppercase-input="true" />
+                    <form:errors path="fullName" cssClass="coa-error" />
+                </div>
+                <div>
+                    <spring:bind path="registrationForm.email">
+                        <label for="email" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.email" /></label>
+                    </spring:bind>
+                    <form:input path="email"
+                                type="email"
+                                autocomplete="email"
+                                inputmode="email"
+                                spellcheck="false"
+                                required="required"
+                                cssClass="registration-field" />
+                    <form:errors path="email" cssClass="coa-error" />
+                </div>
+                <div>
+                    <spring:bind path="registrationForm.phone">
+                        <label for="phone" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.phone" /></label>
+                    </spring:bind>
+                    <form:input path="phone"
+                                type="tel"
+                                autocomplete="tel"
+                                inputmode="numeric"
+                                pattern="255[0-9]{9}"
+                                minlength="12"
+                                maxlength="12"
+                                required="required"
+                                cssClass="registration-field"
+                                placeholder="255712345678" />
+                    <p class="registration-note mt-1 text-sm"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></p>
+                    <form:errors path="phone" cssClass="coa-error" />
+                </div>
+                <div class="registration-field-wide">
+                    <label for="registrationEmployeeNumber" class="mb-1.5 block registration-section-label"><spring:message code="payroll.employeeNumber.optional" /></label>
+                    <form:input path="employeeNumber" id="registrationEmployeeNumber" maxlength="50" pattern="[A-Za-z0-9/._ -]*" cssClass="registration-field" aria-describedby="employeeNumberHelp registrationEmployeeNumberAvailability employeeNumberErrors" />
+                    <p id="employeeNumberHelp" class="mt-1 text-sm"><spring:message code="payroll.employeeNumber.help" /></p>
+                    <p id="registrationEmployeeNumberAvailability" class="mt-1 hidden text-xs" role="status" aria-live="polite"
+                       data-checking-message="<spring:message code='registration.employeeNumber.checking' />"
+                       data-available-message="<spring:message code='registration.employeeNumber.available' />"
+                       data-unavailable-message="<spring:message code='registration.employeeNumber.unavailable' />"
+                       data-failed-message="<spring:message code='registration.employeeNumber.checkFailed' />"></p>
+                    <form:errors path="employeeNumber" id="employeeNumberErrors" cssClass="coa-error" />
+                </div>
             </div>
+        </section>
+        <section class="auth-form-section registration-section" aria-labelledby="registrationPasswordHeading">
+            <h2 id="registrationPasswordHeading"><spring:message code="register.member.password" /></h2>
+            <div class="registration-fields-grid">
+                <div>
+                    <spring:bind path="registrationForm.password">
+                        <label for="registrationPassword" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.password" /></label>
+                    </spring:bind>
+                    <div class="auth-password-control">
+                        <form:password path="password" id="registrationPassword"
+                                       autocomplete="new-password"
+                                       minlength="8"
+                                       cssClass="registration-field" />
+                        <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationPassword" aria-pressed="false"
+                                data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button>
+                    </div>
+                    <form:errors path="password" cssClass="coa-error" />
+                </div>
+                <div>
+                    <spring:bind path="registrationForm.confirmPassword">
+                        <label for="registrationConfirmPassword" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.confirmPassword" /></label>
+                    </spring:bind>
+                    <div class="auth-password-control">
+                        <form:password path="confirmPassword" id="registrationConfirmPassword"
+                                       autocomplete="new-password"
+                                       minlength="8"
+                                       cssClass="registration-field" />
+                        <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationConfirmPassword" aria-pressed="false"
+                                data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button>
+                    </div>
+                    <form:errors path="confirmPassword" cssClass="coa-error" />
+                </div>
+            </div>
+            <p class="registration-note registration-section-note"><spring:message code="register.member.passwordHelp" /></p>
+        </section>
+        <div id="registrationOtpBlock" class="auth-form-section registration-section registration-otp ${not empty registrationForm.otpCode ? '' : 'hidden'}">
+            <spring:bind path="registrationForm.otpCode">
+                <label for="otpCode" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.code" /></label>
+            </spring:bind>
+            <form:input path="otpCode"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        data-otp-hidden="true"
+                        data-otp-label="Registration OTP code"
+                        cssClass="sr-only" />
+            <p class="registration-note mt-2 text-sm"><spring:message code="register.member.otpHelp" /></p>
+            <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                <span data-otp-spinner class="otp-status-spinner"></span>
+                <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
+                </svg>
+                <span data-otp-text>Checking code...</span>
+            </div>
+            <form:errors path="otpCode" cssClass="coa-error" />
         </div>
-
-                <c:if test="${not empty errors}">
-                    <div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div>
-                </c:if>
-                <div id="registrationVerifyError" class="hidden" data-auto-scroll-message="true" aria-live="assertive"></div>
-                <div id="registrationVerifySuccess" class="hidden" data-auto-scroll-message="true" aria-live="polite"></div>
-                <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post" class="space-y-5">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                    <form:errors path="*" cssClass="mb-4 block border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700" element="div" />
-
-                    <div class="auth-form-card space-y-4">
-                    <div class="grid gap-4">
-                        <div>
-                            <spring:bind path="registrationForm.memberNo">
-                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.memberNo" /></label>
-                            </spring:bind>
-                            <form:input path="memberNo" id="registrationMemberNo" autocomplete="username" cssClass="registration-field" aria-describedby="registrationMemberNoAvailability" />
-                            <p id="registrationMemberNoAvailability" class="mt-1 hidden text-xs" role="status" aria-live="polite"
-                               data-checking-message="<spring:message code='registration.memberNo.checking' />"
-                               data-available-message="<spring:message code='registration.memberNo.available' />"
-                               data-unavailable-message="<spring:message code='registration.memberNo.unavailable' />"
-                               data-failed-message="<spring:message code='registration.memberNo.checkFailed' />"></p>
-                            <form:errors path="memberNo" cssClass="mt-1 block text-xs text-rose-600" />
-                        </div>
-                        <div>
-                            <label for="employeeNumber" class="mb-1.5 block registration-section-label"><spring:message code="payroll.employeeNumber.optional" /></label>
-                            <form:input path="employeeNumber" id="registrationEmployeeNumber" maxlength="50" pattern="[A-Za-z0-9/._ -]*" cssClass="registration-field" aria-describedby="employeeNumberHelp registrationEmployeeNumberAvailability employeeNumberErrors" />
-                            <p id="employeeNumberHelp" class="mt-1 text-sm"><spring:message code="payroll.employeeNumber.help" /></p>
-                            <p id="registrationEmployeeNumberAvailability" class="mt-1 hidden text-xs" role="status" aria-live="polite"
-                               data-checking-message="<spring:message code='registration.employeeNumber.checking' />"
-                               data-available-message="<spring:message code='registration.employeeNumber.available' />"
-                               data-unavailable-message="<spring:message code='registration.employeeNumber.unavailable' />"
-                               data-failed-message="<spring:message code='registration.employeeNumber.checkFailed' />"></p>
-                            <form:errors path="employeeNumber" id="employeeNumberErrors" cssClass="mt-1 block text-sm text-rose-600" />
-                        </div>
-                        <div>
-                            <spring:bind path="registrationForm.saccoId">
-                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
-                            </spring:bind>
-                            <form:select path="saccoId" cssClass="registration-select">
-                                <option value="" data-placeholder="true">Select Institution Name</option>
-                                <c:forEach items="${registrationSaccos}" var="sacco">
-                                    <form:option value="${sacco.saccoId}">${sacco.saccoName}</form:option>
-                                </c:forEach>
-                            </form:select>
-                            <form:errors path="saccoId" cssClass="mt-1 block text-xs text-rose-600" />
-                        </div>
-                    </div>
-
-                    <div class="grid gap-4">
-                        <div>
-                            <spring:bind path="registrationForm.fullName">
-                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.fullName" /></label>
-                            </spring:bind>
-                            <form:input path="fullName"
-                                        cssClass="registration-field uppercase"
-                                        autocapitalize="characters"
-                                        spellcheck="false"
-                                        pattern="\s*\S+(?:\s+\S+){2}\s*"
-                                        title="Enter exactly three names."
-                                        data-uppercase-input="true" />
-                            <form:errors path="fullName" cssClass="mt-1 block text-xs text-rose-600" />
-                        </div>
-                        <div>
-                            <spring:bind path="registrationForm.email">
-                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.email" /></label>
-                            </spring:bind>
-                            <form:input path="email"
-                                        type="email"
-                                        autocomplete="email"
-                                        inputmode="email"
-                                        spellcheck="false"
-                                        required="required"
-                                        cssClass="registration-field" />
-                            <form:errors path="email" cssClass="mt-1 block text-xs text-rose-600" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <spring:bind path="registrationForm.phone">
-                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.phone" /></label>
-                        </spring:bind>
-                        <form:input path="phone"
-                                    type="tel"
-                                    autocomplete="tel"
-                                    inputmode="numeric"
-                                    pattern="255[0-9]{9}"
-                                    minlength="12"
-                                    maxlength="12"
-                                    required="required"
-                                    cssClass="registration-field"
-                                    placeholder="255712345678" />
-                        <p class="mt-1 text-xs text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></p>
-                        <form:errors path="phone" cssClass="mt-1 block text-xs text-rose-600" />
-                    </div>
-
-                    <div>
-                        <spring:bind path="registrationForm.stationId">
-                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
-                        </spring:bind>
-                        <form:select path="stationId" id="registrationStationSelect" cssClass="registration-select">
-                            <option value="" data-placeholder="true">Select Branch ID</option>
-                        </form:select>
-                        <form:errors path="stationId" cssClass="mt-1 block text-xs text-rose-600" />
-                    </div>
-                    </div>
-
-                    <div class="auth-form-card space-y-4">
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <spring:bind path="registrationForm.password">
-                                    <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Password</label>
-                                </spring:bind>
-                                <div class="auth-password-control">
-                                    <form:password path="password" id="registrationPassword"
-                                                   autocomplete="new-password"
-                                                   minlength="8"
-                                                   cssClass="registration-field" />
-                                    <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationPassword" aria-pressed="false"
-                                            data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button>
-                                </div>
-                                <form:errors path="password" cssClass="mt-1 block text-xs text-rose-600" />
-                            </div>
-                            <div>
-                                <spring:bind path="registrationForm.confirmPassword">
-                                    <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Confirm Password</label>
-                                </spring:bind>
-                                <div class="auth-password-control">
-                                    <form:password path="confirmPassword" id="registrationConfirmPassword"
-                                                   autocomplete="new-password"
-                                                   minlength="8"
-                                                   cssClass="registration-field" />
-                                    <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationConfirmPassword" aria-pressed="false"
-                                            data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button>
-                                </div>
-                                <form:errors path="confirmPassword" cssClass="mt-1 block text-xs text-rose-600" />
-                            </div>
-                        </div>
-                        <p class="registration-note text-sm">Use at least 8 characters. This password will be saved after your details and OTP are verified.</p>
-                    </div>
-
-                    <div id="registrationOtpBlock" class="auth-form-card ${not empty registrationForm.otpCode ? '' : 'hidden'}">
-                        <spring:bind path="registrationForm.otpCode">
-                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">OTP Code</label>
-                        </spring:bind>
-                        <form:input path="otpCode"
-                                    inputmode="numeric"
-                                    autocomplete="one-time-code"
-                                    maxlength="6"
-                                    data-otp-hidden="true"
-                                    data-otp-label="Registration OTP code"
-                                    cssClass="sr-only" />
-                        <p class="registration-note mt-2 text-sm">Enter the 6-digit code sent to your email to finish registration.</p>
-                        <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                            <span data-otp-spinner class="otp-status-spinner"></span>
-                            <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                            </svg>
-                            <span data-otp-text>Checking code...</span>
-                        </div>
-                        <form:errors path="otpCode" cssClass="mt-1 block text-xs text-rose-600" />
-                    </div>
-
-                    <div class="space-y-3 pt-2">
-                        <button id="memberRegisterRequestOtp" class="otp-request-button registration-action inline-flex w-full items-center justify-center gap-2" type="button">
-                            <span class="otp-button-spinner hidden"></span>
-                            <span class="otp-button-label">Submit</span>
-                        </button>
-                        <button id="memberRegisterSubmit" class="registration-action registration-primary inline-flex w-full items-center justify-center gap-2" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
-                            <span id="memberRegisterSubmitLoader" class="auth-ellipsis-loader hidden" aria-hidden="true">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </span>
-                            <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
-                        </button>
-                        <a href="/login" class="registration-action inline-flex w-full items-center justify-center text-slate-700">
-                            <spring:message code="register.member.back" />
-                        </a>
-                    </div>
-                </form:form>
-    </div>
+        <form:errors path="" cssClass="registration-form-error" element="div" />
+        <div id="registrationVerifyError" class="hidden" data-auto-scroll-message="true" aria-live="assertive"></div>
+        <div id="registrationVerifySuccess" class="hidden" data-auto-scroll-message="true" aria-live="polite"></div>
+        <div class="auth-form-actions registration-actions">
+            <a href="/login" class="registration-action auth-secondary-btn inline-flex items-center justify-center text-slate-700"><spring:message code="register.member.back" /></a>
+            <button id="memberRegisterRequestOtp" class="otp-request-button auth-primary-btn registration-action inline-flex items-center justify-center gap-2" type="button"
+                data-idle-label="<spring:message code='register.member.sendCode' htmlEscape='true' />"
+                data-loading-label="<spring:message code='register.member.sendingCode' htmlEscape='true' />"
+                data-sent-label="<spring:message code='register.member.codeSent' htmlEscape='true' />">
+                <span class="otp-button-spinner hidden"></span>
+                <span class="otp-button-label"><spring:message code="register.member.sendCode" /></span>
+            </button>
+            <button id="memberRegisterSubmit" class="registration-action registration-primary inline-flex items-center justify-center gap-2" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
+                <span id="memberRegisterSubmitLoader" class="auth-ellipsis-loader hidden" aria-hidden="true"><span></span><span></span><span></span></span>
+                <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
+            </button>
+        </div>
+    </form:form>
 </div>
+</main>
 <script id="registrationSaccosData" type="application/json">${registrationSaccosJson}</script>
 <script>
     (() => {
@@ -293,12 +274,11 @@
         const otpLiveStatus = document.getElementById("registrationOtpLiveStatus");
         const saccoSelect = form.querySelector('[name="saccoId"]');
         const stationSelect = document.getElementById("registrationStationSelect");
+        const stationPlaceholderLabel = stationSelect.options[0].textContent;
         const registrationSaccosData = document.getElementById("registrationSaccosData");
-        const memberNoInput = document.getElementById("registrationMemberNo");
-        const memberNoAvailability = document.getElementById("registrationMemberNoAvailability");
         const employeeNumberInput = document.getElementById("registrationEmployeeNumber");
         const employeeNumberAvailability = document.getElementById("registrationEmployeeNumberAvailability");
-        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData || !memberNoInput || !memberNoAvailability || !employeeNumberInput || !employeeNumberAvailability) {
+        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData || !employeeNumberInput || !employeeNumberAvailability) {
             return;
         }
 
@@ -370,12 +350,6 @@
             return check;
         };
 
-        createAvailabilityChecker(
-            memberNoInput,
-            memberNoAvailability,
-            (memberNo) => "/register/member/member-number-availability?memberNo=" + encodeURIComponent(memberNo),
-            () => true
-        );
         const checkEmployeeNumberAvailability = createAvailabilityChecker(
             employeeNumberInput,
             employeeNumberAvailability,
@@ -426,7 +400,7 @@
                 spinner.classList.toggle("hidden", !loading);
             }
             if (label) {
-                label.textContent = loading ? "Submitting..." : (sent ? "Submitted" : "Submit");
+                label.textContent = loading ? requestOtpButton.dataset.loadingLabel : (sent ? requestOtpButton.dataset.sentLabel : requestOtpButton.dataset.idleLabel);
             }
             requestOtpButton.disabled = loading || sent;
             requestOtpButton.classList.toggle("is-loading", loading);
@@ -504,7 +478,11 @@
             const selectedSacco = saccoSelect.value;
             const sacco = registrationSaccos.find((item) => item.saccoId === selectedSacco);
             const currentValue = stationSelect.value;
-            stationSelect.innerHTML = '<option value="" data-placeholder="true">Select Branch ID</option>';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.dataset.placeholder = 'true';
+            placeholder.textContent = stationPlaceholderLabel;
+            stationSelect.replaceChildren(placeholder);
             const stationIds = sacco && Array.isArray(sacco.stationIds) ? sacco.stationIds : [];
             stationIds.forEach((stationId) => {
                 const option = document.createElement('option');

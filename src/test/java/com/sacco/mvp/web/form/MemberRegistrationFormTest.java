@@ -33,6 +33,15 @@ class MemberRegistrationFormTest {
         assertThat(fullNameErrors(form)).containsExactly("Enter exactly three names.");
     }
 
+    @Test
+    void publicRegistrationCannotBindAClientNumber() {
+        var form = new MemberRegistrationForm();
+        var binder = new org.springframework.web.bind.WebDataBinder(form);
+        binder.bind(new org.springframework.beans.MutablePropertyValues(java.util.Map.of("memberNo","CHOSEN-BY-CLIENT","email","client@example.invalid")));
+        assertThat(form.getEmail()).isEqualTo("client@example.invalid");
+        assertThat(java.util.Arrays.stream(MemberRegistrationForm.class.getDeclaredFields()).map(java.lang.reflect.Field::getName)).doesNotContain("memberNo");
+    }
+
     private java.util.List<String> fullNameErrors(MemberRegistrationForm form) {
         return validator.validate(form).stream()
             .filter(violation -> "fullName".equals(violation.getPropertyPath().toString()))

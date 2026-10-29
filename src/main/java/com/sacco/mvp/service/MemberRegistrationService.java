@@ -42,10 +42,10 @@ public class MemberRegistrationService {
 
     /** The onboarding service supplies an authorized, existing scope; no policy defaults or signature are invented. */
     @Transactional
-    public Member registerAssisted(MemberRegistrationForm form,String institution,String branch) {
+    public Member registerAssisted(MemberRegistrationForm form,String clientNumber,String institution,String branch) {
         var registered=resolveRegisteredSacco(institution);
         requireRegisteredStation(institution,branch);
-        var verified=new VerifiedExternalMember(normalizeMemberNo(form.getMemberNo()),normalizeEmail(form.getEmail()),
+        var verified=new VerifiedExternalMember(normalizeMemberNo(clientNumber),normalizeEmail(form.getEmail()),
             nameSignatureService.requireFullName(form.getFullName(),"Enter your full names."),institution,branch,registered.getSaccoName());
         return registerKnown(form,verified,true);
     }
@@ -56,12 +56,13 @@ public class MemberRegistrationService {
         String employeeNumber = EmployeeNumber.normalize(form.getEmployeeNumber());
         ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone,
             employeeNumber, verified.saccoId(), verified.stationId());
+        String memberNo = assisted ? verified.memberNo() : allocateClientNumber();
         if(!assisted)resolveLocalSacco(verified);
         OffsetDateTime now = OffsetDateTime.now();
         Member member = Member.builder()
             .id(UUID.randomUUID())
             .saccoId(verified.saccoId())
-            .memberNo(verified.memberNo())
+            .memberNo(memberNo)
             .employeeNumber(employeeNumber)
             .stationId(verified.stationId())
             .fullName(verified.fullName())
@@ -94,7 +95,6 @@ public class MemberRegistrationService {
     }
 
     public VerifiedExternalMember verifyExternalMember(MemberRegistrationForm form) {
-        String memberNo = normalizeMemberNo(form.getMemberNo());
         String email = normalizeEmail(form.getEmail());
         String fullName = nameSignatureService.requireFullName(form.getFullName(), "Enter your full names.");
         String saccoId = normalizeSaccoId(form.getSaccoId());
@@ -102,7 +102,7 @@ public class MemberRegistrationService {
         RegisteredSacco registeredSacco = resolveRegisteredSacco(saccoId);
         requireRegisteredStation(saccoId, stationId);
         return new VerifiedExternalMember(
-            memberNo,
+            "",
             email,
             fullName,
             saccoId,
@@ -114,7 +114,7 @@ public class MemberRegistrationService {
     public void ensureLocalUniqueness(String memberNo, String email, String phone,
                                       String employeeNumber, String saccoId, String stationId) {
         String normalizedPhone = normalizePhone(phone);
-        if (memberRepository.findByMemberNo(memberNo).isPresent()) {
+        if (memberNo != null && !memberNo.isBlank() && memberRepository.findByMemberNo(memberNo).isPresent()) {
             log.info("Client registration blocked: client number already registered");
             throw new IllegalStateException("That client number is already registered in this system.");
         }
@@ -134,9 +134,13 @@ public class MemberRegistrationService {
         }
     }
 
-    public boolean memberNoAvailable(String memberNo) {
-        String normalizedMemberNo = normalizeMemberNo(memberNo);
-        return !normalizedMemberNo.isBlank() && memberRepository.findByMemberNo(normalizedMemberNo).isEmpty();
+    private String allocateClientNumber() {
+        // nextval is atomic across transactions and app instances. Never recycle rolled-back values.
+        for (int attempt = 0; attempt < 32; attempt++) {
+            String number = "CL-" + String.format(java.util.Locale.ROOT, "%08d", memberRepository.nextClientNumberValue());
+            if (!memberRepository.existsByMemberNoIgnoreCase(number)) return number;
+        }
+        throw new IllegalStateException("Unable to assign a client number. Please try again.");
     }
 
     public boolean employeeNumberAvailable(String employeeNumber, String saccoId, String stationId) {

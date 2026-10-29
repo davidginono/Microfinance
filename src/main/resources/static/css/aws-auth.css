@@ -157,6 +157,96 @@ body.aws-auth-shell .auth-form-fields > label {
     text-align: right;
 }
 
+body.auth-registration-page {
+    --auth-card-max-width: 44rem;
+}
+
+body.auth-registration-page main.auth-form-page {
+    padding: 32px 20px !important;
+}
+
+.registration-layout {
+    max-width: var(--auth-card-max-width);
+}
+
+.registration-heading {
+    margin-bottom: 20px;
+}
+
+.registration-heading h1 {
+    margin: 0;
+}
+
+.registration-layout .registration-section {
+    margin-bottom: 20px;
+    padding: 0;
+}
+
+.registration-section > h2 {
+    margin: 0;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--aws-line);
+    background: #fafafa;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 22px;
+}
+
+.registration-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding: 24px;
+}
+
+.registration-fields-grid > div {
+    min-width: 0;
+}
+
+.registration-field-wide {
+    grid-column: 1 / -1;
+}
+
+body.auth-registration-page .registration-section-label {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 14px !important;
+    line-height: 20px;
+    text-transform: none;
+}
+
+.registration-layout .registration-note,
+.registration-fields-grid [role="status"] {
+    font-size: 14px !important;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+}
+
+.registration-section-note {
+    margin: 0;
+    padding: 0 24px 24px;
+}
+
+.registration-layout .registration-otp {
+    padding: 24px;
+}
+
+.registration-layout .registration-form-error {
+    margin-bottom: 16px;
+    border: 1px solid var(--aws-danger);
+    padding: 12px;
+    background: #fff7f7;
+    color: var(--aws-danger);
+    font-size: 14px;
+}
+
+body.auth-registration-page .registration-actions button:disabled:not(.is-loading):not(.is-sent) {
+    border-color: var(--aws-line) !important;
+    background: #e9ebed !important;
+    color: #687078 !important;
+    cursor: not-allowed;
+}
+
 @media (max-width: 639px) {
     body.aws-auth-shell main.auth-form-page {
         padding: 64px 12px 24px !important;
@@ -164,6 +254,27 @@ body.aws-auth-shell .auth-form-fields > label {
 
     .auth-form-card,
     .auth-form-section {
+        padding: 20px 16px;
+    }
+
+    body.auth-registration-page main.auth-form-page {
+        padding: 20px 12px !important;
+    }
+
+    .registration-section > h2 {
+        padding: 12px 16px;
+    }
+
+    .registration-fields-grid {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 20px 16px;
+    }
+
+    .registration-section-note {
+        padding: 0 16px 20px;
+    }
+
+    .registration-layout .registration-otp {
         padding: 20px 16px;
     }
 }
