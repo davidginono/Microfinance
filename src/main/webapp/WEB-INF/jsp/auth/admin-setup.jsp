@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="<c:url value='/css/amazon-ember.css'/>"/>
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css'/>"/>
     <link rel="stylesheet" href="<c:url value='/css/console-components.css'/>"/>
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css'/>"/>
-    <link rel="stylesheet" href="<c:url value='/css/form-validation.css'/>"/>
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261029-form-spacing'/>"/>
+    <link rel="stylesheet" href="<c:url value='/css/form-validation.css?v=20261029-auth-forms'/>"/>
     <script defer src="<c:url value='/js/form-validation.js'/>"></script>
 </head>
 <body class="aws-auth-shell text-slate-800">
@@ -23,13 +23,13 @@
     data-maximum="<spring:message code='validation.maximum' htmlEscape='true'/>"
     data-short="<spring:message code='validation.short' htmlEscape='true'/>"
     data-long="<spring:message code='validation.long' htmlEscape='true'/>"></span>
-<main class="flex min-h-screen items-center justify-center px-4 py-10">
-<div class="w-full max-w-xl">
-    <h1 class="mb-6 text-2xl font-bold"><spring:message code="adminSetup.title"/></h1>
+<main class="auth-form-page">
+<div class="auth-form-layout">
+    <h1><spring:message code="adminSetup.title"/></h1>
     <form:form method="post" modelAttribute="setupForm" htmlEscape="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
-        <section class="border border-slate-200 bg-white p-6">
-            <div class="space-y-4">
+        <section class="auth-form-section">
+            <div class="auth-form-fields">
                 <c:forEach items="${['fullName','email','phone']}" var="field">
                     <label class="block text-sm font-semibold"><spring:message code="adminSetup.${field}"/>
                         <form:input path="${field}" type="${field=='email'?'email':field=='phone'?'tel':'text'}"
@@ -51,9 +51,9 @@
             </div>
         </section>
         <c:if test="${not empty setupError}"><p role="alert" class="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><spring:message code="${setupError}"/></p></c:if>
-        <div class="mt-6 flex justify-end"><button class="auth-primary-btn border px-4 py-2 text-sm font-semibold" type="submit"><spring:message code="adminSetup.save"/></button></div>
+        <div class="auth-form-actions"><button class="auth-primary-btn border px-4 py-2 text-sm font-semibold" type="submit"><spring:message code="adminSetup.save"/></button></div>
     </form:form>
-    <form method="post" action="<c:url value='/logout'/>" class="mt-4">
+    <form method="post" action="<c:url value='/logout'/>" class="auth-form-signout">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
         <button type="submit" class="auth-secondary-btn border border-slate-300 bg-white px-4 py-2 text-sm font-semibold"><spring:message code="adminSetup.logout"/></button>
     </form>

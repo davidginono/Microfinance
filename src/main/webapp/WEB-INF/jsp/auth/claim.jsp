@@ -15,12 +15,12 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260812-navbar-v6' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261029-form-spacing' />" />
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
 <body class="aws-auth-shell text-slate-800">
-<main class="flex min-h-screen items-center justify-center px-4 py-10">
-    <div class="claim-card w-full max-w-xl border border-slate-200 bg-white p-8">
+<main class="auth-form-page">
+    <div class="claim-card auth-form-layout auth-form-card">
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">Institution Admin Activation</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-900">Activate your staff account</h1>
@@ -57,7 +57,7 @@
                     <button type="submit" class="w-full bg-[#2F348D] px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#262a73]">Send verification code</button>
                 </form>
 
-                <form action="/auth/claim/verify" method="post" class="space-y-4">
+                <form action="/auth/claim/verify" method="post" class="auth-form-fields">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <input type="hidden" name="token" value="${claimToken}" />
 

@@ -564,7 +564,7 @@ class AwsConsoleViewContractTest {
             .contains("inset: 44px 0 auto")
             .contains("--sacco-topbar-height: 44px")
             .contains("--sacco-control-height: 32px")
-            .contains("--aws-topbar: #3A756B")
+            .contains("--aws-topbar: #232f3e")
             .contains("transform: none !important");
         assertThat(loanProducts)
             .contains("loan-calculator-steps")

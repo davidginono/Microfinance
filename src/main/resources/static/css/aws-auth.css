@@ -1,5 +1,5 @@
 :root {
-    --sacco-topbar: #3A756B;
+    --sacco-topbar: #232f3e;
     --sacco-canvas: #F2F3F3;
     --sacco-panel: #ffffff;
     --sacco-line: #d5dbdb;
@@ -15,7 +15,7 @@
     --sacco-control-height: 32px;
     --sacco-font-family: "Amazon Ember", Helvetica, Arial, sans-serif;
     --aws-ink: #16191f;
-    --aws-topbar: #3A756B;
+    --aws-topbar: #232f3e;
     --aws-muted: #5f6b7a;
     --aws-panel: #ffffff;
     --aws-bg: #F2F3F3;
@@ -51,7 +51,7 @@ body.aws-auth-shell::before {
     border-bottom: 1px solid #414750;
     background: var(--aws-topbar);
     color: #ffffff;
-    content: "SACCO Loan Management Console";
+    content: "Microfinance \2713";
     padding: 0 18px;
     font-size: 13px;
     font-weight: 700;
@@ -73,14 +73,98 @@ body.auth-shell.aws-auth-shell > .min-h-screen {
     padding-top: 32px !important;
 }
 
-body.aws-auth-shell .auth-frame,
-body.aws-auth-shell .error-card,
-body.aws-auth-shell main > div,
-body.aws-auth-shell main > section {
-    border: 1px solid var(--aws-line) !important;
-    border-radius: 2px !important;
-    background: var(--aws-panel) !important;
-    box-shadow: 0 1px 1px rgba(0, 28, 36, 0.12) !important;
+/* Standalone setup, activation and verification forms share explicit spacing.
+   Layout must not depend on a generated utility class or paint the page wrapper. */
+body.aws-auth-shell main.auth-form-page {
+    display: block;
+    min-height: 100dvh;
+    padding: 76px 20px 32px !important;
+}
+
+.auth-form-layout {
+    width: 100%;
+    max-width: 36rem;
+    min-width: 0;
+    margin-inline: auto;
+}
+
+body.aws-auth-shell .auth-form-layout > h1 {
+    margin: 0 0 20px;
+}
+
+.auth-form-card,
+.auth-form-section {
+    box-sizing: border-box;
+    min-width: 0;
+    border: 1px solid var(--aws-line);
+    border-radius: 2px;
+    background: var(--aws-panel);
+    box-shadow: 0 1px 1px rgba(0, 28, 36, .12);
+    padding: 24px;
+}
+
+.auth-form-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+}
+
+body.aws-auth-shell .auth-form-fields > label {
+    display: block;
+    min-width: 0;
+    margin: 0;
+    font-size: 14px !important;
+    line-height: 20px;
+    text-transform: none;
+}
+
+.auth-form-fields > label > input:not(.sr-only):not([type="hidden"]),
+.auth-form-fields > label > select,
+.auth-form-fields > label > textarea {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.auth-form-fields .auth-password-control {
+    margin-top: 6px;
+}
+
+.auth-form-fields .auth-password-control > input {
+    display: block;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.auth-form-fields > p {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.auth-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.auth-form-signout {
+    margin-top: 12px;
+    text-align: right;
+}
+
+@media (max-width: 639px) {
+    body.aws-auth-shell main.auth-form-page {
+        padding: 64px 12px 24px !important;
+    }
+
+    .auth-form-card,
+    .auth-form-section {
+        padding: 20px 16px;
+    }
 }
 
 body.aws-auth-shell [class*="from-"],
@@ -589,8 +673,7 @@ body.aws-auth-shell .auth-ellipsis-loader > span:nth-child(3) {
 
     body.aws-auth-shell .auth-frame,
     body.aws-auth-shell .error-card,
-    body.aws-auth-shell main > div,
-    body.aws-auth-shell main > section {
+    body.aws-auth-shell .auth-form-layout {
         width: 100% !important;
         max-width: 100% !important;
     }

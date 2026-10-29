@@ -12,11 +12,11 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260812-navbar-v6' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261029-form-spacing' />" />
 </head>
 <body class="aws-auth-shell text-slate-800">
-<main class="flex min-h-screen items-center justify-center px-4 py-10">
-    <div class="mfa-card w-full max-w-xl">
+<main class="auth-form-page">
+    <div class="mfa-card auth-form-layout auth-form-card">
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sign-In Verification</p>
             <h1 class="mt-2 text-2xl font-bold text-slate-900">Enter your verification code</h1>
@@ -35,7 +35,7 @@
         <div id="staffMfaError" class="hidden border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"></div>
         <div id="staffMfaSuccess" class="hidden border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
 
-        <form id="staffMfaVerifyForm" class="mt-5 space-y-4">
+        <form id="staffMfaVerifyForm" class="mt-5 auth-form-fields">
             <input type="hidden" id="staffMfaCsrfName" value="${_csrf.parameterName}" />
             <input type="hidden" id="staffMfaCsrfToken" value="${_csrf.token}" />
 
