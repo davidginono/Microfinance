@@ -223,7 +223,7 @@ public class MinorAdminInvitationService {
             + link + System.lineSeparator() + System.lineSeparator()
             + "After activation, you can sign in with your staff number and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()
             + "If you did not expect this invitation, please ignore this email.";
-        notificationEmailService.sendDirectEmail(
+        notificationEmailService.sendRequiredDirectEmail(
             member.getEmail(),
             "Activate your SACCO staff account",
             body

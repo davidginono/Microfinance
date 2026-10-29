@@ -26,6 +26,7 @@ public class AppUserPrincipal implements UserDetails {
     private final Set<Position> grantedPositions;
     private final boolean memberAccess;
     private final boolean staffSession;
+    private final boolean platformSetupRequired;
     private final String memberNo;
     private final String username;
     private final String staffNo;
@@ -43,6 +44,7 @@ public class AppUserPrincipal implements UserDetails {
         this.stationId = member.getStationId();
         this.fullName = member.getFullName();
         this.email = member.getEmail();
+        this.platformSetupRequired = member.isPlatformSetupRequired();
         this.memberNo = member.getMemberNo();
         this.staffNo = member.getStaffNo();
         this.memberAccess = member.isMemberAccess();

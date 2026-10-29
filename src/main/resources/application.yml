@@ -121,6 +121,8 @@ management:
       enabled: false
 
 app:
+  bootstrap:
+    admin-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
   base-url: ${APP_BASE_URL:http://localhost:8080}
   time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
   secrets:

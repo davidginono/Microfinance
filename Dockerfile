@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-# Sized for 20 concurrent users on Amazon Lightsail Linux 2 GB (x86 Intel, public IPv4)
-# with Postgres colocated on the same VM. Default image is linux/amd64.
+# Small-host container defaults with Postgres on the same host.
+# Default image is linux/amd64. Capacity requires workload measurements.
 # The JVM assumes a ~1.15g cgroup (see docker-compose.prod.yml).
-# Optional Graviton only: docker build --platform linux/arm64 -t sacco-lms .
+# For an ARM host: docker build --platform linux/arm64 -t sacco-lms .
 
 FROM node:22-alpine AS styles
 WORKDIR /workspace

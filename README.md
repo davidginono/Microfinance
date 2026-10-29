@@ -231,34 +231,19 @@ Enable it only when you explicitly want seeded data:
 APP_SEED_DEMO_DATA_ENABLED=true
 ```
 
+## Fresh deployment
+
+Follow [administrator setup and onboarding](docs/fresh-deployment-onboarding.md). Supply a private `APP_BOOTSTRAP_ADMIN_PASSWORD`, sign in as `ADM001` at `/system-admin/login`, and complete the required administrator profile and password change. No shared initial password is enabled.
+
 ## Docker
 
-This repository includes:
-
-- `Dockerfile` (default **linux/amd64**, Lightsail x86 2 GB with colocated Postgres)
-- `docker-compose.yml` (local)
-- `docker-compose.prod.yml` (20 concurrent users, app + Postgres on one Lightsail 2 GB IPv4 host)
-- `README.Docker.md` for the lowest-cost AWS layout
-
-Start the application and PostgreSQL together locally with:
+The repository includes a host-independent `Dockerfile`, local `docker-compose.yml` and optional `docker-compose.prod.yml`. See [container instructions](README.Docker.md). No cloud deployment is configured.
 
 ```bash
 docker compose up --build
 ```
 
-Default local compose services:
-
-- app on port `8080`
-- PostgreSQL on port `5432`
-- Mailpit SMTP on port `1025` and inbox UI on port `8025`
-
-Production is **Amazon Lightsail Linux 2 GB with public IPv4** (x86 Intel, not Graviton; default image **linux/amd64**), Postgres colocated, extra **20 GB** SSD at `/mnt/saccos-data`, about **$192 / TSh 507,000** per year. Bind `/mnt/saccos-data/postgres`, `/mnt/saccos-data/uploads`, and `/mnt/saccos-data/saccos` as in `docker-compose.prod.yml`. After the disk is mounted:
-
-```bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
-
-See `README.Docker.md`. Do not use a 1 GB instance, IPv6-only, RDS, or an ALB at this size.
+Local compose exposes the app on 8080, PostgreSQL on 5432, and Mailpit's inbox on 8025 (SMTP 1025). Supply the bootstrap secret through a private environment file or shell environment.
 
 ## Important Routes
 

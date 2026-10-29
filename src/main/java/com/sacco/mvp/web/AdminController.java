@@ -915,7 +915,9 @@ public class AdminController {
             String createdUserId = adminService.userIdLabel(createdUser.getId());
             ra.addFlashAttribute("createdStaffUserId", createdUserId);
             ra.addFlashAttribute("createdStaffMemberNumber", createdUser.getStaffNo());
-            ra.addFlashAttribute("message", "Staff member created with User ID " + createdUserId + " and Staff Number " + createdUser.getStaffNo() + ". Invite email sent and waiting for activation.");
+            ra.addFlashAttribute("message", messages.getMessage(createdUser.isMemberAccess()
+                ? "staffOnboarding.assigned" : "staffOnboarding.invited",new Object[]{createdUser.getStaffNo()},
+                org.springframework.context.i18n.LocaleContextHolder.getLocale()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

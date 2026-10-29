@@ -54,7 +54,7 @@ public class NotificationEmailService {
         } catch (Exception ex) {
             log.warn("Unable to send direct email to {}: {}", email, ex.getMessage());
             if (deliveryRequired) {
-                throw new IllegalStateException("The approval email could not be delivered. Please try again.", ex);
+                throw new IllegalStateException("Email could not be sent. Check email settings and try again.", ex);
             }
         }
     }

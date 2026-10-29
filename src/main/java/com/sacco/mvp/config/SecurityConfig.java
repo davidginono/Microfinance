@@ -318,6 +318,7 @@ public class SecurityConfig {
                 }))
             .exceptionHandling(ex -> ex.accessDeniedHandler(loginAwareAccessDeniedHandler()))
             .csrf(Customizer.withDefaults())
+            .addFilterBefore(new com.sacco.mvp.security.PlatformSetupFilter(), AuthorizationFilter.class)
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
             .addFilterAfter(new SessionTimeoutPolicyFilter(platformSessionSettingsService), AuthorizationFilter.class)
             .addFilterAfter(new AppUsageTrackingFilter(appUsageAnalyticsService), AuthorizationFilter.class);
@@ -418,7 +419,7 @@ public class SecurityConfig {
 
             @Override
             public boolean matches(CharSequence rawPassword, String encodedPassword) {
-                if (encodedPassword == null) {
+                if (encodedPassword == null || "!BOOTSTRAP_REQUIRED".equals(encodedPassword)) {
                     return false;
                 }
                 if (encodedPassword.startsWith("$2a$") || encodedPassword.startsWith("$2b$")

@@ -48,6 +48,9 @@ public class Member {
 
     private String email;
 
+    @Column(name = "platform_setup_required", nullable = false)
+    private boolean platformSetupRequired;
+
     @Column(name = "signature_text")
     private String signatureText;
 

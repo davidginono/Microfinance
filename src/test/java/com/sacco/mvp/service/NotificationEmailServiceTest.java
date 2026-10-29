@@ -131,7 +131,7 @@ class NotificationEmailServiceTest {
             "Your code is 123456"
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("could not be delivered")
+            .hasMessageContaining("could not be sent")
             .hasCauseInstanceOf(MailSendException.class);
     }
 
