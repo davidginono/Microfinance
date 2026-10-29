@@ -18,10 +18,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import jakarta.el.ELProcessor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -61,7 +65,7 @@ class PlatformAdminServiceTest {
     }
 
     @Test
-    void saccoDetailExposesScopedLoanApplicationStatusCounts() {
+    void saccoDetailExposesScopedCountsAndResolvesTemplateBindings() throws Exception {
         OffsetDateTime now = OffsetDateTime.now();
         RegisteredSacco sacco = RegisteredSacco.builder()
             .saccoId("SACCO-1")
@@ -112,6 +116,20 @@ class PlatformAdminServiceTest {
                 tuple(LoanStatus.REJECTED, "Rejected", 6L)
             );
         verify(loanApplicationRepository).countByStatusForScope("SACCO-1", "ST-1");
+
+        // Jasper precompilation does not resolve EL properties. Exercise the actual
+        // template bindings, including branches that are not visible on the overview.
+        var el = new ELProcessor();
+        el.defineBean("saccoDetail", detail);
+        String template = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/sacco-detail.jsp"));
+        var bindings = Pattern.compile("saccoDetail(?:\\.[A-Za-z][A-Za-z0-9_]*)+").matcher(template);
+        var expressions = new java.util.LinkedHashSet<String>();
+        while (bindings.find()) expressions.add(bindings.group());
+        assertThat(expressions).isNotEmpty();
+        for (String expression : expressions) {
+            org.assertj.core.api.Assertions.assertThatCode(() -> el.eval(expression))
+                .as("Institution details binding %s", expression).doesNotThrowAnyException();
+        }
     }
 
     private static LoanApplicationRepository.StatusCountProjection statusCount(LoanStatus status, long total) {

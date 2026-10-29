@@ -534,7 +534,7 @@
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Disposable Income</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalsavingsLabel}</p>
+                        <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.totalSavingsLabel}</p>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Exposure</p>
