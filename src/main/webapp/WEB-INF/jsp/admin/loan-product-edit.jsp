@@ -110,11 +110,6 @@
                 <section class="product-builder-section product-config-step is-active" data-product-config-step="identity" aria-label="Product identity"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.identity" /></h2></div>
                     <div id="product-config-identity" class="product-builder-section-body product-identity-grid" data-product-config-panel>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
-                            <input name="displayOrder" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedDisplayOrder}" />
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
                             <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${fn:escapeXml(product.displayName)}" data-product-name-field />
                         </label>
@@ -492,7 +487,6 @@
 <spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
 <spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" var="runtimeDisbursementOfficer" />
-<spring:message code="admin.settings.validation.displayOrder" text="Display order must be 1 or higher." var="validationDisplayOrder" />
 <spring:message code="admin.settings.validation.productNameRequired" text="Enter a loan product name." var="validationProductNameRequired" />
 <spring:message code="admin.settings.validation.productNameLength" text="Loan product name must be 120 characters or fewer." var="validationProductNameLength" />
 <spring:message code="admin.settings.validation.productDescriptionRequired" text="Enter a product description." var="validationProductDescriptionRequired" />

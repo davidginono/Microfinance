@@ -43,6 +43,9 @@ import com.sacco.mvp.repository.UserSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.domain.PageImpl;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -1904,8 +1907,10 @@ class AdminServiceTest {
         verify(memberRepository).flush();
     }
 
-    @Test
-    void updateLoanProductPersistsCurrentConfiguration() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = 6)
+    void updateLoanProductPersistsCurrentConfiguration(Integer displayOrder) {
         UUID productId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
         LoanProductSetting product = LoanProductSetting.builder()
@@ -1960,7 +1965,7 @@ class AdminServiceTest {
             "DEV_GROWTH",
             "Growth Loan",
             "Updated",
-            6,
+            displayOrder,
             new BigDecimal("250000.00"),
             new BigDecimal("2500000.00"),
             1,
@@ -1987,6 +1992,7 @@ class AdminServiceTest {
         verify(loanProductSettingRepository).save(product);
         assertThat(product.getProductCode()).isEqualTo("DEV_GROWTH");
         assertThat(product.getProductName()).isEqualTo("Growth Loan");
+        assertThat(product.getDisplayOrder()).isEqualTo(displayOrder == null ? 4 : displayOrder);
     }
 
     @Test

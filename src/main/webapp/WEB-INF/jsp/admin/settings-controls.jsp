@@ -400,14 +400,8 @@
                         <div class="product-builder-section-header">
                             <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.basics" text="Basics" /></p>
                             <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h2>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityCreateHelp" text="Set the client-facing name, display order, and status for this product." /></p>
                         </div>
                         <div class="product-builder-section-body product-identity-grid">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
-                                <input name="displayOrder" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="5" />
-                            </label>
-
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
                                 <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.namePlaceholder" text="e.g. School Fees Booster" />' data-product-name-field />
@@ -780,7 +774,6 @@
 <spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
 <spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" var="runtimeDisbursementOfficer" />
-<spring:message code="admin.settings.validation.displayOrder" text="Display order must be 1 or higher." var="validationDisplayOrder" />
 <spring:message code="admin.settings.validation.productNameRequired" text="Enter a loan product name." var="validationProductNameRequired" />
 <spring:message code="admin.settings.validation.productNameLength" text="Loan product name must be 120 characters or fewer." var="validationProductNameLength" />
 <spring:message code="admin.settings.validation.productDescriptionRequired" text="Enter a product description." var="validationProductDescriptionRequired" />

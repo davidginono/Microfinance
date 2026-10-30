@@ -1109,7 +1109,9 @@ public class AdminService {
         product.setProductCode(normalizeProductCode(saccoId, product.getLoanType(), productCode, product.getId(), productName));
         product.setProductName(normalizeProductName(product.getLoanType(), productName));
         product.setProductDescription(normalizeRequiredProductDescription(productDescription));
-        product.setDisplayOrder(normalizeDisplayOrder(displayOrder));
+        if (displayOrder != null) {
+            product.setDisplayOrder(normalizeDisplayOrder(displayOrder));
+        }
         product.setMinimumAmount(normalizeMinimumAmount(minimumAmount));
         product.setMaximumAmount(normalizeMaximumAmount(product.getMinimumAmount(), maximumAmount));
         product.setGuarantorsRequired(normalizeGuarantorCount(guarantorsRequired));

@@ -31,7 +31,6 @@
             runtimeAccountant: "${runtimeAccountant}",
             runtimeDisbursementOfficer: "${runtimeDisbursementOfficer}",
             runtimeDisbursementRelease: "${runtimeDisbursementRelease}",
-            validationDisplayOrder: "${validationDisplayOrder}",
             validationProductNameRequired: "${validationProductNameRequired}",
             validationProductNameLength: "${validationProductNameLength}",
             validationProductDescriptionRequired: "${validationProductDescriptionRequired}",
@@ -843,7 +842,6 @@
 
             function validateBeforeSubmit() {
                 const errors = [];
-                const displayOrder = numberOrNull(form.querySelector('[name="displayOrder"]'));
                 const productName = form.querySelector('[name="productName"]');
                 const productDescription = form.querySelector('[name="productDescription"]');
                 const minimumAmount = numberOrNull(form.querySelector('[name="minimumAmount"]'));
@@ -870,9 +868,6 @@
                 const accountantEnabled = accountantToggle && accountantToggle.checked;
                 const disbursementOfficerRequired = !disbursementOfficerToggle || disbursementOfficerToggle.checked;
 
-                if (displayOrder === null || Number.isNaN(displayOrder) || displayOrder < 1) {
-                    addValidationError(errors, 'displayOrder', productSettingsText.validationDisplayOrder);
-                }
                 if (productName && !productName.value.trim()) {
                     addValidationError(errors, 'productName', productSettingsText.validationProductNameRequired);
                 } else if (productName && productName.value.trim().length > 120) {

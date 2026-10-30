@@ -492,7 +492,7 @@ class AdminControllerUserAccessSecurityTest {
     }
 
     @Test
-    void createLoanProductSuccessClosesModalAndTargetsCreatedProductCard() throws Exception {
+    void createLoanProductWithoutDisplayOrderUsesDefaultAndTargetsCreatedProductCard() throws Exception {
         UUID productId = UUID.randomUUID();
         AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
         LoanProductSetting createdProduct = LoanProductSetting.builder().id(productId).build();
@@ -511,7 +511,6 @@ class AdminControllerUserAccessSecurityTest {
                 .param("modalKey", "create-product")
                 .param("productName", "School Fees Booster")
                 .param("productDescription", "Created product")
-                .param("displayOrder", "5")
                 .param("minimumAmount", "0")
                 .param("maximumAmount", "500000")
                 .param("guarantorsRequired", "2")
@@ -546,7 +545,6 @@ class AdminControllerUserAccessSecurityTest {
                 .param("modalKey", "create-product")
                 .param("productName", "School Fees Booster")
                 .param("productDescription", "Submitted text should remain visible")
-                .param("displayOrder", "5")
                 .param("minimumAmount", "0")
                 .param("maximumAmount", "500000")
                 .param("guarantorsRequired", "2")
@@ -573,6 +571,33 @@ class AdminControllerUserAccessSecurityTest {
     }
 
     @Test
+    void updateLoanProductWithoutDisplayOrderSucceeds() throws Exception {
+        UUID productId = UUID.randomUUID();
+        AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_UPDATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
+
+        mockMvc.perform(post("/admin/settings-controls/{id}", productId)
+                .param("productName", "Business Loan")
+                .param("productDescription", "Updated product")
+                .param("minimumAmount", "0")
+                .param("guarantorsRequired", "0")
+                .param(productRatioParameterFromForm(), "0")
+                .param("applicationFee", "0")
+                .param("insurancePercent", "0")
+                .param("processingFeePercent", "0")
+                .param("annualInterestPercent", "10")
+                .param("minRepaymentMonths", "1")
+                .param("maxRepaymentMonths", "12")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/" + productId + "/edit"))
+            .andExpect(flash().attribute("message", "Loan product updated."))
+            .andExpect(flash().attribute("error", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
     void updateLoanProductValidationErrorPreservesSubmittedDraft() throws Exception {
         UUID productId = UUID.randomUUID();
         AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_UPDATE));
@@ -582,7 +607,6 @@ class AdminControllerUserAccessSecurityTest {
                 .param("modalKey", "product-" + productId)
                 .param("productName", "Emergency Loan")
                 .param("productDescription", "Edited text should remain visible")
-                .param("displayOrder", "2")
                 .param("minimumAmount", "10000")
                 .param("maximumAmount", "300000")
                 .param("guarantorsRequired", "1")
