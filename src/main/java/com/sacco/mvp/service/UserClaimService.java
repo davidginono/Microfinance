@@ -107,6 +107,16 @@ public class UserClaimService {
             .anyMatch(principal.getClaims()::contains);
     }
 
+    /** Enabling client access must not expand role-default staff permissions or rewrite explicit assignments. */
+    @Transactional
+    public void preserveStaffClaimsForClientAccess(UUID memberId, Collection<Position> staffRoles) {
+        if (memberAccessClaimRepository.existsByIdMemberId(memberId)) return;
+        var prefs = userSettingsRepository.findById(memberId)
+            .map(UserSettings::getNotificationPrefs).map(this::parsePrefs).orElse(Map.of());
+        if (prefs.containsKey("claims")) return;
+        updateClaims(memberId, new ArrayList<>(defaultClaims(staffRoles, false)));
+    }
+
     @Transactional
     public void updateClaims(UUID memberId, List<UserClaim> claims) {
         if (memberId == null) {

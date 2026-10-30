@@ -277,6 +277,7 @@ public class LoanRecordingService {
         var source=records.topUpSource(a,f.getLoanId());
         if(source.isPresent())records.lockTopUpPair(a,source.get(),f.getLoanId());
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
+        if(a.getMemberId().equals(loan.getApplicantMemberId()))throw new IllegalArgumentException("staffClient.error.ownLoan");
         if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted())||Boolean.TRUE.equals(f.getSharedAccepted()),"organizationFundingPending");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
         String kycError=loans.kycError(loan.getId(),a.getSaccoId(),a.getStationId(),clock.today());

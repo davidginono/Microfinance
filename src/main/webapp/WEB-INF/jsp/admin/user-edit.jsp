@@ -137,6 +137,8 @@
     </div>
 </form>
 
+<%@ include file="staff-client-access.jspf" %>
+
 <c:if test="${user.canDeleteStaffRecord and canDeleteUsers}">
     <div class="app-modal-overlay hidden" data-user-modal="delete-user-${user.accountId}">
         <div class="app-modal-panel app-modal-panel--compact">

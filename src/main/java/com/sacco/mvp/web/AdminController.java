@@ -962,6 +962,7 @@ public class AdminController {
             );
             List<Position> staffPositions = staffPositionsFor(principal);
             model.addAttribute("user", user);
+            model.addAttribute("canEnableClientAccess", user.isCanEnableClientAccess());
             model.addAttribute("staffPositions", staffPositions);
             model.addAttribute("accessActions", com.sacco.mvp.domain.AccessAction.values());
             model.addAttribute("accessMatrixRows", UserClaim.matrixRows());
@@ -1033,6 +1034,21 @@ public class AdminController {
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/users/" + id + "/edit";
+    }
+
+    @PostMapping("/users/{id}/enable-client-access")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
+    public String enableClientAccess(@PathVariable UUID id,
+                                     @AuthenticationPrincipal AppUserPrincipal principal,
+                                     RedirectAttributes ra) {
+        var locale = org.springframework.context.i18n.LocaleContextHolder.getLocale();
+        try {
+            String clientNumber = adminService.enableClientAccess(principal, id);
+            ra.addFlashAttribute("message", messages.getMessage("staffClient.enabled", new Object[]{clientNumber}, locale));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(), locale));
         }
         return "redirect:/admin/users/" + id + "/edit";
     }

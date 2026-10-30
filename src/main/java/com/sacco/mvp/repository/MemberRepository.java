@@ -16,6 +16,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from Member m where m.id = :id and m.saccoId = :institution and lower(m.stationId) = lower(:branch)")
+    Optional<Member> findForClientAccess(@Param("id") UUID id, @Param("institution") String institution,
+                                        @Param("branch") String branch);
+    Optional<Member> findByIdAndSaccoIdAndStationIdIgnoreCase(UUID id, String saccoId, String stationId);
+
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
     @Query("""
         update Member m set m.employeeNumber = :number

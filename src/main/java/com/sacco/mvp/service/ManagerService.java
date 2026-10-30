@@ -257,6 +257,7 @@ public class ManagerService {
                        String signatureText,
                        OffsetDateTime signatureVerifiedAt) {
         LoanApplication app = getManagedApplication(loanId, managerId, managerDecisionClaim(decision));
+        requireIndependentActor(app, managerId);
         if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
             throw new IllegalStateException("Application is not ready for manager review");
         }
@@ -313,6 +314,7 @@ public class ManagerService {
                                  String signatureText,
                                  OffsetDateTime signatureVerifiedAt) {
         LoanApplication app = getAccountantApplication(loanId, accountantId, accountantDecisionClaim(decision));
+        requireIndependentActor(app, accountantId);
         if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
             throw new IllegalStateException("Application is not ready for accountant review");
         }
@@ -353,6 +355,12 @@ public class ManagerService {
         return reasons == null ? "" : reasons.trim();
     }
 
+    private void requireIndependentActor(LoanApplication app, UUID actorId) {
+        if (actorId.equals(app.getApplicantMemberId())) {
+            throw new IllegalArgumentException("staffClient.error.ownLoan");
+        }
+    }
+
     private String normalizeSignature(String signatureText, OffsetDateTime signatureVerifiedAt) {
         String normalizedSignature = signatureText == null ? "" : signatureText.trim();
         if (normalizedSignature.isBlank() || signatureVerifiedAt == null) {
@@ -374,6 +382,7 @@ public class ManagerService {
                              String disbursementNotes,
                              MultipartFile disbursementProofFile) {
         LoanApplication app = getDisbursementApplication(applicationId, disbursementOfficerId);
+        requireIndependentActor(app, disbursementOfficerId);
         if(accountingGuard.recordedLoan(app.getId()))throw new IllegalArgumentException("recording.error.reviewPosting");
         if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
             throw new IllegalStateException("Application is not ready for disbursement");

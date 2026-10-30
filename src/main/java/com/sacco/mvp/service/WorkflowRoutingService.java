@@ -95,6 +95,7 @@ public class WorkflowRoutingService {
                     UserClaim.LOAN_OFFICER_QUEUE_ASSIGN,
                     UserClaim.LOAN_OFFICER_QUEUE_APPROVE
                 )).stream()
+                .filter(officer -> !officer.getId().equals(app.getApplicantMemberId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No active loan officer is configured for this station."));
             boardReviewRepository.save(BoardReview.builder()
@@ -109,6 +110,10 @@ public class WorkflowRoutingService {
         }
 
         java.util.List<UUID> boardMemberIds = productReviewerIds(app, stage);
+        // Keep the product's required reviewers and quorum; never count the borrower.
+        if (app.getApplicantMemberId() != null && boardMemberIds.contains(app.getApplicantMemberId())) {
+            throw new IllegalStateException("staffClient.error.reviewers");
+        }
         if (boardMemberIds.isEmpty()) {
             throw new IllegalStateException("No reviewers are assigned to this loan product stage.");
         }

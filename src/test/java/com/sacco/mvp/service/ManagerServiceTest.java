@@ -45,6 +45,33 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ManagerServiceTest {
+    @Test
+    void borrowerCannotMakeManagerOrAccountantDecisionOnTheirOwnLoan() {
+        UUID actor = UUID.randomUUID();
+        var loan = LoanApplication.builder().id(UUID.randomUUID()).saccoId("I1").applicantMemberId(actor).build();
+        when(loanApplicationRepository.findById(loan.getId())).thenReturn(Optional.of(loan));
+        when(roleDirectoryService.hasActiveClaimInSacco(eq(actor), eq("I1"), any())).thenReturn(true);
+        for (ManagerDecision decision : new ManagerDecision[]{ManagerDecision.ACCEPT, ManagerDecision.REJECT}) {
+            assertThatThrownBy(() -> managerService.decide(loan.getId(), actor, decision, "Reason", "Signature", OffsetDateTime.now()))
+                .hasMessage("staffClient.error.ownLoan");
+            assertThatThrownBy(() -> managerService.decideAccountant(loan.getId(), actor, decision, "Reason", "Signature", OffsetDateTime.now()))
+                .hasMessage("staffClient.error.ownLoan");
+        }
+        verify(managerReviewRepository, never()).save(any());
+        verify(loanApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    void borrowerCannotDisburseTheirOwnLoan() {
+        UUID actor = UUID.randomUUID();
+        var loan = LoanApplication.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").applicantMemberId(actor).build();
+        when(loanApplicationRepository.findForDisbursement(loan.getId())).thenReturn(Optional.of(loan));
+        when(memberRepository.findById(actor)).thenReturn(Optional.of(Member.builder().id(actor).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build()));
+        when(roleDirectoryService.hasActiveClaimInSacco(actor, "I1", UserClaim.DISBURSEMENT_QUEUE_DISBURSE)).thenReturn(true);
+        assertThatThrownBy(() -> managerService.disburseLoan(loan.getId(), actor, LocalDate.now(), null, null, null, null, null, null, null, null))
+            .hasMessage("staffClient.error.ownLoan");
+        verify(loanApplicationRepository, never()).save(any());
+    }
 
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private LoanProductSettingRepository loanProductSettingRepository;

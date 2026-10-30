@@ -162,6 +162,9 @@ public class BoardService {
 
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        if (boardMemberId.equals(app.getApplicantMemberId())) {
+            throw new IllegalArgumentException("staffClient.error.ownLoan");
+        }
         LoanStatus expectedStatus = pendingStatusFor(stage);
         if (app.getStatus() != expectedStatus) {
             throw new IllegalStateException("Application not in " + stage.getDisplayLabel().toLowerCase() + " stage");

@@ -40,6 +40,25 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WorkflowRoutingServiceTest {
+    @Test
+    void configuredBorrowerReviewerDoesNotReduceTheRequiredPanel() {
+        UUID borrower = UUID.randomUUID();
+        UUID independent = UUID.randomUUID();
+        var loan = LoanApplication.builder().id(UUID.randomUUID()).saccoId("I1")
+            .applicantMemberId(borrower).status(LoanStatus.DRAFT).build();
+        var workflow = org.mockito.Mockito.mock(LoanProductWorkflowService.WorkflowDefinition.class);
+        when(workflow.stages()).thenReturn(List.of(ApprovalWorkflowStage.BOARD));
+        when(loanProductWorkflowService.resolveForApplication(loan)).thenReturn(workflow);
+        when(loanProductWorkflowService.recordedReviewerIds(loan, ApprovalWorkflowStage.BOARD))
+            .thenReturn(Optional.of(List.of(borrower, independent)));
+        when(roleDirectoryService.hasActiveClaimInSacco(eq(borrower), eq("I1"), any())).thenReturn(true);
+        when(roleDirectoryService.hasActiveClaimInSacco(eq(independent), eq("I1"), any())).thenReturn(true);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> workflowRoutingService.moveToFirstReviewStage(loan, borrower))
+            .hasMessage("staffClient.error.reviewers");
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DRAFT);
+        org.mockito.Mockito.verify(boardReviewRepository, org.mockito.Mockito.never()).save(any());
+        org.mockito.Mockito.verifyNoInteractions(outboxService);
+    }
 
     @Mock private SaccoSettingsRepository saccoSettingsRepository;
     @Spy private ApprovalFlowService approvalFlowService = new ApprovalFlowService();

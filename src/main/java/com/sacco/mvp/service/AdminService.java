@@ -503,6 +503,52 @@ public class AdminService {
     private record MinorAdminInvitationState(String label, OffsetDateTime expiresAt) {
     }
 
+    /** Adds client access without replacing staff roles, credentials or assigned permissions. */
+    @Transactional(timeout = 15)
+    public String enableClientAccess(com.sacco.mvp.security.AppUserPrincipal actor, UUID accountId) {
+        if (actor == null || !actor.isStaffSession() || !actor.isWorkspaceAdminScope()
+            || !actor.getClaims().contains(UserClaim.USER_ACCESS_UPDATE.name())
+            || actor.getStationId() == null || actor.getStationId().isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException("Forbidden");
+        }
+        // Lock before loading either identity: the administrator may be enabling their own client access.
+        Member member = memberRepository.findForClientAccess(accountId, actor.getSaccoId(), actor.getStationId())
+            .orElseThrow(() -> new IllegalArgumentException("staffClient.error.unavailable"));
+        Member administrator = memberRepository.findByIdAndSaccoIdAndStationIdIgnoreCase(
+            actor.getMemberId(), actor.getSaccoId(), actor.getStationId())
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Forbidden"));
+        if (administrator.getStatus() != MemberStatus.ACTIVE || !administrator.isStaffAccessActive()
+            || !administrator.getActiveStaffRolesResolved().contains(Position.MINOR_ADMIN)
+            || administrator.getStaffRolesResolved().contains(Position.ADMIN)
+            || !roleDirectoryService.hasActiveClaimInSacco(actor.getMemberId(), actor.getSaccoId(), UserClaim.USER_ACCESS_UPDATE)) {
+            throw new org.springframework.security.access.AccessDeniedException("Forbidden");
+        }
+        if (member.getStatus() != MemberStatus.ACTIVE || !member.isStaffAccessActive()
+            || member.getStaffRolesResolved().contains(Position.ADMIN)) {
+            throw new IllegalStateException("staffClient.error.inactive");
+        }
+        if (member.isMemberAccess()) return member.getMemberNo();
+        saccoRegistryService.requireStationForSacco(actor.getSaccoId(), actor.getStationId());
+        Map<String, Object> before = snapshotMember(member);
+        String clientNumber = null;
+        for (int attempt = 0; attempt < 32; attempt++) {
+            String candidate = "CL-" + String.format(Locale.ROOT, "%08d", memberRepository.nextClientNumberValue());
+            if (!memberRepository.existsByMemberNoIgnoreCase(candidate)) {
+                clientNumber = candidate;
+                break;
+            }
+        }
+        if (clientNumber == null) throw new IllegalStateException("staffClient.error.number");
+        member.setMemberNo(clientNumber);
+        member.setMemberAccount(true);
+        memberRepository.save(member);
+        ensureUserSettings(member.getId(), OffsetDateTime.now());
+        // Client login receives client claims; keep staff permissions exactly as assigned.
+        userClaimService.preserveStaffClaimsForClientAccess(member.getId(), member.getStaffRolesResolved());
+        auditService.log("MEMBER", member.getId(), "STAFF_CLIENT_ACCESS_ENABLED", actor.getMemberId(), before, snapshotMember(member));
+        return clientNumber;
+    }
+
     @Transactional
     public UserUpdateResult updateUser(String saccoId,
                                        String stationId,
@@ -2570,6 +2616,8 @@ public class AdminService {
                 : member.getStaffAccessActivatedAt() != null ? "Acknowledged" : "Not Recorded")
             .membershipLabel(resolveMembershipLabel(member))
             .memberAccess(memberAccess)
+            .canEnableClientAccess(!memberAccess && member.getStatus() == MemberStatus.ACTIVE
+                && member.isStaffAccessActive() && !member.getStaffRolesResolved().contains(Position.ADMIN))
             .canDeleteStaffRecord(canDeleteStaffRecord(member))
             .build();
     }
@@ -3586,6 +3634,7 @@ public class AdminService {
         private String acknowledgementStatus;
         private String membershipLabel;
         private boolean memberAccess;
+        private boolean canEnableClientAccess;
         private boolean canDeleteStaffRecord;
     }
 

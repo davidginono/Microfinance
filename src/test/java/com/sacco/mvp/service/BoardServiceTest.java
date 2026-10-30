@@ -22,6 +22,24 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BoardServiceTest {
+    @Test
+    void borrowerCannotReviewOwnLoanAtAnyAssignedStage() {
+        UUID actor = UUID.randomUUID();
+        var loan = LoanApplication.builder().id(UUID.randomUUID()).applicantMemberId(actor).build();
+        when(loanApplicationRepository.findById(loan.getId())).thenReturn(Optional.of(loan));
+        for (ApprovalWorkflowStage stage : new ApprovalWorkflowStage[]{ApprovalWorkflowStage.LOAN_OFFICER,
+                ApprovalWorkflowStage.BOARD, ApprovalWorkflowStage.CREDIT_COMMITTEE, ApprovalWorkflowStage.CHAIRPERSON}) {
+            var review = BoardReview.builder().id(UUID.randomUUID()).decision(BoardDecision.PENDING).build();
+            when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(loan.getId(), actor, stage))
+                .thenReturn(Optional.of(review));
+            for (BoardDecision decision : new BoardDecision[]{BoardDecision.APPROVED, BoardDecision.REJECTED}) {
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> boardService.decide(loan.getId(), actor, stage, decision,
+                    "Reason", "Signature", OffsetDateTime.now())).hasMessage("staffClient.error.ownLoan");
+            }
+        }
+        verify(boardReviewRepository, never()).save(any());
+        verify(loanApplicationRepository, never()).save(any());
+    }
 
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private LoanApplicationRepository loanApplicationRepository;

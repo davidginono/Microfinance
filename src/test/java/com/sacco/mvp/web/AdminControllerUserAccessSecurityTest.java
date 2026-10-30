@@ -133,6 +133,26 @@ class AdminControllerUserAccessSecurityTest {
     }
 
     @Test
+    void enableClientAccessUsesAuthenticatedActorAndRequiresUpdateAndCsrf() throws Exception {
+        UUID id = UUID.randomUUID();
+        var actor = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminService.enableClientAccess(actor, id)).thenReturn("CL-00000042");
+        mockMvc.perform(post("/admin/users/{id}/enable-client-access", id).with(authentication(authenticationFor(actor))).with(csrf())
+                .param("saccoId", "FOREIGN").param("stationId", "FOREIGN"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/admin/users/" + id + "/edit"))
+            .andExpect(flash().attribute("message", org.hamcrest.Matchers.containsString("CL-00000042")));
+        verify(adminService).enableClientAccess(actor, id);
+        Mockito.clearInvocations(adminService);
+        mockMvc.perform(post("/admin/users/{id}/enable-client-access", id).with(authentication(authenticationFor(actor))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/admin/users/{id}/enable-client-access", id)
+                .with(authentication(authenticationFor(principal(Set.of(UserClaim.USER_ACCESS_VIEW))))).with(csrf()))
+            .andExpect(status().isForbidden());
+        Mockito.verifyNoInteractions(adminService);
+    }
+
+    @Test
     void editUserPageAllowsWorkspaceAdminWithUpdateClaim() throws Exception {
         UUID accountId = UUID.randomUUID();
         AppUserPrincipal principal = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));
@@ -878,6 +898,10 @@ class AdminControllerUserAccessSecurityTest {
     @EnableWebSecurity
     @Import(SecurityConfig.class)
     static class TestConfig {
+        @Bean
+        com.sacco.mvp.clients.onboarding.service.OnboardingService onboardingService() {
+            return Mockito.mock(com.sacco.mvp.clients.onboarding.service.OnboardingService.class);
+        }
         @Bean com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts(){return Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanProductAccountService.class);}
         @Bean
         AdminController adminController(AdminService adminService,
