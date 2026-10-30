@@ -131,7 +131,7 @@ public class PlatformSmsGatewaySettingsService {
         }
         SmsSendResult result;
         try {
-            result = smsGateway.send(phoneNumber, "SACCO platform SMS test");
+            result = smsGateway.send(phoneNumber, "Microfinance platform SMS test");
         } catch (RuntimeException ex) {
             log.warn("Platform SMS test failed: {}", ex.getMessage());
             throw new IllegalStateException(describeTestSendFailure(ex), ex);

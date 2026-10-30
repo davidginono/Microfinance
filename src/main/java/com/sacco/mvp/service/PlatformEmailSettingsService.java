@@ -6,7 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
+import jakarta.mail.MessagingException;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -151,14 +152,17 @@ public class PlatformEmailSettingsService {
         if (mailSender == null) {
             throw new IllegalStateException("Email delivery is not configured.");
         }
-        SimpleMailMessage mail = new SimpleMailMessage();
-        mail.setTo(normalizedRecipient);
-        mail.setFrom(config.fromAddress());
-        mail.setSubject("SACCO platform email test");
-        mail.setText("This is a test email from Platform Settings.");
         try {
+            var mail = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(mail, true, "UTF-8");
+            String subject = "Microfinance platform email test";
+            String text = "This is a test email from Platform Settings.";
+            helper.setTo(normalizedRecipient);
+            helper.setFrom(config.fromAddress());
+            helper.setSubject(subject);
+            helper.setText(text, NotificationMessageTemplate.html(subject, text));
             mailSender.send(mail);
-        } catch (RuntimeException ex) {
+        } catch (MessagingException | RuntimeException ex) {
             log.warn("Platform email test failed: {}", ex.getMessage());
             throw new IllegalStateException(describeTestSendFailure(ex, config), ex);
         }

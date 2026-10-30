@@ -54,7 +54,7 @@ public class StaffMfaService {
             member.getEmail(),
             EmailOtpPurpose.LOGIN_MFA,
             member.getId(),
-            "Your Loan Application Portal sign-in verification code",
+            "Your Microfinance sign-in verification code",
             "We received a sign-in attempt for this account. Enter the verification code below to finish signing in. "
                 + "If you did not initiate this sign-in, ignore this message and change your password immediately.",
             member.getSaccoId(),
@@ -124,7 +124,7 @@ public class StaffMfaService {
             member.getEmail(),
             EmailOtpPurpose.LOGIN_MFA,
             member.getId(),
-            "Your Loan Application Portal sign-in verification code",
+            "Your Microfinance sign-in verification code",
             "We received a sign-in attempt for this account. Enter the verification code below to finish signing in.",
             member.getSaccoId(),
             member.getStationId(),
@@ -152,7 +152,7 @@ public class StaffMfaService {
             member.getEmail(),
             EmailOtpPurpose.LOGIN_MFA,
             member.getId(),
-            "Your Loan Application Portal sign-in verification code",
+            "Your Microfinance sign-in verification code",
             "We received a sign-in attempt for this account. Enter the verification code below to finish signing in."
         );
         if (session != null) {

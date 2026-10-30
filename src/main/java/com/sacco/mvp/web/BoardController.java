@@ -868,7 +868,7 @@ public class BoardController {
     }
 
     private String reviewOtpSubject(ApprovalWorkflowStage reviewStage) {
-        return "Loan Application Portal: OTP code for the " + reviewOtpAudienceLabel(reviewStage);
+        return "Microfinance: OTP code for the " + reviewOtpAudienceLabel(reviewStage);
     }
 
     private String reviewOtpBody(ApprovalWorkflowStage reviewStage) {

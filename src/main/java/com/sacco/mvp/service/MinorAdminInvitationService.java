@@ -92,9 +92,8 @@ public class MinorAdminInvitationService {
             member.getEmail(),
             EmailOtpPurpose.CLAIM_ACCOUNT,
             member.getId(),
-            "Activate your SACCO admin account",
-            "Use the code below to complete the activation of your SACCOS Admin account for "
-                + member.getSaccoId() + ".",
+            "Activate your Microfinance administrator account",
+            "Use the code below to activate your institution administrator account.",
             member.getSaccoId(),
             member.getStationId(),
             member.getPhone()
@@ -217,7 +216,7 @@ public class MinorAdminInvitationService {
         String link = buildClaimUrl(rawToken);
         String staffNo = member.getStaffNo() == null || member.getStaffNo().isBlank() ? member.getMemberNo() : member.getStaffNo();
         String body = "Hello " + member.getFullName() + "," + System.lineSeparator() + System.lineSeparator()
-            + "A Super Admin has registered a staff account for you on SACCO " + member.getSaccoId() + "." + System.lineSeparator()
+            + "An administrator has created a Microfinance staff account for you." + System.lineSeparator()
             + "Your Staff Number is " + staffNo + "." + System.lineSeparator()
             + "To activate your account, open the link below within " + ttlHours + " hours, request a one-time code, and create your password:" + System.lineSeparator()
             + link + System.lineSeparator() + System.lineSeparator()
@@ -225,7 +224,7 @@ public class MinorAdminInvitationService {
             + "If you did not expect this invitation, please ignore this email.";
         notificationEmailService.sendRequiredDirectEmail(
             member.getEmail(),
-            "Activate your SACCO staff account",
+            "Activate your Microfinance staff account",
             body
         );
     }

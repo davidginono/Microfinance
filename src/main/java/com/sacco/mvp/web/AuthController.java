@@ -135,7 +135,7 @@ public class AuthController {
                 verified.email(),
                 EmailOtpPurpose.REGISTRATION,
                 null,
-                "Your Loan Application Portal registration code",
+                "Your Microfinance registration code",
                 "We verified your member details. Use the OTP code below to complete your registration.",
                 verified.saccoId(),
                 verified.stationId(),
@@ -212,8 +212,8 @@ public class AuthController {
                 registeredEmail,
                 EmailOtpPurpose.PASSWORD_RESET,
                 member.getId(),
-                "Your Loan Application Portal password reset code",
-                "Use this OTP code to reset your Loan Application Portal password."
+                "Your Microfinance password reset code",
+                "Use this OTP code to reset your Microfinance password."
             );
             boolean staffAccount = member.isStaffAccessActive()
                 && ("staff".equalsIgnoreCase(accountType) || "system-admin".equalsIgnoreCase(accountType));
@@ -318,8 +318,8 @@ public class AuthController {
                 normalizedEmail,
                 EmailOtpPurpose.LOGIN,
                 member.getId(),
-                "Your Loan Application Portal sign-in code",
-                "Use this OTP code to sign in to Loan Application Portal."
+                "Your Microfinance sign-in code",
+                "Use this OTP code to sign in to Microfinance."
             );
             auditIdentityEvent(member.getId(), "OTP_REQUEST", "OTP request", "MEMBER", "Member " + member.getMemberNo(),
                 member.getSaccoId(), member.getStationId(), Map.of("purpose", EmailOtpPurpose.LOGIN.name(), "memberNo", member.getMemberNo()));
@@ -404,8 +404,8 @@ public class AuthController {
                 normalizedEmail,
                 EmailOtpPurpose.STAFF_LOGIN,
                 user.getId(),
-                "Your Loan Application Portal staff sign-in code",
-                "Use this OTP code to sign in to the Loan Application Portal staff workspace."
+                "Your Microfinance staff sign-in code",
+                "Use this OTP code to sign in to the Microfinance staff workspace."
             );
             auditIdentityEvent(user.getId(), "OTP_REQUEST", "OTP request", "STAFF", "Staff " + displayStaffNo(user),
                 user.getSaccoId(), user.getStationId(), Map.of("purpose", EmailOtpPurpose.STAFF_LOGIN.name(), "staffNo", displayStaffNo(user)));

@@ -47,7 +47,7 @@ public class BenterSmsGateway implements SmsGateway {
         BenterSendRequest payload = new BenterSendRequest(
             config.senderId(),
             config.username(),
-            List.of(new BenterMessage(normalizedPhone, trimMessage(message)))
+            List.of(new BenterMessage(normalizedPhone, trimMessage(NotificationMessageTemplate.text(message))))
         );
 
         try {

@@ -3,6 +3,8 @@ package com.sacco.mvp.service;
 import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.web.client.RestClient;
 
 import java.net.InetSocketAddress;
@@ -17,8 +19,9 @@ import static org.mockito.Mockito.when;
 
 class BenterSmsGatewayTest {
 
-    @Test
-    void sendsDocumentedBulkPayloadWithApiKeyHeader() throws Exception {
+    @ParameterizedTest
+    @CsvSource({"Test Message, Test Message", "Loan Application Portal code, Microfinance code"})
+    void sendsDocumentedBulkPayloadWithApiKeyHeader(String inputMessage, String expectedMessage) throws Exception {
         AtomicReference<String> apiKey = new AtomicReference<>();
         AtomicReference<String> method = new AtomicReference<>();
         AtomicReference<String> query = new AtomicReference<>();
@@ -67,7 +70,7 @@ class BenterSmsGatewayTest {
             ));
             BenterSmsGateway gateway = new BenterSmsGateway(RestClient.builder(), objectMapper, settingsService);
 
-            SmsSendResult result = gateway.send("0673054445", "Test Message");
+            SmsSendResult result = gateway.send("0673054445", inputMessage);
 
             assertTrue(result.sent());
             assertEquals("api-key", apiKey.get());
@@ -78,9 +81,9 @@ class BenterSmsGatewayTest {
                 {
                   "senderid": "MFI",
                   "username": "microfinance",
-                  "content": [{"msisdn": "255673054445", "message": "Test Message"}]
+                  "content": [{"msisdn": "255673054445", "message": "%s"}]
                 }
-                """), objectMapper.readTree(requestBody.get()));
+                """.formatted(expectedMessage)), objectMapper.readTree(requestBody.get()));
             assertTrue(objectMapper.readTree(requestBody.get()).path("content").isArray());
         } finally {
             server.stop(0);

@@ -6,13 +6,17 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
+import jakarta.mail.Message;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -219,7 +223,7 @@ class PlatformEmailSettingsServiceTest {
     }
 
     @Test
-    void sendTestEmailUsesCurrentMailSender() {
+    void sendTestEmailUsesCurrentMailSender() throws Exception {
         PlatformEmailSettings existing = existingSettings();
         existing.setEnabled(true);
         existing.setHost("smtp.example.com");
@@ -229,6 +233,7 @@ class PlatformEmailSettingsServiceTest {
         PlatformEmailSettingsRepository repository = Mockito.mock(PlatformEmailSettingsRepository.class);
         PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
         JavaMailSender mailSender = Mockito.mock(JavaMailSender.class);
+        when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
         PlatformMailSenderFactory factory = Mockito.mock(PlatformMailSenderFactory.class);
         AuditService auditService = Mockito.mock(AuditService.class);
         when(repository.findById(PlatformEmailSettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
@@ -239,7 +244,12 @@ class PlatformEmailSettingsServiceTest {
 
         service.sendTestEmail(" Admin@Example.com ", actorId);
 
-        verify(mailSender).send(any(SimpleMailMessage.class));
+        ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender).send(mail.capture());
+        assertEquals("Microfinance platform email test", mail.getValue().getSubject());
+        assertEquals("admin@example.com", mail.getValue().getRecipients(Message.RecipientType.TO)[0].toString());
+        assertEquals("alerts@example.com", mail.getValue().getFrom()[0].toString());
+        assertTrue(mail.getValue().getContent() instanceof jakarta.mail.Multipart);
         verify(auditService).log(eq("PLATFORM_EMAIL_SETTINGS"), isNull(), eq("ADMIN_TEST_EMAIL"), eq(actorId), any(), any());
     }
 
@@ -254,6 +264,7 @@ class PlatformEmailSettingsServiceTest {
         PlatformEmailSettingsRepository repository = Mockito.mock(PlatformEmailSettingsRepository.class);
         PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
         JavaMailSender mailSender = Mockito.mock(JavaMailSender.class);
+        when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
         PlatformMailSenderFactory factory = Mockito.mock(PlatformMailSenderFactory.class);
         AuditService auditService = Mockito.mock(AuditService.class);
         when(repository.findById(PlatformEmailSettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
@@ -262,7 +273,7 @@ class PlatformEmailSettingsServiceTest {
         doThrow(new MailSendException(
             "Mail server connection failed. Couldn't connect to host, port: smtp.microfinance.local, 465; timeout 10000",
             new SocketTimeoutException("Connect timed out")
-        )).when(mailSender).send(any(SimpleMailMessage.class));
+        )).when(mailSender).send(any(MimeMessage.class));
         PlatformEmailSettingsService service = service(repository, secrets, factoryProvider(factory), auditService);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () ->

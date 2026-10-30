@@ -165,13 +165,13 @@ class PlatformSmsGatewaySettingsServiceTest {
         AuditService auditService = Mockito.mock(AuditService.class);
         when(repository.findById(PlatformSmsGatewaySettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
         when(secrets.decrypt("enc:v1:stored")).thenReturn("db-key");
-        when(smsGateway.send("0673054445", "SACCO platform SMS test")).thenReturn(SmsSendResult.sent("message-id"));
+        when(smsGateway.send("0673054445", "Microfinance platform SMS test")).thenReturn(SmsSendResult.sent("message-id"));
         PlatformSmsGatewaySettingsService service = service(repository, secrets, gatewayProvider(smsGateway), auditService);
         UUID actorId = UUID.randomUUID();
 
         service.sendTestSms("0673054445", actorId);
 
-        verify(smsGateway).send("0673054445", "SACCO platform SMS test");
+        verify(smsGateway).send("0673054445", "Microfinance platform SMS test");
         verify(auditService).log(eq("PLATFORM_SMS_GATEWAY_SETTINGS"), isNull(), eq("ADMIN_TEST_SMS"), eq(actorId), any(), any());
     }
 
@@ -204,7 +204,7 @@ class PlatformSmsGatewaySettingsServiceTest {
         AuditService auditService = Mockito.mock(AuditService.class);
         when(repository.findById(PlatformSmsGatewaySettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
         when(secrets.decrypt("enc:v1:stored")).thenReturn("db-key");
-        when(smsGateway.send("0673054445", "SACCO platform SMS test"))
+        when(smsGateway.send("0673054445", "Microfinance platform SMS test"))
             .thenReturn(SmsSendResult.acceptanceUnknown("The SMS gateway connection timed out."));
         PlatformSmsGatewaySettingsService service = service(repository, secrets, gatewayProvider(smsGateway), auditService);
 
@@ -230,7 +230,7 @@ class PlatformSmsGatewaySettingsServiceTest {
         AuditService auditService = Mockito.mock(AuditService.class);
         when(repository.findById(PlatformSmsGatewaySettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
         when(secrets.decrypt("enc:v1:stored")).thenReturn("db-key");
-        when(smsGateway.send("0673054445", "SACCO platform SMS test"))
+        when(smsGateway.send("0673054445", "Microfinance platform SMS test"))
             .thenThrow(new RuntimeException("I/O error on POST request"));
         PlatformSmsGatewaySettingsService service = service(repository, secrets, gatewayProvider(smsGateway), auditService);
 

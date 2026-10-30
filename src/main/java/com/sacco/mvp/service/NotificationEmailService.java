@@ -3,7 +3,6 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -20,14 +19,14 @@ public class NotificationEmailService {
     private final PlatformEmailSettingsService emailSettingsService;
 
     public void sendDirectEmail(String email, String subject, String message) {
-        sendDirectEmail(email, subject, message, false);
+        sendDirectEmail(email, subject, message, null, false);
     }
 
     public void sendRequiredDirectEmail(String email, String subject, String message) {
-        sendDirectEmail(email, subject, message, true);
+        sendDirectEmail(email, subject, message, null, true);
     }
 
-    private void sendDirectEmail(String email, String subject, String message, boolean deliveryRequired) {
+    private void sendDirectEmail(String email, String subject, String message, String html, boolean deliveryRequired) {
         if (email == null || email.isBlank()) {
             if (deliveryRequired) {
                 throw new IllegalStateException("A recipient email address is required for OTP delivery.");
@@ -39,17 +38,20 @@ public class NotificationEmailService {
             if (deliveryRequired) {
                 throw new IllegalStateException("Email delivery is not configured. Contact the system administrator.");
             }
-            log.info("Mail sender not configured. OTP/notification email for {}: {}", email, message);
+            log.info("Mail sender not configured. Email was not sent.");
             return;
         }
 
         PlatformEmailSettingsService.ResolvedEmailConfig config = emailSettingsService.resolvedConfig();
         try {
-            SimpleMailMessage mail = new SimpleMailMessage();
-            mail.setTo(resolveRecipient(email, config));
-            mail.setFrom(config.fromAddress());
-            mail.setSubject(subject);
-            mail.setText(message);
+            MimeMessage mail = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
+            helper.setTo(resolveRecipient(email, config));
+            helper.setFrom(config.fromAddress());
+            helper.setSubject(NotificationMessageTemplate.text(subject));
+            helper.setText(NotificationMessageTemplate.text(message), html == null || html.isBlank()
+                ? NotificationMessageTemplate.html(subject, message)
+                : NotificationMessageTemplate.text(html));
             mailSender.send(mail);
         } catch (Exception ex) {
             log.warn("Unable to send direct email to {}: {}", email, ex.getMessage());
@@ -71,40 +73,7 @@ public class NotificationEmailService {
         if (recipient == null || recipient.getEmail() == null || recipient.getEmail().isBlank()) {
             return;
         }
-        if (html == null || html.isBlank()) {
-            sendDirectEmail(recipient.getEmail(), subject, message);
-            return;
-        }
-        sendDirectHtmlEmail(recipient.getEmail(), subject, message, html);
-    }
-
-    private void sendDirectHtmlEmail(String email, String subject, String text, String html) {
-        JavaMailSender mailSender = mailSenderFactory.getMailSender();
-        if (mailSender == null) {
-            log.info("Mail sender not configured. HTML notification email for {}: {}", email, text);
-            return;
-        }
-
-        PlatformEmailSettingsService.ResolvedEmailConfig config = emailSettingsService.resolvedConfig();
-        MimeMessage mail;
-        try {
-            mail = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
-            helper.setTo(resolveRecipient(email, config));
-            helper.setFrom(config.fromAddress());
-            helper.setSubject(subject);
-            helper.setText(text == null ? "" : text, html);
-        } catch (Exception ex) {
-            log.warn("Unable to prepare HTML notification email to {}: {}", email, ex.getMessage());
-            sendDirectEmail(email, subject, text);
-            return;
-        }
-
-        try {
-            mailSender.send(mail);
-        } catch (Exception ex) {
-            log.warn("Unable to send HTML notification email to {}: {}", email, ex.getMessage());
-        }
+        sendDirectEmail(recipient.getEmail(), subject, message, html, false);
     }
 
     private String resolveRecipient(String email, PlatformEmailSettingsService.ResolvedEmailConfig config) {

@@ -134,7 +134,7 @@ public class StationOtpDeliveryService {
     private String smsOtpMessage(String introMessage, String code, int ttlMinutes) {
         String intro = introMessage == null ? "" : introMessage.trim().replaceAll("\\s+", " ");
         if (intro.isBlank()) {
-            return "Your SACCO OTP code is " + code + ". It expires in " + ttlMinutes + " minutes.";
+            return "Your Microfinance OTP code is " + code + ". It expires in " + ttlMinutes + " minutes.";
         }
         return "OTP: " + code + ". Expires in " + ttlMinutes + " minutes. " + intro;
     }
