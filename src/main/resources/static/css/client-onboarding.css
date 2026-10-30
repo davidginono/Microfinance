@@ -4,3 +4,33 @@
 .kyc-section-body { padding: 1rem; min-width: 0; overflow-wrap: anywhere; }
 .kyc-notice-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .kyc-section-body .aws-settings-checkbox-row { align-items: flex-start; }
+
+.kyc-form-workspace {
+    display: grid;
+    gap: 20px;
+    width: 100%;
+    max-width: 960px;
+    min-width: 0;
+}
+.kyc-form-workspace .erp-page-header { margin: 0; }
+.kyc-client-form { display: grid; gap: 20px; min-width: 0; }
+.kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
+.kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.kyc-client-form .kyc-field { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.kyc-client-form :is(label, .kyc-notice-text, .kyc-field-hint) { font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.kyc-client-form .kyc-field > span:first-child { color: var(--aws-ink, #16191f); font-weight: 700; }
+.aws-console .kyc-client-form :is(.aws-control, .neo-select-button) { max-width: 100%; min-width: 0; font-size: 14px !important; }
+.aws-console .kyc-client-form textarea.aws-control { height: auto !important; min-height: 80px !important; resize: vertical; }
+.kyc-client-form .kyc-checkbox { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-weight: 400; }
+.kyc-client-form .kyc-checkbox input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; margin: 2px 0 0; }
+.kyc-acknowledgement { display: grid; gap: 6px; min-width: 0; }
+.kyc-notice-version { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 14px; line-height: 20px; }
+.kyc-notice-version dt { color: var(--aws-muted, #545b64); }
+.kyc-notice-version dd { margin: 0; overflow-wrap: anywhere; }
+.kyc-client-form .kyc-field-hint { margin: 0; color: var(--aws-muted, #545b64); }
+.kyc-client-form > .console-message { margin: 0; }
+.kyc-client-form .accounting-form-actions { gap: 8px; }
+.kyc-client-form .accounting-form-actions .app-btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+    .kyc-field-pair { grid-template-columns: minmax(0, 1fr); }
+}
