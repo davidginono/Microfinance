@@ -41,8 +41,7 @@
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <section class="auth-form-section registration-card" aria-label="<spring:message code='register.member.title' htmlEscape='true' />">
             <div class="registration-fields">
-                <fieldset class="registration-names">
-                    <legend><spring:message code="register.member.fullName" /></legend>
+                <fieldset class="registration-names" aria-label="<spring:message code='register.member.fullName' htmlEscape='true' />">
                     <div class="registration-name-fields">
                         <div>
                             <label for="firstName" class="registration-section-label"><spring:message code="register.member.firstName" /></label>
