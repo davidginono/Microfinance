@@ -94,6 +94,14 @@
 :is(.aws-console, .aws-auth-shell) .console-message a {color:#0972d3;}
 @media(max-width:600px) {:is(.aws-console, .aws-auth-shell) .console-message {padding:12px 12px 12px 40px!important;}:is(.aws-console, .aws-auth-shell) .console-message > .console-message-icon {left:12px;top:14px;width:18px;height:18px;}}
 
+.aws-console .workspace-navigation-feedback[role="alert"] {
+    min-height:44px;
+    padding-block:6px!important;
+}
+.aws-console .workspace-navigation-feedback[role="alert"] > span {flex:1 1 16rem;min-width:0;}
+.aws-console .workspace-navigation-feedback[role="alert"] > button {flex:0 0 auto;margin-inline-start:auto;}
+.aws-console .workspace-navigation-feedback[role="alert"] > .console-message-icon {top:50%;transform:translateY(-50%);}
+
 /* Persistent command results stay in the workspace and use the shared toast lifecycle. */
 .workspace-flashbar:empty {display:none;}
 .workspace-flashbar {display:grid;gap:8px;min-width:0;margin-bottom:16px;scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
