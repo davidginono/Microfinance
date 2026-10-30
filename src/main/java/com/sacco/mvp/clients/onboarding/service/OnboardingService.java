@@ -68,11 +68,11 @@ public class OnboardingService {
         check(f.getNumber().matches("[A-Za-z0-9/._-]+"),"number");
         try {f.setPhone(TanzaniaPhoneNumber.normalizeRequired(f.getPhone()));}catch(IllegalStateException e){throw invalid("phone");}
         String hash=hash(f);var old=retry(a,"client_onboarding_creation",f.getRequestKey(),hash);if(old.isPresent())return records.created(old.get());
-        var form=new MemberRegistrationForm();form.setFullName(f.getName());form.setEmail(f.getEmail());form.setPhone(f.getPhone());form.setSaccoId(a.getSaccoId());form.setStationId(a.getStationId());
+        var form=new MemberRegistrationForm();form.setEmail(f.getEmail());form.setPhone(f.getPhone());form.setSaccoId(a.getSaccoId());form.setStationId(a.getStationId());
         // An unshared random password does not create an OTP-verification or consent event.
         form.setPassword(UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-",""));
         UUID client;
-        try {client=registration.registerAssisted(form,f.getNumber(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
+        try {client=registration.registerAssisted(form,f.getNumber(),f.getName(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
         records.creation(a,client,UUID.randomUUID(),f.getRequestKey(),hash,clock.now());event(a,client,"CLIENT_ASSISTED_REGISTRATION");return client;
     }
     @Transactional(timeout=20)

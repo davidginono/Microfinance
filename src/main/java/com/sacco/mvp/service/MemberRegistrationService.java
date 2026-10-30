@@ -42,11 +42,11 @@ public class MemberRegistrationService {
 
     /** The onboarding service supplies an authorized, existing scope; no policy defaults or signature are invented. */
     @Transactional
-    public Member registerAssisted(MemberRegistrationForm form,String clientNumber,String institution,String branch) {
+    public Member registerAssisted(MemberRegistrationForm form,String clientNumber,String fullName,String institution,String branch) {
         var registered=resolveRegisteredSacco(institution);
         requireRegisteredStation(institution,branch);
         var verified=new VerifiedExternalMember(normalizeMemberNo(clientNumber),normalizeEmail(form.getEmail()),
-            nameSignatureService.requireFullName(form.getFullName(),"Enter your full names."),institution,branch,registered.getSaccoName());
+            nameSignatureService.requireFullName(fullName,"Enter your full names."),institution,branch,registered.getSaccoName());
         return registerKnown(form,verified,true);
     }
 
@@ -96,6 +96,10 @@ public class MemberRegistrationService {
 
     public VerifiedExternalMember verifyExternalMember(MemberRegistrationForm form) {
         String email = normalizeEmail(form.getEmail());
+        if (java.util.stream.Stream.of(form.getFirstName(), form.getMiddleName(), form.getLastName())
+            .anyMatch(name -> name == null || name.length() > 80 || !name.strip().matches("\\S+"))) {
+            throw new IllegalStateException("Enter your first, middle and last name.");
+        }
         String fullName = nameSignatureService.requireFullName(form.getFullName(), "Enter your full names.");
         String saccoId = normalizeSaccoId(form.getSaccoId());
         String stationId = normalizeStationId(form.getStationId());

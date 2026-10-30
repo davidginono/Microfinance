@@ -81,6 +81,15 @@ class MemberRegistrationServiceTest {
     }
 
     @Test
+    void publicRegistrationRequiresThreeSeparateNamesBeforeReadingScope() {
+        var members = Mockito.mock(MemberRepository.class);
+        var service = new MemberRegistrationService(members,Mockito.mock(RegisteredSaccoRepository.class),Mockito.mock(SaccoStationRepository.class),Mockito.mock(SaccoSettingsRepository.class),Mockito.mock(UserSettingsRepository.class),Mockito.mock(PasswordEncoder.class),new NameSignatureService());
+        var form = new MemberRegistrationForm();form.setFirstName("Jane Test");form.setLastName("Member");
+        assertThatThrownBy(() -> service.verifyExternalMember(form)).isInstanceOf(IllegalStateException.class).hasMessage("Enter your first, middle and last name.");
+        Mockito.verifyNoInteractions(members);
+    }
+
+    @Test
     void verifyExternalMemberRejectsInactiveStation() {
         MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
@@ -101,7 +110,7 @@ class MemberRegistrationServiceTest {
 
         MemberRegistrationForm form = new MemberRegistrationForm();
         form.setEmail("member@example.com");
-        form.setFullName("Jane Member");
+        form.setFirstName("Jane");form.setMiddleName("Test");form.setLastName("Member");
         form.setSaccoId("sacco-1");
         form.setStationId("stn001");
 

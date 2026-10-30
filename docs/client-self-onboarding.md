@@ -6,6 +6,12 @@ Clients use **My verification** (`/app/onboarding`) after existing registration 
 
 Before accepting self-service submissions, staff with the explicitly assigned `CLIENT_ONBOARDING_VIEW` and `CLIENT_ONBOARDING_UPDATE` claims publish **Onboarding notice** from the sidebar. Configuration is branch-scoped and includes the institution-approved English/Kiswahili notice, its version, processing basis and retention reference/review date. No approved text, consent, screening outcome or staff claim is seeded. Drafts remain available when the notice is unavailable or disabled; submission fails with a recovery message.
 
+## Public registration form
+
+Public registration uses a compact 448px card with consistently sized inputs and enhanced institution/branch selectors. First name, Middle name and Last name are separate required fields; each accepts one name of up to 80 characters. The server joins those parts into the existing full-name value. A submitted `fullName` cannot replace the parts. Failed submissions retain each name and its field errors. Staff-assisted creation keeps its existing full-name contract, and existing stored clients are unchanged. No schema change is needed for name parts.
+
+Rebuild verification passed 36 focused Java tests, including the actual PostgreSQL registration/allocation regression, and all 13 shared validation JavaScript checks. The shared select selection passed 10 of 12 checks; its same two pre-existing remote-search failures remain outside the public form's static institution/branch selectors. Browser checks at 320/360/768/1366/1920 pixels verified the 448px desktop limit, stacked mobile names, equal 32px input/select heights, matching trigger/menu widths, body-mounted menus, dependent branch selection, and inline name-error recovery. A query against the disposable test database also verified the joined uppercase full name was persisted. The disposable PostgreSQL server was stopped after verification.
+
 ## Public registration numbers
 
 Public `/register/member` registration does not accept a client number. OTP requests only validate details and deliver a code; after OTP consumption, the registration service allocates `CL-00000001`-style numbers inside the account-creation transaction. PostgreSQL `client_number_seq` is atomic across app instances and never cycles or recycles rolled-back values; gaps are expected. The existing unique `members.member_no` constraint remains the final protection. A bounded indexed collision check also skips older/manual numbers, regardless of letter case.

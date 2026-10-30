@@ -22,9 +22,20 @@ public class MemberRegistrationForm {
     @Pattern(regexp = "^255[0-9]{9}$", message = "Enter your phone number in the format 255XXXXXXXXX.")
     private String phone;
 
-    @NotBlank(message = "Enter your full names.")
-    @Pattern(regexp = "^\\s*\\S+(?:\\s+\\S+){2}\\s*$", message = "Enter exactly three names.")
-    private String fullName;
+    @NotBlank(message = "{registration.firstName.required}")
+    @Pattern(regexp = "\\s*\\S+\\s*", message = "{registration.name.single}")
+    @Size(max = 80, message = "{registration.name.length}")
+    private String firstName;
+
+    @NotBlank(message = "{registration.middleName.required}")
+    @Pattern(regexp = "\\s*\\S+\\s*", message = "{registration.name.single}")
+    @Size(max = 80, message = "{registration.name.length}")
+    private String middleName;
+
+    @NotBlank(message = "{registration.lastName.required}")
+    @Pattern(regexp = "\\s*\\S+\\s*", message = "{registration.name.single}")
+    @Size(max = 80, message = "{registration.name.length}")
+    private String lastName;
 
     @NotBlank(message = "Select a SACCO ID.")
     private String saccoId;
@@ -40,4 +51,10 @@ public class MemberRegistrationForm {
     private String confirmPassword;
 
     private String otpCode;
+
+    /** A derived view of the three public fields; a submitted fullName cannot override them. */
+    public String getFullName() {
+        return java.util.stream.Stream.of(firstName, middleName, lastName)
+            .map(value -> value == null ? "" : value.strip()).collect(java.util.stream.Collectors.joining(" "));
+    }
 }

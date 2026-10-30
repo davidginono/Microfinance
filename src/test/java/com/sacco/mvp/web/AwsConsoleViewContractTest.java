@@ -503,7 +503,7 @@ class AwsConsoleViewContractTest {
             .doesNotContain("data-forgot-password-open=\"member\">Forgot password?</button>")
             .contains("class=\"app-toast-close-icon\"");
         assertThat(registration)
-            .contains("aws-auth.css?v=20261030-registration")
+            .contains("aws-auth.css?v=20261030-registration-v2")
             .contains("class=\"app-toast-close-icon\"")
             .doesNotContain("&times;");
         assertThat(authCss)

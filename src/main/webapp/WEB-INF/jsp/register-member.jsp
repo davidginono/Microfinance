@@ -6,6 +6,7 @@
 <html lang="${pageContext.response.locale.language}">
 <head>
     <meta charset="UTF-8" />
+    <script>document.documentElement.classList.add("registration-initializing");</script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><spring:message code="register.member.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-mark-light-green.png?v=20260826-clean' />" />
@@ -14,7 +15,7 @@
     <link rel="stylesheet" href="<c:url value='/css/amazon-ember.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-registration' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-registration-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/form-validation.css?v=20261030-registration' />" />
     <script defer src="<c:url value='/js/form-validation.js' />"></script>
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
@@ -37,43 +38,28 @@
     <c:if test="${not empty errors}"><div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div></c:if>
     <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <section class="auth-form-section registration-section" aria-labelledby="registrationDetailsHeading">
-            <h2 id="registrationDetailsHeading"><spring:message code="register.member.details" /></h2>
-            <div class="registration-fields-grid">
-                <div>
-                    <spring:bind path="registrationForm.saccoId">
-                        <label for="saccoId" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
-                    </spring:bind>
-                    <form:select path="saccoId" cssClass="registration-select">
-                        <option value="" data-placeholder="true"><spring:message code="register.member.chooseInstitution" /></option>
-                        <c:forEach items="${registrationSaccos}" var="sacco">
-                            <form:option value="${sacco.saccoId}">${sacco.saccoName}</form:option>
-                        </c:forEach>
-                    </form:select>
-                    <form:errors path="saccoId" cssClass="coa-error" />
-                </div>
-                <div>
-                    <spring:bind path="registrationForm.stationId">
-                        <label for="registrationStationSelect" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
-                    </spring:bind>
-                    <form:select path="stationId" id="registrationStationSelect" cssClass="registration-select">
-                        <option value="" data-placeholder="true"><spring:message code="register.member.chooseBranch" /></option>
-                    </form:select>
-                    <form:errors path="stationId" cssClass="coa-error" />
-                </div>
-                <div class="registration-field-wide">
-                    <spring:bind path="registrationForm.fullName">
-                        <label for="fullName" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.fullName" /></label>
-                    </spring:bind>
-                    <form:input path="fullName"
-                                cssClass="registration-field uppercase"
-                                autocapitalize="characters"
-                                spellcheck="false"
-                                pattern="\s*\S+(?:\s+\S+){2}\s*"
-                                title="Enter exactly three names."
-                                data-uppercase-input="true" />
-                    <form:errors path="fullName" cssClass="coa-error" />
-                </div>
+        <section class="auth-form-section registration-card" aria-label="<spring:message code='register.member.title' htmlEscape='true' />">
+            <div class="registration-fields">
+                <fieldset class="registration-names">
+                    <legend><spring:message code="register.member.fullName" /></legend>
+                    <div class="registration-name-fields">
+                        <div>
+                            <label for="firstName" class="registration-section-label"><spring:message code="register.member.firstName" /></label>
+                            <form:input path="firstName" id="firstName" autocomplete="given-name" autocapitalize="characters" spellcheck="false" required="required" maxlength="80" pattern="\s*\S+\s*" data-uppercase-input="true" cssClass="registration-field uppercase" />
+                            <form:errors path="firstName" cssClass="coa-error" />
+                        </div>
+                        <div>
+                            <label for="middleName" class="registration-section-label"><spring:message code="register.member.middleName" /></label>
+                            <form:input path="middleName" id="middleName" autocomplete="additional-name" autocapitalize="characters" spellcheck="false" required="required" maxlength="80" pattern="\s*\S+\s*" data-uppercase-input="true" cssClass="registration-field uppercase" />
+                            <form:errors path="middleName" cssClass="coa-error" />
+                        </div>
+                        <div>
+                            <label for="lastName" class="registration-section-label"><spring:message code="register.member.lastName" /></label>
+                            <form:input path="lastName" id="lastName" autocomplete="family-name" autocapitalize="characters" spellcheck="false" required="required" maxlength="80" pattern="\s*\S+\s*" data-uppercase-input="true" cssClass="registration-field uppercase" />
+                            <form:errors path="lastName" cssClass="coa-error" />
+                        </div>
+                    </div>
+                </fieldset>
                 <div>
                     <spring:bind path="registrationForm.email">
                         <label for="email" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.email" /></label>
@@ -104,7 +90,28 @@
                     <p class="registration-note mt-1 text-sm"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></p>
                     <form:errors path="phone" cssClass="coa-error" />
                 </div>
-                <div class="registration-field-wide">
+                <div>
+                    <spring:bind path="registrationForm.saccoId">
+                        <label for="saccoId" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
+                    </spring:bind>
+                    <form:select path="saccoId" required="required" cssClass="registration-select">
+                        <option value="" data-placeholder="true"><spring:message code="register.member.chooseInstitution" /></option>
+                        <c:forEach items="${registrationSaccos}" var="sacco">
+                            <form:option value="${sacco.saccoId}">${sacco.saccoName}</form:option>
+                        </c:forEach>
+                    </form:select>
+                    <form:errors path="saccoId" cssClass="coa-error" />
+                </div>
+                <div>
+                    <spring:bind path="registrationForm.stationId">
+                        <label for="registrationStationSelect" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
+                    </spring:bind>
+                    <form:select path="stationId" id="registrationStationSelect" required="required" cssClass="registration-select">
+                        <option value="" data-placeholder="true"><spring:message code="register.member.chooseBranch" /></option>
+                    </form:select>
+                    <form:errors path="stationId" cssClass="coa-error" />
+                </div>
+                <div>
                     <label for="registrationEmployeeNumber" class="mb-1.5 block registration-section-label"><spring:message code="payroll.employeeNumber.optional" /></label>
                     <form:input path="employeeNumber" id="registrationEmployeeNumber" maxlength="50" pattern="[A-Za-z0-9/._ -]*" cssClass="registration-field" aria-describedby="employeeNumberHelp registrationEmployeeNumberAvailability employeeNumberErrors" />
                     <p id="employeeNumberHelp" class="mt-1 text-sm"><spring:message code="payroll.employeeNumber.help" /></p>
@@ -115,11 +122,6 @@
                        data-failed-message="<spring:message code='registration.employeeNumber.checkFailed' />"></p>
                     <form:errors path="employeeNumber" id="employeeNumberErrors" cssClass="coa-error" />
                 </div>
-            </div>
-        </section>
-        <section class="auth-form-section registration-section" aria-labelledby="registrationPasswordHeading">
-            <h2 id="registrationPasswordHeading"><spring:message code="register.member.password" /></h2>
-            <div class="registration-fields-grid">
                 <div>
                     <spring:bind path="registrationForm.password">
                         <label for="registrationPassword" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.password" /></label>
@@ -127,6 +129,7 @@
                     <div class="auth-password-control">
                         <form:password path="password" id="registrationPassword"
                                        autocomplete="new-password"
+                                       required="required"
                                        minlength="8"
                                        cssClass="registration-field" />
                         <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationPassword" aria-pressed="false"
@@ -134,6 +137,7 @@
                     </div>
                     <form:errors path="password" cssClass="coa-error" />
                 </div>
+                <p class="registration-note registration-password-note"><spring:message code="register.member.passwordHelp" /></p>
                 <div>
                     <spring:bind path="registrationForm.confirmPassword">
                         <label for="registrationConfirmPassword" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.confirmPassword" /></label>
@@ -141,6 +145,7 @@
                     <div class="auth-password-control">
                         <form:password path="confirmPassword" id="registrationConfirmPassword"
                                        autocomplete="new-password"
+                                       required="required"
                                        minlength="8"
                                        cssClass="registration-field" />
                         <button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="registrationConfirmPassword" aria-pressed="false"
@@ -149,29 +154,28 @@
                     <form:errors path="confirmPassword" cssClass="coa-error" />
                 </div>
             </div>
-            <p class="registration-note registration-section-note"><spring:message code="register.member.passwordHelp" /></p>
-        </section>
-        <div id="registrationOtpBlock" class="auth-form-section registration-section registration-otp ${not empty registrationForm.otpCode ? '' : 'hidden'}">
-            <spring:bind path="registrationForm.otpCode">
-                <label for="otpCode" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.code" /></label>
-            </spring:bind>
-            <form:input path="otpCode"
-                        inputmode="numeric"
-                        autocomplete="one-time-code"
-                        maxlength="6"
-                        data-otp-hidden="true"
-                        data-otp-label="Registration OTP code"
-                        cssClass="sr-only" />
-            <p class="registration-note mt-2 text-sm"><spring:message code="register.member.otpHelp" /></p>
-            <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                <span data-otp-spinner class="otp-status-spinner"></span>
-                <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                </svg>
-                <span data-otp-text>Checking code...</span>
+            <div id="registrationOtpBlock" class="registration-otp ${not empty registrationForm.otpCode ? '' : 'hidden'}">
+                <spring:bind path="registrationForm.otpCode">
+                    <label for="otpCode" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.code" /></label>
+                </spring:bind>
+                <form:input path="otpCode"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength="6"
+                            data-otp-hidden="true"
+                            data-otp-label="Registration OTP code"
+                            cssClass="sr-only" />
+                <p class="registration-note mt-2 text-sm"><spring:message code="register.member.otpHelp" /></p>
+                <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    <span data-otp-spinner class="otp-status-spinner"></span>
+                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span data-otp-text>Checking code...</span>
+                </div>
+                <form:errors path="otpCode" cssClass="coa-error" />
             </div>
-            <form:errors path="otpCode" cssClass="coa-error" />
-        </div>
+        </section>
         <form:errors path="" cssClass="registration-form-error" element="div" />
         <div id="registrationVerifyError" class="hidden" data-auto-scroll-message="true" aria-live="assertive"></div>
         <div id="registrationVerifySuccess" class="hidden" data-auto-scroll-message="true" aria-live="polite"></div>
@@ -192,6 +196,12 @@
     </form:form>
 </div>
 </main>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        window.refreshEnhancedSelects?.(document);
+        document.documentElement.classList.remove("registration-initializing");
+    }, {once:true});
+</script>
 <script id="registrationSaccosData" type="application/json">${registrationSaccosJson}</script>
 <script>
     (() => {

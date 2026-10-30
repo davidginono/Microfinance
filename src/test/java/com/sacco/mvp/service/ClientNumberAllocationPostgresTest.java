@@ -58,11 +58,11 @@ class ClientNumberAllocationPostgresTest {
             assertThatThrownBy(()->tx.executeWithoutResult(s->{rolledBack[0]=service.register(form(92)).getMemberNo();throw new IllegalStateException("Synthetic rollback");})).hasMessage("Synthetic rollback");
             assertThat(jdbc.queryForObject("select count(*) from members where member_no=?",Integer.class,rolledBack[0])).isZero();
             assertThat(service.register(form(93)).getMemberNo()).isNotEqualTo(rolledBack[0]);
-            assertThat(service.registerAssisted(form(94),"ASSISTED-KEEP","NUMBER-TEST","B1").getMemberNo()).isEqualTo("ASSISTED-KEEP");
+            assertThat(service.registerAssisted(form(94),"ASSISTED-KEEP","Synthetic Assisted Client","NUMBER-TEST","B1").getMemberNo()).isEqualTo("ASSISTED-KEEP");
         }
     }
     static MemberRegistrationForm form(int n) {
-        var f=new MemberRegistrationForm();f.setFullName("Synthetic Client Test");f.setEmail("client"+n+"@example.invalid");f.setPhone("2557"+String.format(Locale.ROOT,"%08d",n));f.setSaccoId("NUMBER-TEST");f.setStationId("B1");f.setPassword("SyntheticTestPassword");return f;
+        var f=new MemberRegistrationForm();f.setFirstName("Synthetic");f.setMiddleName("Client");f.setLastName("Test");f.setEmail("client"+n+"@example.invalid");f.setPhone("2557"+String.format(Locale.ROOT,"%08d",n));f.setSaccoId("NUMBER-TEST");f.setStationId("B1");f.setPassword("SyntheticTestPassword");return f;
     }
     static void seed(JdbcTemplate jdbc,String number) {
         jdbc.update("insert into members(id,member_no,full_name,position,status,password_hash,created_at,is_member) values(?,?,?,'MEMBER','ACTIVE','!TEST',now(),true)",UUID.randomUUID(),number,"Existing number fixture");
