@@ -203,14 +203,22 @@ public class EmailOtpService {
             emailOtpTokenRepository.save(token);
 
             StationOtpDeliveryService.DeliveryReceipt receipt;
+            String emailInstitutionId = saccoId;
+            if ((emailInstitutionId == null || emailInstitutionId.isBlank()) && memberId != null) {
+                emailInstitutionId = memberRepository.findById(memberId).map(Member::getSaccoId).orElse(null);
+            }
             if (emailOnly) {
                 receipt = stationOtpDeliveryService.deliverEmailOnly(
+                    emailInstitutionId,
                     normalizedDeliveryEmail,
                     subject,
                     introMessage,
                     code,
                     Math.max(1, otpTtlMinutes)
                 );
+            } else if ((saccoId == null || saccoId.isBlank()) && emailInstitutionId != null) {
+                receipt = stationOtpDeliveryService.deliverEmailOnly(emailInstitutionId, normalizedDeliveryEmail,
+                    subject, introMessage, code, Math.max(1, otpTtlMinutes));
             } else if (loanApplicationId == null && applicantMemberId == null) {
                 receipt = stationOtpDeliveryService.deliver(
                     saccoId,

@@ -143,7 +143,7 @@ public class AuthController {
                 verified.email(),
                 EmailOtpPurpose.REGISTRATION,
                 null,
-                "Your Microfinance registration code",
+                "Your registration code",
                 "We verified your member details. Use the OTP code below to complete your registration.",
                 verified.saccoId(),
                 verified.stationId(),
@@ -226,7 +226,7 @@ public class AuthController {
                 registeredEmail,
                 EmailOtpPurpose.PASSWORD_RESET,
                 member.getId(),
-                "Your Microfinance password reset code",
+                "Your password reset code",
                 "Use this OTP code to reset your Microfinance password."
             );
             boolean staffAccount = member.isStaffAccessActive()
@@ -332,7 +332,7 @@ public class AuthController {
                 normalizedEmail,
                 EmailOtpPurpose.LOGIN,
                 member.getId(),
-                "Your Microfinance sign-in code",
+                "Your sign-in code",
                 "Use this OTP code to sign in to Microfinance."
             );
             auditIdentityEvent(member.getId(), "OTP_REQUEST", "OTP request", "MEMBER", "Member " + member.getMemberNo(),
@@ -418,7 +418,7 @@ public class AuthController {
                 normalizedEmail,
                 EmailOtpPurpose.STAFF_LOGIN,
                 user.getId(),
-                "Your Microfinance staff sign-in code",
+                "Your staff sign-in code",
                 "Use this OTP code to sign in to the Microfinance staff workspace."
             );
             auditIdentityEvent(user.getId(), "OTP_REQUEST", "OTP request", "STAFF", "Staff " + displayStaffNo(user),

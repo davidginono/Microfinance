@@ -54,7 +54,7 @@ class MinorAdminInvitationServiceTest {
         Member member=Member.builder().id(UUID.randomUUID()).memberNo("STAFF-10001").staffNo("10001")
             .saccoId("TEST").email("staff@example.invalid").fullName("Synthetic Staff").build();
         org.mockito.Mockito.doThrow(new IllegalStateException("Email delivery unavailable"))
-            .when(notificationEmailService).sendRequiredDirectEmail(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+            .when(notificationEmailService).sendRequiredDirectEmail(org.mockito.ArgumentMatchers.eq("TEST"),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
         org.assertj.core.api.Assertions.assertThatThrownBy(()->invitationService.issueInvitation(member,UUID.randomUUID()))
             .isInstanceOf(IllegalStateException.class).hasMessage("Email delivery unavailable");
         verify(notificationEmailService,never()).sendDirectEmail(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
@@ -92,7 +92,7 @@ class MinorAdminInvitationServiceTest {
             "ginonodavid625@gmail.com",
             com.sacco.mvp.domain.EmailOtpPurpose.CLAIM_ACCOUNT,
             memberId,
-            "Activate your Microfinance administrator account",
+            "Activate your administrator account",
             "Use the code below to activate your institution administrator account.",
             "SACCO-01",
             "AR704",

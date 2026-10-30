@@ -130,7 +130,7 @@ public class SmsUsageAlertService {
                     .createdAt(now)
                     .sentAt(now)
                     .build());
-                notificationEmailService.sendNotificationEmail(recipient.getId(), subject, message);
+                notificationEmailService.sendNotificationEmail((String) details.get("saccoId"), recipient.getId(), subject, message, null);
             } catch (Exception ex) {
                 log.warn("Unable to deliver SMS usage alert to {}: {}", recipient.getIdentifier(), ex.getMessage());
             }

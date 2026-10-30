@@ -167,6 +167,15 @@ public class SaccoRegistryService {
             : registeredSaccoRepository.findById(saccoId).filter(RegisteredSacco::isActive);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.Optional<String> notificationInstitutionName(String saccoId) {
+        if (saccoId == null || saccoId.isBlank() || "PLATFORM".equalsIgnoreCase(saccoId.trim())) {
+            return java.util.Optional.empty();
+        }
+        return registeredSaccoRepository.findById(saccoId.trim())
+            .map(RegisteredSacco::getSaccoName).map(String::trim).filter(name -> !name.isBlank());
+    }
+
     public java.util.Optional<String> externalSaccoName(String saccoId) {
         return saccoId == null
             ? java.util.Optional.empty()

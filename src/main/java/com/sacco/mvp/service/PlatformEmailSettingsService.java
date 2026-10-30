@@ -155,12 +155,12 @@ public class PlatformEmailSettingsService {
         try {
             var mail = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(mail, true, "UTF-8");
-            String subject = "Microfinance platform email test";
+            String subject = "Platform email test";
             String text = "This is a test email from Platform Settings.";
             helper.setTo(normalizedRecipient);
             helper.setFrom(config.fromAddress());
             helper.setSubject(subject);
-            helper.setText(text, NotificationMessageTemplate.html(subject, text));
+            helper.setText(text, NotificationMessageTemplate.html(null, subject, text));
             mailSender.send(mail);
         } catch (MessagingException | RuntimeException ex) {
             log.warn("Platform email test failed: {}", ex.getMessage());

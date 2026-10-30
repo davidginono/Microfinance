@@ -124,7 +124,7 @@ public class NotificationDeliveryService {
         try {
             OtpDeliveryChannel channel = stationOtpSettingsService.channel(saccoId, stationId);
             if (channel == OtpDeliveryChannel.EMAIL) {
-                notificationEmailService.sendDirectEmail(email, resolvedContent.subject(), resolvedContent.plainText());
+                notificationEmailService.sendDirectEmail(saccoId, email, resolvedContent.subject(), resolvedContent.plainText());
                 return;
             }
 
@@ -138,7 +138,7 @@ public class NotificationDeliveryService {
                 usageContext
             );
             if (!smsSent && channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
-                notificationEmailService.sendDirectEmail(email, resolvedContent.subject(), resolvedContent.plainText());
+                notificationEmailService.sendDirectEmail(saccoId, email, resolvedContent.subject(), resolvedContent.plainText());
             }
         } catch (RuntimeException ex) {
             log.warn("Direct contact notification failed for event {}: {}", eventType, ex.getMessage());
@@ -163,6 +163,7 @@ public class NotificationDeliveryService {
         OtpDeliveryChannel channel = stationOtpSettingsService.channel(saccoId, stationId);
         if (channel == OtpDeliveryChannel.EMAIL) {
             notificationEmailService.sendNotificationEmail(
+                saccoId,
                 recipientId,
                 resolvedContent.subject(),
                 resolvedContent.plainText(),
@@ -174,6 +175,7 @@ public class NotificationDeliveryService {
         boolean smsSent = sendSms(saccoId, stationId, notificationId, recipient, eventType, resolvedContent, usageContext);
         if (!smsSent && channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
             notificationEmailService.sendNotificationEmail(
+                saccoId,
                 recipientId,
                 resolvedContent.subject(),
                 resolvedContent.plainText(),

@@ -25,6 +25,25 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EmailOtpServiceTest {
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value=EmailOtpPurpose.class, names={"LOGIN_MFA", "CLAIM_ACCOUNT"})
+    void emailOnlyAndAccountClaimCodesRetainTheMembersInstitution(EmailOtpPurpose purpose) {
+        UUID id = UUID.randomUUID();
+        when(memberRepository.findById(id)).thenReturn(java.util.Optional.of(com.sacco.mvp.domain.Member.builder()
+            .id(id).saccoId("INST-1").email("client@example.com").build()));
+        when(stationOtpDeliveryService.deliverEmailOnly(org.mockito.ArgumentMatchers.eq("INST-1"),
+            org.mockito.ArgumentMatchers.eq("client@example.com"), org.mockito.ArgumentMatchers.eq("Code"),
+            org.mockito.ArgumentMatchers.eq("Intro"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(10)))
+            .thenReturn(new StationOtpDeliveryService.DeliveryReceipt(OtpDeliveryChannel.EMAIL, "Sent"));
+        var receipt = purpose == EmailOtpPurpose.CLAIM_ACCOUNT
+            ? emailOtpService.issueOtp("client@example.com", purpose, id, "Code", "Intro")
+            : emailOtpService.issueOtpToEmail("client@example.com", purpose, id, "Code", "Intro");
+        assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.EMAIL);
+        verify(stationOtpDeliveryService).deliverEmailOnly(org.mockito.ArgumentMatchers.eq("INST-1"),
+            org.mockito.ArgumentMatchers.eq("client@example.com"), org.mockito.ArgumentMatchers.eq("Code"),
+            org.mockito.ArgumentMatchers.eq("Intro"), org.mockito.ArgumentMatchers.matches("[0-9]{6}"), org.mockito.ArgumentMatchers.eq(10));
+    }
     @Mock private EmailOtpTokenRepository emailOtpTokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private MemberRepository memberRepository;

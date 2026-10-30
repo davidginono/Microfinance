@@ -22,6 +22,14 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StationOtpDeliveryServiceTest {
+
+    @Test
+    void emailOnlyDeliveryRetainsTheInstitutionWithoutSelectingAnSmsChannel() {
+        var receipt = service.deliverEmailOnly("INST-1", "member@example.com", "Your registration code", "Intro", "123456", 10);
+        assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.EMAIL);
+        verify(emailService).sendRequiredDirectEmail(eq("INST-1"), eq("member@example.com"), eq("Your registration code"), any());
+        org.mockito.Mockito.verifyNoInteractions(settingsService, smsGateway, unitService);
+    }
     @Mock private StationOtpSettingsService settingsService;
     @Mock private NotificationEmailService emailService;
     @Mock private SmsGateway smsGateway;
@@ -43,7 +51,7 @@ class StationOtpDeliveryServiceTest {
             EmailOtpPurpose.LOGIN, "Subject", "Intro", "123456", 10);
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.EMAIL);
-        verify(emailService).sendRequiredDirectEmail(eq("member@example.com"), eq("Subject"), any());
+        verify(emailService).sendRequiredDirectEmail(eq("SACCO-1"), eq("member@example.com"), eq("Subject"), any());
         verify(unitService, never()).reserve(any(), any(), any(), any());
     }
 
@@ -62,7 +70,7 @@ class StationOtpDeliveryServiceTest {
             EmailOtpPurpose.LOGIN, "Subject", "Intro", "123456", 10);
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.SMS);
-        verify(emailService, never()).sendRequiredDirectEmail(any(), any(), any());
+        verify(emailService, never()).sendRequiredDirectEmail(any(), any(), any(), any());
         verify(smsGateway).send(eq("255700000001"), argThat(message ->
             message.contains("Intro")
                 && message.contains("OTP: 123456")
@@ -81,7 +89,7 @@ class StationOtpDeliveryServiceTest {
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.EMAIL);
         verify(smsGateway, never()).send(any(), any());
-        verify(emailService).sendRequiredDirectEmail(eq("member@example.com"), eq("Subject"), any());
+        verify(emailService).sendRequiredDirectEmail(eq("SACCO-1"), eq("member@example.com"), eq("Subject"), any());
     }
 
     @Test
@@ -96,14 +104,14 @@ class StationOtpDeliveryServiceTest {
             .hasMessageContaining("depleted");
 
         verify(smsGateway, never()).send(any(), any());
-        verify(emailService, never()).sendRequiredDirectEmail(any(), any(), any());
+        verify(emailService, never()).sendRequiredDirectEmail(any(), any(), any(), any());
     }
 
     @Test
     void emailDeliveryFailureIsReportedInsteadOfReturningFalseSuccess() {
         when(settingsService.channel("SACCO-1", "ST-1")).thenReturn(OtpDeliveryChannel.EMAIL);
         doThrow(new IllegalStateException("SMTP unavailable"))
-            .when(emailService).sendRequiredDirectEmail(eq("member@example.com"), eq("Subject"), any());
+            .when(emailService).sendRequiredDirectEmail(eq("SACCO-1"), eq("member@example.com"), eq("Subject"), any());
 
         assertThatThrownBy(() -> service.deliver(
             "SACCO-1",

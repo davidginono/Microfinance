@@ -76,7 +76,7 @@ class NotificationEmailServiceTest {
         assertThat(message.getValue().getSubject()).isEqualTo("Loan update");
         assertThat(message.getValue().getContent().toString()).contains("MimeMultipart");
         message.getValue().saveChanges();
-        assertThat(content(message.getValue(), "text/html")).isEqualTo("<strong>HTML body</strong>");
+        assertThat(content(message.getValue(), "text/html")).contains("<strong>HTML body</strong>");
         assertThat(content(message.getValue(), "text/plain")).isEqualTo("Plain body");
     }
 
@@ -107,7 +107,7 @@ class NotificationEmailServiceTest {
         PlatformMailSenderFactory factory = mock(PlatformMailSenderFactory.class);
         PlatformEmailSettingsService emailSettings = mock(PlatformEmailSettingsService.class);
         when(factory.getMailSender()).thenReturn(null);
-        NotificationEmailService service = new NotificationEmailService(memberRepository, factory, emailSettings);
+        NotificationEmailService service = new NotificationEmailService(memberRepository, factory, emailSettings, mock(SaccoRegistryService.class));
 
         assertThatThrownBy(() -> service.sendRequiredDirectEmail(
             "reviewer@example.com",
@@ -147,7 +147,7 @@ class NotificationEmailServiceTest {
         verify(sender).send(mail.capture());
         MimeMessage message = mail.getValue();
         message.saveChanges();
-        assertThat(message.getSubject()).isEqualTo("Your Microfinance registration code");
+        assertThat(message.getSubject()).isEqualTo("Your registration code");
         assertThat(message.getFrom()[0].toString()).isEqualTo("no-reply@sacco.local");
         assertThat(content(message, "text/plain")).contains("Sign in to Microfinance.", "123456", "10 minutes")
             .doesNotContain("Loan Application Portal", "<html>");
@@ -186,7 +186,7 @@ class NotificationEmailServiceTest {
         ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
         verify(sender).send(mail.capture());
         mail.getValue().saveChanges();
-        assertThat(mail.getValue().getSubject()).isEqualTo("Microfinance update");
+        assertThat(mail.getValue().getSubject()).isEqualTo("update");
         assertThat(content(mail.getValue(), "text/plain")).isEqualTo("Microfinance update");
         assertThat(content(mail.getValue(), "text/html")).contains("<strong>Microfinance</strong>", "https://microfinance.example/loan/1")
             .doesNotContain("Loan Application Portal");
@@ -213,6 +213,10 @@ class NotificationEmailServiceTest {
     }
 
     private NotificationEmailService service(MemberRepository memberRepository, JavaMailSender mailSender, String overrideRecipient) {
+        return service(memberRepository, mailSender, overrideRecipient, mock(SaccoRegistryService.class));
+    }
+
+    private NotificationEmailService service(MemberRepository memberRepository, JavaMailSender mailSender, String overrideRecipient, SaccoRegistryService registry) {
         PlatformMailSenderFactory factory = mock(PlatformMailSenderFactory.class);
         PlatformEmailSettingsService emailSettings = mock(PlatformEmailSettingsService.class);
         when(factory.getMailSender()).thenReturn(mailSender);
@@ -234,7 +238,86 @@ class NotificationEmailServiceTest {
             true,
             true
         ));
-        return new NotificationEmailService(memberRepository, factory, emailSettings);
+        return new NotificationEmailService(memberRepository, factory, emailSettings, registry);
+    }
+
+    @Test
+    void registrationEmailsUseTheirOriginatingInstitutionEvenWithTheSameOverrideRecipient() throws Exception {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        SaccoRegistryService registry = mock(SaccoRegistryService.class);
+        when(registry.notificationInstitutionName("INST-1")).thenReturn(Optional.of("First Microfinance Limited"));
+        when(registry.notificationInstitutionName("INST-2")).thenReturn(Optional.of("Second Finance & Credit"));
+        MemberRepository members = mock(MemberRepository.class);
+        NotificationEmailService service = service(members, sender, "audit@example.com", registry);
+        String body = "Confirm your registration.\nYour OTP code is: 123456\nThis code expires in 10 minutes.";
+        service.sendRequiredDirectEmail("INST-1", "first@example.com", "Your Microfinance registration code", body);
+        service.sendRequiredDirectEmail("INST-2", "second@example.com", "Your registration code", body);
+
+        ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender, org.mockito.Mockito.times(2)).send(mail.capture());
+        for (MimeMessage message : mail.getAllValues()) {
+            message.saveChanges();
+            assertThat(message.getSubject()).isEqualTo("Your registration code");
+            assertThat(message.getRecipients(Message.RecipientType.TO)[0].toString()).isEqualTo("audit@example.com");
+            assertThat(content(message, "text/html")).contains(">Your registration code</h1>", "123456", "10 minutes")
+                .doesNotContain("Your Microfinance", "Loan Application Portal");
+        }
+        assertThat(content(mail.getAllValues().get(0), "text/html")).contains(">First Microfinance Limited</td>").doesNotContain("Second Finance");
+        assertThat(content(mail.getAllValues().get(1), "text/html")).contains(">Second Finance &amp; Credit</td>").doesNotContain("First Microfinance");
+        org.mockito.Mockito.verifyNoInteractions(members);
+    }
+
+    @Test
+    void memberNotificationsUseTheRecipientsRegisteredInstitutionAndEscapeItsName() throws Exception {
+        UUID id = UUID.randomUUID();
+        MemberRepository members = mock(MemberRepository.class);
+        when(members.findById(id)).thenReturn(Optional.of(com.sacco.mvp.domain.Member.builder()
+            .id(id).saccoId("INST-1").email("client@example.com").build()));
+        SaccoRegistryService registry = mock(SaccoRegistryService.class);
+        when(registry.notificationInstitutionName("INST-1")).thenReturn(Optional.of("Asha & <script>alert(1)</script> Finance"));
+        JavaMailSender sender = mock(JavaMailSender.class);
+        service(members, sender, "", registry).sendNotificationEmail(id, "Your Microfinance sign-in code", "Your OTP code is: 123456");
+
+        ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender).send(mail.capture());mail.getValue().saveChanges();
+        assertThat(content(mail.getValue(), "text/html")).contains("Asha &amp; &lt;script&gt;alert(1)&lt;/script&gt; Finance", ">Your sign-in code</h1>")
+            .doesNotContain("<script>");
+        verify(registry).notificationInstitutionName("INST-1");
+    }
+
+    @Test
+    void richNotificationKeepsItsTitleAndLinksUnderTheOriginatingInstitutionBanner() throws Exception {
+        UUID id = UUID.randomUUID();
+        MemberRepository members = mock(MemberRepository.class);
+        when(members.findById(id)).thenReturn(Optional.of(com.sacco.mvp.domain.Member.builder()
+            .id(id).saccoId("CURRENT-INST").email("client@example.com").build()));
+        SaccoRegistryService registry = mock(SaccoRegistryService.class);
+        when(registry.notificationInstitutionName("ORIGIN-INST")).thenReturn(Optional.of("Original Finance"));
+        JavaMailSender sender = mock(JavaMailSender.class);
+        service(members, sender, "", registry).sendNotificationEmail("ORIGIN-INST", id, "Microfinance: Loan update", "Plain body",
+            "<!doctype html><html><body><h1>Your Microfinance loan update</h1><p>Loan ID: 42</p><a href=\"https://example.com/loans/42\">Details</a></body></html>");
+        ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender).send(mail.capture());mail.getValue().saveChanges();
+        String html = content(mail.getValue(), "text/html");
+        assertThat(mail.getValue().getSubject()).isEqualTo("Loan update");
+        assertThat(html).contains(">Original Finance</td>", "<h1>Your loan update</h1>", "Loan ID: 42", "https://example.com/loans/42")
+            .doesNotContain("Your Microfinance", "CURRENT-INST");
+        assertThat(html.split("<!doctype html>", -1)).hasSize(2);
+        verify(registry, never()).notificationInstitutionName("CURRENT-INST");
+    }
+
+    @Test
+    void missingInstitutionDoesNotBorrowAnotherInstitutionsBrand() throws Exception {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        MemberRepository members = mock(MemberRepository.class);
+        SaccoRegistryService registry = mock(SaccoRegistryService.class);
+        service(members, sender, "", registry).sendDirectEmail("MISSING-INST", "client@example.com", "Your Microfinance code", "Your code");
+        ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender).send(mail.capture());mail.getValue().saveChanges();
+        assertThat(content(mail.getValue(), "text/html")).contains(">Notifications</td>", ">Your code</h1>")
+            .doesNotContain("MISSING-INST", ">Microfinance</td>");
+        verify(registry).notificationInstitutionName("MISSING-INST");
+        org.mockito.Mockito.verifyNoInteractions(members);
     }
 
     private String content(Part part, String type) throws Exception {

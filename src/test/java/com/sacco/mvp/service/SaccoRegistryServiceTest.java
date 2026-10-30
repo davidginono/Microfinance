@@ -37,6 +37,22 @@ import static org.mockito.Mockito.when;
 class SaccoRegistryServiceTest {
 
     @Test
+    void notificationNamesComeOnlyFromTheExactRegisteredInstitution() {
+        var repository = Mockito.mock(RegisteredSaccoRepository.class);
+        var service = new SaccoRegistryService(repository, Mockito.mock(SaccoStationRepository.class), Mockito.mock(SaccoSettingsRepository.class),
+            Mockito.mock(SaccoLogoStorageService.class), Mockito.mock(SmsUnitTransactionService.class), Mockito.mock(AuditService.class), Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class));
+        assertThat(service.notificationInstitutionName(null)).isEmpty();
+        assertThat(service.notificationInstitutionName(" ")).isEmpty();
+        assertThat(service.notificationInstitutionName("PLATFORM")).isEmpty();
+        Mockito.verifyNoInteractions(repository);
+        when(repository.findById("INST-1")).thenReturn(Optional.of(RegisteredSacco.builder()
+            .saccoId("INST-1").saccoName(" First Microfinance Limited ").active(false).build()));
+        assertThat(service.notificationInstitutionName("INST-1")).contains("First Microfinance Limited");
+        assertThat(service.notificationInstitutionName("INST-2")).isEmpty();
+        verify(repository).findById("INST-1");verify(repository).findById("INST-2");
+    }
+
+    @Test
     void platformTopUpQueriesRequireExplicitClaimsAndCapPagesBeforePersistence() {
         var repository = Mockito.mock(RegisteredSaccoRepository.class);
         var service = new SaccoRegistryService(repository, Mockito.mock(SaccoStationRepository.class), Mockito.mock(SaccoSettingsRepository.class),

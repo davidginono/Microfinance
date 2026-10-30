@@ -246,7 +246,7 @@ class PlatformEmailSettingsServiceTest {
 
         ArgumentCaptor<MimeMessage> mail = ArgumentCaptor.forClass(MimeMessage.class);
         verify(mailSender).send(mail.capture());
-        assertEquals("Microfinance platform email test", mail.getValue().getSubject());
+        assertEquals("Platform email test", mail.getValue().getSubject());
         assertEquals("admin@example.com", mail.getValue().getRecipients(Message.RecipientType.TO)[0].toString());
         assertEquals("alerts@example.com", mail.getValue().getFrom()[0].toString());
         assertTrue(mail.getValue().getContent() instanceof jakarta.mail.Multipart);

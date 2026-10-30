@@ -92,7 +92,7 @@ public class MinorAdminInvitationService {
             member.getEmail(),
             EmailOtpPurpose.CLAIM_ACCOUNT,
             member.getId(),
-            "Activate your Microfinance administrator account",
+            "Activate your administrator account",
             "Use the code below to activate your institution administrator account.",
             member.getSaccoId(),
             member.getStationId(),
@@ -223,8 +223,9 @@ public class MinorAdminInvitationService {
             + "After activation, you can sign in with your staff number and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()
             + "If you did not expect this invitation, please ignore this email.";
         notificationEmailService.sendRequiredDirectEmail(
+            member.getSaccoId(),
             member.getEmail(),
-            "Activate your Microfinance staff account",
+            "Activate your staff account",
             body
         );
     }

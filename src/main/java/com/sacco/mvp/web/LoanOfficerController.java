@@ -432,7 +432,7 @@ public class LoanOfficerController {
                 reviewer.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 reviewer.getId(),
-                "Your Microfinance loan officer decision code",
+                "Your loan officer decision code",
                 "Use this OTP code to confirm your assigned loan officer review decision.",
                 app.getSaccoId(),
                 app.getStationId(),

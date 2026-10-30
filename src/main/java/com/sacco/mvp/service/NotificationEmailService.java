@@ -17,16 +17,25 @@ public class NotificationEmailService {
     private final MemberRepository memberRepository;
     private final PlatformMailSenderFactory mailSenderFactory;
     private final PlatformEmailSettingsService emailSettingsService;
+    private final SaccoRegistryService saccoRegistryService;
 
     public void sendDirectEmail(String email, String subject, String message) {
-        sendDirectEmail(email, subject, message, null, false);
+        sendDirectEmail(null, email, subject, message, null, false);
+    }
+
+    public void sendDirectEmail(String saccoId, String email, String subject, String message) {
+        sendDirectEmail(saccoId, email, subject, message, null, false);
     }
 
     public void sendRequiredDirectEmail(String email, String subject, String message) {
-        sendDirectEmail(email, subject, message, null, true);
+        sendDirectEmail(null, email, subject, message, null, true);
     }
 
-    private void sendDirectEmail(String email, String subject, String message, String html, boolean deliveryRequired) {
+    public void sendRequiredDirectEmail(String saccoId, String email, String subject, String message) {
+        sendDirectEmail(saccoId, email, subject, message, null, true);
+    }
+
+    private void sendDirectEmail(String saccoId, String email, String subject, String message, String html, boolean deliveryRequired) {
         if (email == null || email.isBlank()) {
             if (deliveryRequired) {
                 throw new IllegalStateException("A recipient email address is required for OTP delivery.");
@@ -48,10 +57,10 @@ public class NotificationEmailService {
             MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
             helper.setTo(resolveRecipient(email, config));
             helper.setFrom(config.fromAddress());
-            helper.setSubject(NotificationMessageTemplate.text(subject));
-            helper.setText(NotificationMessageTemplate.text(message), html == null || html.isBlank()
-                ? NotificationMessageTemplate.html(subject, message)
-                : NotificationMessageTemplate.text(html));
+            String institutionName = saccoRegistryService.notificationInstitutionName(saccoId).orElse(null);
+            helper.setSubject(NotificationMessageTemplate.title(subject));
+            helper.setText(NotificationMessageTemplate.text(message),
+                NotificationMessageTemplate.html(institutionName, subject, message, html));
             mailSender.send(mail);
         } catch (Exception ex) {
             log.warn("Unable to send direct email to {}: {}", email, ex.getMessage());
@@ -66,6 +75,10 @@ public class NotificationEmailService {
     }
 
     public void sendNotificationEmail(UUID memberId, String subject, String message, String html) {
+        sendNotificationEmail(null, memberId, subject, message, html);
+    }
+
+    public void sendNotificationEmail(String saccoId, UUID memberId, String subject, String message, String html) {
         if (memberId == null) {
             return;
         }
@@ -73,7 +86,7 @@ public class NotificationEmailService {
         if (recipient == null || recipient.getEmail() == null || recipient.getEmail().isBlank()) {
             return;
         }
-        sendDirectEmail(recipient.getEmail(), subject, message, html, false);
+        sendDirectEmail(saccoId == null ? recipient.getSaccoId() : saccoId, recipient.getEmail(), subject, message, html, false);
     }
 
     private String resolveRecipient(String email, PlatformEmailSettingsService.ResolvedEmailConfig config) {

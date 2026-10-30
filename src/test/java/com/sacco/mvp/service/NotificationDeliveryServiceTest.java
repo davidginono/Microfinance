@@ -53,7 +53,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService, never()).sendNotificationEmail(memberId, "Loan update", "Approved", null);
+        verify(emailService, never()).sendNotificationEmail("SACCO-1", memberId, "Loan update", "Approved", null);
         verify(unitService).reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS");
         verify(smsGateway).send("255673054445", "Loan update: Approved");
     }
@@ -93,7 +93,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService, never()).sendNotificationEmail(any(), any(), any(), any());
+        verify(emailService, never()).sendNotificationEmail(any(), any(), any(), any(), any());
         verify(unitService).reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS");
         verify(smsGateway).send("255673054445", "Loan update: Approved");
     }
@@ -127,7 +127,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Approved", null);
+        verify(emailService).sendNotificationEmail("SACCO-1", memberId, "Loan update", "Approved", null);
         verify(smsGateway, never()).send(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(alertService).alertStatus("SACCO-1", "STN001", SmsUnitStatus.DEPLETED, 0);
     }
@@ -168,7 +168,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", content);
 
-        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Plain email body", "<p>HTML email body</p>");
+        verify(emailService).sendNotificationEmail("SACCO-1", memberId, "Loan update", "Plain email body", "<p>HTML email body</p>");
         verify(smsGateway, never()).send(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
@@ -199,7 +199,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Approved", null);
+        verify(emailService).sendNotificationEmail("SACCO-1", memberId, "Loan update", "Approved", null);
         verify(unitService, never()).reserve(any(), any(), any(), any());
         verify(smsGateway, never()).send(any(), any());
     }
@@ -254,7 +254,7 @@ class NotificationDeliveryServiceTest {
         );
 
         verify(memberRepository, never()).findById(any());
-        verify(emailService, never()).sendDirectEmail(any(), any(), any());
+        verify(emailService, never()).sendDirectEmail(any(), any(), any(), any());
         verify(unitService).reserve("SACCO-1", "ST-1", notificationId, "DIRECT_GUARANTOR_OTP_CONFIRMED", context);
         verify(smsGateway).send("255700000002", "Confirmed");
     }
@@ -294,6 +294,7 @@ class NotificationDeliveryServiceTest {
         );
 
         verify(emailService).sendDirectEmail(
+            "SACCO-1",
             "guarantor@example.com",
             "Guarantor confirmation recorded",
             "Plain notification body"

@@ -47,7 +47,7 @@ public class StationOtpDeliveryService {
             + "Your OTP code is: " + code + System.lineSeparator()
             + "This code expires in " + ttlMinutes + " minutes.";
         if (channel == OtpDeliveryChannel.EMAIL) {
-            sendEmail(email, subject, message);
+            sendEmail(saccoId, email, subject, message);
             return new DeliveryReceipt(OtpDeliveryChannel.EMAIL, "We sent an OTP code to your registered email.");
         }
 
@@ -65,13 +65,14 @@ public class StationOtpDeliveryService {
             return new DeliveryReceipt(OtpDeliveryChannel.SMS, "We sent an OTP code to your registered phone.");
         }
         if (channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
-            sendEmail(email, subject, message);
+            sendEmail(saccoId, email, subject, message);
             return new DeliveryReceipt(OtpDeliveryChannel.EMAIL, "SMS was unavailable, so we sent the OTP code to your registered email.");
         }
         throw new IllegalStateException(smsAttempt.reason());
     }
 
-    public DeliveryReceipt deliverEmailOnly(String email,
+    public DeliveryReceipt deliverEmailOnly(String saccoId,
+                                            String email,
                                             String subject,
                                             String introMessage,
                                             String code,
@@ -79,7 +80,7 @@ public class StationOtpDeliveryService {
         String message = introMessage + System.lineSeparator() + System.lineSeparator()
             + "Your OTP code is: " + code + System.lineSeparator()
             + "This code expires in " + ttlMinutes + " minutes.";
-        sendEmail(email, subject, message);
+        sendEmail(saccoId, email, subject, message);
         return new DeliveryReceipt(OtpDeliveryChannel.EMAIL, "We sent an OTP code to your registered email.");
     }
 
@@ -146,11 +147,11 @@ public class StationOtpDeliveryService {
                 && usageContext.recipientMemberId() == null);
     }
 
-    private void sendEmail(String email, String subject, String message) {
+    private void sendEmail(String saccoId, String email, String subject, String message) {
         if (email == null || email.isBlank()) {
             throw new IllegalStateException("This account has no valid email address for OTP delivery.");
         }
-        notificationEmailService.sendRequiredDirectEmail(email.trim().toLowerCase(), subject, message);
+        notificationEmailService.sendRequiredDirectEmail(saccoId, email.trim().toLowerCase(), subject, message);
     }
 
     public record DeliveryReceipt(OtpDeliveryChannel deliveredBy, String userMessage) {
