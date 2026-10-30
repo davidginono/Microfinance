@@ -49,6 +49,19 @@ debounce/stale-response tests. These correctness checks make no throughput claim
   returned available for an unused valid username, unavailable for invalid input and an
   existing username (including uppercase input), with `Cache-Control: no-store`.
 - Visual/mobile browser checks remain pending because local browser access is disabled
-  in Work settings. The broader pre-existing view-contract failures concern institution
-  filter markup, a guaranteed-loans modal option and platform-settings markup; they are
-  outside this change. This is not a full-suite or load-test success claim.
+  in Work settings. This is not a full-suite or load-test success claim.
+
+## UI contract follow-up (2026-10-30)
+
+- Resolved the three stale AWS view assertions for institution-wide branch controls,
+  workspace-aware toast placement and the read-only Platform Settings overview. The
+  controls retain responsive wrapping; platform edits still require the UPDATE claim.
+- Updated the neighboring institution loan-summary assertion to check its localized
+  message keys in both languages and its scoped summary bindings instead of superseded
+  hardcoded English text. Production UI, authorization and business rules are unchanged.
+- All 77 checks passed across `AwsConsoleViewContractTest`,
+  `AdminConfigurationUiContractTest` and `AdminControllerUserAccessSecurityTest` using
+  `mvn -Dmaven.compiler.useIncrementalCompilation=false -Dtest=AwsConsoleViewContractTest,AdminConfigurationUiContractTest,AdminControllerUserAccessSecurityTest test`.
+  All 23 affected JavaScript checks passed for institution tabs, platform forms, shared
+  details and shell navigation. A bounded read-only query confirmed the three current
+  local user records retain their backfilled usernames; no account data was changed.

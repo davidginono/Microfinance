@@ -284,21 +284,36 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
-    void systemAdminSaccoLoanPortfolioShowsOnlyRequestedLoanSummary() throws Exception {
+    void systemAdminInstitutionLoanPortfolioUsesLocalizedScopedSummary() throws Exception {
         String saccoDetail = read(JSP_ROOT.resolve("admin/sacco-detail.jsp"));
 
         assertThat(saccoDetail)
-            .contains("Loan Portfolio")
-            .contains("Total Applied")
-            .contains("Disbursed Principal")
-            .contains("Loan Applications by Status")
-            .contains("No disbursed or rejected loan applications found for this institution.")
+            .contains("selectedSection eq 'loans'")
+            .contains("code=\"admin.institutionDetails.loanPortfolio\"")
+            .contains("code=\"admin.institutionDetails.applications\"")
+            .contains("code=\"admin.institutionDetails.disbursed\"")
+            .contains("code=\"admin.institutionDetails.loanStatuses\"")
+            .contains("code=\"admin.institutionDetails.noLoans\"")
+            .contains("${saccoDetail.totalLoanApplicationCount}")
+            .contains("${saccoDetail.summary.totalDisbursedPrincipalFullLabel}")
+            .contains("${saccoDetail.loanStatusCounts}")
+            .contains("data-institution-scope")
+            .contains("name=\"stationId\"")
             .doesNotContain("Paid Loans")
             .doesNotContain("Overdue Unpaid")
             .doesNotContain("Recent Loan Activity")
             .doesNotContain("saccoDetail.recentLoans")
             .doesNotContain("saccoDetail.paidLoanCount")
             .doesNotContain("saccoDetail.overdueLoanCount");
+        for (String language : java.util.List.of("en", "sw")) {
+            var messages = new java.util.Properties();
+            try (var reader = Files.newBufferedReader(Path.of("src/main/resources/messages_" + language + ".properties"))) {
+                messages.load(reader);
+            }
+            for (String key : java.util.List.of("loanPortfolio", "applications", "disbursed", "loanStatuses", "noLoans")) {
+                assertThat(messages.getProperty("admin.institutionDetails." + key)).as(language + " " + key).isNotBlank();
+            }
+        }
     }
 
     @Test

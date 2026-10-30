@@ -253,6 +253,12 @@ class AwsConsoleViewContractTest {
                 // Selection-dependent GET commands open version proposals; they are not filter toolbars.
                 if (getForms.group().contains("data-table-command")
                     || getForms.group().contains("accounting-create-form")) continue;
+                // Institution branch scope applies to every detail tab, not one resource table.
+                if (path.equals(JSP_ROOT.resolve("admin/sacco-detail.jsp"))
+                    && getForms.group().contains("data-institution-scope")) {
+                    assertThat(getForms.group()).contains("institution-details-controls");
+                    continue;
+                }
                 assertThat(getForms.group())
                     .as(path + " GET form")
                     .satisfiesAnyOf(
@@ -273,6 +279,10 @@ class AwsConsoleViewContractTest {
             .contains(".aws-console .loan-application-steps")
             .contains("overflow-x: auto")
             .contains("white-space: normal");
+        assertThat(read(Path.of("src/main/resources/static/css/console-resource-details.css")))
+            .contains(".aws-console .institution-details-controls {display:flex;flex-flow:row wrap;")
+            .contains(".institution-details-controls > label {display:grid;")
+            .contains(".institution-details-controls .aws-control {width:100%;min-width:0;}");
     }
 
     @Test
@@ -329,7 +339,8 @@ class AwsConsoleViewContractTest {
             .contains("row.hidden = !visible")
             .contains("window.AppLoading?.end(region)")
             .containsPattern("restoreModalAfterReload\\(\\);\\R\\s*document\\.querySelectorAll\\('\\[data-toast-message\\]'\\)")
-            .contains("{ contextElement: element, preferModal: true }")
+            .containsPattern("contextElement:\\s*element,\\s*preferModal:\\s*true")
+            .contains("element.dataset.toastPlacement==='workspace'?{placement:'workspace'}:{}")
             .doesNotContain("loader.append(spinner, label)");
     }
 
@@ -848,8 +859,14 @@ class AwsConsoleViewContractTest {
             .doesNotContain("member.settings.language.eyebrow")
             .doesNotContain("staff-settings-action-bar");
         assertThat(platformSettings)
-            .contains("aws-settings-panel")
-            .contains("aws-settings-subsection")
+            .contains("class=\"platform-settings-overview\"")
+            .contains("class=\"erp-panel\"")
+            .contains("class=\"erp-panel-body\"")
+            .contains("class=\"erp-detail-facts\"")
+            .contains("@access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+            .contains("href=\"/admin/platform-settings/session-timeout/edit\"")
+            .contains("href=\"/admin/platform-settings/email/edit\"")
+            .doesNotContain("<form", "<input", "<select")
             .doesNotContain("platform-settings-card rounded-md");
         assertThat(adminSettings)
             .contains("aws-settings-panel aws-settings-panel--compact")
