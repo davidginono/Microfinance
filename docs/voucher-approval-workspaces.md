@@ -27,12 +27,45 @@ The access matrix groups voucher workspace and decision permissions in one Vouch
 ## Verification (2026-10-23)
 
 - Production compilation and the final focused run passed 62 checks: 35 PostgreSQL voucher/workflow checks, 22 MVC/CSRF/binding checks, four finance workspace security checks and one Jasper check compiling all six affected JSPs. The six JSPs compiled again after the final confirmation markup change. PostgreSQL 18 applied all 110 migrations through V89 on a disposable loopback database. Tests cover all ordinary voucher types, exact boundaries, scope, quorum, distinct people across roles, concurrent decisions/posting, old snapshots, immutable submitted contents, changed rules, incomplete batches, creator-only posting, automatic posting, revoked maker permissions, atomic rollback and retry.
-- The broader voucher-class run also exposed the existing `loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly` assertion: it still expects a loan-purpose Posting account to be excluded after V88's unified Posting account change. No product-account implementation or assertion was changed for this request; that unrelated method was explicitly excluded from the final focused run. This is not a full-suite success claim.
+- The broader voucher-class run also exposed the existing `loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly` assertion: it still expected a loan-purpose Posting account to be excluded after V88's unified Posting account change. That method was excluded from the 2026-10-23 focused run. The assertion was corrected on 2026-10-30; see the follow-up below. This is not a full-suite success claim.
 - Real controller/service browser checks on loopback port 8087 used only synthetic staff and disposable data. Verified staff login/logout, saving role rules, adding/removing steps, adding a batch rule, creating a batch from the journal register, choosing accounts, saving a voucher, sending the batch, immediate reviewer queue visibility, selection-dependent Approve, the exact amount in confirmation, and an independent manager decision. The resulting batch was Approved and Not posted, with no Post action for the reviewer. Browser financial posting was not performed; automatic and creator posting were tested against PostgreSQL.
 - Configuration containment passed at 360, 768, 1366 and 1920 CSS pixels. Mobile navigation opened and closed; final desktop/mobile screenshots are under ignored `target/approval-rules-*.png`. Browser checks found and corrected duplicate counts/headings and excess spacing. No approval-page JavaScript errors were observed; the shared Lucide bundle reported its existing missing `x` icon warning, and notification hydration was unavailable in the synthetic fixture. English/Kiswahili labels, both maintained UI skills, JavaScript syntax, UTF-8 JSP sources and Git whitespace checks were verified.
 - The app started successfully with Java 25 and Spring Boot 4.1.0 against the disposable database. Operational institution rules/permissions, full-suite tests, exports and throughput were not changed or certified. Restart/load V89 before configuring replacement rules. The local commit for this increment is titled `Replace voucher approval rules with role-based workflows`.
 
 This increment does not complete the broader accounting/report-builder backlog or establish measured throughput.
+
+## Posting-account regression follow-up (2026-10-30)
+
+The documented `loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly` failure
+was reproduced on disposable PostgreSQL. Its `control` fixture is a `POSTING` account
+with purpose `LOAN_PRINCIPAL`, so excluding it from product-account choices contradicted
+[the V88 contract](unified-posting-account-type.md). The existing repository correctly
+accepts active `POSTING` and compatible legacy `CONTROL` accounts within the institution;
+no implementation or applied migration needed changing.
+
+The corrected test accepts principal, interest receivable, fee receivable and allowance
+Posting accounts in both unfiltered and selected choices. It rejects groups, inactive,
+missing and foreign accounts. The same loan-purpose accounts still require a loan source
+and are rejected by ordinary receipt, payment and journal posting; mapping eligibility
+does not grant permission to bypass the loan workflow. The separate V88 compatibility
+check retains legacy account kinds, version snapshots and journal history.
+
+Verification passed with Java 25 and disposable PostgreSQL 17.9 databases: **45 checks,
+zero failures/errors/skips** — all 37 `VoucherPostgresTest` methods (including the formerly
+excluded method), six `LoanProductAccountServiceTest` methods, one
+`PostingAccountCompatibilityPostgresTest` and one `LoanProductAccountMigrationTest`.
+Production and test compilation passed. After the final assertion-only refinement, the
+changed test was recompiled with `javac --release 25 -parameters -proc:none` against the
+test classpath, then all four classes ran through:
+
+```text
+mvn -Dtest=VoucherPostgresTest,PostingAccountCompatibilityPostgresTest,LoanProductAccountMigrationTest,LoanProductAccountServiceTest surefire:test
+```
+
+The three existing environment gates pointed only to disposable loopback databases;
+the migration databases were recreated before the final run. Operational accounts,
+balances, permissions, production implementation and V88 were not changed by this fix.
+This is a focused correctness result, not a full-suite or throughput claim.
 
 ---
 

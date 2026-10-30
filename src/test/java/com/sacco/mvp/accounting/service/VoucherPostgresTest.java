@@ -255,14 +255,34 @@ class VoucherPostgresTest {
  @Test void loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly(){
   var accounts=new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc);
   UUID heading=account("GROUP","ASSET","DEBIT","HEADING","OTHER");
-  assertThat(accounts.choices(institution,"",0,null)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id).contains(cash,capital,expense).doesNotContain(heading,control);
-  for(UUID invalid:List.of(heading,control)){
+  UUID interest=account("INTEREST","ASSET","DEBIT","POSTING","INTEREST_RECEIVABLE");
+  UUID fee=account("FEE","ASSET","DEBIT","POSTING","FEE_RECEIVABLE");
+  UUID allowance=account("ALLOWANCE","ASSET","CREDIT","POSTING","ALLOWANCE");
+  UUID inactive=UUID.randomUUID();
+  jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,active,maker_id,created_at) values(?,?,'INACTIVE','Inactive posting account','ASSET','DEBIT','POSTING','OTHER',false,?,?)",inactive,institution,actor.getMemberId(),now);
+  assertThat(accounts.choices(institution,"",0,null)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id)
+   .contains(cash,capital,expense,control,interest,fee,allowance).doesNotContain(heading,inactive);
+  for(UUID invalid:List.of(heading,inactive,UUID.randomUUID())){
    assertThat(accounts.choices(institution,"",0,invalid)).isEmpty();
    assertThat(accounts.valid(institution,invalid)).isFalse();
   }
-  assertThat(accounts.choices(institution,"",0,cash)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id).containsExactly(cash);
-  assertThat(accounts.valid(institution,cash)).isTrue();
-  assertThat(accounts.choices("FOREIGN","",0,cash)).isEmpty();assertThat(accounts.valid("FOREIGN",cash)).isFalse();
+  for(UUID valid:List.of(cash,capital,expense,control,interest,fee,allowance)){
+   assertThat(accounts.choices(institution,"",0,valid)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id).containsExactly(valid);
+   assertThat(accounts.valid(institution,valid)).isTrue();
+   assertThat(accounts.choices("FOREIGN","",0,valid)).isEmpty();assertThat(accounts.valid("FOREIGN",valid)).isFalse();
+  }
+  // Product mapping eligibility does not authorize ordinary vouchers to post loan balances.
+  var vouchers=new VoucherRepository(jdbc);
+  for(UUID loanAccount:List.of(control,interest,fee,allowance)){
+   assertThat(jdbc.queryForObject("select gl_account_requires_loan_source(?)",Boolean.class,loanAccount)).isTrue();
+   assertThat(vouchers.selectedAccounts(institution,List.of(loanAccount),false)).isEmpty();
+   for(Type type:List.of(Type.RECEIPT,Type.PAYMENT,Type.JOURNAL)){
+    var f=form(type);
+    if(type==Type.PAYMENT)f.getRows().getFirst().setDebitAccountId(loanAccount);
+    else f.getRows().getFirst().setCreditAccountId(loanAccount);
+    assertThatThrownBy(()->service.post(actor,type,f)).hasMessage("voucher.error.account");
+   }
+  }
  }
 
  @Test void completeVoucherRoutesImmediatelyAndOnlyMakerCanPost(){
