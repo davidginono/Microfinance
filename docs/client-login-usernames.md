@@ -1,8 +1,9 @@
 # Client login usernames
 
-Client password login and password recovery accept an email address or username. Client
+Client and staff password login and password recovery accept an email address or username. Client
 numbers remain unchanged business identifiers; they are no longer looked up as login
-credentials. Staff numbers and the separate System Admin ID keep their existing login flows.
+credentials. Staff numbers remain business identifiers and are no longer login credentials.
+The separate System Admin ID keeps its existing login flow.
 Email OTP and Google sign-in retain their existing account and scope checks.
 
 Self-registration requires a username of 3–32 ASCII characters, starting with a letter,
@@ -65,3 +66,21 @@ debounce/stale-response tests. These correctness checks make no throughput claim
   All 23 affected JavaScript checks passed for institution tabs, platform forms, shared
   details and shell navigation. A bounded read-only query confirmed the three current
   local user records retain their backfilled usernames; no account data was changed.
+
+## Staff login follow-up (2026-10-30)
+
+- Staff password login and password recovery now use the same indexed email/username
+  resolution as clients. Email matching is case-insensitive, bounded to two records and
+  rejects ambiguity. Username matching uses the existing unique index. Staff and client
+  numbers no longer resolve credentials; staff numbers remain available for business
+  records and audit compatibility. No schema or account-data changes were needed.
+- Staff login labels, password recovery, invitations and activation confirmation use
+  email/username wording. Both language bundles are updated. Active staff access, branch
+  suspension, client/staff session isolation, MFA and the separate System Admin ID remain
+  enforced. Newly invited staff without usernames can use their registered email.
+- Seventy focused Java checks passed across user-details authentication, the password
+  filter, password recovery, principal compatibility, reauthentication, MFA, invitations,
+  view contracts and system-admin isolation. The focused Jasper login-page compilation
+  check also passed. Live page checks remain pending because
+  the local application was not listening on port 8081; visual/mobile browser access
+  remains disabled. No throughput claim is made.

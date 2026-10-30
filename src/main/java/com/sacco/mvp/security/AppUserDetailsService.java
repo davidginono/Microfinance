@@ -40,8 +40,8 @@ public class AppUserDetailsService implements UserDetailsService {
             .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
     }
 
-    public UserDetails loadStaffByStaffNo(String staffNo) throws UsernameNotFoundException {
-        return memberDirectoryService.findStaffLoginAccount(staffNo)
+    public UserDetails loadStaffByEmailOrUsername(String login) throws UsernameNotFoundException {
+        return memberDirectoryService.findStaffLoginAccount(login)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
             .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))

@@ -184,8 +184,8 @@
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="loginType" value="staff-password" />
                                 <div>
-                                    <label class="mb-2 block auth-section-label">Staff Number</label>
-                                    <input name="username" autocomplete="username" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <label for="staffLoginIdentifier" class="mb-2 block auth-section-label"><spring:message code="login.username" /></label>
+                                    <input id="staffLoginIdentifier" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
                                     <label class="mb-2 block auth-section-label">Password</label>
@@ -1005,14 +1005,12 @@
                 if (usernameLabel) {
                     usernameLabel.textContent = accountTypeInput.value === 'system-admin'
                         ? 'System Admin ID'
-                        : (accountTypeInput.value === 'staff' ? 'Staff Number' : '<spring:message code="login.username" javaScriptEscape="true" />');
+                        : '<spring:message code="login.username" javaScriptEscape="true" />';
                 }
                 if (subtitle) {
                     subtitle.textContent = accountTypeInput.value === 'system-admin'
                         ? 'Enter your System Admin ID. The code goes to the email saved on your account.'
-                        : (accountTypeInput.value === 'staff'
-                            ? 'Enter your staff number. The code goes to the email saved on your account.'
-                            : '<spring:message code="login.clientResetHelp" javaScriptEscape="true" />');
+                        : '<spring:message code="login.clientResetHelp" javaScriptEscape="true" />';
                 }
                 otpInput.value = '';
                 passwordInput.value = '';

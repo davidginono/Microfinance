@@ -605,7 +605,7 @@ public class AuthController {
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(Member::isStaffAccessActive)
                 .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
-                .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff number."));
+                .orElseThrow(() -> new IllegalStateException("No active staff account was found for that email or username."));
         }
         Member member = memberDirectoryService.findClientLoginAccount(normalizedUsername)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)

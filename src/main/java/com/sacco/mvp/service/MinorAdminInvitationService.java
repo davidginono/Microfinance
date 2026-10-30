@@ -220,7 +220,7 @@ public class MinorAdminInvitationService {
             + "Your Staff Number is " + staffNo + "." + System.lineSeparator()
             + "To activate your account, open the link below within " + ttlHours + " hours, request a one-time code, and create your password:" + System.lineSeparator()
             + link + System.lineSeparator() + System.lineSeparator()
-            + "After activation, you can sign in with your staff number and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()
+            + "After activation, you can sign in with your email or username and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()
             + "If you did not expect this invitation, please ignore this email.";
         notificationEmailService.sendRequiredDirectEmail(
             member.getSaccoId(),

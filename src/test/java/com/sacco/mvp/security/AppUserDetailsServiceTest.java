@@ -136,7 +136,7 @@ class AppUserDetailsServiceTest {
             .status(MemberStatus.ACTIVE)
             .passwordHash("secret")
             .build();
-        when(memberRepository.findByStaffNo("ADM001")).thenReturn(Optional.of(admin));
+        when(memberRepository.findByUsername("platform.admin")).thenReturn(Optional.of(admin));
 
         AppUserDetailsService service = new AppUserDetailsService(
             new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
@@ -144,7 +144,7 @@ class AppUserDetailsServiceTest {
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
-        assertThatThrownBy(() -> service.loadStaffByStaffNo("ADM001"))
+        assertThatThrownBy(() -> service.loadStaffByEmailOrUsername("platform.admin"))
             .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
     }
 
@@ -201,6 +201,68 @@ class AppUserDetailsServiceTest {
         assertThatThrownBy(() -> users.loadUserByUsername("duplicate@example.com"))
             .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
         org.mockito.Mockito.verify(memberRepository, org.mockito.Mockito.never()).findByMemberNo(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {" MANAGER.ONE ", " MANAGER@EXAMPLE.COM "})
+    void staffCanSignInWithNormalizedEmailOrUsername(String login) {
+        Member staff = loginStaff();
+        if (login.contains("@")) {
+            when(memberRepository.findTop2ByEmailIgnoreCase("manager@example.com")).thenReturn(List.of(staff));
+        } else {
+            when(memberRepository.findByUsername("manager.one")).thenReturn(Optional.of(staff));
+        }
+        var principal = (AppUserPrincipal) staffUsers().loadStaffByEmailOrUsername(login);
+        assertThat(principal.getMemberId()).isEqualTo(staff.getId());
+        assertThat(principal.isStaffSession()).isTrue();
+        assertThat(principal.getStaffRoles()).contains(Position.MANAGER);
+        org.mockito.Mockito.verify(memberRepository, org.mockito.Mockito.never()).findByStaffNo(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"inactive", "pending", "client", "suspended"})
+    void staffIdentifierDoesNotBypassAccessRestrictions(String restriction) {
+        Member staff = loginStaff();
+        if (restriction.equals("inactive")) staff.setStatus(MemberStatus.INACTIVE);
+        if (restriction.equals("pending")) staff.setStaffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.PENDING_ACKNOWLEDGEMENT);
+        if (restriction.equals("client")) {
+            staff.setStaffRoles(new LinkedHashSet<>());
+            staff.setStaffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.NONE);
+            staff.setMemberAccount(true);
+        }
+        if (restriction.equals("suspended")) {
+            when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704"))
+                .thenReturn(Optional.of(station(SaccoAccessStatus.SUSPENDED)));
+        }
+        when(memberRepository.findByUsername("manager.one")).thenReturn(Optional.of(staff));
+        assertThatThrownBy(() -> staffUsers().loadStaffByEmailOrUsername("manager.one"))
+            .isInstanceOf(org.springframework.security.core.AuthenticationException.class);
+    }
+
+    @Test
+    void staffNumbersAndAmbiguousEmailsCannotAuthenticate() {
+        var users = staffUsers();
+        when(memberRepository.findTop2ByEmailIgnoreCase("duplicate@example.com"))
+            .thenReturn(List.of(loginStaff(), loginStaff()));
+        for (String identifier : List.of("12345", "MEM001", "duplicate@example.com")) {
+            assertThatThrownBy(() -> users.loadStaffByEmailOrUsername(identifier))
+                .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+        }
+        org.mockito.Mockito.verify(memberRepository, org.mockito.Mockito.never()).findByStaffNo(org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.verify(memberRepository, org.mockito.Mockito.never()).findByMemberNo(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    private AppUserDetailsService staffUsers() {
+        return new AppUserDetailsService(new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository), org.mockito.Mockito.mock(UserClaimService.class));
+    }
+
+    private Member loginStaff() {
+        return Member.builder().id(UUID.randomUUID()).memberNo("MEM001").staffNo("12345")
+            .username("manager.one").email("manager@example.com").saccoId("SACCO-01").stationId("AR704")
+            .fullName("Manager One").memberAccount(false).status(MemberStatus.ACTIVE)
+            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER))).build();
     }
 
     private SaccoStation station(SaccoAccessStatus accessStatus) {

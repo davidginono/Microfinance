@@ -227,7 +227,7 @@ public class SecurityConfig {
                                     if (!member.isStaffAccessActive()) {
                                         return "This account has no staff access. Sign in through Members instead.";
                                     }
-                                    return "Invalid staff number or password.";
+                                    return "Invalid email, username or password.";
                                 }
                                 if (!member.isMemberAccess()) {
                                     return "You are not registered as a member. Sign in through Staff instead.";
@@ -237,7 +237,7 @@ public class SecurityConfig {
                             .orElse(systemAdminPasswordLogin
                                 ? "Invalid System Admin ID or password."
                                 : staffPasswordLogin
-                                    ? "No active staff account was found for that staff number."
+                                    ? "No active staff account was found for that email or username."
                                     : "Invalid email, username or password.");
                     }
                     if ("system-admin-password".equals(loginType)) {
@@ -449,7 +449,7 @@ public class SecurityConfig {
                 return userDetailsService.loadPlatformAdminByLoginId(normalizedUsername);
             }
             if ("staff-password".equals(loginType)) {
-                return userDetailsService.loadStaffByStaffNo(normalizedUsername);
+                return userDetailsService.loadStaffByEmailOrUsername(normalizedUsername);
             }
             return userDetailsService.loadClientByEmailOrUsername(normalizedUsername);
         };

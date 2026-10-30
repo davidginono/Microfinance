@@ -59,6 +59,15 @@ public class MemberDirectoryService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Optional<Member> findClientLoginAccount(String login) {
+        return findEmailOrUsernameAccount(login);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Optional<Member> findStaffLoginAccount(String login) {
+        return findEmailOrUsernameAccount(login);
+    }
+
+    private Optional<Member> findEmailOrUsernameAccount(String login) {
         String value = LoginUsername.normalize(login);
         if (value.isEmpty() || value.length() > 254) {
             return Optional.empty();
@@ -80,10 +89,6 @@ public class MemberDirectoryService {
         return staffNo == null || staffNo.isBlank()
             ? Optional.empty()
             : memberRepository.findByStaffNo(staffNo);
-    }
-
-    public Optional<Member> findStaffLoginAccount(String staffNo) {
-        return findByStaffNo(staffNo);
     }
 
     public Optional<Member> findPlatformAdminLoginAccount(String loginId) {

@@ -94,6 +94,21 @@ class AuthControllerSaccoAccessTest {
         verify(memberDirectoryService).updatePasswordHash(client, "encoded-password");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"manager.one", "manager@example.com"})
+    void staffPasswordRecoveryUsesEmailOrUsername(String login) {
+        Member staff = staff(Position.MANAGER);
+        staff.setStaffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE);
+        when(memberDirectoryService.findStaffLoginAccount(login.toUpperCase(java.util.Locale.ROOT))).thenReturn(Optional.of(staff));
+        when(passwordEncoder.encode("NewTestPassword")).thenReturn("encoded-password");
+        assertThat(controller().requestPasswordResetOtp(login, "staff").getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(controller().verifyPasswordResetOtp(login, "staff", "123456").getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(controller().savePasswordReset(login, "staff", "123456", "NewTestPassword", "NewTestPassword").getStatusCode().is2xxSuccessful()).isTrue();
+        verify(emailOtpService).validateOtp(staff.getEmail(), EmailOtpPurpose.PASSWORD_RESET, staff.getId(), "123456");
+        verify(emailOtpService).consumeOtp(staff.getEmail(), EmailOtpPurpose.PASSWORD_RESET, staff.getId(), "123456");
+        verify(memberDirectoryService).updatePasswordHash(staff, "encoded-password");
+    }
+
     @Test
     void registrationReturnsAssignedNumberOnlyAfterOtpAndRegistrationSucceed() {
         var form = new com.sacco.mvp.web.form.MemberRegistrationForm();

@@ -42,7 +42,7 @@ class PasswordLoginIsolationTest {
     static class WebSecurity {}
 
     @Test
-    void passwordFilterRejectsCrossedNumbersEvenWithGeneralUserDetailsServiceRegistered() throws Exception {
+    void passwordFilterUsesEmailOrUsernameAndKeepsClientAndStaffSessionsSeparate() throws Exception {
         MemberDirectoryService directory = mock(MemberDirectoryService.class);
         AppUserDetailsService users = new AppUserDetailsService(directory,
             mock(StationAccessService.class), mock(UserClaimService.class));
@@ -69,8 +69,8 @@ class PasswordLoginIsolationTest {
                 .passwordHash(context.getBean(PasswordEncoder.class).encode("test-password")).build();
             when(directory.findClientLoginAccount("DUAL.USER")).thenReturn(Optional.of(dualUser));
             when(directory.findClientLoginAccount("DUAL@EXAMPLE.COM")).thenReturn(Optional.of(dualUser));
-            when(directory.findByStaffNo("12345")).thenReturn(Optional.of(dualUser));
-            when(directory.findStaffLoginAccount("12345")).thenReturn(Optional.of(dualUser));
+            when(directory.findStaffLoginAccount("DUAL.USER")).thenReturn(Optional.of(dualUser));
+            when(directory.findStaffLoginAccount("DUAL@EXAMPLE.COM")).thenReturn(Optional.of(dualUser));
             var filter = context.getBean(SecurityFilterChain.class).getFilters().stream()
                 .filter(UsernamePasswordAuthenticationFilter.class::isInstance).findFirst().orElseThrow();
             AuthenticationManager manager = (AuthenticationManager) ReflectionTestUtils.getField(filter, "authenticationManager");
@@ -78,10 +78,11 @@ class PasswordLoginIsolationTest {
             assertThat(login(manager, "", "dual.user").isStaffSession()).isFalse();
             assertThat(login(manager, "", "dual@example.com").isStaffSession()).isFalse();
             assertThatThrownBy(() -> login(manager, "", "MEM001")).isInstanceOf(AuthenticationException.class);
-            assertThat(login(manager, "staff-password", "12345").isStaffSession()).isTrue();
+            assertThat(login(manager, "staff-password", "dual.user").isStaffSession()).isTrue();
+            assertThat(login(manager, "staff-password", "dual@example.com").isStaffSession()).isTrue();
             assertThatThrownBy(() -> login(manager, "staff-password", "MEM001"))
                 .isInstanceOf(AuthenticationException.class);
-            assertThatThrownBy(() -> login(manager, "staff-password", "dual.user"))
+            assertThatThrownBy(() -> login(manager, "staff-password", "12345"))
                 .isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "", "12345"))
                 .isInstanceOf(AuthenticationException.class);
