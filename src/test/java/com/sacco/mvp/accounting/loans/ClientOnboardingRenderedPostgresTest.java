@@ -55,6 +55,9 @@ class ClientOnboardingRenderedPostgresTest {
             var mapping=new org.apache.tomcat.util.descriptor.web.FilterMap();mapping.setFilterName("security");mapping.addURLPattern("/*");context.addFilterMap(mapping);
             tomcat.start();String base="http://127.0.0.1:"+tomcat.getConnector().getLocalPort();
             var client=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).connectTimeout(Duration.ofSeconds(10)).build();
+            var blocked=client.send(HttpRequest.newBuilder(URI.create(base+"/app/dashboard")).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertThat(blocked.statusCode()).isEqualTo(302);assertThat(blocked.headers().firstValue("Location")).contains("/app/onboarding");
+            assertThat(get(client,base+"/app/onboarding",false)).contains("Complete your profile and wait for verification");
             String form=get(client,base+"/app/onboarding/edit",false);
             assertThat(form).contains("My profile","Privacy notice","Synthetic English privacy notice").doesNotContain("name=\"profile.lawfulBasis\"","name=\"profile.retentionReference\"");
             var values=hidden(form);values.put("action","DRAFT");values.put("profile.identityType","NATIONAL_ID");values.put("profile.issuingCountry","TZ");values.put("profile.identityNumber","TZ-RENDER-1234");values.put("profile.birthDate","1990-01-01");values.put("profile.identityNoExpiry","true");values.put("profile.address","Synthetic address");values.put("profile.activity","Synthetic shop");values.put("profile.activityAddress","Synthetic market");values.put("profile.sourceOfFunds","Synthetic sales");
@@ -76,6 +79,8 @@ class ClientOnboardingRenderedPostgresTest {
             for(String check:List.of("identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked"))verification.put(check,"true");
             verification.put("screening","CLEARED");verification.put("screeningReference","Synthetic dated manual screening evidence");verification.put("policyReference","Approved synthetic policy");verification.put("checkedOn",domain.day.toString());verification.put("reviewDue",domain.day.plusMonths(6).toString());post(client,reviewUrl,verification,true);
             String verified=get(client,base+"/app/onboarding",false);assertThat(verified).contains("Verified","Synthetic corrected address","Loan assessment and approval are separate.").doesNotContain("Please correct your home address.");
+            assertThat(verified).doesNotContain("Complete your profile and wait for verification");
+            assertThat(get(client,base+"/app/dashboard",false)).isEqualTo("Borrower workspace");
             assertThat(get(client,base+"/app/onboarding/versions/2",false)).contains("Please correct your home address.");
             assertThat(get(client,base+"/finance/clients/onboarding/notice",true)).contains("Publish notice","Synthetic English privacy notice");
             assertThat(get(client,base+"/app/onboarding/edit?lang=sw",false)).contains("Taarifa zangu","Taarifa ya faragha ya majaribio iliyoidhinishwa.");get(client,base+"/app/onboarding?lang=en",false);
@@ -104,15 +109,20 @@ class ClientOnboardingRenderedPostgresTest {
         @Bean ResourceBundleMessageSource messageSource(){var source=new ResourceBundleMessageSource();source.setBasename("messages");source.setDefaultEncoding("UTF-8");return source;}
         @Bean InternalResourceViewResolver viewResolver(){return new InternalResourceViewResolver("/WEB-INF/jsp/",".jsp");}
         @Bean StandardServletMultipartResolver multipartResolver(){return new StandardServletMultipartResolver();}
+        @Bean BorrowerFixture borrowerFixture(){return new BorrowerFixture();}
         @Bean org.springframework.web.servlet.i18n.SessionLocaleResolver localeResolver(){var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();resolver.setDefaultLocale(Locale.ENGLISH);return resolver;}
-        @Bean SecurityFilterChain security(HttpSecurity http,AppUserPrincipal fixtureOwner,AppUserPrincipal fixtureReviewer)throws Exception {
+        @Bean SecurityFilterChain security(HttpSecurity http,AppUserPrincipal fixtureOwner,AppUserPrincipal fixtureReviewer,com.sacco.mvp.clients.onboarding.service.OnboardingService onboarding)throws Exception {
             var actors=new OncePerRequestFilter(){@Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)throws ServletException,IOException {
                 var actor="reviewer".equals(request.getHeader("X-Onboarding-Test-Actor"))?fixtureReviewer:fixtureOwner;
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(actor,null,actor.getAuthorities()));chain.doFilter(request,response);
             }};
-            return http.authorizeHttpRequests(auth->auth.dispatcherTypeMatchers(DispatcherType.FORWARD,DispatcherType.ERROR).permitAll().anyRequest().authenticated()).addFilterBefore(actors,AnonymousAuthenticationFilter.class).build();
+            return http.authorizeHttpRequests(auth->auth.dispatcherTypeMatchers(DispatcherType.FORWARD,DispatcherType.ERROR).permitAll().anyRequest().authenticated()).addFilterBefore(actors,AnonymousAuthenticationFilter.class).addFilterAfter(new com.sacco.mvp.security.ClientOnboardingFilter(onboarding),org.springframework.security.web.access.intercept.AuthorizationFilter.class).build();
         }
         @Override public void addResourceHandlers(ResourceHandlerRegistry registry){for(String path:List.of("css","js","fonts","images"))registry.addResourceHandler("/"+path+"/**").addResourceLocations(Path.of("src/main/resources/static",path).toAbsolutePath().toUri().toString()+"/");}
         @Override public void addInterceptors(InterceptorRegistry registry){var locale=new org.springframework.web.servlet.i18n.LocaleChangeInterceptor();locale.setParamName("lang");registry.addInterceptor(locale);registry.addInterceptor(new HandlerInterceptor(){@Override public void postHandle(HttpServletRequest request,HttpServletResponse response,Object handler,ModelAndView view){if(view!=null){var actor=(AppUserPrincipal)SecurityContextHolder.getContext().getAuthentication().getPrincipal();view.addObject("currentMember",com.sacco.mvp.web.view.CurrentUserView.builder().memberNo(actor.getMemberNo()).staffNo(actor.getStaffNo()).fullName(actor.getFullName()).email(actor.getEmail()).position(actor.getPosition()).memberAccess(actor.isMemberAccess()).staffSession(actor.isStaffSession()).build());}}});}
+    }
+    @org.springframework.web.bind.annotation.RestController
+    static class BorrowerFixture {
+        @org.springframework.web.bind.annotation.GetMapping("/app/dashboard") String dashboard(){return "Borrower workspace";}
     }
 }

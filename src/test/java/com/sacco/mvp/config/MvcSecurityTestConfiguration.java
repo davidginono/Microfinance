@@ -27,6 +27,14 @@ import static org.mockito.Mockito.when;
 @Import(SecurityConfig.class)
 public class MvcSecurityTestConfiguration {
     @Bean
+    com.sacco.mvp.clients.onboarding.service.OnboardingService onboardingService() {
+        var service = Mockito.mock(com.sacco.mvp.clients.onboarding.service.OnboardingService.class);
+        when(service.ownStatus(org.mockito.ArgumentMatchers.any())).thenReturn(
+            new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.OwnStatus("VERIFY", null));
+        return service;
+    }
+
+    @Bean
     SaccoAccessFilter saccoAccessFilter(StationAccessService stationAccessService) {
         return new SaccoAccessFilter(stationAccessService);
     }

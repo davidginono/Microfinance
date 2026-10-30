@@ -48,6 +48,25 @@ class ClientOnboardingPostgresTest {
     ReviewForm decision(UUID revision){var form=new ReviewForm();form.setRevisionId(revision);form.setIdentityChecked(true);form.setAddressChecked(true);form.setActivityChecked(true);form.setContactChecked(true);form.setDuplicatesChecked(true);form.setReason("Synthetic independent evidence review");form.setClientMessage("Please provide a current address document.");form.setScreening("CLEARED");form.setScreeningReference("Synthetic manually checked PEP and sanctions sources, dated result");form.setPolicyReference("Synthetic approved KYC policy");form.setCheckedOn(day);form.setReviewDue(day.plusMonths(6));return form;}
     void policy(){var controls=f.context.getBean(CreditControlService.class);var p=new PolicyForm();p.setExpectedRevision(controls.policy(f.actor).revision());p.setKycRequired(true);p.setReference("Synthetic approved branch KYC gate");p.setVerified(true);controls.configure(f.actor,p);}
     String gate(){return f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day);}
+    @Test void workspaceStatusTracksIndependentVerificationExpiryContactChangesAndRevocation() {
+        var owner=owner(f.client);
+        assertThat(service.ownStatus(owner).state()).isEqualTo("NOT_STARTED");
+        UUID revision=submitted(f.client,"TZ-WORKSPACE-"+UUID.randomUUID());
+        assertThat(service.ownStatus(owner).state()).isEqualTo("SUBMITTED");
+        var reviewer=f.operator("B1");
+        service.review(reviewer,f.client,decision(revision));
+        assertThat(service.ownStatus(owner).state()).isEqualTo("VERIFY");
+        f.jdbc.update("update members set phone=? where id=?",phone(),f.client);
+        assertThat(service.ownStatus(owner).state()).isEqualTo("STALE");
+        f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);
+        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day.plusMonths(7));
+        assertThat(service.ownStatus(owner).state()).isEqualTo("EXPIRED");
+        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day);
+        var revoked=decision(revision);revoked.setKind("REVOKE");service.review(reviewer,f.client,revoked);
+        assertThat(service.ownStatus(owner).state()).isEqualTo("REVOKE");
+        f.jdbc.update("update members set station_id='B2' where id=?",f.client);
+        assertThatThrownBy(()->service.ownStatus(owner)).isInstanceOf(AccessDeniedException.class);
+    }
     UUID otherClient(String branch){var id=UUID.randomUUID();f.jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,phone,status,position,is_member,password_hash,created_at) values(?,?,?,?,'Synthetic second client',?,'ACTIVE','MEMBER',true,'test-only',now())",id,f.institution,branch,id.toString(),phone());return id;}
 
     @Test void existingRegistrationIsUnverifiedAndAssistedCreationDoesNotFabricateOtpOrConsent(){

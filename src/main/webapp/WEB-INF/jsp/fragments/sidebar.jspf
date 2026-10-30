@@ -46,9 +46,10 @@
                     </a>
                 </sec:authorize>
             </c:if>
-            <c:if test="${memberWorkspace}"><sec:authorize access="@access.has(principal,'GROUP_COVERAGE_OWN_VIEW')"><a href="<c:url value='/app/group-coverage'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/app/group-coverage')?'shell-nav-active':''}"><spring:message code="coverage.title"/></a></sec:authorize></c:if>
+            <c:if test="${memberWorkspace and not clientOnboardingRequired}"><sec:authorize access="@access.has(principal,'GROUP_COVERAGE_OWN_VIEW')"><a href="<c:url value='/app/group-coverage'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/app/group-coverage')?'shell-nav-active':''}"><spring:message code="coverage.title"/></a></sec:authorize></c:if>
             <c:if test="${memberWorkspace}">
                 <a href="<c:url value='/app/onboarding'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/app/onboarding')?'shell-nav-active':''}"><spring:message code="kyc.ownTitle"/></a>
+                <c:if test="${not clientOnboardingRequired}">
                 <sec:authorize access="@access.canAccessMemberArea(principal)">
                 <div class="shell-sidebar-nav-heading"><span>Overview</span></div>
                 <a href="/app/dashboard" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
@@ -122,6 +123,7 @@
                     </a>
                 </sec:authorize>
                 </sec:authorize>
+                </c:if>
             </c:if>
 
             <c:if test="${staffWorkspace}">

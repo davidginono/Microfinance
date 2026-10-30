@@ -76,6 +76,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   com.sacco.mvp.clients.onboarding.service.OnboardingService onboardingService,
                                                    MemberDirectoryService memberDirectoryService,
                                                    StationAccessService stationAccessService,
                                                    AdminScopeService adminScopeService,
@@ -325,6 +326,7 @@ public class SecurityConfig {
             .csrf(Customizer.withDefaults())
             .addFilterBefore(new com.sacco.mvp.security.PlatformSetupFilter(), AuthorizationFilter.class)
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
+            .addFilterAfter(new com.sacco.mvp.security.ClientOnboardingFilter(onboardingService), AuthorizationFilter.class)
             .addFilterAfter(new SessionTimeoutPolicyFilter(platformSessionSettingsService), AuthorizationFilter.class)
             .addFilterAfter(new AppUsageTrackingFilter(appUsageAnalyticsService), AuthorizationFilter.class);
 

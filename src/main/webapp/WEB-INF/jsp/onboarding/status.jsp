@@ -1,6 +1,7 @@
 <%@ include file="head.jspf" %>
 <c:if test="${workspace.historical}"><nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a href="<c:url value='/app/onboarding'/>"><spring:message code="kyc.ownTitle"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="kyc.version"/> <c:out value="${workspace.revision.sequence}"/></span></nav></c:if>
 <h1><spring:message code="kyc.ownTitle"/></h1>
+<c:if test="${clientOnboardingRequired and not workspace.historical}"><p class="console-message" data-message-type="info" role="status"><spring:message code="kyc.workspaceRequired"/></p></c:if>
 <div data-resource-details-page>
 <section class="erp-resource-section"><h2><spring:message code="kyc.field.state"/></h2><dl class="erp-detail-facts">
 <c:forEach items="${['number','name','phone','email']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:out value="${workspace.client[field]}"/></dd></div></c:forEach>

@@ -110,7 +110,6 @@ class ClientOnboardingMvcTest {
         for(var key:keys){assertThat(en.containsKey(key)).as("English %s",key).isTrue();assertThat(sw.containsKey(key)).as("Kiswahili %s",key).isTrue();}
     }
     @Configuration @EnableWebMvc static class Config {
-        @Bean OnboardingService service(){return mock(OnboardingService.class);}
         @Bean OnboardingController controller(OnboardingService service){return new OnboardingController(service);}
         @Bean ClientOnboardingController clientController(OnboardingService service){return new ClientOnboardingController(service);}
     }
