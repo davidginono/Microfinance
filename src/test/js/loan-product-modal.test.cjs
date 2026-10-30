@@ -95,3 +95,52 @@ test('full-page product creation restores submitted fields without opening or lo
         assert.equal(d.querySelector('[role=dialog]'),null);assert.equal(d.body.style.overflow,'');assert.equal(d.documentElement.style.overflow,'');
     }finally{dom.window.close();}
 });
+
+function multiplierForm(initialPercent = '300', draft = '') {
+    const fragment = readFileSync('src/main/webapp/WEB-INF/jsp/fragments/loan-product-eligibility-fields.jspf', 'utf8');
+    const percent = fragment.match(/<input name="maxLoanSavingsPercent"[^>]*>/)[0].replace(/\$\{[^}]*\}/g, initialPercent);
+    const multiplier = fragment.match(/<input[^>]*data-savings-multiplier[^>]*>/)[0].replace(/\$\{[^}]*\}/g, '3');
+    const dom = new JSDOM(`<form data-product-workflow-builder="true">${percent}
+        <input type="checkbox" data-savings-limit-check checked>
+        <label data-savings-ratio-field>Loan amount limit ${multiplier}</label>
+        <input type="checkbox" data-active-loan-toggle><div data-active-loan-field><input data-active-loan-limit></div>
+        <input type="checkbox" data-workflow-committee><div data-workflow-warnings></div><div data-workflow-preview-runtime></div>
+        ${draft}</form>`, {runScripts:'outside-only', url:'http://localhost/admin/settings-controls'});
+    dom.window.eval(source);
+    return dom;
+}
+
+test('typed income multipliers submit arbitrary decimals and reject empty or out-of-range input', () => {
+    const dom = multiplierForm(), w = dom.window, d = w.document;
+    try {
+        const field = d.querySelector('[data-savings-multiplier]'), percent = d.querySelector('[data-savings-percent]');
+        assert.equal(field.type, 'number');
+        assert.equal(field.value, '3');
+        for (const [value, expectedPercent, valid] of [['3.2755','327.55',true], ['','',false], ['10.1','1010.00',false], ['-0.1','-10.00',false], ['0','0.00',true], ['10','1000.00',true]]) {
+            field.value = value;
+            field.dispatchEvent(new w.Event('input', {bubbles:true}));
+            assert.equal(percent.value, expectedPercent);
+            assert.equal(field.checkValidity(), valid);
+        }
+    } finally {dom.window.close();}
+});
+
+test('income multiplier retains saved and recovered values through reset, history and eligibility toggles', async () => {
+    const dom = multiplierForm('300', '<div data-loan-product-form-draft hidden><span data-loan-product-form-value="maxLoanSavingsPercent">412.5</span></div>');
+    const w = dom.window, d = w.document;
+    try {
+        const field = d.querySelector('[data-savings-multiplier]'), percent = d.querySelector('[data-savings-percent]');
+        assert.equal(field.value, '4.125');
+        field.value = '2.75'; field.dispatchEvent(new w.Event('input', {bubbles:true}));
+        w.dispatchEvent(new w.Event('pageshow'));
+        assert.equal(field.value, '2.75'); assert.equal(percent.value, '275.00');
+        const toggle = d.querySelector('[data-savings-limit-check]');
+        toggle.checked = false; toggle.dispatchEvent(new w.Event('change', {bubbles:true}));
+        assert.equal(field.disabled, true); assert.equal(field.closest('label').hidden, true);
+        toggle.checked = true; toggle.dispatchEvent(new w.Event('change', {bubbles:true}));
+        assert.equal(field.disabled, false); assert.equal(field.value, '2.75');
+        d.querySelector('form').reset();
+        await new Promise(resolve => w.setTimeout(resolve, 0));
+        assert.equal(field.value, '4.125'); assert.equal(percent.value, '412.5');
+    } finally {dom.window.close();}
+});

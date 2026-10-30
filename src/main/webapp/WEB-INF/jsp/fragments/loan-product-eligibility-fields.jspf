@@ -10,11 +10,8 @@
         </label>
         <label class="product-eligibility-dependent block text-xs font-semibold uppercase tracking-wide text-slate-500" data-savings-ratio-field ${eligibilityProduct ne null and not eligibilityProduct.savingsLimitCheckRequired ? 'hidden' : ''}>
             <spring:message code="admin.settings.loanProducts.savingsMultiple" />
-            <select class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" required data-savings-multiplier>
-                <c:forEach begin="0" end="20" var="multipleIndex">
-                    <option value="${multipleIndex / 2}">${multipleIndex / 2} <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" /></option>
-                </c:forEach>
-            </select>
+            <input type="number" inputmode="decimal" min="0" max="10" step="any" value="${eligibilityProduct ne null ? eligibilityProduct.maxLoanSavingsRatio : 3}" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" required data-savings-multiplier />
+            <span class="block mt-1 text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" /></span>
         </label>
     </div>
     <div class="product-eligibility-option">

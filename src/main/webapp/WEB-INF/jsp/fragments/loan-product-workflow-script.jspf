@@ -286,6 +286,10 @@
 
         function resolveFieldTargets(form, key) {
             switch (key) {
+                case 'maxLoanSavingsPercent': {
+                    const field = form.querySelector('[data-savings-multiplier]');
+                    return field ? [field] : [];
+                }
                 case 'workflowStartStage': {
                     const group = form.querySelector('[data-field-group="workflowStartStage"]');
                     return group ? [group] : [];
@@ -587,19 +591,9 @@
                 if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
                     return;
                 }
-                const percent = Number(savingsPercentInput.value);
-                if (!Number.isFinite(percent) || percent < 0) {
-                    return;
-                }
+                const percent = numberOrNull(savingsPercentInput);
                 syncingSavingsRatio = true;
-                const multiplier = percent / 100;
-                if (!Array.from(savingsMultiplierInput.options).some(option => Number(option.value) === multiplier)) {
-                    const option = document.createElement('option');
-                    option.value = String(multiplier);
-                    option.textContent = String(multiplier) + savingsMultiplierInput.options[0].textContent.replace(/^[\d.]+/, '');
-                    savingsMultiplierInput.appendChild(option);
-                }
-                savingsMultiplierInput.value = Array.from(savingsMultiplierInput.options).find(option => Number(option.value) === multiplier).value;
+                savingsMultiplierInput.value = percent !== null && Number.isFinite(percent) ? String(percent / 100) : '';
                 syncingSavingsRatio = false;
             }
 
@@ -607,12 +601,9 @@
                 if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
                     return;
                 }
-                const multiplier = Number(savingsMultiplierInput.value);
-                if (!Number.isFinite(multiplier) || multiplier < 0) {
-                    return;
-                }
+                const multiplier = numberOrNull(savingsMultiplierInput);
                 syncingSavingsRatio = true;
-                savingsPercentInput.value = (multiplier * 100).toFixed(2);
+                savingsPercentInput.value = multiplier !== null && Number.isFinite(multiplier) ? (multiplier * 100).toFixed(2) : '';
                 syncingSavingsRatio = false;
             }
 
