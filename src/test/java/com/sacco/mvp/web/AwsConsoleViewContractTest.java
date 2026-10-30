@@ -340,7 +340,8 @@ class AwsConsoleViewContractTest {
             .contains("[data-aws-table-search]")
             .contains("row.hidden = !visible")
             .contains("window.AppLoading?.end(region)")
-            .containsPattern("restoreModalAfterReload\\(\\);\\R\\s*document\\.querySelectorAll\\('\\[data-toast-message\\]'\\)")
+            .doesNotContain("restoreModalAfterReload")
+            .contains("closeWorkspaceModals()")
             .containsPattern("contextElement:\\s*element,\\s*preferModal:\\s*true")
             .contains("element.dataset.toastPlacement==='workspace'?{placement:'workspace'}:{}")
             .doesNotContain("loader.append(spinner, label)");

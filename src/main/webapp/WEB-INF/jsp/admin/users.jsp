@@ -177,21 +177,20 @@
 </div>
 
 <div class="app-modal-overlay hidden" data-user-modal="create-user">
-    <div class="app-modal-panel app-modal-panel--compact">
+    <div class="app-modal-panel" role="dialog" aria-modal="true" aria-labelledby="create-staff-title" tabindex="-1">
         <div class="app-modal-scroll">
             <div class="app-modal-header">
                 <div>
-                    <p class="erp-widget-title">Add Staff Member</p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.workspace.createStaff" /></h2>
+                    <h2 id="create-staff-title" class="erp-panel-title"><spring:message code="admin.workspace.createStaff" /></h2>
                 </div>
-                <button type="button" class="app-modal-close" data-user-modal-close="create-user" aria-label="Close modal">
+                <button type="button" class="app-modal-close" data-user-modal-close="create-user" aria-label="<spring:message code='common.closeModal'/>">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                     </svg>
                 </button>
             </div>
 
-            <form action="/admin/users" method="post" class="app-modal-body admin-staff-create-form grid gap-4 md:grid-cols-2">
+            <form action="/admin/users" method="post" data-workspace-submit="recover" class="app-modal-body admin-staff-create-form grid gap-4 md:grid-cols-2">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -210,8 +209,8 @@
                     <span class="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
                 </label>
 
-                <div class="md:col-span-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.workspace.staffRoles" /></p>
+                <fieldset class="md:col-span-2 m-0 min-w-0 border-0 p-0">
+                    <legend class="text-sm font-semibold text-slate-700"><spring:message code="admin.workspace.staffRoles" /></legend>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${staffPositions}" var="position">
                             <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
@@ -224,10 +223,10 @@
                             </label>
                         </c:forEach>
                     </div>
-                </div>
+                </fieldset>
 
                 <div class="app-modal-actions md:col-span-2">
-                    <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
+                    <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user"><spring:message code="common.cancel"/></button>
                     <button type="submit" class="app-btn btn-launch"><spring:message code="admin.workspace.createStaff" /></button>
                 </div>
             </form>
@@ -271,13 +270,17 @@
         });
 
         function closeAllUserModals() {
-            document.querySelectorAll('[data-user-modal]').forEach((modal) => {
-                modal.classList.add('hidden');
-                modal.classList.remove('is-open');
-                modal.setAttribute('aria-hidden', 'true');
-            });
-            body.classList.remove('overflow-hidden');
-            window.SaccosUiState?.clearOpenModal();
+            const active = document.querySelector('[data-user-modal].is-open');
+            const close = function () {
+                document.querySelectorAll('[data-user-modal]').forEach((modal) => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('is-open');
+                    modal.setAttribute('aria-hidden', 'true');
+                });
+                body.classList.remove('overflow-hidden');
+            };
+            if (active && !document.dispatchEvent(new CustomEvent('resource:before-close', {cancelable:true, detail:{modal:active, close}}))) return;
+            close();
         }
 
         function openUserModal(key) {
@@ -288,7 +291,6 @@
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
                 body.classList.add('overflow-hidden');
-                window.SaccosUiState?.rememberOpenModal(modal);
             }
         }
 
@@ -302,4 +304,5 @@
     })();
 </script>
 
+<%@ include file="../accounting/accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

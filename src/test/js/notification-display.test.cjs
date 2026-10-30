@@ -58,3 +58,18 @@ test('dismissal promotes queued notices without losing messages or dismissing th
   assert.deepEqual([...d.querySelectorAll('[data-toast-text]')].map(node=>node.textContent),['Notice 1','Notice 2','Notice 3']);
  }finally{dom.window.close();}
 });
+
+test('scroll-wrapped modal feedback stays below its header and reuses one notification region',()=>{
+ const {dom,w,d}=setup();
+ try{
+  const panel=d.querySelector('.app-modal-panel'),scroll=d.createElement('div');scroll.className='app-modal-scroll';
+  scroll.append(...panel.children);panel.append(scroll);
+  const save=d.querySelector('#save');
+  w.showToast('error','Try again',{contextElement:save});
+  w.showToast('info','Values retained',{contextElement:save});
+  const container=d.querySelector('[data-modal-toast-container]');
+  assert.equal(container.parentElement,scroll);assert.equal(container.previousElementSibling.tagName,'HEADER');
+  assert.equal(container.nextElementSibling,save.form);assert.equal(d.querySelectorAll('[data-modal-toast-container]').length,1);
+  assert.equal(container.querySelectorAll('[data-app-toast]').length,2);
+ }finally{dom.window.close();}
+});

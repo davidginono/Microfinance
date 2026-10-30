@@ -298,7 +298,6 @@
                 modal.setAttribute('aria-hidden', 'true');
             });
             body.classList.remove('overflow-hidden');
-            window.SaccosUiState?.clearOpenModal();
         }
 
         function openUserModal(key) {
@@ -309,7 +308,6 @@
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
                 body.classList.add('overflow-hidden');
-                window.SaccosUiState?.rememberOpenModal(modal);
             }
         }
 

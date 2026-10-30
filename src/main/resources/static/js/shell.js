@@ -17,7 +17,6 @@
     const exportPrintFrameCleanupDelayMs = 2 * 60 * 1000;
     const legacyScrollRestoreStorageKey = 'Saccos:restore-scroll';
     const scrollRestoreStorageKeyPrefix = 'Saccos:restore-scroll:';
-    const modalRestoreStorageKey = 'Saccos:open-modal';
     const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
     let scrollStateSaveTimer = null;
     const normalizeBreadcrumbSegment = function (value) {
@@ -778,9 +777,7 @@
 
     const ensureModalToastContainer = function (modal) {
         const panel = modal.querySelector('.app-modal-panel, .session-timeout-panel, [role="dialog"], [role="alertdialog"]') || modal;
-        let container = Array.from(panel.children).find(function (child) {
-            return child instanceof HTMLElement && child.hasAttribute('data-modal-toast-container');
-        });
+        let container = panel.querySelector('[data-modal-toast-container]');
         if (!container) {
             container = document.createElement('div');
             container.className = 'app-modal-toast-container';
@@ -788,7 +785,8 @@
             container.setAttribute('aria-live', 'polite');
             container.setAttribute('aria-atomic', 'false');
             const header = panel.querySelector('.app-modal-header, .session-timeout-header, .guarantor-financial-modal-header');
-            panel.insertBefore(container, header?.parentElement === panel ? header.nextSibling : panel.firstChild);
+            if (header) header.after(container);
+            else panel.prepend(container);
         }
         return container;
     };
@@ -1398,101 +1396,45 @@
         return null;
     }
 
-    const modalMatchesIdentity = function (modal, identity) {
-        if (!identity || !(modal instanceof HTMLElement)) {
-            return false;
-        }
-        if (identity.type === 'id') {
-            return modal.id === identity.value;
-        }
-        return modal.dataset && modal.dataset[identity.type] === identity.value;
-    };
-
-    const findModalByIdentity = function (identity) {
-        if (!identity) {
-            return null;
-        }
-        if (identity.type === 'id') {
-            return document.getElementById(identity.value);
-        }
-        return Array.from(document.querySelectorAll('.app-modal-overlay')).find(function (modal) {
-            return modalMatchesIdentity(modal, identity);
-        }) || null;
-    };
-
     const isModalOpen = function (modal) {
         return modal instanceof HTMLElement
             && modal.classList.contains('app-modal-overlay')
-            && (modal.classList.contains('is-open') || (modal.getAttribute('aria-hidden') === 'false' && !modal.classList.contains('hidden')));
+            && !modal.hidden && !modal.classList.contains('hidden')
+            && (modal.classList.contains('is-open') || modal.getAttribute('aria-hidden') === 'false');
     };
-
-    const rememberOpenModal = function (modal) {
-        const identity = identifyModal(modal);
-        if (!identity) {
-            return;
-        }
-        try {
-            window.sessionStorage.setItem(modalRestoreStorageKey, JSON.stringify({
-                path: currentScrollRestorePath(),
-                modal: identity,
-                at: Date.now()
-            }));
-        } catch (ignored) {
-            // Storage can be unavailable in private browsing or strict browser modes.
-        }
-    };
-
-    const clearOpenModal = function (modal) {
-        try {
-            if (!modal) {
-                window.sessionStorage.removeItem(modalRestoreStorageKey);
-                return;
-            }
-            const saved = JSON.parse(window.sessionStorage.getItem(modalRestoreStorageKey) || 'null');
-            if (!saved || modalMatchesIdentity(modal, saved.modal)) {
-                window.sessionStorage.removeItem(modalRestoreStorageKey);
-            }
-        } catch (ignored) {
-            // Storage can be unavailable in private browsing or strict browser modes.
+    // Modal visibility belongs to the current task, never to reload/history storage.
+    try { window.sessionStorage.removeItem('Saccos:open-modal'); } catch (ignored) {}
+    const modalFocus = new Map();
+    const syncModalState = function (modal) {
+        if (isModalOpen(modal)) {
+            if (modalFocus.has(modal)) return;
+            const previousFocus = document.activeElement;
+            modalFocus.set(modal, previousFocus);
+            const panel = modal.querySelector('.app-modal-panel,[role="dialog"],[role="alertdialog"]');
+            if (!panel) return;
+            if (!panel.hasAttribute('role')) panel.setAttribute('role', 'dialog');
+            panel.setAttribute('aria-modal', 'true');
+            if (!panel.hasAttribute('tabindex')) panel.tabIndex = -1;
+            window.requestAnimationFrame(function () {
+                if (!isModalOpen(modal) || modal.contains(document.activeElement)) return;
+                const initial = Array.from(panel.querySelectorAll('[autofocus],.app-modal-body input:not([type="hidden"]):not([disabled]),.app-modal-body select:not([disabled]),.app-modal-body textarea:not([disabled]),.app-modal-body .neo-select-button:not([disabled]),.app-modal-actions button:not([disabled])'))
+                    .find(control => !control.closest('[hidden],.hidden,[inert]') && control.getClientRects().length);
+                (initial || panel).focus({preventScroll:true});
+            });
+        } else {
+            clearModalToasts(modal);
+            const previousFocus = modalFocus.get(modal);
+            modalFocus.delete(modal);
+            if (previousFocus?.isConnected && modal.contains(document.activeElement)) previousFocus.focus({preventScroll:true});
         }
     };
-
-    const reMemberCurrentOpenModal = function () {
-        const openModal = Array.from(document.querySelectorAll('.app-modal-overlay')).find(isModalOpen);
-        if (openModal) {
-            rememberOpenModal(openModal);
-            return;
-        }
-        clearOpenModal();
-    };
-
-    const openModalElement = function (modal) {
-        if (!(modal instanceof HTMLElement)) {
-            return false;
-        }
-        modal.classList.remove('hidden');
-        modal.classList.add('is-open');
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('overflow-hidden');
-        rememberOpenModal(modal);
-        return true;
-    };
-
-    const restoreModalAfterReload = function () {
-        let saved;
-        try {
-            saved = JSON.parse(window.sessionStorage.getItem(modalRestoreStorageKey) || 'null');
-        } catch (ignored) {
-            return;
-        }
-        if (!saved || saved.path !== currentScrollRestorePath() || Date.now() - Number(saved.at || 0) > restoreStateMaxAgeMs) {
-            clearOpenModal();
-            return;
-        }
-        const modal = findModalByIdentity(saved.modal);
-        if (modal) {
-            openModalElement(modal);
-        }
+    const closeWorkspaceModals = function () {
+        document.querySelectorAll('.app-modal-overlay').forEach(function (modal) {
+            modal.classList.remove('is-open'); modal.classList.add('hidden');
+            modal.setAttribute('aria-hidden', 'true');
+        });
+        document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+        document.body.classList.remove('overflow-hidden');
     };
 
     const observeModalState = function (modal) {
@@ -1500,10 +1442,12 @@
             return;
         }
         modal.dataset.stateObserved = 'true';
+        if (modal.parentElement !== document.body) document.body.appendChild(modal);
         modalStateObserver.observe(modal, {
             attributes: true,
-            attributeFilter: ['class', 'aria-hidden']
+            attributeFilter: ['class', 'aria-hidden', 'hidden']
         });
+        syncModalState(modal);
     };
 
     const modalStateObserver = new MutationObserver(function (mutations) {
@@ -1512,21 +1456,12 @@
             if (!(modal instanceof HTMLElement)) {
                 return;
             }
-            if (isModalOpen(modal)) {
-                rememberOpenModal(modal);
-            } else {
-                clearOpenModal(modal);
-                clearModalToasts(modal);
-            }
+            syncModalState(modal);
         });
     });
 
     const observeExistingModals = function () {
         document.querySelectorAll('.app-modal-overlay').forEach(observeModalState);
-        const openModal = Array.from(document.querySelectorAll('.app-modal-overlay')).find(isModalOpen);
-        if (openModal) {
-            rememberOpenModal(openModal);
-        }
     };
 
     const observeAddedModals = function () {
@@ -1558,16 +1493,41 @@
         });
     };
 
-    window.SaccosUiState = Object.assign({}, window.SaccosUiState, {
-        reMemberscrollForReload: reMemberscrollForReload,
-        rememberOpenModal: rememberOpenModal,
-        clearOpenModal: clearOpenModal,
-        restoreOpenModal: restoreModalAfterReload
-    });
+    window.SaccosUiState = {
+        reMemberscrollForReload: reMemberscrollForReload
+    };
 
     observeExistingModals();
     observeAddedModals();
     applyPlaceholderTitles();
+
+    document.addEventListener('keydown', function (event) {
+        if (event.defaultPrevented || !['Escape', 'Tab'].includes(event.key)) return;
+        // Preserve native cancellation without cascading Escape to the workspace behind it.
+        const nativeDialog = document.querySelector('dialog[open]');
+        if (nativeDialog) {
+            if (event.key === 'Escape') {
+                event.stopImmediatePropagation();
+                if (nativeDialog.querySelector('form[aria-busy="true"],form[inert],[data-modal-pending="true"]')) event.preventDefault();
+            }
+            return;
+        }
+        if (event.target.closest?.('[data-neo-select-menu="true"]:not([hidden])')) return;
+        const modal = Array.from(document.querySelectorAll('.app-modal-overlay')).filter(isModalOpen).at(-1);
+        if (!modal) return;
+        if (event.key === 'Escape') {
+            event.preventDefault(); event.stopImmediatePropagation();
+            if (modal.querySelector('form[aria-busy="true"],form[inert],[data-modal-pending="true"]')) return;
+            modal.querySelector('.app-modal-close:not(:disabled)')?.click();
+            return;
+        }
+        const controls = Array.from(modal.querySelectorAll('button,a[href],input,select,textarea,[tabindex]'))
+            .filter(control => !control.disabled && control.tabIndex >= 0 && !control.closest('[hidden],.hidden,[inert]') && control.getClientRects().length);
+        const first = controls[0], last = controls.at(-1);
+        if (!first) { event.preventDefault(); modal.querySelector('[role="dialog"],[role="alertdialog"]')?.focus(); }
+        else if (event.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+    }, {capture:true});
 
     document.addEventListener('submit', function (event) {
         const form = event.target instanceof HTMLFormElement ? event.target : null;
@@ -1662,16 +1622,14 @@
 
     window.addEventListener('pagehide', function () {
         reMemberscrollForReload();
-        reMemberCurrentOpenModal();
+        closeWorkspaceModals();
     });
     window.addEventListener('beforeunload', function () {
         reMemberscrollForReload();
-        reMemberCurrentOpenModal();
     });
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
             reMemberscrollForReload();
-            reMemberCurrentOpenModal();
         }
     });
 
@@ -2212,7 +2170,6 @@
         initConsoleTableLoading();
         applyPlaceholderTitles();
         restoreScrollAfterReload();
-        restoreModalAfterReload();
         document.querySelectorAll('[data-toast-message]').forEach(function (element) {
             const message = element.getAttribute('data-toast-message');
             if (!message) {

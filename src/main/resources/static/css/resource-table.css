@@ -45,17 +45,17 @@
 .aws-console [data-resource-table] .resource-table-selected > td { background:#e6f3fa; }
 .aws-console .resource-table-record-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .aws-console [data-resource-table] :focus-visible { outline:2px solid #0073bb; outline-offset:2px; }
-.aws-console dialog.resource-table-preferences { position:fixed; inset:0; margin:auto; width:min(800px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #aab7b8; border-radius:2px; color:#16191f; background:white; box-shadow:0 8px 24px #0003; }
-.aws-console dialog.resource-table-preferences::backdrop { background:#0006; }
-.resource-table-dialog-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #d5dbdb; }
+.aws-console dialog.resource-table-preferences { position:fixed; inset:0; margin:auto; width:min(800px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #d5dbdb; border-radius:2px; color:#16191f; background:white; box-shadow:0 2px 8px rgba(0,28,36,.16); }
+.aws-console dialog.resource-table-preferences::backdrop { background:rgba(255,255,255,.82); backdrop-filter:none; }
+.resource-table-dialog-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #eaeded; background:#fafafa; }
 .resource-table-dialog-header h2 { margin:0; font-size:18px; font-weight:700; }
 .resource-table-dialog-header button { min-width:28px; border:0; padding:4px; }
-.resource-table-dialog-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); padding:16px; gap:24px; overflow:auto; max-height:calc(100dvh - 190px); }
+.resource-table-dialog-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); padding:20px; gap:24px; overflow:auto; max-height:calc(100dvh - 190px); }
 .resource-table-option { display:flex; gap:10px; align-items:center; padding:7px 0; font-size:14px; }
 .resource-table-option input { width:16px; height:16px; accent-color:#0073bb; }
 .resource-table-dialog-body fieldset { margin:0 0 20px; border:0; padding:0; min-width:0; }
 .resource-table-dialog-body legend { font-weight:700; padding-right:8px; margin-bottom:8px; }
-.resource-table-dialog-actions { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #d5dbdb; }
+.resource-table-dialog-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; padding:12px 20px; border-top:1px solid #eaeded; background:#fff; }
 @media (min-width:1024px) {
     .aws-console .resource-table-tools { flex-wrap:nowrap; }
     .aws-console .resource-table-tools > .resource-table-filters { flex-flow:row nowrap !important; align-items:flex-end; flex:1 1 0; }

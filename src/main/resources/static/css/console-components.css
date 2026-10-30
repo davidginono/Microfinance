@@ -3316,9 +3316,9 @@ html.session-timeout-active,
         box-sizing: border-box;
         min-height: 100dvh;
         padding: clamp(0.75rem, 2vw, 1.5rem);
-        background: rgba(15, 23, 42, 0.62);
-        -webkit-backdrop-filter: blur(3px);
-        backdrop-filter: blur(3px);
+        background: rgba(255, 255, 255, 0.82);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
         isolation: isolate;
         overscroll-behavior: contain;
         transition: opacity 220ms ease-out;
@@ -3488,7 +3488,7 @@ html.session-timeout-active,
 
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
         .session-timeout-overlay {
-            background: rgba(15, 23, 42, 0.72);
+            background: rgba(255, 255, 255, 0.82);
         }
     }
 
@@ -4330,8 +4330,8 @@ html.session-timeout-active,
         align-items: center;
         justify-content: center;
         padding: 1.5rem;
-        background: rgba(15, 23, 42, 0.16);
-        backdrop-filter: blur(3px);
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: none;
     }
 
     .app-modal-overlay.is-open {
@@ -4339,26 +4339,34 @@ html.session-timeout-active,
     }
 
     .app-modal-panel {
-        width: min(100%, 54rem);
+        display: flex;
+        flex-direction: column;
+        width: min(100%, var(--app-modal-width, 40rem));
         max-height: min(88vh, 52rem);
         overflow: hidden;
-        border: 1px solid #d8e0e8;
+        border: 1px solid #d5dbdb;
         border-radius: 2px;
         background: #ffffff;
-        box-shadow: 0 22px 56px rgba(15, 23, 42, 0.14);
+        box-shadow: 0 2px 8px rgba(0, 28, 36, 0.16);
     }
 
     .app-modal-panel--compact {
-        width: min(100%, 39rem);
+        --app-modal-width: 30rem;
     }
 
+    dialog.app-modal-panel:not([open]) { display: none; }
+    dialog.app-modal-panel::backdrop { background: rgba(255, 255, 255, 0.82); backdrop-filter: none; }
+
     .app-modal-panel--wide {
-        width: min(100%, 68rem);
+        --app-modal-width: 60rem;
     }
 
     .app-modal-scroll {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
         max-height: min(88vh, 52rem);
-        overflow-y: auto;
+        overflow: hidden;
         scrollbar-gutter: stable;
         scrollbar-color: #94a3b8 #f1f5f9;
         scrollbar-width: thin;
@@ -4383,16 +4391,16 @@ html.session-timeout-active,
     }
 
     .app-modal-header {
+        flex: 0 0 auto;
         position: sticky;
         top: 0;
         z-index: 6;
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
-        gap: 1.25rem;
-        background: rgba(255, 255, 255, 0.98);
-        padding: 1.6rem 1.7rem 0.7rem;
-        backdrop-filter: blur(10px);
+        gap: 16px;
+        background: #fafafa;
+        padding: 16px 20px;
     }
 
     .app-modal-header .erp-panel-title {
@@ -4413,7 +4421,7 @@ html.session-timeout-active,
         align-items: center;
         justify-content: center;
         border: 1px solid transparent;
-        border-radius: 0.65rem;
+        border-radius: 2px;
         background: transparent;
         color: #4b5563;
         line-height: 1;
@@ -4436,8 +4444,13 @@ html.session-timeout-active,
     }
 
     .app-modal-body {
-        padding: 0.8rem 1.7rem 1.7rem;
+        padding: 20px;
+        min-width: 0;
+        min-height: 0;
     }
+
+    .app-modal-panel > :is(.app-modal-body, form),
+    .app-modal-scroll > :is(.app-modal-body, form) { overflow-y: auto; min-height: 0; }
 
     .app-modal-section {
         border: 1px solid #e2e8f0;
@@ -4450,14 +4463,19 @@ html.session-timeout-active,
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
-        gap: 0.7rem;
-        padding-top: 0.35rem;
+        gap: 8px;
+        position: sticky;
+        bottom: 0;
+        z-index: 7;
+        border-top: 1px solid #eaeded;
+        background: #fff;
+        padding: 12px 0 0;
     }
 
     .app-modal-actions .app-btn {
-        min-width: 7rem;
+        min-width: 0;
         border-radius: 2px;
-        padding: 0.72rem 1.05rem;
+        padding: 4px 12px;
     }
 
     @media (max-width: 640px) {
@@ -4470,11 +4488,11 @@ html.session-timeout-active,
         }
 
         .app-modal-header {
-            padding: 1.1rem 1.1rem 0.55rem;
+            padding: 12px 16px;
         }
 
         .app-modal-body {
-            padding: 0.65rem 1.1rem 1.1rem;
+            padding: 16px;
         }
 
         .app-modal-section {
@@ -4483,7 +4501,8 @@ html.session-timeout-active,
         }
 
         .app-modal-actions .app-btn {
-            width: 100%;
+            width: auto;
+            max-width: 100%;
         }
     }
 
@@ -5890,12 +5909,11 @@ html.session-timeout-active,
     color: #ffffff;
 }
 
-.loan-calculator-flow {
-    padding: 12px !important;
-}
+.loan-calculator-flow { padding: 20px !important; }
 
 .loan-calculator-input-panel,
-.loan-calculator-results,
+.loan-calculator-results { min-width: 0; padding: 0; }
+
 .loan-flow-panel {
     min-width: 0;
     border: 1px solid #d5dbdb;
@@ -5927,7 +5945,8 @@ html.session-timeout-active,
     font-size: 12px;
 }
 
-.loan-calculator-actionbar,
+.loan-calculator-actionbar { flex: 0 0 auto; margin: 0; padding: 12px 20px; background: #fff; }
+
 .loan-calculator-footer-actions,
 .loan-flow-navigation {
     display: flex;

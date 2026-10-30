@@ -1242,7 +1242,6 @@
         if (createdLoanProductTarget) {
             (window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true})))( () => {
                 closeAllProductModals();
-                window.SaccosUiState?.clearOpenModal();
                 const revealCreatedProduct = () => {
                     const navHeightValue = window.getComputedStyle(document.documentElement)
                         .getPropertyValue('--shell-nav-height');

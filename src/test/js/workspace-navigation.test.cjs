@@ -55,6 +55,28 @@ test('recoverable platform POST keeps values on a server error, then commits onl
  }finally{dom.window.close();}
 });
 
+test('successful modal submission to the same register closes the dialog and reveals the saved notice',async()=>{
+ const {dom,w,d,requests,pages,failures}=await setup({guard:true,holdNavigation:true});
+ try{
+  const form=d.querySelector('form'),button=form.querySelector('button'),modal=d.createElement('div');
+  modal.className='app-modal-overlay is-open';modal.id='create-staff';
+  modal.append(form);d.body.append(modal);form.method='post';form.action='/admin/users';form.dataset.workspaceSubmit='recover';
+  w.sessionStorage.setItem('Saccos:open-modal',JSON.stringify({path:'/admin/users',modal:{type:'id',value:'create-staff'},at:Date.now()}));
+  form.requestSubmit(button);await until(()=>requests.some(r=>r.options.method==='POST'));
+  const destination=html('Users').replace('</main>','<div data-workspace-flashbar><div data-toast-message="Staff invitation sent" data-toast-type="success"></div></div></main><div id="create-staff" class="app-modal-overlay hidden" aria-hidden="true"><section class="app-modal-panel"><h2>Create staff</h2></section></div>');
+  pages.set('/admin/users',destination);
+  requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>destination});
+  await until(()=>w.location.pathname==='/admin/users' && d.querySelector('[data-app-toast]'));
+  assert.equal(d.querySelector('#create-staff').classList.contains('is-open'),false);
+  assert.equal(d.querySelector('#create-staff').getAttribute('aria-hidden'),'true');
+  assert.equal(d.body.classList.contains('overflow-hidden'),false);
+  assert.equal(w.sessionStorage.getItem('Saccos:open-modal'),null);
+  assert.match(d.querySelector('[data-workspace-flashbar]').textContent,/Staff invitation sent/);
+  assert.equal(d.querySelector('[data-modal-toast-container]'),null);
+  assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
 test('a platform modal without a dialog role stays open after a failed command and retains discard protection',async()=>{
  const {dom,w,d,requests}=await setup({guard:true,holdNavigation:true});
  try{

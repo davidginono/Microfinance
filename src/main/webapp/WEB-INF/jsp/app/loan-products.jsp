@@ -26,13 +26,11 @@
 
 <div id="productsCalculatorModal"
      class="app-modal-overlay hidden">
-    <div class="app-modal-panel app-modal-panel--wide">
+    <div class="app-modal-panel app-modal-panel--wide" role="dialog" aria-modal="true" aria-labelledby="productsCalculatorTitle" tabindex="-1">
         <div class="app-modal-scroll">
         <div class="app-modal-header">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"><spring:message code="products.calculator.eyebrow" /></p>
-                <h2 class="mt-2 text-3xl font-semibold text-sacco-ink"><spring:message code="products.calculator.title" /></h2>
-                <p class="mt-2 text-sm text-slate-500"><spring:message code="products.calculator.subtitle" /></p>
+                <h2 id="productsCalculatorTitle" class="erp-panel-title"><spring:message code="products.calculator.title" /></h2>
             </div>
             <button id="productsCalculatorCloseButton" type="button" class="app-modal-close" aria-label="<spring:message code='products.calculator.closeAria' />">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -41,24 +39,22 @@
             </button>
         </div>
 
-        <ol class="loan-calculator-steps" aria-label="Loan eligibility calculator progress">
-            <li class="is-current" data-calculator-step="details"><span>1</span><strong>Loan details</strong></li>
-            <li data-calculator-step="eligibility"><span>2</span><strong>Eligibility</strong></li>
-            <li data-calculator-step="repayment"><span>3</span><strong>Repayment plan</strong></li>
+        <ol class="loan-calculator-steps" aria-label="<spring:message code='products.calculator.title'/>">
+            <li class="is-current" data-calculator-step="details"><span>1</span><strong><spring:message code="products.calculator.step.details"/></strong></li>
+            <li data-calculator-step="eligibility"><span>2</span><strong><spring:message code="products.calculator.step.eligibility"/></strong></li>
+            <li data-calculator-step="repayment"><span>3</span><strong><spring:message code="products.calculator.step.repayment"/></strong></li>
         </ol>
 
         <div class="app-modal-body loan-calculator-flow space-y-5">
             <section class="loan-calculator-input-panel" aria-labelledby="loanCalculatorDetailsHeading">
                 <div class="loan-calculator-section-heading">
-                    <span class="loan-calculator-step-number">1</span>
                     <div>
-                        <h3 id="loanCalculatorDetailsHeading">Choose an amount and repayment period</h3>
-                        <p>Enter only the figures you want to test. You can revise them and calculate again.</p>
+                        <h3 id="loanCalculatorDetailsHeading"><spring:message code="products.calculator.step.details"/></h3>
                     </div>
                 </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <div class="md:col-span-2">
-                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
+                    <label for="productsLoanType" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
                     <select id="productsLoanType" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                         <c:forEach items="${products}" var="p">
                             <option value="${p.id}" data-loan-type="${p.loanType}" data-min-months="${p.minimumRepaymentMonths}" data-max-months="${p.maxRepaymentMonths}">
@@ -68,14 +64,14 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.amount.label" /> (TSh)</label>
+                    <label for="productsLoanAmountDisplay" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.amount.label" /> (TZS)</label>
                     <input id="productsLoanAmount" type="hidden" />
                     <input id="productsLoanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
                            class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            placeholder="100,000" />
                 </div>
                 <div>
-                    <label id="productsTenorDisplayLabel" class="mb-1 block text-sm font-medium text-slate-700"
+                    <label for="productsTenorDisplay" id="productsTenorDisplayLabel" class="mb-1 block text-sm font-medium text-slate-700"
                            data-month-label="<spring:message code='products.tenor.months.label' text='Total Months to Repay' />"
                            data-year-label="<spring:message code='products.tenor.years.label' text='Total Years to Repay' />"><spring:message code="products.tenor.label" /></label>
                     <input id="productsTenorMonths" type="hidden" />
@@ -96,19 +92,10 @@
             </div>
             </section>
 
-            <div class="grid gap-3 md:grid-cols-2">
-                <div class="app-modal-section loan-calculator-guidance">
-                    <p class="font-semibold text-slate-800"><spring:message code="products.beforeYouApply.title" /></p>
-                    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                        <li><spring:message code="products.beforeYouApply.item1" /></li>
-                        <li><spring:message code="products.beforeYouApply.item2" /></li>
-                        <li><spring:message code="products.beforeYouApply.item3" /></li>
-                    </ul>
-                </div>
                 <div id="productsEligibilityCard" class="app-modal-section loan-calculator-result-summary" aria-live="polite">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="font-semibold text-slate-800"><spring:message code="products.eligibilityResult.title" /></p>
-                        <span id="productsEligibilityStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <span id="productsEligibilityStatus" data-resource-status="NOT_CHECKED">
                             <spring:message code="products.eligibilityResult.notChecked" text="Not checked" />
                         </span>
                     </div>
@@ -119,22 +106,11 @@
                         <p><strong><spring:message code="products.eligibilityResult.maximum" />:</strong> <span id="productsMaxAllowedLabel">-</span></p>
                     </div>
                 </div>
-            </div>
-
-            <div class="app-modal-section loan-calculator-actionbar flex flex-wrap items-center justify-between gap-3">
-                <div class="text-sm text-slate-500"><spring:message code="products.loadHint" /></div>
-                <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-primary loan-calculator-load-button">
-                    <span class="loan-calculator-button-spinner hidden" aria-hidden="true"></span>
-                    <span data-calculator-load-label><spring:message code="products.calculateEligibility.button" /></span>
-                </button>
-            </div>
 
             <div id="productsCalculatorResults" class="hidden loan-calculator-results" tabindex="-1">
             <div class="loan-calculator-section-heading">
-                <span class="loan-calculator-step-number">2</span>
                 <div>
-                    <h3>Your eligibility and repayment estimate</h3>
-                    <p>Review the decision first, then inspect the supporting figures and repayment schedule.</p>
+                    <h3><spring:message code="products.calculator.resultsTitle"/></h3>
                 </div>
             </div>
             <div id="productsFinancialFeedback" data-auto-scroll-message="true" class="hidden border px-4 py-3 text-sm"></div>
@@ -184,12 +160,19 @@
             </div>
             </div>
             <div class="loan-calculator-footer-actions">
-                <button type="button" class="app-btn btn-neutral" data-calculator-edit>Change figures</button>
+                <button type="button" class="app-btn btn-neutral" data-calculator-edit><spring:message code="products.calculator.changeFigures"/></button>
                 <c:if test="${empty applicationLockApp and applicantPolicyEligible ne false}">
-                    <a id="productsCalculatorApplyLink" class="app-btn btn-neutral hidden" href="#">Continue to application</a>
+                    <a id="productsCalculatorApplyLink" class="app-btn btn-neutral hidden" href="#"><spring:message code="products.calculator.continue"/></a>
                 </c:if>
             </div>
         </div>
+        </div>
+        <div class="app-modal-actions loan-calculator-actionbar">
+            <button type="button" class="app-btn btn-neutral" data-calculator-close><spring:message code="common.cancel"/></button>
+            <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-launch loan-calculator-load-button">
+                <span class="loan-calculator-button-spinner hidden" aria-hidden="true"></span>
+                <span data-calculator-load-label><spring:message code="products.calculateEligibility.button"/></span>
+            </button>
         </div>
     </div>
 </div>
@@ -558,7 +541,7 @@
         function showFeedback(type, text) {
             feedback.classList.add("hidden");
             feedback.textContent = "";
-            window.showToast?.(type === "success" ? "success" : "error", text, { contextElement: modal });
+            window.showToast?.(type, text, { contextElement: modal });
         }
 
         function clearPreview() {
@@ -583,6 +566,7 @@
                 const wrapper = document.createElement("div");
                 wrapper.className = "erp-table-wrap loan-calculator-detail-card";
                 wrapper.dataset.resourceTable = "member-product-calculation-" + sectionIndex;
+                wrapper.dataset.tableTools = "none";
                 wrapper.dataset.awsNoRefresh = "true";
                 wrapper.innerHTML = ""
                     +"<div class='app-table-titlebar'>"
@@ -614,19 +598,9 @@
             if (!eligibilityStatus) {
                 return;
             }
-            eligibilityStatus.className = "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide";
-            if (eligible === true) {
-                eligibilityStatus.textContent = msgEligibleStatus;
-                eligibilityStatus.classList.add("bg-emerald-100", "text-emerald-700");
-                return;
-            }
-            if (eligible === false) {
-                eligibilityStatus.textContent = msgNotEligibleStatus;
-                eligibilityStatus.classList.add("bg-rose-100", "text-rose-700");
-                return;
-            }
-            eligibilityStatus.textContent = msgNotCheckedStatus;
-            eligibilityStatus.classList.add("bg-slate-100", "text-slate-600");
+            eligibilityStatus.textContent = eligible === true ? msgEligibleStatus : eligible === false ? msgNotEligibleStatus : msgNotCheckedStatus;
+            eligibilityStatus.dataset.resourceStatus = eligible === true ? "SUCCESS" : eligible === false ? "ERROR" : "NOT_CHECKED";
+            window.ConsoleResourceDetails?.status(eligibilityStatus);
         }
 
         function setCalculatorLoading(isLoading) {
@@ -677,6 +651,7 @@
 
         openButton.addEventListener("click", openModal);
         closeButton.addEventListener("click", closeModal);
+        document.querySelector('[data-calculator-close]')?.addEventListener("click", closeModal);
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
                 closeModal();
@@ -762,7 +737,7 @@
                     resultsRegion?.scrollIntoView({ behavior: "smooth", block: "start" });
                 });
 
-                showFeedback(eligibility.eligible === false ? "error" : "success", payload.message || msgLoaded);
+                showFeedback(eligibility.eligible === false ? "error" : eligibility.eligible === true ? "success" : "info", payload.message || msgLoaded);
             } catch (error) {
                 showFeedback("error", error.message || msgFailedLoad);
             } finally {

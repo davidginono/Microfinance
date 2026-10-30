@@ -113,6 +113,7 @@ Reuse the [table skill split-view contract](../microfinance-table-standard/SKILL
 - Lock background scrolling on both body and the document root, restore their prior overflow values on close, and keep footer actions visible during long form scrolling. Ensure the close icon renders after dynamically mounting a dialog.
 - Provide a dialog name, sensible initial focus, focus containment, and focus restoration. Support Escape where cancellation is safe; do not dismiss an in-flight financial command as if it had not been submitted.
 - Keep success, failure, and pending feedback concise. Never imply a payment succeeded before the server confirms posting.
+- Successful form navigation closes the source modal and shows the destination workspace notification. Never persist or restore open-modal state across reloads or history. Recoverable failures retain the live form, values and error inside its dialog; pending commands remain protected. Nested native dialogs and body-mounted dropdowns retain their own keyboard handling.
 - Use the shared discard dialog for changed forms, with focus containment and restoration for both the form and confirmation. Preserve the existing success/X behavior where the workflow requires it. UI submission locks must not re-enable buttons disabled by a business rule when restoring a cached page.
 
 ## Component loading and refreshing

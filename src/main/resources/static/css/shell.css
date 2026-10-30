@@ -1820,14 +1820,17 @@ body.aws-console table.erp-table :is(th, td).text-center {
 }
 
 .app-modal-overlay {
-    background: rgba(22, 25, 31, .55) !important;
+    background: rgba(255, 255, 255, .82) !important;
+    backdrop-filter: none !important;
 }
 
 .app-modal-header {
-    min-height: 39px;
+    min-height: 56px;
     border-color: var(--aws-line) !important;
-    padding: 7px 10px !important;
+    padding: 16px 20px !important;
 }
+
+.app-modal-header :is(h1,h2,h3) {margin:0!important;font-size:18px!important;line-height:24px;font-weight:700;letter-spacing:normal;text-transform:none;}
 
 #appToastContainer {
     left: calc(var(--shell-sidebar-width) + 12px) !important;
@@ -2048,12 +2051,14 @@ body.aws-console table.erp-table :is(th, td).text-center {
     gap: 6px !important;
 }
 
-.app-modal-body,
-.app-modal-section,
 .product-builder-section-body,
 .workflow-subsection {
     padding: 10px !important;
 }
+
+.app-modal-body { padding: 20px !important; }
+.app-modal-body :is(label,legend) {font-size:14px!important;line-height:20px;letter-spacing:normal;text-transform:none;}
+.app-modal-section { padding: 12px; }
 
 .app-modal-section {
     border-radius: 2px !important;
@@ -2232,33 +2237,34 @@ body.aws-console,
 
 .app-modal-panel,
 [role="dialog"] {
-    width: min(100%, 54rem);
+    width: min(100%, var(--app-modal-width, 40rem));
     max-width: calc(100vw - 32px) !important;
     max-height: calc(100dvh - 32px) !important;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 28, 36, .16) !important;
 }
 
 .app-modal-panel--wide {
-    width: min(100%, 68rem);
+    --app-modal-width: 60rem;
 }
 
 .app-modal-scroll {
     max-width: 100%;
     max-height: calc(100dvh - 34px) !important;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .app-modal-header,
 .session-timeout-header {
     border-bottom: 1px solid var(--aws-line) !important;
     border-radius: 0 !important;
-    background: #eaeded !important;
+    background: #fafafa !important;
 }
 
 .session-timeout-overlay {
     padding: 16px !important;
-    background: rgba(22, 25, 31, .62) !important;
+    background: rgba(255, 255, 255, .82) !important;
     backdrop-filter: none !important;
 }
 
@@ -3947,8 +3953,8 @@ body.aws-console,
 }
 
 /* Active dialogs keep the document locked while their own body remains scrollable. */
-html:has(body.aws-console):has(.app-modal-overlay.is-open:not([hidden]), dialog[open]),
-body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
+html:has(body.aws-console):has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([hidden]):not(.hidden), dialog[open]),
+body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([hidden]):not(.hidden), dialog[open]) {
     overflow: hidden !important;
 }
 
