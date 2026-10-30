@@ -759,7 +759,7 @@
     };
 
     const resolveToastModal = function (options) {
-        if (options && (options.forcePage === true || options.placement === 'page')) {
+        if (options && (options.forcePage === true || options.placement === 'page' || options.placement === 'workspace')) {
             return null;
         }
         let modal = options && options.modal instanceof HTMLElement ? options.modal : null;
@@ -776,12 +776,6 @@
         return modal && isToastModalOpen(modal) ? modal : null;
     };
 
-    const updateModalToastOffset = function (panel, container) {
-        const header = panel.querySelector('.app-modal-header, .session-timeout-header, .guarantor-financial-modal-header');
-        const height = header instanceof HTMLElement ? Math.max(0, Math.ceil(header.getBoundingClientRect().height)) : 0;
-        container.style.setProperty('--modal-toast-top', height + 'px');
-    };
-
     const ensureModalToastContainer = function (modal) {
         const panel = modal.querySelector('.app-modal-panel, .session-timeout-panel, [role="dialog"], [role="alertdialog"]') || modal;
         let container = Array.from(panel.children).find(function (child) {
@@ -793,21 +787,21 @@
             container.setAttribute('data-modal-toast-container', 'true');
             container.setAttribute('aria-live', 'polite');
             container.setAttribute('aria-atomic', 'false');
-            panel.appendChild(container);
+            const header = panel.querySelector('.app-modal-header, .session-timeout-header, .guarantor-financial-modal-header');
+            panel.insertBefore(container, header?.parentElement === panel ? header.nextSibling : panel.firstChild);
         }
-        updateModalToastOffset(panel, container);
         return container;
     };
 
     const resolveToastState = function (options) {
-        if(options?.placement==='workspace'){
+        const modal = resolveToastModal(options);
+        if(options?.placement==='workspace' || (!modal && options?.placement!=='page' && options?.forcePage!==true)){
             const container=document.querySelector('[data-workspace-flashbar]');
             if(container){
                 if(!container.toastState)container.toastState={container,queue:[],visible:[]};
                 return container.toastState;
             }
         }
-        const modal = resolveToastModal(options);
         if (!modal) {
             return pageToastState;
         }
@@ -846,20 +840,11 @@
         });
     };
 
-    const refreshToastLayers = function (state) {
-        state.visible.forEach(function (entry, index) {
-            const depth = Math.max(state.visible.length - 1 - index, 0);
-            entry.toast.style.setProperty('--toast-depth', String(depth));
-            entry.toast.style.zIndex = String(100 + index);
-        });
-    };
-
     const promoteQueuedToast = function (state) {
         while (state.visible.length < maxVisibleToasts && state.queue.length > 0) {
             const entry = state.queue.shift();
             state.visible.push(entry);
             state.container.appendChild(entry.toast);
-            refreshToastLayers(state);
         }
     };
 
@@ -871,30 +856,19 @@
         if (!state.container) {
             return null;
         }
-        const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+        const variant = ['success', 'error', 'warning'].includes(type) ? type : 'info';
         const toast = document.createElement('div');
-        toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden border px-4 py-3 shadow-lg backdrop-blur-sm ' +
-            (variant === 'success' ? 'app-toast-success' : variant === 'error' ? 'app-toast-error' : 'app-toast-info');
+        toast.className = 'app-toast-enter app-notification-bar console-message app-toast-' + variant;
+        toast.dataset.messageType = variant;
         toast.setAttribute('data-app-toast', 'true');
         toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
-        toast.innerHTML =
-            '<div class="flex items-start gap-3">' +
-                '<div class="mt-0.5 shrink-0">' +
-                    (variant === 'success'
-                        ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
-                        : variant === 'error'
-                            ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.5a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V6.5zm0 7a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z" clip-rule="evenodd"/></svg>'
-                            : '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7.25-3.75a.75.75 0 10-1.5 0v.25a.75.75 0 001.5 0V6.25zm0 2.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z" clip-rule="evenodd"/></svg>') +
-                '</div>' +
-                '<div class="min-w-0 flex-1 pr-6">' +
-                    '<p class="text-sm font-semibold leading-5" data-toast-text></p>' +
-                '</div>' +
-                '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
+        toast.innerHTML = '<p data-toast-text></p>' +
+                '<button type="button" class="app-toast-close">' +
                     '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
-                '</button>' +
-            '</div>';
+                '</button>';
         toast.querySelector('[data-toast-text]').textContent = String(message);
-        if(options?.placement==='workspace')toast.querySelector('.app-toast-close').setAttribute('aria-label',document.body.dataset.dismissNotification || 'Close');
+        toast.querySelector('.app-toast-close').setAttribute('aria-label',document.body.dataset.dismissNotification || 'Close');
+        window.ConsoleResourceDetails?.init(toast);
 
         const entry = { toast: toast, dismiss: null };
         const dismiss = function () {
@@ -913,7 +887,6 @@
                 if (visibleIndex >= 0) {
                     state.visible.splice(visibleIndex, 1);
                 }
-                refreshToastLayers(state);
                 promoteQueuedToast(state);
             }, 190);
         };
@@ -928,7 +901,6 @@
         if (state.visible.length < maxVisibleToasts) {
             state.visible.push(entry);
             state.container.appendChild(toast);
-            refreshToastLayers(state);
         } else {
             state.queue.push(entry);
         }

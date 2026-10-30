@@ -44,7 +44,9 @@
         if(parent?.tagName==='SPAN' && parent.childElementCount===1)parent.classList.add('console-status-host');
     }
     function messages(scope) {
-        scope.querySelectorAll('[data-message-type],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.live-account-status-message,.app-loading-error,.workspace-navigation-feedback[role="alert"],.loan-error-summary,.accounting-error-summary,.accounting-resource-workspace > .coa-error,.accounting-resource-workspace > .coa-success,.library-modal .coa-success').forEach(message=>{
+        const selector='[data-message-type],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.live-account-status-message,.app-loading-error,.workspace-navigation-feedback[role="alert"],.loan-error-summary,.accounting-error-summary,.accounting-resource-workspace > .coa-error,.accounting-resource-workspace > .coa-success,.library-modal .coa-success';
+        const candidates=[...(scope.matches?.(selector)?[scope]:[]),...scope.querySelectorAll(selector)];
+        candidates.forEach(message=>{
             if(!message.textContent.trim())return;
             const classes=message.className;
             const declared=message.dataset.messageAuto==='true'?null:message.dataset.messageType;

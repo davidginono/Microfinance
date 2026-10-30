@@ -34,6 +34,8 @@ The current interface is a compact operational ERP, not a lending marketing site
 
 ## Messages and notifications
 
+- All page, modal and workspace notifications share the pale severity-tinted `console-message` surface, complete thin border, dark text, Cloudscape status icon and localized dismissal control. Never use a solid green/red/blue strip or overlapping toast layers. Saved-result notices use the workspace Flashbar for every role; modal feedback stays in normal flow below its header so live controls remain visible. Retain persistent notices, bounded queues and field-level validation.
+
 - All notification bars, including global and modal toasts, workspace Flashbars, authentication notices and contextual Alerts, use `--sacco-container-radius` (currently `0px`) to match the app's square default containers. Keep the separate `--sacco-radius` control token unchanged; do not reintroduce rounded notification-specific overrides.
 
 - The 2026-10-29 create/page-edit flow uses a full-width, persistent workspace Flashbar on the destination after successful submissions and an informational Flashbar after an unchanged edit. Platform workspaces use `data-workspace-flashbar` and the shared `showToast` workspace placement; keep notifications visible until dismissed, with localized dismissal and natural mobile wrapping. A recoverable form failure stays as a focused shared Alert above its own footer. Never replace the form or clear its values to display a failure. See the [governance lifecycle](../microfinance-ui-governance/SKILL.md#create-and-page-edit-navigation-2026-10-29).

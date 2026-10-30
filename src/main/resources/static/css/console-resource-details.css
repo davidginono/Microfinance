@@ -105,15 +105,19 @@
 /* Persistent command results stay in the workspace and use the shared toast lifecycle. */
 .workspace-flashbar:empty {display:none;}
 .workspace-flashbar {display:grid;gap:8px;min-width:0;margin-bottom:16px;scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
-.aws-console .workspace-flashbar > [data-app-toast] {
-    position:relative;width:100%;box-sizing:border-box;padding:14px 16px!important;
-    border:1px solid #037f0c!important;border-radius:var(--sacco-container-radius,0px)!important;
-    background:#f2fcf3!important;color:#037f0c!important;box-shadow:none!important;
+/* Shared notification surface for workspace, page and modal delivery. */
+.aws-console .app-notification-bar.console-message {
+    width:100%;box-shadow:none!important;padding-inline-end:52px!important;
 }
-.workspace-flashbar [data-toast-text] {margin:0;font-size:14px!important;line-height:1.5;overflow-wrap:anywhere;}
-.aws-console .workspace-flashbar > .app-toast-info {border-color:#0972d3!important;background:#f2f8fd!important;color:#0972d3!important;}
-.aws-console .workspace-flashbar .app-toast-close {position:absolute;right:12px;top:12px;width:28px;height:28px;padding:6px;background:transparent;color:inherit;border:0;}
-.workspace-flashbar .app-toast-close:focus-visible {outline:2px solid #0972d3;outline-offset:2px;}
+.app-notification-bar [data-toast-text] {margin:0;font-size:14px!important;line-height:22px;font-weight:400;overflow-wrap:anywhere;}
+.aws-console .app-notification-bar .app-toast-close {
+    position:absolute;right:12px;top:12px;display:flex;align-items:center;justify-content:center;
+    width:28px;height:28px;padding:6px;background:transparent;color:var(--message-color);border:0;
+    cursor:pointer;touch-action:manipulation;
+}
+.app-notification-bar .app-toast-close:hover {opacity:.72;}
+.app-notification-bar .app-toast-close:focus-visible {outline:2px solid #0972d3;outline-offset:2px;}
+@media(max-width:600px) {.aws-console .app-notification-bar .app-toast-close {right:8px;top:10px;}}
 form[data-workspace-submit="recover"] {scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
 [data-workspace-form-error] {flex-basis:100%;min-width:0;scroll-margin-top:calc(var(--shell-nav-height,56px) + 56px);}
 .platform-create-form,.minor-admin-create-form {width:100%;max-width:960px;min-width:0;}

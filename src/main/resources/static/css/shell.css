@@ -681,41 +681,6 @@ button:active {
 .app-toast-exit {
     animation: toast-out 180ms ease-in forwards;
 }
-.app-toast-close {
-    position: absolute;
-    top: 0.45rem;
-    right: 0.45rem;
-    z-index: 1;
-    display: inline-flex;
-    width: 1.75rem;
-    height: 1.75rem;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    border-radius: 0.45rem;
-    background: rgba(255, 255, 255, 0.72);
-    color: currentColor;
-    opacity: 0.9;
-    font-size: 1.15rem;
-    font-weight: 800;
-    line-height: 1;
-    transition: background-color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
-}
-.app-toast-close:hover,
-.app-toast-close:focus-visible {
-    background: rgba(255, 255, 255, 0.96);
-    border-color: rgba(100, 116, 139, 0.4);
-    opacity: 1;
-}
-.app-toast-success {
-    border-color: #bbf7d0;
-}
-.app-toast-error {
-    border-color: #fecaca;
-}
-.app-toast-info {
-    border-color: #bfdbfe;
-}
 .tenure-unit-toggle-group {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1865,12 +1830,11 @@ body.aws-console table.erp-table :is(th, td).text-center {
 }
 
 #appToastContainer {
-    left: var(--shell-sidebar-width) !important;
-    right: 0 !important;
-    top: var(--shell-nav-height) !important;
+    left: calc(var(--shell-sidebar-width) + 12px) !important;
+    right: 12px !important;
+    top: calc(var(--shell-nav-height) + 12px) !important;
     width: auto !important;
-    min-height: 38px;
-    gap: 0 !important;
+    gap: 8px !important;
     overflow: visible;
 }
 
@@ -1880,21 +1844,14 @@ body.aws-console table.erp-table :is(th, td).text-center {
 }
 
 .app-modal-toast-container {
-    position: absolute;
-    top: var(--modal-toast-top, 0);
-    left: 0;
-    right: 0;
-    z-index: 18;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+    position: relative;
+    display: grid;
+    gap: 8px;
+    min-width: 0;
     max-width: 100%;
-    pointer-events: none;
+    padding: 12px;
 }
-
-.app-modal-toast-container:empty {
-    display: none;
-}
+.app-modal-toast-container:empty { display: none; }
 
 .profile-panel .truncate {
     overflow: visible !important;
@@ -1903,110 +1860,15 @@ body.aws-console table.erp-table :is(th, td).text-center {
     overflow-wrap: anywhere;
 }
 
-#appToastContainer > * {
-    position: absolute !important;
-    inset: calc(var(--toast-depth, 0) * 4px) 0 auto !important;
-    width: 100%;
-    min-height: 30px;
-    border: 0 !important;
-    border-radius: var(--sacco-container-radius, 0px) !important;
-    box-shadow: none !important;
-    box-sizing: border-box;
-    overflow: hidden !important;
-    padding: 6px 44px 6px 10px !important;
-}
-
-.app-modal-toast-container > * {
-    position: relative !important;
-    inset: auto !important;
-    width: 100%;
-    min-height: 30px;
-    border: 0 !important;
-    border-radius: var(--sacco-container-radius, 0px) !important;
-    box-shadow: none !important;
-    box-sizing: border-box;
-    overflow: hidden !important;
-    padding: 6px 44px 6px 10px !important;
-    pointer-events: auto;
-}
-
-.app-modal-toast-container > * + * {
-    margin-top: 1px;
-}
-
-#appToastContainer > * > .flex,
-.app-modal-toast-container > * > .flex {
+#appToastContainer > [data-app-toast],
+.app-modal-toast-container > [data-app-toast] {
+    position: relative;
     width: 100%;
     min-width: 0;
-    align-items: center !important;
+    box-sizing: border-box;
+    pointer-events: auto;
 }
-
-#appToastContainer [data-toast-text],
-.app-modal-toast-container [data-toast-text] {
-    overflow-wrap: anywhere;
-}
-
-#appToastContainer .app-toast-close,
-.app-modal-toast-container .app-toast-close {
-    position: absolute !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    right: 8px !important;
-    left: auto !important;
-    margin: auto 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 24px !important;
-    min-width: 24px !important;
-    height: 24px !important;
-    min-height: 24px !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: #ffffff !important;
-    padding: 0 !important;
-    font-size: 0 !important;
-    transform: none !important;
-}
-
-.app-modal-toast-container .app-toast-close {
-    right: 8px !important;
-}
-
-#appToastContainer .app-toast-close:hover,
-#appToastContainer .app-toast-close:focus-visible,
-.app-modal-toast-container .app-toast-close:hover,
-.app-modal-toast-container .app-toast-close:focus-visible {
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    opacity: .72;
-}
-
-.app-toast-close-icon {
-    display: block;
-    width: 14px;
-    height: 14px;
-    flex: 0 0 14px;
-    overflow: visible;
-}
-
-.app-toast-success {
-    background: var(--aws-success) !important;
-    color: #ffffff !important;
-}
-
-.app-toast-error {
-    background: var(--aws-danger) !important;
-    color: #ffffff !important;
-}
-
-.app-toast-info {
-    background: var(--aws-blue) !important;
-    color: #ffffff !important;
-}
+.app-toast-close-icon { display: block; width: 14px; height: 14px; }
 
 .app-badge,
 .aws-console [class*="rounded-full"] {
@@ -2297,7 +2159,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     }
 
     .shell-sidebar-collapsed #appToastContainer {
-        left: var(--shell-sidebar-collapsed-width) !important;
+        left: calc(var(--shell-sidebar-collapsed-width) + 12px) !important;
     }
 }
 
@@ -2445,7 +2307,7 @@ body.aws-console,
 
 @media (max-width: 1023px) {
     #appToastContainer {
-        left: 0 !important;
+        left: 12px !important;
     }
 }
 
@@ -4317,7 +4179,7 @@ body.aws-console:has(.app-modal-overlay.is-open:not([hidden]), dialog[open]) {
     }
 }
 
-/* Toasts keep the existing appearance while exposing reliable click targets. */
+/* Global notification gutters remain transparent to pointer input. */
 #appToastContainer {
     pointer-events: none !important;
 }
