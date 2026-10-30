@@ -14,8 +14,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 public class AppUserDetailsService implements UserDetailsService {
@@ -25,25 +23,11 @@ public class AppUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        String normalizedUsername = username == null ? "" : username.trim();
-        Member member = memberDirectoryService.findByMemberNo(normalizedUsername)
-            .or(() -> memberDirectoryService.findByStaffNo(normalizedUsername))
-            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> existing.isMemberAccess() || existing.isStaffAccessActive())
-            .map(existing -> ensureStationAllowed(existing, existing.isStaffAccessActive()))
-            .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
-        boolean staffSession = member.isStaffAccessActive();
-        return new AppUserPrincipal(
-            member,
-            staffSession
-                ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
-                : userClaimService.clientSessionClaims(member.getId()),
-            staffSession
-        );
+        return loadClientByEmailOrUsername(username);
     }
 
-    public UserDetails loadMemberByMemberNo(String username) throws UsernameNotFoundException {
-        return memberDirectoryService.findByMemberNo(username)
+    public UserDetails loadClientByEmailOrUsername(String username) throws UsernameNotFoundException {
+        return memberDirectoryService.findClientLoginAccount(username)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isMemberAccess)
             .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))

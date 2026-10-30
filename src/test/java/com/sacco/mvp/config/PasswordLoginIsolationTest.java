@@ -62,20 +62,26 @@ class PasswordLoginIsolationTest {
             });
             context.refresh();
             Member dualUser = Member.builder().id(UUID.randomUUID()).memberNo("MEM001")
+                .username("dual.user").email("dual@example.com")
                 .staffNo("12345").fullName("Dual User").memberAccount(true)
                 .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
                 .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
                 .passwordHash(context.getBean(PasswordEncoder.class).encode("test-password")).build();
-            when(directory.findByMemberNo("MEM001")).thenReturn(Optional.of(dualUser));
+            when(directory.findClientLoginAccount("DUAL.USER")).thenReturn(Optional.of(dualUser));
+            when(directory.findClientLoginAccount("DUAL@EXAMPLE.COM")).thenReturn(Optional.of(dualUser));
             when(directory.findByStaffNo("12345")).thenReturn(Optional.of(dualUser));
             when(directory.findStaffLoginAccount("12345")).thenReturn(Optional.of(dualUser));
             var filter = context.getBean(SecurityFilterChain.class).getFilters().stream()
                 .filter(UsernamePasswordAuthenticationFilter.class::isInstance).findFirst().orElseThrow();
             AuthenticationManager manager = (AuthenticationManager) ReflectionTestUtils.getField(filter, "authenticationManager");
 
-            assertThat(login(manager, "", "MEM001").isStaffSession()).isFalse();
+            assertThat(login(manager, "", "dual.user").isStaffSession()).isFalse();
+            assertThat(login(manager, "", "dual@example.com").isStaffSession()).isFalse();
+            assertThatThrownBy(() -> login(manager, "", "MEM001")).isInstanceOf(AuthenticationException.class);
             assertThat(login(manager, "staff-password", "12345").isStaffSession()).isTrue();
             assertThatThrownBy(() -> login(manager, "staff-password", "MEM001"))
+                .isInstanceOf(AuthenticationException.class);
+            assertThatThrownBy(() -> login(manager, "staff-password", "dual.user"))
                 .isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "", "12345"))
                 .isInstanceOf(AuthenticationException.class);

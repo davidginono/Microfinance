@@ -41,6 +41,8 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     }
 
     Optional<Member> findByMemberNo(String memberNo);
+    Optional<Member> findByUsername(String username);
+    boolean existsByUsername(String username);
     Optional<Member> findByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
@@ -58,6 +60,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     long nextClientNumberValue();
 
     Optional<Member> findByEmailIgnoreCase(String email);
+    List<Member> findTop2ByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
 

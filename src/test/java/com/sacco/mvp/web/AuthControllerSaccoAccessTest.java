@@ -60,15 +60,51 @@ class AuthControllerSaccoAccessTest {
     @Mock private AuditService auditService;
 
     @Test
+    void usernameAvailabilityReturnsOnlyAnUncachedBoolean() {
+        when(memberRegistrationService.usernameAvailable("asha.mushi")).thenReturn(true);
+        var response = controller().usernameAvailability("asha.mushi");
+        assertThat(response.getBody()).containsExactly(Map.entry("available", true));
+        assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
+    }
+
+    @Test
+    void takenUsernameKeepsTheRegistrationFormAndDoesNotConsumeTheCode() {
+        var form = new com.sacco.mvp.web.form.MemberRegistrationForm();
+        form.setUsername("asha.mushi");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
+        org.mockito.Mockito.doThrow(new MemberRegistrationService.UsernameTakenException()).when(memberRegistrationService).requireUsernameAvailable("asha.mushi");
+        var errors = new org.springframework.validation.BeanPropertyBindingResult(form, "registrationForm");
+        assertThat(controller().registerMemberSubmit(form, errors, new org.springframework.ui.ExtendedModelMap(),
+            new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap())).isEqualTo("register-member");
+        assertThat(errors.getFieldError("username").getCode()).isEqualTo("registration.username.taken");
+        org.mockito.Mockito.verifyNoInteractions(emailOtpService);
+        verify(memberRegistrationService,never()).register(org.mockito.ArgumentMatchers.any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"client.user", "client@example.com"})
+    void passwordRecoveryUsesTheRegisteredAccountForEitherLoginIdentifier(String login) {
+        Member client = member(true);
+        when(memberDirectoryService.findClientLoginAccount(login.toUpperCase(java.util.Locale.ROOT))).thenReturn(Optional.of(client));
+        when(passwordEncoder.encode("NewTestPassword")).thenReturn("encoded-password");
+        assertThat(controller().requestPasswordResetOtp(login, "member").getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(controller().verifyPasswordResetOtp(login, "member", "123456").getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(controller().savePasswordReset(login, "member", "123456", "NewTestPassword", "NewTestPassword").getStatusCode().is2xxSuccessful()).isTrue();
+        verify(emailOtpService).validateOtp(client.getEmail(), EmailOtpPurpose.PASSWORD_RESET, client.getId(), "123456");
+        verify(emailOtpService).consumeOtp(client.getEmail(), EmailOtpPurpose.PASSWORD_RESET, client.getId(), "123456");
+        verify(memberDirectoryService).updatePasswordHash(client, "encoded-password");
+    }
+
+    @Test
     void registrationReturnsAssignedNumberOnlyAfterOtpAndRegistrationSucceed() {
         var form = new com.sacco.mvp.web.form.MemberRegistrationForm();
-        form.setEmail("client@example.invalid");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
-        var registered = member(true);registered.setMemberNo("CL-00000042");
+        form.setEmail("client@example.invalid");form.setUsername("client42");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
+        var registered = member(true);registered.setMemberNo("CL-00000042");registered.setUsername("client42");
         when(memberRegistrationService.register(form)).thenReturn(registered);
         var flash = new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
         String view = controller().registerMemberSubmit(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm"),new org.springframework.ui.ExtendedModelMap(),flash);
         assertThat(view).isEqualTo("redirect:/login");
         assertThat(flash.getFlashAttributes().get("assignedClientNumber")).isEqualTo("CL-00000042");
+        assertThat(flash.getFlashAttributes().get("assignedUsername")).isEqualTo("client42");
         var order = org.mockito.Mockito.inOrder(emailOtpService,memberRegistrationService);
         order.verify(emailOtpService).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,"123456");
         order.verify(memberRegistrationService).register(form);

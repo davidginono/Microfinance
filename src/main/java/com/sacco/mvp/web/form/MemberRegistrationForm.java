@@ -10,6 +10,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class MemberRegistrationForm {
+    @NotBlank(message = "{registration.username.required}")
+    @Pattern(regexp = com.sacco.mvp.domain.LoginUsername.FORMAT, message = "{registration.username.invalid}")
+    private String username;
+
     @Size(max = 50, message = "{payroll.employeeNumber.invalid}")
     @Pattern(regexp = "^[A-Za-z0-9/._ -]*$", message = "{payroll.employeeNumber.invalid}")
     private String employeeNumber;

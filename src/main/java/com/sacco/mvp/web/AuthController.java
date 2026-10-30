@@ -103,6 +103,13 @@ public class AuthController {
         return Map.of("available", memberRegistrationService.employeeNumberAvailable(employeeNumber, saccoId, stationId));
     }
 
+    @GetMapping("/register/member/username-availability")
+    @ResponseBody
+    public ResponseEntity<Map<String, Boolean>> usernameAvailability(@RequestParam(defaultValue = "") String username) {
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+            .body(Map.of("available", memberRegistrationService.usernameAvailable(username)));
+    }
+
     @PostMapping("/register/member/request-otp")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestMemberRegistrationOtp(@Valid @ModelAttribute("registrationForm") MemberRegistrationForm form,
@@ -122,6 +129,7 @@ public class AuthController {
         }
 
         try {
+            memberRegistrationService.requireUsernameAvailable(form.getUsername());
             MemberRegistrationService.VerifiedExternalMember verified = memberRegistrationService.verifyExternalMember(form);
             memberRegistrationService.ensureLocalUniqueness(
                 verified.memberNo(),
@@ -180,13 +188,19 @@ public class AuthController {
                 populateRegistrationOptions(model);
                 return "register-member";
             }
+            memberRegistrationService.requireUsernameAvailable(form.getUsername());
             emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, form.getOtpCode());
             Member registered = memberRegistrationService.register(form);
             auditIdentityEvent(registered.getId(), "REGISTRATION", "Registration", "MEMBER", "Member " + registered.getMemberNo(),
                 registered.getSaccoId(), registered.getStationId(), Map.of("memberNo", registered.getMemberNo()));
             ra.addFlashAttribute("assignedClientNumber", registered.getMemberNo());
-            ra.addFlashAttribute("message", "Registration completed successfully. Request a sign-in code with your email to access the member workspace.");
+            ra.addFlashAttribute("assignedUsername", registered.getUsername());
+            ra.addFlashAttribute("message", "Registration completed successfully. Sign in with your email or username.");
             return "redirect:/login";
+        } catch (MemberRegistrationService.UsernameTakenException ex) {
+            bindingResult.rejectValue("username", "registration.username.taken", ex.getMessage());
+            populateRegistrationOptions(model);
+            return "register-member";
         } catch (IllegalStateException ex) {
             bindingResult.reject("registration.failed", ex.getMessage());
             populateRegistrationOptions(model);
@@ -200,7 +214,7 @@ public class AuthController {
                                                                        @RequestParam String accountType) {
         String normalizedUsername = normalizeMemberNo(username);
         if (normalizedUsername.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your member number."));
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your sign-in identifier."));
         }
         try {
             Member member = findPasswordResetAccount(normalizedUsername, accountType);
@@ -238,7 +252,7 @@ public class AuthController {
                                                                       @RequestParam String otpCode) {
         String normalizedUsername = normalizeMemberNo(username);
         if (normalizedUsername.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your member number."));
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your sign-in identifier."));
         }
         try {
             Member member = findPasswordResetAccount(normalizedUsername, accountType);
@@ -262,7 +276,7 @@ public class AuthController {
         String normalizedUsername = normalizeMemberNo(username);
         String passwordError = passwordValidationMessage(password, confirmPassword);
         if (normalizedUsername.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your member number."));
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your sign-in identifier."));
         }
         if (passwordError != null) {
             return ResponseEntity.badRequest().body(Map.of("valid", false, "message", passwordError));
@@ -593,12 +607,12 @@ public class AuthController {
                 .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
                 .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff number."));
         }
-        Member member = memberDirectoryService.findByMemberNo(normalizedUsername)
+        Member member = memberDirectoryService.findClientLoginAccount(normalizedUsername)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
-            .orElseThrow(() -> new IllegalStateException("No active account was found for that member number."));
+            .orElseThrow(() -> new IllegalStateException("No active client account was found for that email or username."));
         if (!member.isMemberAccess()) {
-            throw new IllegalStateException("No active member account was found for that member number.");
+            throw new IllegalStateException("No active client account was found for that email or username.");
         }
         return member;
     }

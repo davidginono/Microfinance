@@ -184,7 +184,7 @@ public class SecurityConfig {
                 .failureHandler((request, response, exception) -> {
                     String username = request.getParameter("username");
                     String loginType = request.getParameter("loginType");
-                    String message = "Invalid member number or password.";
+                    String message = "Invalid email, username or password.";
                     String redirectTarget = "/login?error";
                     Member auditMember = null;
                     if (username != null && !username.isBlank()) {
@@ -195,7 +195,7 @@ public class SecurityConfig {
                             ? memberDirectoryService.findPlatformAdminLoginAccount(normalizedUsername)
                             : staffPasswordLogin
                                 ? memberDirectoryService.findStaffLoginAccount(normalizedUsername)
-                                : memberDirectoryService.findByMemberNo(normalizedUsername);
+                                : memberDirectoryService.findClientLoginAccount(normalizedUsername);
                         auditMember = matchedMember.orElse(null);
                         message = matchedMember
                             .map(member -> {
@@ -231,13 +231,13 @@ public class SecurityConfig {
                                 if (!member.isMemberAccess()) {
                                     return "You are not registered as a member. Sign in through Staff instead.";
                                 }
-                                return "Invalid member number or password.";
+                                return "Invalid email, username or password.";
                             })
                             .orElse(systemAdminPasswordLogin
                                 ? "Invalid System Admin ID or password."
                                 : staffPasswordLogin
                                     ? "No active staff account was found for that staff number."
-                                    : "No member account was found for that member number. Please register yourself first.");
+                                    : "Invalid email, username or password.");
                     }
                     if ("system-admin-password".equals(loginType)) {
                         redirectTarget = "/system-admin/login?error";
@@ -449,7 +449,7 @@ public class SecurityConfig {
             if ("staff-password".equals(loginType)) {
                 return userDetailsService.loadStaffByStaffNo(normalizedUsername);
             }
-            return userDetailsService.loadMemberByMemberNo(normalizedUsername);
+            return userDetailsService.loadClientByEmailOrUsername(normalizedUsername);
         };
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(loginUserDetailsService) {
             @Override
@@ -521,7 +521,7 @@ public class SecurityConfig {
             ? (member == null ? null : (staff && member.getStaffNo() != null && !member.getStaffNo().isBlank()
                 ? member.getStaffNo()
                 : member.getMemberNo()))
-            : principal.getUsername();
+            : (staff ? principal.getUsername() : principal.getMemberNo());
         java.util.Map<String, Object> details = new java.util.LinkedHashMap<>();
         details.put("result", status == AuditEventStatus.FAIL ? "ERROR" : "SUCCESS");
         details.put("method", method);

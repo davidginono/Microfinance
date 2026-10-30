@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.LoginUsername;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
@@ -52,6 +53,7 @@ public class MemberRegistrationService {
 
     private Member registerKnown(MemberRegistrationForm form,VerifiedExternalMember verified,boolean assisted) {
         log.info("Client registration requested: saccoId={}", verified.saccoId());
+        String username = assisted ? null : requireUsernameAvailable(form.getUsername());
         String normalizedPhone = normalizePhone(form.getPhone());
         String employeeNumber = EmployeeNumber.normalize(form.getEmployeeNumber());
         ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone,
@@ -63,6 +65,7 @@ public class MemberRegistrationService {
             .id(UUID.randomUUID())
             .saccoId(verified.saccoId())
             .memberNo(memberNo)
+            .username(username)
             .employeeNumber(employeeNumber)
             .stationId(verified.stationId())
             .fullName(verified.fullName())
@@ -79,7 +82,16 @@ public class MemberRegistrationService {
             .profileLastSyncedAt(now)
             .build();
 
-        Member savedMember = memberRepository.saveAndFlush(member);
+        Member savedMember;
+        try {
+            savedMember = memberRepository.saveAndFlush(member);
+        } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+            if (conflict.getMostSpecificCause().getMessage() != null
+                && conflict.getMostSpecificCause().getMessage().contains("uq_members_username")) {
+                throw new UsernameTakenException();
+            }
+            throw conflict;
+        }
 
         userSettingsRepository.save(UserSettings.builder()
             .memberId(savedMember.getId())
@@ -163,6 +175,29 @@ public class MemberRegistrationService {
             && saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue(normalizedSaccoId, normalizedStationId).isPresent()
             && !memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase(
                 normalizedSaccoId, normalizedStationId, normalizedEmployeeNumber);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean usernameAvailable(String value) {
+        String username = LoginUsername.normalize(value);
+        return LoginUsername.isValid(username) && !memberRepository.existsByUsername(username);
+    }
+
+    public String requireUsernameAvailable(String value) {
+        String username = LoginUsername.normalize(value);
+        if (!LoginUsername.isValid(username)) {
+            throw new IllegalStateException("Use 3–32 letters, numbers, dots, underscores or hyphens, starting with a letter.");
+        }
+        if (memberRepository.existsByUsername(username)) {
+            throw new UsernameTakenException();
+        }
+        return username;
+    }
+
+    public static final class UsernameTakenException extends IllegalStateException {
+        public UsernameTakenException() {
+            super("This username is already taken.");
+        }
     }
 
     private int nextMemberRank(String saccoId) {

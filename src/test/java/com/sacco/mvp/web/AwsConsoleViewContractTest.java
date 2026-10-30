@@ -174,7 +174,8 @@ class AwsConsoleViewContractTest {
         assertThat(passwordVisibility).contains("input.type = revealed ? \"text\" : \"password\"", "aria-pressed");
         assertThat(authController).contains("/register/member/employee-number-availability", "employeeNumberAvailable(employeeNumber, saccoId, stationId)");
         assertThat(registration).doesNotContain("path=\"memberNo\"", "registrationMemberNo", "member-number-availability");
-        assertThat(login).contains("<output id=\"assignedClientNumber\"", "${assignedClientNumber}");
+        assertThat(login).contains("<output id=\"assignedUsername\"", "${assignedUsername}", "login.username", "clientLoginIdentifier");
+        assertThat(registration).contains("path=\"username\"", "registrationUsernameAvailability", "checkUsernameAvailability", "username-availability");
     }
 
     @Test

@@ -23,6 +23,22 @@ import static org.mockito.Mockito.when;
 class MemberRegistrationServiceTest {
 
     @Test
+    void usernameAvailabilityNormalizesCaseAndSkipsInvalidQueries() {
+        var members = Mockito.mock(MemberRepository.class);
+        var service = new MemberRegistrationService(members, Mockito.mock(RegisteredSaccoRepository.class),
+            Mockito.mock(SaccoStationRepository.class), Mockito.mock(SaccoSettingsRepository.class),
+            Mockito.mock(UserSettingsRepository.class), Mockito.mock(PasswordEncoder.class), new NameSignatureService());
+        assertThat(service.usernameAvailable("ab")).isFalse();
+        assertThat(service.usernameAvailable("client@example.com")).isFalse();
+        Mockito.verifyNoInteractions(members);
+        when(members.existsByUsername("asha.mushi")).thenReturn(true);
+        assertThat(service.usernameAvailable(" ASHA.MUSHI ")).isFalse();
+        assertThatThrownBy(() -> service.requireUsernameAvailable("ASHA.MUSHI"))
+            .isInstanceOf(MemberRegistrationService.UsernameTakenException.class);
+        assertThat(service.requireUsernameAvailable("NEEMA.MUSHI")).isEqualTo("neema.mushi");
+    }
+
+    @Test
     void employeeNumberAvailabilityUsesTheSelectedInstitutionAndBranch() {
         MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);

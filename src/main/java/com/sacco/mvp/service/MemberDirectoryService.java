@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.LoginUsername;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,19 @@ public class MemberDirectoryService {
         return email == null || email.isBlank()
             ? Optional.empty()
             : memberRepository.findByEmailIgnoreCase(email);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Optional<Member> findClientLoginAccount(String login) {
+        String value = LoginUsername.normalize(login);
+        if (value.isEmpty() || value.length() > 254) {
+            return Optional.empty();
+        }
+        if (value.contains("@")) {
+            List<Member> matches = memberRepository.findTop2ByEmailIgnoreCase(value);
+            return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+        }
+        return LoginUsername.isValid(value) ? memberRepository.findByUsername(value) : Optional.empty();
     }
 
     public Optional<Member> findByMemberNo(String memberNo) {

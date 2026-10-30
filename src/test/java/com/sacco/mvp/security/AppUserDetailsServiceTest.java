@@ -36,10 +36,11 @@ class AppUserDetailsServiceTest {
 
     @Test void clientPasswordLoginCarriesExplicitOwnCoverageClaimsWithoutStaffClaims(){
         var id=UUID.randomUUID();var member=Member.builder().id(id).saccoId("SACCO-01").stationId("AR704").memberNo("MEM001").fullName("Client").memberAccount(true).status(MemberStatus.ACTIVE).passwordHash("test-only").build();
-        when(memberRepository.findByMemberNo("MEM001")).thenReturn(Optional.of(member));when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
+        member.setUsername("client.one");
+        when(memberRepository.findByUsername("client.one")).thenReturn(Optional.of(member));when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
         when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(new com.sacco.mvp.domain.MemberAccessClaim(new com.sacco.mvp.domain.MemberAccessClaimId(id,"GROUP_COVERAGE_OWN_VIEW")),new com.sacco.mvp.domain.MemberAccessClaim(new com.sacco.mvp.domain.MemberAccessClaimId(id,"GROUP_COVERAGE_LINK"))));
         var service=new AppUserDetailsService(new com.sacco.mvp.service.MemberDirectoryService(memberRepository),new com.sacco.mvp.service.StationAccessService(saccoStationRepository),new UserClaimService(memberAccessClaimRepository,userSettingsRepository,new ObjectMapper()));
-        var principal=(AppUserPrincipal)service.loadMemberByMemberNo("MEM001");assertThat(principal.isStaffSession()).isFalse();assertThat(principal.getClaims()).contains("GROUP_COVERAGE_OWN_VIEW").doesNotContain("GROUP_COVERAGE_LINK");
+        var principal=(AppUserPrincipal)service.loadClientByEmailOrUsername(" CLIENT.ONE ");assertThat(principal.isStaffSession()).isFalse();assertThat(principal.getUsername()).isEqualTo("client.one");assertThat(principal.getClaims()).contains("GROUP_COVERAGE_OWN_VIEW").doesNotContain("GROUP_COVERAGE_LINK");
     }
 
     @Test
@@ -56,7 +57,7 @@ class AppUserDetailsServiceTest {
             .build();
         SaccoStation station = station(SaccoAccessStatus.SUSPENDED);
         station.setAccessRestrictionReason("payment overdue");
-        when(memberRepository.findByMemberNo("MEM001")).thenReturn(Optional.of(member));
+        when(memberRepository.findByUsername("member.one")).thenReturn(Optional.of(member));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station));
 
         AppUserDetailsService service = new AppUserDetailsService(
@@ -65,7 +66,7 @@ class AppUserDetailsServiceTest {
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
-        assertThatThrownBy(() -> service.loadUserByUsername("MEM001"))
+        assertThatThrownBy(() -> service.loadUserByUsername("member.one"))
             .isInstanceOf(DisabledException.class)
             .hasMessage("This station workspace has been suspended: payment overdue");
     }
@@ -92,7 +93,7 @@ class AppUserDetailsServiceTest {
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
-        service.loadUserByUsername("ADM001");
+        service.loadPlatformAdminByLoginId("ADM001");
     }
 
     @Test
@@ -159,7 +160,7 @@ class AppUserDetailsServiceTest {
             .status(MemberStatus.ACTIVE)
             .passwordHash("secret")
             .build();
-        when(memberRepository.findByMemberNo("ADM001")).thenReturn(Optional.of(admin));
+        when(memberRepository.findByUsername("platform.admin")).thenReturn(Optional.of(admin));
 
         AppUserDetailsService service = new AppUserDetailsService(
             new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
@@ -167,8 +168,39 @@ class AppUserDetailsServiceTest {
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
-        assertThatThrownBy(() -> service.loadMemberByMemberNo("ADM001"))
+        assertThatThrownBy(() -> service.loadClientByEmailOrUsername("platform.admin"))
             .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+    }
+
+    @Test
+    void clientEmailLoginIsCaseInsensitiveAndDoesNotGrantStaffClaims() {
+        Member client = Member.builder().id(UUID.randomUUID()).memberNo("CL-00000001").username("asha.mushi")
+            .email("asha@example.com").memberAccount(true).status(MemberStatus.ACTIVE).build();
+        when(memberRepository.findTop2ByEmailIgnoreCase("asha@example.com")).thenReturn(List.of(client));
+        var users = new AppUserDetailsService(new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper()));
+
+        var principal = (AppUserPrincipal) users.loadUserByUsername(" ASHA@EXAMPLE.COM ");
+        assertThat(principal.getMemberId()).isEqualTo(client.getId());
+        assertThat(principal.getUsername()).isEqualTo("asha.mushi");
+        assertThat(principal.isStaffSession()).isFalse();
+        assertThat(principal.getStaffRoles()).isEmpty();
+    }
+
+    @Test
+    void clientNumbersAndAmbiguousEmailsCannotAuthenticate() {
+        var directory = new com.sacco.mvp.service.MemberDirectoryService(memberRepository);
+        var users = new AppUserDetailsService(directory, new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper()));
+        when(memberRepository.findTop2ByEmailIgnoreCase("duplicate@example.com")).thenReturn(List.of(
+            Member.builder().id(UUID.randomUUID()).build(), Member.builder().id(UUID.randomUUID()).build()));
+
+        assertThatThrownBy(() -> users.loadUserByUsername("CL-00000001"))
+            .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+        assertThatThrownBy(() -> users.loadUserByUsername("duplicate@example.com"))
+            .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+        org.mockito.Mockito.verify(memberRepository, org.mockito.Mockito.never()).findByMemberNo(org.mockito.ArgumentMatchers.anyString());
     }
 
     private SaccoStation station(SaccoAccessStatus accessStatus) {

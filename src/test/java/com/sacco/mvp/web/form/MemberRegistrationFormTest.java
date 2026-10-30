@@ -8,6 +8,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MemberRegistrationFormTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"asha.mushi", "ASHA_123", "a12", "abcdefghijklmnopqrstuvwxyz123456"})
+    void acceptsUsernamesWithinTheLoginNamespace(String username) {
+        var form = new MemberRegistrationForm();form.setUsername(username);
+        assertThat(validator.validateProperty(form, "username")).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"", "ab", "12345", "asha@example.com", "asha mushi", "abcdefghijklmnopqrstuvwxyz1234567", "<script>"})
+    void rejectsMissingOrInvalidUsernames(String username) {
+        var form = new MemberRegistrationForm();form.setUsername(username);
+        assertThat(validator.validateProperty(form, "username")).isNotEmpty();
+    }
+
     @Test void fullNameIsDerivedFromThreeSeparateNames() {
         var form = new MemberRegistrationForm();form.setFirstName("  Asha ");form.setMiddleName(" Neema ");form.setLastName(" Mushi  ");
         assertThat(form.getFullName()).isEqualTo("Asha Neema Mushi");assertThat(nameErrors(form)).isEmpty();

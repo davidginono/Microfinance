@@ -29,6 +29,9 @@ public class Member {
     @Column(name = "member_no", nullable = false, unique = true)
     private String memberNo;
 
+    @Column(name = "username", length = 32)
+    private String username;
+
     @Column(name = "staff_no")
     private String staffNo;
 

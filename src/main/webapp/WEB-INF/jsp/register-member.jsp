@@ -75,6 +75,19 @@
                     <form:errors path="email" cssClass="coa-error" />
                 </div>
                 <div>
+                    <label for="registrationUsername" class="mb-1.5 block registration-section-label"><spring:message code="register.member.username" /></label>
+                    <form:input path="username" id="registrationUsername" autocomplete="username" autocapitalize="none" spellcheck="false"
+                                required="required" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9._\-]{2,31}"
+                                cssClass="registration-field" aria-describedby="registrationUsernameHelp registrationUsernameAvailability usernameErrors" />
+                    <p id="registrationUsernameHelp" class="mt-1 text-sm"><spring:message code="registration.username.invalid" /></p>
+                    <p id="registrationUsernameAvailability" class="mt-1 hidden text-sm" role="status" aria-live="polite"
+                       data-checking-message="<spring:message code='registration.username.checking' />"
+                       data-available-message="<spring:message code='registration.username.available' />"
+                       data-unavailable-message="<spring:message code='registration.username.unavailable' />"
+                       data-failed-message="<spring:message code='registration.username.checkFailed' />"></p>
+                    <form:errors path="username" id="usernameErrors" cssClass="coa-error" />
+                </div>
+                <div>
                     <spring:bind path="registrationForm.phone">
                         <label for="phone" class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.phone" /></label>
                     </spring:bind>
@@ -289,6 +302,8 @@
         const registrationSaccosData = document.getElementById("registrationSaccosData");
         const employeeNumberInput = document.getElementById("registrationEmployeeNumber");
         const employeeNumberAvailability = document.getElementById("registrationEmployeeNumberAvailability");
+        const usernameInput = document.getElementById("registrationUsername");
+        const usernameAvailability = document.getElementById("registrationUsernameAvailability");
         if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData || !employeeNumberInput || !employeeNumberAvailability) {
             return;
         }
@@ -308,14 +323,14 @@
                 const message = availability.dataset[state + "Message"] || "";
                 availability.textContent = message;
                 availability.className = state === "available"
-                    ? "mt-1 text-xs text-emerald-700"
+                    ? "mt-1 text-sm text-emerald-700"
                     : state === "unavailable" || state === "failed"
-                        ? "mt-1 text-xs text-rose-700"
-                        : "mt-1 text-xs text-slate-600";
+                        ? "mt-1 text-sm text-rose-700"
+                        : "mt-1 text-sm text-slate-600";
             };
             const clearAvailability = () => {
                 availability.textContent = "";
-                availability.className = "mt-1 hidden text-xs";
+                availability.className = "mt-1 hidden text-sm";
             };
             const check = () => {
                 version += 1;
@@ -339,13 +354,15 @@
                     try {
                         const response = await fetch(requestUrl(value), {
                         headers: {"Accept": "application/json"},
+                        cache: "no-store",
                         signal: controller.signal
                     });
                     const payload = await response.json();
                     if (currentVersion !== version) {
                         return;
                     }
-                    setAvailability(response.ok && payload.available === true ? "available" : "unavailable");
+                    setAvailability(response.ok && typeof payload.available === "boolean"
+                        ? (payload.available ? "available" : "unavailable") : "failed");
                 } catch (error) {
                     if (error.name !== "AbortError" && currentVersion === version) {
                         setAvailability("failed");
@@ -358,8 +375,21 @@
             }, 350);
         };
             input.addEventListener("input", check);
+            window.addEventListener("pagehide", () => {
+                version += 1;
+                window.clearTimeout(timer);
+                request?.abort();
+            });
             return check;
         };
+
+        const checkUsernameAvailability = createAvailabilityChecker(
+            usernameInput,
+            usernameAvailability,
+            (username) => "/register/member/username-availability?username=" + encodeURIComponent(username),
+            () => usernameInput.validity.valid
+        );
+        checkUsernameAvailability();
 
         const checkEmployeeNumberAvailability = createAvailabilityChecker(
             employeeNumberInput,

@@ -55,7 +55,10 @@ public class AppUserPrincipal implements UserDetails {
         this.staffRoles = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(sessionStaffRoles));
         this.position = Position.primaryRole(this.staffRoles, this.memberAccess);
         this.grantedPositions = resolveGrantedPositions(this.staffRoles, this.memberAccess);
-        this.username = this.staffSession && hasText(member.getStaffNo()) ? member.getStaffNo() : member.getMemberNo();
+        this.username = this.staffSession
+            ? (hasText(member.getStaffNo()) ? member.getStaffNo() : member.getMemberNo())
+            : (hasText(member.getUsername()) ? member.getUsername()
+                : (hasText(member.getEmail()) ? member.getEmail() : member.getMemberNo()));
         this.password = member.getPasswordHash();
         this.authorities = java.util.Collections.emptyList();
         this.claims = claims == null || claims.isEmpty()
