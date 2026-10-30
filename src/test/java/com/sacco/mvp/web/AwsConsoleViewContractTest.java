@@ -497,21 +497,22 @@ class AwsConsoleViewContractTest {
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(login)
-            .contains("aws-auth.css?v=20260827-auth-notice-width-v1")
+            .contains("aws-auth.css?v=20261030-auth-alerts")
             .contains("href=\"#forgotPasswordModal\" class=\"auth-text-link\"")
             .contains("event.preventDefault()")
             .doesNotContain("data-forgot-password-open=\"member\">Forgot password?</button>")
             .contains("class=\"app-toast-close-icon\"");
         assertThat(registration)
-            .contains("aws-auth.css?v=20261030-registration-v2")
+            .contains("aws-auth.css?v=20261030-auth-alerts")
             .contains("class=\"app-toast-close-icon\"")
             .doesNotContain("&times;");
         assertThat(authCss)
             .contains("body.auth-shell.aws-auth-shell::before")
             .contains("display: none")
             .contains("body.auth-shell.aws-auth-shell > .min-h-screen")
-            .contains("body.auth-shell.aws-auth-shell .auth-notification-rail")
-            .contains("inset-block-start: 0");
+            .contains(".auth-notification-rail:empty")
+            .contains("display: grid")
+            .doesNotContain(".auth-notification-success { background:");
         assertThat(shellJs)
             .contains("syncActiveSidebarLink")
             .contains("app-toast-close-icon")
@@ -562,7 +563,7 @@ class AwsConsoleViewContractTest {
             .contains(".auth-notification-bar")
             .contains(".auth-text-link")
             .contains("color: var(--aws-blue) !important")
-            .contains("inset: 44px 0 auto")
+            .contains(".auth-notification-rail:empty")
             .contains("--sacco-topbar-height: 44px")
             .contains("--sacco-control-height: 32px")
             .contains("--aws-topbar: #232f3e")

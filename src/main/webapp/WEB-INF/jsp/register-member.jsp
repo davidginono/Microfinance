@@ -15,7 +15,8 @@
     <link rel="stylesheet" href="<c:url value='/css/amazon-ember.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-registration-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-auth-alerts' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css?v=20261030-auth-alerts' />" />
     <link rel="stylesheet" href="<c:url value='/css/form-validation.css?v=20261030-registration' />" />
     <script defer src="<c:url value='/js/form-validation.js' />"></script>
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
@@ -23,7 +24,6 @@
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
 <body class="auth-shell aws-auth-shell auth-registration-page min-h-screen font-sans text-slate-900 antialiased">
-<div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
 <span id="form-validation-labels" hidden
       data-field="<spring:message code='validation.field' htmlEscape='true' />"
       data-required="<spring:message code='validation.required' htmlEscape='true' />"
@@ -35,6 +35,7 @@
 <main class="auth-form-page">
 <div class="auth-form-layout registration-layout">
     <div class="auth-title-stack registration-heading"><h1 class="auth-heading"><spring:message code="register.member.title" /></h1></div>
+    <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <c:if test="${not empty errors}"><div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div></c:if>
     <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -212,16 +213,16 @@
             }
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
             const icon = variant === 'success'
-                ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
+                ? '<svg class="console-icon console-message-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.5 7.5L7 10L11 5"/></svg>'
                 : variant === 'error'
-                    ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.5a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V6.5zm0 7a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z" clip-rule="evenodd"/></svg>'
-                    : '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7.25-3.75a.75.75 0 10-1.5 0v.25a.75.75 0 001.5 0V6.25zm0 2.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z" clip-rule="evenodd"/></svg>';
+                    ? '<svg class="console-icon console-message-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5"/></svg>'
+                    : '<svg class="console-icon console-message-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 12V7M8 6V4"/></svg>';
             const toast = document.createElement('div');
-            toast.className = 'app-toast-enter auth-notification-bar auth-notification-' + variant;
+            toast.className = 'app-toast-enter console-message auth-notification-bar auth-notification-' + variant;
+            toast.dataset.messageType = variant;
             toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
-            toast.innerHTML =
+            toast.innerHTML = icon +
                 '<div class="flex items-start gap-3">' +
-                    '<div class="mt-0.5 shrink-0">' + icon + '</div>' +
                     '<div class="min-w-0 flex-1 pr-6"><p class="text-sm font-semibold leading-5" data-toast-text></p></div>' +
                     '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
                         '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +

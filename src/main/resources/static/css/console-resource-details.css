@@ -70,7 +70,7 @@
 .aws-console :is(.accounting-workspace,.repayment-workspace)>.console-detail-tabs {margin:12px 0 0;}
 
 /* Cloudscape Alert presentation shared by authored and dynamically inserted messages. */
-.aws-console .console-message {
+:is(.aws-console, .aws-auth-shell) .console-message {
     --message-color:#0972d3;
     --message-background:#f2f8fd;
     position:relative;
@@ -86,13 +86,13 @@
     line-height:22px!important;
     overflow-wrap:anywhere;
 }
-.aws-console .console-message[data-message-type="success"] {--message-color:#037f0c;--message-background:#f2fcf3;}
-.aws-console .console-message[data-message-type="warning"] {--message-color:#8d6605;--message-background:#fffce9;}
-.aws-console .console-message[data-message-type="error"] {--message-color:#d13212;--message-background:#fff7f7;}
-.aws-console .console-message > .console-message-icon {position:absolute;top:16px;left:16px;width:20px;height:20px;color:var(--message-color);}
-.aws-console .console-message[hidden],.aws-console .console-message.hidden {display:none!important;}
-.aws-console .console-message a {color:#0972d3;}
-@media(max-width:600px) {.aws-console .console-message {padding:12px 12px 12px 40px!important;}.aws-console .console-message > .console-message-icon {left:12px;top:14px;width:18px;height:18px;}}
+:is(.aws-console, .aws-auth-shell) .console-message[data-message-type="success"] {--message-color:#037f0c;--message-background:#f2fcf3;}
+:is(.aws-console, .aws-auth-shell) .console-message[data-message-type="warning"] {--message-color:#8d6605;--message-background:#fffce9;}
+:is(.aws-console, .aws-auth-shell) .console-message[data-message-type="error"] {--message-color:#d13212;--message-background:#fff7f7;}
+:is(.aws-console, .aws-auth-shell) .console-message > .console-message-icon {position:absolute;top:16px;left:16px;width:20px;height:20px;color:var(--message-color);}
+:is(.aws-console, .aws-auth-shell) .console-message[hidden],:is(.aws-console, .aws-auth-shell) .console-message.hidden {display:none!important;}
+:is(.aws-console, .aws-auth-shell) .console-message a {color:#0972d3;}
+@media(max-width:600px) {:is(.aws-console, .aws-auth-shell) .console-message {padding:12px 12px 12px 40px!important;}:is(.aws-console, .aws-auth-shell) .console-message > .console-message-icon {left:12px;top:14px;width:18px;height:18px;}}
 
 /* Persistent command results stay in the workspace and use the shared toast lifecycle. */
 .workspace-flashbar:empty {display:none;}

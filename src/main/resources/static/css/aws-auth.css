@@ -457,77 +457,30 @@ body.aws-auth-shell [role="tabpanel"][hidden] {
 }
 
 .auth-notification-rail {
-    position: fixed;
-    inset: 44px 0 auto;
-    z-index: 110;
-    display: block;
-    width: 100%;
-    max-width: 100vw;
-    pointer-events: none;
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    margin-bottom: 20px;
 }
 
-body.auth-shell.aws-auth-shell .auth-notification-rail {
-    inset-block-start: 0;
-    right: auto;
-    left: 50%;
-    width: min(var(--auth-card-max-width), calc(100vw - 20px));
-    max-width: calc(100vw - 20px);
-    transform: translateX(-50%);
-}
-
-.auth-notification-rail > * {
-    position: absolute !important;
-    inset: 0 0 auto !important;
-    z-index: 3;
-}
-
-.auth-notification-rail > :nth-last-child(2) {
-    top: 4px !important;
-    z-index: 2;
-}
-
-.auth-notification-rail > :nth-last-child(3) {
-    top: 8px !important;
-    z-index: 1;
-}
-
-.auth-notification-rail > :nth-last-child(n + 4) {
-    visibility: hidden;
-}
+.auth-notification-rail:empty { display: none; }
 
 .auth-notification-bar {
-    position: relative;
-    display: flex;
-    box-sizing: border-box;
     width: 100%;
-    min-height: 32px;
-    align-items: center;
-    border: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, .2);
-    border-radius: var(--sacco-container-radius, 0px) !important;
-    overflow: hidden;
-    padding: 6px 44px 6px 12px;
-    color: #ffffff !important;
     box-shadow: none !important;
-    pointer-events: auto;
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
 }
 
-.auth-notification-success { background: var(--aws-success) !important; }
-.auth-notification-error { background: var(--aws-danger) !important; }
-.auth-notification-info { background: var(--aws-blue) !important; }
-
-.auth-notification-bar p,
-.auth-notification-bar button,
-.auth-notification-bar svg {
-    color: #ffffff !important;
-}
+.auth-notification-bar > .flex { min-width: 0; }
+.auth-notification-bar [data-toast-text] { margin: 0; font-size: 14px !important; line-height: 22px; font-weight: 400; }
+body.aws-auth-shell .auth-notification-bar p { color: inherit; }
 
 body.aws-auth-shell .auth-notification-bar button[type="button"].app-toast-close {
     top: 50% !important;
-    right: 8px !important;
+    right: 12px !important;
+    color: var(--message-color) !important;
     width: 24px !important;
     min-width: 24px !important;
     height: 24px !important;
@@ -547,16 +500,6 @@ body.aws-auth-shell .auth-notification-bar button[type="button"].app-toast-close
     background: transparent !important;
     box-shadow: none !important;
     opacity: .72;
-}
-
-.auth-notification-bar > .flex {
-    width: 100%;
-    min-width: 0;
-    align-items: center !important;
-}
-
-.auth-notification-bar [data-toast-text] {
-    overflow-wrap: anywhere;
 }
 
 body.aws-auth-shell .auth-notification-bar .app-toast-close-icon {

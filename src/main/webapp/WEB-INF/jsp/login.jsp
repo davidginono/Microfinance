@@ -13,14 +13,15 @@
     <link rel="stylesheet" href="<c:url value='/css/amazon-ember.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-auth-notice-width-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-auth-alerts' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css?v=20261030-auth-alerts' />" />
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
-<div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
+        <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
                 <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to Microfinance'}</h1>
@@ -315,21 +316,21 @@
             const closeable = settings.closeable !== false;
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
             const icon = variant === 'success'
-                ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
+                ? '<svg class="console-icon console-message-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.5 7.5L7 10L11 5"/></svg>'
                 : variant === 'error'
-                    ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.5a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V6.5zm0 7a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z" clip-rule="evenodd"/></svg>'
-                    : '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7.25-3.75a.75.75 0 10-1.5 0v.25a.75.75 0 001.5 0V6.25zm0 2.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z" clip-rule="evenodd"/></svg>';
+                    ? '<svg class="console-icon console-message-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5"/></svg>'
+                    : '<svg class="console-icon console-message-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 12V7M8 6V4"/></svg>';
             const toast = document.createElement('div');
-            toast.className = 'app-toast-enter auth-notification-bar auth-notification-' + variant;
+            toast.className = 'app-toast-enter console-message auth-notification-bar auth-notification-' + variant;
+            toast.dataset.messageType = variant;
             toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
             const closeButtonMarkup = closeable
                 ? '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
                     '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
                 '</button>'
                 : '';
-            toast.innerHTML =
+            toast.innerHTML = icon +
                 '<div class="flex items-start gap-3">' +
-                    '<div class="mt-0.5 shrink-0">' + icon + '</div>' +
                     '<div class="min-w-0 flex-1' + (closeable ? ' pr-6' : '') + '">' +
                         '<p class="text-sm font-semibold leading-5" data-toast-text></p>' +
                         '<div class="mt-3 hidden" data-toast-email-fallback>' +
