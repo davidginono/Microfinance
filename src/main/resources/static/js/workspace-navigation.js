@@ -90,7 +90,7 @@
         const method=(submitter?.getAttribute('formmethod') || form.method || 'get').toLowerCase();
         const target=submitter?.getAttribute('formtarget') || form.target;
         if((target && target!=='_self') || (method!=='get' && !(method==='post' && form.hasAttribute('data-workspace-submit'))))return false;
-        return eligible(new URL(submitter?.getAttribute('formaction') || form.action || location.href,location.href));
+        return eligible(new URL(submitter?.getAttribute('formaction') || form.getAttribute('action') || location.href,location.href));
     }
     function navigate(destination,options={}){
         const url=new URL(destination,location.href);
@@ -365,7 +365,7 @@
         const form=event.target,submitter=event.submitter;
         if(event.defaultPrevented || !handlesForm(form,submitter))return;
         if(submissions.has(form)){event.preventDefault();return;}
-        const url=new URL(submitter?.getAttribute('formaction') || form.action || location.href,location.href);
+        const url=new URL(submitter?.getAttribute('formaction') || form.getAttribute('action') || location.href,location.href);
         const method=(submitter?.getAttribute('formmethod') || form.method || 'get').toLowerCase();
         const data=new FormData(form);
         if(submitter?.name && !data.has(submitter.name))data.append(submitter.name,submitter.value);
