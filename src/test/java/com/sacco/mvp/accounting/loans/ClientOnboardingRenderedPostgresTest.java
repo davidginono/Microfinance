@@ -63,11 +63,11 @@ class ClientOnboardingRenderedPostgresTest {
             post(client,base+"/app/onboarding/loan/edit",loanValues,false);
             assertThat(get(client,base+"/app/onboarding/loan",false)).contains("Synthetic inventory","not verified income").doesNotContain("Continue application");
             String form=get(client,base+"/app/onboarding/edit",false);
-            assertThat(form).contains("My profile","Privacy notice","Synthetic English privacy notice").doesNotContain("name=\"profile.lawfulBasis\"","name=\"profile.retentionReference\"");
-            var values=hidden(form);values.put("action","DRAFT");values.put("profile.identityType","NATIONAL_ID");values.put("profile.issuingCountry","TZ");values.put("profile.identityNumber","TZ-RENDER-1234");values.put("profile.birthDate","1990-01-01");values.put("profile.identityNoExpiry","true");values.put("profile.address","Synthetic address");values.put("profile.activity","Synthetic shop");values.put("profile.activityAddress","Synthetic market");values.put("profile.sourceOfFunds","Synthetic sales");
+            assertThat(form).contains("My profile","Privacy notice","Synthetic English privacy notice","Bio data","Business details","Spouse details","Bank details","Profile photo","name=\"profile.dailySales\"","name=\"profile.bankAccountNumber\"").doesNotContain("name=\"profile.lawfulBasis\"","name=\"profile.retentionReference\"");
+            var values=hidden(form);values.put("action","DRAFT");values.put("profile.identityType","NATIONAL_ID");values.put("profile.issuingCountry","TZ");values.put("profile.identityNumber","TZ-RENDER-1234");values.put("profile.birthDate","1990-01-01");values.put("profile.identityNoExpiry","true");values.put("profile.address","Synthetic address");values.put("profile.activity","Synthetic shop");values.put("profile.activityAddress","Synthetic market");values.put("profile.sourceOfFunds","Synthetic sales");values.put("profile.maritalStatus","SINGLE");values.put("profile.businessName","Rendered synthetic shop");values.put("profile.dailySales","12345.67");values.put("profile.bankAccountNumber","9876543210");
             post(client,base+"/app/onboarding/edit",values,false);
             String draft=get(client,base+"/app/onboarding",false);assertThat(draft).contains("Add document","Draft");
-            for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY")) {
+            for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY","PROFILE_PHOTO","SPOUSE_PHOTO")) {
                 var fields=hidden(get(client,base+"/app/onboarding/documents/new",false));fields.put("category",category);
                 String boundary="kyc-"+UUID.randomUUID();var bytes=new ByteArrayOutputStream();
                 for(var field:fields.entrySet())bytes.write(("--"+boundary+"\r\nContent-Disposition: form-data; name=\""+field.getKey()+"\"\r\n\r\n"+field.getValue()+"\r\n").getBytes(StandardCharsets.UTF_8));
@@ -90,6 +90,10 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(get(client,base+"/app/onboarding/versions/2",false)).contains("Please correct your home address.");
             assertThat(get(client,base+"/finance/clients/onboarding/notice",true)).contains("Publish notice","Synthetic English privacy notice");
             assertThat(get(client,base+"/app/onboarding/edit?lang=sw",false)).contains("Taarifa zangu","Taarifa ya faragha ya majaribio iliyoidhinishwa.");get(client,base+"/app/onboarding?lang=en",false);
+            String creation=get(client,base+"/finance/clients/onboarding/new",true);assertThat(creation).contains("Generated automatically","Business TIN","Daily sales (TZS)","Spouse details","Bank details");
+            var created=hidden(creation);created.put("profile.firstName","Rendered");created.put("profile.lastName","Borrower");created.put("profile.phone",domain.phone());created.put("profile.city","Rendered city");created.put("profile.businessName","Rendered business");created.put("profile.dailyExpenditure","99.50");
+            post(client,base+"/finance/clients/onboarding/new",created,true);
+            String ownDetails=get(client,base+"/app/onboarding",false);assertThat(ownDetails).contains("Rendered synthetic shop","12345.67","3210").doesNotContain(">9876543210<");
             // Optional local visual QA window; never enabled in the normal test suite.
             int seconds=Integer.getInteger("microfinance.onboarding.browser-seconds",0);
             if(seconds>0){System.out.println("ONBOARDING_BROWSER_QA="+base);for(int elapsed=0;elapsed<Math.min(seconds,600);elapsed++)Thread.sleep(1000);}
@@ -119,7 +123,8 @@ class ClientOnboardingRenderedPostgresTest {
         @Bean org.springframework.web.servlet.i18n.SessionLocaleResolver localeResolver(){var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();resolver.setDefaultLocale(Locale.ENGLISH);return resolver;}
         @Bean SecurityFilterChain security(HttpSecurity http,AppUserPrincipal fixtureOwner,AppUserPrincipal fixtureReviewer,com.sacco.mvp.clients.onboarding.service.OnboardingService onboarding)throws Exception {
             var actors=new OncePerRequestFilter(){@Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)throws ServletException,IOException {
-                var actor="reviewer".equals(request.getHeader("X-Onboarding-Test-Actor"))?fixtureReviewer:fixtureOwner;
+                if(Integer.getInteger("microfinance.onboarding.browser-seconds",0)>0 && Set.of("reviewer","owner").contains(Objects.toString(request.getParameter("qaActor"),"")))request.getSession().setAttribute("qaActor",request.getParameter("qaActor"));
+                var actor="reviewer".equals(request.getHeader("X-Onboarding-Test-Actor"))||"reviewer".equals(request.getSession().getAttribute("qaActor"))?fixtureReviewer:fixtureOwner;
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(actor,null,actor.getAuthorities()));chain.doFilter(request,response);
             }};
             return http.authorizeHttpRequests(auth->auth.dispatcherTypeMatchers(DispatcherType.FORWARD,DispatcherType.ERROR).permitAll().anyRequest().authenticated()).addFilterBefore(actors,AnonymousAuthenticationFilter.class).addFilterAfter(new com.sacco.mvp.security.ClientOnboardingFilter(onboarding),org.springframework.security.web.access.intercept.AuthorizationFilter.class).build();

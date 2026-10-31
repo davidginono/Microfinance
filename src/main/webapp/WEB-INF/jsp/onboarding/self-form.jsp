@@ -1,5 +1,5 @@
 <%@ include file="head.jspf" %>
-<div class="kyc-form-workspace" data-resource-form-page>
+<div class="kyc-form-workspace" data-resource-form-page ${formKind=='self'?'data-resource-details-page':''}>
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>">
         <a href="<c:url value='/app/onboarding'/>"><spring:message code="kyc.ownTitle"/></a>
         <span aria-hidden="true">&#8250;</span>
@@ -10,70 +10,15 @@
     <form:form id="client-onboarding-form" method="post" modelAttribute="${modelName}"
                enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}"
                cssClass="accounting-create-form kyc-client-form" data-accounting-dirty-form="true"
-               data-preserve-submit-command="true" data-workspace-submit="recover" data-workspace-return="client-onboarding-form">
+               data-onboarding-form="${formKind}" data-preserve-submit-command="true" data-workspace-submit="recover" data-workspace-return="client-onboarding-form">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
         <form:hidden path="requestKey"/>
         <c:choose>
             <c:when test="${formKind=='self'}">
                 <form:hidden path="expectedSequence"/>
                 <form:hidden path="noticeId"/>
-                <section class="erp-resource-section" aria-labelledby="kyc-personal-heading">
-                    <h2 id="kyc-personal-heading"><spring:message code="kyc.personal"/></h2>
-                    <div class="kyc-form-fields">
-                        <div class="kyc-field-pair">
-                            <label class="kyc-field">
-                                <span><spring:message code="kyc.field.identityType"/></span>
-                                <form:select path="profile.identityType" cssClass="aws-control" required="true">
-                                    <form:option value=""><spring:message code="kyc.choose"/></form:option>
-                                    <c:forEach items="${['NATIONAL_ID','PASSPORT','VOTER_ID','DRIVING_LICENCE','OTHER']}" var="type">
-                                        <form:option value="${type}"><spring:message code="kyc.identity.${type}"/></form:option>
-                                    </c:forEach>
-                                </form:select>
-                                <form:errors path="profile.identityType" cssClass="coa-error"/>
-                            </label>
-                            <label class="kyc-field">
-                                <span><spring:message code="kyc.field.issuingCountry"/></span>
-                                <form:input path="profile.issuingCountry" cssClass="aws-control" maxlength="2" required="true"/>
-                                <form:errors path="profile.issuingCountry" cssClass="coa-error"/>
-                            </label>
-                        </div>
-                        <label class="kyc-field">
-                            <span><spring:message code="kyc.field.identityNumber"/></span>
-                            <form:input path="profile.identityNumber" cssClass="aws-control" maxlength="64" required="true"/>
-                            <form:errors path="profile.identityNumber" cssClass="coa-error"/>
-                        </label>
-                        <div class="kyc-field-pair">
-                            <c:forEach items="${['birthDate','identityExpiresOn']}" var="field">
-                                <label class="kyc-field">
-                                    <span><spring:message code="kyc.field.${field}"/></span>
-                                    <form:input path="profile.${field}" type="date" cssClass="aws-control"/>
-                                    <form:errors path="profile.${field}" cssClass="coa-error"/>
-                                </label>
-                            </c:forEach>
-                        </div>
-                        <label class="kyc-checkbox">
-                            <form:checkbox path="profile.identityNoExpiry"/>
-                            <span><spring:message code="kyc.field.identityNoExpiry"/></span>
-                        </label>
-                        <label class="kyc-field">
-                            <span><spring:message code="kyc.field.address"/></span>
-                            <form:textarea path="profile.address" cssClass="aws-control" rows="3" maxlength="1000" required="true"/>
-                            <form:errors path="profile.address" cssClass="coa-error"/>
-                        </label>
-                    </div>
-                </section>
-                <section class="erp-resource-section" aria-labelledby="kyc-activity-heading">
-                    <h2 id="kyc-activity-heading"><spring:message code="kyc.activity"/></h2>
-                    <div class="kyc-form-fields">
-                        <c:forEach items="${['activity','activityAddress','sourceOfFunds']}" var="field">
-                            <label class="kyc-field">
-                                <span><spring:message code="kyc.field.${field}"/></span>
-                                <form:textarea path="profile.${field}" cssClass="aws-control" rows="3" maxlength="1000" required="true"/>
-                                <form:errors path="profile.${field}" cssClass="coa-error"/>
-                            </label>
-                        </c:forEach>
-                    </div>
-                </section>
+<c:set var="client" value="${workspace.client}"/><c:set var="identityReadOnly" value="${true}"/><c:set var="profileValues" value="${selfForm.profile}"/><c:set var="groupLookup" value="/app/onboarding/groups"/>
+<div data-profile-tabs><div id="profile-bio" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><%@ include file="profile-fields.jspf" %>
                 <section class="erp-resource-section" aria-labelledby="kyc-notice-heading">
                     <h2 id="kyc-notice-heading"><spring:message code="kyc.notice"/></h2>
                     <div class="kyc-form-fields">
@@ -105,7 +50,8 @@
                         </c:choose>
                     </div>
                 </section>
-                <p class="console-message" data-message-type="info" role="status"><spring:message code="kyc.beforeSubmit"/></p>
+                <p class="console-message" data-message-type="info" role="status"><spring:message code="kyc.beforeSubmit"/></p></div>
+<c:set var="profileDocuments" value="${workspace.documents}"/><c:set var="canReadProfileDocuments" value="${true}"/><c:set var="uploadPath" value="/app/onboarding/documents/new"/><c:set var="photoRoot" value="/app/onboarding/photos"/><c:set var="documentRoot" value="/app/onboarding/documents"/><%@ include file="profile-attachments.jspf" %></div>
             </c:when>
             <c:otherwise>
                 <form:hidden path="revisionId"/>
@@ -116,7 +62,7 @@
                             <label class="kyc-field">
                                 <span><spring:message code="kyc.field.category"/></span>
                                 <form:select path="category" cssClass="aws-control">
-                                    <c:forEach items="${['IDENTITY','ADDRESS','ACTIVITY','CONSENT']}" var="category">
+                                    <c:forEach items="${['IDENTITY','ADDRESS','ACTIVITY','CONSENT','PROFILE_PHOTO','SPOUSE_PHOTO']}" var="category">
                                         <form:option value="${category}"><spring:message code="kyc.category.${category}"/></form:option>
                                     </c:forEach>
                                 </form:select>
@@ -156,5 +102,6 @@
         </div>
     </form:form>
 </div>
+<script src="<c:url value='/js/loan-recording.js'/>" defer></script><script src="<c:url value='/js/client-onboarding.js'/>" defer></script>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

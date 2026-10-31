@@ -16,6 +16,16 @@ import java.util.*;
 public class OnboardingRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    public List<GroupChoice> groups(AppUserPrincipal a,String search,int page) {
+        return jdbc.query("select id,code||' - '||name from lending_group where sacco_id=? and station_id=? and status='ACTIVE' and strpos(lower(code||' '||name),?)>0 order by name,id limit 26 offset ?",
+            (r,n)->new GroupChoice(r.getObject(1,UUID.class),r.getString(2)),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);
+    }
+    public Optional<GroupChoice> group(AppUserPrincipal a,UUID id) {
+        return jdbc.query("select id,code||' - '||name from lending_group where id=? and sacco_id=? and station_id=? and status='ACTIVE'",(r,n)->new GroupChoice(r.getObject(1,UUID.class),r.getString(2)),id,a.getSaccoId(),a.getStationId()).stream().findFirst();
+    }
+    public boolean photo(AppUserPrincipal a,UUID client,UUID id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from client_onboarding_document where id=? and client_id=? and sacco_id=? and station_id=? and category in('PROFILE_PHOTO','SPOUSE_PHOTO'))",Boolean.class,id,client,a.getSaccoId(),a.getStationId()));
+    }
     private static final String CLIENT_SELECT="""
         select m.id,m.member_no,m.full_name,m.phone,m.email,m.client_portal_enabled,c.id revision_id,coalesce((select max(sequence) from client_onboarding_revision r where r.client_id=m.id),0) sequence,c.review_due,
           case when c.state='VERIFY' and (m.full_name is distinct from c.profile->>'fullName' or m.phone is distinct from c.profile->>'phone' or m.email is distinct from c.profile->>'email') then 'STALE' when c.state='VERIFY' and (c.review_due<? or (c.profile->>'identityExpiresOn')::date<? or (c.profile->>'retentionReviewOn')::date<?

@@ -269,6 +269,11 @@ public class EmailOtpService {
         token.setConsumedAt(OffsetDateTime.now());
     }
 
+    @Transactional
+    public void invalidateClientRegistration(UUID memberId) {
+        emailOtpTokenRepository.invalidateRegistration(memberId,OffsetDateTime.now());
+    }
+
     @Transactional(readOnly = true)
     public UUID validateOtp(String email, EmailOtpPurpose purpose, String code) {
         return requireValidOtp(email, purpose, null, code).getId();

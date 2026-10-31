@@ -21,9 +21,11 @@ public class ClientOnboardingController {
     private static final String ROOT="/app/onboarding";
     private final OnboardingService service;
     @InitBinder("selfForm") void profileBinder(WebDataBinder b) {
-        b.setAllowedFields("requestKey","expectedSequence","action","noticeId","noticeAcknowledged","declarationAccepted","profile.identityType","profile.issuingCountry","profile.identityNumber","profile.birthDate","profile.identityExpiresOn","profile.identityNoExpiry","profile.address","profile.activity","profile.activityAddress","profile.sourceOfFunds");
+        b.setAllowedFields(java.util.stream.Stream.concat(java.util.stream.Stream.of("requestKey","expectedSequence","action","noticeId","noticeAcknowledged","declarationAccepted"),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new));
     }
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
+    @GetMapping("/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.groups(a,a.getMemberId(),search,page));}
+    @GetMapping("/photos/{id}") public ResponseEntity<byte[]> photo(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id) {var f=service.ownPhoto(a,id);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox").contentType(MediaType.parseMediaType(f.contentType())).body(f.bytes());}
     @GetMapping public String status(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="0") int page,Model m) {
         m.addAttribute("workspace",service.ownWorkspace(a,page,null));return "onboarding/status";
     }
@@ -37,8 +39,8 @@ public class ClientOnboardingController {
         if(!errors.hasErrors())try{service.saveOwn(a,f);return "redirect:"+ROOT;}catch(IllegalArgumentException e){reject(errors,e);}
         return profile(a,m);
     }
-    @GetMapping("/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,Model m) {
-        m.addAttribute("documentForm",service.ownDocumentForm(a));return documentPage(a,m);
+    @GetMapping("/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="IDENTITY") String category,Model m) {
+        var f=service.ownDocumentForm(a);if(OnboardingService.DOCUMENT_CATEGORIES.contains(category))f.setCategory(category);m.addAttribute("documentForm",f);return documentPage(a,m);
     }
     @PostMapping("/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("documentForm") DocumentForm f,BindingResult errors,@RequestParam(required=false) MultipartFile file,Model m) {
         if(!errors.hasErrors())try{service.attachOwn(a,f,file);return "redirect:"+ROOT;}catch(IllegalArgumentException e){reject(errors,e);}
@@ -69,6 +71,7 @@ public class ClientOnboardingController {
             case "kyc.error.acknowledgement" -> "noticeAcknowledged";
             default -> null;
         };
+        if(field==null&&Arrays.asList(OnboardingService.PERSONAL_FIELDS).contains(key.substring("kyc.error.".length())))field="profile."+key.substring("kyc.error.".length());
         if(field==null)errors.reject(key);else errors.rejectValue(field,key);
     }
     private static String key(IllegalArgumentException e) {return Objects.toString(e.getMessage(),"").matches("kyc\\.error\\.[A-Za-z]+")?e.getMessage():"kyc.error.invalid";}

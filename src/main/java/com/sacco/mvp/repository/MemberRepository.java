@@ -31,6 +31,18 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     int activateClientPortal(@Param("id") UUID id,@Param("institution") String institution,@Param("branch") String branch,
                              @Param("username") String username,@Param("password") String password);
 
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically=true,flushAutomatically=true)
+    @Query("""
+        update Member m set m.fullName=:name,m.phone=:phone,m.email=:email,
+          m.phoneVerifiedAt=case when m.phone=:phone then m.phoneVerifiedAt else null end
+        where m.id=:id and m.saccoId=:institution and m.stationId=:branch and m.clientPortalEnabled=false
+          and m.status=com.sacco.mvp.domain.MemberStatus.ACTIVE and m.fullName=:beforeName
+          and coalesce(m.phone,'')=:beforePhone and coalesce(m.email,'')=:beforeEmail
+        """)
+    int correctProvisionalContact(@Param("id") UUID id,@Param("institution") String institution,@Param("branch") String branch,
+        @Param("name") String name,@Param("phone") String phone,@Param("email") String email,
+        @Param("beforeName") String beforeName,@Param("beforePhone") String beforePhone,@Param("beforeEmail") String beforeEmail);
+
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
     @Query("""
         update Member m set m.employeeNumber = :number

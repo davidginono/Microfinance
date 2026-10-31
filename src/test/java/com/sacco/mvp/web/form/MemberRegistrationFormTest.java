@@ -26,9 +26,10 @@ class MemberRegistrationFormTest {
         var form = new MemberRegistrationForm();form.setFirstName("  Asha ");form.setMiddleName(" Neema ");form.setLastName(" Mushi  ");
         assertThat(form.getFullName()).isEqualTo("Asha Neema Mushi");assertThat(nameErrors(form)).isEmpty();
     }
-    @Test void everyNameIsRequired() {
-        assertThat(nameErrors(new MemberRegistrationForm())).contains("firstName","middleName","lastName");
+    @Test void firstAndLastNameAreRequired() {
+        assertThat(nameErrors(new MemberRegistrationForm())).containsExactly("firstName","lastName");
     }
+    @Test void middleNameIsOptional() {var f=new MemberRegistrationForm();f.setFirstName("Asha");f.setLastName("Mushi");assertThat(nameErrors(f)).isEmpty();assertThat(f.getFullName()).isEqualTo("Asha Mushi");}
     @Test void multipleNamesCannotBeEnteredInOnePart() {
         var form = new MemberRegistrationForm();form.setFirstName("Asha Neema");form.setMiddleName("Maria");form.setLastName("Mushi");
         assertThat(nameErrors(form)).containsExactly("firstName");

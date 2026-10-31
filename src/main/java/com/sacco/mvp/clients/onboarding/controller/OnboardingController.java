@@ -21,12 +21,15 @@ public class OnboardingController {
     private static final String ROOT="/finance/clients/onboarding";
     private final OnboardingService service;
 
-    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields("requestKey","name","phone","email");}
-    @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields("requestKey","expectedSequence","action","profile.identityType","profile.issuingCountry","profile.identityNumber","profile.birthDate","profile.identityExpiresOn","profile.identityNoExpiry","profile.address","profile.activity","profile.activityAddress","profile.sourceOfFunds","profile.noticeVersion","profile.lawfulBasis","profile.consentReference","profile.consentOn","profile.retentionReference","profile.retentionReviewOn","profile.legalHoldReference");}
+    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email"));}
+    @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","expectedSequence","action","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","profile.noticeVersion","profile.lawfulBasis","profile.consentReference","profile.consentOn","profile.retentionReference","profile.retentionReviewOn","profile.legalHoldReference"));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","screening","screeningReference","policyReference","checkedOn","reviewDue");}
     @InitBinder("noticeForm") void noticeBinder(WebDataBinder b) {b.setAllowedFields("requestKey","expectedSequence","enabled","version","english","kiswahili","lawfulBasis","retentionReference","retentionReviewOn");}
 
+    private static String[] fields(String... base) {return java.util.stream.Stream.concat(Arrays.stream(base),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new);}
+    @GetMapping("/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID clientId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.groups(a,clientId,search,page));}
+    @GetMapping("/{id}/photos/{document}") public ResponseEntity<byte[]> photo(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID document) {var f=service.photo(a,id,document);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox").contentType(MediaType.parseMediaType(f.contentType())).body(f.bytes());}
     @GetMapping("/notice") public String notice(@AuthenticationPrincipal AppUserPrincipal a,Model m) {m.addAttribute("noticeForm",service.noticeForm(a));return "onboarding/notice";}
     @PostMapping("/notice") public String notice(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("noticeForm") NoticeForm f,BindingResult errors) {
         service.authorize(a,"UPDATE");if(!errors.hasErrors())try{service.saveNotice(a,f);return "redirect:"+ROOT+"/notice";}catch(IllegalArgumentException e){reject(errors,e);}
@@ -45,7 +48,7 @@ public class OnboardingController {
         context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));return "onboarding/details";
     }
     @GetMapping("/{id}/edit") public String edit(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m) {
-        service.authorize(a,"UPDATE");var c=service.client(a,id);var f=new ProfileForm();f.setExpectedSequence(c.sequence());service.latest(a,id).ifPresent(r->f.setProfile(r.profile()));m.addAttribute("profileForm",f);context(a,id,m);return form(m,"profile");
+        var f=service.profileForm(a,id);m.addAttribute("profileForm",f);context(a,id,m);return form(m,"profile");
     }
     @GetMapping("/{id}/versions/{sequence}") public String version(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable int sequence,Model m) {
         var r=service.version(a,id,sequence);var decisions=service.versionDecisions(a,id,sequence);
@@ -56,8 +59,8 @@ public class OnboardingController {
         service.authorize(a,"UPDATE");if(!errors.hasErrors())try{service.save(a,id,f);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}
         context(a,id,m);return form(m,"profile");
     }
-    @GetMapping("/{id}/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m) {
-        service.authorize(a,"UPDATE");var f=new DocumentForm();f.setRevisionId(service.client(a,id).revisionId());m.addAttribute("documentForm",f);context(a,id,m);return form(m,"document");
+    @GetMapping("/{id}/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="IDENTITY") String category,Model m) {
+        service.authorize(a,"UPDATE");var f=new DocumentForm();if(OnboardingService.DOCUMENT_CATEGORIES.contains(category))f.setCategory(category);f.setRevisionId(service.client(a,id).revisionId());m.addAttribute("documentForm",f);context(a,id,m);return form(m,"document");
     }
     @PostMapping("/{id}/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute("documentForm") DocumentForm f,BindingResult errors,@RequestParam(required=false) MultipartFile file,Model m) {
         service.authorize(a,"UPDATE");if(!errors.hasErrors())try{service.attach(a,id,f,file);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}
@@ -81,6 +84,10 @@ public class OnboardingController {
         String key=key(e);if(errors.getObjectName().equals("noticeForm")) {
             String field=switch(key) {case "kyc.error.noticeVersion" -> "version";case "kyc.error.noticeEnglish" -> "english";case "kyc.error.noticeKiswahili" -> "kiswahili";case "kyc.error.lawfulBasis" -> "lawfulBasis";case "kyc.error.retentionReference" -> "retentionReference";case "kyc.error.retentionReviewOn" -> "retentionReviewOn";default -> null;};
             if(field!=null){errors.rejectValue(field,key);return;}
+        }
+        if(Set.of("createForm","profileForm").contains(errors.getObjectName())) {
+            String field=key.substring("kyc.error.".length());if(field.equals("identityExpiry"))field="identityExpiresOn";if(field.equals("nameParts")||field.equals("name"))field="firstName";
+            if(Arrays.asList(fields("profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email")).contains("profile."+field)){errors.rejectValue("profile."+field,key);return;}
         }
         errors.reject(key);
     }

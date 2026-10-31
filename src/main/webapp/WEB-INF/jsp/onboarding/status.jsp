@@ -23,8 +23,9 @@
 <div><dt><spring:message code="kyc.field.identityNumber"/></dt><dd>&#8226;&#8226;&#8226;&#8226;<c:out value="${workspace.revision.profile.identityNumber.length()>4?workspace.revision.profile.identityNumber.substring(workspace.revision.profile.identityNumber.length()-4):''}"/></dd></div>
 <div><dt><spring:message code="kyc.field.identityNoExpiry"/></dt><dd><spring:message code="${workspace.revision.profile.identityNoExpiry?'kyc.yes':'kyc.no'}"/></dd></div>
 </dl></section>
+<c:set var="profileValues" value="${workspace.revision.profile}"/><%@ include file="profile-details.jspf" %>
 <section class="erp-resource-section"><h2><spring:message code="kyc.documents"/></h2><div class="kyc-section-body">
-<c:forEach items="${workspace.documents}" var="document"><p><spring:message code="kyc.category.${document.category}"/>: <a class="resource-table-id-link" href="<c:url value='/app/onboarding/documents/${document.id}'/>"><c:out value="${document.name}"/></a><c:if test="${not empty document.expiresOn}"> &#183; <spring:message code="kyc.field.expiresOn"/> <c:out value="${appTime:display(document.expiresOn)}"/></c:if></p></c:forEach>
+<c:forEach items="${workspace.documents}" var="document"><c:if test="${document.category=='PROFILE_PHOTO' or document.category=='SPOUSE_PHOTO'}"><div class="kyc-photo"><img src="<c:url value='/app/onboarding/photos/${document.id}'/>" alt="<spring:message code='kyc.category.${document.category}'/>" loading="lazy"/></div></c:if><p><spring:message code="kyc.category.${document.category}"/>: <a class="resource-table-id-link" href="<c:url value='/app/onboarding/documents/${document.id}'/>"><c:out value="${document.name}"/></a><c:if test="${not empty document.expiresOn}"> &#183; <spring:message code="kyc.field.expiresOn"/> <c:out value="${appTime:display(document.expiresOn)}"/></c:if></p></c:forEach>
 <c:if test="${empty workspace.documents}"><p><spring:message code="kyc.noDocuments"/></p></c:if>
 <c:if test="${not workspace.historical and workspace.client.state=='DRAFT'}"><p><spring:message code="kyc.requiredDocuments"/></p></c:if>
 </div></section>

@@ -32,6 +32,7 @@ public class MemberRegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final NameSignatureService nameSignatureService;
     private final AuditService auditService;
+    private final EmailOtpService emailOtpService;
 
     @Transactional
     public Member register(MemberRegistrationForm form) {
@@ -102,7 +103,7 @@ public class MemberRegistrationService {
     public Member registerAssisted(MemberRegistrationForm form,String fullName,String institution,String branch) {
         var registered=resolveRegisteredSacco(institution);
         requireRegisteredStation(institution,branch);
-        var verified=new VerifiedExternalMember("",normalizeEmail(form.getEmail()),
+        var verified=new VerifiedExternalMember("",normalizeEmail(form.getEmail()).isEmpty()?null:normalizeEmail(form.getEmail()),
             nameSignatureService.requireFullName(fullName,"Enter your full names."),institution,branch,registered.getSaccoName());
         return registerKnown(form,verified,true);
     }
@@ -164,20 +165,49 @@ public class MemberRegistrationService {
     }
 
     private void lockRegistrationContacts(MemberRegistrationForm form, VerifiedExternalMember verified) {
+        registrationKeys(form,verified).forEach(memberRepository::lockClientRegistrationIdentity);
+    }
+
+    private java.util.SortedSet<String> registrationKeys(MemberRegistrationForm form, VerifiedExternalMember verified) {
         var keys = new java.util.TreeSet<String>();
-        keys.add("CLIENT_REGISTRATION_EMAIL/" + verified.email());
-        keys.add("CLIENT_REGISTRATION_PHONE/" + normalizePhone(form.getPhone()));
+        if (verified.email()!=null&&!verified.email().isBlank()) keys.add("CLIENT_REGISTRATION_EMAIL/" + verified.email());
+        if(form.getPhone()!=null&&!form.getPhone().isBlank()) keys.add("CLIENT_REGISTRATION_PHONE/" + normalizePhone(form.getPhone()));
         String employee = EmployeeNumber.normalize(form.getEmployeeNumber());
         if (employee != null) keys.add("CLIENT_REGISTRATION_EMPLOYEE/" + verified.saccoId() + "/" + verified.stationId() + "/" + employee.toLowerCase(java.util.Locale.ROOT));
-        keys.forEach(memberRepository::lockClientRegistrationIdentity);
+        return keys;
+    }
+
+    /** Onboarding owns the current staff claim check; this operation preserves its exact authorized client scope. */
+    @Transactional
+    public void correctProvisionalContact(com.sacco.mvp.security.AppUserPrincipal actor,UUID id,String fullName,String phone,String email) {
+        if(actor==null||!actor.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
+        Member before=memberRepository.findByIdAndSaccoIdAndStationIdIgnoreCase(id,actor.getSaccoId(),actor.getStationId()).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
+        String name=nameSignatureService.requireFullName(fullName,"Enter your full names."),normalizedPhone=normalizePhone(phone),normalizedEmail=normalizeEmail(email);
+        if(normalizedEmail.isEmpty())normalizedEmail=null;
+        if(normalizedEmail!=null&&(normalizedEmail.length()>255||!normalizedEmail.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")))throw new IllegalStateException("Enter a valid email address.");
+        var oldForm=new MemberRegistrationForm();oldForm.setPhone(before.getPhone());oldForm.setEmployeeNumber(before.getEmployeeNumber());
+        var nextForm=new MemberRegistrationForm();nextForm.setPhone(normalizedPhone);nextForm.setEmployeeNumber(before.getEmployeeNumber());
+        var oldScope=new VerifiedExternalMember("",before.getEmail(),before.getFullName(),before.getSaccoId(),before.getStationId(),"");
+        var newScope=new VerifiedExternalMember("",normalizedEmail,name,before.getSaccoId(),before.getStationId(),"");
+        var keys=registrationKeys(oldForm,oldScope);keys.addAll(registrationKeys(nextForm,newScope));keys.forEach(memberRepository::lockClientRegistrationIdentity);
+        var current=memberRepository.findForClientAccess(id,actor.getSaccoId(),actor.getStationId()).orElseThrow();
+        if(current.isClientPortalEnabled()||!current.getStaffRolesResolved().isEmpty())throw new IllegalStateException("Use the account profile to change contact details.");
+        if(java.util.Objects.equals(before.getFullName(),name)&&java.util.Objects.equals(before.getPhone(),normalizedPhone)&&java.util.Objects.equals(before.getEmail(),normalizedEmail))return;
+        if((normalizedEmail!=null&&memberRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail,id))||memberRepository.existsByPhoneAndIdNot(normalizedPhone,id))throw new IllegalStateException("That email address or phone is already registered.");
+        if(memberRepository.correctProvisionalContact(id,actor.getSaccoId(),actor.getStationId(),name,normalizedPhone,normalizedEmail,before.getFullName(),java.util.Objects.toString(before.getPhone(),""),java.util.Objects.toString(before.getEmail(),""))!=1)
+            throw new IllegalStateException("Client details changed. Refresh and try again.");
+        emailOtpService.invalidateClientRegistration(id);
+        auditService.logEvent("CLIENT",id,"CLIENT_PROVISIONAL_CONTACT_CORRECTED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Provisional client details updated","CLIENT",id.toString(),actor.getSaccoId(),actor.getStationId(),java.util.Map.of());
     }
 
     public VerifiedExternalMember verifyExternalMember(MemberRegistrationForm form) {
         String email = normalizeEmail(form.getEmail());
-        if (java.util.stream.Stream.of(form.getFirstName(), form.getMiddleName(), form.getLastName())
+        if (java.util.stream.Stream.of(form.getFirstName(), form.getLastName())
             .anyMatch(name -> name == null || name.length() > 80 || !name.strip().matches("\\S+"))) {
-            throw new IllegalStateException("Enter your first, middle and last name.");
+            throw new IllegalStateException("Enter your first and last name.");
         }
+        if(form.getMiddleName()!=null&&!form.getMiddleName().isBlank()&&(form.getMiddleName().length()>80||!form.getMiddleName().strip().matches("\\S+")))
+            throw new IllegalStateException("Enter one middle name, or leave it blank.");
         String fullName = nameSignatureService.requireFullName(form.getFullName(), "Enter your full names.");
         String saccoId = normalizeSaccoId(form.getSaccoId());
         String stationId = normalizeStationId(form.getStationId());
@@ -200,7 +230,7 @@ public class MemberRegistrationService {
             log.info("Client registration blocked: client number already registered");
             throw new IllegalStateException("That client number is already registered in this system.");
         }
-        if (memberRepository.existsByEmailIgnoreCase(email)) {
+        if (email!=null&&!email.isBlank()&&memberRepository.existsByEmailIgnoreCase(email)) {
             log.info("Client registration blocked: email already registered");
             throw new IllegalStateException("That email address is already registered in this system.");
         }

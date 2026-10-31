@@ -34,3 +34,11 @@
 @media (max-width: 640px) {
     .kyc-field-pair { grid-template-columns: minmax(0, 1fr); }
 }
+
+.kyc-profile-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; padding:16px; min-width:0; }
+[data-profile-tabs], [data-detail-panel] { min-width:0; }
+[data-detail-panel] > .erp-resource-section + .erp-resource-section { margin-top:20px; }
+.kyc-profile-note { grid-column:1 / -1; margin:0; color:var(--aws-muted,#545b64); font-size:14px; }
+.kyc-photo { display:inline-grid; gap:8px; margin:0 20px 16px 0; max-width:100%; }
+.kyc-photo img { display:block; width:160px; height:180px; object-fit:contain; border:1px solid #d5dbdb; }
+@media(max-width:640px) { .kyc-profile-grid { grid-template-columns:minmax(0,1fr); } }

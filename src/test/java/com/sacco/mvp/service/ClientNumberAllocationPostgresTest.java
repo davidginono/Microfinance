@@ -112,7 +112,7 @@ class ClientNumberAllocationPostgresTest {
         }
         @Bean PlatformTransactionManager transactionManager(jakarta.persistence.EntityManagerFactory f){return new JpaTransactionManager(f);}
         @Bean MemberRegistrationService registration(MemberRepository members,RegisteredSaccoRepository institutions,SaccoStationRepository branches,UserSettingsRepository users) {
-            var passwords=mock(PasswordEncoder.class);when(passwords.encode(any())).thenReturn("!SYNTHETIC");return new MemberRegistrationService(members,institutions,branches,users,passwords,new NameSignatureService(),mock(AuditService.class));
+            var passwords=mock(PasswordEncoder.class);when(passwords.encode(any())).thenReturn("!SYNTHETIC");return new MemberRegistrationService(members,institutions,branches,users,passwords,new NameSignatureService(),mock(AuditService.class),mock(EmailOtpService.class));
         }
     }
 }

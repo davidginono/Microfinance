@@ -31,8 +31,7 @@ public class MemberRegistrationForm {
     @Size(max = 80, message = "{registration.name.length}")
     private String firstName;
 
-    @NotBlank(message = "{registration.middleName.required}")
-    @Pattern(regexp = "\\s*\\S+\\s*", message = "{registration.name.single}")
+    @Pattern(regexp = "(?:\\s*\\S+\\s*)?", message = "{registration.name.single}")
     @Size(max = 80, message = "{registration.name.length}")
     private String middleName;
 
@@ -59,6 +58,6 @@ public class MemberRegistrationForm {
     /** A derived view of the three public fields; a submitted fullName cannot override them. */
     public String getFullName() {
         return java.util.stream.Stream.of(firstName, middleName, lastName)
-            .map(value -> value == null ? "" : value.strip()).collect(java.util.stream.Collectors.joining(" "));
+            .map(value -> value == null ? "" : value.strip()).filter(value -> !value.isEmpty()).collect(java.util.stream.Collectors.joining(" "));
     }
 }

@@ -40,16 +40,21 @@ class ClientOnboardingMvcTest {
             mvc.perform(post(path).with(user(client)).with(csrf())).andExpect(status().isForbidden());
         }
     }
-    @Test void submittedProfileCannotBindServerIdentityScopeOrVerification()throws Exception {
+    @Test void submittedProfileCannotBindServerFullNameScopeOrVerification()throws Exception {
         mvc.perform(post(root+"/"+id+"/edit").with(user(staff)).with(csrf()).param("action","SUBMITTED").param("profile.address","Keep this address").param("profile.fullName","Forged name").param("profile.phone","Forged phone").param("saccoId","FOREIGN").param("actorId",client.getMemberId().toString()).param("state","VERIFY"))
             .andExpect(redirectedUrl(root+"/"+id));
-        verify(service).save(eq(staff),eq(id),argThat(f->f.getAction().equals("SUBMITTED")&&f.getProfile().getAddress().equals("Keep this address")&&f.getProfile().getFullName().isEmpty()&&f.getProfile().getPhone().isEmpty()));
+        verify(service).save(eq(staff),eq(id),argThat(f->f.getAction().equals("SUBMITTED")&&f.getProfile().getAddress().equals("Keep this address")&&f.getProfile().getFullName().isEmpty()&&f.getProfile().getPhone().equals("Forged phone")));
     }
     @Test void failedProfileKeepsValuesAndReportsSafeError()throws Exception {
         when(service.save(any(),any(),any())).thenThrow(new IllegalArgumentException("kyc.error.documents"));
         var result=mvc.perform(post(root+"/"+id+"/edit").with(user(staff)).with(csrf()).param("profile.address","Keep my values").param("profile.identityNumber","TZ-1234")).andExpect(view().name("onboarding/form")).andExpect(model().attributeHasErrors("profileForm")).andReturn();
         assertThat(((ProfileForm)result.getModelAndView().getModel().get("profileForm")).getProfile().getAddress()).isEqualTo("Keep my values");
     }
+    @Test void expandedOwnFieldsBindButAccountContactAndPolicyDoNot() throws Exception {
+        mvc.perform(post("/app/onboarding/edit").with(user(client)).with(csrf()).param("profile.businessName","My shop").param("profile.dailySales","123.45").param("profile.bankAccountNumber","123456789").param("profile.firstName","Forged").param("profile.phone","255700000000").param("profile.email","forged@example.invalid").param("profile.groupName","Forged group")) .andExpect(redirectedUrl("/app/onboarding"));
+        verify(service).saveOwn(eq(client),argThat(f->f.getProfile().getBusinessName().equals("My shop")&&f.getProfile().getDailySales().toPlainString().equals("123.45")&&f.getProfile().getBankAccountNumber().equals("123456789")&&f.getProfile().getFirstName().isEmpty()&&f.getProfile().getPhone().isEmpty()&&f.getProfile().getEmail().isEmpty()&&f.getProfile().getGroupName().isEmpty()));
+    }
+    @Test void photosUsePrivateScopedResponses()throws Exception {UUID doc=UUID.randomUUID();when(service.photo(staff,id,doc)).thenReturn(new Download(new byte[]{1},"image/png","evidence.png"));mvc.perform(get(root+"/"+id+"/photos/"+doc).with(user(staff))).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(content().contentType("image/png"));}
     @Test void documentsDownloadAsPrivateAttachmentsAndScopeFailureIsForbidden()throws Exception {
         UUID doc=UUID.randomUUID();when(service.download(staff,id,doc)).thenReturn(new Download(new byte[]{1,2},"application/pdf","evidence.pdf"));
         mvc.perform(get(root+"/"+id+"/documents/"+doc).with(user(staff))).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("Content-Security-Policy","sandbox")).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(header().string("Content-Disposition","attachment; filename=\"evidence.pdf\""));

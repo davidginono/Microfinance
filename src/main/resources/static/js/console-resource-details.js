@@ -104,11 +104,11 @@
     }
     function details() {
         if(document.body.dataset.resourceDetails!=='true' && !document.querySelector('[data-resource-details-page]'))return;
-        const scope=document.querySelector('.shell-content-frame') || document.querySelector('main');if(!scope || scope.dataset.detailsReady)return;
+        const scope=document.querySelector('[data-profile-tabs]') || document.querySelector('.shell-content-frame') || document.querySelector('main');if(!scope || scope.dataset.detailsReady)return;
         scope.dataset.detailsReady='true';
-        const selector='article.voucher-document,section.voucher-document,.erp-form-wrap,.loan-view-summary-card,.loan-view-hero-summary,section.repayment-section,section.accounting-form,.erp-panel,.erp-section,section.accounting-section,details.accounting-section,section.erp-resource-section,section.erp-table-wrap,div.erp-table-wrap,section.loan-flow-panel,section.erp-detail-card';
+        const selector='[data-detail-panel],article.voucher-document,section.voucher-document,.erp-form-wrap,.loan-view-summary-card,.loan-view-hero-summary,section.repayment-section,section.accounting-form,.erp-panel,.erp-section,section.accounting-section,details.accounting-section,section.erp-resource-section,section.erp-table-wrap,div.erp-table-wrap,section.loan-flow-panel,section.erp-detail-card';
         const candidates=[...scope.querySelectorAll(selector)].filter(section=>!section.parentElement.closest(selector) && !section.closest('dialog,[role=dialog],[data-detail-persistent]') && section.querySelector('h2,h3,summary'));
-        const summary=candidates.find(section=>section.hasAttribute('data-detail-summary') || section.querySelector('.erp-detail-facts,.voucher-metadata,.loan-staff-review-overview,.loan-view-hero-summary'));
+        const summary=candidates.find(section=>section.hasAttribute('data-detail-summary') || !section.hasAttribute('data-detail-panel') && section.querySelector('.erp-detail-facts,.voucher-metadata,.loan-staff-review-overview,.loan-view-hero-summary'));
         const panels=candidates.filter(section=>section!==summary && !section.matches('[data-detail-persistent],.accounting-filter-section'));
         if(!panels.length || (!summary && panels.length<2))return;
         const tabs=document.createElement('div');tabs.className='console-detail-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label',label().sections || 'Details sections');

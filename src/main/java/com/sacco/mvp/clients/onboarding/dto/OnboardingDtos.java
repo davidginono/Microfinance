@@ -33,8 +33,19 @@ public final class OnboardingDtos {
                               String noticeKiswahili, boolean acknowledged, OffsetDateTime acknowledgedAt) {}
     public record OwnWorkspace(Client client, OwnRevision revision, List<OwnDocument> documents,
                                Feedback feedback, Page<OwnHistory> history, boolean historical) {}
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)
     @Data public static class ClientProfile {
+        private String firstName="", middleName="", lastName="", phone="", email="";
+        private String gender="", maritalStatus="", familiarName="";
+        private Integer dependants;
+        private UUID groupId;
+        private String groupName="";
         private String identityType="", issuingCountry="", identityNumber="", address="";
+        private String postalAddress="", city="", ward="", villageStreet="", nearbyPlace="";
+        private String businessName="", businessType="", businessTin="", businessLicence="", businessLocation="", businessWard="", businessCity="", otherIncomeSources="";
+        private java.math.BigDecimal dailySales, dailyExpenditure;
+        private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
+        private String bankName="", bankAccountName="", bankAccountNumber="";
         private String activity="", activityAddress="", sourceOfFunds="";
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate birthDate, identityExpiresOn;
         private boolean identityNoExpiry;
@@ -53,13 +64,11 @@ public final class OnboardingDtos {
         private String version="", english="", kiswahili="", lawfulBasis="", retentionReference="";
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate retentionReviewOn;
     }
-    @Data public static class Profile {
-        private String fullName="", phone="", email="", clientNumber="";
-        private String identityType="", issuingCountry="", identityNumber="", address="";
-        private String activity="", activityAddress="", sourceOfFunds="", noticeVersion="", lawfulBasis="", consentReference="";
+    @Data @lombok.EqualsAndHashCode(callSuper=true) public static class Profile extends ClientProfile {
+        private String fullName="", clientNumber="";
+        private String noticeVersion="", lawfulBasis="", consentReference="";
         private String retentionReference="", legalHoldReference="";
-        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate birthDate, identityExpiresOn, consentOn, retentionReviewOn;
-        private boolean identityNoExpiry;
+        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate consentOn, retentionReviewOn;
         private boolean selfService, noticeAcknowledged, declarationAccepted;
         private UUID noticeId;
         private String noticeEnglish="", noticeKiswahili="";
@@ -74,7 +83,15 @@ public final class OnboardingDtos {
     @Data public static class CreateForm {
         private UUID requestKey=UUID.randomUUID();
         private String name="", phone="", email="";
+        private ClientProfile profile=new ClientProfile();
+        public String getName() {
+            return profile!=null&&(!profile.getFirstName().isBlank()||!profile.getLastName().isBlank())
+                ? java.util.stream.Stream.of(profile.getFirstName(),profile.getMiddleName(),profile.getLastName()).filter(v->v!=null&&!v.isBlank()).map(String::strip).collect(java.util.stream.Collectors.joining(" ")):name;
+        }
+        public String getPhone() {return profile!=null&&!profile.getPhone().isBlank()?profile.getPhone():phone;}
+        public String getEmail() {return profile!=null&&!profile.getEmail().isBlank()?profile.getEmail():email;}
     }
+    public record GroupChoice(UUID id,String label) {}
     @Data public static class ReviewForm {
         private UUID requestKey=UUID.randomUUID();
         private UUID revisionId;

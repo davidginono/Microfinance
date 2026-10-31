@@ -1,0 +1,25 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:forEach items="${['bio','contact','business','spouse','bank']}" var="profileSection">
+    <c:choose>
+        <c:when test="${profileSection=='bio'}"><c:set var="profileFields" value="${['gender','maritalStatus','dependants','familiarName','groupName']}"/></c:when>
+        <c:when test="${profileSection=='contact'}"><c:set var="profileFields" value="${['postalAddress','city','ward','villageStreet','nearbyPlace']}"/></c:when>
+        <c:when test="${profileSection=='business'}"><c:set var="profileFields" value="${['businessName','businessType','businessTin','businessLicence','businessLocation','businessWard','businessCity','otherIncomeSources','dailySales','dailyExpenditure']}"/></c:when>
+        <c:when test="${profileSection=='spouse'}"><c:set var="profileFields" value="${['spouseName','spouseRelationship','spousePhone','spouseWork','spouseWorkLocation']}"/></c:when>
+        <c:otherwise><c:set var="profileFields" value="${['bankName','bankAccountName','bankAccountNumber']}"/></c:otherwise>
+    </c:choose>
+    <section class="erp-resource-section">
+        <h2><spring:message code="kyc.section.${profileSection}"/></h2>
+        <dl class="erp-detail-facts">
+            <c:forEach items="${profileFields}" var="profileField"><div>
+                <dt><spring:message code="kyc.field.${profileField}"/></dt>
+                <dd><c:choose>
+                    <c:when test="${empty profileValues[profileField]}"><spring:message code="kyc.notProvided"/></c:when>
+                    <c:when test="${profileField=='gender' or profileField=='maritalStatus'}"><spring:message code="kyc.${profileField}.${profileValues[profileField]}"/></c:when>
+                    <c:when test="${profileField=='bankAccountNumber'}">&#8226;&#8226;&#8226;&#8226;<c:out value="${profileValues.bankAccountNumber.length()>4?profileValues.bankAccountNumber.substring(profileValues.bankAccountNumber.length()-4):''}"/></c:when>
+                    <c:otherwise><c:out value="${profileValues[profileField]}"/></c:otherwise>
+                </c:choose></dd>
+            </div></c:forEach>
+        </dl>
+        <c:if test="${profileSection=='business' or profileSection=='bank'}"><p class="kyc-section-body"><spring:message code="${profileSection=='business'?'kyc.dailyDeclared':'kyc.bankDeclared'}"/></p></c:if>
+    </section>
+</c:forEach>

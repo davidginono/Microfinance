@@ -51,7 +51,7 @@
                         </div>
                         <div>
                             <label for="middleName" class="registration-section-label"><spring:message code="register.member.middleName" /></label>
-                            <form:input path="middleName" id="middleName" autocomplete="additional-name" autocapitalize="characters" spellcheck="false" required="required" maxlength="80" pattern="\s*\S+\s*" data-uppercase-input="true" cssClass="registration-field uppercase" />
+                            <form:input path="middleName" id="middleName" autocomplete="additional-name" autocapitalize="characters" spellcheck="false" maxlength="80" pattern="\s*\S+\s*" data-uppercase-input="true" cssClass="registration-field uppercase" />
                             <form:errors path="middleName" cssClass="coa-error" />
                         </div>
                         <div>
