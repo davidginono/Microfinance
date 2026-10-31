@@ -462,6 +462,9 @@ body.aws-auth-shell [role="tabpanel"][hidden] {
     margin-bottom: 20px;
 }
 
+.auth-login-layout { width:100%;max-width:var(--auth-card-max-width);min-width:0; }
+.auth-login-notice:not(.hidden) { margin-bottom:16px; }
+
 .auth-notification-rail:empty { display: none; }
 
 .auth-notification-bar {

@@ -20,8 +20,9 @@
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
-    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
+    <div class="auth-login-layout">
         <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
+    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
                 <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to Microfinance'}</h1>
@@ -240,6 +241,7 @@
         </div>
     </div>
 </div>
+    </div>
 <div id="forgotPasswordModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/45 px-4 py-8">
     <div class="forgot-password-dialog border border-slate-200 bg-white">
         <div class="flex items-start justify-between border-b border-slate-200 px-5 py-4">

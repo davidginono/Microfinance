@@ -16,7 +16,10 @@
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="auth-form-page">
-    <div class="mfa-card auth-form-layout auth-form-card">
+    <div class="auth-form-layout">
+        <div id="staffMfaError" class="auth-login-notice hidden border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700" role="alert"></div>
+        <div id="staffMfaSuccess" class="auth-login-notice hidden border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status"></div>
+    <div class="mfa-card auth-form-card">
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sign-In Verification</p>
             <h1 class="mt-2 text-2xl font-bold text-slate-900">Enter your verification code</h1>
@@ -31,9 +34,6 @@
                 </c:choose>
             </p>
         </div>
-
-        <div id="staffMfaError" class="hidden border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"></div>
-        <div id="staffMfaSuccess" class="hidden border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
 
         <form id="staffMfaVerifyForm" class="mt-5 auth-form-fields">
             <input type="hidden" id="staffMfaCsrfName" value="${_csrf.parameterName}" />
@@ -88,6 +88,7 @@
                 <c:otherwise>This verification step follows your Branch OTP settings.</c:otherwise>
             </c:choose>
         </p>
+    </div>
     </div>
 </main>
 
