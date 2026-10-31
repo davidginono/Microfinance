@@ -11,6 +11,9 @@
         const baseline=controls.map(control=>({control,value:control.value,checked:control.checked,disabled:control.disabled}));
         const signature=()=>JSON.stringify(controls.map(control=>[control.value,control.checked]));
         const initial=signature();let page=0,size=Number(matrix.dataset.tablePageSize)||10,sort='claim',descending=false;
+        // Keep saved grants visible first without making rows jump when a checkbox is edited.
+        const assignedRows=new Set(rows.filter(row=>row.querySelector('[data-access-claim]:checked')));
+        let assignedFirst=true;
         const collator=new Intl.Collator(document.documentElement.lang||'en',{numeric:true,sensitivity:'base'});
         const normalize=text=>text.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
         const searchable=new Map(rows.map(row=>[row,{name:normalize(row.cells[0].textContent),codes:normalize(row.dataset.claimKey+' '+[...row.querySelectorAll('[data-access-claim]')].map(input=>input.value).join(' '))}]));
@@ -25,14 +28,19 @@
                 relevance.set(row,!query||text===query?0:text.startsWith(query)?1:text.includes(query)?2:3);return true;
             });
             const value=row=>sort==='claim'?row.cells[0].textContent.trim():row.querySelector(`[data-claim-action="${sort}"] input`)?.checked?2:row.querySelector(`[data-claim-action="${sort}"] input`)?1:0;
-            matches.sort((a,b)=>{const rank=relevance.get(a)-relevance.get(b);if(rank)return rank;const result=sort==='claim'?collator.compare(value(a),value(b)):value(a)-value(b);return (descending?-result:result)||collator.compare(a.dataset.claimKey,b.dataset.claimKey);});
+            matches.sort((a,b)=>{
+                const rank=relevance.get(a)-relevance.get(b);if(rank)return rank;
+                if(!query&&assignedFirst){const assigned=Number(assignedRows.has(b))-Number(assignedRows.has(a));if(assigned)return assigned;}
+                const result=sort==='claim'?collator.compare(value(a),value(b)):value(a)-value(b);
+                return (descending?-result:result)||collator.compare(a.dataset.claimKey,b.dataset.claimKey);
+            });
             const totalPages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,totalPages-1));
             rows.forEach(row=>row.hidden=true);matches.slice(page*size,(page+1)*size).forEach(row=>row.hidden=false);
             // Move existing nodes only; hidden pages remain successful controls when Save submits.
             const matching=new Set(matches),current=[...body.rows].filter(row=>matching.has(row));
             if(matches.some((row,index)=>row!==current[index]))body.append(...matches);
             count.textContent='('+new Intl.NumberFormat(document.documentElement.lang||'en').format(matches.length)+')';empty.hidden=matches.length>0;
-            headers.forEach(header=>header.setAttribute('aria-sort',header.dataset.accessSort===sort?(descending?'descending':'ascending'):'none'));
+            headers.forEach(header=>header.setAttribute('aria-sort',!(assignedFirst&&!query)&&header.dataset.accessSort===sort?(descending?'descending':'ascending'):'none'));
             window.ResourceTable.setPage(matrix,{page,hasNext:page+1<totalPages,totalPages,loading:false});
             syncActions();
         }
@@ -40,7 +48,7 @@
             const label=header.textContent.trim(),button=document.createElement('button');button.type='button';button.className='access-matrix-sort';
             button.append(document.createTextNode(label));button.setAttribute('aria-label',label);
             button.innerHTML+='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11L12 5H4L8 11Z" /></svg>';
-            button.addEventListener('click',()=>{if(sort===header.dataset.accessSort)descending=!descending;else{sort=header.dataset.accessSort;descending=false;}page=0;render();});header.replaceChildren(button);
+            button.addEventListener('click',()=>{assignedFirst=false;if(sort===header.dataset.accessSort)descending=!descending;else{sort=header.dataset.accessSort;descending=false;}page=0;render();});header.replaceChildren(button);
         });
         search.addEventListener('input',()=>{page=0;render();});
         search.addEventListener('keydown',event=>{if(event.key==='Enter')event.preventDefault();});

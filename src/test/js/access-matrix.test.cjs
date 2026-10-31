@@ -13,6 +13,20 @@ async function setup(extraClaims=[]){
  w.eval(editor);w.eval(shared);w.eval(matrix);await settle();return {dom,w,d:w.document};
 }
 function search(w,d,value){const input=d.querySelector('[data-access-search]');input.value=value;input.dispatchEvent(new w.Event('input',{bubbles:true}));}
+
+test('initial page shows saved assignments first without changing checked values or moving edited rows',async()=>{
+ const {dom,w,d}=await setup();
+ try{
+  const form=d.querySelector('form'),visible=[...d.querySelectorAll('[data-claim-row]:not([hidden])')];
+  assert.ok(visible.every(row=>row.querySelector('[data-access-claim]:checked')));
+  const before=[...new w.FormData(form).getAll('claims')].sort();
+  const row=visible[0],grant=row.querySelector('[data-access-claim]:checked');grant.click();
+  assert.equal([...d.querySelectorAll('[data-claim-row]:not([hidden])')][0],row);
+  assert.equal(grant.checked,false);d.querySelector('[data-access-discard]').click();
+  assert.equal(grant.checked,true);assert.deepEqual([...new w.FormData(form).getAll('claims')].sort(),before);
+  assert.equal(d.querySelector('[data-access-save]').disabled,true);
+ }finally{dom.window.close();}
+});
 test('voucher approval rules have a separate row and remain independently editable through search, sorting and Discard',async()=>{
  const {dom,w,d}=await setup([{name:'Voucher approvals',key:'VOUCHER_WORKSPACE',actions:{VIEW:{key:'VOUCHER_WORKSPACE_VIEW',allowed:true}}},{name:'Voucher approval rules',key:'VOUCHER_RULES',actions:{VIEW:{key:'VOUCHER_RULE_VIEW',allowed:false},CONFIGURE:{key:'VOUCHER_RULE_CONFIGURE',allowed:false}}}]);try{
   const form=d.querySelector('form'),before=[...new w.FormData(form).getAll('claims')].sort(),vouchers=d.querySelector('[value="VOUCHER_WORKSPACE_VIEW"]'),rules=d.querySelector('[value="VOUCHER_RULE_VIEW"]');
