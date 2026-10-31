@@ -1,5 +1,7 @@
 # Microfinance Conversion Gap Checklist
 
+2026-10-31 provisional-registration increment: assisted client records without login access, self-service registration/activation using the same client-number sequence, and scoped versioned loan requests during onboarding. Verification and existing lending approval gates remain independent. See [scope and verification](provisional-client-registration.md).
+
 2026-10-29 onboarding increment: client self-service drafts, protected uploads, frozen notice acknowledgements, submission, correction/resubmission, outcome and version history now extend the scoped staff-assisted workflow. Independent KYC review, exact duplicate checks and optional branch lending gates remain in place. See [self-service activation and verification](client-self-onboarding.md) and [existing KYC controls](client-onboarding-kyc.md). Live provider checks, organization due diligence, automated retention disposal and complete verified credit underwriting remain separate work.
 
 2026-10-27 credit-control increment: scoped ordinary/external guarantor capacity assessments, collateral valuation/pledge/custody/release history, collections cases and configured instalment reminders are implemented. See [activation, boundaries and verification](credit-capacity-collateral-collections.md). This does not complete verified borrower underwriting, legacy openings, legal enforcement, statutory submissions or the accounting backlog.

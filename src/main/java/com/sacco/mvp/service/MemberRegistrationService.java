@@ -1,15 +1,14 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.LoginUsername;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
-import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.UserSettings;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.web.form.MemberRegistrationForm;
@@ -19,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -30,42 +28,101 @@ public class MemberRegistrationService {
     private final MemberRepository memberRepository;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoStationRepository saccoStationRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final NameSignatureService nameSignatureService;
+    private final AuditService auditService;
 
     @Transactional
     public Member register(MemberRegistrationForm form) {
+        return register(form, null);
+    }
+
+    /** The controller supplies this context only after consuming an OTP bound to the same client. */
+    @Transactional
+    public Member register(MemberRegistrationForm form, UUID activationClientId) {
         VerifiedExternalMember verified = verifyExternalMember(form);
+        lockRegistrationContacts(form, verified);
+        var existing = provisionalForActivation(form, verified);
+        if (!java.util.Objects.equals(existing.map(Member::getId).orElse(null), activationClientId))
+            throw new IllegalStateException("Registration details changed. Request a new code.");
+        if (existing.isPresent()) {
+            Member client = memberRepository.findForClientAccess(existing.get().getId(), verified.saccoId(), verified.stationId()).orElseThrow();
+            requireProvisionalMatch(client, form, verified);
+            String username = requireUsernameAvailable(form.getUsername()), password = passwordEncoder.encode(form.getPassword());
+            try {
+                if (memberRepository.activateClientPortal(client.getId(), verified.saccoId(), verified.stationId(), username, password) != 1)
+                    throw new IllegalStateException("This client already has portal access. Sign in instead.");
+            } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+                if (java.util.Objects.toString(conflict.getMostSpecificCause().getMessage(), "").contains("uq_members_username")) throw new UsernameTakenException();
+                throw conflict;
+            }
+            // Portal activation does not invent KYC, a signature, or a new client identity.
+            client.setUsername(username);client.setPasswordHash(password);client.setClientPortalEnabled(true);
+            userSettingsRepository.save(UserSettings.builder().memberId(client.getId()).language("en")
+                .notificationPrefs("{}").createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build());
+            auditService.logEvent("CLIENT_PORTAL",client.getId(),"CLIENT_PORTAL_ACTIVATED",client.getId(),AuditEventStatus.SUCCESS,
+                "Client portal activation","CLIENT",client.getId().toString(),client.getSaccoId(),client.getStationId(),java.util.Map.of());
+            return client;
+        }
         return registerKnown(form,verified,false);
+    }
+
+    /** Called before issuing registration OTP; activation must use the client's stored contact and scope. */
+    @Transactional(readOnly = true)
+    public UUID validatePublicRegistration(MemberRegistrationForm form, VerifiedExternalMember verified) {
+        var existing=provisionalForActivation(form, verified);
+        if (existing.isEmpty())
+            ensureLocalUniqueness("", verified.email(), form.getPhone(), form.getEmployeeNumber(), verified.saccoId(), verified.stationId());
+        return existing.map(Member::getId).orElse(null);
+    }
+
+    private java.util.Optional<Member> provisionalForActivation(MemberRegistrationForm form, VerifiedExternalMember verified) {
+        var matches = memberRepository.findTop2ByEmailIgnoreCase(verified.email());
+        if (matches.isEmpty()) return java.util.Optional.empty();
+        if (matches.size() != 1) throw new IllegalStateException("Registration details do not match an available client record.");
+        Member client = matches.getFirst();
+        requireProvisionalMatch(client, form, verified);
+        return java.util.Optional.of(client);
+    }
+
+    private void requireProvisionalMatch(Member client, MemberRegistrationForm form, VerifiedExternalMember verified) {
+        if (client.isClientPortalEnabled() || !client.isMemberAccess() || client.getStatus() != MemberStatus.ACTIVE
+            || !client.getStaffRolesResolved().isEmpty() || !java.util.Objects.equals(client.getSaccoId(), verified.saccoId())
+            || !java.util.Objects.equals(client.getStationId(), verified.stationId())
+            || !normalizeSpaces(client.getFullName()).equalsIgnoreCase(normalizeSpaces(verified.fullName()))
+            || !java.util.Objects.equals(client.getPhone(), normalizePhone(form.getPhone()))
+            || !normalizeEmail(client.getEmail()).equals(verified.email())
+            || !java.util.Objects.equals(EmployeeNumber.normalize(client.getEmployeeNumber()), EmployeeNumber.normalize(form.getEmployeeNumber())))
+            throw new IllegalStateException("Registration details do not match an available client record.");
     }
 
     /** The onboarding service supplies an authorized, existing scope; no policy defaults or signature are invented. */
     @Transactional
-    public Member registerAssisted(MemberRegistrationForm form,String clientNumber,String fullName,String institution,String branch) {
+    public Member registerAssisted(MemberRegistrationForm form,String fullName,String institution,String branch) {
         var registered=resolveRegisteredSacco(institution);
         requireRegisteredStation(institution,branch);
-        var verified=new VerifiedExternalMember(normalizeMemberNo(clientNumber),normalizeEmail(form.getEmail()),
+        var verified=new VerifiedExternalMember("",normalizeEmail(form.getEmail()),
             nameSignatureService.requireFullName(fullName,"Enter your full names."),institution,branch,registered.getSaccoName());
         return registerKnown(form,verified,true);
     }
 
     private Member registerKnown(MemberRegistrationForm form,VerifiedExternalMember verified,boolean assisted) {
         log.info("Client registration requested: saccoId={}", verified.saccoId());
+        if (assisted) lockRegistrationContacts(form, verified);
         String username = assisted ? null : requireUsernameAvailable(form.getUsername());
         String normalizedPhone = normalizePhone(form.getPhone());
         String employeeNumber = EmployeeNumber.normalize(form.getEmployeeNumber());
         ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone,
             employeeNumber, verified.saccoId(), verified.stationId());
-        String memberNo = assisted ? verified.memberNo() : allocateClientNumber();
-        if(!assisted)resolveLocalSacco(verified);
+        String memberNo = allocateClientNumber();
         OffsetDateTime now = OffsetDateTime.now();
         Member member = Member.builder()
             .id(UUID.randomUUID())
             .saccoId(verified.saccoId())
             .memberNo(memberNo)
             .username(username)
+            .clientPortalEnabled(!assisted)
             .employeeNumber(employeeNumber)
             .stationId(verified.stationId())
             .fullName(verified.fullName())
@@ -77,7 +134,7 @@ public class MemberRegistrationService {
             .status(MemberStatus.ACTIVE)
             .position(Position.MEMBER)
             .rank(nextMemberRank(verified.saccoId()))
-            .passwordHash(passwordEncoder.encode(form.getPassword()))
+            .passwordHash(assisted ? "!NO_PORTAL_ACCESS" : passwordEncoder.encode(form.getPassword()))
             .createdAt(now)
             .profileLastSyncedAt(now)
             .build();
@@ -93,7 +150,7 @@ public class MemberRegistrationService {
             throw conflict;
         }
 
-        userSettingsRepository.save(UserSettings.builder()
+        if (!assisted) userSettingsRepository.save(UserSettings.builder()
             .memberId(savedMember.getId())
             .language("en")
             .notificationPrefs("{}")
@@ -104,6 +161,15 @@ public class MemberRegistrationService {
         log.info("Client registration completed successfully: localMemberId={}, saccoId={}",
             savedMember.getId(), savedMember.getSaccoId());
         return savedMember;
+    }
+
+    private void lockRegistrationContacts(MemberRegistrationForm form, VerifiedExternalMember verified) {
+        var keys = new java.util.TreeSet<String>();
+        keys.add("CLIENT_REGISTRATION_EMAIL/" + verified.email());
+        keys.add("CLIENT_REGISTRATION_PHONE/" + normalizePhone(form.getPhone()));
+        String employee = EmployeeNumber.normalize(form.getEmployeeNumber());
+        if (employee != null) keys.add("CLIENT_REGISTRATION_EMPLOYEE/" + verified.saccoId() + "/" + verified.stationId() + "/" + employee.toLowerCase(java.util.Locale.ROOT));
+        keys.forEach(memberRepository::lockClientRegistrationIdentity);
     }
 
     public VerifiedExternalMember verifyExternalMember(MemberRegistrationForm form) {
@@ -204,34 +270,6 @@ public class MemberRegistrationService {
         return memberRepository.findTopBySaccoIdAndPositionOrderByRankDesc(saccoId, Position.MEMBER)
             .map(Member::getRank)
             .orElse(0) + 1;
-    }
-
-    private SaccoSettings resolveLocalSacco(VerifiedExternalMember verified) {
-        OffsetDateTime now = OffsetDateTime.now();
-        return saccoSettingsRepository.findById(verified.saccoId())
-            .map(existing -> {
-                existing.setExternalStationId(verified.stationId());
-                existing.setExternalSaccoName(normalizeSpaces(verified.institutionName()));
-                existing.setUpdatedAt(now);
-                return saccoSettingsRepository.save(existing);
-            })
-            .orElseGet(() -> saccoSettingsRepository.save(SaccoSettings.builder()
-                .saccoId(verified.saccoId())
-                .externalStationId(verified.stationId())
-                .externalSaccoName(normalizeSpaces(verified.institutionName()))
-                .requiredGuarantors(3)
-                .boardSize(3)
-                .boardQuorum(2)
-                .maxLoanSavingsRatio(new BigDecimal("0.3333"))
-                .applicationFee(new BigDecimal("15000.00"))
-                .defaultLanguage("en")
-                .createdAt(now)
-                .updatedAt(now)
-                .build()));
-    }
-
-    private String normalizeMemberNo(String value) {
-        return normalizeSpaces(value).toUpperCase();
     }
 
     private String normalizeEmail(String value) {

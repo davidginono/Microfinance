@@ -63,16 +63,13 @@ public class OnboardingService {
 
     @Transactional(timeout=30)
     public UUID create(AppUserPrincipal a,CreateForm f) {
-        authorize(a,"CREATE");text(f.getNumber(),64,"number",true);text(f.getName(),255,"name",true);text(f.getEmail(),255,"email",true);
+        authorize(a,"CREATE");text(f.getName(),255,"name",true);text(f.getEmail(),255,"email",true);
         check(f.getName().strip().split("\\s+").length>=2,"name");check(f.getEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"),"email");
-        check(f.getNumber().matches("[A-Za-z0-9/._-]+"),"number");
         try {f.setPhone(TanzaniaPhoneNumber.normalizeRequired(f.getPhone()));}catch(IllegalStateException e){throw invalid("phone");}
         String hash=hash(f);var old=retry(a,"client_onboarding_creation",f.getRequestKey(),hash);if(old.isPresent())return records.created(old.get());
         var form=new MemberRegistrationForm();form.setEmail(f.getEmail());form.setPhone(f.getPhone());form.setSaccoId(a.getSaccoId());form.setStationId(a.getStationId());
-        // An unshared random password does not create an OTP-verification or consent event.
-        form.setPassword(UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-",""));
         UUID client;
-        try {client=registration.registerAssisted(form,f.getNumber(),f.getName(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
+        try {client=registration.registerAssisted(form,f.getName(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
         records.creation(a,client,UUID.randomUUID(),f.getRequestKey(),hash,clock.now());event(a,client,"CLIENT_ASSISTED_REGISTRATION");return client;
     }
     @Transactional(timeout=20)
@@ -142,7 +139,7 @@ public class OnboardingService {
     private void requireOwner(AppUserPrincipal a) {
         if(a==null||!a.isMemberAccess()||a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Client workspace required");
         var member=directory.find(a.getMemberId()).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
-        if(!member.isMemberAccess()||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE||!Objects.equals(member.getSaccoId(),a.getSaccoId())||!Objects.equals(member.getStationId(),a.getStationId()))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
+        if(!member.isMemberAccess()||!member.isClientPortalEnabled()||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE||!Objects.equals(member.getSaccoId(),a.getSaccoId())||!Objects.equals(member.getStationId(),a.getStationId()))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
     }
     @Transactional(readOnly=true)
     public OwnWorkspace ownWorkspace(AppUserPrincipal a,int page,Integer sequence) {
@@ -150,7 +147,7 @@ public class OnboardingService {
         var revision=sequence==null?records.latest(a,c.id()).orElse(null):records.version(a,c.id(),sequence);
         if(sequence!=null) {
             var decisions=records.decisions(revision.id());var decision=decisions.isEmpty()?null:decisions.getFirst();var p=revision.profile();
-            c=new Client(c.id(),p.getClientNumber(),p.getFullName(),p.getPhone(),p.getEmail(),decision==null?revision.mode():decision.kind(),revision.id(),sequence,decision==null?null:decision.reviewDue());
+            c=new Client(c.id(),p.getClientNumber(),p.getFullName(),p.getPhone(),p.getEmail(),decision==null?revision.mode():decision.kind(),revision.id(),sequence,decision==null?null:decision.reviewDue(),c.portalEnabled());
         }
         var documents=revision==null?List.<OwnDocument>of():records.documents(revision.id()).stream().map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn())).toList();
         var history=records.history(a,c.id(),page);

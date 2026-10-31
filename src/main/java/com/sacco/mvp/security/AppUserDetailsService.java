@@ -30,6 +30,7 @@ public class AppUserDetailsService implements UserDetailsService {
         return memberDirectoryService.findClientLoginAccount(username)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isMemberAccess)
+            .filter(Member::isClientPortalEnabled)
             .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .map(member -> ensureStationAllowed(member, false))
             .map(member -> new AppUserPrincipal(

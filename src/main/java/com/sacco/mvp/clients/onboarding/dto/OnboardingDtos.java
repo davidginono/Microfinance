@@ -9,7 +9,11 @@ public final class OnboardingDtos {
     private OnboardingDtos() {}
     public record Page<T>(List<T> rows, int page, boolean hasNext) {}
     public record Client(UUID id, String number, String name, String phone, String email, String state,
-                         UUID revisionId, int sequence, LocalDate reviewDue) {}
+                         UUID revisionId, int sequence, LocalDate reviewDue, boolean portalEnabled) {
+        public Client(UUID id,String number,String name,String phone,String email,String state,UUID revisionId,int sequence,LocalDate reviewDue) {
+            this(id,number,name,phone,email,state,revisionId,sequence,reviewDue,true);
+        }
+    }
     public record Revision(UUID id, UUID clientId, int sequence, String mode, Profile profile,
                            UUID maker, String makerName, OffsetDateTime recordedAt) {}
     public record Decision(UUID id, String kind, String reason, String clientMessage, String screening, String screeningReference,
@@ -69,7 +73,7 @@ public final class OnboardingDtos {
     }
     @Data public static class CreateForm {
         private UUID requestKey=UUID.randomUUID();
-        private String number="", name="", phone="", email="";
+        private String name="", phone="", email="";
     }
     @Data public static class ReviewForm {
         private UUID requestKey=UUID.randomUUID();

@@ -21,7 +21,7 @@ public class OnboardingController {
     private static final String ROOT="/finance/clients/onboarding";
     private final OnboardingService service;
 
-    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields("requestKey","number","name","phone","email");}
+    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields("requestKey","name","phone","email");}
     @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields("requestKey","expectedSequence","action","profile.identityType","profile.issuingCountry","profile.identityNumber","profile.birthDate","profile.identityExpiresOn","profile.identityNoExpiry","profile.address","profile.activity","profile.activityAddress","profile.sourceOfFunds","profile.noticeVersion","profile.lawfulBasis","profile.consentReference","profile.consentOn","profile.retentionReference","profile.retentionReviewOn","profile.legalHoldReference");}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","screening","screeningReference","policyReference","checkedOn","reviewDue");}

@@ -131,20 +131,13 @@ public class AuthController {
         try {
             memberRegistrationService.requireUsernameAvailable(form.getUsername());
             MemberRegistrationService.VerifiedExternalMember verified = memberRegistrationService.verifyExternalMember(form);
-            memberRegistrationService.ensureLocalUniqueness(
-                verified.memberNo(),
-                verified.email(),
-                form.getPhone(),
-                form.getEmployeeNumber(),
-                verified.saccoId(),
-                verified.stationId()
-            );
+            java.util.UUID activationClientId = memberRegistrationService.validatePublicRegistration(form, verified);
             var delivery = emailOtpService.issueOtp(
                 verified.email(),
                 EmailOtpPurpose.REGISTRATION,
-                null,
+                activationClientId,
                 "Your registration code",
-                "We verified your member details. Use the OTP code below to complete your registration.",
+                "Use the OTP code below to complete your client registration.",
                 verified.saccoId(),
                 verified.stationId(),
                 form.getPhone()
@@ -189,9 +182,13 @@ public class AuthController {
                 return "register-member";
             }
             memberRegistrationService.requireUsernameAvailable(form.getUsername());
-            emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, form.getOtpCode());
-            Member registered = memberRegistrationService.register(form);
-            auditIdentityEvent(registered.getId(), "REGISTRATION", "Registration", "MEMBER", "Member " + registered.getMemberNo(),
+            var verified = memberRegistrationService.verifyExternalMember(form);
+            java.util.UUID activationClientId = memberRegistrationService.validatePublicRegistration(form, verified);
+            if (activationClientId == null) emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, form.getOtpCode());
+            else emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, activationClientId, form.getOtpCode());
+            Member registered = activationClientId == null ? memberRegistrationService.register(form)
+                : memberRegistrationService.register(form, activationClientId);
+            if (activationClientId == null) auditIdentityEvent(registered.getId(), "REGISTRATION", "Registration", "MEMBER", "Member " + registered.getMemberNo(),
                 registered.getSaccoId(), registered.getStationId(), Map.of("memberNo", registered.getMemberNo()));
             ra.addFlashAttribute("assignedClientNumber", registered.getMemberNo());
             ra.addFlashAttribute("assignedUsername", registered.getUsername());
@@ -304,6 +301,7 @@ public class AuthController {
 
         Member matchedAccount = memberDirectoryService.findByEmail(normalizedEmail)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .filter(Member::isClientPortalEnabled)
             .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .orElse(null);
         if (matchedAccount != null && !matchedAccount.isMemberAccess()) {
@@ -359,6 +357,7 @@ public class AuthController {
         try {
             Member member = memberDirectoryService.findByEmail(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+                .filter(Member::isClientPortalEnabled)
                 .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
                 .orElseThrow(() -> new IllegalStateException("No member account was found for that email address. Please register yourself first."));
             if (!member.isMemberAccess()) {
@@ -611,7 +610,7 @@ public class AuthController {
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
             .orElseThrow(() -> new IllegalStateException("No active client account was found for that email or username."));
-        if (!member.isMemberAccess()) {
+        if (!member.isMemberAccess() || !member.isClientPortalEnabled()) {
             throw new IllegalStateException("No active client account was found for that email or username.");
         }
         return member;

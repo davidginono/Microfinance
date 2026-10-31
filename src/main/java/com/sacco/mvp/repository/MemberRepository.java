@@ -22,6 +22,15 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                         @Param("branch") String branch);
     Optional<Member> findByIdAndSaccoIdAndStationIdIgnoreCase(UUID id, String saccoId, String stationId);
 
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update Member m set m.clientPortalEnabled=true,m.username=:username,m.passwordHash=:password
+        where m.id=:id and m.saccoId=:institution and m.stationId=:branch and m.clientPortalEnabled=false
+          and m.status=com.sacco.mvp.domain.MemberStatus.ACTIVE and m.memberAccount=true
+        """)
+    int activateClientPortal(@Param("id") UUID id,@Param("institution") String institution,@Param("branch") String branch,
+                             @Param("username") String username,@Param("password") String password);
+
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
     @Query("""
         update Member m set m.employeeNumber = :number
@@ -64,6 +73,9 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     @Query(value = "select nextval('public.client_number_seq')", nativeQuery = true)
     long nextClientNumberValue();
+
+    @Query(value="select pg_advisory_xact_lock(hashtextextended(:key,0))",nativeQuery=true)
+    Object lockClientRegistrationIdentity(@Param("key") String key);
 
     Optional<Member> findByEmailIgnoreCase(String email);
     List<Member> findTop2ByEmailIgnoreCase(String email);
@@ -352,7 +364,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         value = """
             select m.*
             from members m
-            where m.sacco_id = :saccoId
+            where m.sacco_id = :saccoId and m.client_portal_enabled
               and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
               and (
                 :query = ''
@@ -363,7 +375,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         countQuery = """
             select count(*)
             from members m
-            where m.sacco_id = :saccoId
+            where m.sacco_id = :saccoId and m.client_portal_enabled
               and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
               and (
                 :query = ''
@@ -380,7 +392,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Query(value = """
         select m.*
         from members m
-        where m.sacco_id = :saccoId
+        where m.sacco_id = :saccoId and m.client_portal_enabled
           and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
           and (
             :query = ''
@@ -396,7 +408,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Query("""
         select m
         from Member m
-        where m.id = :accountId
+        where m.id = :accountId and m.clientPortalEnabled = true
           and m.saccoId = :saccoId
           and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
         """)

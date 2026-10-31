@@ -3,7 +3,6 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.web.form.MemberRegistrationForm;
@@ -26,8 +25,8 @@ class MemberRegistrationServiceTest {
     void usernameAvailabilityNormalizesCaseAndSkipsInvalidQueries() {
         var members = Mockito.mock(MemberRepository.class);
         var service = new MemberRegistrationService(members, Mockito.mock(RegisteredSaccoRepository.class),
-            Mockito.mock(SaccoStationRepository.class), Mockito.mock(SaccoSettingsRepository.class),
-            Mockito.mock(UserSettingsRepository.class), Mockito.mock(PasswordEncoder.class), new NameSignatureService());
+            Mockito.mock(SaccoStationRepository.class),
+            Mockito.mock(UserSettingsRepository.class), Mockito.mock(PasswordEncoder.class), new NameSignatureService(), Mockito.mock(AuditService.class));
         assertThat(service.usernameAvailable("ab")).isFalse();
         assertThat(service.usernameAvailable("client@example.com")).isFalse();
         Mockito.verifyNoInteractions(members);
@@ -47,10 +46,10 @@ class MemberRegistrationServiceTest {
             memberRepository,
             registeredSaccoRepository,
             saccoStationRepository,
-            Mockito.mock(SaccoSettingsRepository.class),
+
             Mockito.mock(UserSettingsRepository.class),
             Mockito.mock(PasswordEncoder.class),
-            new NameSignatureService()
+            new NameSignatureService(), Mockito.mock(AuditService.class)
         );
 
         when(registeredSaccoRepository.existsById("SACCO-1")).thenReturn(true);
@@ -71,10 +70,10 @@ class MemberRegistrationServiceTest {
             memberRepository,
             Mockito.mock(RegisteredSaccoRepository.class),
             Mockito.mock(SaccoStationRepository.class),
-            Mockito.mock(SaccoSettingsRepository.class),
+
             Mockito.mock(UserSettingsRepository.class),
             Mockito.mock(PasswordEncoder.class),
-            new NameSignatureService()
+            new NameSignatureService(), Mockito.mock(AuditService.class)
         );
 
         when(memberRepository.findByMemberNo("000001")).thenReturn(Optional.empty());
@@ -99,7 +98,7 @@ class MemberRegistrationServiceTest {
     @Test
     void publicRegistrationRequiresThreeSeparateNamesBeforeReadingScope() {
         var members = Mockito.mock(MemberRepository.class);
-        var service = new MemberRegistrationService(members,Mockito.mock(RegisteredSaccoRepository.class),Mockito.mock(SaccoStationRepository.class),Mockito.mock(SaccoSettingsRepository.class),Mockito.mock(UserSettingsRepository.class),Mockito.mock(PasswordEncoder.class),new NameSignatureService());
+        var service = new MemberRegistrationService(members,Mockito.mock(RegisteredSaccoRepository.class),Mockito.mock(SaccoStationRepository.class),Mockito.mock(UserSettingsRepository.class),Mockito.mock(PasswordEncoder.class),new NameSignatureService(), Mockito.mock(AuditService.class));
         var form = new MemberRegistrationForm();form.setFirstName("Jane Test");form.setLastName("Member");
         assertThatThrownBy(() -> service.verifyExternalMember(form)).isInstanceOf(IllegalStateException.class).hasMessage("Enter your first, middle and last name.");
         Mockito.verifyNoInteractions(members);
@@ -110,7 +109,6 @@ class MemberRegistrationServiceTest {
         MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
-        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
         UserSettingsRepository userSettingsRepository = Mockito.mock(UserSettingsRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
@@ -118,10 +116,9 @@ class MemberRegistrationServiceTest {
             memberRepository,
             registeredSaccoRepository,
             saccoStationRepository,
-            saccoSettingsRepository,
             userSettingsRepository,
             passwordEncoder,
-            new NameSignatureService()
+            new NameSignatureService(), Mockito.mock(AuditService.class)
         );
 
         MemberRegistrationForm form = new MemberRegistrationForm();

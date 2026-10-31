@@ -44,7 +44,7 @@ class ClientOnboardingRenderedPostgresTest {
         var domain=new ClientOnboardingPostgresTest();domain.start();var tomcat=new Tomcat();
         var web=new AnnotationConfigWebApplicationContext();
         try {
-            domain.fixture();var owner=domain.owner(domain.f.client);domain.service.saveNotice(domain.f.actor,domain.notice());
+            domain.fixture();domain.owner(domain.f.client);var owner=new AppUserPrincipal(domain.f.context.getBean(com.sacco.mvp.service.MemberDirectoryService.class).find(domain.f.client).orElseThrow(),Set.of(com.sacco.mvp.domain.UserClaim.MEMBER_LOANS_CREATE),false);domain.service.saveNotice(domain.f.actor,domain.notice());
             tomcat.setBaseDir(temporary.toString());tomcat.setPort(0);tomcat.getConnector().setProperty("address","127.0.0.1");
             var context=tomcat.addContext("",Path.of("src/main/webapp").toAbsolutePath().toString());context.setParentClassLoader(getClass().getClassLoader());Tomcat.initWebappDefaults(context);context.addServletContainerInitializer(new JasperInitializer(),null);
             web.setParent(domain.f.context);web.setServletContext(context.getServletContext());web.register(WebConfig.class);
@@ -58,6 +58,10 @@ class ClientOnboardingRenderedPostgresTest {
             var blocked=client.send(HttpRequest.newBuilder(URI.create(base+"/app/dashboard")).GET().build(),HttpResponse.BodyHandlers.ofString());
             assertThat(blocked.statusCode()).isEqualTo(302);assertThat(blocked.headers().firstValue("Location")).contains("/app/onboarding");
             assertThat(get(client,base+"/app/onboarding",false)).contains("Complete your profile and wait for verification");
+            String loanForm=get(client,base+"/app/onboarding/loan/edit",false);assertThat(loanForm).contains("Loan request","Monthly cash flow","aria-label=\"Loan product\"","Repayment period","Other monthly debt repayments");
+            var loanValues=hidden(loanForm);loanValues.put("action","SUBMITTED");loanValues.put("details.productId",domain.f.product.toString());loanValues.put("details.principal","1000.00");loanValues.put("details.tenureValue","6");loanValues.put("details.purpose","Synthetic inventory");loanValues.put("details.business","Synthetic shop");loanValues.put("details.income","2000.00");loanValues.put("details.expenses","500.00");loanValues.put("details.otherDebt","0.00");
+            post(client,base+"/app/onboarding/loan/edit",loanValues,false);
+            assertThat(get(client,base+"/app/onboarding/loan",false)).contains("Synthetic inventory","not verified income").doesNotContain("Continue application");
             String form=get(client,base+"/app/onboarding/edit",false);
             assertThat(form).contains("My profile","Privacy notice","Synthetic English privacy notice").doesNotContain("name=\"profile.lawfulBasis\"","name=\"profile.retentionReference\"");
             var values=hidden(form);values.put("action","DRAFT");values.put("profile.identityType","NATIONAL_ID");values.put("profile.issuingCountry","TZ");values.put("profile.identityNumber","TZ-RENDER-1234");values.put("profile.birthDate","1990-01-01");values.put("profile.identityNoExpiry","true");values.put("profile.address","Synthetic address");values.put("profile.activity","Synthetic shop");values.put("profile.activityAddress","Synthetic market");values.put("profile.sourceOfFunds","Synthetic sales");
@@ -81,6 +85,8 @@ class ClientOnboardingRenderedPostgresTest {
             String verified=get(client,base+"/app/onboarding",false);assertThat(verified).contains("Verified","Synthetic corrected address","Loan assessment and approval are separate.").doesNotContain("Please correct your home address.");
             assertThat(verified).doesNotContain("Complete your profile and wait for verification");
             assertThat(get(client,base+"/app/dashboard",false)).isEqualTo("Borrower workspace");
+            assertThat(get(client,base+"/app/onboarding/loan",false)).contains("Continue application");
+            assertThat(get(client,base+"/app/onboarding/loan/edit?lang=sw",false)).contains("Ombi la mkopo","Mapato na matumizi ya mwezi");get(client,base+"/app/onboarding?lang=en",false);
             assertThat(get(client,base+"/app/onboarding/versions/2",false)).contains("Please correct your home address.");
             assertThat(get(client,base+"/finance/clients/onboarding/notice",true)).contains("Publish notice","Synthetic English privacy notice");
             assertThat(get(client,base+"/app/onboarding/edit?lang=sw",false)).contains("Taarifa zangu","Taarifa ya faragha ya majaribio iliyoidhinishwa.");get(client,base+"/app/onboarding?lang=en",false);
@@ -102,7 +108,7 @@ class ClientOnboardingRenderedPostgresTest {
         var values=new LinkedHashMap<String,String>();var inputs=Pattern.compile("<input[^>]*>").matcher(html);
         while(inputs.find()){String input=inputs.group();if(!input.contains("type=\"hidden\""))continue;var name=Pattern.compile("name=\"([^\"]+)\"").matcher(input);var value=Pattern.compile("value=\"([^\"]*)\"").matcher(input);if(name.find()&&value.find())values.put(name.group(1),value.group(1));}return values;
     }
-    @TestConfiguration @EnableWebMvc @EnableWebSecurity @Import({ClientOnboardingController.class,OnboardingController.class})
+    @TestConfiguration @EnableWebMvc @EnableWebSecurity @Import({ClientOnboardingController.class,OnboardingController.class,LoanIntakeController.class})
     static class WebConfig implements WebMvcConfigurer {
         @Bean("access") AccessControlService access(){return new AccessControlService();}
         @Bean("authz") com.sacco.mvp.security.AuthzService authz(){return org.mockito.Mockito.mock(com.sacco.mvp.security.AuthzService.class);}

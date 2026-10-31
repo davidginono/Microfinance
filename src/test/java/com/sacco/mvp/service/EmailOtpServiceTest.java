@@ -25,6 +25,13 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EmailOtpServiceTest {
+    @Test void clientBoundRegistrationValidationNeverReadsUnboundSignupCodes() {
+        UUID id=UUID.randomUUID();
+        assertThatThrownBy(()->emailOtpService.validateOtp("synthetic@example.invalid",EmailOtpPurpose.REGISTRATION,id,"123456"))
+            .isInstanceOf(IllegalStateException.class).hasMessage("No active OTP code was found. Request a new code.");
+        verify(emailOtpTokenRepository).findTopByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNullOrderByCreatedAtDesc("synthetic@example.invalid",EmailOtpPurpose.REGISTRATION,id);
+        verify(emailOtpTokenRepository,never()).findTopByEmailIgnoreCaseAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any());
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(value=EmailOtpPurpose.class, names={"LOGIN_MFA", "CLAIM_ACCOUNT"})

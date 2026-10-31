@@ -4,6 +4,7 @@
 <%@ include file="facts.jspf" %>
 <c:if test="${duplicate}"><p role="status" class="field-error"><spring:message code="kyc.error.duplicate"/></p></c:if>
 <c:if test="${not historical}"><div class="accounting-actions">
+    <a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/loan'/>"><spring:message code="kyc.loan.title"/></a>
     <c:if test="${client.state!='SUBMITTED'}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize></c:if>
     <c:if test="${client.state=='SUBMITTED' or client.state=='VERIFY' or client.state=='EXPIRED' or client.state=='STALE'}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_REVIEW')"><a class="app-btn btn-launch" href="<c:url value='/finance/clients/onboarding/${client.id}/review'/>"><spring:message code="kyc.review"/></a></sec:authorize></c:if>
 </div></c:if>

@@ -1,5 +1,7 @@
 # Client self-service onboarding
 
+31 October 2026: [Provisional registration](provisional-client-registration.md) supersedes the earlier assisted-number/password behavior below. Both channels now use automatic client numbers; assisted records have no portal access until verified registration activation. Loan-request drafts are available during onboarding.
+
 ## Scope and activation
 
 Clients use **My verification** (`/app/onboarding`) after existing registration and sign-in. They complete their own profile, save incomplete drafts, upload evidence, acknowledge the approved notice, submit, read feedback and correct/resubmit. Registration and OTP verification do not verify KYC. Staff-assisted onboarding remains available through the same component.

@@ -10,7 +10,7 @@
     <form:errors path="*" cssClass="field-error" element="p" role="alert"/>
     <section class="erp-resource-section"><h2><spring:message code="kyc.form.${formKind}"/></h2><div class="accounting-form-grid">
     <c:choose>
-        <c:when test="${formKind=='create'}"><c:forEach items="${['number','name','phone','email']}" var="field"><label><span><spring:message code="kyc.field.${field}"/></span><form:input path="${field}" cssClass="aws-control" maxlength="255" required="required"/></label></c:forEach></c:when>
+        <c:when test="${formKind=='create'}"><c:forEach items="${['name','phone','email']}" var="field"><label><span><spring:message code="kyc.field.${field}"/></span><form:input path="${field}" cssClass="aws-control" maxlength="255" required="required"/></label></c:forEach></c:when>
         <c:when test="${formKind=='profile'}">
             <form:hidden path="expectedSequence"/>
             <label><span><spring:message code="kyc.field.identityType"/></span><form:select path="profile.identityType" cssClass="aws-control"><form:option value=""><spring:message code="kyc.choose"/></form:option><c:forEach items="${['NATIONAL_ID','PASSPORT','VOTER_ID','DRIVING_LICENCE','OTHER']}" var="type"><form:option value="${type}"><spring:message code="kyc.identity.${type}"/></form:option></c:forEach></form:select></label>

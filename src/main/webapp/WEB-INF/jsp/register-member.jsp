@@ -35,6 +35,7 @@
 <main class="auth-form-page">
 <div class="auth-form-layout registration-layout">
     <div class="auth-title-stack registration-heading"><h1 class="auth-heading"><spring:message code="register.member.title" /></h1></div>
+    <p class="console-message" data-message-type="info" role="status"><spring:message code="register.member.provisional"/></p>
     <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <c:if test="${not empty errors}"><div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div></c:if>
     <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post">

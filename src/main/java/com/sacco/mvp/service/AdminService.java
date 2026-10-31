@@ -584,6 +584,7 @@ public class AdminService {
         if (!sameSacco) {
             throw new IllegalArgumentException("Member not found in this SACCO");
         }
+        if (!member.isClientPortalEnabled()) throw new IllegalStateException("This client has no portal account.");
         boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
         if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
             throw new IllegalStateException("Only super admins can update Super Admin accounts.");

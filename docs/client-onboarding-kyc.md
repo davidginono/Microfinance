@@ -1,5 +1,7 @@
 # Client onboarding and KYC
 
+31 October 2026: [Provisional registration](provisional-client-registration.md) supersedes the earlier assisted-number/password behavior below. Both channels now use automatic client numbers; assisted records have no portal access until verified registration activation. Loan-request drafts are available during onboarding.
+
 Implementation date: 27 October 2026. This implements the individual-client operational workflow in G01 of the research audit. Existing registration and client identifiers remain in place. Registration, an OTP, a signature label and a loan estimate do not establish verified KYC.
 
 ## 1. Scope, policy and activation

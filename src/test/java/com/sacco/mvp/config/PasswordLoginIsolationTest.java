@@ -37,6 +37,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class PasswordLoginIsolationTest {
+    @Test void provisionalClientCannotLoadPasswordCredentialsEvenWhenItsRecordIsFound() {
+        var directory=mock(MemberDirectoryService.class);
+        var member=Member.builder().id(UUID.randomUUID()).position(Position.MEMBER).memberAccount(true).clientPortalEnabled(false).status(MemberStatus.ACTIVE).build();
+        when(directory.findClientLoginAccount("synthetic@example.invalid")).thenReturn(Optional.of(member));
+        var users=new AppUserDetailsService(directory,mock(StationAccessService.class),mock(UserClaimService.class));
+        assertThatThrownBy(()->users.loadClientByEmailOrUsername("synthetic@example.invalid")).isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+    }
     @Configuration
     @EnableWebSecurity
     static class WebSecurity {}

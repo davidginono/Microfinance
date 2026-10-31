@@ -59,7 +59,7 @@ public class MemberDirectoryService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Optional<Member> findClientLoginAccount(String login) {
-        return findEmailOrUsernameAccount(login);
+        return findEmailOrUsernameAccount(login).filter(Member::isClientPortalEnabled);
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)

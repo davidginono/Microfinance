@@ -345,7 +345,7 @@ public class SecurityConfig {
 
                     var ssoMember = memberDirectoryService.findByEmail(email)
                         .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-                        .filter(member -> member.isMemberAccess() || member.isStaffAccessActive())
+                        .filter(member -> (member.isMemberAccess() && member.isClientPortalEnabled()) || member.isStaffAccessActive())
                         .orElse(null);
                     if (ssoMember == null) {
                         auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "No active SACCO account is linked to that Google email.");

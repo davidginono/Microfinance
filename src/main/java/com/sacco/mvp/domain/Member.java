@@ -32,6 +32,10 @@ public class Member {
     @Column(name = "username", length = 32)
     private String username;
 
+    @Builder.Default
+    @Column(name = "client_portal_enabled", nullable = false)
+    private boolean clientPortalEnabled = true;
+
     @Column(name = "staff_no")
     private String staffNo;
 

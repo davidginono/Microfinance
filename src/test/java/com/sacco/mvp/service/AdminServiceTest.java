@@ -78,6 +78,14 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
+    @Test void userRoleEditingCannotTurnAProvisionalClientIntoASystemUser() {
+        UUID id=UUID.randomUUID();var provisional=Member.builder().id(id).saccoId("I1").stationId("B1").position(Position.MEMBER)
+            .memberAccount(true).clientPortalEnabled(false).status(MemberStatus.ACTIVE).build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(provisional));
+        assertThatThrownBy(()->adminService.updateUser("I1","B1",UUID.randomUUID(),Set.of(Position.MINOR_ADMIN),id,List.of(Position.MANAGER),MemberStatus.ACTIVE,List.of()))
+            .hasMessage("This client has no portal account.");
+        verify(memberRepository,never()).save(any());verifyNoInteractions(memberAccessClaimRepository,userSettingsRepository);
+    }
     @Test void customisedWorkflowRequiresAnEligibleInstitutionTeller(){
         var form=new com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm();
         assertThatThrownBy(()->adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form)).hasMessage("recording.error.customTellers");

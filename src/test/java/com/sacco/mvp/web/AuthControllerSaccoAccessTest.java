@@ -36,6 +36,35 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerSaccoAccessTest {
+    @Test void activationOtpIssuanceBindsTheExistingClientIdentity() {
+        var form=new com.sacco.mvp.web.form.MemberRegistrationForm();form.setUsername("synthetic.client");form.setEmail("synthetic@example.invalid");form.setPhone("255700000001");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());
+        UUID id=UUID.randomUUID();var verified=new MemberRegistrationService.VerifiedExternalMember("",form.getEmail(),"SYNTHETIC PROVISIONAL CLIENT","I1","B1","Synthetic institution");
+        when(memberRegistrationService.verifyExternalMember(form)).thenReturn(verified);when(memberRegistrationService.validatePublicRegistration(form,verified)).thenReturn(id);
+        assertThat(controller().requestMemberRegistrationOtp(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm")).getStatusCode().is2xxSuccessful()).isTrue();
+        verify(emailOtpService).issueOtp(org.mockito.ArgumentMatchers.eq(form.getEmail()),org.mockito.ArgumentMatchers.eq(EmailOtpPurpose.REGISTRATION),org.mockito.ArgumentMatchers.eq(id),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("I1"),org.mockito.ArgumentMatchers.eq("B1"),org.mockito.ArgumentMatchers.eq(form.getPhone()));
+    }
+    @Test void activatingAProvisionalClientConsumesOnlyItsBoundRegistrationCode() {
+        var form=new com.sacco.mvp.web.form.MemberRegistrationForm();form.setUsername("synthetic.client");form.setEmail("synthetic@example.invalid");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
+        UUID id=UUID.randomUUID();var verified=new MemberRegistrationService.VerifiedExternalMember("",form.getEmail(),"SYNTHETIC PROVISIONAL CLIENT","I1","B1","Synthetic institution");
+        when(memberRegistrationService.verifyExternalMember(form)).thenReturn(verified);when(memberRegistrationService.validatePublicRegistration(form,verified)).thenReturn(id);
+        var registered=Member.builder().id(id).memberNo("CL-00000001").username(form.getUsername()).saccoId("I1").stationId("B1").build();when(memberRegistrationService.register(form,id)).thenReturn(registered);
+        var errors=new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm");var flash=new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
+        assertThat(controller().registerMemberSubmit(form,errors,new org.springframework.ui.ExtendedModelMap(),flash)).isEqualTo("redirect:/login");
+        var order=org.mockito.Mockito.inOrder(emailOtpService,memberRegistrationService);order.verify(emailOtpService).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,id,"123456");order.verify(memberRegistrationService).register(form,id);
+        verify(emailOtpService,never()).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,"123456");assertThat(flash.getFlashAttributes().get("assignedClientNumber")).isEqualTo("CL-00000001");
+    }
+    @Test
+    void provisionalClientCannotUseLoginOtpOrPasswordReset() {
+        var provisional=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("CL-00000001")
+            .fullName("Synthetic Provisional Client").email("synthetic@example.invalid").memberAccount(true).clientPortalEnabled(false)
+            .status(MemberStatus.ACTIVE).position(Position.MEMBER).build();
+        when(memberDirectoryService.findByEmail("synthetic@example.invalid")).thenReturn(Optional.of(provisional));
+        when(memberDirectoryService.findClientLoginAccount(org.mockito.ArgumentMatchers.anyString())).thenReturn(Optional.empty());
+        assertThat(controller().requestMemberLoginOtp("synthetic@example.invalid").getStatusCode().value()).isEqualTo(400);
+        assertThat(controller().verifyMemberLoginOtp("synthetic@example.invalid","123456",new MockHttpServletRequest()).getStatusCode().value()).isEqualTo(400);
+        assertThat(controller().requestPasswordResetOtp("synthetic@example.invalid","member").getStatusCode().value()).isEqualTo(400);
+        org.mockito.Mockito.verifyNoInteractions(emailOtpService);
+    }
 
     @Test
     void anonymousRootShowsPublicLandingPage() {

@@ -32,7 +32,7 @@ class ClientNumberAllocationPostgresTest {
             var tx=new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
             var service=context.getBean(MemberRegistrationService.class);
             assertThat(jdbc.queryForObject("select count(*) from members where username is null",Integer.class)).isZero();
-            assertThat(jdbc.queryForObject("select md5(coalesce(string_agg((to_jsonb(m)-'username')::text,'' order by id),'')) from members m",String.class))
+            assertThat(jdbc.queryForObject("select md5(coalesce(string_agg((to_jsonb(m)-'username'-'client_portal_enabled')::text,'' order by id),'')) from members m",String.class))
                 .isEqualTo(Config.beforeUsernameMigration);
             assertThat(jdbc.queryForList("select username from members where member_no like 'LOGIN-BEFORE-%' order by member_no",String.class))
                 .containsExactly("asha", "asha_2", "asha_3", "user_123", "user_a");
@@ -82,7 +82,8 @@ class ClientNumberAllocationPostgresTest {
             assertThatThrownBy(()->tx.executeWithoutResult(s->{rolledBack[0]=service.register(form(92)).getMemberNo();throw new IllegalStateException("Synthetic rollback");})).hasMessage("Synthetic rollback");
             assertThat(jdbc.queryForObject("select count(*) from members where member_no=?",Integer.class,rolledBack[0])).isZero();
             assertThat(service.register(form(93)).getMemberNo()).isNotEqualTo(rolledBack[0]);
-            assertThat(service.registerAssisted(form(94),"ASSISTED-KEEP","Synthetic Assisted Client","NUMBER-TEST","B1").getMemberNo()).isEqualTo("ASSISTED-KEEP");
+            var assisted=service.registerAssisted(form(94),"Synthetic Assisted Client","NUMBER-TEST","B1");
+            assertThat(assisted.getMemberNo()).matches("CL-[0-9]{8,}");assertThat(assisted.isClientPortalEnabled()).isFalse();
         }
     }
     static MemberRegistrationForm form(int n) {
@@ -110,8 +111,8 @@ class ClientNumberAllocationPostgresTest {
             f.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto","validate","hibernate.physical_naming_strategy","org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy"));return f;
         }
         @Bean PlatformTransactionManager transactionManager(jakarta.persistence.EntityManagerFactory f){return new JpaTransactionManager(f);}
-        @Bean MemberRegistrationService registration(MemberRepository members,RegisteredSaccoRepository institutions,SaccoStationRepository branches,SaccoSettingsRepository settings,UserSettingsRepository users) {
-            var passwords=mock(PasswordEncoder.class);when(passwords.encode(any())).thenReturn("!SYNTHETIC");return new MemberRegistrationService(members,institutions,branches,settings,users,passwords,new NameSignatureService());
+        @Bean MemberRegistrationService registration(MemberRepository members,RegisteredSaccoRepository institutions,SaccoStationRepository branches,UserSettingsRepository users) {
+            var passwords=mock(PasswordEncoder.class);when(passwords.encode(any())).thenReturn("!SYNTHETIC");return new MemberRegistrationService(members,institutions,branches,users,passwords,new NameSignatureService(),mock(AuditService.class));
         }
     }
 }

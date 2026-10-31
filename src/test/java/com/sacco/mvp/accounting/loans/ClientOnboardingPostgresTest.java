@@ -71,7 +71,7 @@ class ClientOnboardingPostgresTest {
 
     @Test void existingRegistrationIsUnverifiedAndAssistedCreationDoesNotFabricateOtpOrConsent(){
         assertThat(service.client(f.actor,f.client).state()).isEqualTo("NOT_STARTED");assertThat(gate()).isEqualTo("kyc.error.required");
-        var form=new CreateForm();form.setNumber("KYC-"+UUID.randomUUID());form.setName("Synthetic New Client");form.setPhone("2557"+String.format("%08d",Math.floorMod(UUID.randomUUID().getLeastSignificantBits(),100000000)));form.setEmail(UUID.randomUUID()+"@example.invalid");
+        var form=new CreateForm();form.setName("Synthetic New Client");form.setPhone("2557"+String.format("%08d",Math.floorMod(UUID.randomUUID().getLeastSignificantBits(),100000000)));form.setEmail(UUID.randomUUID()+"@example.invalid");
         UUID id=service.create(f.actor,form);assertThat(service.create(f.actor,form)).isEqualTo(id);assertThat(service.client(f.actor,id).state()).isEqualTo("NOT_STARTED");assertThat(f.jdbc.queryForObject("select phone_verified_at from members where id=?",OffsetDateTime.class,id)).isNull();assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_revision where client_id=?",Integer.class,id)).isZero();
         assertThat(f.jdbc.queryForObject("select signature_text from members where id=?",String.class,id)).isNull();assertThat(f.jdbc.queryForObject("select count(*) from sacco_settings where sacco_id=?",Integer.class,f.institution)).isZero();
     }
