@@ -2,7 +2,7 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="${pageContext.response.locale.language}">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -17,21 +17,29 @@
     <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css?v=20261030-auth-alerts' />" />
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
-<body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
+<body class="auth-shell aws-auth-shell auth-login-page min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
+<nav class="auth-language" aria-label="<spring:message code='portal.language' />">
+    <c:forEach items="${['en','sw']}" var="loginLanguage">
+        <c:url value="${systemAdminLogin ? '/system-admin/login' : '/login'}" var="loginLanguageUrl">
+            <c:param name="lang" value="${loginLanguage}" />
+            <c:if test="${not systemAdminLogin}"><c:param name="tab" value="${activeLoginTab}" /></c:if>
+        </c:url>
+        <a href="${loginLanguageUrl}" lang="${loginLanguage}" hreflang="${loginLanguage}" data-login-language ${pageContext.response.locale.language eq loginLanguage ? 'aria-current="true"' : ''}>${loginLanguage eq 'sw' ? 'Kiswahili' : 'English'}</a>
+    </c:forEach>
+</nav>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
     <div class="auth-login-layout">
         <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
-        <a class="auth-home-link" href="<c:url value='/' />"><spring:message code="home.back" /></a>
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to Microfinance'}</h1>
+                <h1 class="auth-heading"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'login.heading'}" /></h1>
             </div>
         </div>
         <c:if test="${not systemAdminLogin}">
         <div class="mb-5">
-            <div class="auth-tabs mb-5" role="tablist" aria-label="Choose login type">
+            <div class="auth-tabs mb-5" role="tablist" aria-label="<spring:message code='login.chooseType' />">
                 <button type="button"
                         id="memberLoginTab"
                         class="auth-tab ${activeLoginTab eq 'member' ? 'is-active' : ''}"
@@ -40,7 +48,7 @@
                         aria-selected="${activeLoginTab eq 'member'}"
                         data-login-tab-toggle="member"
                         data-active="${activeLoginTab eq 'member'}">
-                    Clients
+                    <spring:message code="login.clients" />
                 </button>
                 <button type="button"
                         id="staffLoginTab"
@@ -50,7 +58,7 @@
                         aria-selected="${activeLoginTab eq 'staff'}"
                         data-login-tab-toggle="staff"
                         data-active="${activeLoginTab eq 'staff'}">
-                    Staff
+                    <spring:message code="login.staff" />
                 </button>
             </div>
         </div>
@@ -93,34 +101,34 @@
                     <div data-login-tab="system-admin" class="space-y-5">
                         <div class="auth-mode-card space-y-4">
                             <div>
-                                <p class="auth-mode-title">System Admin</p>
+                                <p class="auth-mode-title"><spring:message code="home.systemAdmin" /></p>
                             </div>
                             <form action="/login" method="post" class="space-y-4" data-login-password-form>
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="loginType" value="system-admin-password" />
                                 <div>
-                                    <label class="mb-2 block auth-section-label">System Admin ID</label>
+                                    <label class="mb-2 block auth-section-label"><spring:message code="login.systemAdminId" /></label>
                                     <input name="username" autocomplete="username" required autofocus class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
-                                    <label class="mb-2 block auth-section-label">Password</label>
+                                    <label class="mb-2 block auth-section-label"><spring:message code="login.password" /></label>
                                     <div class="auth-password-control"><input id="systemAdminLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="systemAdminLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                    <span class="text-slate-500">Having trouble with your password?</span>
-                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="system-admin">Forgot password?</a>
+                                    <span class="text-slate-500"><spring:message code="login.passwordHelp" /></span>
+                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="system-admin"><spring:message code="login.forgotPassword" /></a>
                                 </div>
                                 <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
-                                    <span data-login-submit-label>Log in as System Admin</span>
+                                    <span data-login-submit-label><spring:message code="login.asSystemAdmin" /></span>
                                     <span class="hidden items-center gap-2" data-login-submit-loading>
                                         <span class="auth-submit-spinner" aria-hidden="true"></span>
-                                        <span>Logging in...</span>
+                                        <span><spring:message code="login.signingIn" /></span>
                                     </span>
                                 </button>
                             </form>
                         </div>
                         <div class="auth-login-meta border-t border-slate-200 pt-6 text-center text-sm">
-                            <a href="/login" class="auth-text-link">Client or staff login</a>
+                            <a href="/login" class="auth-text-link"><spring:message code="login.otherLogin" /></a>
                         </div>
                     </div>
                     </c:when>
@@ -138,24 +146,24 @@
                                     <input id="clientLoginIdentifier" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
-                                    <label class="mb-2 block auth-section-label">Password</label>
+                                    <label class="mb-2 block auth-section-label"><spring:message code="login.password" /></label>
                                     <div class="auth-password-control"><input id="memberLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="memberLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                    <span class="text-slate-500">Having trouble with your password?</span>
-                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="member">Forgot password?</a>
+                                    <span class="text-slate-500"><spring:message code="login.passwordHelp" /></span>
+                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="member"><spring:message code="login.forgotPassword" /></a>
                                 </div>
                                 <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
-                                    <span data-login-submit-label>Log in</span>
+                                    <span data-login-submit-label><spring:message code="home.login" /></span>
                                     <span class="hidden items-center gap-2" data-login-submit-loading>
                                         <span class="auth-submit-spinner" aria-hidden="true"></span>
-                                        <span>Logging in...</span>
+                                        <span><spring:message code="login.signingIn" /></span>
                                     </span>
                                 </button>
                             </form>
                         </div>
 
-                        <div class="auth-or-divider">or</div>
+                        <div class="auth-or-divider"><spring:message code="login.or" /></div>
 
                         <div class="auth-mode-card space-y-4">
                             <div>
@@ -170,7 +178,7 @@
                                 </c:when>
                                 <c:otherwise>
                                     <button type="button" class="auth-secondary-btn inline-flex w-full cursor-not-allowed items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold opacity-70" disabled>
-                                        Google SSO not configured
+                                        <spring:message code="login.ssoUnavailable" />
                                     </button>
                                 </c:otherwise>
                             </c:choose>
@@ -190,24 +198,24 @@
                                     <input id="staffLoginIdentifier" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
-                                    <label class="mb-2 block auth-section-label">Password</label>
+                                    <label class="mb-2 block auth-section-label"><spring:message code="login.password" /></label>
                                     <div class="auth-password-control"><input id="staffLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="staffLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                    <span class="text-slate-500">Having trouble with your password?</span>
-                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="staff">Forgot password?</a>
+                                    <span class="text-slate-500"><spring:message code="login.passwordHelp" /></span>
+                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="staff"><spring:message code="login.forgotPassword" /></a>
                                 </div>
                                 <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
-                                    <span data-login-submit-label>Log in as Staff</span>
+                                    <span data-login-submit-label><spring:message code="login.asStaff" /></span>
                                     <span class="hidden items-center gap-2" data-login-submit-loading>
                                         <span class="auth-submit-spinner" aria-hidden="true"></span>
-                                        <span>Logging in...</span>
+                                        <span><spring:message code="login.signingIn" /></span>
                                     </span>
                                 </button>
                             </form>
                         </div>
 
-                        <div class="auth-or-divider">or</div>
+                        <div class="auth-or-divider"><spring:message code="login.or" /></div>
 
                         <div class="auth-mode-card space-y-4">
                             <div>
@@ -222,7 +230,7 @@
                                 </c:when>
                                 <c:otherwise>
                                     <button type="button" class="auth-secondary-btn inline-flex w-full cursor-not-allowed items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold opacity-70" disabled>
-                                        Google SSO not configured
+                                        <spring:message code="login.ssoUnavailable" />
                                     </button>
                                 </c:otherwise>
                             </c:choose>
@@ -230,11 +238,11 @@
                     </div>
 
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
-                        <span>Don't have an account? </span>
+                        <span><spring:message code="login.noAccount" /> </span>
                         <a class="auth-signup-link" href="<c:url value='/client-portal'/>"><spring:message code="portal.title"/></a>
                         <a href="/register/member" class="auth-signup-link"><spring:message code="login.registerMember" /></a>
                         <div class="mt-3">
-                            <a href="/system-admin/login" class="auth-text-link">System Admin login</a>
+                            <a href="/system-admin/login" class="auth-text-link"><spring:message code="home.systemAdmin" /></a>
                         </div>
                     </div>
                     </c:otherwise>
@@ -624,6 +632,11 @@
             const nextUrl = new URL(window.location.href);
             nextUrl.searchParams.set('tab', key);
             window.history.replaceState(window.history.state, '', nextUrl);
+            if (key !== 'system-admin') document.querySelectorAll('[data-login-language]').forEach(link => {
+                const languageUrl = new URL(link.href);
+                languageUrl.searchParams.set('tab', key);
+                link.href = languageUrl.toString();
+            });
         }
         toggles.forEach((button) => {
             button.addEventListener('click', () => activate(button.getAttribute('data-login-tab-toggle')));

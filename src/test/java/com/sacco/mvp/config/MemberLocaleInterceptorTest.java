@@ -23,6 +23,19 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class MemberLocaleInterceptorTest {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"/login","/system-admin/login"})
+    void publicLoginLanguageSwitchesWithoutLookingUpAUser(String path)throws Exception {
+        var settings=mock(UserSettingsService.class);var institutions=mock(SaccoRegistryService.class);
+        var request=new MockHttpServletRequest("GET",path);var response=new MockHttpServletResponse();
+        var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
+        request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);
+        org.springframework.web.util.ServletRequestPathUtils.parseAndCache(request);
+        var registrations=new RegisteredInterceptors();new WebConfig(mock(AdminScopeInterceptor.class),new MemberLocaleInterceptor(settings,institutions)).addInterceptors(registrations);
+        request.setParameter("lang","sw");registrations.apply(request,response);assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.of("sw"));
+        request.setParameter("lang","en");registrations.apply(request,response);assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.ENGLISH);
+        verifyNoInteractions(settings,institutions);
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"/finance/groups","/finance/groups/example","/finance/groups/example/authority/new","/finance/groups/cycles/example"})

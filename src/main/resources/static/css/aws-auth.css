@@ -1,6 +1,11 @@
 .auth-home-link { display: inline-block; margin-bottom: 16px; color: #0972d3; font-size: 14px; }
 .auth-home-link:hover { text-decoration: underline; }
 .auth-home-link:focus-visible { outline: 3px solid #0972d3; outline-offset: 4px; }
+.auth-language { position: absolute; top: 8px; right: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 16px; z-index: 10; font-size: 14px; }
+.auth-language a { display: inline-flex; align-items: center; min-height: 36px; }
+.auth-language a[aria-current] { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+.auth-language a:focus-visible { outline: 2px solid #0972d3; outline-offset: 3px; }
+body.auth-shell.aws-auth-shell.auth-login-page > .min-h-screen { padding-top: 64px !important; }
 
 :root {
     --sacco-topbar: #232f3e;

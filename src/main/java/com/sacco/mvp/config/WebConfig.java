@@ -47,7 +47,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         var portalLocale=new org.springframework.web.servlet.i18n.LocaleChangeInterceptor();
         portalLocale.setParamName("lang");portalLocale.setHttpMethods("GET");
-        registry.addInterceptor(portalLocale).addPathPatterns("/","/client-portal","/client-portal/**");
+        registry.addInterceptor(portalLocale).addPathPatterns("/","/login","/system-admin/login","/client-portal","/client-portal/**");
         registry.addInterceptor(memberLocaleInterceptor)
             .addPathPatterns("/app/**", "/admin/**", "/staff/**", "/manager/**", "/board/**",
                 "/loan-officer/**", "/accountant/**", "/disbursement/**", "/repayments", "/repayments/**",
