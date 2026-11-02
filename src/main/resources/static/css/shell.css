@@ -3492,7 +3492,6 @@ body.aws-console,
     position: sticky;
     top: 0;
     z-index: 2;
-    background: #eaeded !important;
 }
 .aws-console .member-dashboard-flow-shell {
     max-width: 100%;
