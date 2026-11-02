@@ -45,6 +45,25 @@ class ClientPortalSecurityMvcTest {
         var auth=UsernamePasswordAuthenticationToken.authenticated(session(),null,List.of());
         mvc.perform(get("/").with(authentication(auth))).andExpect(status().isOk()).andExpect(content().string("public home"));
     }
+    @Test void registrationBindsProfileDetailsWithoutAcceptingPrivateOrStaffFields()throws Exception{
+        mvc.perform(post("/client-portal/request-code").with(csrf()).param("intent","REGISTER")
+            .param("registration.profile.businessName","Synthetic shop").param("registration.profile.dailySales","12500.50")
+            .param("registration.profile.spouseName","Synthetic spouse").param("registration.profile.bankAccountNumber","12345678")
+            .param("registration.profile.groupId",UUID.randomUUID().toString()).param("registration.profile.groupName","Forged group")
+            .param("registration.profile.lawfulBasis","LEGAL_OBLIGATION")).andExpect(status().is3xxRedirection());
+        var captured=org.mockito.ArgumentCaptor.forClass(com.sacco.mvp.clients.portal.dto.ClientPortalDtos.EntryForm.class);
+        verify(portal).request(captured.capture(),anyString());var p=captured.getValue().getRegistration().getProfile();
+        assertThat(p.getBusinessName()).isEqualTo("Synthetic shop");assertThat(p.getDailySales()).isEqualByComparingTo("12500.50");
+        assertThat(p.getSpouseName()).isEqualTo("Synthetic spouse");assertThat(p.getBankAccountNumber()).isEqualTo("12345678");
+        assertThat(p.getGroupId()).isNull();assertThat(p.getGroupName()).isEmpty();
+    }
+    @Test void invalidRegistrationDetailsReturnTheSameFormWithFieldErrors()throws Exception{
+        when(portal.request(any(),anyString())).thenThrow(new IllegalArgumentException("kyc.error.dailySales"));
+        mvc.perform(post("/client-portal/request-code").with(csrf()).param("intent","REGISTER")
+            .param("registration.profile.businessName","Keep my shop").param("registration.profile.dailySales","-1"))
+            .andExpect(status().isOk()).andExpect(view().name("portal/entry"))
+            .andExpect(model().attributeHasFieldErrors("entryForm","registration.profile.dailySales"));
+    }
     @Test void successfulCodeVerificationRotatesSessionAndNeverGrantsNormalAuthorities()throws Exception{
         var http=new MockHttpSession();String before=http.getId();UUID nonce=UUID.randomUUID();http.setAttribute("clientPortalChallenge",nonce);Session access=session();when(portal.verify(nonce,"123456","127.0.0.1")).thenReturn(Optional.of(access));
         mvc.perform(post("/client-portal/verify").session(http).with(csrf()).param("code","123456")).andExpect(redirectedUrl("/client-portal/workspace/applications"));

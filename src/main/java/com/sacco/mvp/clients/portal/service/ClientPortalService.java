@@ -56,6 +56,7 @@ public class ClientPortalService {
                 String phone;try{phone=TanzaniaPhoneNumber.normalizeRequired(p.getPhone());}catch(IllegalStateException e){throw new IllegalArgumentException("portal.error.contact");}
                 check(p.getEmail()!=null&&p.getEmail().length()<=255&&(p.getEmail().isBlank()||p.getEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")));
                 p.setPhone(phone);p.setEmail(p.getEmail().strip().toLowerCase(Locale.ROOT));
+                onboarding.validateRegistrationProfile(p);
                 member=Member.builder().saccoId(f.getInstitution()).stationId(f.getBranch()).fullName(name).phone(phone).email(p.getEmail()).build();
             } else {
                 check(f.getClientNumber()!=null&&f.getClientNumber().length()<=80);member=records.client(f.getClientNumber().strip().toUpperCase(Locale.ROOT)).orElse(null);

@@ -246,6 +246,11 @@ public class OnboardingService {
         check(documents.stream().map(Document::category).collect(java.util.stream.Collectors.toSet()).containsAll(p.isSelfService()?Set.of("IDENTITY","ADDRESS","ACTIVITY"):Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")),"documents");
         check(documents.stream().noneMatch(d->d.expiresOn()!=null&&d.expiresOn().isBefore(today())),"documentExpiry");
     }
+    /** Public enrollment accepts the same draft fields; private group choices follow contact verification. */
+    public void validateRegistrationProfile(ClientProfile profile) {
+        check(profile!=null,"profile");names(profile);check(profile.getGroupId()==null,"groupId");
+        validate(json.readValue(json.writeValueAsString(profile),Profile.class),false);
+    }
     private void validate(Profile p,boolean complete) {
         text(p.getGender(),20,"gender",false);check(p.getGender().isBlank()||Set.of("MALE","FEMALE","OTHER","NOT_DISCLOSED").contains(p.getGender()),"gender");
         text(p.getMaritalStatus(),20,"maritalStatus",false);check(p.getMaritalStatus().isBlank()||Set.of("SINGLE","MARRIED","DIVORCED","SEPARATED","WIDOWED","NOT_DISCLOSED").contains(p.getMaritalStatus()),"maritalStatus");

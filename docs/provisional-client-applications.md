@@ -29,6 +29,12 @@ Successful verification rotates the HTTP session ID and establishes a restricted
 
 Consumed challenges immediately discard their code hash and registration payload. A bounded cleanup removes challenges and rate buckets older than a day, 500 of each per minute by default. `app.client-portal.cleanup-ms` controls the interval.
 
+## Shared client profile
+
+Public provisional registration, staff-assisted registration and the borrower Complete profile flow reuse the same profile-field fragment: bio data, contact/address, business, spouse and bank details. Public registration retains these details through contact OTP verification into the initial profile draft, using the same draft validation before sending a code. Private group choices, photos and supporting documents become available after contact verification; their tabs explain this before verification. Profile submission, document checks and independent staff verification remain unchanged. A provisional identity still has no borrower account, and subsequent applications reuse its client number.
+
+The profile parity correction passed 15 distinct focused cases: real staff/client JSP rendering, Jasper compilation, portal MVC/security and PostgreSQL tests, and the full Spring Boot registration/OTP/loan flow. The public form renders every applicable shared profile field; supplied business, spouse, bank and other profile details survive OTP and database storage. Browser checks confirmed tab value preservation, upload guidance, no console errors and no page overflow at 360, 768, 1366 and 1920 pixels in English and Kiswahili. Delivery was mocked; no live SMS/email provider was exercised.
+
 ## Recording and evidence
 
 The reference application's four sections informed the form: application information, guarantors, collateral and documents. Fields include application date, product, amount, explicit repayment period, officer preference, purpose/use of funds, business, declared monthly income/expenses/debt, guarantor relationship/activity/contact, and repeated collateral names, numbers, types, descriptions, owners, contacts, locations and declared values.

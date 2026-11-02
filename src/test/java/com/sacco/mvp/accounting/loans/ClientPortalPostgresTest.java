@@ -36,7 +36,12 @@ class ClientPortalPostgresTest {
     EntryForm enrollment(){var e=new EntryForm();e.setIntent("REGISTER");e.setInstitution(f.f.institution);e.setBranch("B1");var p=e.getRegistration().getProfile();p.setFirstName("Synthetic");p.setLastName("Applicant");p.setPhone(f.phone());p.setEmail(UUID.randomUUID()+"@example.invalid");return e;}
     Session register(){var id=portal.request(enrollment(),"127.0.0.3");return portal.verify(id,code.get(),"127.0.0.3").orElseThrow();}
     @Test void selfRegistrationCreatesOnePermanentIdentityWithoutAUserAccountAndRejectsReuse(){
-        var entry=enrollment();var id=portal.request(entry,"127.0.0.4");String otp=code.get();var session=portal.verify(id,otp,"127.0.0.4").orElseThrow();
+        var entry=enrollment();var p=entry.getRegistration().getProfile();p.setGender("FEMALE");p.setMaritalStatus("MARRIED");p.setDependants(2);p.setIdentityType("NATIONAL_ID");p.setIssuingCountry("TZ");p.setIdentityNumber("TZ-PUBLIC-12345");p.setBirthDate(LocalDate.of(1990,1,1));p.setIdentityNoExpiry(true);
+        p.setCity("Synthetic city");p.setPostalAddress("Box 10");p.setAddress("Synthetic address");p.setBusinessName("Synthetic shop");p.setBusinessTin("123456789");p.setBusinessType("Retail");p.setBusinessLicence("LIC-10");p.setBusinessLocation("Synthetic market");p.setBusinessWard("Synthetic ward");p.setBusinessCity("Synthetic city");p.setDailySales(new java.math.BigDecimal("30000.00"));p.setDailyExpenditure(new java.math.BigDecimal("20000.00"));p.setOtherIncomeSources("Farm sales");p.setActivity("Retail");p.setActivityAddress("Synthetic market");p.setSourceOfFunds("Sales");
+        p.setSpouseName("Synthetic spouse");p.setSpouseRelationship("Spouse");p.setSpousePhone(f.phone());p.setSpouseWork("Retail");p.setSpouseWorkLocation("Synthetic market");p.setBankName("Synthetic bank");p.setBankAccountName("Synthetic Applicant");p.setBankAccountNumber("1234567890");
+        var id=portal.request(entry,"127.0.0.4");String otp=code.get();var session=portal.verify(id,otp,"127.0.0.4").orElseThrow();
+        p.setFirstName("SYNTHETIC");p.setLastName("APPLICANT");
+        assertThat(f.service.ownForm(portal.actor(session,false)).getProfile()).usingRecursiveComparison().isEqualTo(p);
         var member=f.f.context.getBean(MemberRepository.class).findById(session.clientId()).orElseThrow();assertThat(member.isClientPortalEnabled()).isFalse();assertThat(member.getUsername()).isNull();assertThat(member.getPasswordHash()).isEqualTo("!NO_PORTAL_ACCESS");assertThat(member.getMemberNo()).matches("CL-[0-9]{8,}");assertThat(member.getSignatureText()).isNull();assertThat(f.service.ownStatus(portal.actor(session,false)).state()).isEqualTo("DRAFT");
         assertThat(portal.verify(id,otp,"127.0.0.4")).isEmpty();assertThatThrownBy(()->portal.actor(session,true)).isInstanceOf(AccessDeniedException.class);
         var duplicate=portal.request(entry,"127.0.0.5");assertThat(portal.verify(duplicate,code.get(),"127.0.0.5")).isEmpty();assertThat(f.f.jdbc.queryForObject("select count(*) from members where phone=?",Integer.class,member.getPhone())).isEqualTo(1);
@@ -55,4 +60,10 @@ class ClientPortalPostgresTest {
         var session=register();f.f.jdbc.update("update sacco_stations set active=false where sacco_id=? and station_id='B1'",f.f.institution);assertThatThrownBy(()->portal.actor(session,false)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void staffCannotCreateOrEditProfilesForFullBorrowerAccounts(){f.f.jdbc.update("update members set client_portal_enabled=true,password_hash='test-only' where id=?",f.f.client);assertThatThrownBy(()->f.service.profileForm(f.f.actor,f.f.client)).hasMessage("kyc.error.selfServiceOnly");assertThatThrownBy(()->f.service.save(f.f.actor,f.f.client,new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.ProfileForm())).hasMessage("kyc.error.selfServiceOnly");}
+    @Test void invalidProfileFieldsAndPrivateGroupSelectionsFailBeforeCodeDelivery(){
+        var entry=enrollment();entry.getRegistration().getProfile().setDailySales(new java.math.BigDecimal("-0.01"));
+        assertThatThrownBy(()->portal.request(entry,"127.0.0.61")).hasMessage("kyc.error.dailySales");
+        entry.getRegistration().getProfile().setDailySales(null);entry.getRegistration().getProfile().setGroupId(UUID.randomUUID());
+        assertThatThrownBy(()->portal.request(entry,"127.0.0.62")).hasMessage("kyc.error.groupId");verifyNoInteractions(delivery);
+    }
 }

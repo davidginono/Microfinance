@@ -25,14 +25,19 @@ public class ClientPortalController {
     private static final String ROOT="/client-portal",PROFILE=ROOT+"/workspace/profile";
     private final ClientPortalService portal;
     private final OnboardingService onboarding;
-    @InitBinder("entryForm") void entryBinder(WebDataBinder b){b.setAllowedFields("clientNumber","intent","institution","branch","registration.profile.firstName","registration.profile.middleName","registration.profile.lastName","registration.profile.phone","registration.profile.email");}
+    private static String[] entryFields(){return java.util.stream.Stream.concat(java.util.stream.Stream.of("clientNumber","intent","institution","branch","registration.profile.firstName","registration.profile.middleName","registration.profile.lastName","registration.profile.phone","registration.profile.email"),Arrays.stream(OnboardingService.PERSONAL_FIELDS).filter(f->!f.equals("groupId")).map(f->"registration.profile."+f)).toArray(String[]::new);}
+    @InitBinder("entryForm") void entryBinder(WebDataBinder b){b.setAllowedFields(entryFields());}
     @InitBinder("selfForm") void selfBinder(WebDataBinder b){b.setAllowedFields(java.util.stream.Stream.concat(java.util.stream.Stream.of("requestKey","expectedSequence","action","noticeId","noticeAcknowledged","declarationAccepted"),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b){b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @GetMapping public String entry(Model m){m.addAttribute("entryForm",new EntryForm());return "portal/entry";}
     @GetMapping("/register") public String register(Model m){var f=new EntryForm();f.setIntent("REGISTER");m.addAttribute("entryForm",f);return "portal/entry";}
     @GetMapping("/choices") @ResponseBody public ResponseEntity<List<Choice>> choices(@RequestParam(required=false) String institution,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(portal.choices(institution,search,page));}
     @PostMapping("/request-code") public String request(@ModelAttribute("entryForm") EntryForm f,BindingResult errors,HttpServletRequest request,Model m){
-        if(!errors.hasErrors())try{UUID id=portal.request(f,request.getRemoteAddr());request.getSession().setAttribute("clientPortalChallenge",id);return "redirect:"+ROOT+"/verify";}catch(IllegalArgumentException e){errors.reject("portal.error.invalid");}
+        if(!errors.hasErrors())try{UUID id=portal.request(f,request.getRemoteAddr());request.getSession().setAttribute("clientPortalChallenge",id);return "redirect:"+ROOT+"/verify";}catch(IllegalArgumentException e){
+            String key=Objects.toString(e.getMessage(),"");String field=key.startsWith("kyc.error.")?key.substring("kyc.error.".length()):"";
+            if(field.equals("nameParts"))field="firstName";if(field.equals("identityExpiry"))field="identityExpiresOn";
+            if(f.getIntent().equals("REGISTER")&&Arrays.asList(entryFields()).contains("registration.profile."+field))errors.rejectValue("registration.profile."+field,key);else errors.reject("portal.error.invalid");
+        }
         return "portal/entry";
     }
     @GetMapping("/verify") public String code(HttpSession session){return session.getAttribute("clientPortalChallenge") instanceof UUID?"portal/verify":"redirect:"+ROOT;}
