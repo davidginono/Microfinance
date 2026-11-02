@@ -1692,7 +1692,7 @@
             ? Math.max(configuredWarningMs, 1000)
             : 60000;
         let timeoutMs = Math.max(configuredTimeoutMs, warningMs + 1000);
-        const warningEnabled = prompt.getAttribute('data-warning-enabled') === 'true';
+        let warningEnabled = prompt.getAttribute('data-warning-enabled') === 'true';
         const pendingUploads = new Set();
         document.addEventListener('workspace:form-pending', function (event) {
             const form = event.detail.form;
@@ -1739,6 +1739,20 @@
         const pageRequestStartedAt = requestStartAttribute !== null ? Number(requestStartAttribute)
             : navigation ? window.performance.timeOrigin + navigation.requestStart : Date.now();
         let cycleStartedAt = Number.isFinite(pageRequestStartedAt) ? Math.min(pageRequestStartedAt, Date.now()) : Date.now();
+        let lastActivityAt = null;
+        let lastActivityRequestAt = cycleStartedAt;
+        let activityTimer = null;
+        const sessionChannel = window.BroadcastChannel ? new BroadcastChannel('microfinance-session-renewal') : null;
+        if (sessionChannel) sessionChannel.onmessage = function (event) {
+            const renewal = event.data;
+            if (loggingOut || keepalivePending || !renewal || !Number.isFinite(renewal.startedAt)
+                || !Number.isFinite(renewal.timeoutMs) || renewal.timeoutMs <= warningMs
+                || renewal.startedAt > Date.now() || renewal.startedAt + renewal.timeoutMs <= cycleDeadline()) return;
+            timeoutMs = renewal.timeoutMs;
+            if (typeof renewal.warningEnabled === 'boolean') warningEnabled = renewal.warningEnabled;
+            if (promptVisible()) hidePrompt();
+            startSessionCycle(renewal.startedAt);
+        };
         let audioContext = null;
         let audioUnlocked = false;
         let stopwatchTickTimer = null;
@@ -1930,6 +1944,7 @@
             loggingOut = true;
             clearCountdown();
             if (checkTimer) window.clearTimeout(checkTimer);
+            if (activityTimer) window.clearTimeout(activityTimer);
             setStayPending(true);
             document.dispatchEvent(new Event('session:logout'));
             logoutForm.submit();
@@ -2044,7 +2059,8 @@
             scheduleFinalMinuteCheck();
         };
 
-        const refreshSession = function () {
+        const refreshSession = function (activityAt) {
+            const activity = Number.isFinite(activityAt);
             if (keepalivePending || loggingOut) {
                 return;
             }
@@ -2053,7 +2069,7 @@
                 return;
             }
             const password = passwordInput.value || '';
-            if (!password.trim()) {
+            if (!activity && !password.trim()) {
                 setPromptError(prompt.getAttribute('data-password-required-message') || 'Enter your current password to continue.');
                 passwordInput.focus();
                 return;
@@ -2062,8 +2078,9 @@
             setStayPending(true);
             clearPromptError();
             const body = new URLSearchParams();
-            body.set('password', password);
+            if (!activity) body.set('password', password);
             const requestStartedAt = Date.now();
+            const keepaliveUrl = prompt.getAttribute('data-keepalive-url') || '/session/keepalive';
             const controller = new AbortController();
             let renewalTimer;
             const renewalTimeout = new Promise(function (_, reject) {
@@ -2072,7 +2089,7 @@
                     reject(new Error('Session renewal timed out'));
                 }, 15000);
             });
-            Promise.race([fetch(prompt.getAttribute('data-keepalive-url') || '/session/keepalive', {
+            Promise.race([fetch(activity ? keepaliveUrl.replace(/\/keepalive$/, '/activity') : keepaliveUrl, {
                 method: 'POST',
                 headers: Object.assign(keepaliveHeaders(), {
                     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
@@ -2087,6 +2104,7 @@
                             return {};
                         })
                         .then(function (payload) {
+                            if (typeof payload.warningEnabled === 'boolean') warningEnabled = payload.warningEnabled;
                             if (!response.ok || response.redirected || payload.refreshed !== true) {
                                 const message = response.status === 403 && payload.refreshed === false
                                     ? prompt.getAttribute('data-password-invalid-message') || payload.message
@@ -2104,10 +2122,13 @@
                     if (Number.isFinite(payload.timeoutMs) && payload.timeoutMs > warningMs) {
                         timeoutMs = payload.timeoutMs;
                     }
-                    passwordInput.value = '';
-                    hidePrompt();
-                    startSessionCycle(requestStartedAt);
-                    if (typeof window.showToast === 'function') {
+                    if (!activity) {
+                        passwordInput.value = '';
+                        hidePrompt();
+                    }
+                    startSessionCycle(activity ? activityAt : requestStartedAt);
+                    sessionChannel?.postMessage({startedAt:cycleStartedAt, timeoutMs, warningEnabled});
+                    if (!activity && typeof window.showToast === 'function') {
                         window.showToast('success', prompt.getAttribute('data-refresh-success-message') || 'Session refreshed.');
                     }
                 })
@@ -2117,6 +2138,7 @@
                         expireSession();
                         return;
                     }
+                    if (activity) return;
                     setPromptError(error && error.sessionMessage ? error.message : prompt.getAttribute('data-refresh-error-message'));
                     setStayPending(false);
                     try {
@@ -2129,8 +2151,39 @@
                 .finally(function () {
                     window.clearTimeout(renewalTimer);
                     keepalivePending = false;
-                    if (!loggingOut) setStayPending(false);
+                    if (!loggingOut) {
+                        setStayPending(false);
+                        if (!promptVisible()) scheduleFinalMinuteCheck();
+                        scheduleActivityRenewal();
+                    }
                 });
+        };
+
+        const scheduleActivityRenewal = function () {
+            if (activityTimer || keepalivePending || warningEnabled || loggingOut || promptVisible() || lastActivityAt === null) return;
+            // Send at most one request per 30–60 seconds, only after browser input.
+            const intervalMs = Math.min(60000, timeoutMs / 4);
+            activityTimer = window.setTimeout(renewFromActivity, Math.max(lastActivityRequestAt + intervalMs - Date.now(), 0));
+        };
+
+        function renewFromActivity() {
+            if (activityTimer) window.clearTimeout(activityTimer);
+            activityTimer = null;
+            if (warningEnabled || loggingOut || keepalivePending || promptVisible() || document.hidden || lastActivityAt === null) return;
+            const activityAt = lastActivityAt;
+            lastActivityAt = null;
+            lastActivityRequestAt = Date.now();
+            refreshSession(activityAt);
+        }
+
+        const recordSessionActivity = function (event) {
+            if (warningEnabled || loggingOut || promptVisible() || document.hidden || !event.isTrusted || prompt.contains(event.target)) return;
+            if (Date.now() >= cycleDeadline()) {
+                if (!keepalivePending) expireSession();
+                return;
+            }
+            lastActivityAt = Date.now();
+            scheduleActivityRenewal();
         };
 
         function runFinalMinuteCheck() {
@@ -2138,12 +2191,18 @@
                 window.clearTimeout(checkTimer);
                 checkTimer = null;
             }
-            if (promptVisible()) {
+            if (promptVisible() || keepalivePending) {
                 return;
             }
             const now = Date.now();
             if (now >= cycleDeadline()) {
                 expireSession();
+                return;
+            }
+            if (!warningEnabled && lastActivityAt !== null && !document.hidden) {
+                scheduleActivityRenewal();
+                const nextAttemptAt = lastActivityRequestAt + Math.min(60000, timeoutMs / 4);
+                checkTimer = window.setTimeout(runFinalMinuteCheck, Math.max(Math.min(nextAttemptAt, cycleDeadline()) - now, 1));
                 return;
             }
             if (now < finalCheckAt()) {
@@ -2163,6 +2222,7 @@
                 updateCountdown();
                 return;
             }
+            if (keepalivePending) return;
             const now = Date.now();
             if (now >= cycleDeadline()) {
                 expireSession();
@@ -2181,10 +2241,22 @@
         window.addEventListener('focus', function () {
             handleWake();
         }, { passive: true });
+        window.addEventListener('pagehide', function (event) {
+            if (event.persisted) return;
+            // Late replies from a replaced workspace must not schedule another logout.
+            loggingOut = true;
+            sessionChannel?.close();
+            clearCountdown();
+            if (checkTimer) window.clearTimeout(checkTimer);
+            if (activityTimer) window.clearTimeout(activityTimer);
+        });
         document.addEventListener('visibilitychange', function () {
             if (!document.hidden) {
                 handleWake();
             }
+        });
+        ['pointerdown', 'pointermove', 'keydown', 'input', 'wheel', 'touchstart'].forEach(function (eventName) {
+            document.addEventListener(eventName, recordSessionActivity, {capture: true, passive: true});
         });
         ['input', 'change'].forEach(function (eventName) {
             document.addEventListener(eventName, function (event) {
@@ -2224,6 +2296,7 @@
             }
         });
         startSessionCycle(cycleStartedAt);
+        sessionChannel?.postMessage({startedAt:cycleStartedAt, timeoutMs, warningEnabled});
     };
 
     onReady( function () {

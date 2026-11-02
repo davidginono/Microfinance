@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 
-function setup(warningEnabled = true, {requestStartedAt, navigationStartedAt, initializedAt = 0} = {}) {
+function setup(warningEnabled = true, {requestStartedAt, navigationStartedAt, initializedAt = 0, broadcastChannel} = {}) {
     const dom = new JSDOM(`<form method="post" class="accounting-create-form"><input name="purpose" value="original"><a href="/finance/loan-records">Cancel</a></form>
         <div id="accounting-discard-modal" hidden><div role="dialog"><button data-accounting-keep>Close</button>
         <div class="app-modal-actions"><button data-accounting-keep>Continue editing</button><button data-accounting-discard>Discard</button></div></div></div>
@@ -16,6 +16,14 @@ function setup(warningEnabled = true, {requestStartedAt, navigationStartedAt, in
         <form id="sessionInactivityLogoutForm" action="/logout" method="post"><button type="submit">Logout Now</button></form>
         <button id="sessionInactivityStayButton">Stay Logged In</button></div>`, {url:'http://localhost/finance/loan-records/new', runScripts:'outside-only'});
     const w = dom.window, d = w.document;
+    if (broadcastChannel) w.BroadcastChannel = broadcastChannel;
+    Object.defineProperty(d, 'hidden', {configurable:true, value:false});
+    let activityListener;
+    const addListener = d.addEventListener.bind(d);
+    d.addEventListener = (type, handler, options) => {
+        if (handler.name === 'recordSessionActivity') activityListener = handler;
+        return addListener(type, handler, options);
+    };
     let now = initializedAt, nextId = 1, logouts = 0;
     if (requestStartedAt !== undefined) d.getElementById('sessionInactivityPrompt').dataset.clientRequestStartedAt = requestStartedAt;
     if (navigationStartedAt !== undefined) {
@@ -41,11 +49,144 @@ function setup(warningEnabled = true, {requestStartedAt, navigationStartedAt, in
         for (const fn of [...intervals.values()]) fn();
     };
     return {dom, w, d, advance, logouts:() => logouts,
+        interact:(target = d.querySelector('.accounting-create-form input')) => activityListener?.({isTrusted:true, target}),
         prompt:d.getElementById('sessionInactivityPrompt'), password:d.getElementById('sessionInactivityPassword'),
         stay:d.getElementById('sessionInactivityStayButton'), form:d.querySelector('.accounting-create-form'),
         logout:d.getElementById('sessionInactivityLogoutForm')};
 }
 const settled = () => new Promise(resolve => setImmediate(resolve));
+
+test('warning off batches trusted activity and extends only after server confirmation without sending a password', async () => {
+    const s = setup(false);
+    try {
+        const requests = [];
+        s.w.fetch = async (url, options) => { requests.push({url,options}); return {ok:true, status:200, json:async()=>({refreshed:true,timeoutMs:120000,warningEnabled:false})}; };
+        s.advance(1000); s.interact();
+        for (let i=0;i<100;i++) s.interact();
+        assert.equal(requests.length,0);
+        s.advance(30000); await settled();
+        assert.equal(requests.length,1); assert.equal(requests[0].url,'/session/activity');
+        assert.equal(requests[0].options.headers['X-CSRF-TOKEN'],'masked-token');
+        assert.equal(new URLSearchParams(requests[0].options.body).has('password'),false);
+        s.advance(121000); assert.equal(s.logouts(),1);
+        assert.equal(requests.length,1);
+    } finally { s.dom.window.close(); }
+});
+
+test('continued activity renews without opening the modal and stopping activity eventually logs out', async () => {
+    const s = setup(false);
+    try {
+        let requests=0;
+        s.w.fetch = async()=>{requests++;return {ok:true,status:200,json:async()=>({refreshed:true,timeoutMs:120000,warningEnabled:false})};};
+        for (const now of [1000,31000,61000,91000,121000,151000]) {
+            s.advance(now); s.interact(); s.advance(now+29000); await settled();
+            assert.equal(s.prompt.classList.contains('hidden'),true);assert.equal(s.logouts(),0);
+        }
+        assert.equal(requests,6);
+        s.advance(271000); assert.equal(s.logouts(),1); assert.equal(requests,6);
+    } finally { s.dom.window.close(); }
+});
+
+test('confirmed renewal in one tab prevents an idle tab from logging out the shared session', async () => {
+    const peers=new Set();
+    class Channel {
+        constructor(){peers.add(this);}
+        postMessage(data){for(const peer of peers)if(peer!==this)peer.onmessage?.({data});}
+        close(){peers.delete(this);}
+    }
+    const active=setup(false,{broadcastChannel:Channel}),idle=setup(false,{broadcastChannel:Channel});
+    try {
+        let idleRequests=0;idle.w.fetch=()=>{idleRequests++;return new Promise(()=>{});};
+        active.w.fetch=async()=>({ok:true,status:200,json:async()=>({refreshed:true,timeoutMs:120000,warningEnabled:false})});
+        active.advance(50000);idle.advance(50000);active.interact();active.advance(50000);await settled();
+        active.advance(120000);idle.advance(120000);
+        assert.equal(active.logouts(),0);assert.equal(idle.logouts(),0);assert.equal(idleRequests,0);
+        active.advance(170000);idle.advance(170000);assert.equal(active.logouts(),1);assert.equal(idle.logouts(),1);
+    } finally {active.dom.window.close();idle.dom.window.close();}
+});
+
+test('loading an authenticated workspace synchronizes its request timing with an older tab', () => {
+    const peers=new Set();
+    class Channel {
+        constructor(){peers.add(this);}
+        postMessage(data){for(const peer of peers)if(peer!==this)peer.onmessage?.({data});}
+        close(){peers.delete(this);}
+    }
+    const old=setup(false,{broadcastChannel:Channel});old.advance(50000);
+    const fresh=setup(false,{broadcastChannel:Channel,requestStartedAt:50000,initializedAt:50000});
+    try {
+        old.advance(120000);assert.equal(old.logouts(),0);
+        old.advance(170000);assert.equal(old.logouts(),1);
+    } finally {old.dom.window.close();fresh.dom.window.close();}
+});
+
+test('scripted input, background visibility, focus and idle timers do not renew sessions', () => {
+    const s=setup(false);
+    try {
+        let requests=0;s.w.fetch=()=>{requests++;return new Promise(()=>{});};
+        s.form.querySelector('input').dispatchEvent(new s.w.Event('input',{bubbles:true}));
+        s.w.dispatchEvent(new s.w.Event('focus'));
+        Object.defineProperty(s.d,'hidden',{configurable:true,value:true});s.interact();
+        s.advance(60000);s.advance(120000);
+        assert.equal(requests,0);assert.equal(s.logouts(),1);
+    } finally {s.dom.window.close();}
+});
+
+test('warning on keeps password confirmation even during trusted activity', () => {
+    const s=setup(true);
+    try {
+        let requests=0;s.w.fetch=()=>{requests++;return new Promise(()=>{});};
+        s.advance(1000);s.interact();s.advance(30000);s.interact();s.advance(60000);
+        assert.equal(requests,0);assert.equal(s.prompt.classList.contains('hidden'),false);
+        s.interact(s.password);s.advance(120000);assert.equal(s.logouts(),1);
+    } finally {s.dom.window.close();}
+});
+
+test('expired and failed activity renewals never extend the browser deadline', async () => {
+    for(const expired of [true,false]) {
+        const s=setup(false);
+        try {
+            s.w.fetch=async()=>{if(!expired)throw new TypeError('offline');return {ok:false,status:401,json:async()=>({refreshed:false})};};
+            s.advance(1000);s.interact();s.advance(30000);await settled();
+            assert.equal(s.logouts(),expired?1:0);
+            s.advance(120000);assert.equal(s.logouts(),1);
+        } finally {s.dom.window.close();}
+    }
+});
+
+test('enabling warnings on the server stops activity renewal on an already open page', async () => {
+    const s=setup(false);
+    try {
+        let requests=0;s.w.fetch=async()=>{requests++;return {ok:false,status:403,json:async()=>({refreshed:false,warningEnabled:true,timeoutMs:120000})};};
+        s.advance(1000);s.interact();s.advance(30000);await settled();
+        s.advance(31000);s.interact();s.advance(60000);
+        assert.equal(requests,1);assert.equal(s.prompt.classList.contains('hidden'),false);
+    } finally {s.dom.window.close();}
+});
+
+test('failed requests remain throttled while the user keeps interacting during the final minute', async () => {
+    const s=setup(false);
+    try {
+        let requests=0;s.w.fetch=async()=>{requests++;throw new TypeError('offline');};
+        s.advance(1000);s.interact();s.advance(30000);await settled();
+        s.advance(61000);s.interact();s.advance(61000);await settled();
+        assert.equal(requests,2);
+        for(const now of [62000,63000,64000]) {s.advance(now);s.interact();await settled();}
+        assert.equal(requests,2);
+        s.advance(91000);await settled();assert.equal(requests,3);
+    } finally {s.dom.window.close();}
+});
+
+test('leaving a workspace ignores its pending activity response and cancels its timers', async () => {
+    const s=setup(false);
+    try {
+        let resolve;s.w.fetch=()=>new Promise(done=>{resolve=done;});
+        s.advance(1000);s.interact();s.advance(30000);
+        s.w.dispatchEvent(new s.w.PageTransitionEvent('pagehide',{persisted:false}));
+        resolve({ok:true,status:200,json:async()=>({refreshed:true,timeoutMs:120000,warningEnabled:false})});await settled();
+        s.advance(300000);assert.equal(s.logouts(),0);
+    } finally {s.dom.window.close();}
+});
 
 test('slow page initialization does not restart the full timeout after the HTML request', () => {
     const s = setup(true, {requestStartedAt:0, initializedAt:30000});

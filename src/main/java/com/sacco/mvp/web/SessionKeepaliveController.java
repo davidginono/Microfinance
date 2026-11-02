@@ -37,14 +37,34 @@ public class SessionKeepaliveController {
                 .body(new SessionKeepalivePayload(false, "Enter the current password for this account to continue."));
         }
         SessionTimeoutPolicy policy = platformSessionSettingsService.policy();
-        session.setMaxInactiveInterval(policy.timeoutSeconds());
-        session.setAttribute(KEEPALIVE_ATTRIBUTE, System.currentTimeMillis());
-        return ResponseEntity.ok(new SessionKeepalivePayload(true, null, policy.timeoutMs()));
+        return renew(session, policy);
     }
 
-    public record SessionKeepalivePayload(boolean refreshed, String message, Long timeoutMs) {
+    @PostMapping("/session/activity")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<SessionKeepalivePayload> activity(HttpServletRequest request,
+                                                           @AuthenticationPrincipal AppUserPrincipal principal) {
+        HttpSession session = request.getSession(false);
+        if (session == null || principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        SessionTimeoutPolicy policy = platformSessionSettingsService.policy();
+        if (policy.warningEnabled()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new SessionKeepalivePayload(false, null, policy.timeoutMs(), true));
+        }
+        return renew(session, policy);
+    }
+
+    private ResponseEntity<SessionKeepalivePayload> renew(HttpSession session, SessionTimeoutPolicy policy) {
+        session.setMaxInactiveInterval(policy.timeoutSeconds());
+        session.setAttribute(KEEPALIVE_ATTRIBUTE, System.currentTimeMillis());
+        return ResponseEntity.ok(new SessionKeepalivePayload(true, null, policy.timeoutMs(), policy.warningEnabled()));
+    }
+
+    public record SessionKeepalivePayload(boolean refreshed, String message, Long timeoutMs, Boolean warningEnabled) {
         public SessionKeepalivePayload(boolean refreshed, String message) {
-            this(refreshed, message, null);
+            this(refreshed, message, null, null);
         }
     }
 }

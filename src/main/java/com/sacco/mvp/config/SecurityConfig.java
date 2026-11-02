@@ -640,7 +640,7 @@ public class SecurityConfig {
             if (exception instanceof CsrfException && !hasAuthenticatedSession()
                 && "POST".equalsIgnoreCase(request.getMethod())) {
                 String path = pathWithinApplication(request);
-                if ("/session/keepalive".equals(path)) {
+                if ("/session/keepalive".equals(path) || "/session/activity".equals(path)) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"refreshed\":false}");

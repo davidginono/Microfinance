@@ -81,6 +81,20 @@ class SessionKeepaliveControllerTest {
         verifyNoInteractions(settingsService);
     }
 
+    @Test
+    void activityCannotCreateSessionOrRenewWithoutPrincipal() {
+        var settings = mock(PlatformSessionSettingsService.class);
+        var reauthentication = mock(SessionReauthenticationService.class);
+        var controller = new SessionKeepaliveController(settings, reauthentication);
+        var request = new MockHttpServletRequest();
+        assertThat(controller.activity(request, principal()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(request.getSession(false)).isNull();
+        var session = request.getSession(true);
+        assertThat(controller.activity(request, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(session.getAttribute("sessionKeepaliveAt")).isNull();
+        verifyNoInteractions(settings, reauthentication);
+    }
+
     private AppUserPrincipal principal() {
         Member member = Member.builder()
             .id(UUID.randomUUID())

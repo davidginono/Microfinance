@@ -42,12 +42,14 @@ class SessionKeepaliveSecurityTest {
     @Autowired private WebApplicationContext context;
     @Autowired private MemberDirectoryService directory;
     @Autowired private PasswordEncoder encoder;
+    @Autowired private PlatformSessionSettingsService settings;
     private MockMvc mvc;
     private AppUserPrincipal principal;
     private MockHttpSession session;
     private CsrfToken csrf;
 
     @BeforeEach void setUp() throws Exception {
+        when(settings.policy()).thenReturn(new com.sacco.mvp.service.SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         Member member = Member.builder().id(UUID.randomUUID()).memberNo("SESSION-TEST")
             .memberAccount(true).status(MemberStatus.ACTIVE).passwordHash(encoder.encode("current-password")).build();
@@ -80,6 +82,31 @@ class SessionKeepaliveSecurityTest {
     @Test void expiredSessionReturnsUnauthorizedRatherThanPasswordFailure() throws Exception {
         mvc.perform(post("/session/keepalive").header(csrf.getHeaderName(), csrf.getToken())
                 .param("password", "current-password"))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.refreshed").value(false));
+    }
+
+    @Test void activityRenewsWithoutPasswordOnlyWhenWarningsAreOff() throws Exception {
+        mvc.perform(post("/session/activity").session(session).with(user(principal))
+                .header(csrf.getHeaderName(), csrf.getToken()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.refreshed").value(true))
+            .andExpect(jsonPath("$.warningEnabled").value(false))
+            .andExpect(jsonPath("$.timeoutMs").value(1_800_000L));
+        assertThat(session.getAttribute("sessionKeepaliveAt")).isInstanceOf(Long.class);
+
+        session.removeAttribute("sessionKeepaliveAt");
+        when(settings.policy()).thenReturn(new com.sacco.mvp.service.SessionTimeoutPolicy(30, 1_800_000L, 60_000L, true));
+        mvc.perform(post("/session/activity").session(session).with(user(principal))
+                .header(csrf.getHeaderName(), csrf.getToken()))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.refreshed").value(false))
+            .andExpect(jsonPath("$.warningEnabled").value(true));
+        assertThat(session.getAttribute("sessionKeepaliveAt")).isNull();
+    }
+
+    @Test void activityRequiresCsrfAndCannotReviveExpiredSessions() throws Exception {
+        mvc.perform(post("/session/activity").session(session).with(user(principal)))
+            .andExpect(status().isForbidden());
+        assertThat(session.getAttribute("sessionKeepaliveAt")).isNull();
+        mvc.perform(post("/session/activity").header(csrf.getHeaderName(), csrf.getToken()))
             .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.refreshed").value(false));
     }
 

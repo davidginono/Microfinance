@@ -25,7 +25,7 @@ class SessionTimeoutUiContractTest {
     }
 
     @Test
-    void shellScriptRequiresPasswordVerificationInsteadOfSilentRefresh() throws Exception {
+    void shellScriptSeparatesPasswordConfirmationFromActivityRenewal() throws Exception {
         String shell = Files.readString(Path.of("src/main/resources/static/js/shell.js"));
 
         assertThat(shell).contains("data-timeout-ms");
@@ -34,6 +34,7 @@ class SessionTimeoutUiContractTest {
         assertThat(shell).contains("runFinalMinuteCheck");
         assertThat(shell).contains("body.set('password', password)");
         assertThat(shell).contains("payload.refreshed !== true");
+        assertThat(shell).contains("!activity && !password.trim()", "!event.isTrusted", "scheduleActivityRenewal", "'/activity'");
         assertThat(shell).doesNotContain("activityInCycle");
         assertThat(shell).doesNotContain("refreshSession(true)");
         assertThat(shell).doesNotContain("schedulePrompt");
