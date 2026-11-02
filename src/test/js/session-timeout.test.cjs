@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 
-function setup(warningEnabled = true) {
+function setup(warningEnabled = true, {requestStartedAt, navigationStartedAt, initializedAt = 0} = {}) {
     const dom = new JSDOM(`<form method="post" class="accounting-create-form"><input name="purpose" value="original"><a href="/finance/loan-records">Cancel</a></form>
         <div id="accounting-discard-modal" hidden><div role="dialog"><button data-accounting-keep>Close</button>
         <div class="app-modal-actions"><button data-accounting-keep>Continue editing</button><button data-accounting-discard>Discard</button></div></div></div>
@@ -16,7 +16,12 @@ function setup(warningEnabled = true) {
         <form id="sessionInactivityLogoutForm" action="/logout" method="post"><button type="submit">Logout Now</button></form>
         <button id="sessionInactivityStayButton">Stay Logged In</button></div>`, {url:'http://localhost/finance/loan-records/new', runScripts:'outside-only'});
     const w = dom.window, d = w.document;
-    let now = 0, nextId = 1, logouts = 0;
+    let now = initializedAt, nextId = 1, logouts = 0;
+    if (requestStartedAt !== undefined) d.getElementById('sessionInactivityPrompt').dataset.clientRequestStartedAt = requestStartedAt;
+    if (navigationStartedAt !== undefined) {
+        Object.defineProperty(w.performance, 'timeOrigin', {value:navigationStartedAt});
+        w.performance.getEntriesByType = () => [{requestStart:0}];
+    }
     const timeouts = new Map(), intervals = new Map();
     w.Date.now = () => now;
     w.setTimeout = (fn, delay) => { const id = nextId++; timeouts.set(id, {fn, at:now + delay}); return id; };
@@ -41,6 +46,50 @@ function setup(warningEnabled = true) {
         logout:d.getElementById('sessionInactivityLogoutForm')};
 }
 const settled = () => new Promise(resolve => setImmediate(resolve));
+
+test('slow page initialization does not restart the full timeout after the HTML request', () => {
+    const s = setup(true, {requestStartedAt:0, initializedAt:30000});
+    try {
+        s.advance(60000); assert.equal(s.prompt.classList.contains('hidden'), false);
+        s.advance(120000); assert.equal(s.logouts(), 1);
+    } finally { s.dom.window.close(); }
+});
+
+test('a full-page load uses navigation request timing before scripts initialize', () => {
+    const s = setup(true, {navigationStartedAt:1000, initializedAt:31000});
+    try {
+        s.advance(61000); assert.equal(s.prompt.classList.contains('hidden'), false);
+        s.advance(121000); assert.equal(s.logouts(), 1);
+    } finally { s.dom.window.close(); }
+});
+
+test('a renewal submitted before expiry can succeed after the old countdown reaches zero', async () => {
+    const s = setup();
+    try {
+        let resolve;
+        s.w.fetch = () => new Promise(done => { resolve = done; });
+        s.advance(119000); s.password.value = 'current'; s.stay.click();
+        s.advance(121000); assert.equal(s.logouts(), 0);
+        resolve({ok:true, status:200, json:async () => ({refreshed:true, timeoutMs:120000})}); await settled();
+        assert.equal(s.prompt.classList.contains('hidden'), true);
+        assert.equal(s.stay.disabled, false); assert.equal(s.logouts(), 0);
+        s.advance(239000); assert.equal(s.logouts(), 1);
+    } finally { s.dom.window.close(); }
+});
+
+test('renewal uses the server timeout and request start rather than response arrival', async () => {
+    const s = setup();
+    try {
+        let resolve;
+        s.w.fetch = () => new Promise(done => { resolve = done; });
+        s.advance(60000); s.password.value = 'current'; s.stay.click();
+        s.advance(65000);
+        resolve({ok:true, status:200, json:async () => ({refreshed:true, timeoutMs:180000})}); await settled();
+        s.advance(179999); assert.equal(s.prompt.classList.contains('hidden'), true);
+        s.advance(180000); assert.equal(s.prompt.classList.contains('hidden'), false);
+        s.advance(240000); assert.equal(s.logouts(), 1);
+    } finally { s.dom.window.close(); }
+});
 
 test('warning off logs out untouched pages automatically without showing the modal', () => {
     const s = setup(false);
@@ -200,19 +249,36 @@ test('Logout Now bypasses dirty-form confirmation and beforeunload, including an
     } finally { s.dom.window.close(); }
 });
 
-test('automatic expiry cannot be blocked by dirty forms or undone by a late renewal response', async () => {
+test('a stalled renewal has a bounded wait and a late response cannot undo logout', async () => {
     const s = setup();
     try {
         s.form.querySelector('input').value = 'unsaved';
         let resolve;
         s.w.fetch = () => new Promise(done => { resolve = done; });
-        s.advance(60000); s.password.value = 'correct'; s.stay.click();
-        s.advance(120000); assert.equal(s.logouts(), 1);
+        s.advance(119000); s.password.value = 'correct'; s.stay.click();
+        s.advance(120000); assert.equal(s.logouts(), 0);
+        s.advance(134000); await settled(); assert.equal(s.logouts(), 1);
         const unload = new s.w.Event('beforeunload', {cancelable:true}); s.w.dispatchEvent(unload);
         assert.equal(unload.defaultPrevented, false);
         resolve({ok:true, status:200, json:async () => ({refreshed:true})}); await settled();
         assert.equal(s.stay.disabled, true); assert.equal(s.prompt.classList.contains('hidden'), false);
         s.advance(240000); assert.equal(s.logouts(), 1);
+    } finally { s.dom.window.close(); }
+});
+
+test('a renewal timeout before session expiry keeps the warning usable for retry', async () => {
+    const s = setup();
+    try {
+        let signal;
+        s.w.fetch = (_, options) => { signal = options.signal; return new Promise(() => {}); };
+        s.advance(60000); s.password.value = 'correct'; s.stay.click();
+        s.advance(75000); await settled();
+        assert.equal(signal.aborted, true); assert.equal(s.logouts(), 0);
+        assert.equal(s.stay.disabled, false); assert.equal(s.password.disabled, false);
+        assert.equal(s.d.getElementById('sessionInactivityError').textContent, 'Please retry.');
+        s.w.fetch = async () => ({ok:true, status:200, json:async () => ({refreshed:true, timeoutMs:120000})});
+        s.stay.click(); await settled();
+        assert.equal(s.prompt.classList.contains('hidden'), true);
     } finally { s.dom.window.close(); }
 });
 

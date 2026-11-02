@@ -39,12 +39,12 @@ public class SessionKeepaliveController {
         SessionTimeoutPolicy policy = platformSessionSettingsService.policy();
         session.setMaxInactiveInterval(policy.timeoutSeconds());
         session.setAttribute(KEEPALIVE_ATTRIBUTE, System.currentTimeMillis());
-        return ResponseEntity.ok(new SessionKeepalivePayload(true));
+        return ResponseEntity.ok(new SessionKeepalivePayload(true, null, policy.timeoutMs()));
     }
 
-    public record SessionKeepalivePayload(boolean refreshed, String message) {
-        public SessionKeepalivePayload(boolean refreshed) {
-            this(refreshed, null);
+    public record SessionKeepalivePayload(boolean refreshed, String message, Long timeoutMs) {
+        public SessionKeepalivePayload(boolean refreshed, String message) {
+            this(refreshed, message, null);
         }
     }
 }

@@ -7,8 +7,10 @@ Platform Settings → Session timeout → Edit requires the existing platform ad
 - When enabled, the shared password-confirmation dialog appears during the final 60 seconds.
 - When disabled, clean pages log out automatically. Changed POST forms, selected files and pending workspace document uploads still receive the confirmation dialog during the final minute. An edit made during that minute opens it with the time remaining.
 - Continue requires the current password and a CSRF-protected POST. Forms and selected files stay in the current document. No automatic keepalive or form submission is introduced.
-- The dialog does not extend expiry by itself. No response, a delayed browser wake after expiry or an already-expired server session leads to logout. Unsaved values are not persisted for recovery after logout.
+- The dialog does not extend expiry by itself. A renewal submitted before expiry waits at most 15 seconds for the server's decision, including when its original countdown reaches zero. A successful response uses the server's returned timeout, measured from the renewal request's start. A stalled renewal past expiry, a delayed browser wake after expiry or an already-expired server session leads to logout. Unsaved values are not persisted for recovery after logout.
 
 The existing server inactivity timeout remains authoritative. Browser settings are supplied on page/workspace rendering; already-open pages receive changed settings on their next workspace load. Shared form guards supply their initialized dirty baseline, so a saved form normalized by deferred controls is not mistaken for unfinished work.
+
+Initial countdowns start from the HTML request, using browser navigation timing for full-page loads and the recorded fetch start for workspace transitions. Downloading HTML, preparing styles and initializing components do not grant a fresh timeout after the server has already started counting.
 
 Verification: service/default/audit tests, settings authorization and CSRF tests, keepalive/logout security tests, targeted JSP compilation, and JavaScript session/form/navigation tests. Live visual checks and applying V140 to a running PostgreSQL installation remain deployment checks; no throughput capacity is claimed.

@@ -40,6 +40,7 @@ class SessionKeepaliveControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().refreshed()).isTrue();
         assertThat(response.getBody().message()).isNull();
+        assertThat(response.getBody().timeoutMs()).isEqualTo(1_800_000L);
         assertThat(session.getAttribute("sessionKeepaliveAt")).isInstanceOf(Long.class);
         assertThat(session.getMaxInactiveInterval()).isEqualTo(1800);
         verify(reauthenticationService).passwordMatches(principal, "current-password");

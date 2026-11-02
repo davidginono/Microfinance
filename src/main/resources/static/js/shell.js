@@ -1691,7 +1691,7 @@
         const warningMs = Number.isFinite(configuredWarningMs) && configuredWarningMs > 0
             ? Math.max(configuredWarningMs, 1000)
             : 60000;
-        const timeoutMs = Math.max(configuredTimeoutMs, warningMs + 1000);
+        let timeoutMs = Math.max(configuredTimeoutMs, warningMs + 1000);
         const warningEnabled = prompt.getAttribute('data-warning-enabled') === 'true';
         const pendingUploads = new Set();
         document.addEventListener('workspace:form-pending', function (event) {
@@ -1734,7 +1734,11 @@
         let keepalivePending = false;
         let loggingOut = false;
         let previousFocus = null;
-        let cycleStartedAt = Date.now();
+        const navigation = window.performance?.getEntriesByType?.('navigation')?.[0];
+        const requestStartAttribute = prompt.getAttribute('data-client-request-started-at');
+        const pageRequestStartedAt = requestStartAttribute !== null ? Number(requestStartAttribute)
+            : navigation ? window.performance.timeOrigin + navigation.requestStart : Date.now();
+        let cycleStartedAt = Number.isFinite(pageRequestStartedAt) ? Math.min(pageRequestStartedAt, Date.now()) : Date.now();
         let audioContext = null;
         let audioUnlocked = false;
         let stopwatchTickTimer = null;
@@ -1934,9 +1938,9 @@
         const updateCountdown = function () {
             const remainingMs = Math.max(deadline - Date.now(), 0);
             const remainingSeconds = Math.ceil(remainingMs / 1000);
-            countdown.textContent = String(remainingSeconds);
+            countdown.textContent = remainingMs <= 0 && keepalivePending ? '--' : String(remainingSeconds);
             setProgress(warningMs > 0 ? (remainingMs / warningMs) * 100 : 0);
-            if (remainingMs <= 0) {
+            if (remainingMs <= 0 && !keepalivePending) {
                 expireSession();
             }
         };
@@ -2035,8 +2039,8 @@
             checkTimer = window.setTimeout(runFinalMinuteCheck, delayMs);
         };
 
-        const startSessionCycle = function () {
-            cycleStartedAt = Date.now();
+        const startSessionCycle = function (startedAt) {
+            cycleStartedAt = startedAt;
             scheduleFinalMinuteCheck();
         };
 
@@ -2059,12 +2063,22 @@
             clearPromptError();
             const body = new URLSearchParams();
             body.set('password', password);
-            fetch(prompt.getAttribute('data-keepalive-url') || '/session/keepalive', {
+            const requestStartedAt = Date.now();
+            const controller = new AbortController();
+            let renewalTimer;
+            const renewalTimeout = new Promise(function (_, reject) {
+                renewalTimer = window.setTimeout(function () {
+                    controller.abort();
+                    reject(new Error('Session renewal timed out'));
+                }, 15000);
+            });
+            Promise.race([fetch(prompt.getAttribute('data-keepalive-url') || '/session/keepalive', {
                 method: 'POST',
                 headers: Object.assign(keepaliveHeaders(), {
                     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
                 }),
                 credentials: 'same-origin',
+                signal: controller.signal,
                 body: body.toString()
             })
                 .then(function (response) {
@@ -2084,19 +2098,22 @@
                             }
                             return payload;
                         });
-                })
-                .then(function () {
+                }), renewalTimeout])
+                .then(function (payload) {
                     if (loggingOut) return;
+                    if (Number.isFinite(payload.timeoutMs) && payload.timeoutMs > warningMs) {
+                        timeoutMs = payload.timeoutMs;
+                    }
                     passwordInput.value = '';
                     hidePrompt();
-                    startSessionCycle();
+                    startSessionCycle(requestStartedAt);
                     if (typeof window.showToast === 'function') {
                         window.showToast('success', prompt.getAttribute('data-refresh-success-message') || 'Session refreshed.');
                     }
                 })
                 .catch(function (error) {
                     if (loggingOut) return;
-                    if (error && error.status === 401) {
+                    if ((error && error.status === 401) || Date.now() >= cycleDeadline()) {
                         expireSession();
                         return;
                     }
@@ -2110,6 +2127,7 @@
                     }
                 })
                 .finally(function () {
+                    window.clearTimeout(renewalTimer);
                     keepalivePending = false;
                     if (!loggingOut) setStayPending(false);
                 });
@@ -2205,7 +2223,7 @@
                 (passwordInput.disabled ? logoutForm.querySelector('button') : passwordInput).focus();
             }
         });
-        startSessionCycle();
+        startSessionCycle(cycleStartedAt);
     };
 
     onReady( function () {

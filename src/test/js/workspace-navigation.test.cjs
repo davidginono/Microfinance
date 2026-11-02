@@ -30,6 +30,19 @@ async function setup({guard=false,holdNavigation=false,pageScript=init,assets={}
 }
 const until=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('Navigation did not settle');};
 
+test('session timing retains the workspace request start across delayed responses and initialization', async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  let now=10000;w.Date.now=()=>now;
+  const visit=w.WorkspaceNavigation.visit('/admin/users');
+  const pending=requests.find(r=>r.url.pathname==='/admin/users');
+  now=20000;
+  pending.resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>html('Users').replace('</main>','<div id="sessionInactivityPrompt"></div></main>')});
+  await visit;
+  assert.equal(d.getElementById('sessionInactivityPrompt').dataset.clientRequestStartedAt,'10000');
+ }finally{dom.window.close();}
+});
+
 test('recoverable platform POST keeps values on a server error, then commits only the successful destination',async()=>{
  const {dom,w,d,requests,failures}=await setup({guard:true,holdNavigation:true});
  try{

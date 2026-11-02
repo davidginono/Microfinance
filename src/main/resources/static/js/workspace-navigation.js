@@ -286,6 +286,7 @@
         const timeout=timers.setTimeout(()=>controller.abort(),20000);
         if(!recover)feedback(false,url.href);
         try{
+            const requestStartedAt=Date.now();
             const response=await native.fetch(url.href,{...options.submission?.request,credentials:'same-origin',cache:'no-store',headers:{Accept:'text/html'},signal:controller.signal});
             if(version!==generation)return true;
             const finalUrl=new URL(response.url || url.href,location.href);
@@ -294,6 +295,8 @@
             if(/\/(?:login|auth)(?:\/|$)/i.test(finalUrl.pathname)){location.assign(finalUrl.href);return true;}
             if(!response.ok || !response.headers.get('Content-Type')?.includes('text/html'))throw new Error('Workspace response');
             const page=new DOMParser().parseFromString(await response.text(),'text/html');
+            const sessionPrompt=page.getElementById('sessionInactivityPrompt');
+            if(sessionPrompt)sessionPrompt.dataset.clientRequestStartedAt=String(requestStartedAt);
             if(version!==generation)return true;
             if(!page.body.matches('.aws-console') || !page.querySelector('.shell-main') || !page.querySelector('#appSidebar'))throw new Error('Workspace shell');
             if(recover){

@@ -61,7 +61,8 @@ class SessionKeepaliveSecurityTest {
     @Test void renderedCsrfHeaderAndCurrentPasswordRenewSession() throws Exception {
         mvc.perform(post("/session/keepalive").session(session).with(user(principal))
                 .header(csrf.getHeaderName(), csrf.getToken()).param("password", "current-password"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.refreshed").value(true));
+            .andExpect(status().isOk()).andExpect(jsonPath("$.refreshed").value(true))
+            .andExpect(jsonPath("$.timeoutMs").value(1_800_000L));
         assertThat(session.getAttribute("sessionKeepaliveAt")).isInstanceOf(Long.class);
         assertThat(session.getMaxInactiveInterval()).isEqualTo(1800);
     }
