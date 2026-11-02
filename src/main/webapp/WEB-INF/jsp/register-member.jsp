@@ -34,6 +34,7 @@
       data-long="<spring:message code='validation.long' htmlEscape='true' />"></span>
 <main class="auth-form-page">
 <div class="auth-form-layout registration-layout">
+    <a class="auth-home-link" href="<c:url value='/' />"><spring:message code="home.back" /></a>
     <div class="auth-title-stack registration-heading"><h1 class="auth-heading"><spring:message code="register.member.title" /></h1></div>
     <p class="console-message" data-message-type="info" role="status"><spring:message code="register.member.provisional"/></p>
     <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>

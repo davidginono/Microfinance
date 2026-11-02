@@ -23,6 +23,7 @@
     <div class="auth-login-layout">
         <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
+        <a class="auth-home-link" href="<c:url value='/' />"><spring:message code="home.back" /></a>
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
                 <h1 class="auth-heading">${systemAdminLogin ? 'System Admin Login' : 'Log in to Microfinance'}</h1>

@@ -1,3 +1,7 @@
+.auth-home-link { display: inline-block; margin-bottom: 16px; color: #0972d3; font-size: 14px; }
+.auth-home-link:hover { text-decoration: underline; }
+.auth-home-link:focus-visible { outline: 3px solid #0972d3; outline-offset: 4px; }
+
 :root {
     --sacco-topbar: #232f3e;
     --sacco-canvas: #F2F3F3;

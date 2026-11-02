@@ -40,6 +40,11 @@ class ClientPortalSecurityMvcTest {
         mvc.perform(get("/client-portal/workspace/probe").with(authentication(auth))).andExpect(status().isOk()).andExpect(content().string("own portal"));
         mvc.perform(get("/client-portal/workspace/probe")).andExpect(status().is3xxRedirection());
     }
+    @Test void publicHomeRemainsAccessibleToAnonymousAndProvisionalClients()throws Exception{
+        mvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string("public home"));
+        var auth=UsernamePasswordAuthenticationToken.authenticated(session(),null,List.of());
+        mvc.perform(get("/").with(authentication(auth))).andExpect(status().isOk()).andExpect(content().string("public home"));
+    }
     @Test void successfulCodeVerificationRotatesSessionAndNeverGrantsNormalAuthorities()throws Exception{
         var http=new MockHttpSession();String before=http.getId();UUID nonce=UUID.randomUUID();http.setAttribute("clientPortalChallenge",nonce);Session access=session();when(portal.verify(nonce,"123456","127.0.0.1")).thenReturn(Optional.of(access));
         mvc.perform(post("/client-portal/verify").session(http).with(csrf()).param("code","123456")).andExpect(redirectedUrl("/client-portal/workspace/applications"));
@@ -47,5 +52,5 @@ class ClientPortalSecurityMvcTest {
         mvc.perform(get("/app/dashboard").session(http)).andExpect(status().isForbidden());
     }
     @Configuration @EnableWebMvc @Import({ClientPortalController.class,Probe.class}) static class Config {@Bean ClientPortalService portal(){return mock(ClientPortalService.class);}}
-    @RestController static class Probe {@GetMapping("/client-portal/workspace/probe") String own(){return "own portal";}@GetMapping({"/app/dashboard","/app/settings","/admin/users","/finance/private"}) String normal(){return "normal workspace";}}
+    @RestController static class Probe {@GetMapping("/") String home(){return "public home";}@GetMapping("/client-portal/workspace/probe") String own(){return "own portal";}@GetMapping({"/app/dashboard","/app/settings","/admin/users","/finance/private"}) String normal(){return "normal workspace";}}
 }
