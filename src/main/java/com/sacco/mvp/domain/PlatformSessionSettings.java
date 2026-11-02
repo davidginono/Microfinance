@@ -29,6 +29,9 @@ public class PlatformSessionSettings {
     @Column(name = "timeout_minutes", nullable = false)
     private int timeoutMinutes;
 
+    @Column(name = "warning_enabled", nullable = false)
+    private boolean warningEnabled;
+
     @Column(name = "updated_by_member_id")
     private UUID updatedByMemberId;
 

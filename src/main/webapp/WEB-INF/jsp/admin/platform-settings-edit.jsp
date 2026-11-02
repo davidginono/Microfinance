@@ -21,6 +21,10 @@
                            class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
                            value="${not empty platformSettingsDraft ? fn:escapeXml(platformSettingsDraft['timeoutMinutes']) : platformSessionSettings.timeoutMinutes}" />
                 </label>
+                <label class="aws-settings-checkbox-row"><input name="warningEnabled" type="checkbox" value="true" class="aws-settings-checkbox" aria-describedby="session-warning-help"
+                    ${(not empty platformSettingsDraft ? platformSettingsDraft['warningEnabled'] eq 'true' : platformSessionSettings.warningEnabled) ? 'checked' : ''} />
+                    <span><spring:message code="platform.settings.sessionWarning" /></span></label>
+                <p id="session-warning-help" class="mt-2 text-sm text-slate-600"><spring:message code="platform.settings.sessionWarning.help" /></p>
             </div>
         </div>
         </div></section>

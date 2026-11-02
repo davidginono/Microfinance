@@ -295,6 +295,7 @@
 <spring:message code="session.timeout.refreshFailed" text="We could not verify your password. Please try again or log out." var="sessionTimeoutRefreshFailedMessage" />
 <spring:message code="session.timeout.passwordRequired" text="Enter your current password to continue." var="sessionTimeoutPasswordRequiredMessage" />
 <spring:message code="session.timeout.passwordInvalid" text="The current password could not be verified. Please try again or log out." var="sessionTimeoutPasswordInvalidMessage" />
+<spring:message code="session.timeout.unfinishedWork" var="sessionTimeoutUnfinishedWorkMessage" />
 <div id="sessionInactivityPrompt"
      class="session-timeout-overlay hidden"
      role="alertdialog"
@@ -304,6 +305,8 @@
      aria-describedby="sessionInactivityMessage"
      data-timeout-ms="${sessionTimeoutMs}"
      data-warning-ms="${sessionTimeoutWarningMs}"
+     data-warning-enabled="${sessionTimeoutWarningEnabled}"
+     data-unfinished-work-message="${fn:escapeXml(sessionTimeoutUnfinishedWorkMessage)}"
      data-keepalive-url="<c:url value='/session/keepalive' />"
      data-csrf-header="${_csrf.headerName}"
      data-csrf-token="${_csrf.token}"

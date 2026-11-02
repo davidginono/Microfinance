@@ -62,7 +62,7 @@ public class MvcSecurityTestConfiguration {
     @Bean
     PlatformSessionSettingsService platformSessionSettingsService() {
         PlatformSessionSettingsService service = Mockito.mock(PlatformSessionSettingsService.class);
-        when(service.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+        when(service.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         return service;
     }
 }

@@ -21,6 +21,11 @@ public class SessionInactivityModelAdvice {
         return policy().warningMs();
     }
 
+    @ModelAttribute("sessionTimeoutWarningEnabled")
+    public boolean sessionTimeoutWarningEnabled() {
+        return policy().warningEnabled();
+    }
+
     private SessionTimeoutPolicy policy() {
         return platformSessionSettingsService.policy();
     }

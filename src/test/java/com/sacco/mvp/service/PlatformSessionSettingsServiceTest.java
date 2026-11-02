@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +33,7 @@ class PlatformSessionSettingsServiceTest {
         assertThat(policy.timeoutMinutes()).isEqualTo(30);
         assertThat(policy.timeoutMs()).isEqualTo(1_800_000L);
         assertThat(policy.warningMs()).isEqualTo(60_000L);
+        assertThat(policy.warningEnabled()).isFalse();
         verify(repository).save(any(PlatformSessionSettings.class));
     }
 
@@ -45,12 +47,18 @@ class PlatformSessionSettingsServiceTest {
         PlatformSessionSettingsService service = new PlatformSessionSettingsService(repository, auditService);
         UUID actorId = UUID.randomUUID();
 
-        PlatformSessionSettings saved = service.updateTimeout(45, actorId);
+        PlatformSessionSettings saved = service.updateTimeout(45, true, actorId);
 
         assertThat(saved.getTimeoutMinutes()).isEqualTo(45);
         assertThat(saved.getUpdatedByMemberId()).isEqualTo(actorId);
         assertThat(service.policy().timeoutMinutes()).isEqualTo(45);
-        verify(auditService).log(eq("PLATFORM_SESSION_SETTINGS"), isNull(), eq("ADMIN_UPDATE_SESSION_TIMEOUT"), eq(actorId), any(), any());
+        assertThat(saved.isWarningEnabled()).isTrue();
+        assertThat(service.policy().warningEnabled()).isTrue();
+        verify(auditService).log(eq("PLATFORM_SESSION_SETTINGS"), isNull(), eq("ADMIN_UPDATE_SESSION_TIMEOUT"), eq(actorId),
+            eq(Map.of("timeoutMinutes", 30, "warningEnabled", false)), eq(Map.of("timeoutMinutes", 45, "warningEnabled", true)));
+
+        service.updateTimeout(45, false, actorId);
+        assertThat(service.policy().warningEnabled()).isFalse();
     }
 
     @Test
@@ -60,7 +68,7 @@ class PlatformSessionSettingsServiceTest {
             Mockito.mock(AuditService.class)
         );
 
-        assertThatThrownBy(() -> service.updateTimeout(1, UUID.randomUUID()))
+        assertThatThrownBy(() -> service.updateTimeout(1, true, UUID.randomUUID()))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Session timeout must be between 2 and 480 minutes.");
     }
@@ -76,7 +84,7 @@ class PlatformSessionSettingsServiceTest {
         assertThat(service.policy().timeoutMinutes()).isEqualTo(20);
         assertThat(service.policy().timeoutMinutes()).isEqualTo(20);
 
-        service.updateTimeout(35, UUID.randomUUID());
+        service.updateTimeout(35, false, UUID.randomUUID());
 
         assertThat(service.policy().timeoutMinutes()).isEqualTo(35);
         verify(repository, times(2)).findById(PlatformSessionSettings.DEFAULT_ID);

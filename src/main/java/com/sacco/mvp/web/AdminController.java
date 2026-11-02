@@ -339,9 +339,10 @@ public class AdminController {
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
     public String updateSessionTimeout(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @RequestParam int timeoutMinutes,
+                                       @RequestParam(defaultValue = "false") boolean warningEnabled,
                                        HttpServletRequest request, RedirectAttributes ra) {
         try {
-            platformSessionSettingsService.updateTimeout(timeoutMinutes, principal.getMemberId());
+            platformSessionSettingsService.updateTimeout(timeoutMinutes, warningEnabled, principal.getMemberId());
             ra.addFlashAttribute("message", "Session timeout settings updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return platformSettingsFailure(request, ra, "session-timeout", ex.getMessage());
@@ -531,7 +532,7 @@ public class AdminController {
 
     private String platformSettingsFailure(HttpServletRequest request, RedirectAttributes attributes, String section, String error) {
         List<String> fields = switch (section) {
-            case "session-timeout" -> List.of("timeoutMinutes");
+            case "session-timeout" -> List.of("timeoutMinutes", "warningEnabled");
             case "logo-policy" -> List.of("minWidthPx", "minHeightPx", "maxWidthPx", "maxHeightPx", "maxFileSizeKb");
             case "support-contact" -> List.of("displayName", "displayRole", "phone", "email", "officeHours", "supportNote");
             case "email" -> List.of("enabled", "host", "port", "username", "fromAddress", "overrideRecipient", "sslEnabled", "starttlsEnabled", "connectionTimeoutMs", "readTimeoutMs", "writeTimeoutMs");

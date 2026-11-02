@@ -378,14 +378,15 @@
             const body=form.enctype==='multipart/form-data'?data:new URLSearchParams();
             if(body!==data)for(const [name,value] of data)if(typeof value==='string')body.append(name,value);
             submissions.add(form);
+            document.dispatchEvent(new CustomEvent('workspace:form-pending',{detail:{form}}));
             const recover=form.dataset.workspaceSubmit==='recover';
             const controls=recover?[...form.querySelectorAll('button[type="submit"],input[type="submit"]')].filter(control=>!control.disabled):[];
             const finish=recover?window.AppLoading?.action(submitter):null;
             if(recover){form.setAttribute('aria-busy','true');form.inert=true;controls.forEach(control=>control.disabled=true);}
             void visit(url.href,{force:true,submission:{form,submitter,request:{method:'POST',body}}}).finally(()=>{
                 submissions.delete(form);finish?.();
-                if(recover){form.removeAttribute('aria-busy');form.inert=false;controls.forEach(control=>control.disabled=false);
-                    if(form.isConnected)document.dispatchEvent(new CustomEvent('workspace:form-settled',{detail:{form}}));}
+                if(recover){form.removeAttribute('aria-busy');form.inert=false;controls.forEach(control=>control.disabled=false);}
+                if(form.isConnected)document.dispatchEvent(new CustomEvent('workspace:form-settled',{detail:{form}}));
             });
         }
     });

@@ -11,6 +11,7 @@
 <sec:authorize access="@access.has(principal, 'PLATFORM_SETTINGS_UPDATE')"><div class="platform-settings-section-actions"><a href="/admin/platform-settings/session-timeout/edit" class="app-btn btn-neutral" aria-label="<spring:message code='platform.settings.session-timeout.edit' />"><spring:message code="common.edit" /></a></div></sec:authorize></div>
 <div class="erp-panel-body"><dl class="erp-detail-facts">
 <div><dt><spring:message code="platform.settings.timeoutMinutes" /></dt><dd><c:out value="${platformSessionSettings.timeoutMinutes}" default="—" /></dd></div>
+<div><dt><spring:message code="platform.settings.sessionWarning" /></dt><dd><spring:message code="${platformSessionSettings.warningEnabled ? 'platform.settings.active' : 'platform.settings.disabled'}" /></dd></div>
 </dl></div></section>
 <section class="erp-panel" id="support-contact">
 <div class="erp-panel-header platform-settings-section-header"><h2 class="erp-panel-title"><spring:message code="platform.settings.support-contact.title" /></h2>

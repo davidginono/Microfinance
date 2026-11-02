@@ -115,7 +115,7 @@ class AdminControllerUserAccessSecurityTest {
         Mockito.reset(productAccounts,adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
             platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService,
             stationOtpSettingsService);
-        when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+        when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
@@ -387,7 +387,7 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/platform-settings#session-timeout"));
 
-        verify(platformSessionSettingsService).updateTimeout(45, principal.getMemberId());
+        verify(platformSessionSettingsService).updateTimeout(45, false, principal.getMemberId());
     }
 
     @Test
@@ -400,7 +400,24 @@ class AdminControllerUserAccessSecurityTest {
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().isForbidden());
 
-        verify(platformSessionSettingsService, never()).updateTimeout(any(Integer.class), any());
+        verify(platformSessionSettingsService, never()).updateTimeout(any(Integer.class), anyBoolean(), any());
+    }
+
+    @Test
+    void updateSessionTimeoutSavesEnabledWarningAndRequiresCsrf() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+        mockMvc.perform(post("/admin/platform-settings/session-timeout")
+                .param("timeoutMinutes", "45").param("warningEnabled", "true")
+                .with(csrf()).with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings#session-timeout"));
+        verify(platformSessionSettingsService).updateTimeout(45, true, principal.getMemberId());
+
+        mockMvc.perform(post("/admin/platform-settings/session-timeout")
+                .param("timeoutMinutes", "60").param("warningEnabled", "false")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+        verify(platformSessionSettingsService, never()).updateTimeout(60, false, principal.getMemberId());
     }
 
     @Test
@@ -1029,7 +1046,7 @@ class AdminControllerUserAccessSecurityTest {
         @Bean
         PlatformSessionSettingsService platformSessionSettingsService() {
             PlatformSessionSettingsService service = Mockito.mock(PlatformSessionSettingsService.class);
-            when(service.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+            when(service.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
             return service;
         }
         @Bean PlatformSupportContactSettingsService platformSupportContactSettingsService() { return Mockito.mock(PlatformSupportContactSettingsService.class); }

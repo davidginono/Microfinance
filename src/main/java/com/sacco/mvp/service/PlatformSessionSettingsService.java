@@ -39,11 +39,12 @@ public class PlatformSessionSettingsService {
     }
 
     @Transactional
-    public PlatformSessionSettings updateTimeout(int timeoutMinutes, UUID actorMemberId) {
+    public PlatformSessionSettings updateTimeout(int timeoutMinutes, boolean warningEnabled, UUID actorMemberId) {
         validateTimeout(timeoutMinutes);
         PlatformSessionSettings settings = settings();
         Map<String, Object> before = snapshot(settings);
         settings.setTimeoutMinutes(timeoutMinutes);
+        settings.setWarningEnabled(warningEnabled);
         settings.setUpdatedByMemberId(actorMemberId);
         settings.setUpdatedAt(OffsetDateTime.now());
         PlatformSessionSettings saved = repository.save(settings);
@@ -79,12 +80,13 @@ public class PlatformSessionSettingsService {
 
     private SessionTimeoutPolicy toPolicy(PlatformSessionSettings settings) {
         long timeoutMs = settings.getTimeoutMinutes() * 60_000L;
-        return new SessionTimeoutPolicy(settings.getTimeoutMinutes(), timeoutMs, WARNING_MS);
+        return new SessionTimeoutPolicy(settings.getTimeoutMinutes(), timeoutMs, WARNING_MS, settings.isWarningEnabled());
     }
 
     private Map<String, Object> snapshot(PlatformSessionSettings settings) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("timeoutMinutes", settings.getTimeoutMinutes());
+        data.put("warningEnabled", settings.isWarningEnabled());
         return data;
     }
 }

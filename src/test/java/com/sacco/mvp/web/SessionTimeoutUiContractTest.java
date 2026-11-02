@@ -15,6 +15,8 @@ class SessionTimeoutUiContractTest {
 
         assertThat(footer).contains("data-timeout-ms=\"${sessionTimeoutMs}\"");
         assertThat(footer).contains("data-warning-ms=\"${sessionTimeoutWarningMs}\"");
+        assertThat(footer).contains("data-warning-enabled=\"${sessionTimeoutWarningEnabled}\"");
+        assertThat(footer).contains("session.timeout.unfinishedWork");
         assertThat(footer).contains("Verify to continue");
         assertThat(footer).contains("id=\"sessionInactivityPassword\"");
         assertThat(footer).contains("Verify &amp; Stay Logged In");
@@ -40,11 +42,12 @@ class SessionTimeoutUiContractTest {
     @Test
     void platformSettingsRendersSessionTimeoutCard() throws Exception {
         String jsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
+        String editor = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings-edit.jsp"));
 
         assertThat(jsp).contains("/admin/platform-settings/session-timeout");
-        assertThat(jsp).contains("name=\"timeoutMinutes\"");
-        assertThat(jsp).contains("value=\"${platformSessionSettings.timeoutMinutes}\"");
-        assertThat(jsp).contains("Save Timeout");
+        assertThat(jsp).contains("${platformSessionSettings.timeoutMinutes}");
+        assertThat(jsp).contains("platformSessionSettings.warningEnabled");
+        assertThat(editor).contains("name=\"timeoutMinutes\"", "name=\"warningEnabled\"", "platform.settings.sessionWarning.help");
     }
 
     @Test

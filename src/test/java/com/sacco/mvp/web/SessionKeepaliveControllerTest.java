@@ -27,7 +27,7 @@ class SessionKeepaliveControllerTest {
     void keepaliveRefreshesExistingSession() {
         PlatformSessionSettingsService settingsService = mock(PlatformSessionSettingsService.class);
         SessionReauthenticationService reauthenticationService = mock(SessionReauthenticationService.class);
-        when(settingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+        when(settingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         SessionKeepaliveController controller = new SessionKeepaliveController(settingsService, reauthenticationService);
         MockHttpServletRequest request = new MockHttpServletRequest();
         HttpSession session = request.getSession(true);
