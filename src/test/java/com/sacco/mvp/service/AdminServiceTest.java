@@ -79,6 +79,20 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
     @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"daniel.manager"})
+    void userAccessShowsUsernameOrEmailRatherThanStaffNumberAsLoginId(String username) {
+        UUID id = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("TEST").stationId("BR-1")
+            .position(Position.MANAGER).memberAccount(false).staffNo("10001")
+            .email("manager@example.invalid").username(username).status(MemberStatus.ACTIVE).build();
+        when(memberRepository.findUserAccessByScope("TEST", "BR-1", id)).thenReturn(Optional.of(member));
+        var view = adminService.userAccess("TEST", "BR-1", id);
+        assertThat(view.getLoginId()).isEqualTo(username == null ? "manager@example.invalid" : username);
+        assertThat(view.getStaffMemberNumber()).isEqualTo("10001");
+    }
+
+    @ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(value = MemberStatus.class, names = {"INVITED", "INACTIVE"})
     void resendStaffInvitationPreservesIdentityRolesAndClaims(MemberStatus status) {
         UUID id = UUID.randomUUID(), actor = UUID.randomUUID();
@@ -236,7 +250,8 @@ class AdminServiceTest {
             null,
             null,
             null,
-            nameSignatureService
+            nameSignatureService,
+            org.mockito.Mockito.mock(org.springframework.context.MessageSource.class)
         ) {
             @Override
             public com.sacco.mvp.domain.MinorAdminInvitation issueInvitation(Member member, UUID invitedBy) {
@@ -508,7 +523,7 @@ class AdminServiceTest {
             .get(0);
 
         assertThat(row.getAccountId()).isEqualTo(accountId);
-        assertThat(row.getLoginId()).isEqualTo("MBR100");
+        assertThat(row.getLoginId()).isEqualTo("dual@example.com");
         assertThat(row.getMembershipLabel()).isEqualTo("Staff And Member");
         assertThat(row.getRoleSummary()).isEqualTo("Manager");
         assertThat(row.getPhone()).isEqualTo("255700000001");

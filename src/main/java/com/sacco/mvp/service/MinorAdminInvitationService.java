@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.MinorAdminInvitation;
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.StaffAccessStatus;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.MinorAdminInvitationRepository;
@@ -13,6 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -38,6 +41,7 @@ public class MinorAdminInvitationService {
     private final NotificationEmailService notificationEmailService;
     private final PasswordEncoder passwordEncoder;
     private final NameSignatureService nameSignatureService;
+    private final MessageSource messages;
 
     @Value("${app.auth.invitation.ttl-hours:72}")
     private int invitationTtlHours;
@@ -68,7 +72,7 @@ public class MinorAdminInvitationService {
         invitationRepository.save(invitation);
 
         sendInviteEmail(member, rawToken, ttl);
-        log.info("Issued SACCOS admin invitation for memberId={} invitedBy={} expiresAt={}",
+        log.info("Issued staff invitation for memberId={} invitedBy={} expiresAt={}",
             member.getId(), invitedBy, invitation.getExpiresAt());
         return invitation;
     }
@@ -88,12 +92,13 @@ public class MinorAdminInvitationService {
     public StationOtpDeliveryService.DeliveryReceipt requestOtp(String rawToken) {
         ClaimContext ctx = loadClaimContext(rawToken);
         Member member = ctx.member();
+        String role = invitationRoleLabel(member);
         return emailOtpService.issueOtp(
             member.getEmail(),
             EmailOtpPurpose.CLAIM_ACCOUNT,
             member.getId(),
-            "Activate your administrator account",
-            "Use the code below to activate your institution administrator account.",
+            messages.getMessage("staffInvitation.otpSubject", new Object[]{role}, LocaleContextHolder.getLocale()),
+            messages.getMessage("staffInvitation.otpMessage", new Object[]{role}, LocaleContextHolder.getLocale()),
             member.getSaccoId(),
             member.getStationId(),
             member.getPhone()
@@ -215,19 +220,22 @@ public class MinorAdminInvitationService {
     private void sendInviteEmail(Member member, String rawToken, int ttlHours) {
         String link = buildClaimUrl(rawToken);
         String staffNo = member.getStaffNo() == null || member.getStaffNo().isBlank() ? member.getMemberNo() : member.getStaffNo();
-        String body = "Hello " + member.getFullName() + "," + System.lineSeparator() + System.lineSeparator()
-            + "An administrator has created a Microfinance staff account for you." + System.lineSeparator()
-            + "Your Staff Number is " + staffNo + "." + System.lineSeparator()
-            + "To activate your account, open the link below within " + ttlHours + " hours, request a one-time code, and create your password:" + System.lineSeparator()
-            + link + System.lineSeparator() + System.lineSeparator()
-            + "After activation, you can sign in with your email or username and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()
-            + "If you did not expect this invitation, please ignore this email.";
+        String role = invitationRoleLabel(member);
+        String body = messages.getMessage("staffInvitation.emailBody",
+            new Object[]{member.getFullName(), role, staffNo, ttlHours, link, member.getEmail()}, LocaleContextHolder.getLocale());
         notificationEmailService.sendRequiredDirectEmail(
             member.getSaccoId(),
             member.getEmail(),
-            "Activate your staff account",
+            messages.getMessage("staffInvitation.activateRole", new Object[]{role}, LocaleContextHolder.getLocale()),
             body
         );
+    }
+
+    public String invitationRoleLabel(Member member) {
+        String roles = Position.normalizeStaffRoles(member.getStaffRolesResolved()).stream()
+            .map(role -> messages.getMessage("admin.role." + role.name(), null, role.getDisplayName(), LocaleContextHolder.getLocale()))
+            .collect(java.util.stream.Collectors.joining(", "));
+        return roles.isBlank() ? messages.getMessage("staffInvitation.staffRole", null, LocaleContextHolder.getLocale()) : roles;
     }
 
     private String buildClaimUrl(String rawToken) {

@@ -2625,7 +2625,7 @@ public class AdminService {
         return UserAccessView.builder()
             .accountId(member.getId())
             .userIdLabel(formatUserId(member.getId()))
-            .loginId(member.isStaffAccessActive() ? displayStaffNo(member) : member.getMemberNo())
+            .loginId(member.getUsername() == null || member.getUsername().isBlank() ? displayOrDash(member.getEmail()) : member.getUsername())
             .memberNumber(memberAccess ? displayOrDash(member.getMemberNo()) : "-")
             .staffMemberNumber(displayStaffNo(member))
             .fullName(member.getFullName())

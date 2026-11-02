@@ -37,6 +37,7 @@ public class AuthClaimController {
             Member member = ctx.member();
             model.addAttribute("claimToken", token);
             model.addAttribute("memberFullName", member.getFullName());
+            model.addAttribute("invitationRole", invitationService.invitationRoleLabel(member));
             model.addAttribute("memberSaccoId", member.getSaccoId());
             model.addAttribute("memberStationId", member.getStationId());
             model.addAttribute("staffNo", member.getStaffNo());

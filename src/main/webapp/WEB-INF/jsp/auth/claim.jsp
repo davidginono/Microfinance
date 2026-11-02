@@ -3,11 +3,11 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="${pageContext.response.locale.language}">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Activate Your Institution Admin Account</title>
+    <title><spring:message code="staffInvitation.activateStaff" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-mark-light-green.png?v=20260826-clean' />" />
     <link rel="preload" href="<c:url value='/fonts/amazon-ember/AmazonEmber_W_Rg.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="<c:url value='/fonts/amazon-ember/AmazonEmber_W_Bd.woff2' />" as="font" type="font/woff2" crossorigin />
@@ -22,8 +22,7 @@
 <main class="auth-form-page">
     <div class="claim-card auth-form-layout auth-form-card">
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">Institution Admin Activation</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-900">Activate your staff account</h1>
+            <h1 class="mt-1 text-2xl font-bold text-slate-900"><c:choose><c:when test="${not empty invitationRole}"><spring:message code="staffInvitation.activateRole" htmlEscape="true"><spring:argument value="${invitationRole}" /></spring:message></c:when><c:otherwise><spring:message code="staffInvitation.activateStaff" /></c:otherwise></c:choose></h1>
             <p class="mt-1 text-sm text-slate-500">Verify your staff account, then create your password.</p>
         </div>
 

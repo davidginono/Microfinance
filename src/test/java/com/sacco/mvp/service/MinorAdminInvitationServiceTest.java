@@ -8,6 +8,7 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.MinorAdminInvitationRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -39,14 +40,62 @@ class MinorAdminInvitationServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.context.i18n.LocaleContextHolder.setLocale(java.util.Locale.ENGLISH);
+        var messages = new org.springframework.context.support.ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
         invitationService = new MinorAdminInvitationService(
             invitationRepository,
             memberRepository,
             emailOtpService,
             notificationEmailService,
             passwordEncoder,
-            new NameSignatureService()
+            new NameSignatureService(),
+            messages
         );
+    }
+
+    @AfterEach
+    void resetLocale() {
+        org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"MANAGER,Manager", "MINOR_ADMIN,Institution Admin", "ACCOUNTANT,Accountant"})
+    void activationEmailNamesTheAssignedRoleWithoutChangingAccess(Position role, String label) {
+        String token = "synthetic-token";
+        UUID id = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("TEST").stationId("BR-1").fullName("Synthetic Staff")
+            .email("staff@example.invalid").staffNo("10001").position(role).status(MemberStatus.INVITED).build();
+        when(invitationRepository.findByTokenHashAndClaimedAtIsNullAndRevokedAtIsNull(hashToken(token)))
+            .thenReturn(Optional.of(MinorAdminInvitation.builder().memberId(id).expiresAt(OffsetDateTime.now().plusHours(1)).build()));
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+
+        invitationService.requestOtp(token);
+        invitationService.issueInvitation(member, UUID.randomUUID());
+        var channels = org.mockito.Mockito.mock(StationOtpSettingsService.class);
+        when(channels.channel("TEST", "BR-1")).thenReturn(OtpDeliveryChannel.EMAIL);
+        var model = new org.springframework.ui.ExtendedModelMap();
+        new com.sacco.mvp.web.AuthClaimController(invitationService, channels).showClaim(token, model);
+        org.assertj.core.api.Assertions.assertThat(model.get("invitationRole")).isEqualTo(label);
+
+        verify(emailOtpService).issueOtp(member.getEmail(), com.sacco.mvp.domain.EmailOtpPurpose.CLAIM_ACCOUNT, id,
+            label + " account activation code", "Use the code below to activate your " + label + " account.", "TEST", "BR-1", null);
+        verify(notificationEmailService).sendRequiredDirectEmail(org.mockito.ArgumentMatchers.eq("TEST"),
+            org.mockito.ArgumentMatchers.eq(member.getEmail()), org.mockito.ArgumentMatchers.eq("Activate your " + label + " account"),
+            org.mockito.ArgumentMatchers.argThat(body -> body.contains("Role: " + label) && body.contains("Staff Number: 10001")
+                && body.contains("select Staff") && body.contains(member.getEmail())));
+        org.assertj.core.api.Assertions.assertThat(member.getStatus()).isEqualTo(MemberStatus.INVITED);
+        org.assertj.core.api.Assertions.assertThat(member.getStaffRolesResolved()).containsExactly(role);
+    }
+
+    @Test
+    void invitationRolesAreLocalizedAndMultipleRolesAreRetained() {
+        Member member = Member.builder().position(Position.MANAGER)
+            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.ACCOUNTANT, Position.MANAGER))).build();
+        org.assertj.core.api.Assertions.assertThat(invitationService.invitationRoleLabel(member)).isEqualTo("Manager, Accountant");
+        org.springframework.context.i18n.LocaleContextHolder.setLocale(java.util.Locale.forLanguageTag("sw"));
+        org.assertj.core.api.Assertions.assertThat(invitationService.invitationRoleLabel(member)).isEqualTo("Meneja, Mhasibu");
     }
 
     @Test
@@ -92,8 +141,8 @@ class MinorAdminInvitationServiceTest {
             "ginonodavid625@gmail.com",
             com.sacco.mvp.domain.EmailOtpPurpose.CLAIM_ACCOUNT,
             memberId,
-            "Activate your administrator account",
-            "Use the code below to activate your institution administrator account.",
+            "Credit Committee account activation code",
+            "Use the code below to activate your Credit Committee account.",
             "SACCO-01",
             "AR704",
             "255746359369"
