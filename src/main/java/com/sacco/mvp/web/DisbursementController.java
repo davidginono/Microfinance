@@ -330,7 +330,7 @@ public class DisbursementController {
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));
-        model.addAttribute("formFields", parseJsonObject(app.getFormData()));
+        model.addAttribute("formFields", loanPresentationService.parseStaffFormFields(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("totalDeductions", loanPresentationService.totalDeductions(app));

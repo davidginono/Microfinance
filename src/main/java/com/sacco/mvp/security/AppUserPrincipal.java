@@ -26,6 +26,7 @@ public class AppUserPrincipal implements UserDetails {
     private final Set<Position> grantedPositions;
     private final boolean memberAccess;
     private final boolean staffSession;
+    private final boolean provisionalPortal;
     private final boolean platformSetupRequired;
     private final String memberNo;
     private final String username;
@@ -38,7 +39,10 @@ public class AppUserPrincipal implements UserDetails {
         this(member, claims, member.isStaffAccessActive());
     }
 
-    public AppUserPrincipal(Member member, Set<UserClaim> claims, boolean staffSession) {
+    public AppUserPrincipal(Member member, Set<UserClaim> claims, boolean staffSession) {this(member,claims,staffSession,false);}
+    public static AppUserPrincipal forClientPortal(Member member){return new AppUserPrincipal(member,Set.of(),false,true);}
+    private AppUserPrincipal(Member member,Set<UserClaim> claims,boolean staffSession,boolean provisionalPortal) {
+        this.provisionalPortal=provisionalPortal;
         this.memberId = member.getId();
         this.saccoId = member.getSaccoId();
         this.stationId = member.getStationId();

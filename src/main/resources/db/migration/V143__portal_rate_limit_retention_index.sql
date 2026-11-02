@@ -1,0 +1,1 @@
+CREATE INDEX ix_client_portal_rate_expiry ON client_portal_rate_limit(last_requested);

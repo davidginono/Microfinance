@@ -56,6 +56,12 @@ public class LoanNotificationFormatter {
         if (event == null) {
             return fallback;
         }
+        if("CLIENT_PROFILE_VERIFIED".equals(event.getEventType())){
+            String number=detailText(payload,"clientNumber");
+            return content("Client profile verified / Wasifu umehakikiwa","Client profile verified",
+                "Your profile is verified. Request a fresh access code to apply for a loan. / Wasifu umehakikiwa. Omba msimbo mpya wa kuingia kuomba mkopo.",
+                Map.of("Client number / Namba ya mteja",number),absoluteUrl("/client-portal"));
+        }
         if ("GUARANTOR_REQUEST".equals(event.getAggregateType())) {
             return guarantorRequestContent(event, payload, fallback);
         }
@@ -79,7 +85,7 @@ public class LoanNotificationFormatter {
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         return staffAction
             ? staffContent(app, applicant, eventType)
-            : applicantContent(app, eventType, payload);
+            : applicantContent(app, eventType, payload,applicant);
     }
 
     private NotificationDeliveryService.DeliveryContent guarantorRequestContent(OutboxEvent event,
@@ -222,7 +228,7 @@ public class LoanNotificationFormatter {
 
     private NotificationDeliveryService.DeliveryContent applicantContent(LoanApplication app,
                                                                          String eventType,
-                                                                         JsonNode payload) {
+                                                                         JsonNode payload,Member applicant) {
         LoanStatus status = statusForApplicantEvent(app, eventType);
         String statusLabel = statusLabel(status);
         String subject = "Loan application status updated";
@@ -237,7 +243,7 @@ public class LoanNotificationFormatter {
         if (!reason.isBlank()) {
             rows.put("Reason", reason);
         }
-        String url = absoluteUrl("/app/loan-applications/" + app.getId());
+        String url = absoluteUrl(applicant!=null&&!applicant.isClientPortalEnabled()?"/client-portal":"/app/loan-applications/" + app.getId());
         return content(subject, title, summary, rows, url);
     }
 

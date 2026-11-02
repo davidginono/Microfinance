@@ -3,7 +3,7 @@
  * See vendor/cloudscape-icons.LICENSE and vendor/cloudscape-icons.NOTICE. */
 (() => {
     'use strict';
-    const onReady = window.WorkspaceNavigation?.onReady || (callback => window.addEventListener("load", callback, {once:true}));
+    const onReady = window.WorkspaceNavigation?.onReady || (callback => document.readyState==='loading'?document.addEventListener("DOMContentLoaded",callback,{once:true}):callback());
 
     const artwork = {
     "status-positive": "<circle cx=\"8\" cy=\"8\" r=\"7\" />\n<path d=\"M4.5 7.5L7 10L11 5\" class=\"stroke-linejoin-round\"/>",

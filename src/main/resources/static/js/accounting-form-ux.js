@@ -44,6 +44,7 @@
     };
     document.addEventListener('workspace:form-settled', event => {
         if (!states.some(state => state.form === event.detail.form)) return;
+        if(event.detail.saved){const state=states.find(state=>state.form===event.detail.form);state.initial=values(state.form);state.restoredErrors=false;}
         submitting = false; discarding = false; submitted = null;
     });
     const confirmDiscard = action => {

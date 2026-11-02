@@ -93,6 +93,14 @@ public class LoanAttachmentService {
         return writeJson(attachments);
     }
 
+    public record NamedUpload(MultipartFile file,String title,String purpose,UUID requiredId) {}
+    public String storeNamed(UUID loan,List<NamedUpload> files,String existingJson) {
+        List<Map<String,Object>> items=parse(existingJson);
+        if(items.size()+files.stream().filter(f->f.file()!=null&&!f.file().isEmpty()).count()>40)throw new IllegalArgumentException("applications.error.attachments");
+        try {for(var upload:files){if(upload.file()==null||upload.file().isEmpty())continue;storeOne(loan,items,upload.file(),CATEGORY_APPLICATION_ATTACHMENT,upload.requiredId(),upload.title());var item=items.getLast();item.put("documentTitle",upload.title());item.put("documentPurpose",upload.purpose());}}
+        catch(IOException e){throw new IllegalArgumentException("applications.error.attachments",e);}return writeJson(items);
+    }
+
     private void storeOne(UUID loanId,
                           List<Map<String, Object>> attachments,
                           MultipartFile file,

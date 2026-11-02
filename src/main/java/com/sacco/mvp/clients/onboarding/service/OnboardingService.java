@@ -38,6 +38,7 @@ public class OnboardingService {
     private final AuditService audit;
     private final ObjectMapper json;
     private final PlatformTransactionManager transactions;
+    private final OutboxService outbox;
 
     public void authorize(AppUserPrincipal a,String action) {
         access.requireActor(a,"CLIENT_ONBOARDING_VIEW");
@@ -79,7 +80,7 @@ public class OnboardingService {
         return client;
     }
     @Transactional(readOnly=true) public ProfileForm profileForm(AppUserPrincipal a,UUID id) {
-        authorize(a,"UPDATE");var c=records.client(a,id,today());var f=new ProfileForm();f.setExpectedSequence(c.sequence());records.latest(a,id).ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);return f;
+        authorize(a,"UPDATE");var c=records.client(a,id,today());check(!c.portalEnabled(),"selfServiceOnly");var f=new ProfileForm();f.setExpectedSequence(c.sequence());records.latest(a,id).ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);return f;
     }
     @Transactional(readOnly=true) public List<GroupChoice> groups(AppUserPrincipal a,UUID client,String search,int page) {
         if(a!=null&&!a.isStaffSession()){requireOwner(a);check(Objects.equals(a.getMemberId(),client),"scope");}
@@ -88,7 +89,7 @@ public class OnboardingService {
     }
     @Transactional(timeout=20)
     public UUID save(AppUserPrincipal a,UUID client,ProfileForm f) {
-        authorize(a,"UPDATE");return saveRevision(a,client,f,hash(List.of(client,f)));
+        authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");return saveRevision(a,client,f,hash(List.of(client,f)));
     }
     private UUID saveRevision(AppUserPrincipal a,UUID client,ProfileForm f,String hash) {
         records.client(a,client,today());var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
@@ -109,7 +110,7 @@ public class OnboardingService {
         event(a,client,"CLIENT_KYC_"+f.getAction());return id;
     }
     public UUID attach(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file) {
-        authorize(a,"UPDATE");return attach(a,client,f,file,false);
+        authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");return attach(a,client,f,file,false);
     }
     private UUID attach(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file,boolean own) {
         records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRequestKey()!=null,"request");check(DOCUMENT_CATEGORIES.contains(f.getCategory()),"category");
@@ -144,6 +145,7 @@ public class OnboardingService {
             String identity=identity(r.profile());records.lock("CLIENT_IDENTITY/"+a.getSaccoId()+"/"+identity);check(!records.duplicate(a.getSaccoId(),identity,client),"duplicate");
         }
         UUID id=UUID.randomUUID();records.decision(a,client,id,f,hash,clock.now());
+        if(f.getKind().equals("VERIFY")&&!c.portalEnabled())outbox.enqueue("CLIENT_KYC",id,"CLIENT_PROFILE_VERIFIED",client,a.getMemberId(),a.getSaccoId(),a.getStationId(),Map.of("clientNumber",c.number(),"message","Your profile is verified. Client number: "+c.number()+". Open the Client portal and request a new access code to apply for a loan.","portalPath","/client-portal"));
         event(a,client,"CLIENT_KYC_"+f.getKind());return id;
     }
     @Transactional(timeout=15)
@@ -166,7 +168,7 @@ public class OnboardingService {
     private void requireOwner(AppUserPrincipal a) {
         if(a==null||!a.isMemberAccess()||a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Client workspace required");
         var member=directory.find(a.getMemberId()).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
-        if(!member.isMemberAccess()||!member.isClientPortalEnabled()||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE||!Objects.equals(member.getSaccoId(),a.getSaccoId())||!Objects.equals(member.getStationId(),a.getStationId()))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
+        if(!member.isMemberAccess()||(!member.isClientPortalEnabled()&&!a.isProvisionalPortal())||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE||!Objects.equals(member.getSaccoId(),a.getSaccoId())||!Objects.equals(member.getStationId(),a.getStationId()))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
     }
     @Transactional(readOnly=true)
     public OwnWorkspace ownWorkspace(AppUserPrincipal a,int page,Integer sequence) {

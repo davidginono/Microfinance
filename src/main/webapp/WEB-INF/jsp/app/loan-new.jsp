@@ -131,6 +131,12 @@
         <p class="mt-2 text-xs text-slate-500"><spring:message code="newloan.purpose.help" /></p>
     </div>
 
+    <div class="erp-section-muted application-recording-fields"><h3 class="erp-panel-title"><spring:message code="applications.information"/></h3>
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div><label for="applicationDate"><spring:message code="applications.applicationDate"/></label><input class="aws-control w-full" type="date" id="applicationDate" name="applicationDate" value="<c:out value='${formValues.applicationDate}'/>"/></div>
+    <c:forEach items="${['collateralItemNumber','collateralAssetType','collateralOwner','collateralLocation','collateralContactPhone']}" var="key"><div><label for="${key}"><spring:message code="applications.${key}"/></label><input class="aws-control w-full" id="${key}" name="${key}" maxlength="255" value="<c:out value='${formValues[key]}'/>"/></div></c:forEach>
+    <div class="md:col-span-2"><label for="useOfFunds"><spring:message code="applications.useOfFunds"/></label><textarea class="aws-control w-full" id="useOfFunds" name="useOfFunds" maxlength="2000" rows="2"><c:out value="${formValues.useOfFunds}"/></textarea></div>
+    </div></div>
     <c:forEach items="${formModel.fields}" var="field">
         <c:set var="fieldValue" value="${formValues[field.name]}" />
         <div>
@@ -539,6 +545,7 @@
         <c:if test="${not product.applicantAttachmentRequired}">
             <p class="mt-2 text-sm text-slate-500">
                 <span class="attachment-dropzone-help"><spring:message code="attachments.dropzone.help" text="Images and documents can be attached." /></span>
+                <div data-attachment-titles data-label="<spring:message code='applications.documentName'/>"></div>
             </p>
         </c:if>
         </div>
@@ -2029,4 +2036,5 @@
 </c:if>
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
+<script src="<c:url value='/js/application-attachment-titles.js'/>" defer></script>
 <%@ include file="../fragments/footer.jspf" %>

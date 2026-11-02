@@ -32,7 +32,7 @@ class ClientOnboardingPostgresTest {
         var bytes=new ByteArrayOutputStream();ImageIO.write(new BufferedImage(2,2,BufferedImage.TYPE_INT_RGB),"png",bytes);image=bytes.toByteArray();
     }
     @AfterAll void stop(){f.stop();}
-    @BeforeEach void fixture(){f.fixture();clientPhone=phone();f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day);when(f.context.getBean(ApplicationClock.class).now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
+    @BeforeEach void fixture(){f.fixture();clientPhone=phone();f.jdbc.update("update members set phone=?,client_portal_enabled=false,password_hash='!NO_PORTAL_ACCESS' where id=?",clientPhone,f.client);when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day);when(f.context.getBean(ApplicationClock.class).now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
     String phone(){return "2557"+String.format("%08d",Math.floorMod(UUID.randomUUID().getLeastSignificantBits(),100000000));}
     ProfileForm profile(UUID client,String identity) {
         var form=new ProfileForm();form.setExpectedSequence(service.client(f.actor,client).sequence());var p=form.getProfile();
@@ -67,7 +67,7 @@ class ClientOnboardingPostgresTest {
         f.jdbc.update("update members set station_id='B2' where id=?",f.client);
         assertThatThrownBy(()->service.ownStatus(owner)).isInstanceOf(AccessDeniedException.class);
     }
-    UUID otherClient(String branch){var id=UUID.randomUUID();f.jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,phone,status,position,is_member,password_hash,created_at) values(?,?,?,?,'Synthetic second client',?,'ACTIVE','MEMBER',true,'test-only',now())",id,f.institution,branch,id.toString(),phone());return id;}
+    UUID otherClient(String branch){var id=UUID.randomUUID();f.jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,phone,status,position,is_member,password_hash,client_portal_enabled,created_at) values(?,?,?,?,'Synthetic second client',?,'ACTIVE','MEMBER',true,'!NO_PORTAL_ACCESS',false,now())",id,f.institution,branch,id.toString(),phone());return id;}
 
     @Test void existingRegistrationIsUnverifiedAndAssistedCreationDoesNotFabricateOtpOrConsent(){
         assertThat(service.client(f.actor,f.client).state()).isEqualTo("NOT_STARTED");assertThat(gate()).isEqualTo("kyc.error.required");
@@ -80,7 +80,7 @@ class ClientOnboardingPostgresTest {
         f.jdbc.update("update members set phone=null where id=?",f.client);var missingContact=profile(f.client,"TZ-0000-1234");missingContact.setAction("SUBMITTED");assertThatThrownBy(()->service.save(f.actor,f.client,missingContact)).hasMessage("kyc.error.phone");f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);
         var form=profile(f.client,"TZ-0000-1234");form.setAction("SUBMITTED");assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.documents");
         UUID submitted=submitted(f.client,"TZ-0000-1234");var review=decision(submitted);assertThatThrownBy(()->service.review(f.actor,f.client,review)).hasMessage("kyc.error.independent");
-        var selfMember=Member.builder().id(f.client).saccoId(f.institution).stationId("B1").memberNo(f.client.toString()).memberAccount(true).fullName("Synthetic client").phone(clientPhone).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE' where id=?",f.client);when(f.context.getBean(MemberDirectoryService.class).find(f.client)).thenReturn(Optional.of(selfMember));var selfReviewer=new AppUserPrincipal(selfMember,EnumSet.allOf(UserClaim.class),true);assertThatThrownBy(()->service.review(selfReviewer,f.client,review)).hasMessage("kyc.error.independent");
+        var selfMember=Member.builder().id(f.client).saccoId(f.institution).stationId("B1").memberNo(f.client.toString()).memberAccount(true).fullName("Synthetic client").phone(clientPhone).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE',client_portal_enabled=true,password_hash='test-only' where id=?",f.client);when(f.context.getBean(MemberDirectoryService.class).find(f.client)).thenReturn(Optional.of(selfMember));var selfReviewer=new AppUserPrincipal(selfMember,EnumSet.allOf(UserClaim.class),true);assertThatThrownBy(()->service.review(selfReviewer,f.client,review)).hasMessage("kyc.error.independent");
         var verifier=f.operator("B1");UUID saved=service.review(verifier,f.client,review);assertThat(service.review(verifier,f.client,review)).isEqualTo(saved);assertThat(gate()).isNull();assertThat(service.documents(f.actor,f.client)).hasSize(4);
         assertThatThrownBy(()->f.jdbc.update("delete from client_onboarding_decision where id=?",saved)).isInstanceOf(DataAccessException.class);
         assertThatThrownBy(()->f.jdbc.execute("truncate client_onboarding_revision cascade")).isInstanceOf(DataAccessException.class);
@@ -129,7 +129,7 @@ class ClientOnboardingPostgresTest {
     }
     AppUserPrincipal owner(UUID id) {
         var member=Member.builder().id(id).saccoId(f.institution).stationId("B1").memberNo(id.toString()).fullName("Synthetic client").phone(clientPhone).position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build();
-        when(f.context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(member));return new AppUserPrincipal(member,Set.of(),false);
+        member.setClientPortalEnabled(false);when(f.context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(member));return AppUserPrincipal.forClientPortal(member);
     }
     NoticeForm notice() {
         var n=service.noticeForm(f.actor);n.setEnabled(true);n.setVersion("Approved synthetic notice 1");n.setEnglish("Synthetic English privacy notice with purpose and contact details.");n.setKiswahili("Taarifa ya faragha ya majaribio iliyoidhinishwa.");n.setLawfulBasis("CONSENT");n.setRetentionReference("Approved synthetic retention schedule");n.setRetentionReviewOn(day.plusYears(2));return n;

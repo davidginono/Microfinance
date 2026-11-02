@@ -212,6 +212,7 @@ public class NotificationViewService {
             return "Loan Status Updated";
         }
         return switch (type) {
+            case "CLIENT_PROFILE_VERIFIED" -> "Client profile verified / Wasifu umehakikiwa";
             case "SUPPORT_MESSAGE" -> "Support Message";
             case "ADMIN_REPLY" -> "Admin Reply";
             case "ADMIN_BROADCAST" -> "Admin Broadcast";
@@ -278,6 +279,7 @@ public class NotificationViewService {
             case "LOAN_READY_FOR_ACCOUNTANT" -> "A loan application requires your accountant review.";
             case "LOAN_READY_FOR_BOARD" -> "A loan application requires committee review.";
             case "LOAN_READY_FOR_DISBURSEMENT" -> "A loan application is ready for disbursement.";
+            case "CLIENT_PROFILE_VERIFIED" -> "Your profile is verified. Client number / Namba ya mteja: " + stringValue(details.get("clientNumber")) + ". Open the Client portal / Fungua tovuti ya mteja: /client-portal. Request a new access code to apply for a loan / Omba msimbo mpya wa kuingia kuomba mkopo.";
             case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to continue the review workflow.";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "You have a new guarantor request waiting for a decision.";
             case "GUARANTOR_REQUEST_APPROVED" -> "A selected guarantor approved your guarantee request.";

@@ -23,6 +23,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class LoanNotificationFormatterTest {
+    @Test void verifiedProvisionalClientsReceiveTheirNumberAndThePublicPortalLink()throws Exception{
+        var formatter=formatter(mock(LoanApplicationRepository.class),mock(MemberRepository.class));
+        var content=formatter.format(OutboxEvent.builder().eventType("CLIENT_PROFILE_VERIFIED").aggregateType("CLIENT_KYC").build(),payload("{\"details\":{\"clientNumber\":\"CL-00000123\"}}"),NotificationDeliveryService.DeliveryContent.plain("Fallback","Fallback"));
+        assertThat(content.smsText()).contains("CL-00000123","https://sacco.example/client-portal").doesNotContain("/app/loan-applications/");
+    }
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test

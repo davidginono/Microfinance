@@ -44,7 +44,7 @@ class ClientOnboardingRenderedPostgresTest {
         var domain=new ClientOnboardingPostgresTest();domain.start();var tomcat=new Tomcat();
         var web=new AnnotationConfigWebApplicationContext();
         try {
-            domain.fixture();domain.owner(domain.f.client);var owner=new AppUserPrincipal(domain.f.context.getBean(com.sacco.mvp.service.MemberDirectoryService.class).find(domain.f.client).orElseThrow(),Set.of(com.sacco.mvp.domain.UserClaim.MEMBER_LOANS_CREATE),false);domain.service.saveNotice(domain.f.actor,domain.notice());
+            domain.fixture();domain.owner(domain.f.client);domain.f.jdbc.update("update members set client_portal_enabled=true,password_hash='test-only' where id=?",domain.f.client);domain.f.context.getBean(com.sacco.mvp.service.MemberDirectoryService.class).find(domain.f.client).orElseThrow().setClientPortalEnabled(true);var owner=new AppUserPrincipal(domain.f.context.getBean(com.sacco.mvp.service.MemberDirectoryService.class).find(domain.f.client).orElseThrow(),Set.of(com.sacco.mvp.domain.UserClaim.MEMBER_LOANS_CREATE),false);domain.service.saveNotice(domain.f.actor,domain.notice());
             tomcat.setBaseDir(temporary.toString());tomcat.setPort(0);tomcat.getConnector().setProperty("address","127.0.0.1");
             var context=tomcat.addContext("",Path.of("src/main/webapp").toAbsolutePath().toString());context.setParentClassLoader(getClass().getClassLoader());Tomcat.initWebappDefaults(context);context.addServletContainerInitializer(new JasperInitializer(),null);
             web.setParent(domain.f.context);web.setServletContext(context.getServletContext());web.register(WebConfig.class);

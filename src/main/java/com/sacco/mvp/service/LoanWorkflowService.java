@@ -380,6 +380,21 @@ public class LoanWorkflowService {
         return sourceLoan;
     }
 
+    @Transactional(timeout=30)
+    public UUID saveRecordingDraft(String institution,String branch,UUID client,UUID actor,
+            com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Form form,Map<String,String> fields,List<LoanAttachmentService.NamedUpload> files) {
+        var member=memberRepository.findByIdAndSaccoIdAndStationIdIgnoreCase(client,institution,branch).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
+        if(member.isClientPortalEnabled()||!member.isMemberAccess()||member.getStatus()!=MemberStatus.ACTIVE)throw new org.springframework.security.access.AccessDeniedException("Provisional client required");
+        var product=formSchemaService.getSchema(institution,form.getProductId(),null);var tenure=LoanTenure.from(Map.of("tenureUnit",form.getTenureUnit(),"tenureValue",form.getTenureValue().toString()),form.getTenureValue());tenure.validate(product);validateRequestedAmount(product,form.getAmount());
+        var app=form.getApplicationId()==null?null:loanApplicationRepository.findByIdAndApplicantMemberId(form.getApplicationId(),client).orElseThrow(()->new IllegalArgumentException("applications.error.changed"));
+        if(app!=null&&(!institution.equals(app.getSaccoId())||!branch.equals(app.getStationId())||app.getStatus()!=LoanStatus.DRAFT))throw new IllegalArgumentException("applications.error.state");
+        if(app==null){findBlockingApplicationInProgress(client,null).ifPresent(old->{throw new IllegalArgumentException("applications.error.ongoing");});app=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(applicationNumberService.nextFor(institution)).saccoId(institution).stationId(branch).applicantMemberId(client).createdAt(applicationClock.now()).build();}
+        var data=formSchemaService.extractFormData(fields,product.getFormSchema());data.put("recordingDetails",objectMapper.readValue(objectMapper.writeValueAsString(form),new TypeReference<Map<String,Object>>(){}));data.put("informationSource","DECLARED");
+        app.setLoanType(product.getLoanType());app.setLoanProductSettingId(product.getId());app.setAmount(form.getAmount());app.setTenorMonths(tenure.compatibilityMonths());app.setStatus(LoanStatus.DRAFT);app.setRequiredGuarantors(product.getGuarantorsRequired());app.setFormData(formSchemaService.toJson(data));
+        app.setPolicySnapshot("{\"assessmentType\":\"NOT_ASSESSED\",\"verificationStatus\":\"DECLARED_NOT_VERIFIED\"}");app.setFinancialSnapshot(null);app.setSelectedGuarantors("[]");app.setApplicantSignatureText(null);app.setApplicantSignatureVerifiedAt(null);app.setUpdatedAt(applicationClock.now());
+        app=loanApplicationRepository.saveAndFlush(app);app.setAttachmentsJson(loanAttachmentService.storeNamed(app.getId(),files,app.getAttachmentsJson()));app=loanApplicationRepository.saveAndFlush(app);auditLoan(app,actor,"LOAN_APPLICATION_RECORDED_DRAFT","Client application recorded as draft");return app.getId();
+    }
+
     public LoanApplication saveDraft(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                      List<?> guarantorSelections,
@@ -434,11 +449,15 @@ public class LoanWorkflowService {
             : requireFinancialSnapshotAmount(generatedTopUpSnapshot, "principalAmount");
         validateRequestedAmount(product, applicationAmount);
         requireLoadedFinancialDataForDraft(product, financialSnapshotJson);
-        Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
+        Map<String,String> schemaParams=new LinkedHashMap<>(requestParams);
+        Map<String,Object> supplemental=applicationRecordingFields(schemaParams);
+        Map<String, Object> formData = formSchemaService.extractFormData(schemaParams, product.getFormSchema());
         String guarantorApprovalMode = normalizeGuarantorApprovalMode(requestParams.get(GUARANTOR_APPROVAL_MODE_FIELD));
         formData.put(GUARANTOR_APPROVAL_MODE_FIELD, guarantorApprovalMode);
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
+        formData.putAll(supplemental);
         appendLoanPurpose(formData, requestParams.get("purpose"));
+        if(existingDraft!=null){var prior=parseFormData(existingDraft.getFormData());if(prior.containsKey("recordingDetails"))formData.put("recordingDetails",prior.get("recordingDetails"));}
         List<LoanProductRequiredAttachment> requiredAttachmentDefinitions = validateApplicantAttachmentRequirement(
             product,
             existingDraft,
@@ -505,7 +524,16 @@ public class LoanWorkflowService {
             if (reEditingAfterGuarantorApproval) {
                 expireGuarantorApprovalsForApplicantEdit(persisted.getId());
             }
-            persisted.setAttachmentsJson(loanAttachmentService.store(persisted.getId(), attachments, persisted.getAttachmentsJson()));
+            var namedUploads=new ArrayList<LoanAttachmentService.NamedUpload>();
+            if(attachments!=null)for(int i=0;i<attachments.size();i++){
+                var file=attachments.get(i);if(file==null||file.isEmpty())continue;
+                String title=requestParams.getOrDefault("attachmentTitle_"+i,Objects.toString(file.getOriginalFilename(),"Document")).strip();
+                if(title.isBlank()||title.length()>120)throw new IllegalArgumentException("applications.error.attachments");
+                namedUploads.add(new LoanAttachmentService.NamedUpload(file,title,"OTHER",null));
+            }
+            persisted.setAttachmentsJson(requestParams.keySet().stream().anyMatch(k->k.startsWith("attachmentTitle_"))
+                ?loanAttachmentService.storeNamed(persisted.getId(),namedUploads,persisted.getAttachmentsJson())
+                :loanAttachmentService.store(persisted.getId(),attachments,persisted.getAttachmentsJson()));
             persisted.setAttachmentsJson(loanAttachmentService.storeRequired(
                 persisted.getId(),
                 requiredAttachmentDefinitions.stream()
@@ -598,6 +626,18 @@ public class LoanWorkflowService {
         return loanAttachmentService.parse(existingDraft.getAttachmentsJson()).stream()
             .anyMatch(item -> LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT.equals(String.valueOf(item.get("attachmentCategory")))
                 && requirementId.toString().equals(String.valueOf(item.get("requiredAttachmentId"))));
+    }
+
+    private Map<String,Object> applicationRecordingFields(Map<String,String> fields) {
+        Map<String,Object> result=new LinkedHashMap<>();
+        for(String key:List.of("applicationDate","useOfFunds","collateralItemNumber","collateralAssetType","collateralOwner","collateralLocation","collateralContactPhone")){
+            String value=fields.remove(key);if(value==null||value.isBlank())continue;value=value.strip();
+            if(value.length()>(key.equals("useOfFunds")?2000:255)||value.codePoints().anyMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9))throw new IllegalArgumentException("applications.error.details");
+            if(key.equals("applicationDate"))try{if(LocalDate.parse(value).isAfter(applicationClock.today()))throw new IllegalArgumentException("applications.error.date");}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("applications.error.date");}
+            if(key.equals("collateralContactPhone"))try{value=TanzaniaPhoneNumber.normalizeRequired(value);}catch(IllegalStateException e){throw new IllegalArgumentException("applications.error.phone");}
+            result.put(key,value);
+        }
+        fields.keySet().removeIf(k->k.startsWith("attachmentTitle_"));return result;
     }
 
     private void appendLoanPurpose(Map<String, Object> formData, String purpose) {

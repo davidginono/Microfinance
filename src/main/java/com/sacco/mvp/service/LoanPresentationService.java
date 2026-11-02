@@ -180,8 +180,20 @@ public class LoanPresentationService {
         return managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
     }
 
+    public Map<String,Object> parseStaffFormFields(String json){
+        var result=new LinkedHashMap<>(parseNamedMap(json,Set.of("_csrf","additionalNotes","recordingDetails","informationSource")));
+        result.putAll(parseFormFields(json));
+        if(json!=null&&!json.isBlank())try{var rows=objectMapper.readTree(json).path("recordingDetails").path("guarantors");if(rows.isArray())for(int i=0;i<Math.min(20,rows.size());i++)for(String key:List.of("relationship","business","location","phone"))if(!rows.get(i).path(key).isNull()&&!rows.get(i).path(key).isMissingNode())result.put("Guarantor "+(i+1)+" - "+humanizeFieldLabel(key),rows.get(i).path(key).asString());}catch(RuntimeException ignored){/* Legacy records have no recording evidence. */}
+        return result;
+    }
     public Map<String, Object> parseFormFields(String json) {
-        return parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "nationalId", "employerName", "hasExistingLoan", "additionalNotes"));
+        var result=new LinkedHashMap<>(parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "nationalId", "employerName", "hasExistingLoan", "additionalNotes","recordingDetails","informationSource")));
+        if(json!=null&&!json.isBlank())try{
+            var recorded=objectMapper.readTree(json).path("recordingDetails");
+            for(String key:List.of("applicationDate","useOfFunds","business"))if(!recorded.path(key).isMissingNode()&&!recorded.path(key).isNull())result.put(humanizeFieldLabel(key),recorded.path(key).asString());
+            var assets=recorded.path("collateral");if(assets.isArray())for(int i=0;i<Math.min(20,assets.size());i++){var asset=assets.get(i);for(String key:List.of("itemName","itemNumber","itemType","description","owner","phone","location","estimatedValue"))if(!asset.path(key).isMissingNode()&&!asset.path(key).isNull())result.put("Collateral "+(i+1)+" - "+humanizeFieldLabel(key),asset.path(key).asString());}
+        }catch(RuntimeException ignored){/* Legacy forms may contain no recording details. */}
+        return result;
     }
 
     public Map<String, Object> parseFinancialFields(String json) {

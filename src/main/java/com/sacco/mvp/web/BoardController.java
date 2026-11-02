@@ -274,7 +274,7 @@ public class BoardController {
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading credit profile..."));
         model.addAttribute("myReview", myReview);
-        model.addAttribute("formFields", parseFormData(app.getFormData()));
+        model.addAttribute("formFields", loanPresentationService.parseStaffFormFields(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());

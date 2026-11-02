@@ -230,6 +230,7 @@
 
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
                         <span>Don't have an account? </span>
+                        <a class="auth-signup-link" href="<c:url value='/client-portal'/>"><spring:message code="portal.title"/></a>
                         <a href="/register/member" class="auth-signup-link"><spring:message code="login.registerMember" /></a>
                         <div class="mt-3">
                             <a href="/system-admin/login" class="auth-text-link">System Admin login</a>

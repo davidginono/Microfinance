@@ -2872,6 +2872,7 @@ public class AppController {
     }
 
     private String humanizeLoanFormError(String message, AppUserPrincipal principal, LoanProductSetting product) {
+        if(message!=null&&message.matches("applications\\.error\\.[A-Za-z]+"))return messageSource.getMessage(message,null,org.springframework.context.i18n.LocaleContextHolder.getLocale());
         if (message != null
             && (message.contains("Amount exceeds eligibility cap")
                 || message.contains("Loan amount exceeds the applicant savings limit"))) {

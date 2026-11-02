@@ -100,6 +100,8 @@ public class SecurityConfig {
                     auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
                 }
                 auth
+                .requestMatchers("/client-portal/workspace/**").access((authentication,context)->new AuthorizationDecision(authentication.get().getPrincipal() instanceof com.sacco.mvp.clients.portal.dto.ClientPortalDtos.Session))
+                .requestMatchers("/client-portal", "/client-portal/register", "/client-portal/choices", "/client-portal/request-code", "/client-portal/verify").permitAll()
                 .requestMatchers("/documents/reports/*.xlsx", "/documents/reports/*.csv").denyAll()
                 .requestMatchers("/finance/**", "/reports/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
@@ -324,6 +326,7 @@ public class SecurityConfig {
                 }))
             .exceptionHandling(ex -> ex.accessDeniedHandler(loginAwareAccessDeniedHandler()))
             .csrf(Customizer.withDefaults())
+            .addFilterBefore(new com.sacco.mvp.clients.portal.security.ClientPortalIsolationFilter(), AuthorizationFilter.class)
             .addFilterBefore(new com.sacco.mvp.security.PlatformSetupFilter(), AuthorizationFilter.class)
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
             .addFilterAfter(new com.sacco.mvp.security.ClientOnboardingFilter(onboardingService), AuthorizationFilter.class)

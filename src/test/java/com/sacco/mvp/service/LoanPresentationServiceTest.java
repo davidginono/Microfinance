@@ -43,6 +43,13 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LoanPresentationServiceTest {
+    @Test void structuredRecordingEvidenceIsReadableWithoutExposingCommandInternals(){
+        String source="""
+            {"nationalId":"SYNTHETIC-ID","monthlyIncome":"1500000","recordingDetails":{"requestKey":"SECRET-REQUEST","applicationDate":"2026-11-02","useOfFunds":"Inventory","collateral":[{"itemName":"Machine","itemNumber":"TEST-1"}],"guarantors":[{"clientId":"SECRET-INTERNAL-ID","relationship":"Sibling"}]}}
+            """;
+        assertThat(loanPresentationService.parseStaffFormFields(source).toString()).contains("SYNTHETIC-ID","Machine","TEST-1","Inventory","Sibling").doesNotContain("SECRET-REQUEST","SECRET-INTERNAL-ID","recordingDetails");
+        assertThat(loanPresentationService.parseFormFields(source).toString()).doesNotContain("Sibling","SYNTHETIC-ID","SECRET-REQUEST");
+    }
 
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
