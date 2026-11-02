@@ -1033,7 +1033,8 @@ public class AdminController {
                 ra.addFlashAttribute("message", "User updated.");
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(),
+                org.springframework.context.i18n.LocaleContextHolder.getLocale()));
         }
         return "redirect:/admin/users/" + id + "/edit";
     }
@@ -1071,6 +1072,23 @@ public class AdminController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/admin/users/" + id + "/edit";
+    }
+
+    @PostMapping("/users/{id}/resend-invite")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
+    public String resendStaffInvite(@PathVariable UUID id,
+                                    @AuthenticationPrincipal AppUserPrincipal principal,
+                                    @RequestParam(defaultValue = "false") boolean returnToList,
+                                    RedirectAttributes ra) {
+        var locale = org.springframework.context.i18n.LocaleContextHolder.getLocale();
+        try {
+            adminService.resendStaffInvitation(adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal), principal.getMemberId(), principal.getGrantedPositions(), id);
+            ra.addFlashAttribute("message", messages.getMessage("admin.users.invite.sent", null, locale));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(), locale));
+        }
+        return returnToList ? "redirect:/admin/users" : "redirect:/admin/users/" + id + "/edit";
     }
 
     @PostMapping("/users/{id}/delete")

@@ -325,6 +325,28 @@ public class AdminService {
     }
 
     @Transactional
+    public void resendStaffInvitation(String saccoId, String stationId, UUID adminId,
+                                      Set<Position> actorRoles, UUID accountId) {
+        Member member = memberRepository.findForStaffInvitation(accountId, saccoId, normalizeOptional(stationId))
+            .orElseThrow(() -> new IllegalArgumentException("admin.users.invite.notFound"));
+        if (!canResendStaffInvitation(member)) {
+            throw new IllegalStateException("admin.users.invite.ineligible");
+        }
+        validateStaffRoles(actorRoles, new ArrayList<>(member.getStaffRolesResolved()));
+        if (member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            ensureMinorAdminSlotAvailable(saccoId, member.getStationId(), accountId);
+        }
+        if (member.getStaffRolesResolved().contains(Position.CHAIRPERSON)) {
+            ensureChairpersonSlotAvailable(saccoId, accountId);
+        }
+        Map<String, Object> before = snapshotMember(member);
+        member.setStatus(MemberStatus.INVITED);
+        memberRepository.save(member);
+        minorAdminInvitationService.issueInvitation(member, adminId);
+        auditService.log("STAFF_USER", accountId, "ADMIN_RESEND_STAFF_INVITE", adminId, before, snapshotMember(member));
+    }
+
+    @Transactional
     public Member registerMinorAdmin(UUID adminId,
                                      String saccoId,
                                      String stationId,
@@ -588,6 +610,9 @@ public class AdminService {
         boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
         if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
             throw new IllegalStateException("Only super admins can update Super Admin accounts.");
+        }
+        if (canDeleteStaffRecord(member) && status != MemberStatus.INACTIVE) {
+            throw new IllegalStateException("admin.users.invite.activationRequired");
         }
         enforceUserStatusTransition(member.getStatus(), status);
         LinkedHashSet<Position> staffRoles = member.isMemberAccess()
@@ -2620,7 +2645,14 @@ public class AdminService {
             .canEnableClientAccess(!memberAccess && member.getStatus() == MemberStatus.ACTIVE
                 && member.isStaffAccessActive() && !member.getStaffRolesResolved().contains(Position.ADMIN))
             .canDeleteStaffRecord(canDeleteStaffRecord(member))
+            .canResendStaffInvitation(canResendStaffInvitation(member))
             .build();
+    }
+
+    private boolean canResendStaffInvitation(Member member) {
+        return member != null && !member.isMemberAccess() && !member.getStaffRolesResolved().isEmpty()
+            && INVITED_ACCOUNT_PASSWORD_PLACEHOLDER.equals(member.getPasswordHash())
+            && (member.getStatus() == MemberStatus.INVITED || member.getStatus() == MemberStatus.INACTIVE);
     }
 
     private boolean canDeleteStaffRecord(Member member) {
@@ -3637,6 +3669,7 @@ public class AdminService {
         private boolean memberAccess;
         private boolean canEnableClientAccess;
         private boolean canDeleteStaffRecord;
+        private boolean canResendStaffInvitation;
     }
 
     @lombok.Getter

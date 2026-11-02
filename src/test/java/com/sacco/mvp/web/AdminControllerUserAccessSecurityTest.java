@@ -153,6 +153,41 @@ class AdminControllerUserAccessSecurityTest {
     }
 
     @Test
+    void resendStaffInviteRequiresUpdateAndCsrfAndUsesAuthenticatedScope() throws Exception {
+        UUID id = UUID.randomUUID();
+        var actor = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any())).thenReturn("SACCO-01");
+        when(adminScopeService.currentStationId(any())).thenReturn("ST-1");
+        mockMvc.perform(post("/admin/users/{id}/resend-invite", id).with(authentication(authenticationFor(actor))).with(csrf())
+                .param("saccoId", "FOREIGN").param("stationId", "FOREIGN").param("returnToList", "true"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/admin/users"))
+            .andExpect(flash().attributeExists("message"));
+        verify(adminService).resendStaffInvitation("SACCO-01", "ST-1", actor.getMemberId(), actor.getGrantedPositions(), id);
+        Mockito.clearInvocations(adminService);
+        mockMvc.perform(post("/admin/users/{id}/resend-invite", id).with(authentication(authenticationFor(actor))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/admin/users/{id}/resend-invite", id)
+                .with(authentication(authenticationFor(principal(Set.of(UserClaim.USER_ACCESS_VIEW))))).with(csrf()))
+            .andExpect(status().isForbidden());
+        Mockito.verifyNoInteractions(adminService);
+    }
+
+    @Test
+    void failedStaffResendShowsErrorAndReturnsToAccount() throws Exception {
+        UUID id = UUID.randomUUID();
+        var actor = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(any())).thenReturn("SACCO-01");
+        when(adminScopeService.currentStationId(any())).thenReturn("ST-1");
+        doThrow(new IllegalStateException("admin.users.invite.ineligible")).when(adminService)
+            .resendStaffInvitation("SACCO-01", "ST-1", actor.getMemberId(), actor.getGrantedPositions(), id);
+        mockMvc.perform(post("/admin/users/{id}/resend-invite", id).with(authentication(authenticationFor(actor))).with(csrf()))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/admin/users/" + id + "/edit"))
+            .andExpect(flash().attributeExists("error"));
+    }
+
+    @Test
     void editUserPageAllowsWorkspaceAdminWithUpdateClaim() throws Exception {
         UUID accountId = UUID.randomUUID();
         AppUserPrincipal principal = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));

@@ -6,7 +6,7 @@
         const rows=[...matrix.querySelectorAll('[data-claim-row]')],search=matrix.querySelector('[data-access-search]');
         const headers=[...matrix.querySelectorAll('[data-access-sort]')],body=matrix.querySelector('tbody');
         const count=matrix.querySelector('[data-access-count]'),empty=matrix.querySelector('[data-access-empty]');
-        const save=matrix.querySelector('[data-access-save]'),discard=matrix.querySelector('[data-access-discard]');
+        const save=form.querySelector('[data-access-save]'),discard=form.querySelector('[data-access-discard]');
         const controls=[...form.elements].filter(control=>control.name&&!['hidden','submit','button'].includes(control.type));
         const baseline=controls.map(control=>({control,value:control.value,checked:control.checked,disabled:control.disabled}));
         const signature=()=>JSON.stringify(controls.map(control=>[control.value,control.checked]));
@@ -58,6 +58,7 @@
         form.addEventListener('input',syncActions);form.addEventListener('change',syncActions);
         discard.addEventListener('click',()=>{
             for(const {control,value,checked,disabled} of baseline){control.value=value;control.disabled=disabled;if(control.type==='checkbox'||control.type==='radio')control.checked=checked;}
+            window.refreshEnhancedSelects?.(form);
             render();form.dispatchEvent(new Event('input',{bubbles:true}));
         });
         render();

@@ -128,6 +128,13 @@
                             <c:choose>
                                 <c:when test="${canEditUsers}">
                                     <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-neutral"><spring:message code="common.edit" /></a>
+                                    <c:if test="${user.canResendStaffInvitation}">
+                                        <form action="<c:url value='/admin/users/${user.accountId}/resend-invite' />" method="post">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                            <input type="hidden" name="returnToList" value="true" />
+                                            <button type="submit" class="app-btn btn-neutral"><spring:message code="admin.users.invite.resend" /></button>
+                                        </form>
+                                    </c:if>
                                 </c:when>
                                 <c:otherwise>
                                     <span class="app-btn btn-neutral pointer-events-none opacity-50">View Only</span>

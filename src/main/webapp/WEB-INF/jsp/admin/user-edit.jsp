@@ -67,8 +67,6 @@
             <h2><spring:message code="access.matrix.title" /> <span class="app-table-count" data-access-count></span></h2>
             <div class="app-table-toolbar admin-user-section-actions">
                 <button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims data-table-command><spring:message code="access.matrix.restore" /></button>
-                <button type="button" class="app-btn btn-neutral" data-access-discard disabled><spring:message code="access.matrix.discard" /></button>
-                <button type="submit" class="app-btn btn-neutral" data-access-save disabled><spring:message code="common.save" /></button>
             </div>
         </div>
         <div class="aws-filter-toolbar resource-table-search"><label><span class="sr-only"><spring:message code="access.matrix.search" /></span><span class="access-matrix-search"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.5" cy="6.5" r="4.5" /><path d="m10 10 4 4" /></svg><input type="search" class="aws-control" data-access-search placeholder="<spring:message code='access.matrix.search' />" autocomplete="off" /></span></label></div>
@@ -92,17 +90,17 @@
         </div>
         <div class="admin-user-section-body">
             <c:choose>
-                <c:when test="${user.status eq 'INVITED'}">
-                    <input type="hidden" name="status" value="INVITED" />
+                <c:when test="${user.status eq 'INVITED' or user.canDeleteStaffRecord}">
+                    <input type="hidden" name="status" value="${user.status}" />
                     <div class="admin-status-callout is-warning">
-                        <p class="admin-section-kicker">Status</p>
+                        <p class="admin-section-kicker"><spring:message code="common.status" /></p>
                         <p class="admin-status-callout__value"><c:out value="${user.displayStatus}" /></p>
-                        <p class="admin-status-callout__text">This account becomes active only after the invite form is completed.</p>
+                        <p class="admin-status-callout__text"><spring:message code="${user.status eq 'INVITED' ? 'admin.users.invite.pending' : 'admin.users.invite.cancelled'}" /></p>
                     </div>
                 </c:when>
                 <c:otherwise>
                     <label class="fcms-label admin-status-field">
-                        Status
+                        <spring:message code="common.status" />
                         <select name="status" class="fcms-control">
                             <c:forEach items="${statuses}" var="status">
                                 <c:if test="${status ne 'INVITED'}">
@@ -117,6 +115,9 @@
     </section>
 
     <div class="admin-user-edit-actions">
+        <c:if test="${user.canResendStaffInvitation}">
+            <button type="submit" form="resend-staff-invite-form" class="app-btn btn-neutral"><spring:message code="admin.users.invite.resend" /></button>
+        </c:if>
         <c:if test="${user.status eq 'INVITED'}">
             <button type="submit"
                     class="app-btn btn-danger"
@@ -130,12 +131,20 @@
             <button type="button"
                     class="app-btn btn-danger"
                     data-user-modal-open="delete-user-${user.accountId}">
-                Delete
+                <spring:message code="admin.users.deleteUser" />
             </button>
         </c:if>
         <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
+        <button type="button" class="app-btn btn-neutral" data-access-discard disabled><spring:message code="access.matrix.discard" /></button>
+        <button type="submit" class="app-btn btn-launch" data-access-save disabled><spring:message code="admin.saccoRegistry.saveChanges" /></button>
     </div>
 </form>
+
+<c:if test="${user.canResendStaffInvitation}">
+    <form id="resend-staff-invite-form" action="<c:url value='/admin/users/${user.accountId}/resend-invite' />" method="post" data-workspace-submit="recover">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+    </form>
+</c:if>
 
 <%@ include file="staff-client-access.jspf" %>
 
@@ -145,7 +154,7 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="admin-section-kicker">Delete Staff Member</p>
+                        <p class="admin-section-kicker"><spring:message code="admin.users.deleteUser" /></p>
                         <h2 class="admin-modal-title"><c:out value="${user.fullName}" /></h2>
                         <p class="admin-modal-copy">This permanently removes the cancelled staff invitation record.</p>
                     </div>
@@ -167,7 +176,7 @@
                     </label>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-user-modal-close="delete-user-${user.accountId}">Cancel</button>
-                        <button type="submit" class="app-btn btn-danger">Delete</button>
+                        <button type="submit" class="app-btn btn-danger"><spring:message code="admin.users.deleteUser" /></button>
                     </div>
                 </form>
             </div>

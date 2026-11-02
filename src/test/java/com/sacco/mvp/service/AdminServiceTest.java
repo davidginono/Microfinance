@@ -78,6 +78,69 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = MemberStatus.class, names = {"INVITED", "INACTIVE"})
+    void resendStaffInvitationPreservesIdentityRolesAndClaims(MemberStatus status) {
+        UUID id = UUID.randomUUID(), actor = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .memberNo("STAFF-10002").staffNo("10002").fullName("Staff Example").email("staff@example.invalid")
+            .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false).status(status).passwordHash("OTP_ONLY_LOGIN").build();
+        when(memberRepository.findForStaffInvitation(id, "SACCO-01", "ST-1")).thenReturn(Optional.of(member));
+
+        adminService.resendStaffInvitation("SACCO-01", "ST-1", actor, Set.of(Position.MINOR_ADMIN), id);
+
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.INVITED);
+        assertThat(member.getStaffNo()).isEqualTo("10002");
+        assertThat(member.getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
+        assertThat(member.getStaffRolesResolved()).containsExactly(Position.MANAGER);
+        assertThat(issuedInvitationCount.get()).isEqualTo(1);
+        assertThat(lastInvitedMember.get()).isSameAs(member);
+        assertThat(lastInvitedBy.get()).isEqualTo(actor);
+        verifyNoInteractions(memberAccessClaimRepository);
+        verify(auditLogRepository).save(argThat(log -> "ADMIN_RESEND_STAFF_INVITE".equals(log.getAction())));
+    }
+
+    @Test
+    void resendStaffInvitationRejectsRecordOutsideSelectedScope() {
+        UUID id = UUID.randomUUID();
+        when(memberRepository.findForStaffInvitation(id, "SACCO-01", "ST-1")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> adminService.resendStaffInvitation("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN), id))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("admin.users.invite.notFound");
+        assertThat(issuedInvitationCount.get()).isZero();
+        verify(memberRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"active", "accepted", "client", "super-admin"})
+    void resendStaffInvitationCannotResetAcceptedAccountsClientsOrElevatedStaff(String scenario) {
+        UUID id = UUID.randomUUID();
+        Position role = scenario.equals("super-admin") ? Position.ADMIN : Position.MANAGER;
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .position(role).staffRoles(new LinkedHashSet<>(List.of(role)))
+            .memberAccount(scenario.equals("client"))
+            .status(scenario.equals("active") ? MemberStatus.ACTIVE : MemberStatus.INACTIVE)
+            .passwordHash(scenario.equals("accepted") ? "encoded-password" : "OTP_ONLY_LOGIN").build();
+        when(memberRepository.findForStaffInvitation(id, "SACCO-01", "ST-1")).thenReturn(Optional.of(member));
+        assertThatThrownBy(() -> adminService.resendStaffInvitation("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN), id))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(issuedInvitationCount.get()).isZero();
+        verify(memberRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelledUnacceptedStaffCannotBeActivatedThroughStatusSave() {
+        UUID id = UUID.randomUUID();
+        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
+            .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false).status(MemberStatus.INACTIVE).passwordHash("OTP_ONLY_LOGIN").build();
+        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
+        assertThatThrownBy(() -> adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN),
+            id, List.of(Position.MANAGER), MemberStatus.ACTIVE, List.of()))
+            .isInstanceOf(IllegalStateException.class).hasMessage("admin.users.invite.activationRequired");
+        verify(memberRepository, never()).save(any());
+    }
+
     @Test void userRoleEditingCannotTurnAProvisionalClientIntoASystemUser() {
         UUID id=UUID.randomUUID();var provisional=Member.builder().id(id).saccoId("I1").stationId("B1").position(Position.MEMBER)
             .memberAccount(true).clientPortalEnabled(false).status(MemberStatus.ACTIVE).build();
