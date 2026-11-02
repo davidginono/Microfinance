@@ -57,16 +57,12 @@ class ClientOnboardingRenderedPostgresTest {
             var client=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).connectTimeout(Duration.ofSeconds(10)).build();
             var blocked=client.send(HttpRequest.newBuilder(URI.create(base+"/app/dashboard")).GET().build(),HttpResponse.BodyHandlers.ofString());
             assertThat(blocked.statusCode()).isEqualTo(302);assertThat(blocked.headers().firstValue("Location")).contains("/app/onboarding");
-            assertThat(get(client,base+"/app/onboarding",false)).contains("Complete your profile and wait for verification");
-            String loanForm=get(client,base+"/app/onboarding/loan/edit",false);assertThat(loanForm).contains("Loan request","Monthly cash flow","aria-label=\"Loan product\"","Repayment period","Other monthly debt repayments");
-            var loanValues=hidden(loanForm);loanValues.put("action","SUBMITTED");loanValues.put("details.productId",domain.f.product.toString());loanValues.put("details.principal","1000.00");loanValues.put("details.tenureValue","6");loanValues.put("details.purpose","Synthetic inventory");loanValues.put("details.business","Synthetic shop");loanValues.put("details.income","2000.00");loanValues.put("details.expenses","500.00");loanValues.put("details.otherDebt","0.00");
-            post(client,base+"/app/onboarding/loan/edit",loanValues,false);
-            assertThat(get(client,base+"/app/onboarding/loan",false)).contains("Synthetic inventory","not verified income").doesNotContain("Continue application");
+            assertThat(get(client,base+"/app/onboarding",false)).contains("My profile","Bio data","Complete your profile and wait for verification").doesNotContain("Loan request","Complete profile","/app/onboarding/loan");
             String form=get(client,base+"/app/onboarding/edit",false);
             assertThat(form).contains("My profile","Privacy notice","Synthetic English privacy notice","Bio data","Business details","Spouse details","Bank details","Profile photo","name=\"profile.dailySales\"","name=\"profile.bankAccountNumber\"").doesNotContain("name=\"profile.lawfulBasis\"","name=\"profile.retentionReference\"");
             var values=hidden(form);values.put("action","DRAFT");values.put("profile.identityType","NATIONAL_ID");values.put("profile.issuingCountry","TZ");values.put("profile.identityNumber","TZ-RENDER-1234");values.put("profile.birthDate","1990-01-01");values.put("profile.identityNoExpiry","true");values.put("profile.address","Synthetic address");values.put("profile.activity","Synthetic shop");values.put("profile.activityAddress","Synthetic market");values.put("profile.sourceOfFunds","Synthetic sales");values.put("profile.maritalStatus","SINGLE");values.put("profile.businessName","Rendered synthetic shop");values.put("profile.dailySales","12345.67");values.put("profile.bankAccountNumber","9876543210");
             post(client,base+"/app/onboarding/edit",values,false);
-            String draft=get(client,base+"/app/onboarding",false);assertThat(draft).contains("Add document","Draft");
+            String draft=get(client,base+"/app/onboarding",false);assertThat(draft).contains("Add document","Send for review","Rendered synthetic shop");
             for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY","PROFILE_PHOTO","SPOUSE_PHOTO")) {
                 var fields=hidden(get(client,base+"/app/onboarding/documents/new",false));fields.put("category",category);
                 String boundary="kyc-"+UUID.randomUUID();var bytes=new ByteArrayOutputStream();
@@ -75,25 +71,24 @@ class ClientOnboardingRenderedPostgresTest {
                 var response=client.send(HttpRequest.newBuilder(URI.create(base+"/app/onboarding/documents/new")).header("Content-Type","multipart/form-data; boundary="+boundary).POST(HttpRequest.BodyPublishers.ofByteArray(bytes.toByteArray())).build(),HttpResponse.BodyHandlers.ofString());assertThat(response.statusCode()).as(response.body()).isEqualTo(302);
             }
             form=get(client,base+"/app/onboarding/edit",false);var submitted=hidden(form);values.forEach((key,value)->{if(key.startsWith("profile."))submitted.put(key,value);});submitted.put("action","SUBMITTED");submitted.put("noticeAcknowledged","true");submitted.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",submitted,false);
-            assertThat(get(client,base+"/app/onboarding",false)).contains("awaiting review").doesNotContain("href=\"/app/onboarding/edit\"");
+            assertThat(get(client,base+"/app/onboarding",false)).contains("awaiting review","<fieldset class=\"kyc-profile-fields\" disabled").doesNotContain("value=\"SUBMITTED\"", "value=\"DRAFT\"");
             String reviewUrl=base+"/finance/clients/onboarding/"+domain.f.client+"/review";var review=hidden(get(client,reviewUrl,true));review.put("kind","RETURN");review.put("reason","INTERNAL-SCREENING-SECRET");review.put("clientMessage","Please correct your home address.");post(client,reviewUrl,review,true);
             String returned=get(client,base+"/app/onboarding",false);assertThat(returned).contains("Please correct your home address.").doesNotContain("INTERNAL-SCREENING-SECRET");
             var correction=hidden(get(client,base+"/app/onboarding/edit",false));values.forEach((key,value)->{if(key.startsWith("profile."))correction.put(key,value);});correction.put("profile.address","Synthetic corrected address");correction.put("action","SUBMITTED");correction.put("noticeAcknowledged","true");correction.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",correction,false);
             var verification=hidden(get(client,reviewUrl,true));verification.put("kind","VERIFY");verification.put("reason","Synthetic independent checks complete");
             for(String check:List.of("identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked"))verification.put(check,"true");
             verification.put("screening","CLEARED");verification.put("screeningReference","Synthetic dated manual screening evidence");verification.put("policyReference","Approved synthetic policy");verification.put("checkedOn",domain.day.toString());verification.put("reviewDue",domain.day.plusMonths(6).toString());post(client,reviewUrl,verification,true);
-            String verified=get(client,base+"/app/onboarding",false);assertThat(verified).contains("Verified","Synthetic corrected address","Loan assessment and approval are separate.").doesNotContain("Please correct your home address.");
+            String verified=get(client,base+"/app/onboarding",false);assertThat(verified).contains("Synthetic corrected address","Loan assessment and approval are separate.").doesNotContain("Please correct your home address.");
             assertThat(verified).doesNotContain("Complete your profile and wait for verification");
             assertThat(get(client,base+"/app/dashboard",false)).isEqualTo("Borrower workspace");
-            assertThat(get(client,base+"/app/onboarding/loan",false)).contains("Continue application");
-            assertThat(get(client,base+"/app/onboarding/loan/edit?lang=sw",false)).contains("Ombi la mkopo","Mapato na matumizi ya mwezi");get(client,base+"/app/onboarding?lang=en",false);
-            assertThat(get(client,base+"/app/onboarding/versions/2",false)).contains("Please correct your home address.");
+            var retired=client.send(HttpRequest.newBuilder(URI.create(base+"/app/onboarding/loan")).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertThat(retired.statusCode()).isEqualTo(302);assertThat(retired.headers().firstValue("Location")).contains("/app/onboarding");
             assertThat(get(client,base+"/finance/clients/onboarding/notice",true)).contains("Publish notice","Synthetic English privacy notice");
             assertThat(get(client,base+"/app/onboarding/edit?lang=sw",false)).contains("Taarifa zangu","Taarifa ya faragha ya majaribio iliyoidhinishwa.");get(client,base+"/app/onboarding?lang=en",false);
             String creation=get(client,base+"/finance/clients/onboarding/new",true);assertThat(creation).contains("Generated automatically","Business TIN","Daily sales (TZS)","Spouse details","Bank details");
             var created=hidden(creation);created.put("profile.firstName","Rendered");created.put("profile.lastName","Borrower");created.put("profile.phone",domain.phone());created.put("profile.city","Rendered city");created.put("profile.businessName","Rendered business");created.put("profile.dailyExpenditure","99.50");
             post(client,base+"/finance/clients/onboarding/new",created,true);
-            String ownDetails=get(client,base+"/app/onboarding",false);assertThat(ownDetails).contains("Rendered synthetic shop","12345.67","3210").doesNotContain(">9876543210<");
+            String ownDetails=get(client,base+"/app/onboarding",false);assertThat(ownDetails).contains("Rendered synthetic shop","12345.67","9876543210");
             // Optional local visual QA window; never enabled in the normal test suite.
             int seconds=Integer.getInteger("microfinance.onboarding.browser-seconds",0);
             if(seconds>0){System.out.println("ONBOARDING_BROWSER_QA="+base);for(int elapsed=0;elapsed<Math.min(seconds,600);elapsed++)Thread.sleep(1000);}
@@ -112,7 +107,7 @@ class ClientOnboardingRenderedPostgresTest {
         var values=new LinkedHashMap<String,String>();var inputs=Pattern.compile("<input[^>]*>").matcher(html);
         while(inputs.find()){String input=inputs.group();if(!input.contains("type=\"hidden\""))continue;var name=Pattern.compile("name=\"([^\"]+)\"").matcher(input);var value=Pattern.compile("value=\"([^\"]*)\"").matcher(input);if(name.find()&&value.find())values.put(name.group(1),value.group(1));}return values;
     }
-    @TestConfiguration @EnableWebMvc @EnableWebSecurity @Import({ClientOnboardingController.class,OnboardingController.class,LoanIntakeController.class})
+    @TestConfiguration @EnableWebMvc @EnableWebSecurity @Import({ClientOnboardingController.class,OnboardingController.class})
     static class WebConfig implements WebMvcConfigurer {
         @Bean("access") AccessControlService access(){return new AccessControlService();}
         @Bean("authz") com.sacco.mvp.security.AuthzService authz(){return org.mockito.Mockito.mock(com.sacco.mvp.security.AuthzService.class);}

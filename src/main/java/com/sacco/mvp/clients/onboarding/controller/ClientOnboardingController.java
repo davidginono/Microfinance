@@ -26,17 +26,20 @@ public class ClientOnboardingController {
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @GetMapping("/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.groups(a,a.getMemberId(),search,page));}
     @GetMapping("/photos/{id}") public ResponseEntity<byte[]> photo(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id) {var f=service.ownPhoto(a,id);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox").contentType(MediaType.parseMediaType(f.contentType())).body(f.bytes());}
-    @GetMapping public String status(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="0") int page,Model m) {
-        m.addAttribute("workspace",service.ownWorkspace(a,page,null));return "onboarding/status";
+    @GetMapping public String status(@AuthenticationPrincipal AppUserPrincipal a,Model m) {
+        return edit(a,m);
     }
     @GetMapping("/versions/{sequence}") public String version(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable int sequence,Model m) {
-        m.addAttribute("workspace",service.ownWorkspace(a,0,sequence));return "onboarding/status";
+        service.ownStatus(a);return "redirect:"+ROOT;
+    }
+    @GetMapping({"/loan","/loan/edit","/loan/products","/loan/continue"}) public String retiredLoan(@AuthenticationPrincipal AppUserPrincipal a) {
+        service.ownStatus(a);return "redirect:"+ROOT;
     }
     @GetMapping("/edit") public String edit(@AuthenticationPrincipal AppUserPrincipal a,Model m) {
         m.addAttribute("selfForm",service.ownForm(a));return profile(a,m);
     }
-    @PostMapping("/edit") public String edit(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("selfForm") SelfForm f,BindingResult errors,Model m) {
-        if(!errors.hasErrors())try{service.saveOwn(a,f);return "redirect:"+ROOT;}catch(IllegalArgumentException e){reject(errors,e);}
+    @PostMapping("/edit") public String edit(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("selfForm") SelfForm f,BindingResult errors,Model m,org.springframework.web.servlet.mvc.support.RedirectAttributes flash) {
+        if(!errors.hasErrors())try{service.saveOwn(a,f);flash.addFlashAttribute("onboardingSaved",true);return "redirect:"+ROOT;}catch(IllegalArgumentException e){reject(errors,e);}
         return profile(a,m);
     }
     @GetMapping("/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="IDENTITY") String category,Model m) {
@@ -52,7 +55,9 @@ public class ClientOnboardingController {
             .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.name()).build().toString()).contentType(MediaType.parseMediaType(file.contentType())).body(file.bytes());
     }
     private String profile(AppUserPrincipal a,Model m) {
-        m.addAttribute("workspace",service.ownWorkspace(a,0,null));var notice=service.ownNotice(a).orElse(null);var form=(SelfForm)m.getAttribute("selfForm");
+        var workspace=service.ownWorkspace(a,0,null);m.addAttribute("workspace",workspace);
+        boolean readOnly=workspace!=null&&"SUBMITTED".equals(workspace.client().state());m.addAttribute("profileReadOnly",readOnly);
+        var notice=readOnly?null:service.ownNotice(a).orElse(null);var form=(SelfForm)m.getAttribute("selfForm");
         if(form!=null&&notice!=null&&!notice.id().equals(form.getNoticeId())) {form.setNoticeId(notice.id());form.setNoticeAcknowledged(false);form.setDeclarationAccepted(false);}
         m.addAttribute("notice",notice);m.addAttribute("formKind","self");return "onboarding/self-form";
     }

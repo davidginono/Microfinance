@@ -29,7 +29,7 @@ class ClientOnboardingMvcTest {
     @Autowired OnboardingService service;
     MockMvc mvc;AppUserPrincipal staff,client;UUID id=UUID.randomUUID();String root="/finance/clients/onboarding";
     @BeforeEach void setup() {
-        reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        reset(service);when(service.ownForm(any())).thenReturn(new SelfForm());mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         staff=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
         client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
         when(service.client(any(),any())).thenReturn(new Client(id,"C1","Synthetic client",null,null,"DRAFT",UUID.randomUUID(),1,null));when(service.latest(any(),any())).thenReturn(Optional.empty());
@@ -62,7 +62,14 @@ class ClientOnboardingMvcTest {
     }
     @Test void ownStatusUsesAuthenticatedIdentityAndDoesNotReturnStaffEvidence()throws Exception {
         when(service.ownWorkspace(client,0,null)).thenReturn(new OwnWorkspace(new Client(client.getMemberId(),"C1","Synthetic client",null,null,"NOT_STARTED",null,0,null),null,List.of(),null,new Page<>(List.of(),0,false),false));
-        mvc.perform(get("/app/onboarding").with(user(client)).param("clientId",staff.getMemberId().toString())).andExpect(view().name("onboarding/status")).andExpect(model().attributeDoesNotExist("revision","documents","decisions"));verify(service).ownWorkspace(client,0,null);
+        mvc.perform(get("/app/onboarding").with(user(client)).param("clientId",staff.getMemberId().toString())).andExpect(view().name("onboarding/self-form")).andExpect(model().attributeDoesNotExist("revision","documents","decisions"));verify(service).ownWorkspace(client,0,null);
+        verify(service).ownForm(client);
+    }
+    @Test void submittedClientOpensTheSameProfileReadOnlyAndOldDetailsLinksReturnThere()throws Exception {
+        when(service.ownWorkspace(client,0,null)).thenReturn(new OwnWorkspace(new Client(client.getMemberId(),"C1","Synthetic client",null,null,"SUBMITTED",UUID.randomUUID(),2,null),null,List.of(),null,new Page<>(List.of(),0,false),false));
+        mvc.perform(get("/app/onboarding").with(user(client))).andExpect(view().name("onboarding/self-form")).andExpect(model().attribute("profileReadOnly",true));
+        verify(service,never()).ownNotice(client);
+        mvc.perform(get("/app/onboarding/versions/1").with(user(client))).andExpect(redirectedUrl("/app/onboarding"));
     }
     @Test void clientWritesRequireCsrfAndCannotBindStaffFields()throws Exception {
         mvc.perform(post("/app/onboarding/edit").with(user(client))).andExpect(status().isForbidden());
@@ -74,7 +81,7 @@ class ClientOnboardingMvcTest {
     }
     @Test void ownOnboardingDoesNotRequireLoanPermissionsOrGrantOtherWorkspaceAccess()throws Exception {
         var noClaims=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),Set.of(),false);
-        mvc.perform(get("/app/onboarding").with(user(noClaims))).andExpect(status().isOk()).andExpect(view().name("onboarding/status"));
+        mvc.perform(get("/app/onboarding").with(user(noClaims))).andExpect(status().isOk()).andExpect(view().name("onboarding/self-form"));
         mvc.perform(post("/app/onboarding/edit").with(user(noClaims)).with(csrf()).param("action","DRAFT")).andExpect(redirectedUrl("/app/onboarding"));
         mvc.perform(get("/app/loan-products").with(user(noClaims))).andExpect(status().isForbidden());verify(service).ownWorkspace(noClaims,0,null);verify(service).saveOwn(eq(noClaims),any());
     }

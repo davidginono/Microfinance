@@ -1,8 +1,6 @@
 package com.sacco.mvp.accounting.loans;
 
 import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.CreateForm;
-import com.sacco.mvp.clients.onboarding.dto.LoanIntakeDtos.Form;
-import com.sacco.mvp.clients.onboarding.service.LoanIntakeService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -11,7 +9,6 @@ import com.sacco.mvp.web.form.MemberRegistrationForm;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.security.access.AccessDeniedException;
-import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
@@ -21,15 +18,14 @@ import static org.mockito.Mockito.*;
 @EnabledIfEnvironmentVariable(named="MICROFINANCE_RECORDING_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_recording_test")
 class ProvisionalClientPostgresTest {
     final ClientOnboardingPostgresTest d=new ClientOnboardingPostgresTest();
-    LoanIntakeService intake;MemberRegistrationService registration;
-    @BeforeAll void start()throws Exception{d.start();intake=d.f.context.getBean(LoanIntakeService.class);registration=d.f.context.getBean(MemberRegistrationService.class);}
+    MemberRegistrationService registration;
+    @BeforeAll void start()throws Exception{d.start();registration=d.f.context.getBean(MemberRegistrationService.class);}
     @AfterAll void stop(){d.stop();}
     @BeforeEach void fixture(){d.fixture();}
     CreateForm createForm(){var f=new CreateForm();f.setName("Synthetic Provisional Client");f.setPhone(d.phone());f.setEmail(UUID.randomUUID()+"@example.invalid");return f;}
     Member member(UUID id){return d.f.context.getBean(MemberRepository.class).findById(id).orElseThrow();}
     AppUserPrincipal owner(UUID id){var m=member(id);when(d.f.context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(m));return new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class),false);}
     MemberRegistrationForm publicForm(CreateForm source){var f=new MemberRegistrationForm();f.setFirstName("Synthetic");f.setMiddleName("Provisional");f.setLastName("Client");f.setSaccoId(d.f.institution);f.setStationId("B1");f.setEmail(source.getEmail());f.setPhone(source.getPhone());f.setUsername("client_"+UUID.randomUUID().toString().substring(0,8));f.setPassword("Synthetic-only-password-42!");return f;}
-    Form complete(UUID client){var f=intake.form(d.f.actor,client);var v=f.getDetails();v.setProductId(d.f.product);v.setPrincipal(new BigDecimal("1000.00"));v.setTenureValue(6);v.setPurpose("Synthetic stock purchase");v.setBusiness("Synthetic shop");v.setIncome(new BigDecimal("2000.00"));v.setExpenses(new BigDecimal("500.00"));v.setOtherDebt(BigDecimal.ZERO);f.setAction("SUBMITTED");return f;}
 
     @Test void assistedRegistrationHasAutomaticIdentityButNoLoginOrInventedEvidence(){
         var f=createForm();UUID id=d.service.create(d.f.actor,f);var m=member(id);
@@ -42,14 +38,14 @@ class ProvisionalClientPostgresTest {
         assertThatThrownBy(()->d.service.ownStatus(owner(id))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->d.f.jdbc.update("update members set password_hash='forged' where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
-    @Test void activationRetainsClientNumberProfileAndLoanRequest(){
+    @Test void activationRetainsClientNumberAndProfile(){
         var c=createForm();UUID id=d.service.create(d.f.actor,c);String number=member(id).getMemberNo();
-        d.service.save(d.f.actor,id,d.profile(id,"SYNTHETIC-"+UUID.randomUUID()));UUID loan=intake.save(d.f.actor,id,complete(id));
+        d.service.save(d.f.actor,id,d.profile(id,"SYNTHETIC-"+UUID.randomUUID()));
         var form=publicForm(c);assertThat(registration.validatePublicRegistration(form,registration.verifyExternalMember(form))).isEqualTo(id);var activated=registration.register(form,id);
         assertThat(activated.getId()).isEqualTo(id);assertThat(activated.getMemberNo()).isEqualTo(number);assertThat(activated.isClientPortalEnabled()).isTrue();
         assertThat(d.f.context.getBean(MemberRepository.class).findUserAccessByScope(d.f.institution,"B1",id)).isPresent();
         assertThat(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().matches(form.getPassword(),member(id).getPasswordHash())).isTrue();
-        var owner=owner(id);assertThat(d.service.ownStatus(owner).state()).isEqualTo("DRAFT");assertThat(intake.latest(owner,id).orElseThrow().id()).isEqualTo(loan);
+        var owner=owner(id);assertThat(d.service.ownStatus(owner).state()).isEqualTo("DRAFT");
         assertThat(member(id).getSignatureText()).isNull();assertThatThrownBy(()->registration.register(form,id)).isInstanceOf(IllegalStateException.class);
     }
     @Test void activationCannotChangeContactIdentityOrBranch(){
@@ -95,49 +91,15 @@ class ProvisionalClientPostgresTest {
             assertThat(d.f.jdbc.queryForObject("select count(*) from user_settings where member_id=?",Integer.class,id)).isEqualTo(1);
         }finally{pool.shutdownNow();}
     }
-    @Test void aMovedClientStartsBranchScopedIntakeWithoutExposingThePreviousRequest(){
-        UUID id=d.service.create(d.f.actor,createForm());intake.save(d.f.actor,id,complete(id));
-        d.f.jdbc.update("update members set station_id='B2' where id=?",id);var nextBranch=d.f.operator("B2");
-        assertThatThrownBy(()->intake.latest(d.f.actor,id)).isInstanceOf(AccessDeniedException.class);assertThat(intake.latest(nextBranch,id)).isEmpty();
-        var draft=intake.form(nextBranch,id);assertThat(draft.getDetails().getPurpose()).isEmpty();assertThat(draft.getExpectedSequence()).isEqualTo(1);
-        intake.save(nextBranch,id,draft);assertThat(intake.latest(nextBranch,id).orElseThrow().sequence()).isEqualTo(2);
-    }
+
     @Test void assistedAndPublicRegistrationsShareTheSequenceUnderConcurrency()throws Exception {
         var pool=Executors.newFixedThreadPool(4);var jobs=new ArrayList<Callable<String>>();
         try {for(int n=0;n<12;n++){var c=createForm();boolean assisted=n%2==0;jobs.add(()->assisted?member(d.service.create(d.f.actor,c)).getMemberNo():registration.register(publicForm(c)).getMemberNo());}
             var numbers=new HashSet<String>();for(var future:pool.invokeAll(jobs)){String number=future.get();assertThat(number).matches("CL-[0-9]{8,}");numbers.add(number);}assertThat(numbers).hasSize(12);
         }finally{pool.shutdownNow();}
     }
-    @Test void bothChannelsKeepDraftsAndRejectMissingOrInvalidCashflow(){
-        var c=createForm();UUID id=d.service.create(d.f.actor,c);var f=new Form();UUID first=intake.save(d.f.actor,id,f);assertThat(intake.save(d.f.actor,id,f)).isEqualTo(first);
-        var complete=complete(id);complete.getDetails().setExpenses(null);assertThatThrownBy(()->intake.save(d.f.actor,id,complete)).hasMessage("kyc.error.loanMoney");
-        complete.getDetails().setExpenses(new BigDecimal("-0.01"));assertThatThrownBy(()->intake.save(d.f.actor,id,complete)).hasMessage("kyc.error.loanMoney");
-        complete.getDetails().setExpenses(new BigDecimal("10.001"));assertThatThrownBy(()->intake.save(d.f.actor,id,complete)).hasMessage("kyc.error.loanMoney");
-        complete.getDetails().setExpenses(BigDecimal.ZERO);UUID sent=intake.save(d.f.actor,id,complete);
-        registration.register(publicForm(c),id);var owner=owner(id);assertThat(intake.latest(owner,id).orElseThrow().id()).isEqualTo(sent);
-        var self=intake.form(owner,id);self.getDetails().setPurpose("Client correction");intake.save(owner,id,self);assertThat(intake.latest(d.f.actor,id).orElseThrow().details().getPurpose()).isEqualTo("Client correction");
-        assertThatThrownBy(()->d.f.jdbc.update("delete from client_onboarding_loan_request where id=?",sent)).isInstanceOf(org.springframework.dao.DataAccessException.class);
-    }
-    @Test void loanDraftsEnforceClaimsOwnershipTenantBranchProductAndVersion(){
-        UUID id=d.service.create(d.f.actor,createForm());var f=complete(id);f.getDetails().setProductId(UUID.randomUUID());assertThatThrownBy(()->intake.save(d.f.actor,id,f)).hasMessage("kyc.error.loanProduct");
-        assertThatThrownBy(()->intake.latest(d.f.operator("B2"),id)).isInstanceOf(AccessDeniedException.class);
-        var noClaim=new AppUserPrincipal(member(d.f.actor.getMemberId()),Set.of(UserClaim.CLIENT_ONBOARDING_VIEW),true);
-        when(d.f.context.getBean(UserClaimService.class).effectiveClaims(eq(noClaim.getMemberId()),any(),anyBoolean())).thenReturn(Set.of(UserClaim.CLIENT_ONBOARDING_VIEW));
-        assertThatThrownBy(()->intake.save(noClaim,id,new Form())).isInstanceOf(AccessDeniedException.class);
-        when(d.f.context.getBean(UserClaimService.class).effectiveClaims(eq(d.f.actor.getMemberId()),any(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
-        UUID ownClient=d.otherClient("B1");var owner=d.owner(ownClient);assertThatThrownBy(()->intake.latest(owner,id)).isInstanceOf(IllegalArgumentException.class);
-        var first=intake.form(d.f.actor,id);intake.save(d.f.actor,id,first);assertThatThrownBy(()->intake.save(d.f.actor,id,new Form())).hasMessage("kyc.error.changed");
-    }
-    @Test void continuationRequiresVerificationAndDoesNotCreateOrApproveALoan(){
-        UUID id=d.service.create(d.f.actor,createForm());intake.save(d.f.actor,id,complete(id));assertThatThrownBy(()->intake.ready(d.f.actor,id)).hasMessage("kyc.error.required");
-        UUID revision=d.submitted(id,"SYNTHETIC-"+UUID.randomUUID());d.service.review(d.f.operator("B1"),id,d.decision(revision));
-        var form=intake.recordingForm(d.f.actor,id);assertThat(form.getClientId()).isEqualTo(id);assertThat(form.getPrincipal()).isEqualByComparingTo("1000.00");assertThat(form.getInformationSource()).isEqualTo("DECLARED");assertThat(form.getProductId()).isEqualTo(d.f.product);
-        assertThat(d.f.jdbc.queryForObject("select count(*) from loan_applications where applicant_member_id=?",Integer.class,id)).isZero();
-    }
-    @Test void concurrentLoanEditsRejectLostUpdates()throws Exception {
-        UUID id=d.service.create(d.f.actor,createForm());var pool=Executors.newFixedThreadPool(2);
-        try {var first=new Form();var second=new Form();var results=pool.invokeAll(List.<Callable<Boolean>>of(()->{try{intake.save(d.f.actor,id,first);return true;}catch(IllegalArgumentException e){return false;}},()->{try{intake.save(d.f.actor,id,second);return true;}catch(IllegalArgumentException e){return false;}}));
-            assertThat(results.get(0).get() ^ results.get(1).get()).isTrue();assertThat(intake.latest(d.f.actor,id).orElseThrow().sequence()).isEqualTo(1);
-        }finally{pool.shutdownNow();}
-    }
+
+
+
+
 }

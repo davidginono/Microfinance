@@ -1,16 +1,23 @@
 <%@ include file="head.jspf" %>
 <div class="kyc-form-workspace" data-resource-form-page ${formKind=='self'?'data-resource-details-page':''}>
-    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>">
-        <a href="<c:url value='/app/onboarding'/>"><spring:message code="kyc.ownTitle"/></a>
+    <c:if test="${formKind!='self'}"><nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>">
+        <a href="<c:url value='/app/onboarding'/>"><spring:message code="kyc.form.self"/></a>
         <span aria-hidden="true">&#8250;</span>
         <span aria-current="page"><spring:message code="kyc.form.${formKind}"/></span>
-    </nav>
+    </nav></c:if>
     <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="kyc.form.${formKind}"/></h1></div>
+    <c:if test="${formKind=='self'}">
+        <c:if test="${onboardingSaved}"><div class="console-message" data-message-type="success" data-workspace-flashbar role="status"><spring:message code="kyc.profileSaved"/></div></c:if>
+        <c:if test="${clientOnboardingRequired and not profileReadOnly}"><p class="console-message" data-message-type="info" role="status"><spring:message code="kyc.workspaceRequired"/></p></c:if>
+        <p class="console-message" data-message-type="info" role="status"><spring:message code="${profileReadOnly?'kyc.awaitingReview':workspace.client.state=='VERIFY'?'kyc.verifiedMeaning':'kyc.declaredMeaning'}"/></p>
+        <c:if test="${not empty workspace.feedback}"><div class="console-message" data-message-type="info" role="status"><strong><spring:message code="kyc.state.${workspace.feedback.kind}"/></strong><p class="kyc-notice-text"><c:out value="${workspace.feedback.message}"/></p></div></c:if>
+    </c:if>
     <c:set var="modelName" value="${formKind=='self'?'selfForm':'documentForm'}"/>
-    <form:form id="client-onboarding-form" method="post" modelAttribute="${modelName}"
+    <c:url value="${formKind=='self'?'/app/onboarding/edit':'/app/onboarding/documents/new'}" var="selfFormAction"/>
+    <form:form id="client-onboarding-form" action="${selfFormAction}" method="post" modelAttribute="${modelName}"
                enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}"
                cssClass="accounting-create-form kyc-client-form" data-accounting-dirty-form="true"
-               data-onboarding-form="${formKind}" data-preserve-submit-command="true" data-workspace-submit="recover" data-workspace-return="client-onboarding-form">
+               data-onboarding-form="${formKind}" data-preserve-submit-command="true" data-workspace-submit="recover">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
         <form:hidden path="requestKey"/>
         <c:choose>
@@ -18,11 +25,16 @@
                 <form:hidden path="expectedSequence"/>
                 <form:hidden path="noticeId"/>
 <c:set var="client" value="${workspace.client}"/><c:set var="identityReadOnly" value="${true}"/><c:set var="profileValues" value="${selfForm.profile}"/><c:set var="groupLookup" value="/app/onboarding/groups"/>
-<div data-profile-tabs><div id="profile-bio" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><%@ include file="profile-fields.jspf" %>
+<div data-profile-tabs><div id="profile-bio" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}><%@ include file="profile-fields.jspf" %></fieldset>
                 <section class="erp-resource-section" aria-labelledby="kyc-notice-heading">
                     <h2 id="kyc-notice-heading"><spring:message code="kyc.notice"/></h2>
                     <div class="kyc-form-fields">
                         <c:choose>
+                            <c:when test="${profileReadOnly and not empty workspace.revision}">
+                                <dl class="kyc-notice-version"><dt><spring:message code="kyc.field.noticeVersion"/></dt><dd><c:out value="${workspace.revision.noticeVersion}"/></dd></dl>
+                                <div class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?workspace.revision.noticeKiswahili:workspace.revision.noticeEnglish}"/></div>
+                                <p><spring:message code="kyc.acknowledged"/>: <spring:message code="${workspace.revision.acknowledged?'kyc.yes':'kyc.no'}"/> &#183; <c:out value="${appTime:display(workspace.revision.acknowledgedAt)}"/></p>
+                            </c:when>
                             <c:when test="${not empty notice}">
                                 <dl class="kyc-notice-version">
                                     <dt><spring:message code="kyc.field.noticeVersion"/></dt>
@@ -50,7 +62,7 @@
                         </c:choose>
                     </div>
                 </section>
-                <p class="console-message" data-message-type="info" role="status"><spring:message code="kyc.beforeSubmit"/></p></div>
+                <c:if test="${not profileReadOnly}"><p class="console-message" data-message-type="info" role="status"><spring:message code="kyc.beforeSubmit"/></p></c:if></div>
 <c:set var="profileDocuments" value="${workspace.documents}"/><c:set var="canReadProfileDocuments" value="${true}"/><c:set var="uploadPath" value="/app/onboarding/documents/new"/><c:set var="photoRoot" value="/app/onboarding/photos"/><c:set var="documentRoot" value="/app/onboarding/documents"/><%@ include file="profile-attachments.jspf" %></div>
             </c:when>
             <c:otherwise>
@@ -90,7 +102,7 @@
                 </div>
             </c:if>
         </spring:bind>
-        <div class="accounting-actions accounting-form-actions" data-form-actions>
+        <c:if test="${not profileReadOnly}"><div class="accounting-actions accounting-form-actions" data-form-actions>
             <a class="app-btn btn-neutral" href="<c:url value='/app/onboarding'/>"><spring:message code="common.cancel"/></a>
             <c:choose>
                 <c:when test="${formKind=='self'}">
@@ -99,7 +111,7 @@
                 </c:when>
                 <c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="kyc.addDocument"/></button></c:otherwise>
             </c:choose>
-        </div>
+        </div></c:if>
     </form:form>
 </div>
 <script src="<c:url value='/js/loan-recording.js'/>" defer></script><script src="<c:url value='/js/client-onboarding.js'/>" defer></script>

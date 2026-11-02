@@ -1,4 +1,5 @@
 [data-kyc-verify] { grid-column: 1 / -1; }
+.kyc-profile-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
 [data-kyc-verify][hidden] { display: none !important; }
 
 .kyc-section-body { padding: 1rem; min-width: 0; overflow-wrap: anywhere; }

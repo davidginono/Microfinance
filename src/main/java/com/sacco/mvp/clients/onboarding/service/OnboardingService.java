@@ -183,7 +183,7 @@ public class OnboardingService {
     }
     @Transactional(readOnly=true)
     public SelfForm ownForm(AppUserPrincipal a) {
-        requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(!c.state().equals("SUBMITTED"),"state");
+        requireOwner(a);var c=records.client(a,a.getMemberId(),today());
         var f=new SelfForm();f.setExpectedSequence(c.sequence());records.latest(a,c.id()).ifPresent(r->f.setProfile(personal(r.profile())));identityFields(f.getProfile(),c);records.notice(a).ifPresent(n->f.setNoticeId(n.id()));return f;
     }
     @Transactional(readOnly=true)

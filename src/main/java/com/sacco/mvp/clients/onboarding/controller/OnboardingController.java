@@ -47,6 +47,9 @@ public class OnboardingController {
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model m) {
         context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));return "onboarding/details";
     }
+    @GetMapping({"/{id}/loan","/{id}/loan/edit","/{id}/loan/products","/{id}/loan/continue"}) public String retiredLoan(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id) {
+        service.client(a,id);return "redirect:"+ROOT+"/"+id;
+    }
     @GetMapping("/{id}/edit") public String edit(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m) {
         var f=service.profileForm(a,id);m.addAttribute("profileForm",f);context(a,id,m);return form(m,"profile");
     }

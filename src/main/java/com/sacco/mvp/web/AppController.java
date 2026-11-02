@@ -96,7 +96,6 @@ public class AppController {
         + "that you are willing to guarantee this loan, accept responsibility for recoveries and penalties if the applicant "
         + "defaults, and agree to the guarantor terms and conditions in the SACCO bylaws and loan contract.";
     private final LoanWorkflowService loanWorkflowService;
-    private final com.sacco.mvp.clients.onboarding.service.LoanIntakeService loanIntakeService;
     private final com.sacco.mvp.service.LoanRepaymentLedgerService loanRepaymentLedgerService;
     private final LoanAnalyticsService loanAnalyticsService;
     private final LoanQualificationPolicyService loanQualificationPolicyService;
@@ -1092,7 +1091,6 @@ public class AppController {
                          @RequestParam(required = false) UUID loanProductId,
                          @RequestParam(required = false) LoanType loanType,
                          @RequestParam(required = false) UUID topUpLoanId,
-                         @RequestParam(defaultValue = "false") boolean onboardingRequest,
                          RedirectAttributes ra,
                          Model model) {
         Optional<LoanApplication> blockingApplication = loanWorkflowService.findApplicationInProgress(principal.getMemberId());
@@ -1106,10 +1104,6 @@ public class AppController {
             );
             return "redirect:/app/loan-applications/" + app.getId();
         }
-        if (onboardingRequest) {
-            if (topUpLoanId != null) throw new IllegalArgumentException("An onboarding request cannot be a top-up.");
-            loanProductId = loanIntakeService.ready(principal, principal.getMemberId()).details().getProductId();
-        }
         LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
         try {
             loanWorkflowService.assertCanApplyForProduct(principal.getSaccoId(), principal.getMemberId(), product);
@@ -1118,7 +1112,6 @@ public class AppController {
             return "redirect:/app/loan-products";
         }
         Map<String, String> formValues = new LinkedHashMap<>();
-        if (onboardingRequest) formValues.putAll(loanIntakeService.ownApplicationValues(principal));
         if (topUpLoanId != null) {
             try {
                 loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
