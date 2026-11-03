@@ -1541,7 +1541,7 @@
         if (form.target && form.target !== '_self') {
             return;
         }
-        if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+        if (!form.noValidate && !event.submitter?.formNoValidate && typeof form.checkValidity === 'function' && !form.checkValidity()) {
             return;
         }
         const exportUrl = resolveExportFormUrl(form, event.submitter);

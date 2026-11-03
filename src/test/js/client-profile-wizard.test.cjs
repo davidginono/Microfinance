@@ -92,3 +92,34 @@ test('the shared shell keeps wizard navigation labels while enhancing ordinary p
   assert.equal(pager.classList.contains('aws-pagination-chevron'),true);assert.equal(pager.getAttribute('aria-label'),'Next page');
  }finally{dom.window.close();}
 });
+test('Save draft bypasses submission-only consent checks in the shared shell',async()=>{
+ const {dom,w,d,form}=await setup({saved:'review'});try{
+  d.querySelector('[name="declarationAccepted"]').checked=false;
+  w.WorkspaceNavigation={onReady:callback=>callback()};w.matchMedia=()=>({matches:false,addEventListener(){}});
+  w.eval(readFileSync('src/main/resources/static/js/shell.js','utf8'));
+  w.addEventListener('submit',event=>event.preventDefault());
+  let validations=0;const check=form.checkValidity.bind(form);form.checkValidity=()=>{validations++;return check();};
+  // jsdom does not implement formnovalidate; dispatch the event browsers emit for this submitter.
+  form.dispatchEvent(new w.SubmitEvent('submit',{submitter:d.querySelector('[value="DRAFT"]'),bubbles:true,cancelable:true}));
+  assert.equal(validations,0);assert.equal(d.querySelector('.erp-field-error'),null);
+  assert.equal(d.querySelector('[name="declarationAccepted"]').checked,false);
+  form.noValidate=true;
+  form.dispatchEvent(new w.SubmitEvent('submit',{submitter:d.querySelector('[value="SUBMITTED"]'),bubbles:true,cancelable:true}));
+  assert.equal(validations,0);
+  form.noValidate=false;
+  form.dispatchEvent(new w.SubmitEvent('submit',{submitter:d.querySelector('[value="SUBMITTED"]'),bubbles:true,cancelable:true}));
+  assert.equal(validations,1);assert.equal(d.querySelector('[name="declarationAccepted"]').getAttribute('aria-invalid'),'true');
+ }finally{dom.window.close();}
+});
+test('Add document remains a navigation link when final-confirmation errors are already visible',async()=>{
+ const {dom,w,d,form,active}=await setup({saved:'documents'});try{
+  const declaration=d.querySelector('[name="declarationAccepted"]');declaration.checked=false;
+  d.querySelector('[data-profile-next]').click();assert.match(active(),/Documents and privacy/);
+  assert.equal(declaration.getAttribute('aria-invalid'),'true');
+  let submits=0,validations=0,destination;
+  form.addEventListener('submit',()=>submits++);form.checkValidity=()=>{validations++;return false;};
+  const link=d.querySelector('a[href="/documents/new"]');
+  link.addEventListener('click',event=>{event.preventDefault();destination=link.href;});link.click();
+  assert.equal(destination,'http://localhost/documents/new');assert.equal(submits,0);assert.equal(validations,0);
+ }finally{dom.window.close();}
+});
