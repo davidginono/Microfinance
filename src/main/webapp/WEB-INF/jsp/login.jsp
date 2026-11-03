@@ -198,9 +198,11 @@
                     </div>
 
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
-                        <span><spring:message code="login.noAccount" /> </span>
-                        <a class="auth-signup-link" href="<c:url value='/client-portal'/>"><spring:message code="portal.title"/></a>
-                        <a href="/register/member" class="auth-signup-link"><spring:message code="login.registerMember" /></a>
+                        <div class="auth-access-choices">
+                            <a href="<c:url value='/register/member'/>" class="auth-signup-link"><spring:message code="home.createAccount" /></a>
+                            <span><spring:message code="login.or" /></span>
+                            <a class="auth-signup-link" href="<c:url value='/client-portal'/>"><spring:message code="home.openPortal"/></a>
+                        </div>
                         <div class="mt-3">
                             <a href="/system-admin/login" class="auth-text-link"><spring:message code="home.systemAdmin" /></a>
                         </div>
