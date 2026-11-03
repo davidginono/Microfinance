@@ -68,8 +68,16 @@
 
 <section class="erp-resource-section"><h2><spring:message code="kyc.section.activity"/></h2>
 <div class="kyc-profile-grid">
+<fieldset class="kyc-income-choices">
+    <legend><spring:message code="kyc.field.activity"/></legend>
+    <div class="kyc-income-options">
+        <c:forEach items="${['BUSINESS','EMPLOYMENT','OTHER']}" var="incomeActivity"><label class="kyc-checkbox"><form:checkbox path="profile.incomeActivities" value="${incomeActivity}"/><span><spring:message code="kyc.income.${incomeActivity}"/></span></label></c:forEach>
+        <c:forEach items="${profileValues.incomeActivities}" var="legacyIncomeActivity"><c:if test="${not ['BUSINESS','EMPLOYMENT','OTHER'].contains(legacyIncomeActivity)}"><label class="kyc-checkbox"><form:checkbox path="profile.incomeActivities" value="${legacyIncomeActivity}"/><span><c:out value="${legacyIncomeActivity}"/></span></label></c:if></c:forEach>
+    </div>
+    <form:errors path="profile.activity" cssClass="field-error"/>
+    <form:errors path="profile.incomeActivities" cssClass="field-error"/>
+</fieldset>
 <label class="kyc-field"><span><spring:message code="kyc.field.otherIncomeSources"/></span><form:input path="profile.otherIncomeSources" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.otherIncomeSources" cssClass="field-error"/></label>
-<label class="kyc-field"><span><spring:message code="kyc.field.activity"/></span><form:input path="profile.activity" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.activity" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.activityAddress"/></span><form:input path="profile.activityAddress" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.activityAddress" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.sourceOfFunds"/></span><form:input path="profile.sourceOfFunds" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.sourceOfFunds" cssClass="field-error"/></label>
 </div></section>

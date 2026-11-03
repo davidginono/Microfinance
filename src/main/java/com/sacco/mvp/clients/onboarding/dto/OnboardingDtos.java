@@ -49,6 +49,19 @@ public final class OnboardingDtos {
         private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
         private String bankName="", bankAccountName="", bankAccountNumber="";
         private String activity="", activityAddress="", sourceOfFunds="";
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        public List<String> getIncomeActivities() {
+            if(activity==null||activity.isBlank())return List.of();
+            var choices=new ArrayList<String>();
+            for(String value:activity.split(";")) {
+                String choice=switch(value.strip().toLowerCase(Locale.ROOT)) {case "business" -> "BUSINESS";case "employment" -> "EMPLOYMENT";case "other" -> "OTHER";default -> value.strip();};
+                if(!choice.isEmpty()&&!choices.contains(choice))choices.add(choice);
+            }
+            return choices.stream().noneMatch(Set.of("BUSINESS","EMPLOYMENT","OTHER")::contains)?List.of(activity):choices;
+        }
+        public void setIncomeActivities(List<String> choices) {
+            activity=choices==null?"":choices.stream().map(value->switch(value) {case "BUSINESS" -> "Business";case "EMPLOYMENT" -> "Employment";case "OTHER" -> "Other";default -> value;}).distinct().collect(java.util.stream.Collectors.joining("; "));
+        }
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate birthDate, identityExpiresOn;
         private boolean identityNoExpiry;
         public Boolean getHasBusiness() {

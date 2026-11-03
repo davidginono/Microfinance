@@ -121,6 +121,24 @@ class ClientOnboardingMvcTest {
         var en=ResourceBundle.getBundle("messages",Locale.ENGLISH);var sw=ResourceBundle.getBundle("messages",Locale.of("sw"));for(var key:en.keySet())if(key.startsWith("kyc.")||key.equals("credit.field.kycRequired"))keys.add(key);
         for(var key:keys){assertThat(en.containsKey(key)).as("English %s",key).isTrue();assertThat(sw.containsKey(key)).as("Kiswahili %s",key).isTrue();}
     }
+    @Test void incomeCheckboxesAllowBothSourcesAndCanBeCleared()throws Exception {
+        mvc.perform(post("/app/onboarding/edit").with(user(client)).with(csrf()).param("profile.incomeActivities","BUSINESS","EMPLOYMENT").param("profile.otherIncomeSources","Rent"))
+            .andExpect(redirectedUrl("/app/onboarding"));
+        verify(service).saveOwn(eq(client),argThat(f->f.getProfile().getActivity().equals("Business; Employment")&&f.getProfile().getOtherIncomeSources().equals("Rent")));
+        clearInvocations(service);
+        mvc.perform(post("/app/onboarding/edit").with(user(client)).with(csrf()).param("_profile.incomeActivities","on"))
+            .andExpect(redirectedUrl("/app/onboarding"));
+        verify(service).saveOwn(eq(client),argThat(f->f.getProfile().getActivity().isEmpty()));
+    }
+    @Test void incomeChoicesPreserveExistingDescriptionsAndUseTheExistingSnapshotField() {
+        var p=new ClientProfile();p.setActivity("employment");assertThat(p.getIncomeActivities()).containsExactly("EMPLOYMENT");
+        p.setActivity("Tailoring and market sales");assertThat(p.getIncomeActivities()).containsExactly("Tailoring and market sales");
+        p.setIncomeActivities(List.of("BUSINESS","Tailoring and market sales"));assertThat(p.getActivity()).isEqualTo("Business; Tailoring and market sales");
+        assertThat(p.getIncomeActivities()).containsExactly("BUSINESS","Tailoring and market sales");
+        var json=tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build();String snapshot=json.writeValueAsString(p);
+        assertThat(snapshot).contains("Business; Tailoring and market sales").doesNotContain("incomeActivities");
+        assertThat(json.readValue(snapshot,ClientProfile.class).getActivity()).isEqualTo(p.getActivity());
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean OnboardingController controller(OnboardingService service){return new OnboardingController(service);}
         @Bean ClientOnboardingController clientController(OnboardingService service){return new ClientOnboardingController(service);}
