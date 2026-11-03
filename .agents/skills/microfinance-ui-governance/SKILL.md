@@ -95,6 +95,15 @@ For COA or activity/transaction configuration, read [the accounting architecture
 
 ## Actions And Recovery
 
+### Feedback selection
+
+Follow Cloudscape [Feedback mechanisms](https://cloudscape.design/patterns/general/user-feedback/) through the existing JSP components and the [style feedback contract](../microfinance-ui-style/SKILL.md#messages-and-notifications). Choose by purpose and location before choosing severity.
+
+- A completed task or operation-level result belongs in the destination workspace Flashbar above the page heading. Keep it persistent and dismissible. A recoverable form failure stays beside its form actions, with field errors beside their inputs.
+- A prerequisite, returned review or actionable warning belongs in one contextual Alert beside the affected section. Preserve mandatory disclosures and recovery actions; do not collect unrelated notices below the page heading.
+- A stored workflow state is a labeled status indicator in the resource summary. Ordinary instructions are plain section or action hints, not notifications. On client profiles, keep declared/unverified meaning with the declaration, review feedback with profile status and submission guidance with the submit controls. Verification does not imply loan approval.
+- Unknown-duration work uses a request-bound Spinner in the initiating control or affected data region. Use a Progress bar only for measurable completed/total work, such as real transfer bytes or completed batch items; never turn review stages or elapsed time into a pretend completion percentage. Keep financial commands under their existing submission owner.
+
 - Reflect service-layer permissions and valid workflow transitions in visible actions. Hiding a control is not authorization; server checks remain mandatory.
 - Confirm disbursement, payment reversal, restructuring, write-off, and other high-impact actions with the specific loan and financial consequence.
 - Financial corrections preserve the original record and show a linked reversal or adjustment. Do not offer silent edit/delete actions for posted payments.

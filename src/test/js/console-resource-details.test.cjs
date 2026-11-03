@@ -10,6 +10,20 @@ async function setup(markup,query=''){
 }
 const sections='<section class="accounting-section"><h2>Summary</h2><dl class="erp-detail-facts"><div><dt>Loan</dt><dd>L001</dd></div></dl></section><section id="schedule" class="erp-table-wrap"><h2>Schedule</h2><input value="draft"><form method="post"><input name="_csrf" value="token"></form></section><section id="history" class="erp-table-wrap"><h2>History</h2><a href="/receipt">Receipt</a></section>';
 
+test('server flashbars dismiss with keyboard focus recovery without removing contextual warnings',async()=>{
+ const {dom,w,d}=await setup('<div data-workspace-flashbar><div data-app-toast data-message-type="success" role="status"><p>Profile saved.</p><button type="button" data-feedback-dismiss aria-label="Funga taarifa">×</button></div></div><h1>My profile</h1><section><p data-message-type="warning">Correct your address.</p><input value="unsaved"></section>');
+ try {
+  w.ConsoleResourceDetails.init();w.ConsoleResourceDetails.init();
+  const dismiss=d.querySelector('[data-feedback-dismiss]');dismiss.focus();dismiss.click();
+  assert.equal(d.querySelector('[data-app-toast]'),null);
+  assert.equal(d.activeElement,d.querySelector('h1'));
+  assert.equal(d.querySelector('[data-message-type="warning"]').textContent,'Correct your address.');
+  assert.equal(d.querySelector('input').value,'unsaved');
+  const replacement=d.createElement('div');replacement.dataset.workspaceFlashbar='';replacement.innerHTML='<div data-app-toast data-message-type="info"><p>No changes.</p><button type="button" data-feedback-dismiss>Dismiss</button></div>';d.querySelector('main').prepend(replacement);
+  await settle();await settle();replacement.querySelector('button').click();assert.equal(replacement.children.length,0);
+ } finally {dom.window.close();}
+});
+
 test('shared alerts preserve native recovery actions and hidden and empty states',async()=>{
  const {dom,w,d}=await setup('<p class="aws-inline-notice aws-inline-notice--warning" hidden>Permission required</p><div class="app-loading-error" role="alert">Retry failed <button>Retry</button></div><div class="accounting-error-summary" role="alert"></div><label>Email <span class="coa-error">Invalid email</span></label>');
  try {

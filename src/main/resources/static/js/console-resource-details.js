@@ -149,6 +149,16 @@
         window.addEventListener('popstate',()=>activate(new URL(location.href).searchParams.get('detailTab') || saved() || panels[0].id,false,false));
     }
     function init(scope=document) {
+        scope.querySelectorAll('[data-workspace-flashbar] [data-feedback-dismiss]').forEach(button=>{
+            if(button.dataset.feedbackReady)return;
+            button.dataset.feedbackReady='true';
+            button.addEventListener('click',()=>{
+                const notice=button.closest('[data-app-toast]');if(!notice)return;
+                const next=notice.nextElementSibling || notice.previousElementSibling || document.querySelector('main h1');
+                if(next){if(!next.hasAttribute('tabindex'))next.tabIndex=-1;next.focus({preventScroll:true});}
+                notice.remove();
+            });
+        });
         scope.querySelectorAll('.loan-status-badge,.voucher-status,.staff-recent-disbursements-status').forEach(node=>{
             if(!node.querySelector('[data-resource-status]') && (!node.hasAttribute('data-resource-status') || node.dataset.statusAuto==='true')){node.dataset.statusAuto='true';node.dataset.resourceStatus=node.textContent.trim();}
         });

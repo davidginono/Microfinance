@@ -14,6 +14,8 @@
     min-width: 0;
 }
 .kyc-form-workspace .erp-page-header { margin: 0; }
+.kyc-form-workspace > .workspace-flashbar { margin: 0; }
+.kyc-client-form > [data-profile-tabs] > .console-detail-tabs { margin-top: 0; }
 .kyc-client-form { display: grid; gap: 20px; min-width: 0; }
 .kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
 .kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }

@@ -104,3 +104,23 @@ test('button loading preserves existing icons, native listeners and updated labe
   const finish=w.AppLoading.action(save);save.textContent='Saved';finish();assert.equal(save.textContent,'Saved');assert.equal(save.classList.contains('is-action-loading'),false);
  }finally{dom.window.close();}
 });
+
+test('portal submissions keep pending feedback in the pressed button and recover the live form on failure',async()=>{
+ const {dom,w,d}=await setup('<main><form action="/client-portal/workspace/profile/edit" method="post" data-portal-recover="true"><input name="_csrf" value="token"><input name="profile.city" value="Unsaved town"><div class="accounting-form-actions"><button name="action" value="DRAFT">Save draft</button><button disabled>Unavailable</button></div></form></main>');
+ try {
+  let rejectRequest,requests=0;w.fetch=()=>{requests++;return new Promise((_,reject)=>{rejectRequest=reject;});};
+  w.HTMLElement.prototype.scrollIntoView=()=>{};d.body.dataset.portalSaveError='Please try again.';
+  w.eval(readFileSync('src/main/resources/static/js/client-portal-forms.js','utf8'));
+  const form=d.querySelector('form'),button=d.querySelector('button');
+  const submit=()=>form.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:button}));
+  submit();submit();assert.equal(requests,1);
+  assert.equal(button.querySelector('[data-ui-action-loading]').getAttribute('aria-label'),'Loading');
+  assert.equal(form.querySelectorAll('.app-loading-spinner').length,1);assert.equal(form.getAttribute('aria-busy'),'true');
+  rejectRequest(Error('Network unavailable'));await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(button.disabled,false);assert.equal(d.querySelectorAll('button')[1].disabled,true);
+  assert.equal(form.querySelector('[data-ui-action-loading]'),null);assert.equal(form.hasAttribute('aria-busy'),false);
+  assert.equal(d.querySelector('input[name="profile.city"]').value,'Unsaved town');
+  assert.equal(d.activeElement.getAttribute('role'),'alert');assert.equal(d.activeElement.textContent,'Please try again.');
+  assert.equal(d.activeElement.nextElementSibling,form.querySelector('.accounting-form-actions'));
+ } finally {dom.window.close();}
+});
