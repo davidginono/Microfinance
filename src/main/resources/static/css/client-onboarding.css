@@ -37,9 +37,22 @@
 .kyc-upload-dialog form { min-width: 0; }
 .kyc-upload-dialog input[type="file"] { width: 100%; min-width: 0; }
 .kyc-upload-dialog .erp-resource-section { border: 0; box-shadow: none; margin: 0; }
-.kyc-upload-queue, .kyc-upload-confirmations { display: grid; gap: 16px; min-width: 0; }
-.kyc-upload-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #d5dbdb; min-width: 0; align-items: end; }
-.kyc-upload-name { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.kyc-upload-dropzone { display: flex; flex-flow: row wrap; align-items: center; justify-content: center; gap: 12px; padding: 20px 12px; border: 1px dashed #879596; background: #fafafa; min-width: 0; }
+.kyc-upload-dropzone.is-dragging { border-color: var(--aws-blue, #0972d3); background: #f1faff; }
+.kyc-upload-queue, .kyc-upload-confirmations { display: grid; gap: 12px; min-width: 0; }
+.kyc-upload-queue { list-style: none; padding: 0; margin: 0; }
+.kyc-upload-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px; border: 1px solid #aab7b8; border-radius: 2px; background: white; min-width: 0; align-items: end; }
+.kyc-upload-row[data-upload-state="error"] { border-color: #b42318; }
+.kyc-upload-token { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.kyc-upload-details { flex: 1 1 0; min-width: 0; }
+.kyc-upload-name { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.kyc-upload-metadata { display: flex; flex-flow: row wrap; gap: 4px 16px; margin: 4px 0 0; font-size: 14px; line-height: 20px; }
+.kyc-upload-metadata > div { display: flex; flex-flow: row wrap; gap: 4px; min-width: 0; }
+.kyc-upload-metadata dt { color: var(--aws-muted, #545b64); }
+.kyc-upload-metadata dd { margin: 0; }
+.kyc-upload-thumbnail { width: 48px; height: 48px; object-fit: contain; flex: 0 0 48px; border: 1px solid #eaeded; }
+.kyc-upload-dialog .kyc-upload-remove { flex: 0 0 32px; width: 32px; height: 32px; padding: 0; }
+.kyc-upload-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; overflow-wrap: anywhere; }
 .kyc-upload-dialog .app-modal-actions { position: sticky; bottom: -20px; background: white; }
 @media (max-width: 640px) { .kyc-upload-row { grid-template-columns: minmax(0, 1fr); } }
 .kyc-client-form .kyc-field-hint { margin: 0; color: var(--aws-muted, #545b64); }

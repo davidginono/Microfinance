@@ -21,5 +21,13 @@
           data-uploaded="<spring:message code='kyc.uploaded'/>"
           data-upload-error="<spring:message code='kyc.uploadError'/>"
           data-choose-files="<spring:message code='kyc.chooseFiles'/>"
+          data-file-label="<spring:message code='kyc.uploadImages'/>"
+          data-drop-images="<spring:message code='kyc.dropImages'/>"
+          data-selected-images="<spring:message code='kyc.selectedImages'/>"
+          data-file-size="<spring:message code='kyc.fileSize'/>"
+          data-file-modified="<spring:message code='kyc.fileModified'/>"
+          data-remove-selected="<spring:message code='kyc.removeSelected'/>"
+          data-uploading-file="<spring:message code='kyc.uploadingFile'/>"
+          data-uploading-files="<spring:message code='kyc.uploadingFiles'/>"
           data-close="<spring:message code='common.closeModal'/>"
 ></template>
