@@ -89,7 +89,16 @@ public class OnboardingService {
     }
     @Transactional(timeout=20)
     public UUID save(AppUserPrincipal a,UUID client,ProfileForm f) {
-        authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");return saveRevision(a,client,f,hash(List.of(client,f)));
+        authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");
+        String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+        var command=json.readValue(json.writeValueAsString(f),ProfileForm.class);
+        check(command.getProfile()!=null,"profile");var p=command.getProfile();standardNotice(p,records.notice());p.setSelfService(false);
+        if(command.getAction().equals("SUBMITTED")) {
+            var c=records.client(a,client,today());check(c.phone()!=null&&c.phone().matches("255[0-9]{9}"),"phone");check(c.revisionId()!=null,"documents");
+            var consent=records.documents(c.revisionId()).stream().filter(d->d.category().equals("CONSENT")).findFirst().orElseThrow(()->invalid("documents"));
+            p.setConsentReference("Client consent document / "+consent.id());p.setConsentOn(consent.recordedAt().atZoneSameInstant(ZoneId.of("Africa/Dar_es_Salaam")).toLocalDate());
+        }
+        return saveRevision(a,client,command,hash);
     }
     private UUID saveRevision(AppUserPrincipal a,UUID client,ProfileForm f,String hash) {
         records.client(a,client,today());var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
@@ -186,24 +195,23 @@ public class OnboardingService {
     @Transactional(readOnly=true)
     public SelfForm ownForm(AppUserPrincipal a) {
         requireOwner(a);var c=records.client(a,a.getMemberId(),today());
-        var f=new SelfForm();f.setExpectedSequence(c.sequence());records.latest(a,c.id()).ifPresent(r->f.setProfile(personal(r.profile())));identityFields(f.getProfile(),c);records.notice(a).ifPresent(n->f.setNoticeId(n.id()));return f;
+        var f=new SelfForm();f.setExpectedSequence(c.sequence());records.latest(a,c.id()).ifPresent(r->f.setProfile(personal(r.profile())));identityFields(f.getProfile(),c);f.setNoticeId(records.notice().id());return f;
     }
     @Transactional(readOnly=true)
-    public Optional<Notice> ownNotice(AppUserPrincipal a) {requireOwner(a);return records.notice(a).filter(n->n.enabled()&&!n.retentionReviewOn().isBefore(today()));}
+    public Notice ownNotice(AppUserPrincipal a) {requireOwner(a);return records.notice();}
+    @Transactional(readOnly=true)
+    public Notice staffNotice(AppUserPrincipal a) {authorize(a,"UPDATE");return records.notice();}
     @Transactional(timeout=20)
     public UUID saveOwn(AppUserPrincipal a,SelfForm f) {
         requireOwner(a);check(f.getProfile()!=null,"profile");String hash=hash(List.of(a.getMemberId(),f));
         var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
-        records.lock(noticeLock(a));var n=records.notice(a).orElse(null);var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);p.setSelfService(true);
+        var n=records.notice();var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);p.setSelfService(true);standardNotice(p,n);
         if(f.getAction().equals("SUBMITTED")) {
-            check(n!=null&&n.enabled()&&!n.retentionReviewOn().isBefore(today()),"noticeUnavailable");check(n.id().equals(f.getNoticeId()),"noticeChanged");
+            check(n.id().equals(f.getNoticeId()),"noticeChanged");
             check(f.isNoticeAcknowledged()&&f.isDeclarationAccepted(),"acknowledgement");
         }
-        if(n!=null) {
-            p.setNoticeId(n.id());p.setNoticeVersion(n.version());p.setNoticeEnglish(n.english());p.setNoticeKiswahili(n.kiswahili());p.setLawfulBasis(n.lawfulBasis());p.setRetentionReference(n.retentionReference());p.setRetentionReviewOn(n.retentionReviewOn());
-            if(n.id().equals(f.getNoticeId())&&f.isNoticeAcknowledged()&&f.isDeclarationAccepted()) {
-                p.setNoticeAcknowledged(true);p.setDeclarationAccepted(true);p.setAcknowledgedAt(clock.now());p.setConsentOn(today());p.setConsentReference("Client acknowledgement / "+n.id());
-            }
+        if(n.id().equals(f.getNoticeId())&&f.isNoticeAcknowledged()&&f.isDeclarationAccepted()) {
+            p.setNoticeAcknowledged(true);p.setDeclarationAccepted(true);p.setAcknowledgedAt(clock.now());p.setConsentOn(today());p.setConsentReference("Client acknowledgement / "+n.id());
         }
         var command=new ProfileForm();command.setRequestKey(f.getRequestKey());command.setExpectedSequence(f.getExpectedSequence());command.setAction(f.getAction());command.setProfile(p);
         return saveRevision(a,a.getMemberId(),command,hash);
@@ -218,19 +226,11 @@ public class OnboardingService {
         requireOwner(a);var uploadId=records.upload(a,a.getMemberId(),document);var upload=uploads.load(uploadId,"CLIENT_KYC",document.toString());
         check(upload.getContent().length<=5*1024*1024&&uploads.verify(upload,upload.getContent()),"file");event(a,a.getMemberId(),"CLIENT_KYC_DOCUMENT_READ");return new Download(upload.getContent(),upload.getContentType(),upload.getOriginalName());
     }
-    @Transactional(readOnly=true)
-    public NoticeForm noticeForm(AppUserPrincipal a) {
-        authorize(a,"UPDATE");var f=new NoticeForm();records.notice(a).ifPresent(n->{f.setExpectedSequence(n.sequence());f.setEnabled(n.enabled());f.setVersion(n.version());f.setEnglish(n.english());f.setKiswahili(n.kiswahili());f.setLawfulBasis(n.lawfulBasis());f.setRetentionReference(n.retentionReference());f.setRetentionReviewOn(n.retentionReviewOn());});return f;
+    private void standardNotice(Profile p,Notice n) {
+        p.setNoticeId(n.id());p.setNoticeVersion(n.version());p.setNoticeEnglish(n.english());p.setNoticeKiswahili(n.kiswahili());p.setLawfulBasis("CONSENT");
+        p.setRetentionReference("");p.setRetentionReviewOn(null);p.setConsentReference("");p.setConsentOn(null);
+        p.setNoticeAcknowledged(false);p.setDeclarationAccepted(false);p.setAcknowledgedAt(null);
     }
-    @Transactional(timeout=20)
-    public UUID saveNotice(AppUserPrincipal a,NoticeForm f) {
-        authorize(a,"UPDATE");String hash=hash(f);var old=retry(a,"client_onboarding_notice",f.getRequestKey(),hash);if(old.isPresent())return old.get();
-        text(f.getVersion(),100,"noticeVersion",true);text(f.getEnglish(),12000,"noticeEnglish",true);text(f.getKiswahili(),12000,"noticeKiswahili",true);text(f.getRetentionReference(),500,"retentionReference",true);
-        check(Set.of("CONSENT","CONTRACT","LEGAL_OBLIGATION").contains(f.getLawfulBasis()),"lawfulBasis");check(f.getRetentionReviewOn()!=null&&!f.getRetentionReviewOn().isBefore(today()),"retentionReviewOn");
-        records.lock(noticeLock(a));check(records.notice(a).map(Notice::sequence).orElse(0)==f.getExpectedSequence(),"changed");UUID id=UUID.randomUUID();records.notice(a,id,f,hash,clock.now());
-        audit.logEvent("CLIENT_KYC_NOTICE",id,"CLIENT_KYC_NOTICE_PUBLISHED",a.getMemberId(),AuditEventStatus.SUCCESS,"CLIENT_KYC_NOTICE_PUBLISHED","BRANCH",a.getStationId(),a.getSaccoId(),a.getStationId(),Map.of());return id;
-    }
-    private String noticeLock(AppUserPrincipal a) {return "CLIENT_KYC_NOTICE/"+a.getSaccoId()+"/"+a.getStationId();}
     private ClientProfile personal(Profile p) {
         return json.readValue(json.writeValueAsString(p),ClientProfile.class);
     }
@@ -280,8 +280,9 @@ public class OnboardingService {
         text(p.getNoticeVersion(),100,"noticeVersion",complete);text(p.getConsentReference(),1000,"consentReference",complete);text(p.getLawfulBasis(),30,"lawfulBasis",complete);
         check(p.getLawfulBasis().isEmpty()||Set.of("CONSENT","CONTRACT","LEGAL_OBLIGATION").contains(p.getLawfulBasis()),"lawfulBasis");
         check(p.getConsentOn()==null?!complete:!p.getConsentOn().isAfter(today())&&p.getConsentOn().getYear()>=1901,"consentOn");
-        text(p.getRetentionReference(),500,"retentionReference",complete);text(p.getLegalHoldReference(),500,"legalHoldReference",false);
-        if(complete)check(p.getRetentionReviewOn()!=null&&!p.getRetentionReviewOn().isBefore(today()),"retentionReviewOn");
+        boolean standard=Notice.STANDARD_ID.equals(p.getNoticeId());
+        text(p.getRetentionReference(),500,"retentionReference",complete&&!standard);text(p.getLegalHoldReference(),500,"legalHoldReference",false);
+        if(complete&&!standard)check(p.getRetentionReviewOn()!=null&&!p.getRetentionReviewOn().isBefore(today()),"retentionReviewOn");
         if(complete&&p.isSelfService())check(p.isNoticeAcknowledged()&&p.isDeclarationAccepted()&&p.getAcknowledgedAt()!=null&&p.getNoticeId()!=null&&!p.getNoticeEnglish().isBlank()&&!p.getNoticeKiswahili().isBlank(),"acknowledgement");
     }
     private void money(java.math.BigDecimal value,String field) {check(value==null||value.signum()>=0&&value.scale()<=2&&value.compareTo(new java.math.BigDecimal("9999999999999999.99"))<=0,field);}

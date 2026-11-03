@@ -4,6 +4,8 @@
 
 Implementation date: 27 October 2026. This implements the individual-client operational workflow in G01 of the research audit. Existing registration and client identifiers remain in place. Registration, an OTP, a signature label and a loan estimate do not establish verified KYC.
 
+3 November 2026: [Simplified onboarding data use](simple-onboarding-data-use.md) replaces branch notice publication and manual notice/retention fields on new profiles. Earlier notice-policy setup instructions below are historical; independent KYC checks, scoped access and signed evidence for staff-assisted submission remain required.
+
 ## 1. Scope, policy and activation
 
 Staff use **Client onboarding** at `/finance/clients/onboarding`. Clients complete their own drafts, uploads, acknowledgements and submissions and view outcomes, correction messages and version history at `/app/onboarding`. The 29 October self-service extension and branch notice activation are documented in [Client self-service onboarding](client-self-onboarding.md). Staff assistance remains optional. Institution and branch scope come from the current staff session and the current client record. Historical evidence retains its original branch. Moving a client does not expose the previous branch's evidence or transfer its verification; the destination branch needs its own review.

@@ -32,7 +32,7 @@ class ClientApplicationEndToEndPostgresTest {
     @Test void assistedAndOtpClientsRecordSubmitAndRepeatApplicationsAgainstTheSameIdentity()throws Exception{
         var fixture=new ClientOnboardingPostgresTest();fixture.start();ConfigurableApplicationContext app=null;
         try{
-            fixture.fixture();fixture.service.saveNotice(fixture.f.actor,fixture.notice());
+            fixture.fixture();
             fixture.f.jdbc.update("update loan_product_settings set application_fee=0,processing_fee_rate=0,insurance_rate=0,affordability_check_required=true where id=?",fixture.f.product);
             fixture.f.jdbc.update("update loan_product_settings set manager_review_required=true,disbursement_officer_required=true where id=?",fixture.f.product);
             fixture.f.jdbc.update("insert into member_staff_roles(member_id,role_name) values(?,'MANAGER') on conflict do nothing",fixture.f.actor.getMemberId());
@@ -44,7 +44,7 @@ class ClientApplicationEndToEndPostgresTest {
             var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).connectTimeout(Duration.ofSeconds(10)).build();
             String register=get(http,base+"/client-portal/register");assertThat(register).contains("Client portal","registration.profile.firstName");
             for(String field:com.sacco.mvp.clients.onboarding.service.OnboardingService.PERSONAL_FIELDS)if(!field.equals("groupId"))assertThat(register).contains("name=\"registration.profile."+field+"\"");
-            assertThat(register).contains("Profile photo","Spouse details","Bank details","Verify your contact to add photos and documents.").doesNotContain("data-loan-choice");
+            assertThat(register).contains("Attachments and Documents","Spouse details","Bank details","Verify your contact to add photos and documents.").doesNotContain("data-loan-choice");
             var fields=ClientOnboardingRenderedPostgresTest.hidden(register);fields.put("intent","REGISTER");fields.put("institution",fixture.f.institution);fields.put("branch","B1");fields.put("registration.profile.firstName","Synthetic");fields.put("registration.profile.lastName","Applicant");fields.put("registration.profile.phone",fixture.phone());fields.put("registration.profile.email",UUID.randomUUID()+"@example.invalid");
             fields.put("registration.profile.businessName","Public synthetic shop");fields.put("registration.profile.dailySales","12345.67");fields.put("registration.profile.spouseName","Public synthetic spouse");fields.put("registration.profile.bankAccountNumber","9876543210");
             post(http,base+"/client-portal/request-code",fields);String verifyPage=get(http,base+"/client-portal/verify");var verification=ClientOnboardingRenderedPostgresTest.hidden(verifyPage);verification.put("code",OTP.get());post(http,base+"/client-portal/verify",verification);

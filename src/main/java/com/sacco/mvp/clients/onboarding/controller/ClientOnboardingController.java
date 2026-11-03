@@ -57,7 +57,7 @@ public class ClientOnboardingController {
     private String profile(AppUserPrincipal a,Model m) {
         var workspace=service.ownWorkspace(a,0,null);m.addAttribute("workspace",workspace);
         boolean readOnly=workspace!=null&&"SUBMITTED".equals(workspace.client().state());m.addAttribute("profileReadOnly",readOnly);
-        var notice=readOnly?null:service.ownNotice(a).orElse(null);var form=(SelfForm)m.getAttribute("selfForm");
+        var notice=readOnly?null:service.ownNotice(a);var form=(SelfForm)m.getAttribute("selfForm");
         if(form!=null&&notice!=null&&!notice.id().equals(form.getNoticeId())) {form.setNoticeId(notice.id());form.setNoticeAcknowledged(false);form.setDeclarationAccepted(false);}
         m.addAttribute("notice",notice);m.addAttribute("formKind","self");return "onboarding/self-form";
     }

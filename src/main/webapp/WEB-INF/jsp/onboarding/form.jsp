@@ -14,8 +14,10 @@
 <c:if test="${formKind=='profile'}"><form:hidden path="expectedSequence"/><c:set var="groupLookup" value="/finance/clients/onboarding/groups?clientId=${client.id}"/></c:if>
 <div data-profile-tabs><div id="profile-bio" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2>
 <%@ include file="profile-fields.jspf" %>
-<c:if test="${formKind=='profile'}"><section class="erp-resource-section"><h2><spring:message code="kyc.notice"/></h2><div class="kyc-profile-grid"><c:forEach items="${['noticeVersion']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:input path="profile.${field}" cssClass="aws-control" maxlength="100"/></label></c:forEach><c:forEach items="${['consentOn','retentionReviewOn']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:input path="profile.${field}" type="date" cssClass="aws-control"/></label></c:forEach>            <label><span><spring:message code="kyc.field.lawfulBasis"/></span><form:select path="profile.lawfulBasis" cssClass="aws-control"><form:option value=""><spring:message code="kyc.choose"/></form:option><c:forEach items="${['CONSENT','CONTRACT','LEGAL_OBLIGATION']}" var="basis"><form:option value="${basis}"><spring:message code="kyc.basis.${basis}"/></form:option></c:forEach></form:select></label>
-            <c:forEach items="${['consentReference','retentionReference','legalHoldReference']}" var="field"><label><span><spring:message code="kyc.field.${field}"/></span><form:textarea path="profile.${field}" cssClass="aws-control" rows="3" maxlength="${field=='retentionReference'||field=='legalHoldReference'?500:1000}"/></label></c:forEach>
+<c:if test="${formKind=='profile'}"><section class="erp-resource-section"><h2><spring:message code="kyc.notice"/></h2><div class="kyc-form-fields">
+    <p class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?notice.kiswahili:notice.english}"/></p>
+    <p class="kyc-field-hint"><spring:message code="kyc.assistedConsent"/></p>
+    <label class="kyc-field"><span><spring:message code="kyc.field.legalHoldReference"/></span><form:textarea path="profile.legalHoldReference" cssClass="aws-control" rows="3" maxlength="500"/><form:errors path="profile.legalHoldReference" cssClass="coa-error"/></label>
 </div></section></c:if>
 </div>
 <c:set var="profileDocuments" value="${documents}"/><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_DOCUMENTS')" var="canReadProfileDocuments"/>

@@ -44,20 +44,15 @@
                         <c:if test="${workspace.client.state!='VERIFY'}"><p class="kyc-field-hint"><spring:message code="kyc.declaredMeaning"/></p></c:if>
                         <c:choose>
                             <c:when test="${profileReadOnly and not empty workspace.revision}">
-                                <dl class="kyc-notice-version"><dt><spring:message code="kyc.field.noticeVersion"/></dt><dd><c:out value="${workspace.revision.noticeVersion}"/></dd></dl>
                                 <div class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?workspace.revision.noticeKiswahili:workspace.revision.noticeEnglish}"/></div>
                                 <p><spring:message code="kyc.acknowledged"/>: <spring:message code="${workspace.revision.acknowledged?'kyc.yes':'kyc.no'}"/> &#183; <c:out value="${appTime:display(workspace.revision.acknowledgedAt)}"/></p>
                             </c:when>
                             <c:when test="${not empty notice}">
-                                <dl class="kyc-notice-version">
-                                    <dt><spring:message code="kyc.field.noticeVersion"/></dt>
-                                    <dd><c:out value="${notice.version}"/></dd>
-                                </dl>
                                 <div class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?notice.kiswahili:notice.english}"/></div>
                                 <div class="kyc-acknowledgement">
                                     <label class="kyc-checkbox">
                                         <form:checkbox path="noticeAcknowledged" required="true"/>
-                                        <span><spring:message code="${notice.lawfulBasis=='CONSENT'?'kyc.acceptConsent':'kyc.acceptNotice'}"/></span>
+                                        <span><spring:message code="kyc.acceptConsent"/></span>
                                     </label>
                                     <form:errors path="noticeAcknowledged" cssClass="coa-error"/>
                                 </div>
@@ -69,9 +64,6 @@
                                     <form:errors path="declarationAccepted" cssClass="coa-error"/>
                                 </div>
                             </c:when>
-                            <c:otherwise>
-                                <p class="console-message" data-message-type="warning" role="status"><spring:message code="kyc.error.noticeUnavailable"/></p>
-                            </c:otherwise>
                         </c:choose>
                     </div>
                 </section>

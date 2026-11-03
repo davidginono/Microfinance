@@ -24,8 +24,9 @@ public final class OnboardingDtos {
     public record History(int sequence, String mode, String result, String actor, OffsetDateTime recordedAt) {}
     public record Download(byte[] bytes, String contentType, String name) {}
     public record OwnStatus(String state, LocalDate reviewDue) {}
-    public record Notice(UUID id, int sequence, boolean enabled, String version, String english, String kiswahili,
-                         String lawfulBasis, String retentionReference, LocalDate retentionReviewOn) {}
+    public record Notice(UUID id, String version, String english, String kiswahili) {
+        public static final UUID STANDARD_ID=UUID.fromString("59bf1107-d9c1-44ca-a91f-e4b266123d3c");
+    }
     public record OwnDocument(UUID id, String category, String name, LocalDate expiresOn) {}
     public record Feedback(String kind, String message, OffsetDateTime recordedAt) {}
     public record OwnHistory(int sequence, String result, OffsetDateTime recordedAt) {}
@@ -62,13 +63,6 @@ public final class OnboardingDtos {
         private ClientProfile profile=new ClientProfile();
         private String action="DRAFT";
         private boolean noticeAcknowledged, declarationAccepted;
-    }
-    @Data public static class NoticeForm {
-        private UUID requestKey=UUID.randomUUID();
-        private int expectedSequence;
-        private boolean enabled;
-        private String version="", english="", kiswahili="", lawfulBasis="", retentionReference="";
-        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate retentionReviewOn;
     }
     @Data @lombok.EqualsAndHashCode(callSuper=true) public static class Profile extends ClientProfile {
         private String fullName="", clientNumber="";

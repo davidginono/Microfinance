@@ -131,8 +131,10 @@ class ClientOnboardingPostgresTest {
         var member=Member.builder().id(id).saccoId(f.institution).stationId("B1").memberNo(id.toString()).fullName("Synthetic client").phone(clientPhone).position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build();
         member.setClientPortalEnabled(false);when(f.context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(member));return AppUserPrincipal.forClientPortal(member);
     }
-    NoticeForm notice() {
-        var n=service.noticeForm(f.actor);n.setEnabled(true);n.setVersion("Approved synthetic notice 1");n.setEnglish("Synthetic English privacy notice with purpose and contact details.");n.setKiswahili("Taarifa ya faragha ya majaribio iliyoidhinishwa.");n.setLawfulBasis("CONSENT");n.setRetentionReference("Approved synthetic retention schedule");n.setRetentionReviewOn(day.plusYears(2));return n;
+    UUID legacyNotice(boolean enabled,LocalDate reviewOn) {
+        UUID id=UUID.randomUUID();
+        f.jdbc.update("insert into client_onboarding_notice values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,f.institution,"B1",1,enabled,"Legacy notice","Legacy English notice","Taarifa ya awali","CONSENT","Legacy retention reference",reviewOn,UUID.randomUUID(),"0".repeat(64),f.actor.getMemberId(),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));
+        return id;
     }
     SelfForm ownProfile(AppUserPrincipal owner) {
         var form=service.ownForm(owner);var p=form.getProfile();p.setIdentityType("NATIONAL_ID");p.setIssuingCountry("TZ");p.setIdentityNumber("TZ-SELF-1234");p.setBirthDate(day.minusYears(30));p.setIdentityExpiresOn(null);p.setIdentityNoExpiry(true);p.setAddress("Synthetic home");p.setActivity("Synthetic business");p.setActivityAddress("Synthetic market");p.setSourceOfFunds("Synthetic verified sales");return form;
@@ -141,7 +143,7 @@ class ClientOnboardingPostgresTest {
         var form=ownProfile(owner);form.setAction("SUBMITTED");form.setNoticeAcknowledged(true);form.setDeclarationAccepted(true);return service.saveOwn(owner,form);
     }
     @Test void clientCompletesOwnDraftUploadsSubmitsReceivesCorrectionsAndIsIndependentlyVerified() {
-        var owner=owner(f.client);var notice=notice();UUID noticeId=service.saveNotice(f.actor,notice);assertThat(service.saveNotice(f.actor,notice)).isEqualTo(noticeId);
+        var owner=owner(f.client);UUID legacyId=legacyNotice(false,day.minusDays(1));UUID noticeId=service.ownNotice(owner).id();
         var draftForm=ownProfile(owner);UUID draft=service.saveOwn(owner,draftForm);assertThat(service.saveOwn(owner,draftForm)).isEqualTo(draft);
         var superseded=service.ownDocumentForm(owner);UUID oldDocument=service.attachOwn(owner,superseded,image());
         for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY")){var upload=service.ownDocumentForm(owner);upload.setCategory(category);UUID document=service.attachOwn(owner,upload,image());assertThat(service.attachOwn(owner,upload,image())).isEqualTo(document);assertThat(service.downloadOwn(owner,document).bytes()).isEqualTo(image);}
@@ -158,24 +160,66 @@ class ClientOnboardingPostgresTest {
         assertThat(service.ownWorkspace(owner,0,2).feedback().message()).isEqualTo(review.getClientMessage());assertThat(service.ownWorkspace(owner,0,2).documents()).hasSize(3);
         assertThat(service.version(f.actor,f.client,2).profile().getNoticeId()).isEqualTo(noticeId);assertThat(service.version(f.actor,f.client,2).profile().getAcknowledgedAt()).isNotNull();
         assertThat(f.jdbc.queryForObject("select actor_id from client_onboarding_revision where id=?",UUID.class,correctedDraft)).isEqualTo(f.client);
-        assertThatThrownBy(()->f.jdbc.update("update client_onboarding_notice set english='changed' where id=?",noticeId)).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(()->f.jdbc.update("update client_onboarding_notice set english='changed' where id=?",legacyId)).isInstanceOf(DataAccessException.class);
     }
     SelfForm ownProfileFromDraft(SelfForm draft) {var f=new SelfForm();f.setProfile(draft.getProfile());return f;}
-    @Test void selfSubmissionRequiresPublishedCurrentNoticeAcknowledgementsAndCurrentDocuments() {
+    @Test void selfSubmissionNeedsAcknowledgementAndDocumentsWithoutBranchConfiguration() {
         var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));
-        var missingNotice=ownProfile(owner);missingNotice.setAction("SUBMITTED");assertThatThrownBy(()->service.saveOwn(owner,missingNotice)).hasMessage("kyc.error.noticeUnavailable");
-        SelfForm submit;
-        service.saveNotice(f.actor,notice());submit=ownProfile(owner);submit.setAction("SUBMITTED");final var noAcknowledgement=submit;assertThatThrownBy(()->service.saveOwn(owner,noAcknowledgement)).hasMessage("kyc.error.acknowledgement");
-        submit.setNoticeAcknowledged(true);submit.setDeclarationAccepted(true);assertThatThrownBy(()->service.saveOwn(owner,noAcknowledgement)).hasMessage("kyc.error.documents");
-        service.saveNotice(f.actor,notice());assertThatThrownBy(()->service.saveOwn(owner,noAcknowledgement)).hasMessage("kyc.error.noticeChanged");
+        assertThat(service.ownNotice(owner).english()).contains("identity checks", "loan assessment", "repayment administration");
+        assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_notice where sacco_id=?",Integer.class,f.institution)).isZero();
+        var submit=ownProfile(owner);submit.setAction("SUBMITTED");
+        assertThatThrownBy(()->service.saveOwn(owner,submit)).hasMessage("kyc.error.acknowledgement");
+        submit.setNoticeAcknowledged(true);submit.setDeclarationAccepted(true);
+        assertThatThrownBy(()->service.saveOwn(owner,submit)).hasMessage("kyc.error.documents");
+        submit.setNoticeId(UUID.randomUUID());assertThatThrownBy(()->service.saveOwn(owner,submit)).hasMessage("kyc.error.noticeChanged");
         var current=ownProfile(owner);current.setExpectedSequence(0);assertThatThrownBy(()->service.saveOwn(owner,current)).hasMessage("kyc.error.changed");
+        for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY")){var doc=service.ownDocumentForm(owner);doc.setCategory(category);service.attachOwn(owner,doc,image());}
+        var submitted=submitOwn(owner);var snapshot=service.latest(f.actor,f.client).orElseThrow().profile();
+        assertThat(snapshot.getRetentionReference()).isEmpty();assertThat(snapshot.getRetentionReviewOn()).isNull();
+        assertThat(snapshot.getNoticeEnglish()).isEqualTo(service.ownNotice(owner).english());
+        assertThat(snapshot.isNoticeAcknowledged()).isTrue();assertThat(snapshot.getAcknowledgedAt()).isNotNull();
+        assertThat(f.jdbc.queryForObject("select client_onboarding_complete(?,?)",Boolean.class,submitted,day)).isTrue();
+        service.review(f.operator("B1"),f.client,decision(submitted));assertThat(gate()).isNull();
     }
     @Test void selfServiceCannotClearAStaffRecordedLegalHold() {
         var staffProfile=profile(f.client,"TZ-LEGAL-HOLD");staffProfile.getProfile().setLegalHoldReference("Existing institution hold reference");service.save(f.actor,f.client,staffProfile);
         var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));assertThat(service.latest(f.actor,f.client).orElseThrow().profile().getLegalHoldReference()).isEqualTo("Existing institution hold reference");
     }
+    @Test void previousNoticeAndAcknowledgedProfileStayUnchangedAndReviewable() {
+        UUID legacyId=legacyNotice(true,day.plusYears(2));UUID draft=draft(f.client,"TZ-LEGACY-REVIEW");documents(f.client,draft);
+        var previous=service.latest(f.actor,f.client).orElseThrow().profile();previous.setNoticeId(legacyId);previous.setNoticeVersion("Legacy notice");
+        previous.setNoticeEnglish("Legacy English notice");previous.setNoticeKiswahili("Taarifa ya awali");previous.setLawfulBasis("CONSENT");
+        previous.setRetentionReference("Legacy retention reference");previous.setRetentionReviewOn(day.plusYears(2));previous.setConsentReference("Legacy signed document");previous.setConsentOn(day);
+        previous.setSelfService(true);previous.setNoticeAcknowledged(true);previous.setDeclarationAccepted(true);previous.setAcknowledgedAt(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));var owner=owner(f.client);
+        UUID submitted=UUID.randomUUID();var records=f.context.getBean(com.sacco.mvp.clients.onboarding.repository.OnboardingRepository.class);
+        String identity=f.jdbc.queryForObject("select identity_key from client_onboarding_revision where id=?",String.class,draft);
+        new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class)).executeWithoutResult(tx->{
+            records.revision(owner,f.client,submitted,2,"SUBMITTED",previous,identity,UUID.randomUUID(),"0".repeat(64),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));
+            records.copyDocuments(f.actor,f.client,draft,submitted);
+        });
+        String original=f.jdbc.queryForObject("select profile::text from client_onboarding_revision where id=?",String.class,submitted);
+        service.review(f.operator("B1"),f.client,decision(submitted));assertThat(gate()).isNull();
+        assertThat(service.staffNotice(f.actor).id()).isEqualTo(Notice.STANDARD_ID);
+        assertThat(service.version(f.actor,f.client,2).profile().getNoticeEnglish()).isEqualTo("Legacy English notice");
+        assertThat(f.jdbc.queryForObject("select profile::text from client_onboarding_revision where id=?",String.class,submitted)).isEqualTo(original);
+        assertThat(f.jdbc.queryForObject("select english from client_onboarding_notice where id=?",String.class,legacyId)).isEqualTo("Legacy English notice");
+    }
+    @Test void databaseRejectsAnAlteredStandardMessageAndAssistedConsentComesFromEvidence() {
+        UUID submitted=submitted(f.client,"TZ-STANDARD-EVIDENCE");var revision=service.latest(f.actor,f.client).orElseThrow();
+        assertThat(revision.profile().getConsentReference()).startsWith("Client consent document / ");
+        assertThat(revision.profile().isNoticeAcknowledged()).isFalse();assertThat(revision.profile().getAcknowledgedAt()).isNull();
+        assertThat(f.jdbc.queryForObject("select client_onboarding_complete(?,?)",Boolean.class,submitted,day)).isTrue();
+        var returned=decision(submitted);returned.setKind("RETURN");service.review(f.operator("B1"),f.client,returned);
+        UUID altered=UUID.randomUUID();var records=f.context.getBean(com.sacco.mvp.clients.onboarding.repository.OnboardingRepository.class);var changed=revision.profile();changed.setNoticeEnglish("Use for anything");
+        new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class)).executeWithoutResult(tx->{
+            records.revision(f.actor,f.client,altered,3,"SUBMITTED",changed,"0".repeat(64),UUID.randomUUID(),"0".repeat(64),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));
+            records.copyDocuments(f.actor,f.client,submitted,altered);
+        });
+        assertThat(f.jdbc.queryForObject("select client_onboarding_complete(?,?)",Boolean.class,altered,day)).isFalse();
+        assertThatThrownBy(()->service.review(f.operator("B1"),f.client,decision(altered))).isInstanceOf(DataAccessException.class);
+    }
     @Test void clientOwnershipBranchAndFreshAccountStatusAreCheckedForEveryAction() {
-        var first=owner(f.client);service.saveNotice(f.actor,notice());service.saveOwn(first,ownProfile(first));var doc=service.ownDocumentForm(first);UUID document=service.attachOwn(first,doc,image());
+        var first=owner(f.client);service.saveOwn(first,ownProfile(first));var doc=service.ownDocumentForm(first);UUID document=service.attachOwn(first,doc,image());
         var stranger=owner(otherClient("B1"));assertThatThrownBy(()->service.downloadOwn(stranger,document)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->service.ownWorkspace(stranger,0,1)).isInstanceOf(AccessDeniedException.class);
         doc.setRequestKey(UUID.randomUUID());assertThatThrownBy(()->service.attachOwn(stranger,doc,image())).hasMessage("kyc.error.changed");
@@ -183,7 +227,7 @@ class ClientOnboardingPostgresTest {
         var moved=f.context.getBean(MemberDirectoryService.class).find(f.client).orElseThrow();moved.setStationId("B2");assertThatThrownBy(()->service.ownWorkspace(first,0,null)).isInstanceOf(AccessDeniedException.class);moved.setStationId("B1");moved.setStatus(MemberStatus.INACTIVE);assertThatThrownBy(()->service.downloadOwn(first,document)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void concurrentClientSavesCannotLoseChangesAndRejectedSubmissionsRemainInHistory()throws Exception {
-        var owner=owner(f.client);service.saveNotice(f.actor,notice());var one=ownProfile(owner);var two=ownProfile(owner);
+        var owner=owner(f.client);var one=ownProfile(owner);var two=ownProfile(owner);
         try(var pool=Executors.newFixedThreadPool(2)){var latch=new CountDownLatch(1);var results=new ArrayList<Future<Boolean>>();for(var form:List.of(one,two))results.add(pool.submit(()->{latch.await();try{service.saveOwn(owner,form);return true;}catch(IllegalArgumentException expected){assertThat(expected).hasMessage("kyc.error.changed");return false;}}));latch.countDown();assertThat(results.get(0).get(30,TimeUnit.SECONDS)^results.get(1).get(30,TimeUnit.SECONDS)).isTrue();}
         for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY")){var d=service.ownDocumentForm(owner);d.setCategory(category);service.attachOwn(owner,d,image());}
         UUID submitted=submitOwn(owner);var rejected=decision(submitted);rejected.setKind("REJECT");service.review(f.operator("B1"),f.client,rejected);assertThat(service.ownWorkspace(owner,0,null).client().state()).isEqualTo("REJECT");assertThat(service.ownWorkspace(owner,0,2).feedback().message()).isEqualTo(rejected.getClientMessage());
@@ -220,7 +264,7 @@ class ClientOnboardingPostgresTest {
         assertThatThrownBy(()->service.profileForm(f.operator("B2"),id)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void ownRichProfileAndPhotosRemainPrivateAndDoNotReplaceRequiredEvidence() {
-        var owner=owner(f.client);service.saveNotice(f.actor,notice());var form=ownProfile(owner);form.getProfile().setBusinessName("Own synthetic shop");form.getProfile().setBankAccountNumber("PRIVATE-12345");form.getProfile().setDailyExpenditure(null);form.getProfile().setDependants(0);form.getProfile().setGroupId(group("B1"));service.saveOwn(owner,form);
+        var owner=owner(f.client);var form=ownProfile(owner);form.getProfile().setBusinessName("Own synthetic shop");form.getProfile().setBankAccountNumber("PRIVATE-12345");form.getProfile().setDailyExpenditure(null);form.getProfile().setDependants(0);form.getProfile().setGroupId(group("B1"));service.saveOwn(owner,form);
         var copy=service.ownForm(owner).getProfile();assertThat(copy.getBusinessName()).isEqualTo("Own synthetic shop");assertThat(copy.getBankAccountNumber()).isEqualTo("PRIVATE-12345");assertThat(copy.getDailyExpenditure()).isNull();assertThat(copy.getDependants()).isZero();
         var photo=service.ownDocumentForm(owner);photo.setCategory("PROFILE_PHOTO");UUID id=service.attachOwn(owner,photo,image());assertThat(service.ownPhoto(owner,id).bytes()).isEqualTo(image);assertThat(service.photo(f.actor,f.client,id).contentType()).isEqualTo("image/png");
         var spouse=service.ownDocumentForm(owner);spouse.setCategory("SPOUSE_PHOTO");service.attachOwn(owner,spouse,image());assertThatThrownBy(()->submitOwn(owner)).hasMessage("kyc.error.documents");

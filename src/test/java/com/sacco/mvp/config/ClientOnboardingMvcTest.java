@@ -100,16 +100,16 @@ class ClientOnboardingMvcTest {
         mvc.perform(get("/app/onboarding/documents/"+document).with(user(client))).andExpect(status().isForbidden());
     }
     @Test void changedNoticePreservesProfileAndRequiresFreshAcknowledgements()throws Exception {
-        UUID next=UUID.randomUUID();when(service.ownNotice(client)).thenReturn(Optional.of(new Notice(next,2,true,"Notice 2","English","Kiswahili","CONSENT","Internal retention reference",java.time.LocalDate.of(2028,1,1))));
+        UUID next=UUID.randomUUID();when(service.ownNotice(client)).thenReturn(new Notice(next,"Notice 2","English","Kiswahili"));
         when(service.saveOwn(any(),any())).thenThrow(new IllegalArgumentException("kyc.error.noticeChanged"));
         var result=mvc.perform(post("/app/onboarding/edit").with(user(client)).with(csrf()).param("noticeId",UUID.randomUUID().toString()).param("noticeAcknowledged","true").param("declarationAccepted","true").param("profile.address","Keep my address")).andExpect(view().name("onboarding/self-form")).andReturn();
         var form=(SelfForm)result.getModelAndView().getModel().get("selfForm");assertThat(form.getProfile().getAddress()).isEqualTo("Keep my address");assertThat(form.getNoticeId()).isEqualTo(next);assertThat(form.isNoticeAcknowledged()).isFalse();assertThat(form.isDeclarationAccepted()).isFalse();
     }
-    @Test void noticeConfigurationRequiresStaffAndCsrf()throws Exception {
+    @Test void retiredNoticeRedirectsStaffAndCannotPublish()throws Exception {
+        mvc.perform(get(root+"/notice").with(user(staff))).andExpect(redirectedUrl(root));
+        mvc.perform(get(root+"/notice").with(user(client))).andExpect(status().isForbidden());
         mvc.perform(post(root+"/notice").with(user(staff))).andExpect(status().isForbidden());
-        mvc.perform(post(root+"/notice").with(user(client)).with(csrf())).andExpect(status().isForbidden());
-        mvc.perform(post(root+"/notice").with(user(staff)).with(csrf()).param("version","Approved 1").param("english","Approved notice")).andExpect(redirectedUrl(root+"/notice"));
-        verify(service).saveNotice(eq(staff),argThat(f->f.getVersion().equals("Approved 1")));
+        mvc.perform(post(root+"/notice").with(user(staff)).with(csrf()).param("version","New notice")).andExpect(status().is4xxClientError());
     }
     @Test void onboardingClaimsAreExplicitAndHaveAStaffLanding() {
         var claims=Arrays.stream(UserClaim.values()).filter(c->c.getFeature()==AccessFeature.CLIENT_ONBOARDING).toList();assertThat(claims).hasSize(5);

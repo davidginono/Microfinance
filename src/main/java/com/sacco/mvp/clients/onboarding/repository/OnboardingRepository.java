@@ -113,12 +113,9 @@ public class OnboardingRepository {
     public void decision(AppUserPrincipal a,UUID client,UUID id,ReviewForm f,String hash,OffsetDateTime now) {
         jdbc.update("insert into client_onboarding_decision values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,f.getRevisionId(),client,a.getSaccoId(),a.getStationId(),f.getKind(),f.getReason().strip(),f.isIdentityChecked(),f.isAddressChecked(),f.isActivityChecked(),f.isContactChecked(),f.isDuplicatesChecked(),f.getScreening(),f.getScreeningReference().strip(),f.getCheckedOn(),f.getReviewDue(),f.getPolicyReference().strip(),f.getRequestKey(),hash,a.getMemberId(),now,f.getClientMessage().strip());
     }
-    public Optional<Notice> notice(AppUserPrincipal a) {
-        return jdbc.query("select * from client_onboarding_notice where sacco_id=? and station_id=? order by sequence desc limit 1",
-            (r,n)->new Notice(r.getObject("id",UUID.class),r.getInt("sequence"),r.getBoolean("enabled"),r.getString("version"),r.getString("english"),r.getString("kiswahili"),r.getString("lawful_basis"),r.getString("retention_reference"),r.getObject("retention_review_on",LocalDate.class)),a.getSaccoId(),a.getStationId()).stream().findFirst();
-    }
-    public void notice(AppUserPrincipal a,UUID id,NoticeForm f,String hash,OffsetDateTime now) {
-        jdbc.update("insert into client_onboarding_notice values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,a.getSaccoId(),a.getStationId(),f.getExpectedSequence()+1,f.isEnabled(),f.getVersion(),f.getEnglish(),f.getKiswahili(),f.getLawfulBasis(),f.getRetentionReference(),f.getRetentionReviewOn(),f.getRequestKey(),hash,a.getMemberId(),now);
+    public Notice notice() {
+        return jdbc.queryForObject("select * from client_onboarding_data_notice()",
+            (r,n)->new Notice(r.getObject("id",UUID.class),r.getString("version"),r.getString("english"),r.getString("kiswahili")));
     }
     public Feedback feedback(AppUserPrincipal a,UUID client,UUID revision) {
         return jdbc.query("select d.kind,d.client_message,d.recorded_at from client_onboarding_decision d join client_onboarding_revision r on r.id=d.revision_id where d.client_id=? and d.sacco_id=? and d.station_id=? and (?::uuid is null or d.revision_id=?) order by r.sequence desc,d.recorded_at desc,(d.kind='REVOKE') desc,d.id desc limit 1",

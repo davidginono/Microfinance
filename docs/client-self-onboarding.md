@@ -2,6 +2,10 @@
 
 31 October 2026: [Provisional registration](provisional-client-registration.md) supersedes the earlier assisted-number/password behavior below. Both channels now use automatic client numbers; assisted records have no portal access until verified registration activation. Loan-request drafts are available during onboarding.
 
+## Standard data-use message — 3 November 2026
+
+The standard message and explicit client acknowledgement replace branch notice publication. There is no Onboarding notice setup page, activation flag, processing-basis choice or retention configuration before submission. Missing, disabled and expired old branch notices do not block new submissions. See [Simplified onboarding data use](simple-onboarding-data-use.md) for the current behavior and historical compatibility. Earlier branch-publication instructions below describe the previous implementation.
+
 ## Scope and activation
 
 Clients use **My verification** (`/app/onboarding`) after existing registration and sign-in. They complete their own profile, save incomplete drafts, upload evidence, acknowledge the approved notice, submit, read feedback and correct/resubmit. Registration and OTP verification do not verify KYC. Staff-assisted onboarding remains available through the same component.
@@ -12,11 +16,11 @@ Client onboarding is mandatory. An authenticated client must have a current inde
 
 Not started, draft, awaiting review, returned, rejected, revoked, expired and stale-contact profiles remain restricted. My verification, its documents/history/corrections, personal settings, support, notifications and logout remain available under their existing permissions. The shared sidebar hides borrower destinations while verification is required, and the status page explains the requirement in English/Kiswahili. Current verification restores normal workspace access without granting any additional permissions. Institution/branch/owner checks, independent review, staff sessions, staff repayment posting and financial corrections remain unchanged. The existing branch lending policy still controls its separate service-level submission/funding gate; it cannot disable this client workspace restriction.
 
-Institutions must publish an approved bilingual notice and assign independent reviewers before onboarding can complete. This change creates no approved notice, verification evidence or automatic staff claims, and does not mark existing clients verified. It adds no migration or financial mutation. The status check uses existing bounded account/profile reads; no throughput benchmark is implied.
+Clients acknowledge the built-in bilingual data-use message before submission; institutions still assign independent reviewers. The message creates no approved retention policy, verification evidence or automatic staff claims, and does not mark existing clients verified. It adds no migration or financial mutation. The status check uses existing bounded account/profile reads; no throughput benchmark is implied.
 
 Verification passed 60 tests with zero failures/errors/skips: 16 PostgreSQL onboarding tests, the real HTTP/JSP/multipart correction and independent-verification flow, 16 mandatory-access security cases, 13 existing onboarding MVC cases, five JSP compilations in one Jasper test, the architecture check, password-login isolation and 11 finance/login/session regressions. Tests used only an owned disposable PostgreSQL 17.9 database on loopback port 55473, which was stopped afterwards. The focused Maven run used isolated `target/mandatory-onboarding` output; the default Java 25 compile also passed. The running local development app loaded `ClientOnboardingFilter` after compilation and its health endpoint returned HTTP 200. The new notice and sidebar use existing responsive shared styles; a separate mobile/desktop visual inspection was not performed.
 
-Before accepting self-service submissions, staff with the explicitly assigned `CLIENT_ONBOARDING_VIEW` and `CLIENT_ONBOARDING_UPDATE` claims publish **Onboarding notice** from the sidebar. Configuration is branch-scoped and includes the institution-approved English/Kiswahili notice, its version, processing basis and retention reference/review date. No approved text, consent, screening outcome or staff claim is seeded. Drafts remain available when the notice is unavailable or disabled; submission fails with a recovery message.
+Clients can save drafts and submit complete profiles without publishing a branch notice. The service freezes the standard English/Kiswahili message, its version and the actual client acknowledgement with each submitted profile. Staff-assisted submissions retain their separate client-consent document requirement.
 
 ## Public registration form
 
@@ -57,7 +61,7 @@ Every client use case checks a current active client account and exact instituti
 
 ## Transactions and concurrency
 
-Existing request keys, payload hashes, version checks and client advisory locks protect writes. Retry ownership is checked as well as the payload. Notice publication/submission use a scoped notice lock so the accepted policy cannot change mid-submission. Upload parsing happens before transaction locks. Independent review, duplicate-identity reservations and loan KYC gates retain their existing safeguards. No new executor or background worker is added.
+Existing request keys, payload hashes, version checks and client advisory locks protect writes. Retry ownership is checked as well as the payload. The versioned standard message has no mutable branch configuration or publication lock; submission still uses client locks and records the exact message acknowledged. Upload parsing happens before transaction locks. Independent review, duplicate-identity reservations and loan KYC gates retain their existing safeguards. No new executor or background worker is added.
 
 ## Files changed
 
