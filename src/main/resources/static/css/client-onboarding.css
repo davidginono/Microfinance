@@ -45,3 +45,5 @@
 .kyc-photo { display:inline-grid; gap:8px; margin:0 20px 16px 0; max-width:100%; }
 .kyc-photo img { display:block; width:160px; height:180px; object-fit:contain; border:1px solid #d5dbdb; }
 @media(max-width:640px) { .kyc-profile-grid { grid-template-columns:minmax(0,1fr); } }
+
+.kyc-client-form :is([data-profile-business-fields],[data-profile-spouse-section])[hidden] { display: none !important; }

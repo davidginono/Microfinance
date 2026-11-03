@@ -51,4 +51,5 @@
     </form:form>
 </div>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
+<script src="<c:url value='/js/client-onboarding.js'/>" defer></script>
 <%@ include file="foot.jspf" %>

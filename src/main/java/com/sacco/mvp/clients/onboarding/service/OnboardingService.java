@@ -28,7 +28,7 @@ public class OnboardingService {
     public static final Set<String> IDENTITY_TYPES=Set.of("NATIONAL_ID","PASSPORT","VOTER_ID","DRIVING_LICENCE","OTHER");
     public static final Set<String> DOCUMENT_CATEGORIES=Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT","PROFILE_PHOTO","SPOUSE_PHOTO");
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
-    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber"};
+    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber"};
     private final OnboardingRepository records;
     private final GeneralLedgerService access;
     private final MemberRegistrationService registration;
@@ -252,6 +252,12 @@ public class OnboardingService {
         validate(json.readValue(json.writeValueAsString(profile),Profile.class),false);
     }
     private void validate(Profile p,boolean complete) {
+        if(Boolean.FALSE.equals(p.getHasBusiness())) {
+            p.setBusinessName("");p.setBusinessType("");p.setBusinessTin("");p.setBusinessLicence("");p.setBusinessLocation("");p.setBusinessWard("");p.setBusinessCity("");p.setDailySales(null);p.setDailyExpenditure(null);
+        }
+        if(Set.of("SINGLE","DIVORCED","WIDOWED").contains(p.getMaritalStatus())) {
+            p.setSpouseName("");p.setSpouseRelationship("");p.setSpousePhone("");p.setSpouseWork("");p.setSpouseWorkLocation("");
+        }
         text(p.getGender(),20,"gender",false);check(p.getGender().isBlank()||Set.of("MALE","FEMALE","OTHER","NOT_DISCLOSED").contains(p.getGender()),"gender");
         text(p.getMaritalStatus(),20,"maritalStatus",false);check(p.getMaritalStatus().isBlank()||Set.of("SINGLE","MARRIED","DIVORCED","SEPARATED","WIDOWED","NOT_DISCLOSED").contains(p.getMaritalStatus()),"maritalStatus");
         check(p.getDependants()==null||p.getDependants()>=0&&p.getDependants()<=100,"dependants");

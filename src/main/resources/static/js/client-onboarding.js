@@ -1,7 +1,16 @@
 (() => {
     'use strict';
     const ready = window.WorkspaceNavigation?.onReady || (fn => document.addEventListener('DOMContentLoaded', fn, {once: true}));
-    ready(() => document.querySelectorAll('[data-onboarding-form]').forEach(form => {
+    ready(() => document.querySelectorAll('form').forEach(form => {
+        const business=form.querySelector('[data-profile-business-choice]'), businessFields=form.querySelector('[data-profile-business-fields]');
+        const marital=form.querySelector('[data-profile-marital-status]'), spouse=form.querySelector('[data-profile-spouse-section]'), spouseFields=form.querySelector('[data-profile-spouse-fields]');
+        const refreshProfile=()=>{
+            if(business && businessFields){const hide=business.value!=='true';businessFields.hidden=hide;businessFields.disabled=hide;}
+            if(marital && spouse && spouseFields){const hide=['SINGLE','DIVORCED','WIDOWED'].includes(marital.value);spouse.hidden=hide;spouseFields.disabled=hide;}
+        };
+        business?.addEventListener('change',refreshProfile);marital?.addEventListener('change',refreshProfile);
+        if(business || marital){refreshProfile();form.addEventListener('reset',()=>queueMicrotask(refreshProfile));}
+        if(!form.hasAttribute('data-onboarding-form'))return;
         const decision = form.querySelector('[data-kyc-decision]');
         const category=form.querySelector('[name="category"]'), expires=form.querySelector('[name="expiresOn"]'), file=form.querySelector('[name="file"]');
         if(category && expires && file) {

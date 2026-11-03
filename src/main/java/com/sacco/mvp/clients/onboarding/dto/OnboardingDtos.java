@@ -42,6 +42,7 @@ public final class OnboardingDtos {
         private String groupName="";
         private String identityType="", issuingCountry="", identityNumber="", address="";
         private String postalAddress="", city="", ward="", villageStreet="", nearbyPlace="";
+        private Boolean hasBusiness;
         private String businessName="", businessType="", businessTin="", businessLicence="", businessLocation="", businessWard="", businessCity="", otherIncomeSources="";
         private java.math.BigDecimal dailySales, dailyExpenditure;
         private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
@@ -49,6 +50,11 @@ public final class OnboardingDtos {
         private String activity="", activityAddress="", sourceOfFunds="";
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate birthDate, identityExpiresOn;
         private boolean identityNoExpiry;
+        public Boolean getHasBusiness() {
+            if(hasBusiness!=null)return hasBusiness;
+            // Existing profiles predate this question; retain their recorded business details.
+            return java.util.stream.Stream.of(businessName,businessType,businessTin,businessLicence,businessLocation,businessWard,businessCity).anyMatch(v->v!=null&&!v.isBlank()) || dailySales!=null || dailyExpenditure!=null ? Boolean.TRUE : null;
+        }
     }
     @Data public static class SelfForm {
         private UUID requestKey=UUID.randomUUID(), noticeId;

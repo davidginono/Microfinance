@@ -47,12 +47,14 @@ class ClientPortalSecurityMvcTest {
     }
     @Test void registrationBindsProfileDetailsWithoutAcceptingPrivateOrStaffFields()throws Exception{
         mvc.perform(post("/client-portal/request-code").with(csrf()).param("intent","REGISTER")
+            .param("registration.profile.hasBusiness","false")
             .param("registration.profile.businessName","Synthetic shop").param("registration.profile.dailySales","12500.50")
             .param("registration.profile.spouseName","Synthetic spouse").param("registration.profile.bankAccountNumber","12345678")
             .param("registration.profile.groupId",UUID.randomUUID().toString()).param("registration.profile.groupName","Forged group")
             .param("registration.profile.lawfulBasis","LEGAL_OBLIGATION")).andExpect(status().is3xxRedirection());
         var captured=org.mockito.ArgumentCaptor.forClass(com.sacco.mvp.clients.portal.dto.ClientPortalDtos.EntryForm.class);
         verify(portal).request(captured.capture(),anyString());var p=captured.getValue().getRegistration().getProfile();
+        assertThat(p.getHasBusiness()).isFalse();
         assertThat(p.getBusinessName()).isEqualTo("Synthetic shop");assertThat(p.getDailySales()).isEqualByComparingTo("12500.50");
         assertThat(p.getSpouseName()).isEqualTo("Synthetic spouse");assertThat(p.getBankAccountNumber()).isEqualTo("12345678");
         assertThat(p.getGroupId()).isNull();assertThat(p.getGroupName()).isEmpty();

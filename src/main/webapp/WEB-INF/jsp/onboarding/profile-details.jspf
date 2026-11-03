@@ -3,7 +3,7 @@
     <c:choose>
         <c:when test="${profileSection=='bio'}"><c:set var="profileFields" value="${['gender','maritalStatus','dependants','familiarName','groupName']}"/></c:when>
         <c:when test="${profileSection=='contact'}"><c:set var="profileFields" value="${['postalAddress','city','ward','villageStreet','nearbyPlace']}"/></c:when>
-        <c:when test="${profileSection=='business'}"><c:set var="profileFields" value="${['businessName','businessType','businessTin','businessLicence','businessLocation','businessWard','businessCity','otherIncomeSources','dailySales','dailyExpenditure']}"/></c:when>
+        <c:when test="${profileSection=='business'}"><c:set var="profileFields" value="${['hasBusiness','businessName','businessType','businessTin','businessLicence','businessLocation','businessWard','businessCity','otherIncomeSources','dailySales','dailyExpenditure']}"/></c:when>
         <c:when test="${profileSection=='spouse'}"><c:set var="profileFields" value="${['spouseName','spouseRelationship','spousePhone','spouseWork','spouseWorkLocation']}"/></c:when>
         <c:otherwise><c:set var="profileFields" value="${['bankName','bankAccountName','bankAccountNumber']}"/></c:otherwise>
     </c:choose>
@@ -14,6 +14,7 @@
                 <dt><spring:message code="kyc.field.${profileField}"/></dt>
                 <dd><c:choose>
                     <c:when test="${empty profileValues[profileField]}"><spring:message code="kyc.notProvided"/></c:when>
+                    <c:when test="${profileField=='hasBusiness'}"><spring:message code="${profileValues.hasBusiness?'kyc.yes':'kyc.no'}"/></c:when>
                     <c:when test="${profileField=='gender' or profileField=='maritalStatus'}"><spring:message code="kyc.${profileField}.${profileValues[profileField]}"/></c:when>
                     <c:when test="${profileField=='bankAccountNumber'}">&#8226;&#8226;&#8226;&#8226;<c:out value="${profileValues.bankAccountNumber.length()>4?profileValues.bankAccountNumber.substring(profileValues.bankAccountNumber.length()-4):''}"/></c:when>
                     <c:otherwise><c:out value="${profileValues[profileField]}"/></c:otherwise>
