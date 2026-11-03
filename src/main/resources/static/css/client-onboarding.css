@@ -54,7 +54,7 @@
 .kyc-profile-wizard nav { min-width: 0; }
 .kyc-profile-wizard > div { min-width: 0; }
 .kyc-profile-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
-.kyc-profile-steps button { display: grid; gap: 4px; width: 100%; padding: 0 0 0 12px; border: 0; border-left: 2px solid #aab7b8; background: transparent; text-align: start; font: inherit; color: var(--aws-blue, #0972d3); overflow-wrap: anywhere; cursor: pointer; }
+.kyc-profile-steps button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; width: 100%; padding: 0 0 0 12px; border: 0; border-left: 2px solid #aab7b8; background: transparent; text-align: start; white-space: normal; font: inherit; color: var(--aws-blue, #0972d3); overflow-wrap: anywhere; cursor: pointer; }
 .kyc-profile-steps button small { font-size: 12px; line-height: 16px; color: var(--aws-muted, #545b64); }
 .kyc-profile-steps button[aria-current="step"] { border-color: var(--aws-blue, #0972d3); color: var(--aws-ink, #16191f); font-weight: 700; }
 .kyc-profile-steps button:disabled { color: var(--aws-muted, #545b64); cursor: default; }
