@@ -1,0 +1,18 @@
+<%@ page pageEncoding="UTF-8" %>
+<template data-profile-wizard-labels
+          data-personal="<spring:message code='kyc.wizard.personal'/>"
+          data-finances="<spring:message code='kyc.wizard.finances'/>"
+          data-documents="<spring:message code='kyc.wizard.documents'/>"
+          data-review="<spring:message code='kyc.wizard.review'/>"
+          data-navigation="<spring:message code='kyc.wizard.navigation'/>"
+          data-step="<spring:message code='kyc.wizard.step'/>"
+          data-edit="<spring:message code='common.edit'/>"
+          data-empty="<spring:message code='kyc.wizard.empty'/>"
+          data-yes="<spring:message code='kyc.yes'/>"
+          data-no="<spring:message code='kyc.no'/>"
+          data-no-documents="<spring:message code='kyc.noDocuments'/>"
+          data-documents-error="<spring:message code='kyc.error.documents'/>"
+          data-document-expiry-error="<spring:message code='kyc.error.documentExpiry'/>"
+          data-acknowledgement-error="<spring:message code='kyc.error.acknowledgement'/>"
+          data-notice-changed-error="<spring:message code='kyc.error.noticeChanged'/>"
+></template>

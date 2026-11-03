@@ -1,7 +1,7 @@
 <%@ page pageEncoding="UTF-8" %>
 <spring:message code="kyc.field.hasBusiness" var="profileBusinessLabel" htmlEscape="true"/>
 <spring:message code="kyc.field.maritalStatus" var="profileMaritalLabel" htmlEscape="true"/>
-<section class="erp-resource-section"><h2><spring:message code="kyc.section.bio"/></h2>
+<section class="erp-resource-section" data-profile-section="personal"><h2><spring:message code="kyc.section.bio"/></h2>
 <div class="kyc-profile-grid">
 <label class="kyc-field"><span><spring:message code="kyc.field.firstName"/> *</span><form:input path="profile.firstName" type="text" cssClass="aws-control" readonly="${identityReadOnly}" maxlength="80" required="true"/><form:errors path="profile.firstName" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.middleName"/></span><form:input path="profile.middleName" type="text" cssClass="aws-control" readonly="${identityReadOnly}" maxlength="80"/><form:errors path="profile.middleName" cssClass="field-error"/></label>
@@ -24,7 +24,7 @@
 <label class="kyc-checkbox"><form:checkbox path="profile.identityNoExpiry"/><span><spring:message code="kyc.field.identityNoExpiry"/></span></label>
 </div></section>
 
-<section class="erp-resource-section"><h2><spring:message code="kyc.section.contact"/></h2>
+<section class="erp-resource-section" data-profile-section="personal"><h2><spring:message code="kyc.section.contact"/></h2>
 <div class="kyc-profile-grid">
 <label class="kyc-field"><span><spring:message code="kyc.field.phone"/> *</span><form:input path="profile.phone" type="tel" cssClass="aws-control" readonly="${identityReadOnly}" maxlength="16" required="true"/><form:errors path="profile.phone" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.email"/></span><form:input path="profile.email" type="email" cssClass="aws-control" readonly="${identityReadOnly}" maxlength="255"/><form:errors path="profile.email" cssClass="field-error"/></label>
@@ -36,7 +36,7 @@
 <label class="kyc-field"><span><spring:message code="kyc.field.address"/></span><form:input path="profile.address" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.address" cssClass="field-error"/></label>
 </div></section>
 
-<section class="erp-resource-section"><h2 id="profile-business-heading"><spring:message code="kyc.section.business"/></h2>
+<section class="erp-resource-section" data-profile-section="finances"><h2 id="profile-business-heading"><spring:message code="kyc.section.business"/></h2>
 <div class="kyc-profile-grid"><label class="kyc-field"><span><spring:message code="kyc.field.hasBusiness"/></span><form:select path="profile.hasBusiness" cssClass="aws-control" data-profile-business-choice="true" aria-label="${profileBusinessLabel}" aria-controls="profile-business-details"><form:option value=""><spring:message code="kyc.choose"/></form:option><form:option value="true"><spring:message code="kyc.yes"/></form:option><form:option value="false"><spring:message code="kyc.no"/></form:option></form:select><form:errors path="profile.hasBusiness" cssClass="field-error"/></label></div>
 <fieldset id="profile-business-details" class="kyc-profile-fields" aria-labelledby="profile-business-heading" data-profile-business-fields ${profileValues.hasBusiness==true?'':'hidden'}><div class="kyc-profile-grid">
 <label class="kyc-field"><span><spring:message code="kyc.field.businessName"/></span><form:input path="profile.businessName" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.businessName" cssClass="field-error"/></label>
@@ -50,7 +50,7 @@
 <label class="kyc-field"><span><spring:message code="kyc.field.dailyExpenditure"/></span><form:input path="profile.dailyExpenditure" type="number" cssClass="aws-control"  min="0" step="0.01" max="9999999999999999.99"/><form:errors path="profile.dailyExpenditure" cssClass="field-error"/></label>
 <p class="kyc-profile-note"><spring:message code="kyc.dailyDeclared"/></p></div></fieldset></section>
 
-<section id="profile-spouse-details" class="erp-resource-section" data-profile-spouse-section ${profileValues.maritalStatus=='SINGLE' or profileValues.maritalStatus=='DIVORCED' or profileValues.maritalStatus=='WIDOWED'?'hidden':''}><h2 id="profile-spouse-heading"><spring:message code="kyc.section.spouse"/></h2>
+<section id="profile-spouse-details" class="erp-resource-section" data-profile-section="personal" data-profile-spouse-section ${profileValues.maritalStatus=='SINGLE' or profileValues.maritalStatus=='DIVORCED' or profileValues.maritalStatus=='WIDOWED'?'hidden':''}><h2 id="profile-spouse-heading"><spring:message code="kyc.section.spouse"/></h2>
 <fieldset class="kyc-profile-fields" aria-labelledby="profile-spouse-heading" data-profile-spouse-fields><div class="kyc-profile-grid">
 <label class="kyc-field"><span><spring:message code="kyc.field.spouseName"/></span><form:input path="profile.spouseName" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.spouseName" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.spouseRelationship"/></span><form:input path="profile.spouseRelationship" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.spouseRelationship" cssClass="field-error"/></label>
@@ -59,14 +59,14 @@
 <label class="kyc-field"><span><spring:message code="kyc.field.spouseWorkLocation"/></span><form:input path="profile.spouseWorkLocation" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.spouseWorkLocation" cssClass="field-error"/></label>
 </div></fieldset></section>
 
-<section class="erp-resource-section"><h2><spring:message code="kyc.section.bank"/></h2>
+<section class="erp-resource-section" data-profile-section="finances"><h2><spring:message code="kyc.section.bank"/></h2>
 <div class="kyc-profile-grid">
 <label class="kyc-field"><span><spring:message code="kyc.field.bankName"/></span><form:input path="profile.bankName" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.bankName" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.bankAccountName"/></span><form:input path="profile.bankAccountName" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.bankAccountName" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.bankAccountNumber"/></span><form:input path="profile.bankAccountNumber" type="text" cssClass="aws-control"  maxlength="80"/><form:errors path="profile.bankAccountNumber" cssClass="field-error"/></label>
 <p class="kyc-profile-note"><spring:message code="kyc.bankDeclared"/></p></div></section>
 
-<section class="erp-resource-section"><h2><spring:message code="kyc.section.activity"/></h2>
+<section class="erp-resource-section" data-profile-section="finances"><h2><spring:message code="kyc.section.activity"/></h2>
 <div class="kyc-profile-grid">
 <fieldset class="kyc-income-choices">
     <legend><spring:message code="kyc.field.activity"/></legend>

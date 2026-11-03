@@ -1,5 +1,5 @@
 <%@ include file="head.jspf" %>
-<div class="kyc-form-workspace" data-resource-form-page ${formKind=='self'?'data-resource-details-page':''}>
+<div class="kyc-form-workspace" data-resource-form-page ${formKind=='self' and profileReadOnly?'data-resource-details-page':''}>
     <c:if test="${formKind!='self'}"><nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>">
         <a href="<c:url value='${onboardingRoot}'/>"><spring:message code="kyc.form.self"/></a>
         <span aria-hidden="true">&#8250;</span>
@@ -37,8 +37,9 @@
                     </div>
                 </section>
 <c:set var="client" value="${workspace.client}"/><c:set var="identityReadOnly" value="${true}"/><c:set var="profileValues" value="${selfForm.profile}"/><c:set var="groupLookup" value="${onboardingRoot}/groups"/>
-<div data-profile-tabs><div id="profile-bio" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}><%@ include file="profile-fields.jspf" %></fieldset>
-                <section class="erp-resource-section" aria-labelledby="kyc-notice-heading">
+<c:if test="${not profileReadOnly}"><%@ include file="profile-wizard-labels.jspf" %></c:if>
+<div ${profileReadOnly?'data-profile-tabs':'data-profile-wizard'}><div id="profile-bio" ${profileReadOnly?'data-detail-panel':''}><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}><%@ include file="profile-fields.jspf" %></fieldset>
+                <section class="erp-resource-section" aria-labelledby="kyc-notice-heading" data-profile-section="documents">
                     <h2 id="kyc-notice-heading"><spring:message code="kyc.notice"/></h2>
                     <div class="kyc-form-fields">
                         <c:if test="${workspace.client.state!='VERIFY'}"><p class="kyc-field-hint"><spring:message code="kyc.declaredMeaning"/></p></c:if>
@@ -55,13 +56,6 @@
                                         <span><spring:message code="kyc.acceptConsent"/></span>
                                     </label>
                                     <form:errors path="noticeAcknowledged" cssClass="coa-error"/>
-                                </div>
-                                <div class="kyc-acknowledgement">
-                                    <label class="kyc-checkbox">
-                                        <form:checkbox path="declarationAccepted" required="true"/>
-                                        <span><spring:message code="kyc.acceptDeclaration"/></span>
-                                    </label>
-                                    <form:errors path="declarationAccepted" cssClass="coa-error"/>
                                 </div>
                             </c:when>
                         </c:choose>
@@ -107,12 +101,13 @@
                 </div>
             </c:if>
         </spring:bind>
-        <c:if test="${formKind=='self' and not profileReadOnly}"><p class="kyc-field-hint"><spring:message code="kyc.beforeSubmit"/></p></c:if>
         <c:if test="${not profileReadOnly}"><div class="accounting-actions accounting-form-actions" data-form-actions>
             <a class="app-btn btn-neutral" href="<c:url value='${onboardingRoot}'/>"><spring:message code="common.cancel"/></a>
             <c:choose>
                 <c:when test="${formKind=='self'}">
                     <button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formaction="<c:url value='${onboardingRoot}/edit'/>" formnovalidate><spring:message code="kyc.saveDraft"/></button>
+                    <button class="app-btn btn-neutral" type="button" data-profile-previous hidden><spring:message code="common.previous"/></button>
+                    <button class="app-btn btn-launch" type="button" data-profile-next hidden><spring:message code="common.next"/></button>
                     <button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED" formaction="<c:url value='${onboardingRoot}/edit'/>"><spring:message code="kyc.submit"/></button>
                 </c:when>
                 <c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="kyc.addDocument"/></button></c:otherwise>
@@ -121,5 +116,6 @@
     </form:form>
 </div>
 <script src="<c:url value='/js/loan-recording.js'/>" defer></script><script src="<c:url value='/js/client-onboarding.js'/>" defer></script>
+<c:if test="${formKind=='self' and not profileReadOnly}"><script src="<c:url value='/js/client-profile-wizard.js'/>" defer></script></c:if>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <c:choose><c:when test="${portalWorkspace}"><%@ include file="../portal/foot.jspf" %></c:when><c:otherwise><%@ include file="../fragments/footer.jspf" %></c:otherwise></c:choose>

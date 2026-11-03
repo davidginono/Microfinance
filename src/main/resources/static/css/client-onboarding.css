@@ -30,6 +30,7 @@
 .kyc-client-form .kyc-checkbox { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-weight: 400; }
 .kyc-client-form .kyc-checkbox input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; margin: 2px 0 0; }
 .kyc-acknowledgement { display: grid; gap: 6px; min-width: 0; }
+.kyc-section-body > .kyc-acknowledgement { margin-top: 16px; }
 .kyc-client-form .kyc-field-hint { margin: 0; color: var(--aws-muted, #545b64); }
 .kyc-client-form > .console-message { margin: 0; }
 .kyc-client-form .accounting-form-actions { gap: 8px; }
@@ -47,3 +48,30 @@
 @media(max-width:640px) { .kyc-profile-grid { grid-template-columns:minmax(0,1fr); } }
 
 .kyc-client-form :is([data-profile-business-fields],[data-profile-spouse-section])[hidden] { display: none !important; }
+
+.kyc-form-workspace:has([data-profile-wizard]) { max-width: 1160px; }
+.kyc-profile-wizard { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: start; }
+.kyc-profile-wizard nav { min-width: 0; }
+.kyc-profile-wizard > div { min-width: 0; }
+.kyc-profile-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.kyc-profile-steps button { display: grid; gap: 4px; width: 100%; padding: 0 0 0 12px; border: 0; border-left: 2px solid #aab7b8; background: transparent; text-align: start; font: inherit; color: var(--aws-blue, #0972d3); overflow-wrap: anywhere; cursor: pointer; }
+.kyc-profile-steps button small { font-size: 12px; line-height: 16px; color: var(--aws-muted, #545b64); }
+.kyc-profile-steps button[aria-current="step"] { border-color: var(--aws-blue, #0972d3); color: var(--aws-ink, #16191f); font-weight: 700; }
+.kyc-profile-steps button:disabled { color: var(--aws-muted, #545b64); cursor: default; }
+.kyc-profile-steps button:focus-visible { outline: 2px solid var(--aws-blue, #0972d3); outline-offset: 4px; }
+.kyc-profile-step { display: grid; gap: 20px; min-width: 0; }
+.kyc-profile-step[hidden], .kyc-client-form [data-profile-next][hidden], .kyc-client-form [data-profile-previous][hidden], .kyc-client-form button[type="submit"][hidden] { display: none !important; }
+.kyc-profile-step > h2 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 700; }
+.kyc-profile-review-heading { display: flex; flex-flow: row wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 20px; border-bottom: 1px solid #eaeded; background: #fafafa; }
+.kyc-profile-review-heading h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.kyc-profile-review dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 20px; }
+.kyc-profile-review dl > div { min-width: 0; overflow-wrap: anywhere; }
+.kyc-profile-review dt { color: var(--aws-muted, #545b64); }
+.kyc-profile-review dd { margin: 4px 0 0; white-space: pre-wrap; }
+@media (max-width: 800px) {
+    .kyc-profile-wizard { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .kyc-profile-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+@media (max-width: 640px) {
+    .kyc-profile-review dl { grid-template-columns: minmax(0, 1fr); }
+}

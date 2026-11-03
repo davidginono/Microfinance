@@ -1,0 +1,94 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {readFileSync}=require('node:fs');
+const {JSDOM}=require('jsdom');
+const source=readFileSync('src/main/resources/static/js/client-profile-wizard.js','utf8');
+const conditions=readFileSync('src/main/resources/static/js/client-onboarding.js','utf8');
+const validation=readFileSync('src/main/resources/static/js/form-validation.js','utf8');
+async function setup({error='',saved='',name='Asha'}={}){
+ const dom=new JSDOM(`<form data-onboarding-form="self"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="requestKey" value="request-key">
+ <template data-profile-wizard-labels data-personal="Personal details" data-finances="Income and bank details" data-documents="Documents and privacy" data-review="Review and send" data-navigation="Profile steps" data-step="Step" data-edit="Edit" data-empty="Not provided" data-yes="Yes" data-no="No" data-no-documents="No documents" data-documents-error="Upload required documents" data-document-expiry-error="Expired document" data-acknowledgement-error="Accept consent" data-notice-changed-error="Notice changed"></template>
+ <div data-profile-wizard><div><fieldset>
+ <section data-profile-section="personal"><h2>Bio data</h2><label class="kyc-field"><span>First name</span><input name="profile.firstName" required value="${name}"></label><div class="kyc-field"><label for="group">Group</label><select name="profile.groupId" id="group"><option value="">Individual / no group</option></select><button type="button"><span>Individual / no group</span></button></div><select data-profile-marital-status name="profile.maritalStatus"><option value="SINGLE">Single</option><option value="MARRIED">Married</option></select>${error==='field'?'<span class="field-error" id="profile.firstName.errors">Correct your name</span>':''}</section>
+ <section data-profile-section="personal" data-profile-spouse-section><h2>Spouse details</h2><fieldset data-profile-spouse-fields><label class="kyc-field"><span>Spouse name</span><input name="profile.spouseName" value="Spouse value"></label></fieldset></section>
+ <section data-profile-section="finances"><h2>Income sources</h2><fieldset class="kyc-income-choices"><legend>Business or employment</legend><label class="kyc-checkbox"><input type="checkbox" name="profile.incomeActivities" value="BUSINESS" checked><span>Business</span></label><label class="kyc-checkbox"><input type="checkbox" name="profile.incomeActivities" value="EMPLOYMENT" checked><span>Employment</span></label></fieldset><label class="kyc-field"><span>Other income sources</span><input name="profile.otherIncomeSources" value="Rent"></label></section>
+ </fieldset><section data-profile-section="documents"><h2>Privacy notice</h2><label class="kyc-checkbox"><input type="checkbox" name="noticeAcknowledged" required checked><span>I agree to data use</span></label></section></div>
+ <section data-profile-section="documents"><h3>Attachments and Documents</h3><p data-profile-document>Identity: identity.png</p><a href="/documents/new">Add document</a><label class="kyc-checkbox"><input type="checkbox" name="declarationAccepted" required checked><span>I confirm accuracy</span></label></section></div>
+ ${error==='documents'?'<div data-workspace-form-error role="alert">Upload required documents</div>':''}
+ <a href="/profile">Cancel</a><button type="submit" name="action" value="DRAFT" formnovalidate>Save draft</button><button type="button" data-profile-previous hidden>Previous</button><button type="button" data-profile-next hidden>Next</button><button type="submit" name="action" value="SUBMITTED">Send for review</button></form>`,{url:'http://localhost/app/onboarding',runScripts:'outside-only',pretendToBeVisual:true});
+ const {window:w}=dom,d=w.document;
+ if(saved)w.sessionStorage.setItem('client-profile-step:v1:/app/onboarding',saved);
+ w.eval(conditions);w.eval(validation);w.eval(source);
+ await new Promise(resolve=>d.addEventListener('DOMContentLoaded',resolve,{once:true}));await Promise.resolve();
+ const next=()=>d.querySelector('[data-profile-next]').click();
+ return {dom,w,d,form:d.querySelector('form'),next,active:()=>d.querySelector('[aria-current="step"]').textContent};
+}
+test('steps preserve live controls, both income choices and native draft/submit commands',async()=>{
+ const {dom,w,d,form,next,active}=await setup();try{
+  const input=d.querySelector('[name="profile.firstName"]');input.value='Changed client';
+  assert.match(active(),/Personal details/);assert.equal(d.querySelector('[value="SUBMITTED"]').hidden,true);
+  assert.equal(d.querySelector('[data-profile-previous]').hidden,true);assert.equal(d.querySelectorAll('nav button')[2].disabled,true);
+  next();assert.match(active(),/Income and bank/);next();assert.match(active(),/Documents and privacy/);next();assert.match(active(),/Review and send/);
+  assert.equal(d.querySelector('[value="SUBMITTED"]').hidden,false);assert.equal(d.querySelector('[data-profile-next]').hidden,true);
+  assert.equal(d.querySelectorAll('[name="profile.firstName"]').length,1);assert.equal(d.querySelector('[name="profile.firstName"]'),input);
+  const data=new w.FormData(form);assert.equal(data.get('_csrf'),'token');assert.equal(data.get('requestKey'),'request-key');assert.equal(data.get('profile.firstName'),'Changed client');assert.deepEqual(data.getAll('profile.incomeActivities'),['BUSINESS','EMPLOYMENT']);
+  assert.equal(d.querySelector('[value="DRAFT"]').formNoValidate,true);
+  assert.match(d.querySelector('#profile-step-review').textContent,/Changed client/);assert.match(d.querySelector('#profile-step-review').textContent,/Business, Employment/);assert.match(d.querySelector('#profile-step-review').textContent,/identity.png/);assert.doesNotMatch(d.querySelector('#profile-step-review').textContent,/Spouse value/);
+  assert.ok([...d.querySelectorAll('#profile-step-review dt')].some(dt=>dt.textContent==='Group' && dt.nextElementSibling.textContent==='Individual / no group'));
+  const edit=d.querySelector('[aria-label="Edit: Bio data"]');edit.click();assert.match(active(),/Personal details/);assert.equal(d.activeElement.id,'profile-step-personal-heading');
+  input.value='<img src=x onerror=alert(1)>';d.querySelectorAll('nav button')[3].click();assert.equal(d.querySelector('#profile-step-review img'),null);assert.match(d.querySelector('#profile-step-review').textContent,/<img src=x/);
+  assert.equal(w.sessionStorage.length,1);assert.equal(w.sessionStorage.getItem(w.sessionStorage.key(0)),'review');
+ }finally{dom.window.close();}
+});
+test('Next validates only the current step and reveals a failed acknowledgement',async()=>{
+ const {dom,d,next,active}=await setup({name:''});try{
+  d.querySelector('[name="declarationAccepted"]').checked=false;
+  next();assert.match(active(),/Personal details/);assert.equal(d.querySelector('[name="profile.firstName"]').getAttribute('aria-invalid'),'true');
+  d.querySelector('[name="profile.firstName"]').value='Asha';next();assert.match(active(),/Income and bank/);next();assert.match(active(),/Documents and privacy/);
+  next();assert.match(active(),/Documents and privacy/);assert.equal(d.querySelector('[name="declarationAccepted"]').getAttribute('aria-invalid'),'true');
+  d.querySelector('[name="declarationAccepted"]').checked=true;next();assert.match(active(),/Review and send/);
+ }finally{dom.window.close();}
+});
+test('final native validation opens the first invalid step and keeps all form fields enabled',async()=>{
+ const {dom,d,form,active}=await setup({saved:'review'});try{
+  d.querySelector('[name="profile.firstName"]').value='';d.querySelector('[name="declarationAccepted"]').checked=false;
+  assert.equal(form.checkValidity(),false);assert.match(active(),/Personal details/);
+  assert.equal(d.querySelector('[name="noticeAcknowledged"]').disabled,false);assert.equal(d.querySelector('[name="declarationAccepted"]').disabled,false);
+ }finally{dom.window.close();}
+});
+test('server errors override a restored step and document failures return to Documents',async()=>{
+ for(const [error,expected] of [['field','Personal details'],['documents','Documents and privacy']]){
+  const {dom,active}=await setup({error,saved:'review'});try{assert.match(active(),new RegExp(expected));}finally{dom.window.close();}
+ }
+ const {dom,w,d,form,next,active}=await setup();try{
+  next();next();next();const error=d.createElement('div');error.dataset.workspaceFormError='';error.textContent='Upload required documents';form.append(error);
+  d.dispatchEvent(new w.CustomEvent('workspace:form-settled',{detail:{form}}));assert.match(active(),/Documents and privacy/);
+ }finally{dom.window.close();}
+});
+test('review reflects conditional sections and edited values without creating another mutation',async()=>{
+ const {dom,w,d,form,next}=await setup();try{
+  const marital=d.querySelector('[data-profile-marital-status]');marital.value='MARRIED';marital.dispatchEvent(new w.Event('change',{bubbles:true}));
+  next();next();next();assert.match(d.querySelector('#profile-step-review').textContent,/Spouse value/);
+  let submits=0;form.addEventListener('submit',e=>{e.preventDefault();submits++;});
+  d.querySelector('[aria-label="Edit: Income sources"]').click();d.querySelector('[name="profile.otherIncomeSources"]').value='Pension';next();next();
+  assert.match(d.querySelector('#profile-step-review').textContent,/Pension/);assert.equal(submits,0);
+ }finally{dom.window.close();}
+});
+test('Enter advances a text input while the final command still requires review',async()=>{
+ const {dom,w,d,form,active}=await setup();try{
+  const input=d.querySelector('[name="profile.firstName"]');const event=new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});input.dispatchEvent(event);
+  assert.equal(event.defaultPrevented,true);assert.match(active(),/Income and bank/);
+  const send=d.querySelector('[value="SUBMITTED"]'),submit=new w.SubmitEvent('submit',{submitter:send,bubbles:true,cancelable:true});
+  form.dispatchEvent(submit);assert.equal(submit.defaultPrevented,true);assert.match(active(),/Review and send/);
+ }finally{dom.window.close();}
+});
+test('the shared shell keeps wizard navigation labels while enhancing ordinary page links',async()=>{
+ const {dom,w,d}=await setup();try{
+  const pager=d.createElement('a');pager.className='app-btn';pager.href='/registry?page=1';pager.textContent='Next';d.body.append(pager);
+  w.WorkspaceNavigation={onReady:callback=>callback()};w.matchMedia=()=>({matches:false,addEventListener(){}});
+  w.eval(readFileSync('src/main/resources/static/js/shell.js','utf8'));
+  assert.equal(d.querySelector('[data-profile-next]').textContent,'Next');assert.equal(d.querySelector('[data-profile-previous]').textContent,'Previous');
+  assert.equal(d.querySelector('[data-profile-next]').classList.contains('aws-pagination-chevron'),false);
+  assert.equal(pager.classList.contains('aws-pagination-chevron'),true);assert.equal(pager.getAttribute('aria-label'),'Next page');
+ }finally{dom.window.close();}
+});
