@@ -23,7 +23,7 @@ async function setup({guard=false,holdNavigation=false,pageScript=init,assets={}
  const dom=new JSDOM(html('Dashboard',guard),{url:'http://localhost/admin/dashboard',runScripts:'dangerously',resources,pretendToBeVisual:true,virtualConsole:console,beforeParse(w){
    for(const key of ['initialized','commands','ready','loaded','hidden','late'])w[key]=[];
    w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};
-   w.fetch=(url,options={})=>{const target=new URL(url,w.location.href),item={url:target,options};requests.push(item);if(target.pathname.startsWith('/card/') || (holdNavigation && target.pathname==='/admin/users'))return new Promise(resolve=>item.resolve=resolve);if(target.pathname==='/pending')return new Promise(()=>{});return Promise.resolve({ok:pages.has(target.pathname+target.search),url:target.href,headers:{get:()=> 'text/html'},text:async()=>pages.get(target.pathname+target.search) || '<h1>Denied</h1>'});};
+   w.fetch=(url,options={})=>{const target=new URL(url,w.location.href),item={url:target,options};requests.push(item);if(target.pathname.startsWith('/card/') || (holdNavigation && (target.pathname==='/admin/users' || options.method==='POST')))return new Promise(resolve=>item.resolve=resolve);if(target.pathname==='/pending')return new Promise(()=>{});return Promise.resolve({ok:pages.has(target.pathname+target.search),url:target.href,headers:{get:()=> 'text/html'},text:async()=>pages.get(target.pathname+target.search) || '<h1>Denied</h1>'});};
  }});
  await new Promise(resolve=>dom.window.addEventListener('load',resolve,{once:true}));
  return {dom,w:dom.window,d:dom.window.document,requests,pages,failures};
@@ -40,6 +40,53 @@ test('session timing retains the workspace request start across delayed response
   pending.resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>html('Users').replace('</main>','<div id="sessionInactivityPrompt"></div></main>')});
   await visit;
   assert.equal(d.getElementById('sessionInactivityPrompt').dataset.clientRequestStartedAt,'10000');
+ }finally{dom.window.close();}
+});
+
+test('user access saves refresh the main content without replacing the shell or animating feedback',async()=>{
+ const pageScript=init+`document.getElementById('header-child')?.addEventListener('click',()=>window.commands.push('header:'+document.querySelector('h1').textContent));`;
+ const {dom,w,d,requests,failures}=await setup({guard:true,holdNavigation:true,pageScript});
+ try{
+  const main=d.querySelector('main'),form=d.querySelector('form'),button=form.querySelector('button'),header=d.getElementById('shellTopNav'),sidebar=d.getElementById('appSidebar'),link=sidebar.querySelector('a');
+  header.insertAdjacentHTML('beforeend','<button id="header-child">Menu</button>');const headerChild=d.getElementById('header-child');
+  headerChild.addEventListener('click',()=>w.commands.push('old-header'));
+  const scrolls=[];w.scrollTo=options=>scrolls.push(options);w.HTMLElement.prototype.scrollIntoView=function(options){scrolls.push(options);};
+  Object.defineProperty(w,'scrollY',{value:700,configurable:true});
+  form.method='post';form.action='/admin/users/USER1';form.dataset.accessEditForm='';
+  form.insertAdjacentHTML('beforeend','<input type="hidden" name="_csrf" value="csrf-token"><input type="checkbox" name="claims" value="ONE" checked><input type="checkbox" name="claims" value="TWO" checked>');
+  button.name='command';button.value='save';form.requestSubmit(button);
+  await until(()=>requests.some(r=>r.options.method==='POST'));
+  const post=requests.find(r=>r.options.method==='POST');assert.equal(form.dataset.workspaceSubmit,'recover');assert.equal(post.url.pathname,'/admin/users/USER1');
+  assert.equal(post.options.body.get('_csrf'),'csrf-token');assert.deepEqual(post.options.body.getAll('claims'),['ONE','TWO']);assert.equal(post.options.body.get('command'),'save');
+  const destination=html('Saved access').replace('<nav id="shellTopNav">Header</nav>','<nav id="shellTopNav">Updated header<button id="header-child">Menu</button></nav>').replace('</main>','<div data-workspace-flashbar><div data-toast-message="User updated." data-toast-type="success"></div></div></main>');
+  post.resolve({ok:true,url:'http://localhost/admin/users/USER1',headers:{get:()=> 'text/html'},text:async()=>destination});
+  await until(()=>d.querySelector('[data-app-toast]'));
+  await new Promise(resolve=>setTimeout(resolve,180));
+  assert.equal(w.document,d);assert.notEqual(d.querySelector('main'),main);assert.equal(d.getElementById('shellTopNav'),header);assert.equal(d.getElementById('appSidebar'),sidebar);assert.equal(sidebar.querySelector('a'),link);assert.equal(d.getElementById('header-child'),headerChild);
+  assert.match(header.textContent,/Updated header/);headerChild.click();assert.deepEqual(w.commands,['header:Saved access']);
+  assert.ok(scrolls.length);assert.ok(scrolls.every(call=>call.behavior==='instant'));assert.match(d.querySelector('[data-workspace-flashbar]').textContent,/User updated/);assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
+for(const action of ['/staff/settings/language','/app/settings/payment-details','/admin/settings-controls/otp-delivery','/admin/platform-settings/email'])test('settings save is handled in place: '+action,async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  const form=d.querySelector('form');form.method='post';form.action=action;form.requestSubmit(form.querySelector('button'));
+  await until(()=>requests.some(r=>r.options.method==='POST'));assert.equal(form.dataset.workspaceSubmit,'recover');assert.equal(requests.filter(r=>r.options.method==='POST').length,1);
+ }finally{dom.window.close();}
+});
+
+test('settings transport does not acquire native financial, external or opt-out commands',async()=>{
+ const {dom,w,d,requests}=await setup();
+ try{
+  const form=d.querySelector('form');form.method='post';
+  for(const action of ['/finance/vouchers/payment','/app/loan-applications','https://example.test/staff/settings/language']){
+   form.action=action;const event=new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:form.querySelector('button')});form.dispatchEvent(event);
+   assert.equal(event.defaultPrevented,false);assert.equal(form.hasAttribute('data-workspace-submit'),false);
+  }
+  form.action='/staff/settings/language';form.target='_blank';form.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true}));assert.equal(form.hasAttribute('data-workspace-submit'),false);
+  form.target='_self';form.dataset.nativeNavigation='';form.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true}));
+  assert.equal(form.hasAttribute('data-workspace-submit'),false);assert.equal(requests.some(r=>r.options.method==='POST'),false);
  }finally{dom.window.close();}
 });
 
@@ -81,6 +128,7 @@ test('successful modal submission to the same register closes the dialog and rev
   requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>destination});
   await until(()=>w.location.pathname==='/admin/users' && d.querySelector('[data-app-toast]'));
   assert.equal(d.querySelector('#create-staff').classList.contains('is-open'),false);
+  assert.notEqual(d.getElementById('create-staff'),modal);
   assert.equal(d.querySelector('#create-staff').getAttribute('aria-hidden'),'true');
   assert.equal(d.body.classList.contains('overflow-hidden'),false);
   assert.equal(w.sessionStorage.getItem('Saccos:open-modal'),null);

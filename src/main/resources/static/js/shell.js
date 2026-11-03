@@ -1336,6 +1336,7 @@
     };
 
     const restoreScrollAfterReload = function () {
+        if(window.WorkspaceNavigation?.restoring || document.querySelector('[data-toast-message],[data-workspace-response-error]'))return;
         let saved;
         try {
             saved = JSON.parse(
@@ -1352,7 +1353,7 @@
         }
         const targetX = Math.max(Number(saved.x) || 0, 0);
         const targetY = Math.max(Number(saved.y) || 0, 0);
-        const behavior = !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
+        const behavior = 'instant';
         const restore = function () {
             window.scrollTo({ left: targetX, top: targetY, behavior: behavior });
             restoreScrollablePositions(saved.containers, behavior);
@@ -1649,7 +1650,7 @@
         window.requestAnimationFrame(function () {
             const rect = element.getBoundingClientRect();
             const top = Math.max(window.scrollY + rect.top - navHeight - 18, 0);
-            window.scrollTo({ top: top, behavior: 'smooth' });
+            window.scrollTo({ top: top, behavior: 'instant' });
             element.setAttribute('tabindex', '-1');
             if (typeof element.focus === 'function') {
                 try {

@@ -92,6 +92,13 @@
         if((target && target!=='_self') || (method!=='get' && !(method==='post' && form.hasAttribute('data-workspace-submit'))))return false;
         return eligible(new URL(submitter?.getAttribute('formaction') || form.getAttribute('action') || location.href,location.href));
     }
+    function settingsForm(form,submitter){
+        if(!form?.matches('form') || form.hasAttribute('data-native-navigation'))return false;
+        const target=submitter?.getAttribute('formtarget') || form.target;
+        if(target && target!=='_self')return false;
+        const url=new URL(submitter?.getAttribute('formaction') || form.getAttribute('action') || location.href,location.href);
+        return eligible(url) && (form.hasAttribute('data-access-edit-form') || /^\/(?:admin\/(?:settings-controls|platform-settings)|(?:app|staff)\/settings)(?:\/|$)/.test(url.pathname));
+    }
     function navigate(destination,options={}){
         const url=new URL(destination,location.href);
         if(eligible(url))return visit(url.href,options);
@@ -198,7 +205,7 @@
             if(actions)actions.before(alert);else form.append(alert);
         }
         alert.textContent=message;
-        alert.focus();alert.scrollIntoView?.({block:'nearest'});
+        alert.focus({preventScroll:true});alert.scrollIntoView?.({block:'nearest',behavior:'instant'});
     }
     function undoPop(previous,target){reversing=true;history.go(previous.index-target.index);}
     async function prepareStyles(page,signal){
@@ -244,16 +251,30 @@
         }
     }
     function replaceBody(page){
-        const fragment=document.createDocumentFragment();
-        fragment.append(...[...page.body.childNodes].map(child=>document.importNode(child,true)));
-        // Retain the visible chrome roots; refresh their authorized contents and rebind their controls.
-        for(const id of ['shellTopNav','appSidebar']){
-            const current=document.getElementById(id),fresh=fragment.querySelector('#'+id);if(!current || !fresh)continue;
-            [...current.attributes].forEach(attribute=>current.removeAttribute(attribute.name));
-            [...fresh.attributes].forEach(attribute=>current.setAttribute(attribute.name,attribute.value));
-            current.replaceChildren(...fresh.childNodes);fresh.replaceWith(current);
+        // Replace the workspace while updating authorized shell text/attributes in place.
+        // Unchanged header, navigation and layout nodes remain connected throughout the save.
+        function sync(current,fresh){
+            if(current.nodeType!==fresh.nodeType || (current.nodeType===1 && (current.tagName!==fresh.tagName || current.id!==fresh.id || fresh.matches('.shell-main,template,dialog,[role="dialog"],[role="alertdialog"],.app-modal-overlay,.session-timeout-overlay')))){
+                current.replaceWith(fresh);return fresh;
+            }
+            if(current.nodeType!==1){if(current.nodeValue!==fresh.nodeValue)current.nodeValue=fresh.nodeValue;return current;}
+            for(const attribute of [...current.attributes])if(!fresh.hasAttribute(attribute.name))current.removeAttribute(attribute.name);
+            for(const attribute of fresh.attributes)if(current.getAttribute(attribute.name)!==attribute.value)current.setAttribute(attribute.name,attribute.value);
+            const keyed=new Map([...current.children].filter(child=>child.id).map(child=>[child.id,child]));
+            let cursor=current.firstChild;
+            for(const child of [...fresh.childNodes]){
+                const id=child.nodeType===1?child.id:'';
+                const match=id?keyed.get(id):cursor;
+                if(!match || (!id && match.nodeType===1 && match.id)){
+                    current.insertBefore(child,cursor);continue;
+                }
+                if(match!==cursor)current.insertBefore(match,cursor);
+                cursor=sync(match,child).nextSibling;
+            }
+            while(cursor){const next=cursor.nextSibling;cursor.remove();cursor=next;}
+            return current;
         }
-        document.body.replaceChildren(fragment);
+        sync(document.body,document.importNode(page.body,true));
     }
     async function execute(source,key){
         if(source.hasAttribute('src') && new URL(source.getAttribute('src'),location.href).href===ownScript?.src)return;
@@ -337,7 +358,13 @@
             initialized=true;
             booting=false;window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
             const title=document.querySelector('[data-workspace-flashbar] [data-app-toast]') || document.querySelector('.erp-page-title,h1,[data-workspace-title]');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
-            if(!options.pop){const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));if(anchor)(anchor.previousElementSibling?.matches('[data-workspace-flashbar]')?anchor.previousElementSibling:anchor).scrollIntoView();else window.scrollTo({top:0,left:0,behavior:'instant'});}
+            if(!options.pop){
+                const notice=options.submission && document.querySelector('[data-workspace-flashbar] [data-app-toast]');
+                const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));
+                if(notice && window.scrollToFeedback)window.scrollToFeedback(notice);
+                else if(notice || anchor)(notice || (anchor.previousElementSibling?.matches('[data-workspace-flashbar]')?anchor.previousElementSibling:anchor)).scrollIntoView({block:'start',behavior:'instant'});
+                else window.scrollTo({top:0,left:0,behavior:'instant'});
+            }
             document.dispatchEvent(new CustomEvent('workspace:navigated',{detail:{url:finalUrl.href}}));
         }catch(error){
             if(version===generation){
@@ -393,6 +420,11 @@
             });
         }
     });
+    native.add.call(document,'submit',event=>{
+        const form=event.target,submitter=event.submitter;
+        if(document.body.matches('.aws-console') && settingsForm(form,submitter) && !form.hasAttribute('data-workspace-submit')
+            && (submitter?.getAttribute('formmethod') || form.method).toLowerCase()==='post')form.dataset.workspaceSubmit='recover';
+    },true);
     native.add.call(window,'popstate',event=>{
         const marker=event.state?.workspaceNavigation,previous={...entry};
         if(reversing){reversing=false;entry={url:location.href,index:marker?.index || 0};return;}

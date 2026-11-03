@@ -39,10 +39,11 @@
         const flashbar=document.querySelector('[data-workspace-flashbar]');
         const anchor=location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
         if(flashbar?.querySelector('[data-app-toast]') && anchor?.matches('form[data-workspace-submit="recover"],.platform-settings-overview > section')){
-            anchor.before(flashbar);flashbar.scrollIntoView?.({block:'nearest'});
+            anchor.before(flashbar);
+            if(!window.WorkspaceNavigation.restoring)flashbar.scrollIntoView?.({block:'nearest',behavior:'instant'});
         }
         const failure=document.querySelector('[data-workspace-response-error],[data-workspace-form-error]');
-        if(failure)requestAnimationFrame(()=>{failure.focus();failure.scrollIntoView?.({block:'nearest'});});
+        if(failure)requestAnimationFrame(()=>{failure.focus({preventScroll:true});failure.scrollIntoView?.({block:'nearest',behavior:'instant'});});
     };
     window.WorkspaceNavigation.onReady(ready);
 })();

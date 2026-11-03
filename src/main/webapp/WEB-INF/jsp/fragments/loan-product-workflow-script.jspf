@@ -386,13 +386,13 @@
                 const desiredTop = scrollBox.scrollTop + targetRect.top - scrollRect.top - Math.max(24, scrollBox.clientHeight * 0.25);
                 scrollBox.scrollTo({
                     top: Math.max(0, desiredTop),
-                    behavior: 'smooth'
+                    behavior: 'instant'
                 });
             } else if (typeof container.scrollIntoView === 'function') {
-                container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                container.scrollIntoView({ behavior: 'instant', block: 'center' });
             }
             if (target.matches && target.matches('input, select, textarea')) {
-                window.setTimeout(() => target.focus({ preventScroll: true }), 180);
+                target.focus({ preventScroll: true });
             }
         }
 
@@ -1240,20 +1240,7 @@
 
         const createdLoanProductTarget = document.querySelector('[data-created-loan-product-target="true"]');
         if (createdLoanProductTarget) {
-            (window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true})))( () => {
-                closeAllProductModals();
-                const revealCreatedProduct = () => {
-                    const navHeightValue = window.getComputedStyle(document.documentElement)
-                        .getPropertyValue('--shell-nav-height');
-                    const navHeight = Number.parseFloat(navHeightValue) || 52;
-                    const targetTop = window.scrollY + createdLoanProductTarget.getBoundingClientRect().top - navHeight - 12;
-                    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-                    window.scrollTo({ top: Math.max(0, targetTop), behavior });
-                    createdLoanProductTarget.setAttribute('tabindex', '-1');
-                    createdLoanProductTarget.focus({ preventScroll: true });
-                };
-                window.setTimeout(revealCreatedProduct, 180);
-            }, { once: true });
+            (window.WorkspaceNavigation?.onReady || (callback => window.addEventListener('load', callback, {once:true})))(closeAllProductModals);
         }
 
         document.querySelectorAll('[data-product-card-toggle]').forEach((button) => {
@@ -1318,7 +1305,7 @@
                 const pageHeader = document.querySelector('.erp-page-header[data-aws-page-header]');
                 return pageHeader ? Math.ceil(Math.max(0, pageHeader.getBoundingClientRect().bottom) + 12) : 12;
             };
-            const scrollStepIntoView = (step, behavior = 'smooth') => {
+            const scrollStepIntoView = (step, behavior = 'instant') => {
                 const target = workflowScrollTarget(step) || step;
                 if (typeof window.scrollTo === 'function') {
                     const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -1455,8 +1442,8 @@
             const resolvedInitialKey = initialKey || steps[0].getAttribute('data-product-config-step');
             activateStep(resolvedInitialKey);
             const resolvedInitialIndex = stepIndex(resolvedInitialKey);
-            if (resolvedInitialKey === 'workflow' && resolvedInitialIndex >= 0) {
-                window.requestAnimationFrame(() => scrollStepIntoView(steps[resolvedInitialIndex], 'auto'));
+            if (resolvedInitialKey === 'workflow' && resolvedInitialIndex >= 0 && !document.querySelector('[data-toast-message],[data-workspace-response-error]')) {
+                window.requestAnimationFrame(() => scrollStepIntoView(steps[resolvedInitialIndex], 'instant'));
             }
         });
     })();

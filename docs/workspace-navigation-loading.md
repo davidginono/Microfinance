@@ -2,6 +2,16 @@
 
 Implemented 20 October 2026 in the shared JSP navigation runtime and shell CSS.
 
+## Settings saves — 3 November 2026
+
+- User access editors and POST forms under `/admin/settings-controls`, `/admin/platform-settings`, `/app/settings` and `/staff/settings` use the existing recoverable workspace submission path. Native opt-outs, external destinations and existing submission owners remain respected. Other financial commands retain their own submission owners.
+- Saving replaces the main workspace without browser navigation. Unchanged header/sidebar descendants and layout containers stay connected; authorized shell labels and attributes are reconciled in place. Page-owned dialogs and templates are refreshed so their bindings and server context cannot become stale.
+- Successful saves reveal the workspace notifier immediately, without smooth scrolling or a competing restore of the old scroll position. Failed requests retain the live form, values and uploads, restore controls and never replay a POST automatically. CSRF, repeated fields and the clicked submitter remain in the original server request.
+- Loan-product settings no longer schedule a delayed scroll to a created product. Wizard restoration respects pending feedback, and field/step positioning is immediate.
+- Verification: 53 focused JavaScript cases passed, five affected JSP views compiled with Jasper, and WAR packaging succeeded. The broader suite passed 346/348 cases; two remote-select cases also fail in isolation and load only unchanged select/search/loan-choice scripts. An isolated browser fixture using the actual shared assets completed ten saves with one document load, retained a navigation input and displayed the notifier below the fixed header at 360, 768, 1366 and 1920 pixels. These checks do not modify production settings or establish throughput capacity.
+
+## Workspace transitions
+
 - Returning to a workspace shows blank outlines at its last measured section positions, with a spinner inside each section. Dashboard widgets, form sections, detail cards and resource tables use the same lifecycle. Table loaders sit below the measured column headings.
 - The first visit, a different query/language, or an unmatched viewport/content width uses the workspace spinner at the top left until the authorized server HTML arrives, retaining the original native nodes for recovery. This placement follows the user's 21 October correction. The animated progress line below the top navigation was removed at the user’s request. The client cannot know an unvisited page's exact layout before that response. Ready destination content appears immediately; subsequent asynchronous sections retain their existing request-owned loaders. No speculative backend requests or artificial delays are introduced.
 - At most 12 exact-URL layouts and 32 outer sections per layout are kept in memory. Layout values contain only numeric geometry; no HTML, labels, account balances, field values, record IDs or rows are copied into previews or persisted in browser storage. Hidden/nested sections are excluded. Logout clears this memory.
