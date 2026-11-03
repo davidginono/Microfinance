@@ -14,8 +14,9 @@
         const decision = form.querySelector('[data-kyc-decision]');
         const category=form.querySelector('[name="category"]'), expires=form.querySelector('[name="expiresOn"]'), file=form.querySelector('[name="file"]');
         if(category && expires && file) {
-            const refreshUpload=()=>{const photo=['PROFILE_PHOTO','SPOUSE_PHOTO'].includes(category.value);expires.disabled=photo;expires.closest('label').hidden=photo;if(photo)expires.value='';file.accept=photo?'.png,.jpg,.jpeg':'.pdf,.png,.jpg,.jpeg';};
+            const refreshUpload=()=>{const photo=['PROFILE_PHOTO','SPOUSE_PHOTO'].includes(category.value);expires.disabled=photo;expires.closest('label').hidden=photo;if(photo)expires.value='';file.accept='.png,.jpg,.jpeg';};
             category.addEventListener('change',refreshUpload);refreshUpload();
+            file.addEventListener('change',()=>{const selected=file.files[0];let error='';if(selected && (!/\.(png|jpe?g)$/i.test(selected.name) || selected.size>Number(file.dataset.uploadMaxBytes)))error=file.dataset.uploadFileError;else if(selected && (Number(file.dataset.uploadRemainingFiles)<1 || selected.size>Number(file.dataset.uploadRemainingBytes)))error=file.dataset.uploadLimitError;file.setCustomValidity(error);});
         }
         if (!decision) return;
         const refresh = () => {

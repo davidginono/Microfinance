@@ -15,4 +15,11 @@
           data-document-expiry-error="<spring:message code='kyc.error.documentExpiry'/>"
           data-acknowledgement-error="<spring:message code='kyc.error.acknowledgement'/>"
           data-notice-changed-error="<spring:message code='kyc.error.noticeChanged'/>"
+          data-upload="<spring:message code='kyc.uploadFiles'/>"
+          data-done="<spring:message code='kyc.uploadDone'/>"
+          data-remove="<spring:message code='kyc.removeFile'/>"
+          data-uploaded="<spring:message code='kyc.uploaded'/>"
+          data-upload-error="<spring:message code='kyc.uploadError'/>"
+          data-choose-files="<spring:message code='kyc.chooseFiles'/>"
+          data-close="<spring:message code='common.closeModal'/>"
 ></template>

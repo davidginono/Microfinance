@@ -39,7 +39,7 @@
 <c:set var="client" value="${workspace.client}"/><c:set var="identityReadOnly" value="${true}"/><c:set var="profileValues" value="${selfForm.profile}"/><c:set var="groupLookup" value="${onboardingRoot}/groups"/>
 <c:if test="${not profileReadOnly}"><%@ include file="profile-wizard-labels.jspf" %></c:if>
 <div ${profileReadOnly?'data-profile-tabs':'data-profile-wizard'}><div id="profile-bio" ${profileReadOnly?'data-detail-panel':''}><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}><%@ include file="profile-fields.jspf" %></fieldset>
-                <section class="erp-resource-section" aria-labelledby="kyc-notice-heading" data-profile-section="documents">
+                <section class="erp-resource-section" aria-labelledby="kyc-notice-heading" data-profile-section="documents" ${profileReadOnly?'':'data-profile-confirmations'}>
                     <h2 id="kyc-notice-heading"><spring:message code="kyc.notice"/></h2>
                     <div class="kyc-form-fields">
                         <c:if test="${workspace.client.state!='VERIFY'}"><p class="kyc-field-hint"><spring:message code="kyc.declaredMeaning"/></p></c:if>
@@ -87,7 +87,9 @@
                         </div>
                         <div class="kyc-field">
                             <label for="kyc-document-file"><spring:message code="kyc.field.file"/></label>
-                            <input id="kyc-document-file" class="aws-control" type="file" name="file" accept=".pdf,.png,.jpg,.jpeg" required aria-describedby="kyc-file-help"/>
+                            <input id="kyc-document-file" class="aws-control" type="file" name="file" accept=".png,.jpg,.jpeg" required aria-describedby="kyc-file-help"
+                                   data-upload-max-bytes="${documentForm.maxFileBytes}" data-upload-remaining-files="${documentForm.remainingFiles}" data-upload-remaining-bytes="${documentForm.remainingBytes}"
+                                   data-upload-file-error="<spring:message code='kyc.error.file'/>" data-upload-limit-error="<spring:message code='kyc.error.uploadLimit'/>"/>
                             <p id="kyc-file-help" class="kyc-field-hint"><spring:message code="kyc.fileHelp"/></p>
                         </div>
                     </div>
@@ -117,5 +119,6 @@
 </div>
 <script src="<c:url value='/js/loan-recording.js'/>" defer></script><script src="<c:url value='/js/client-onboarding.js'/>" defer></script>
 <c:if test="${formKind=='self' and not profileReadOnly}"><script src="<c:url value='/js/client-profile-wizard.js'/>" defer></script></c:if>
+<c:if test="${formKind=='self' and not profileReadOnly}"><script src="<c:url value='/js/client-profile-documents.js'/>" defer></script></c:if>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <c:choose><c:when test="${portalWorkspace}"><%@ include file="../portal/foot.jspf" %></c:when><c:otherwise><%@ include file="../fragments/footer.jspf" %></c:otherwise></c:choose>

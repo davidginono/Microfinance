@@ -8,7 +8,6 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import com.sacco.mvp.web.form.MemberRegistrationForm;
 import lombok.RequiredArgsConstructor;
-import org.apache.pdfbox.Loader;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,9 +57,9 @@ public class OnboardingService {
     @Transactional(readOnly=true) public Client client(AppUserPrincipal a,UUID client) {authorize(a,"VIEW");return records.client(a,client,today());}
     @Transactional(readOnly=true) public Optional<Revision> latest(AppUserPrincipal a,UUID client) {client(a,client);return records.latest(a,client);}
     @Transactional(readOnly=true) public Revision version(AppUserPrincipal a,UUID client,int sequence) {client(a,client);return records.version(a,client,sequence);}
-    @Transactional(readOnly=true) public List<Document> versionDocuments(AppUserPrincipal a,UUID client,int sequence) {return records.documents(version(a,client,sequence).id());}
+    @Transactional(readOnly=true) public List<Document> versionDocuments(AppUserPrincipal a,UUID client,int sequence) {return records.attachments(version(a,client,sequence).id());}
     @Transactional(readOnly=true) public List<Decision> versionDecisions(AppUserPrincipal a,UUID client,int sequence) {return records.decisions(version(a,client,sequence).id());}
-    @Transactional(readOnly=true) public List<Document> documents(AppUserPrincipal a,UUID client) {var c=client(a,client);return c.revisionId()==null?List.of():records.documents(c.revisionId());}
+    @Transactional(readOnly=true) public List<Document> documents(AppUserPrincipal a,UUID client) {var c=client(a,client);return c.revisionId()==null?List.of():records.attachments(c.revisionId());}
     @Transactional(readOnly=true) public List<Decision> decisions(AppUserPrincipal a,UUID client) {var c=client(a,client);return c.revisionId()==null?List.of():records.decisions(c.revisionId());}
     @Transactional(readOnly=true) public Page<History> history(AppUserPrincipal a,UUID client,int page) {client(a,client);page(page);var rows=records.history(a,client,page);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional(readOnly=true) public boolean duplicate(AppUserPrincipal a,UUID client) {var r=latest(a,client);return r.isPresent()&&!identity(r.get().profile()).isBlank()&&records.duplicate(a.getSaccoId(),identity(r.get().profile()),client);}
@@ -125,12 +124,14 @@ public class OnboardingService {
         records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRequestKey()!=null,"request");check(DOCUMENT_CATEGORIES.contains(f.getCategory()),"category");
         boolean photo=PHOTO_CATEGORIES.contains(f.getCategory());check(!photo||f.getExpiresOn()==null,"photoExpiry");
         check(f.getExpiresOn()==null||!f.getExpiresOn().isBefore(today()),"documentExpiry");
-        var content=prepare(file);check(!photo||content.contentType().startsWith("image/"),"photoFile");String hash=hash(List.of(client,f,hash(content.bytes())));
+        var content=prepare(file);String hash=hash(List.of(client,f,hash(content.bytes())));
         var tx=new TransactionTemplate(transactions);tx.setTimeout(20);
         return tx.execute(status->{
             if(own)requireOwner(a);else authorize(a,"UPDATE");records.client(a,client,today());var old=retry(a,"client_onboarding_document",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+            var before=records.uploadUsage(a,client);check(before.files()<DocumentForm.MAX_FILES&&before.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             UUID id=UUID.randomUUID();var upload=uploads.store(null,"CLIENT_KYC",id.toString(),f.getCategory(),content.name(),content.contentType(),content.bytes());
             records.lock(client);var c=records.client(a,client,today());check(c.state().equals("DRAFT")&&f.getRevisionId().equals(c.revisionId()),"changed");
+            var usage=records.uploadUsage(a,client);check(usage.files()<DocumentForm.MAX_FILES&&usage.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             records.document(a,client,c.revisionId(),id,upload.getId(),f,hash,clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");return id;
         });
     }
@@ -187,7 +188,7 @@ public class OnboardingService {
             var decisions=records.decisions(revision.id());var decision=decisions.isEmpty()?null:decisions.getFirst();var p=revision.profile();
             c=new Client(c.id(),p.getClientNumber(),p.getFullName(),p.getPhone(),p.getEmail(),decision==null?revision.mode():decision.kind(),revision.id(),sequence,decision==null?null:decision.reviewDue(),c.portalEnabled());
         }
-        var documents=revision==null?List.<OwnDocument>of():records.documents(revision.id()).stream().map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn())).toList();
+        var documents=revision==null?List.<OwnDocument>of():records.attachments(revision.id()).stream().map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn())).toList();
         var history=records.history(a,c.id(),page);
         var ownRevision=revision==null?null:new OwnRevision(revision.sequence(),personal(revision.profile()),revision.profile().getNoticeVersion(),revision.profile().getNoticeEnglish(),revision.profile().getNoticeKiswahili(),revision.profile().isNoticeAcknowledged(),revision.profile().getAcknowledgedAt());
         return new OwnWorkspace(c,ownRevision,documents,records.feedback(a,c.id(),sequence==null?null:revision.id()),new Page<>(history.stream().limit(25).map(h->new OwnHistory(h.sequence(),h.result(),h.recordedAt())).toList(),page,history.size()>25),sequence!=null);
@@ -195,7 +196,7 @@ public class OnboardingService {
     @Transactional(readOnly=true)
     public SelfForm ownForm(AppUserPrincipal a) {
         requireOwner(a);var c=records.client(a,a.getMemberId(),today());
-        var f=new SelfForm();f.setExpectedSequence(c.sequence());records.latest(a,c.id()).ifPresent(r->f.setProfile(personal(r.profile())));identityFields(f.getProfile(),c);f.setNoticeId(records.notice().id());return f;
+        var f=new SelfForm();f.setExpectedSequence(c.sequence());var notice=records.notice();records.latest(a,c.id()).ifPresent(r->{f.setProfile(personal(r.profile()));if(notice.id().equals(r.profile().getNoticeId())){f.setNoticeAcknowledged(r.profile().isNoticeAcknowledged());f.setDeclarationAccepted(r.profile().isDeclarationAccepted());}});identityFields(f.getProfile(),c);f.setNoticeId(notice.id());return f;
     }
     @Transactional(readOnly=true)
     public Notice ownNotice(AppUserPrincipal a) {requireOwner(a);return records.notice();}
@@ -219,8 +220,10 @@ public class OnboardingService {
     public UUID attachOwn(AppUserPrincipal a,DocumentForm f,MultipartFile file) {requireOwner(a);return attach(a,a.getMemberId(),f,file,true);}
     @Transactional(readOnly=true)
     public DocumentForm ownDocumentForm(AppUserPrincipal a) {
-        requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(c.state().equals("DRAFT"),"state");var f=new DocumentForm();f.setRevisionId(c.revisionId());return f;
+        requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(c.state().equals("DRAFT"),"state");return uploadForm(a,c);
     }
+    @Transactional(readOnly=true) public DocumentForm documentForm(AppUserPrincipal a,UUID client) {authorize(a,"UPDATE");return uploadForm(a,records.client(a,client,today()));}
+    private DocumentForm uploadForm(AppUserPrincipal a,Client c) {var usage=records.uploadUsage(a,c.id());var f=new DocumentForm();f.setRevisionId(c.revisionId());f.setRemainingFiles((int)Math.max(0,DocumentForm.MAX_FILES-usage.files()));f.setRemainingBytes(Math.max(0,DocumentForm.MAX_TOTAL_BYTES-usage.bytes()));return f;}
     @Transactional(timeout=20)
     public Download downloadOwn(AppUserPrincipal a,UUID document) {
         requireOwner(a);var uploadId=records.upload(a,a.getMemberId(),document);var upload=uploads.load(uploadId,"CLIENT_KYC",document.toString());
@@ -287,20 +290,16 @@ public class OnboardingService {
     }
     private void money(java.math.BigDecimal value,String field) {check(value==null||value.signum()>=0&&value.scale()<=2&&value.compareTo(new java.math.BigDecimal("9999999999999999.99"))<=0,field);}
     private Download prepare(MultipartFile f) {
-        check(f!=null&&!f.isEmpty()&&f.getSize()<=5*1024*1024,"file");
+        check(f!=null&&!f.isEmpty()&&f.getSize()<=DocumentForm.MAX_FILE_BYTES,"file");
         try {
-            byte[] bytes;try(var input=f.getInputStream()){bytes=input.readNBytes(5*1024*1024+1);}check(bytes.length>0&&bytes.length<=5*1024*1024,"file");
-            String name=Objects.toString(f.getOriginalFilename(),"").toLowerCase(Locale.ROOT);
-            if(name.endsWith(".pdf")&&new String(bytes,0,Math.min(5,bytes.length),StandardCharsets.US_ASCII).equals("%PDF-")) {
-                try(var pdf=Loader.loadPDF(bytes)){check(!pdf.isEncrypted()&&pdf.getNumberOfPages()>0&&pdf.getNumberOfPages()<=40,"file");}
-                return new Download(bytes,"application/pdf","evidence.pdf");
-            }
+            byte[] bytes;try(var input=f.getInputStream()){bytes=input.readNBytes(DocumentForm.MAX_FILE_BYTES+1);}check(bytes.length>0&&bytes.length<=DocumentForm.MAX_FILE_BYTES,"file");
+            String original=Objects.toString(f.getOriginalFilename(),"").replace('\\','/');original=original.substring(original.lastIndexOf('/')+1);text(original,255,"file",true);String name=original.toLowerCase(Locale.ROOT);
             boolean png=name.endsWith(".png"),jpg=name.endsWith(".jpg")||name.endsWith(".jpeg");check(png||jpg,"file");
             try(var in=ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
                 var readers=ImageIO.getImageReaders(in);check(readers.hasNext(),"file");var reader=readers.next();
                 try {reader.setInput(in);String format=reader.getFormatName();check((png&&format.equalsIgnoreCase("png"))||(jpg&&format.equalsIgnoreCase("JPEG")),"file");check((long)reader.getWidth(0)*reader.getHeight(0)<=9_000_000,"file");check(reader.read(0)!=null,"file");}finally{reader.dispose();}
             }
-            return new Download(bytes,png?"image/png":"image/jpeg",png?"evidence.png":"evidence.jpg");
+            return new Download(bytes,png?"image/png":"image/jpeg",original);
         } catch(IOException|RuntimeException e) {if(e instanceof IllegalArgumentException i&&Objects.toString(i.getMessage(),"").startsWith("kyc.error."))throw i;throw invalid("file");}
     }
     private Optional<UUID> retry(AppUserPrincipal a,String table,UUID key,String hash) {check(key!=null,"request");records.lock(table+"/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);return records.retry(a,table,key,hash);}

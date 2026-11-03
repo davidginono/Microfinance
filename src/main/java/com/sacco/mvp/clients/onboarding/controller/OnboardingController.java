@@ -58,7 +58,7 @@ public class OnboardingController {
         m.addAttribute("notice",service.staffNotice(a));context(a,id,m);return form(m,"profile");
     }
     @GetMapping("/{id}/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="IDENTITY") String category,Model m) {
-        service.authorize(a,"UPDATE");var f=new DocumentForm();if(OnboardingService.DOCUMENT_CATEGORIES.contains(category))f.setCategory(category);f.setRevisionId(service.client(a,id).revisionId());m.addAttribute("documentForm",f);context(a,id,m);return form(m,"document");
+        var f=service.documentForm(a,id);if(OnboardingService.DOCUMENT_CATEGORIES.contains(category))f.setCategory(category);m.addAttribute("documentForm",f);context(a,id,m);return form(m,"document");
     }
     @PostMapping("/{id}/documents/new") public String document(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute("documentForm") DocumentForm f,BindingResult errors,@RequestParam(required=false) MultipartFile file,Model m) {
         service.authorize(a,"UPDATE");if(!errors.hasErrors())try{service.attach(a,id,f,file);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}

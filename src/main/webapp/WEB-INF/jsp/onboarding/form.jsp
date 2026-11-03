@@ -28,7 +28,10 @@
             <form:hidden path="revisionId"/>
             <label><span><spring:message code="kyc.field.category"/></span><form:select path="category" cssClass="aws-control"><c:forEach items="${['IDENTITY','ADDRESS','ACTIVITY','CONSENT','PROFILE_PHOTO','SPOUSE_PHOTO']}" var="category"><form:option value="${category}"><spring:message code="kyc.category.${category}"/></form:option></c:forEach></form:select></label>
             <label><span><spring:message code="kyc.field.expiresOn"/></span><form:input path="expiresOn" type="date" cssClass="aws-control"/></label>
-            <label><span><spring:message code="kyc.field.file"/></span><input class="aws-control" type="file" name="file" accept=".pdf,.png,.jpg,.jpeg" required/></label>
+            <label><span><spring:message code="kyc.field.file"/></span><input class="aws-control" type="file" name="file" accept=".png,.jpg,.jpeg" required
+                data-upload-max-bytes="${documentForm.maxFileBytes}" data-upload-remaining-files="${documentForm.remainingFiles}" data-upload-remaining-bytes="${documentForm.remainingBytes}"
+                data-upload-file-error="<spring:message code='kyc.error.file'/>" data-upload-limit-error="<spring:message code='kyc.error.uploadLimit'/>"/></label>
+            <p class="kyc-field-hint"><spring:message code="kyc.fileHelp"/></p>
         </c:when>
         <c:otherwise>
             <form:hidden path="revisionId"/>

@@ -113,9 +113,16 @@ public final class OnboardingDtos {
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate checkedOn, reviewDue;
     }
     @Data public static class DocumentForm {
+        public static final int MAX_FILES=10, MAX_FILE_BYTES=1024*1024, MAX_TOTAL_BYTES=MAX_FILES*MAX_FILE_BYTES;
         private UUID requestKey=UUID.randomUUID();
         private UUID revisionId;
         private String category="IDENTITY";
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate expiresOn;
+        private int remainingFiles=MAX_FILES;
+        private long remainingBytes=MAX_TOTAL_BYTES;
+        @com.fasterxml.jackson.annotation.JsonIgnore public int getRemainingFiles(){return remainingFiles;}
+        @com.fasterxml.jackson.annotation.JsonIgnore public long getRemainingBytes(){return remainingBytes;}
+        @com.fasterxml.jackson.annotation.JsonIgnore public int getMaxFileBytes(){return MAX_FILE_BYTES;}
     }
+    public record UploadUsage(long files,long bytes) {}
 }

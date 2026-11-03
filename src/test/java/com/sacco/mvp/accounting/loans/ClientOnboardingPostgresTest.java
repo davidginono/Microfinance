@@ -157,12 +157,57 @@ class ClientOnboardingPostgresTest {
         UUID correctedDraft=service.saveOwn(owner,ownProfile(owner));var replacement=service.ownDocumentForm(owner);replacement.setCategory("ADDRESS");service.attachOwn(owner,replacement,image());
         UUID corrected=submitOwn(owner);var accepted=decision(corrected);accepted.setClientMessage("");service.review(verifier,f.client,accepted);
         assertThat(service.ownWorkspace(owner,0,null).client().state()).isEqualTo("VERIFY");assertThat(service.ownWorkspace(owner,0,null).feedback()).isNull();assertThat(gate()).isNull();
-        assertThat(service.ownWorkspace(owner,0,2).feedback().message()).isEqualTo(review.getClientMessage());assertThat(service.ownWorkspace(owner,0,2).documents()).hasSize(3);
+        assertThat(service.ownWorkspace(owner,0,2).feedback().message()).isEqualTo(review.getClientMessage());assertThat(service.ownWorkspace(owner,0,2).documents()).hasSize(4);
         assertThat(service.version(f.actor,f.client,2).profile().getNoticeId()).isEqualTo(noticeId);assertThat(service.version(f.actor,f.client,2).profile().getAcknowledgedAt()).isNotNull();
         assertThat(f.jdbc.queryForObject("select actor_id from client_onboarding_revision where id=?",UUID.class,correctedDraft)).isEqualTo(f.client);
         assertThatThrownBy(()->f.jdbc.update("update client_onboarding_notice set english='changed' where id=?",legacyId)).isInstanceOf(DataAccessException.class);
     }
     SelfForm ownProfileFromDraft(SelfForm draft) {var f=new SelfForm();f.setProfile(draft.getProfile());return f;}
+    @Test void repeatedDocumentsAndActualConfirmationsSurviveSavingAnotherDraft() {
+        var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));
+        for(String category:List.of("IDENTITY","IDENTITY","ADDRESS","ACTIVITY")){var doc=service.ownDocumentForm(owner);doc.setCategory(category);service.attachOwn(owner,doc,image());}
+        assertThat(service.ownWorkspace(owner,0,null).documents()).hasSize(4);
+        var draft=ownProfile(owner);draft.setNoticeAcknowledged(true);draft.setDeclarationAccepted(true);service.saveOwn(owner,draft);
+        assertThat(service.ownWorkspace(owner,0,null).documents()).hasSize(4);
+        assertThat(service.ownForm(owner).isNoticeAcknowledged()).isTrue();assertThat(service.ownForm(owner).isDeclarationAccepted()).isTrue();
+        assertThat(service.documents(f.actor,f.client)).hasSize(4);
+        var submitted=submitOwn(owner);assertThat(service.ownWorkspace(owner,0,null).documents()).hasSize(4);
+        assertThat(f.jdbc.queryForObject("select client_onboarding_complete(?,?)",Boolean.class,submitted,day)).isTrue();
+    }
+    @Test void imageTypesSizesAndLifetimeStorageLimitsAreEnforcedBeforePersistence() {
+        var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));
+        var oversized=new MockMultipartFile("file","large.png","image/png",Arrays.copyOf(image,DocumentForm.MAX_FILE_BYTES+1));
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),oversized)).hasMessage("kyc.error.file");
+        var disguised=new MockMultipartFile("file","photo.jpg","image/jpeg","not an image".getBytes());
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),disguised)).hasMessage("kyc.error.file");
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),new MockMultipartFile("file","wrong.jpg","image/jpeg",image))).hasMessage("kyc.error.file");
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),new MockMultipartFile("file","document.pdf","application/pdf",image))).hasMessage("kyc.error.file");
+        UUID last=null;DocumentForm retry=null;
+        for(int i=0;i<DocumentForm.MAX_FILES;i++){retry=service.ownDocumentForm(owner);last=service.attachOwn(owner,retry,i==0?new MockMultipartFile("file","boundary.png","image/png",Arrays.copyOf(image,DocumentForm.MAX_FILE_BYTES)):image());}
+        assertThat(service.ownDocumentForm(owner).getRemainingFiles()).isZero();assertThat(service.attachOwn(owner,retry,image())).isEqualTo(last);
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),image())).hasMessage("kyc.error.uploadLimit");
+        service.saveOwn(owner,ownProfile(owner));assertThat(service.ownDocumentForm(owner).getRemainingFiles()).isZero();
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),image())).hasMessage("kyc.error.uploadLimit");
+        assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_document where client_id=?",Integer.class,f.client)).isEqualTo(10);
+    }
+    @Test void theTotalByteBudgetIncludesLegacyUploads() {
+        var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));var revision=service.ownDocumentForm(owner).getRevisionId();
+        var records=f.context.getBean(com.sacco.mvp.clients.onboarding.repository.OnboardingRepository.class);
+        OnboardingService target=org.springframework.test.util.AopTestUtils.getTargetObject(service);var storage=(StoredUploadStorageService)org.springframework.test.util.ReflectionTestUtils.getField(target,"uploads");
+        var tx=new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        // Seed genuine old-limit files before linking them; permanent evidence is never edited.
+        for(int i=0;i<2;i++)tx.execute(status->{var id=UUID.randomUUID();var upload=storage.store(null,"CLIENT_KYC",id.toString(),"IDENTITY","legacy.png","image/png",Arrays.copyOf(image,5*1024*1024));var form=new DocumentForm();form.setRevisionId(revision);records.document(owner,f.client,revision,id,upload.getId(),form,"0".repeat(64),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));return id;});
+        assertThat(service.ownDocumentForm(owner).getRemainingBytes()).isZero();assertThat(service.ownDocumentForm(owner).getRemainingFiles()).isEqualTo(8);
+        assertThatThrownBy(()->service.attachOwn(owner,service.ownDocumentForm(owner),image())).hasMessage("kyc.error.uploadLimit");
+    }
+    @Test void concurrentUploadsCannotExceedTheLastAvailableSlot()throws Exception {
+        var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));for(int i=0;i<9;i++)service.attachOwn(owner,service.ownDocumentForm(owner),image());
+        long storedBefore=f.jdbc.queryForObject("select count(*) from stored_uploads where owner_type='CLIENT_KYC'",Long.class);
+        var forms=List.of(service.ownDocumentForm(owner),service.ownDocumentForm(owner));
+        try(var pool=Executors.newFixedThreadPool(2)){var latch=new CountDownLatch(1);var results=new ArrayList<Future<Boolean>>();for(var form:forms)results.add(pool.submit(()->{latch.await();try{service.attachOwn(owner,form,image());return true;}catch(IllegalArgumentException expected){assertThat(expected).hasMessage("kyc.error.uploadLimit");return false;}}));latch.countDown();assertThat(results.get(0).get(30,TimeUnit.SECONDS)^results.get(1).get(30,TimeUnit.SECONDS)).isTrue();}
+        assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_document where client_id=?",Integer.class,f.client)).isEqualTo(10);
+        assertThat(f.jdbc.queryForObject("select count(*) from stored_uploads where owner_type='CLIENT_KYC'",Long.class)).isEqualTo(storedBefore+1);
+    }
     @Test void selfSubmissionNeedsAcknowledgementAndDocumentsWithoutBranchConfiguration() {
         var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));
         assertThat(service.ownNotice(owner).english()).contains("identity checks", "loan assessment", "repayment administration");

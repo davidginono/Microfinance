@@ -87,6 +87,7 @@
             if (focus) {const heading = panels[index].querySelector('h2');heading.focus({preventScroll:true});heading.scrollIntoView?.({block:'start'});}
         }
         const advance = () => {
+            if (active === 2 && !form.dispatchEvent(new CustomEvent('profile:before-review', {cancelable:true}))) return;
             const invalid = [...panels[active].querySelectorAll('input,select,textarea')].find(control => control.willValidate && !control.checkValidity());
             if (invalid) {invalid.reportValidity();return;}
             if (active < 3) show(active + 1);
