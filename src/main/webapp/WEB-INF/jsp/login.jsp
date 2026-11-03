@@ -163,26 +163,6 @@
                             </form>
                         </div>
 
-                        <div class="auth-or-divider"><spring:message code="login.or" /></div>
-
-                        <div class="auth-mode-card space-y-4">
-                            <div>
-                                <p class="auth-mode-title">Google SSO</p>
-                            </div>
-                            <c:choose>
-                                <c:when test="${googleSsoEnabled}">
-                                    <a href="/oauth2/authorization/google" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold">
-                                        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-700">G</span>
-                                        Continue with Google
-                                    </a>
-                                </c:when>
-                                <c:otherwise>
-                                    <button type="button" class="auth-secondary-btn inline-flex w-full cursor-not-allowed items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold opacity-70" disabled>
-                                        <spring:message code="login.ssoUnavailable" />
-                                    </button>
-                                </c:otherwise>
-                            </c:choose>
-                        </div>
                     </div>
 
                     <div id="staffLoginPanel" role="tabpanel" aria-labelledby="staffLoginTab" data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'staff'}">hidden</c:if>>
@@ -215,26 +195,6 @@
                             </form>
                         </div>
 
-                        <div class="auth-or-divider"><spring:message code="login.or" /></div>
-
-                        <div class="auth-mode-card space-y-4">
-                            <div>
-                                <p class="auth-mode-title">Google SSO</p>
-                            </div>
-                            <c:choose>
-                                <c:when test="${googleSsoEnabled}">
-                                    <a href="/oauth2/authorization/google" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold">
-                                        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-700">G</span>
-                                        Continue with Google
-                                    </a>
-                                </c:when>
-                                <c:otherwise>
-                                    <button type="button" class="auth-secondary-btn inline-flex w-full cursor-not-allowed items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold opacity-70" disabled>
-                                        <spring:message code="login.ssoUnavailable" />
-                                    </button>
-                                </c:otherwise>
-                            </c:choose>
-                        </div>
                     </div>
 
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">

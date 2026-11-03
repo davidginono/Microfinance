@@ -54,15 +54,6 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
 
-    @org.springframework.beans.factory.annotation.Value("${app.auth.google-sso.enabled:false}")
-    private boolean googleSsoEnabled;
-
-    @org.springframework.beans.factory.annotation.Value("${spring.security.oauth2.client.registration.google.client-id:}")
-    private String googleClientId;
-
-    @org.springframework.beans.factory.annotation.Value("${spring.security.oauth2.client.registration.google.client-secret:}")
-    private String googleClientSecret;
-
     @GetMapping("/")
     public String root(@org.springframework.security.core.annotation.AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal == null) {
@@ -82,7 +73,6 @@ public class AuthController {
             }
         }
         model.addAttribute("systemAdminLogin", "/system-admin/login".equals(request.getRequestURI()));
-        model.addAttribute("googleSsoEnabled", isGoogleSsoConfigured());
         return "login";
     }
 
@@ -565,14 +555,6 @@ public class AuthController {
 
     private String normalizeMemberNo(String value) {
         return value == null ? "" : value.trim().toUpperCase();
-    }
-
-    private boolean isGoogleSsoConfigured() {
-        return googleSsoEnabled
-            && googleClientId != null
-            && !googleClientId.isBlank()
-            && googleClientSecret != null
-            && !googleClientSecret.isBlank();
     }
 
     private String passwordValidationMessage(String password, String confirmPassword) {
