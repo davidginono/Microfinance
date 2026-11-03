@@ -19,7 +19,7 @@
 </div></section></c:if>
 </div>
 <c:set var="profileDocuments" value="${documents}"/><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_DOCUMENTS')" var="canReadProfileDocuments"/>
-<c:set var="uploadPath" value="/finance/clients/onboarding/${client.id}/documents/new"/><c:set var="photoRoot" value="/finance/clients/onboarding/${client.id}/photos"/><c:set var="documentRoot" value="/finance/clients/onboarding/${client.id}/documents"/>
+<c:set var="uploadPath" value="/finance/clients/onboarding/${client.id}/documents/new"/><c:set var="documentRoot" value="/finance/clients/onboarding/${client.id}/documents"/>
 <%@ include file="profile-attachments.jspf" %></div>
 </c:when><c:otherwise><section class="erp-resource-section"><h2><spring:message code="kyc.form.${formKind}"/></h2><div class="accounting-form-grid"><c:choose>
         <c:when test="${formKind=='document'}">

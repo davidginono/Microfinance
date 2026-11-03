@@ -76,7 +76,7 @@
                     </div>
                 </section>
                 </div>
-<c:set var="profileDocuments" value="${workspace.documents}"/><c:set var="canReadProfileDocuments" value="${true}"/><c:set var="uploadPath" value="${onboardingRoot}/documents/new"/><c:set var="photoRoot" value="${onboardingRoot}/photos"/><c:set var="documentRoot" value="${onboardingRoot}/documents"/><%@ include file="profile-attachments.jspf" %></div>
+<c:set var="profileDocuments" value="${workspace.documents}"/><c:set var="canReadProfileDocuments" value="${true}"/><c:set var="uploadPath" value="${onboardingRoot}/documents/new"/><c:set var="documentRoot" value="${onboardingRoot}/documents"/><%@ include file="profile-attachments.jspf" %></div>
             </c:when>
             <c:otherwise>
                 <form:hidden path="revisionId"/>
