@@ -13,20 +13,66 @@
         checks.forEach(check => check.required = false);
         if (!link) return;
         const node = (tag, text, className) => {const el = document.createElement(tag);if (text !== undefined) el.textContent = text;if (className) el.className = className;return el;};
-        let dialog, pending = false, controller, returnFocus, overflow, rootOverflow;
+        let dialog, pending = false, removing = false, controller, returnFocus, overflow, rootOverflow;
+        const savedList = profile.querySelector('[data-profile-document-list]');
+        const showRemoveButtons = () => savedList.querySelectorAll('[data-profile-remove]').forEach(button => button.hidden = false);
+        showRemoveButtons();
         const restore = () => {
             placements.forEach(({block, anchor}) => {anchor.after(block);block.hidden = true;});
             checks.forEach(check => {check.removeAttribute('form');check.required = false;});
         };
-        const close = () => {if (!pending) dialog?.close();};
+        const close = () => {if (!pending && !removing) dialog?.close();};
         const parse = async response => {
             if (!response.ok || !response.headers.get('Content-Type')?.includes('text/html')) throw new Error(labels.uploadError);
             return new DOMParser().parseFromString(await response.text(), 'text/html');
         };
         const uploadForm = page => page.querySelector('form[data-onboarding-form="document"]');
+        document.addEventListener('click', async event => {
+            const button = event.target.closest('[data-profile-remove]');
+            if (!button || (!profile.contains(button) && !dialog?.contains(button)) || pending || removing) return;
+            const modal = dialog?.contains(button);
+            const list = modal ? button.closest('.kyc-upload-saved') : savedList;
+            const csrf = profile.querySelector('[data-profile-csrf]');
+            list.querySelector('[data-profile-remove-error]')?.remove();
+            removing = true;
+            button.disabled = true;
+            try {
+                const data = new URLSearchParams({revisionId:savedList.dataset.revisionId});
+                data.set(csrf.name,csrf.value);
+                const page = await parse(await fetch(button.dataset.profileRemove, {method:'POST',credentials:'same-origin',body:data}));
+                const updated = page.querySelector('[data-profile-document-list]');
+                if (!updated || updated.dataset.revisionId !== savedList.dataset.revisionId ||
+                    Array.from(updated.querySelectorAll('[data-profile-remove]')).some(action => action.dataset.profileRemove === button.dataset.profileRemove)) {
+                    throw new Error(labels.removeError);
+                }
+                savedList.replaceChildren(...updated.childNodes);
+                showRemoveButtons();
+                checks.forEach(check => {
+                    check.checked = false;
+                    check.dispatchEvent(new Event('change', {bubbles:true}));
+                });
+                if (modal) {
+                    button.closest('[data-profile-document]').remove();
+                    list.hidden = !list.querySelector('[data-profile-document]');
+                    dialog.dispatchEvent(new Event('profile:file-removed'));
+                    (list.querySelector('[data-profile-remove]') || dialog.querySelector('[data-profile-choose]')).focus();
+                } else {
+                    (savedList.querySelector('[data-profile-remove]') || link).focus();
+                }
+            } catch {
+                const error = node('p', labels.removeError, 'coa-error');
+                error.dataset.profileRemoveError = '';
+                error.setAttribute('role','alert');
+                list.prepend(error);
+                button.disabled = false;
+                button.focus();
+            } finally {
+                removing = false;
+            }
+        });
         async function open() {
-            if (dialog?.open) return;
-            const previousChecks = checks.map(check => check.checked), previews = new Set();let accepted = false, uploaded = false;
+            if (dialog?.open || removing) return;
+            const previousChecks = checks.map(check => check.checked), previews = new Set();let accepted = false, attachmentsChanged = false;
             returnFocus = document.activeElement;overflow = document.body.style.overflow;rootOverflow = document.documentElement.style.overflow;
             dialog = node('dialog', undefined, 'app-modal-panel kyc-upload-dialog');dialog.setAttribute('aria-labelledby', 'profile-upload-title');
             const header = node('div', undefined, 'app-modal-header'), title = node('h2', link.textContent.trim(), 'erp-panel-title');title.id = 'profile-upload-title';
@@ -34,9 +80,9 @@
             header.append(title, dismiss);const body = node('div', undefined, 'app-modal-body');dialog.append(header, body);document.body.append(dialog);
             document.body.style.overflow = 'hidden';document.documentElement.style.overflow = 'hidden';dialog.showModal();
             const fail = message => {let error = body.querySelector('[data-upload-error]');if (!error) {error = node('div', undefined, 'console-message');error.dataset.uploadError = '';error.dataset.messageType = 'error';error.setAttribute('role', 'alert');error.tabIndex = -1;const actions = body.querySelector('[data-upload-actions]');if (actions) actions.before(error);else body.append(error);}error.textContent = message;window.ConsoleResourceDetails?.init(dialog);error.focus();};
-            dialog.addEventListener('cancel', event => {if (pending) event.preventDefault();});
+            dialog.addEventListener('cancel', event => {if (pending || removing) event.preventDefault();});
             dialog.addEventListener('close', () => {
-                controller?.abort();previews.forEach(url => URL.revokeObjectURL(url));restore();if (!accepted) checks.forEach((check,index) => {check.checked = uploaded ? false : previousChecks[index];check.dispatchEvent(new Event('change',{bubbles:true}));});dialog.remove();document.body.style.overflow = overflow;document.documentElement.style.overflow = rootOverflow;returnFocus?.focus();
+                controller?.abort();previews.forEach(url => URL.revokeObjectURL(url));restore();if (!accepted) checks.forEach((check,index) => {check.checked = attachmentsChanged ? false : previousChecks[index];check.dispatchEvent(new Event('change',{bubbles:true}));});dialog.remove();document.body.style.overflow = overflow;document.documentElement.style.overflow = rootOverflow;returnFocus?.focus();
             }, {once:true});
             controller = new AbortController();window.AppLoading?.begin(body);
             try {
@@ -54,7 +100,7 @@
                 const dropzone = node('div', undefined, 'kyc-upload-dropzone'), choose = node('button', labels.chooseFiles, 'app-btn btn-neutral');choose.type = 'button';choose.addEventListener('click', () => picker.click());dropzone.append(node('span', labels.dropImages), choose, picker);
                 const help = node('p', sourcePicker.closest('.kyc-field')?.querySelector('.kyc-field-hint')?.textContent || sourcePicker.dataset.uploadFileError, 'kyc-field-hint');help.id = 'profile-upload-help';choose.setAttribute('aria-describedby',help.id);pickerField.append(pickerLabel,dropzone,help);
                 const queue = node('ul', undefined, 'kyc-upload-queue'), confirmations = node('div', undefined, 'kyc-upload-confirmations'), announcement = node('span', undefined, 'sr-only');queue.setAttribute('aria-label',labels.selectedImages);announcement.setAttribute('role','status');
-                const savedList = profile.querySelector('[data-profile-document-list]');
+                choose.dataset.profileChoose = '';
                 const saved = node('section', undefined, 'kyc-upload-saved');
                 if (savedList.querySelector('[data-profile-document]')) {
                     saved.append(node('h3', labels.uploadedFiles), ...Array.from(savedList.childNodes, child => child.cloneNode(true)));
@@ -72,6 +118,7 @@
                 const fileSize = bytes => bytes < 1024 ? number.format(bytes)+' B' : bytes < 1024*1024 ? number.format(bytes/1024)+' KB' : number.format(bytes/(1024*1024))+' MB';
                 const hasDocuments = () => Boolean(savedList.querySelector('[data-profile-document]'));
                 const update = () => {queue.hidden = !rows.length;confirmations.hidden = !rows.length && !hasDocuments();submit.hidden = confirmations.hidden;submit.textContent = rows.some(row => !row.done) ? labels.upload : labels.done;};
+                dialog.addEventListener('profile:file-removed', () => {attachmentsChanged = true;update();});
                 const addFiles = incoming => {
                     if (pending || !incoming.length) return;
                     const invalid = incoming.find(file => !/\.(png|jpe?g)$/i.test(file.name) || file.size<1 || file.size>maxBytes);
@@ -104,7 +151,7 @@
                 dropzone.addEventListener('dragleave',event=>{if(!dropzone.contains(event.relatedTarget))dropzone.classList.remove('is-dragging');});
                 dropzone.addEventListener('drop',event=>{event.preventDefault();event.stopPropagation();dropzone.classList.remove('is-dragging');addFiles([...(event.dataTransfer?.files || [])]);});
                 form.addEventListener('submit', async event => {
-                    event.preventDefault();event.stopPropagation();if (pending) return;
+                    event.preventDefault();event.stopPropagation();if (pending || removing) return;
                     const missing = checks.find(check => !check.checkValidity());if (missing) {missing.reportValidity();return;}
                     body.querySelector('[data-upload-error]')?.remove();
                     const pendingRows = rows.filter(row => !row.done);announcement.textContent = pendingRows.length ? labels.uploadingFiles.replace('{0}',String(pendingRows.length)) : '';
@@ -123,7 +170,8 @@
                             const list = page.querySelector('[data-profile-document-list]');
                             if (uploadForm(page) || !list || errors.length) throw new Error(errors.join('\n') || labels.uploadError);
                             savedList.replaceChildren(...list.childNodes);
-                            row.done = true;uploaded = true;row.item.dataset.uploadState = 'success';row.status.textContent = labels.uploaded;row.status.dataset.resourceStatus = 'SUCCESS';window.ConsoleResourceDetails?.init(row.status);
+                            showRemoveButtons();
+                            row.done = true;attachmentsChanged = true;row.item.dataset.uploadState = 'success';row.status.textContent = labels.uploaded;row.status.dataset.resourceStatus = 'SUCCESS';window.ConsoleResourceDetails?.init(row.status);
                         }
                         accepted = true;pending = false;dialog.close();
                     } catch (error) {if (error.name !== 'AbortError') {const message = error instanceof TypeError ? labels.uploadError : error.message || labels.uploadError;if(activeRow){activeRow.item.dataset.uploadState = 'error';activeRow.status.className = 'kyc-upload-status coa-error';activeRow.status.textContent = message;activeRow.status.setAttribute('role','alert');}else fail(message);}}
@@ -136,8 +184,18 @@
             } catch (error) {window.AppLoading?.end(body);if (error.name !== 'AbortError') fail(labels.uploadError);}
         }
         link.addEventListener('click', event => {if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;event.preventDefault();event.stopPropagation();void open();});
-        profile.addEventListener('profile:before-review', event => {if (checks.some(check => !check.checked)) {event.preventDefault();void open();}});
-        profile.addEventListener('submit', event => {if (event.submitter?.value === 'SUBMITTED' && checks.some(check => !check.checked)) {event.preventDefault();event.stopPropagation();void open();}});
+        profile.addEventListener('profile:before-review', event => {
+            if (removing || checks.some(check => !check.checked)) {
+                event.preventDefault();
+                if (!removing) void open();
+            }
+        });
+        profile.addEventListener('submit', event => {
+            if (removing || (event.submitter?.value === 'SUBMITTED' && checks.some(check => !check.checked))) {
+                event.preventDefault();event.stopPropagation();
+                if (!removing) void open();
+            }
+        });
         window.addEventListener('pagehide', () => {controller?.abort();if (dialog?.open) {pending = false;dialog.close();}});
     }));
 })();

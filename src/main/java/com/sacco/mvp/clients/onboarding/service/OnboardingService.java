@@ -219,6 +219,19 @@ public class OnboardingService {
         return saveRevision(a,a.getMemberId(),command,hash);
     }
     public UUID attachOwn(AppUserPrincipal a,DocumentForm f,MultipartFile file) {requireOwner(a);return attach(a,a.getMemberId(),f,file,true);}
+    @Transactional(timeout=15)
+    public void removeOwnAttachment(AppUserPrincipal actor,UUID revision,UUID document) {
+        requireOwner(actor);
+        UUID client=actor.getMemberId();
+        records.lock(client);
+        var current=records.client(actor,client,today());
+        check("DRAFT".equals(current.state()) && revision.equals(current.revisionId()),"changed");
+        if (records.removeAttachment(actor,revision,document,clock.now())) {
+            event(actor,client,"CLIENT_KYC_DOCUMENT_REMOVED");
+        } else if (!records.removedFromDraft(revision,document)) {
+            throw new org.springframework.security.access.AccessDeniedException("Document unavailable");
+        }
+    }
     @Transactional(readOnly=true)
     public DocumentForm ownDocumentForm(AppUserPrincipal a) {
         requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(c.state().equals("DRAFT"),"state");return uploadForm(a,c);

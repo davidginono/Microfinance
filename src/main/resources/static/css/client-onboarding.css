@@ -55,7 +55,8 @@
 .kyc-upload-metadata dt { color: var(--aws-muted, #545b64); }
 .kyc-upload-metadata dd { margin: 0; }
 .kyc-upload-thumbnail { width: 48px; height: 48px; object-fit: contain; flex: 0 0 48px; border: 1px solid #eaeded; }
-.kyc-upload-dialog .kyc-upload-remove { flex: 0 0 32px; width: 32px; height: 32px; padding: 0; }
+.kyc-upload-token .kyc-upload-remove { flex: 0 0 32px; width: 32px; height: 32px; padding: 0; }
+.kyc-upload-token .kyc-upload-remove[hidden] { display: none; }
 .kyc-upload-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; overflow-wrap: anywhere; }
 .kyc-upload-dialog .app-modal-actions { position: sticky; bottom: -20px; background: white; }
 @media (max-width: 640px) { .kyc-upload-row { grid-template-columns: minmax(0, 1fr); } }

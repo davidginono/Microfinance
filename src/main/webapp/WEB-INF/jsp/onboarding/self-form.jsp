@@ -18,7 +18,7 @@
                enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}"
                cssClass="accounting-create-form kyc-client-form" data-accounting-dirty-form="true"
                data-portal-recover="${portalWorkspace}" data-onboarding-form="${formKind}" data-preserve-submit-command="true" data-workspace-submit="recover">
-        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" data-profile-csrf/>
         <form:hidden path="requestKey"/>
         <c:choose>
             <c:when test="${formKind=='self'}">

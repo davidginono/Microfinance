@@ -56,6 +56,16 @@ public class ClientPortalController {
     @GetMapping("/workspace/profile/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal Session session,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){var a=portal.actor(session,false);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(onboarding.groups(a,a.getMemberId(),search,page));}
     @GetMapping("/workspace/profile/documents/new") public String upload(@AuthenticationPrincipal Session session,@RequestParam(defaultValue="IDENTITY") String category,Model m){var f=onboarding.ownDocumentForm(portal.actor(session,false));if(OnboardingService.DOCUMENT_CATEGORIES.contains(category))f.setCategory(category);m.addAttribute("documentForm",f);workspace(session,m);m.addAttribute("formKind","document");return "onboarding/self-form";}
     @PostMapping("/workspace/profile/documents/new") public String upload(@AuthenticationPrincipal Session session,@ModelAttribute("documentForm") DocumentForm f,BindingResult errors,@RequestParam(required=false) MultipartFile file,Model m){var a=portal.actor(session,false);if(!errors.hasErrors())try{onboarding.attachOwn(a,f,file);return "redirect:"+PROFILE;}catch(IllegalArgumentException e){reject(errors,e);}workspace(session,m);m.addAttribute("formKind","document");return "onboarding/self-form";}
+    @PostMapping("/workspace/profile/documents/{id}/remove")
+    public String removeDocument(@AuthenticationPrincipal Session session,@PathVariable UUID id,@RequestParam UUID revisionId) {
+        var actor=portal.actor(session,false);
+        try {
+            onboarding.removeOwnAttachment(actor,revisionId,id);
+        } catch (IllegalArgumentException stale) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT);
+        }
+        return "redirect:"+PROFILE;
+    }
     @GetMapping("/workspace/profile/documents/{id}") public ResponseEntity<byte[]> document(@AuthenticationPrincipal Session session,@PathVariable UUID id,
                                                                                            @RequestParam(defaultValue="false") boolean preview) {
         var document=onboarding.downloadOwn(portal.actor(session,false),id);

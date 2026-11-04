@@ -1,7 +1,7 @@
 <%@ page pageEncoding="UTF-8" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <div id="profile-documents" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.attachmentsAndDocuments"/></h2><section class="erp-resource-section" data-profile-section="documents"><h3><spring:message code="kyc.attachmentsAndDocuments"/></h3><div class="kyc-section-body">
-<div data-profile-document-list class="kyc-profile-document-list">
+<div data-profile-document-list data-revision-id="${client.revisionId}" class="kyc-profile-document-list">
 <c:if test="${not empty profileDocuments}">
     <ul class="kyc-upload-queue" aria-label="<spring:message code='kyc.uploadedFiles'/>">
         <c:forEach items="${profileDocuments}" var="doc">
@@ -26,6 +26,12 @@
                             <div><dt><spring:message code="kyc.uploaded"/></dt><dd><c:out value="${appTime:display(doc.recordedAt)}"/></dd></div>
                         </dl>
                     </div>
+                    <c:if test="${formKind=='self' and not profileReadOnly and client.state=='DRAFT'}">
+                        <button type="button" class="erp-icon-btn kyc-upload-remove" data-profile-remove="<c:url value='${documentRoot}/${doc.id}/remove'/>"
+                                aria-label="<spring:message code='kyc.removeFile'/>: <c:out value='${doc.name}'/>" hidden>
+                            <svg class="console-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 3l10 10M13 3L3 13"/></svg>
+                        </button>
+                    </c:if>
                 </div>
             </li>
         </c:forEach>

@@ -49,6 +49,15 @@ public class ClientOnboardingController {
         if(!errors.hasErrors())try{service.attachOwn(a,f,file);return "redirect:"+ROOT;}catch(IllegalArgumentException e){reject(errors,e);}
         return documentPage(a,m);
     }
+    @PostMapping("/documents/{id}/remove")
+    public String removeDocument(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam UUID revisionId) {
+        try {
+            service.removeOwnAttachment(actor,revisionId,id);
+        } catch (IllegalArgumentException stale) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT);
+        }
+        return "redirect:"+ROOT;
+    }
     @GetMapping("/documents/{id}") public ResponseEntity<byte[]> download(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,
                                                                            @RequestParam(defaultValue="false") boolean preview) {
         var file=service.downloadOwn(a,id);

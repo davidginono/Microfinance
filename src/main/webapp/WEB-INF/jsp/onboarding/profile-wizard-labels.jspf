@@ -20,6 +20,7 @@
           data-remove="<spring:message code='kyc.removeFile'/>"
           data-uploaded="<spring:message code='kyc.uploaded'/>"
           data-uploaded-files="<spring:message code='kyc.uploadedFiles'/>"
+          data-remove-error="<spring:message code='kyc.removeError'/>"
           data-upload-error="<spring:message code='kyc.uploadError'/>"
           data-choose-files="<spring:message code='kyc.chooseFiles'/>"
           data-file-label="<spring:message code='kyc.uploadImages'/>"

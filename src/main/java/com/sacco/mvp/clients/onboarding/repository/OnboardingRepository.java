@@ -80,16 +80,34 @@ public class OnboardingRepository {
         if(from==null)return;
         jdbc.update("""
             insert into client_onboarding_document_link
-            select ?,x.document_id,x.client_id,x.sacco_id,x.station_id from client_onboarding_document_link x
-            where x.revision_id=? and x.document_id in(select distinct on(d.category) d.id from client_onboarding_document_link y join client_onboarding_document d on d.id=y.document_id where y.revision_id=? order by d.category,d.sequence desc)
-            """,to,from,from);
+            select distinct on (d.category) ?,d.id,d.client_id,d.sacco_id,d.station_id
+            """+EVIDENCE_FROM+"""
+            where r.id=? and r.client_id=? and r.sacco_id=? and r.station_id=?
+            order by d.category,d.sequence desc
+            """,to,from,client,a.getSaccoId(),a.getStationId());
     }
+    private static final String VISIBLE_ATTACHMENTS = """
+        d.sequence <= (select max(h.sequence) from client_onboarding_document_link x
+            join client_onboarding_document h on h.id=x.document_id where x.revision_id=r.id)
+        and not exists(select 1 from client_onboarding_document_removal m
+            join client_onboarding_revision removed_at on removed_at.id=m.revision_id
+            where m.document_id=d.id and removed_at.sequence<=r.sequence)
+        """;
+    private static final String EVIDENCE_FROM = """
+        from client_onboarding_revision r join client_onboarding_document d
+          on d.client_id=r.client_id and d.sacco_id=r.sacco_id and d.station_id=r.station_id
+          and ((r.mode='DRAFT' and (
+        """+VISIBLE_ATTACHMENTS+"""
+          )) or (r.mode='SUBMITTED' and exists(select 1 from client_onboarding_document_link x
+              where x.revision_id=r.id and x.document_id=d.id)))
+        """;
     public List<Document> attachments(UUID revision) {
         return jdbc.query("""
             select d.id,d.category,u.original_name,d.expires_on,u.sha256,m.full_name,d.recorded_at,u.size_bytes,u.content_type
             from client_onboarding_revision r join client_onboarding_document d on d.client_id=r.client_id and d.sacco_id=r.sacco_id and d.station_id=r.station_id
             join stored_uploads u on u.id=d.upload_id join members m on m.id=d.actor_id
-            where r.id=? and d.sequence<=(select max(h.sequence) from client_onboarding_document_link x join client_onboarding_document h on h.id=x.document_id where x.revision_id=r.id)
+            where r.id=? and
+            """+VISIBLE_ATTACHMENTS+"""
             order by d.sequence desc limit 100
             """,(r,n)->new Document(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),r.getString(6),r.getObject(7,OffsetDateTime.class),r.getLong(8),r.getString(9)),revision);
     }
@@ -100,9 +118,27 @@ public class OnboardingRepository {
     public List<Document> documents(UUID revision) {
         return jdbc.query("""
             select distinct on(d.category) d.id,d.category,u.original_name,d.expires_on,u.sha256,m.full_name,d.recorded_at,u.size_bytes,u.content_type
-            from client_onboarding_document_link x join client_onboarding_document d on d.id=x.document_id join stored_uploads u on u.id=d.upload_id join members m on m.id=d.actor_id
-            where x.revision_id=? order by d.category,d.sequence desc
+            """+EVIDENCE_FROM+"""
+            join stored_uploads u on u.id=d.upload_id join members m on m.id=d.actor_id
+            where r.id=? order by d.category,d.sequence desc
             """,(r,n)->new Document(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),r.getString(6),r.getObject(7,OffsetDateTime.class),r.getLong(8),r.getString(9)),revision);
+    }
+    public boolean removeAttachment(AppUserPrincipal actor,UUID revision,UUID document,OffsetDateTime now) {
+        return jdbc.update("""
+            insert into client_onboarding_document_removal
+                (document_id,revision_id,client_id,sacco_id,station_id,recorded_at)
+            select d.id,r.id,d.client_id,d.sacco_id,d.station_id,?
+            """+EVIDENCE_FROM+"""
+            where r.id=? and r.mode='DRAFT' and r.client_id=? and r.sacco_id=? and r.station_id=? and d.id=?
+            on conflict (document_id) do nothing
+            """,now,revision,actor.getMemberId(),actor.getSaccoId(),actor.getStationId(),document)==1;
+    }
+
+    public boolean removedFromDraft(UUID revision,UUID document) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from client_onboarding_document_removal
+                where document_id=? and revision_id=?)
+            """,Boolean.class,document,revision));
     }
     public void document(AppUserPrincipal a,UUID client,UUID revision,UUID id,UUID upload,DocumentForm f,String hash,OffsetDateTime now) {
         jdbc.update("insert into client_onboarding_document values(?,?,?,?,?,?,?,?,?,?,?, (select coalesce(max(sequence),0)+1 from client_onboarding_document where client_id=?))",

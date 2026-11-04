@@ -92,6 +92,30 @@ test('existing uploaded documents can be confirmed without uploading or navigati
   assert.equal(profile.dispatchEvent(new w.CustomEvent('profile:before-review',{cancelable:true})),true);
  }finally{dom.window.close();}
 });
+test('the saved file X removes only the attachment and preserves edits in both lists',async()=>{
+ for(const inModal of [false,true]){
+  const {dom,w,d,profile,open}=await setup({existing:true});try{
+   profile.insertAdjacentHTML('afterbegin','<input data-profile-csrf type="hidden" name="_csrf" value="token">');
+   const list=profile.querySelector('[data-profile-document-list]');
+   list.dataset.revisionId='revision-3';
+   list.querySelector('[data-profile-document]').insertAdjacentHTML('beforeend','<button type="button" data-profile-remove="/documents/1/remove">Remove</button>');
+   if(inModal)await open();
+   let request;
+   w.fetch=async(url,options)=>{
+    request={url,body:options.body};
+    return {ok:true,headers:{get:()=> 'text/html'},text:async()=>'<div data-profile-document-list data-revision-id="revision-3">No documents added</div>'};
+   };
+   d.querySelector(inModal?'dialog [data-profile-remove]':'[data-profile-remove]').click();
+   await settle();
+   assert.equal(request.url,'/documents/1/remove');
+   assert.equal(request.body.get('_csrf'),'token');
+   assert.equal(request.body.get('revisionId'),'revision-3');
+   assert.equal(profile.querySelector('[data-profile-document]'),null);
+   assert.equal(profile.elements['profile.address'].value,'Unsaved home address');
+   if(inModal)assert.equal(d.querySelector('.kyc-upload-saved').hidden,true);
+  }finally{dom.window.close();}
+ }
+});
 test('an early final command opens document confirmation without posting or discarding the profile',async()=>{
  const {dom,w,d,profile,posts}=await setup({existing:true});try{
   const send=d.createElement('button');send.type='submit';send.value='SUBMITTED';profile.append(send);

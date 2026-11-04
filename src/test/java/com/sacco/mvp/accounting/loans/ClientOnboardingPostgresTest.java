@@ -163,6 +163,34 @@ class ClientOnboardingPostgresTest {
         assertThatThrownBy(()->f.jdbc.update("update client_onboarding_notice set english='changed' where id=?",legacyId)).isInstanceOf(DataAccessException.class);
     }
     SelfForm ownProfileFromDraft(SelfForm draft) {var f=new SelfForm();f.setProfile(draft.getProfile());return f;}
+    @Test void removingAnAttachmentKeepsEarlierSubmissionAndFallsBackToRemainingEvidence() {
+        var owner=owner(f.client);
+        service.saveOwn(owner,ownProfile(owner));
+        UUID older=service.attachOwn(owner,service.ownDocumentForm(owner),image());
+        UUID selected=service.attachOwn(owner,service.ownDocumentForm(owner),image());
+        for (String category:List.of("ADDRESS","ACTIVITY")) {
+            var document=service.ownDocumentForm(owner);
+            document.setCategory(category);
+            service.attachOwn(owner,document,image());
+        }
+        UUID submitted=submitOwn(owner);
+        assertThatThrownBy(()->service.removeOwnAttachment(owner,submitted,selected)).hasMessage("kyc.error.changed");
+        var returned=decision(submitted);
+        returned.setKind("RETURN");
+        service.review(f.operator("B1"),f.client,returned);
+        UUID draft=service.saveOwn(owner,ownProfile(owner));
+        service.removeOwnAttachment(owner,draft,selected);
+        service.removeOwnAttachment(owner,draft,selected);
+        assertThat(service.ownWorkspace(owner,0,null).documents()).extracting(OwnDocument::id)
+            .contains(older).doesNotContain(selected);
+        assertThat(service.ownWorkspace(owner,0,2).documents()).extracting(OwnDocument::id).contains(selected);
+        assertThatThrownBy(()->service.removeOwnAttachment(owner,draft,UUID.randomUUID()))
+            .isInstanceOf(AccessDeniedException.class);
+        UUID corrected=submitOwn(owner);
+        assertThat(f.jdbc.queryForList("select document_id from client_onboarding_document_link where revision_id=?",UUID.class,corrected))
+            .contains(older).doesNotContain(selected);
+        assertThat(service.download(f.actor,f.client,selected).bytes()).isEqualTo(image);
+    }
     @Test void repeatedDocumentsAndActualConfirmationsSurviveSavingAnotherDraft() {
         var owner=owner(f.client);service.saveOwn(owner,ownProfile(owner));
         for(String category:List.of("IDENTITY","IDENTITY","ADDRESS","ACTIVITY")){var doc=service.ownDocumentForm(owner);doc.setCategory(category);service.attachOwn(owner,doc,image());}
