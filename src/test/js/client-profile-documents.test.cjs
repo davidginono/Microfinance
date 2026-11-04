@@ -95,18 +95,35 @@ test('existing uploaded documents can be confirmed without uploading or navigati
 test('the saved file X removes only the attachment and preserves edits in both lists',async()=>{
  for(const inModal of [false,true]){
   const {dom,w,d,profile,open}=await setup({existing:true});try{
+   w.eval(readFileSync('src/main/resources/static/js/ui-loading.js','utf8'));
+   profile.querySelector('[data-profile-wizard-labels]').dataset.removingFile='Removing file';
    profile.insertAdjacentHTML('afterbegin','<input data-profile-csrf type="hidden" name="_csrf" value="token">');
    const list=profile.querySelector('[data-profile-document-list]');
    list.dataset.revisionId='revision-3';
    list.querySelector('[data-profile-document]').insertAdjacentHTML('beforeend','<button type="button" data-profile-remove="/documents/1/remove">Remove</button>');
    if(inModal)await open();
-   let request;
-   w.fetch=async(url,options)=>{
+   let request, respond;
+   w.fetch=(url,options)=>{
     request={url,body:options.body};
-    return {ok:true,headers:{get:()=> 'text/html'},text:async()=>'<div data-profile-document-list data-revision-id="revision-3">No documents added</div>'};
+    return new Promise(resolve=>{respond=resolve;});
    };
-   d.querySelector(inModal?'dialog [data-profile-remove]':'[data-profile-remove]').click();
+   const remove=d.querySelector(inModal?'dialog [data-profile-remove]':'[data-profile-remove]');
+   remove.click();
+   assert.equal(remove.disabled,true);
+   assert.equal(remove.getAttribute('aria-busy'),'true');
+   assert.ok(remove.querySelector('[aria-label="Removing file"] .app-loading-spinner'));
+   assert.ok(profile.querySelector('[data-profile-document]'));
+   respond({ok:false});
    await settle();
+   assert.equal(remove.disabled,false);
+   assert.equal(remove.getAttribute('aria-busy'),null);
+   assert.equal(remove.querySelector('.app-loading-spinner'),null);
+   assert.equal(d.activeElement,remove);
+   assert.ok(remove.closest(inModal?'.kyc-upload-saved':'[data-profile-document-list]').querySelector('[data-profile-remove-error]'));
+   remove.click();
+   respond({ok:true,headers:{get:()=> 'text/html'},text:async()=>'<div data-profile-document-list data-revision-id="revision-3">No documents added</div>'});
+   await settle();
+   assert.equal(d.querySelector('.app-loading-spinner'),null);
    assert.equal(request.url,'/documents/1/remove');
    assert.equal(request.body.get('_csrf'),'token');
    assert.equal(request.body.get('revisionId'),'revision-3');

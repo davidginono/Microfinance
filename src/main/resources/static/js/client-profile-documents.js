@@ -36,6 +36,7 @@
             list.querySelector('[data-profile-remove-error]')?.remove();
             removing = true;
             button.disabled = true;
+            const finish = window.AppLoading?.action(button, {label: labels.removingFile});
             try {
                 const data = new URLSearchParams({revisionId:savedList.dataset.revisionId});
                 data.set(csrf.name,csrf.value);
@@ -64,10 +65,13 @@
                 error.dataset.profileRemoveError = '';
                 error.setAttribute('role','alert');
                 list.prepend(error);
-                button.disabled = false;
-                button.focus();
             } finally {
+                finish?.();
                 removing = false;
+                if (button.isConnected) {
+                    button.disabled = false;
+                    button.focus();
+                }
             }
         });
         async function open() {

@@ -5,7 +5,27 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
 .workspace-initializing-status {position:absolute;top:24px;left:var(--shell-workspace-inset,12px);display:flex;align-items:center;justify-content:center;}
 .app-loading-status {display:flex;align-items:center;justify-content:center;min-height:64px;gap:8px;color:#545b64;}
 .app-loading-error {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:8px 12px;border:1px solid #d13212;background:#fff3f1;color:#16191f;font-size:14px;line-height:20px;}
-.app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before {display:inline-block;flex:none;width:20px;height:20px;box-sizing:border-box;border:2px solid transparent;border-top-color:#687078;border-right-color:#687078;border-radius:50%;animation:aws-console-spin .7s linear infinite;}
+@property --app-spinner-sweep {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 90deg;
+}
+
+@keyframes app-spinner-sweep {
+    50% { --app-spinner-sweep: 330deg; }
+}
+
+.app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before {
+    display: inline-block;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    color: #687078;
+    background: conic-gradient(currentColor var(--app-spinner-sweep, 90deg), transparent 0);
+    mask-image: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+    animation: aws-console-spin .7s linear infinite, app-spinner-sweep 1.5s ease-in-out infinite;
+}
 [data-dashboard-board]:not([data-dashboard-ready]) {position:relative;min-height:180px;}
 [data-dashboard-board]:not([data-dashboard-ready]) > * {visibility:hidden;}
 [data-dashboard-board]:not([data-dashboard-ready])::before {content:"";position:absolute;top:80px;left:calc(50% - 10px);}
@@ -20,7 +40,7 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
 .aws-console .app-btn.is-action-loading {height:auto!important;}
 .erp-icon-btn.is-action-loading > .app-action-label {opacity:0;}
 .erp-icon-btn.is-action-loading > .app-action-loading {position:absolute;inset:0;}
-.is-action-loading > .app-action-loading .app-loading-spinner {border-top-color:currentColor;border-right-color:currentColor;}
+.is-action-loading > .app-action-loading .app-loading-spinner {color:inherit;}
 .aws-console .erp-table tbody tr.app-loading-row > td {padding:24px!important;text-align:center!important;vertical-align:middle;height:96px;}
 .aws-console .erp-table tbody tr:not(.app-loading-row) > td[colspan]:only-child {text-align:center!important;vertical-align:middle;white-space:normal;}
 .aws-console .erp-table-wrap.is-loading {overflow:visible!important;}
@@ -29,5 +49,16 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
 .aws-console .erp-table-wrap.is-loading .aws-table-loader {display:none!important;}
 .neo-select-loading {display:flex;justify-content:center;align-items:center;min-height:40px;flex:none;border-top:1px solid #eaeded;}
 .neo-select-loading .app-loading-status {min-height:40px;}
+@media (forced-colors: active) {
+    .app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before {
+        forced-color-adjust: none;
+        box-sizing: border-box;
+        border: 2px solid transparent;
+        border-block-start-color: CanvasText;
+        border-inline-end-color: CanvasText;
+        background: none;
+        mask-image: none;
+    }
+}
 @media(prefers-reduced-motion:reduce){.app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before{animation:none;}}
 @media print{.app-loading-status,.app-loading-row,.neo-select-loading{display:none!important;}}

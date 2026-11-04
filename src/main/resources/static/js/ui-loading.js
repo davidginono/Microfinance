@@ -45,10 +45,10 @@
         region.classList.remove('is-loading');
         if(state.busy===null)region.removeAttribute('aria-busy');else region.setAttribute('aria-busy',state.busy==='true'?'false':state.busy);
     }
-    function action(control){
+    function action(control,{label:statusLabel}={}){
         if(!control?.isConnected)return ()=>{};
         actions.get(control)?.();
-        const loader=status(null,true,'small','span'),busy=control.getAttribute('aria-busy');
+        const loader=status(statusLabel,true,'small','span'),busy=control.getAttribute('aria-busy');
         loader.classList.add('app-action-loading');loader.dataset.uiActionLoading='true';
         let label;
         if(control.matches('button,a,[role="button"]')){

@@ -25,6 +25,7 @@
           data-uploaded="<spring:message code='kyc.uploaded'/>"
           data-uploaded-files="<spring:message code='kyc.uploadedFiles'/>"
           data-remove-error="<spring:message code='kyc.removeError'/>"
+          data-removing-file="<spring:message code='kyc.removingFile' text='Removing file'/>"
           data-upload-error="<spring:message code='kyc.uploadError'/>"
           data-choose-files="<spring:message code='kyc.chooseFiles'/>"
           data-file-label="<spring:message code='kyc.uploadImages'/>"

@@ -19,7 +19,7 @@ Use the [observed AWS instance type finder workflow](references/aws-instance-typ
 
 Use unlabeled, request-bound spinners inside pending values, tables, charts and data sections, with localized screen-reader names. Retain visible header/sidebar roots, progressively reveal ready sections, and preserve editable controls. The reference documents the observed canvas-to-component transitions, sizes and recovery lifecycle; a labeled page strip or artificial loading delay does not satisfy this behavior.
 
-All circular loaders use a single rotating open half-circle arc with a transparent remainder, matching the user's reference. Do not render a gray circular track, background ring or nested spinner ring. Keep existing size variants, reduced-motion support and a contrasting light arc on dark buttons.
+Use the [Cloudscape Spinner](https://cloudscape.design/components/spinner/) as the default for indeterminate loading. Reuse the shared `app-loading-spinner` in JSP workspaces for a rotating arc that expands and contracts. Keep the track transparent and preserve the size variants, reduced-motion support and contrast on dark buttons. For icon-only actions such as removing an attachment, replace the initiating icon with the centered spinner while the request is pending. Restore the icon and retry control on failure.
 
 ## Start With The Shared Shell
 
