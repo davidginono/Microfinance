@@ -1,9 +1,121 @@
-(function(){'use strict';
- function ready(){document.body.classList.add('portal-ready');var institution=document.querySelector('[data-portal-institution]'),branch=document.querySelector('[data-portal-branch]');if(!institution||!branch||!window.NeoSelect)return;
- var root=document.querySelector('meta[name="app-context-path"]').content,states=new WeakMap();
- function bind(select,isBranch){var ui=window.NeoSelect.search(select),state={page:0,search:'',controller:null,timer:null,ui:ui};states.set(select,state);
- async function load(more){if(isBranch&&!institution.value){select.options.length=1;return;}state.controller?.abort();var controller=new AbortController();state.controller=controller;ui.setLoading(true);try{var query=new URLSearchParams({search:state.search,page:String(more?state.page+1:0)});if(isBranch)query.set('institution',institution.value);var response=await fetch(root+'/client-portal/choices?'+query,{headers:{Accept:'application/json'},signal:controller.signal});if(!response.ok||response.redirected)throw new Error();var rows=await response.json();if(state.controller!==controller)return;var selected=select.selectedOptions[0]?.cloneNode(true);if(!more){select.options.length=1;if(selected?.value)select.add(selected);}rows.slice(0,25).forEach(function(r){var existing=Array.from(select.options).find(function(o){return o.value===r.id;});if(existing)existing.textContent=r.label;else select.add(new Option(r.label,r.id));});if(selected)select.value=selected.value;state.page=more?state.page+1:0;ui.more.hidden=rows.length<=25;ui.setError('');}catch(e){if(e.name!=='AbortError')ui.setError(document.body.dataset.portalError||'');}finally{if(state.controller===controller)ui.setLoading(false);}}
- ui.input.addEventListener('input',function(){clearTimeout(state.timer);state.search=ui.input.value.slice(0,100);state.timer=setTimeout(function(){load(false);},250);});ui.more.addEventListener('click',function(){load(true);});state.load=load;load(false);}
- bind(institution,false);bind(branch,true);institution.addEventListener('change',function(){branch.value='';branch.options.length=1;states.get(branch).search='';states.get(branch).ui.input.value='';states.get(branch).load(false);});window.addEventListener('pagehide',function(){states.get(institution).controller?.abort();states.get(branch).controller?.abort();});}
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+(() => {
+    'use strict';
+
+    function ready() {
+        const institution = document.querySelector('[data-portal-institution]');
+        const branch = document.querySelector('[data-portal-branch]');
+        if (institution && branch && window.NeoSelect && window.AppSearch) {
+            const root = document.querySelector('meta[name="app-context-path"]').content;
+            bindChoices(institution, root);
+            const resetBranches = bindChoices(branch, root, institution);
+            let institutionId = institution.value;
+            institution.addEventListener('change', () => {
+                if (institution.value === institutionId) return;
+                institutionId = institution.value;
+                resetBranches();
+            });
+        }
+        document.body.classList.add('portal-ready');
+    }
+
+    function bindChoices(select, root, parent) {
+        const picker = window.NeoSelect.search(select);
+        const {input, more} = picker;
+        const placeholder = select.options[0];
+        let controller, loadedSearch, page = 0;
+        const searchValue = () => input.value.trim();
+        const cancelRequest = () => {
+            controller?.abort();
+            controller = undefined;
+            picker.setLoading(false);
+            more.disabled = false;
+        };
+
+        async function load(targetPage = 0) {
+            if (parent && !parent.value) return;
+            controller?.abort();
+            const request = new AbortController();
+            controller = request;
+            const search = searchValue();
+            const normalized = search.toLocaleLowerCase();
+            const query = new URLSearchParams({search, page: targetPage});
+            if (parent) query.set('institution', parent.value);
+            more.disabled = true;
+            if (!targetPage) more.hidden = true;
+            picker.setLoading(true);
+            try {
+                const response = await fetch(root + '/client-portal/choices?' + query, {
+                    headers: {Accept: 'application/json'}, signal: request.signal
+                });
+                if (!response.ok || response.redirected) throw new Error('Lookup failed');
+                const rows = await response.json();
+                if (controller !== request || !select.isConnected) return;
+                const selected = select.selectedOptions[0];
+                const value = select.value;
+                const previous = targetPage ? [...select.options].filter(option => option.value && !option.hidden) : [];
+                const options = new Map(previous.map(option => [option.value, option]));
+                rows.slice(0, 25).forEach(row => {
+                    const option = new Option(row.label, row.id);
+                    option.dataset.searchQuery = normalized;
+                    options.set(row.id, option);
+                });
+                const visible = [...options.values()].slice(-100);
+                select.replaceChildren(placeholder, ...visible);
+                if (value && !visible.some(option => option.value === value)) {
+                    selected.hidden = true;
+                    select.add(selected);
+                }
+                select.value = value;
+                page = targetPage;
+                loadedSearch = search;
+                more.hidden = rows.length <= 25;
+                picker.setError('');
+            } catch (error) {
+                if (controller !== request || error.name === 'AbortError') return;
+                loadedSearch = undefined;
+                more.hidden = true;
+                picker.setError(document.body.dataset.searchUnavailable);
+            } finally {
+                if (controller === request) cancelRequest();
+            }
+        }
+
+        const binding = window.AppSearch.bind(input, () => load(), () => {
+            cancelRequest();
+            more.hidden = true;
+            if (!parent || parent.value) picker.setLoading(true);
+        });
+        more.addEventListener('click', () => load(page + 1));
+        select.addEventListener('neo-select:open', () => {
+            if (!controller && loadedSearch !== searchValue()) load();
+        });
+        select.addEventListener('neo-select:close', () => {
+            binding.cancel();
+            if (input.value || controller) loadedSearch = undefined;
+            input.value = '';
+            cancelRequest();
+        });
+        window.addEventListener('pagehide', () => {
+            binding.cancel();
+            if (controller) loadedSearch = undefined;
+            cancelRequest();
+        });
+
+        load();
+        return () => {
+            binding.cancel();
+            cancelRequest();
+            loadedSearch = undefined;
+            page = 0;
+            input.value = '';
+            more.hidden = true;
+            select.replaceChildren(placeholder);
+            select.value = '';
+            picker.setError('');
+            load();
+        };
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, {once: true});
+    else ready();
 })();
