@@ -4,14 +4,18 @@
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <%@ include file="head.jspf" %>
 <c:set var="publicProfileRegistration" value="${entryForm.intent=='REGISTER'}"/>
+<c:set var="portalEntryTitle" value="${publicProfileRegistration?'portal.register':'portal.title'}"/>
 <div class="portal-entry ${publicProfileRegistration?'portal-registration':''}" data-resource-form-page>
-    <h1 class="erp-page-title"><spring:message code="${publicProfileRegistration?'portal.register':'portal.title'}"/></h1>
-    <nav class="portal-entry-links">
-        <a href="<c:url value='/'/>"><spring:message code="home.back"/></a>
-        <a href="<c:url value='/client-portal/register'/>"><spring:message code="portal.register"/></a>
-        <a href="<c:url value='/client-portal'/>"><spring:message code="portal.existing"/></a>
-        <a href="<c:url value='/login'/>"><spring:message code="portal.fullAccount"/></a>
+    <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>">
+        <a class="erp-page-path__link" href="<c:url value='/'/>"><spring:message code="home.back"/></a>
+        <span class="erp-page-path__separator" aria-hidden="true">&#8250;</span>
+        <c:if test="${publicProfileRegistration}">
+            <a class="erp-page-path__link" href="<c:url value='/client-portal'/>"><spring:message code="portal.title"/></a>
+            <span class="erp-page-path__separator" aria-hidden="true">&#8250;</span>
+        </c:if>
+        <span class="erp-page-path__item" aria-current="page"><spring:message code="${portalEntryTitle}"/></span>
     </nav>
+    <h1 class="erp-page-title"><spring:message code="${portalEntryTitle}"/></h1>
     <form:form modelAttribute="entryForm" action="${pageContext.request.contextPath}/client-portal/request-code" method="post" cssClass="kyc-client-form" data-accounting-dirty-form="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
         <c:choose>

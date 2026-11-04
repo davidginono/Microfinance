@@ -20,14 +20,19 @@ public final class OnboardingDtos {
                            LocalDate checkedOn, LocalDate reviewDue, String policyReference,
                            UUID actor, String actorName, OffsetDateTime recordedAt) {}
     public record Document(UUID id, String category, String name, LocalDate expiresOn, String checksum,
-                           String actor, OffsetDateTime recordedAt) {}
+                           String actor, OffsetDateTime recordedAt, long sizeBytes, String contentType) {}
     public record History(int sequence, String mode, String result, String actor, OffsetDateTime recordedAt) {}
-    public record Download(byte[] bytes, String contentType, String name) {}
+    public record Download(byte[] bytes, String contentType, String name) {
+        public boolean isImage() {
+            return "image/jpeg".equals(contentType) || "image/png".equals(contentType);
+        }
+    }
     public record OwnStatus(String state, LocalDate reviewDue) {}
     public record Notice(UUID id, String version, String english, String kiswahili) {
         public static final UUID STANDARD_ID=UUID.fromString("59bf1107-d9c1-44ca-a91f-e4b266123d3c");
     }
-    public record OwnDocument(UUID id, String category, String name, LocalDate expiresOn) {}
+    public record OwnDocument(UUID id, String category, String name, LocalDate expiresOn,
+                              long sizeBytes, String contentType, OffsetDateTime recordedAt) {}
     public record Feedback(String kind, String message, OffsetDateTime recordedAt) {}
     public record OwnHistory(int sequence, String result, OffsetDateTime recordedAt) {}
     public record OwnRevision(int sequence, ClientProfile profile, String noticeVersion, String noticeEnglish,

@@ -49,10 +49,14 @@ public class ClientOnboardingController {
         if(!errors.hasErrors())try{service.attachOwn(a,f,file);return "redirect:"+ROOT;}catch(IllegalArgumentException e){reject(errors,e);}
         return documentPage(a,m);
     }
-    @GetMapping("/documents/{id}") public ResponseEntity<byte[]> download(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id) {
+    @GetMapping("/documents/{id}") public ResponseEntity<byte[]> download(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,
+                                                                           @RequestParam(defaultValue="false") boolean preview) {
         var file=service.downloadOwn(a,id);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox")
-            .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.name()).build().toString()).contentType(MediaType.parseMediaType(file.contentType())).body(file.bytes());
+        var response=ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox");
+        if (!preview || !file.isImage()) {
+            response.header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.name()).build().toString());
+        }
+        return response.contentType(MediaType.parseMediaType(file.contentType())).body(file.bytes());
     }
     private String profile(AppUserPrincipal a,Model m) {
         var workspace=service.ownWorkspace(a,0,null);m.addAttribute("workspace",workspace);

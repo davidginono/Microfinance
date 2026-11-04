@@ -83,7 +83,12 @@ test('the active file token shows uploading state and one batch announcement',as
 });
 test('existing uploaded documents can be confirmed without uploading or navigating again',async()=>{
  const {dom,w,d,profile,posts,agree,submit}=await setup({existing:true});try{
-  const event=new w.CustomEvent('profile:before-review',{cancelable:true});profile.dispatchEvent(event);assert.equal(event.defaultPrevented,true);await settle();assert.equal(d.querySelector('.kyc-upload-confirmations').hidden,false);agree();await submit();assert.equal(posts.length,0);assert.equal(d.querySelector('dialog'),null);
+  const event=new w.CustomEvent('profile:before-review',{cancelable:true});profile.dispatchEvent(event);assert.equal(event.defaultPrevented,true);await settle();
+  const saved=d.querySelector('dialog .kyc-upload-saved');
+  assert.equal(saved.querySelector('[data-profile-document]').textContent,'Existing ID');
+  assert.equal(saved.querySelector('button'),null);
+  assert.equal(profile.querySelector('[data-profile-document]').textContent,'Existing ID');
+  assert.equal(d.querySelector('.kyc-upload-confirmations').hidden,false);agree();await submit();assert.equal(posts.length,0);assert.equal(d.querySelector('dialog'),null);
   assert.equal(profile.dispatchEvent(new w.CustomEvent('profile:before-review',{cancelable:true})),true);
  }finally{dom.window.close();}
 });

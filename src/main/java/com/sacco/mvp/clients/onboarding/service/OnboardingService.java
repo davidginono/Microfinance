@@ -188,7 +188,8 @@ public class OnboardingService {
             var decisions=records.decisions(revision.id());var decision=decisions.isEmpty()?null:decisions.getFirst();var p=revision.profile();
             c=new Client(c.id(),p.getClientNumber(),p.getFullName(),p.getPhone(),p.getEmail(),decision==null?revision.mode():decision.kind(),revision.id(),sequence,decision==null?null:decision.reviewDue(),c.portalEnabled());
         }
-        var documents=revision==null?List.<OwnDocument>of():records.attachments(revision.id()).stream().map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn())).toList();
+        var documents=revision==null?List.<OwnDocument>of():records.attachments(revision.id()).stream()
+            .map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn(),d.sizeBytes(),d.contentType(),d.recordedAt())).toList();
         var history=records.history(a,c.id(),page);
         var ownRevision=revision==null?null:new OwnRevision(revision.sequence(),personal(revision.profile()),revision.profile().getNoticeVersion(),revision.profile().getNoticeEnglish(),revision.profile().getNoticeKiswahili(),revision.profile().isNoticeAcknowledged(),revision.profile().getAcknowledgedAt());
         return new OwnWorkspace(c,ownRevision,documents,records.feedback(a,c.id(),sequence==null?null:revision.id()),new Page<>(history.stream().limit(25).map(h->new OwnHistory(h.sequence(),h.result(),h.recordedAt())).toList(),page,history.size()>25),sequence!=null);

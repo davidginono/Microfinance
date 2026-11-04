@@ -54,16 +54,23 @@
                 const dropzone = node('div', undefined, 'kyc-upload-dropzone'), choose = node('button', labels.chooseFiles, 'app-btn btn-neutral');choose.type = 'button';choose.addEventListener('click', () => picker.click());dropzone.append(node('span', labels.dropImages), choose, picker);
                 const help = node('p', sourcePicker.closest('.kyc-field')?.querySelector('.kyc-field-hint')?.textContent || sourcePicker.dataset.uploadFileError, 'kyc-field-hint');help.id = 'profile-upload-help';choose.setAttribute('aria-describedby',help.id);pickerField.append(pickerLabel,dropzone,help);
                 const queue = node('ul', undefined, 'kyc-upload-queue'), confirmations = node('div', undefined, 'kyc-upload-confirmations'), announcement = node('span', undefined, 'sr-only');queue.setAttribute('aria-label',labels.selectedImages);announcement.setAttribute('role','status');
+                const savedList = profile.querySelector('[data-profile-document-list]');
+                const saved = node('section', undefined, 'kyc-upload-saved');
+                if (savedList.querySelector('[data-profile-document]')) {
+                    saved.append(node('h3', labels.uploadedFiles), ...Array.from(savedList.childNodes, child => child.cloneNode(true)));
+                } else {
+                    saved.hidden = true;
+                }
                 const actions = node('div', undefined, 'app-modal-actions');actions.dataset.uploadActions = '';
                 const cancel = node('button', cancelText, 'app-btn btn-neutral');cancel.type = 'button';cancel.addEventListener('click', close);
                 const submit = node('button', labels.upload, 'app-btn btn-launch');submit.type = 'submit';actions.append(cancel, submit);
-                form.append(pickerField, queue, confirmations, actions);body.append(form,announcement);
+                form.append(pickerField, queue, saved, confirmations, actions);body.append(form,announcement);
                 placements.forEach(({block}) => {confirmations.append(block);block.hidden = false;});
                 checks.forEach(check => {check.setAttribute('form', profile.id);check.required = true;});
                 const rows = [];let tokenIndex = 0;
                 const number = new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits:1}), date = new Intl.DateTimeFormat('en-GB', {timeZone:'Africa/Dar_es_Salaam',day:'2-digit',month:'2-digit',year:'numeric'});
                 const fileSize = bytes => bytes < 1024 ? number.format(bytes)+' B' : bytes < 1024*1024 ? number.format(bytes/1024)+' KB' : number.format(bytes/(1024*1024))+' MB';
-                const hasDocuments = () => Boolean(profile.querySelector('[data-profile-document-list] [data-profile-document]'));
+                const hasDocuments = () => Boolean(savedList.querySelector('[data-profile-document]'));
                 const update = () => {queue.hidden = !rows.length;confirmations.hidden = !rows.length && !hasDocuments();submit.hidden = confirmations.hidden;submit.textContent = rows.some(row => !row.done) ? labels.upload : labels.done;};
                 const addFiles = incoming => {
                     if (pending || !incoming.length) return;
@@ -115,7 +122,7 @@
                             const errors = [...page.querySelectorAll('[data-workspace-response-error],.field-error,.coa-error')].map(error => error.textContent.trim()).filter(Boolean);
                             const list = page.querySelector('[data-profile-document-list]');
                             if (uploadForm(page) || !list || errors.length) throw new Error(errors.join('\n') || labels.uploadError);
-                            profile.querySelector('[data-profile-document-list]').replaceChildren(...list.childNodes);
+                            savedList.replaceChildren(...list.childNodes);
                             row.done = true;uploaded = true;row.item.dataset.uploadState = 'success';row.status.textContent = labels.uploaded;row.status.dataset.resourceStatus = 'SUCCESS';window.ConsoleResourceDetails?.init(row.status);
                         }
                         accepted = true;pending = false;dialog.close();

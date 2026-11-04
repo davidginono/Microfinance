@@ -96,8 +96,14 @@ class ClientOnboardingMvcTest {
         verify(service).attachOwn(eq(client),argThat(f->f.getRevisionId().equals(revision)&&f.getCategory().equals("ADDRESS")),any());
         when(service.downloadOwn(client,document)).thenReturn(new Download(new byte[]{1},"image/png","evidence.png"));
         mvc.perform(get("/app/onboarding/documents/"+document).with(user(client))).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("Content-Security-Policy","sandbox"));
+        mvc.perform(get("/app/onboarding/documents/"+document).param("preview","true").with(user(client)))
+            .andExpect(status().isOk()).andExpect(content().contentType("image/png"))
+            .andExpect(header().doesNotExist("Content-Disposition")).andExpect(header().string("X-Content-Type-Options","nosniff"));
+        when(service.downloadOwn(client,document)).thenReturn(new Download(new byte[]{1},"application/pdf","legacy.pdf"));
+        mvc.perform(get("/app/onboarding/documents/"+document).param("preview","true").with(user(client)))
+            .andExpect(status().isOk()).andExpect(header().string("Content-Disposition","attachment; filename=\"legacy.pdf\""));
         when(service.downloadOwn(client,document)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
-        mvc.perform(get("/app/onboarding/documents/"+document).with(user(client))).andExpect(status().isForbidden());
+        mvc.perform(get("/app/onboarding/documents/"+document).param("preview","true").with(user(client))).andExpect(status().isForbidden());
     }
     @Test void changedNoticePreservesProfileAndRequiresFreshAcknowledgements()throws Exception {
         UUID next=UUID.randomUUID();when(service.ownNotice(client)).thenReturn(new Notice(next,"Notice 2","English","Kiswahili"));

@@ -41,7 +41,11 @@
 .kyc-upload-dropzone.is-dragging { border-color: var(--aws-blue, #0972d3); background: #f1faff; }
 .kyc-upload-queue, .kyc-upload-confirmations { display: grid; gap: 12px; min-width: 0; }
 .kyc-upload-queue { list-style: none; padding: 0; margin: 0; }
+.kyc-profile-document-list { margin-bottom: 12px; }
+.kyc-upload-saved { display: grid; gap: 8px; min-width: 0; }
+.kyc-upload-saved h3 { margin: 0; font-size: 14px; }
 .kyc-upload-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px; border: 1px solid #aab7b8; border-radius: 2px; background: white; min-width: 0; align-items: end; }
+.kyc-upload-row:focus-within { border-color: var(--aws-blue, #0972d3); }
 .kyc-upload-row[data-upload-state="error"] { border-color: #b42318; }
 .kyc-upload-token { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .kyc-upload-details { flex: 1 1 0; min-width: 0; }
@@ -74,8 +78,21 @@
 .kyc-client-form :is([data-profile-business-fields],[data-profile-spouse-section])[hidden] { display: none !important; }
 
 .kyc-form-workspace:has([data-profile-wizard]) { max-width: 1160px; }
-.kyc-profile-wizard { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: start; }
-.kyc-profile-wizard nav { min-width: 0; }
+.kyc-profile-wizard {
+    --kyc-step-top: calc(var(--shell-nav-height, 0px) + var(--kyc-breadcrumb-height, 0px));
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+.kyc-profile-wizard > nav {
+    position: sticky;
+    top: var(--kyc-step-top);
+    z-index: 3;
+    min-width: 0;
+    padding: 8px 4px 8px 0;
+    background: var(--sacco-canvas, #f2f3f3);
+}
 .kyc-profile-wizard > div { min-width: 0; }
 .kyc-profile-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
 .kyc-profile-steps button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; width: 100%; padding: 0 0 0 12px; border: 0; border-left: 2px solid #aab7b8; background: transparent; text-align: start; white-space: normal; font: inherit; color: var(--aws-blue, #0972d3); overflow-wrap: anywhere; cursor: pointer; }
@@ -85,7 +102,7 @@
 .kyc-profile-steps button:focus-visible { outline: 2px solid var(--aws-blue, #0972d3); outline-offset: 4px; }
 .kyc-profile-step { display: grid; gap: 20px; min-width: 0; }
 .kyc-profile-step[hidden], .kyc-client-form [data-profile-next][hidden], .kyc-client-form [data-profile-previous][hidden], .kyc-client-form button[type="submit"][hidden] { display: none !important; }
-.kyc-profile-step > h2 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 700; }
+.kyc-profile-step > h2 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 700; scroll-margin-top: calc(var(--kyc-step-top) + 8px); }
 .kyc-profile-review-heading { display: flex; flex-flow: row wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 20px; border-bottom: 1px solid #eaeded; background: #fafafa; }
 .kyc-profile-review-heading h3 { margin: 0; font-size: 16px; font-weight: 700; }
 .kyc-profile-review dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 20px; }
@@ -93,8 +110,10 @@
 .kyc-profile-review dt { color: var(--aws-muted, #545b64); }
 .kyc-profile-review dd { margin: 4px 0 0; white-space: pre-wrap; }
 @media (max-width: 800px) {
-    .kyc-profile-wizard { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .kyc-profile-wizard { display: block; }
+    .kyc-profile-wizard > nav { margin-bottom: 12px; }
     .kyc-profile-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .kyc-profile-step > h2 { scroll-margin-top: calc(var(--kyc-step-top) + var(--kyc-step-nav-height, 0px) + 8px); }
 }
 @media (max-width: 640px) {
     .kyc-profile-review dl { grid-template-columns: minmax(0, 1fr); }

@@ -86,12 +86,12 @@ public class OnboardingRepository {
     }
     public List<Document> attachments(UUID revision) {
         return jdbc.query("""
-            select d.id,d.category,u.original_name,d.expires_on,u.sha256,m.full_name,d.recorded_at
+            select d.id,d.category,u.original_name,d.expires_on,u.sha256,m.full_name,d.recorded_at,u.size_bytes,u.content_type
             from client_onboarding_revision r join client_onboarding_document d on d.client_id=r.client_id and d.sacco_id=r.sacco_id and d.station_id=r.station_id
             join stored_uploads u on u.id=d.upload_id join members m on m.id=d.actor_id
             where r.id=? and d.sequence<=(select max(h.sequence) from client_onboarding_document_link x join client_onboarding_document h on h.id=x.document_id where x.revision_id=r.id)
             order by d.sequence desc limit 100
-            """,(r,n)->new Document(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),r.getString(6),r.getObject(7,OffsetDateTime.class)),revision);
+            """,(r,n)->new Document(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),r.getString(6),r.getObject(7,OffsetDateTime.class),r.getLong(8),r.getString(9)),revision);
     }
     public UploadUsage uploadUsage(AppUserPrincipal a,UUID client) {
         return jdbc.queryForObject("select count(*),coalesce(sum(u.size_bytes),0) from client_onboarding_document d join stored_uploads u on u.id=d.upload_id where d.client_id=? and d.sacco_id=?",
@@ -99,10 +99,10 @@ public class OnboardingRepository {
     }
     public List<Document> documents(UUID revision) {
         return jdbc.query("""
-            select distinct on(d.category) d.id,d.category,u.original_name,d.expires_on,u.sha256,m.full_name,d.recorded_at
+            select distinct on(d.category) d.id,d.category,u.original_name,d.expires_on,u.sha256,m.full_name,d.recorded_at,u.size_bytes,u.content_type
             from client_onboarding_document_link x join client_onboarding_document d on d.id=x.document_id join stored_uploads u on u.id=d.upload_id join members m on m.id=d.actor_id
             where x.revision_id=? order by d.category,d.sequence desc
-            """,(r,n)->new Document(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),r.getString(6),r.getObject(7,OffsetDateTime.class)),revision);
+            """,(r,n)->new Document(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getObject(4,LocalDate.class),r.getString(5),r.getString(6),r.getObject(7,OffsetDateTime.class),r.getLong(8),r.getString(9)),revision);
     }
     public void document(AppUserPrincipal a,UUID client,UUID revision,UUID id,UUID upload,DocumentForm f,String hash,OffsetDateTime now) {
         jdbc.update("insert into client_onboarding_document values(?,?,?,?,?,?,?,?,?,?,?, (select coalesce(max(sequence),0)+1 from client_onboarding_document where client_id=?))",

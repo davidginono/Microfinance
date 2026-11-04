@@ -37,6 +37,17 @@
         // Move live controls, never clone inputs or persist their values in browser storage.
         sections.forEach(section => panels[keys.indexOf(section.dataset.profileSection)].append(section));
         wizard.replaceChildren(nav, main);
+        const breadcrumb = wizard.closest('.portal-entry')?.querySelector(':scope > .erp-page-path');
+        const measureSticky = () => {
+            wizard.style.setProperty('--kyc-step-nav-height', nav.offsetHeight + 'px');
+            if (breadcrumb) wizard.style.setProperty('--kyc-breadcrumb-height', breadcrumb.offsetHeight + 'px');
+        };
+        measureSticky();
+        if (window.ResizeObserver) {
+            const observer = new ResizeObserver(measureSticky);
+            observer.observe(nav);
+            if (breadcrumb) observer.observe(breadcrumb);
+        }
         const storageKey = 'client-profile-step:v1:' + location.pathname.replace(/\/edit$/, '');
         let active = 0, furthest = 0, invalidPending = false;
         const fieldText = field => {
@@ -70,7 +81,8 @@
                     const value = valueText(field);if (value !== null) add(fieldText(field), value);
                 });
                 if (section.querySelector('[data-profile-document]') || section.querySelector('[name="declarationAccepted"]')) {
-                    const documents = [...section.querySelectorAll('[data-profile-document]')].map(doc => doc.textContent.trim());
+                    const documents = [...section.querySelectorAll('[data-profile-document]')]
+                        .map(doc => (doc.querySelector('[data-profile-file-name]') || doc).textContent.trim());
                     const fact = node('div');fact.append(node('dt', title), node('dd', documents.join('\n') || labels.noDocuments));facts.prepend(fact);
                 }
                 summary.append(facts);panel.insertBefore(summary, panel.querySelector('[data-profile-section="review"]'));
