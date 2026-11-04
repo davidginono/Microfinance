@@ -79,7 +79,20 @@
             const dismiss = node('button', '×', 'app-modal-close');dismiss.type = 'button';dismiss.setAttribute('aria-label', labels.close);dismiss.addEventListener('click', close);
             header.append(title, dismiss);const body = node('div', undefined, 'app-modal-body');dialog.append(header, body);document.body.append(dialog);
             document.body.style.overflow = 'hidden';document.documentElement.style.overflow = 'hidden';dialog.showModal();
-            const fail = message => {let error = body.querySelector('[data-upload-error]');if (!error) {error = node('div', undefined, 'console-message');error.dataset.uploadError = '';error.dataset.messageType = 'error';error.setAttribute('role', 'alert');error.tabIndex = -1;const actions = body.querySelector('[data-upload-actions]');if (actions) actions.before(error);else body.append(error);}error.textContent = message;window.ConsoleResourceDetails?.init(dialog);error.focus();};
+            const fail = message => {
+                let error = body.querySelector('[data-upload-error]');
+                if (!error) {
+                    error = node('div', undefined, 'console-message');
+                    error.dataset.uploadError = '';
+                    error.dataset.messageType = 'error';
+                    error.setAttribute('role', 'alert');
+                    error.tabIndex = -1;
+                    (body.querySelector('form') || body).append(error);
+                }
+                error.textContent = message;
+                window.ConsoleResourceDetails?.init(dialog);
+                error.focus();
+            };
             dialog.addEventListener('cancel', event => {if (pending || removing) event.preventDefault();});
             dialog.addEventListener('close', () => {
                 controller?.abort();previews.forEach(url => URL.revokeObjectURL(url));restore();if (!accepted) checks.forEach((check,index) => {check.checked = attachmentsChanged ? false : previousChecks[index];check.dispatchEvent(new Event('change',{bubbles:true}));});dialog.remove();document.body.style.overflow = overflow;document.documentElement.style.overflow = rootOverflow;returnFocus?.focus();
@@ -108,10 +121,15 @@
                 } else {
                     saved.hidden = true;
                 }
-                const actions = node('div', undefined, 'app-modal-actions');actions.dataset.uploadActions = '';
+                const actions = node('div', undefined, 'app-modal-actions');
                 const cancel = node('button', cancelText, 'app-btn btn-neutral');cancel.type = 'button';cancel.addEventListener('click', close);
-                const submit = node('button', labels.upload, 'app-btn btn-launch');submit.type = 'submit';actions.append(cancel, submit);
-                form.append(pickerField, queue, saved, confirmations, actions);body.append(form,announcement);
+                const submit = node('button', labels.upload, 'app-btn btn-launch');
+                submit.type = 'submit';
+                submit.setAttribute('form', form.id);
+                actions.append(cancel, submit);
+                form.append(pickerField, queue, saved, confirmations);
+                body.append(form, announcement);
+                dialog.append(actions);
                 placements.forEach(({block}) => {confirmations.append(block);block.hidden = false;});
                 checks.forEach(check => {check.setAttribute('form', profile.id);check.required = true;});
                 const rows = [];let tokenIndex = 0;

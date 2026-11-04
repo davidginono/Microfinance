@@ -31,7 +31,31 @@
 .kyc-client-form .kyc-checkbox input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; margin: 2px 0 0; }
 .kyc-acknowledgement { display: grid; gap: 6px; min-width: 0; }
 .kyc-section-body > .kyc-acknowledgement { margin-top: 16px; }
-.kyc-upload-dialog { padding: 0; width: min(728px, calc(100% - 32px)); }
+/* Center the native dialog in the viewport, independent of the workspace chrome. */
+.kyc-upload-dialog[open] {
+    position: fixed;
+    inset: 0 !important;
+    margin: auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: min(728px, calc(100% - 32px));
+    max-width: none !important;
+    max-height: calc(100dvh - 32px) !important;
+    padding: 0;
+    overflow: hidden;
+}
+.kyc-upload-dialog[open]::backdrop { inset: 0 !important; }
+.kyc-upload-dialog > .app-modal-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.kyc-upload-dialog > .app-modal-actions {
+    position: static;
+    flex: 0 0 auto;
+    padding: 12px 20px;
+}
 .kyc-upload-dialog [hidden] { display: none !important; }
 .kyc-client-form :is([data-profile-confirmations], [data-profile-declaration])[hidden] { display: none !important; }
 .kyc-upload-dialog form { min-width: 0; }
@@ -64,7 +88,6 @@
 .kyc-upload-token .kyc-upload-remove { flex: 0 0 32px; width: 32px; height: 32px; padding: 0; }
 .kyc-upload-token .kyc-upload-remove[hidden] { display: none; }
 .kyc-upload-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; overflow-wrap: anywhere; }
-.kyc-upload-dialog .app-modal-actions { position: sticky; bottom: -20px; background: white; }
 @media (max-width: 640px) { .kyc-upload-row { grid-template-columns: minmax(0, 1fr); } }
 .kyc-client-form .kyc-field-hint { margin: 0; color: var(--aws-muted, #545b64); }
 .kyc-client-form > .console-message { margin: 0; }
