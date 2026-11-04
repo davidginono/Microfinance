@@ -79,7 +79,7 @@
 .landing-footer a { color: #0972d3; font-size: 14px; }
 
 @media (min-width: 761px) {
-    .landing-portal { margin-block-start: -24px; }
+    .landing-portal { margin-block-start: -68px; }
 }
 @media (max-width: 760px) {
     .landing-page { --landing-columns: minmax(0, 1fr); }
