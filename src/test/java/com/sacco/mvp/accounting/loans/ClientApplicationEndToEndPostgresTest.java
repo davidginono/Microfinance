@@ -42,9 +42,12 @@ class ClientApplicationEndToEndPostgresTest {
             var portal=app.getBean(ClientPortalService.class);var applications=app.getBean(ClientApplicationService.class);
             String base="http://127.0.0.1:"+((WebServerApplicationContext)app).getWebServer().getPort();
             var http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).connectTimeout(Duration.ofSeconds(10)).build();
+            assertThat(get(http,base+"/")).contains("href=\"/client-portal/register\"","Staff login")
+                .doesNotContain("href=\"/system-admin/login\"");
             String register=get(http,base+"/client-portal/register");assertThat(register).contains("Client portal","registration.profile.firstName");
             for(String field:com.sacco.mvp.clients.onboarding.service.OnboardingService.PERSONAL_FIELDS)if(!field.equals("groupId")&&!field.equals("activity"))assertThat(register).contains("name=\"registration.profile."+field+"\"");
-            assertThat(register).contains("Attachments and Documents","Spouse details","Bank details","Verify your contact to add photos and documents.").doesNotContain("data-loan-choice");
+            assertThat(register).contains("Spouse details","Bank details","Verify your contact to add photos and documents.")
+                .doesNotContain("data-loan-choice","data-income-required");
             var fields=ClientOnboardingRenderedPostgresTest.hidden(register);fields.put("intent","REGISTER");fields.put("institution",fixture.f.institution);fields.put("branch","B1");fields.put("registration.profile.firstName","Synthetic");fields.put("registration.profile.lastName","Applicant");fields.put("registration.profile.phone",fixture.phone());fields.put("registration.profile.email",UUID.randomUUID()+"@example.invalid");
             fields.put("registration.profile.businessName","Public synthetic shop");fields.put("registration.profile.dailySales","12345.67");fields.put("registration.profile.spouseName","Public synthetic spouse");fields.put("registration.profile.bankAccountNumber","9876543210");
             post(http,base+"/client-portal/request-code",fields);String verifyPage=get(http,base+"/client-portal/verify");var verification=ClientOnboardingRenderedPostgresTest.hidden(verifyPage);verification.put("code",OTP.get());post(http,base+"/client-portal/verify",verification);

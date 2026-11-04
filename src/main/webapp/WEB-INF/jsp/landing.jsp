@@ -58,7 +58,6 @@
     <h2 id="staffTitle"><spring:message code="home.staff" /></h2>
     <nav aria-labelledby="staffTitle">
         <a href="<c:url value='/login'><c:param name='tab' value='staff' /></c:url>"><spring:message code="home.staffLogin" /></a>
-        <a href="<c:url value='/system-admin/login' />"><spring:message code="home.systemAdmin" /></a>
     </nav>
 </footer>
 </body>
