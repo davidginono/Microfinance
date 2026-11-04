@@ -164,10 +164,23 @@
                         row.item = item;row.category = category;row.expiry = expiry;row.remove = remove;
                         const refresh = () => {const photo = ['PROFILE_PHOTO','SPOUSE_PHOTO'].includes(category.value);expiryField.hidden = photo;expiry.disabled = photo;if (photo) expiry.value = '';checks.forEach(check => check.checked = false);};
                         category.addEventListener('change', refresh);expiry.addEventListener('change', () => checks.forEach(check => check.checked = false));refresh();
-                        remove.addEventListener('click', () => {const index = rows.indexOf(row);rows.splice(index,1);if(row.preview){URL.revokeObjectURL(row.preview);previews.delete(row.preview);}item.remove();checks.forEach(check => check.checked = false);update();const next = rows[Math.min(index,rows.length-1)]?.remove;(next && !next.disabled ? next : choose).focus();});
-                        item.append(token, categoryField, expiryField);queue.append(item);rows.push(row);
+                        remove.addEventListener('click', () => {
+                            const adjacent = item.nextElementSibling || item.previousElementSibling;
+                            rows.splice(rows.indexOf(row), 1);
+                            if (row.preview) {URL.revokeObjectURL(row.preview);previews.delete(row.preview);}
+                            item.remove();
+                            checks.forEach(check => check.checked = false);
+                            update();
+                            (adjacent?.querySelector('.kyc-upload-remove:not(:disabled)') || choose).focus();
+                        });
+                        item.append(token, categoryField, expiryField);
+                        // Display newest selections first while uploading in selection order.
+                        queue.prepend(item);
+                        rows.push(row);
                     }
                     picker.value = '';update();window.refreshEnhancedSelects?.(queue);
+                    body.scrollTop = 0;
+                    queue.firstElementChild.scrollIntoView?.({block:'nearest'});
                 };
                 picker.addEventListener('change', () => addFiles([...picker.files]));
                 dropzone.addEventListener('dragover',event=>{event.preventDefault();if(!pending)dropzone.classList.add('is-dragging');});
@@ -195,6 +208,9 @@
                             savedList.replaceChildren(...list.childNodes);
                             showRemoveButtons();
                             row.done = true;attachmentsChanged = true;row.item.dataset.uploadState = 'success';row.status.textContent = labels.uploaded;row.status.dataset.resourceStatus = 'SUCCESS';window.ConsoleResourceDetails?.init(row.status);
+                        }
+                        if (rows.some(row => row.done)) {
+                            returnFocus = savedList.querySelector('[data-profile-file-name] a') || returnFocus;
                         }
                         accepted = true;pending = false;dialog.close();
                     } catch (error) {if (error.name !== 'AbortError') {const message = error instanceof TypeError ? labels.uploadError : error.message || labels.uploadError;if(activeRow){activeRow.item.dataset.uploadState = 'error';activeRow.status.className = 'kyc-upload-status coa-error';activeRow.status.textContent = message;activeRow.status.setAttribute('role','alert');}else fail(message);}}

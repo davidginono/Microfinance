@@ -10,7 +10,20 @@ async function setup({existing=false,failAt=0,remainingFiles=10,remainingBytes=1
  w.URL.createObjectURL=file=>{const url='blob:test-'+created.length;created.push(url);return url;};w.URL.revokeObjectURL=url=>revoked.push(url);
  w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');this.dispatchEvent(new w.Event('close'));};
  const upload=()=>`<form data-onboarding-form="document"><input type="hidden" name="_csrf" value="csrf-token"><input type="hidden" name="revisionId" value="revision-3"><input type="hidden" name="requestKey" value="upload-${++sequence}"><label><span>Category</span><select name="category"><option value="IDENTITY">Identity</option><option value="ADDRESS">Address</option><option value="ACTIVITY">Business</option><option value="PROFILE_PHOTO">Client photo</option></select></label><label><span>Expiry</span><input type="date" name="expiresOn"></label><input type="file" name="file" data-upload-max-bytes="${maxBytes}" data-upload-remaining-files="${remainingFiles}" data-upload-remaining-bytes="${remainingBytes}" data-upload-file-error="JPG or PNG, up to 1 MB" data-upload-limit-error="Upload limit reached"><div class="accounting-form-actions"><a href="/app/onboarding">Cancel</a></div></form>`;
- w.fetch=async(url,options={})=>{requests.push({url,options});let html;if(options.method==='POST'){posts.push(options.body);html=failAt===posts.length?upload()+'<div data-workspace-response-error>Invalid file</div>':`<div data-profile-document-list>${posts.map((data,i)=>'<p data-profile-document>'+data.get('file').name+'</p>').join('')}</div>`;}else html=upload();return {ok:true,headers:{get:()=> 'text/html'},text:async()=>html};};
+ const savedFiles=[];
+ w.fetch=async(url,options={})=>{
+  requests.push({url,options});
+  let html;
+  if(options.method==='POST'){
+   posts.push(options.body);
+   if(failAt===posts.length)html=upload()+'<div data-workspace-response-error>Invalid file</div>';
+   else{
+    savedFiles.unshift(options.body.get('file').name);
+    html=`<div data-profile-document-list>${savedFiles.map(name=>'<p data-profile-document data-profile-file-name><a href="/file">'+name+'</a></p>').join('')}</div>`;
+   }
+  }else html=upload();
+  return {ok:true,headers:{get:()=> 'text/html'},text:async()=>html};
+ };
  w.eval(source);await new Promise(resolve=>d.addEventListener('DOMContentLoaded',resolve,{once:true}));
  const profile=d.querySelector('form');profile.classList.add('accounting-create-form');
  const guard=d.createElement('div');guard.id='accounting-discard-modal';guard.hidden=true;guard.innerHTML='<div role="dialog"><button type="button" data-accounting-keep>Close</button><div class="app-modal-actions"><button type="button" data-accounting-keep>Continue editing</button><button type="button" data-accounting-discard>Discard</button></div></div>';d.body.append(guard);
@@ -35,19 +48,21 @@ test('Add document opens in place despite unsaved profile changes and hides conf
 });
 test('one confirmation covers the completed selection and each file uses its own request key and category',async()=>{
  const {dom,w,d,profile,posts,open,choose,agree,submit}=await setup();try{
-  await open();await choose('id.png','address.png');d.querySelectorAll('.kyc-upload-row select')[1].value='ADDRESS';
+  await open();await choose('id.png','address.png');d.querySelector('.kyc-upload-row select').value='ADDRESS';
   await submit();assert.equal(posts.length,0);agree();await submit();
   assert.equal(posts.length,2);assert.deepEqual(posts.map(data=>data.get('category')),['IDENTITY','ADDRESS']);assert.notEqual(posts[0].get('requestKey'),posts[1].get('requestKey'));
   assert.ok(posts.every(data=>data.get('_csrf')==='csrf-token'&&data.get('revisionId')==='revision-3'));assert.equal(d.querySelector('dialog'),null);
   assert.equal(profile.elements.noticeAcknowledged.checked,true);assert.equal(profile.elements.declarationAccepted.checked,true);assert.equal(new w.FormData(profile).get('requestKey'),'profile-key');
   assert.equal(profile.elements['profile.address'].value,'Unsaved home address');assert.equal(d.querySelectorAll('[data-profile-document]').length,2);assert.equal(profile.elements.noticeAcknowledged.required,false);
+  assert.deepEqual([...d.querySelectorAll('[data-profile-document]')].map(row=>row.textContent),['address.png','id.png']);
+  assert.equal(d.activeElement,d.querySelector('[data-profile-document] a'));
  }finally{dom.window.close();}
 });
 test('changing the selection resets confirmations and photo rows do not submit expiry dates',async()=>{
  const {dom,w,d,profile,posts,open,choose,agree,submit}=await setup();try{
   await open();await choose('id.png');agree();await choose('photo.png');assert.equal(profile.elements.noticeAcknowledged.checked,false);
-  const row=d.querySelectorAll('.kyc-upload-row')[1],category=row.querySelector('select');category.value='PROFILE_PHOTO';category.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(row.querySelector('input[type=date]').disabled,true);
-  d.querySelector('.kyc-upload-row button').click();assert.equal(d.querySelectorAll('.kyc-upload-row').length,1);agree();await submit();assert.equal(posts[0].get('category'),'PROFILE_PHOTO');assert.equal(posts[0].get('expiresOn'),'');
+  const row=d.querySelector('.kyc-upload-row'),category=row.querySelector('select');category.value='PROFILE_PHOTO';category.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(row.querySelector('input[type=date]').disabled,true);
+  d.querySelectorAll('.kyc-upload-row button')[1].click();assert.equal(d.querySelectorAll('.kyc-upload-row').length,1);agree();await submit();assert.equal(posts[0].get('category'),'PROFILE_PHOTO');assert.equal(posts[0].get('expiresOn'),'');
  }finally{dom.window.close();}
 });
 test('partial failures retain the remaining files, original profile and successful uploads without replaying them',async()=>{
@@ -59,18 +74,19 @@ test('partial failures retain the remaining files, original profile and successf
 test('selected image tokens show basename, size, modified date and previews with accessible individual removal',async()=>{
  const {dom,d,open,choose,created,revoked}=await setup();try{
   await open();await choose('C:\\fakepath\\identity.png','address.png');
-  const rows=d.querySelectorAll('ul.kyc-upload-queue > li');assert.equal(rows.length,2);assert.equal(rows[0].querySelector('.kyc-upload-name').textContent,'identity.png');
-  assert.match(rows[0].querySelector('.kyc-upload-metadata').textContent,/Size9 B/);assert.match(rows[0].querySelector('.kyc-upload-metadata').textContent,/Modified03\/11\/2026/);assert.equal(rows[0].querySelector('img').src,created[0]);
-  const remove=rows[0].querySelector('button');assert.equal(remove.getAttribute('aria-label'),'Remove file 1: identity.png');remove.click();assert.deepEqual(revoked,[created[0]]);assert.equal(d.activeElement,d.querySelector('.kyc-upload-row button'));
+  const rows=d.querySelectorAll('ul.kyc-upload-queue > li');assert.equal(rows.length,2);assert.equal(rows[1].querySelector('.kyc-upload-name').textContent,'identity.png');
+  assert.match(rows[1].querySelector('.kyc-upload-metadata').textContent,/Size9 B/);assert.match(rows[1].querySelector('.kyc-upload-metadata').textContent,/Modified03\/11\/2026/);assert.equal(rows[1].querySelector('img').src,created[0]);
+  const remove=rows[1].querySelector('button');assert.equal(remove.getAttribute('aria-label'),'Remove file 1: identity.png');remove.click();assert.deepEqual(revoked,[created[0]]);assert.equal(d.activeElement,d.querySelector('.kyc-upload-row button'));
   d.querySelector('.app-modal-close').click();assert.deepEqual(new Set(revoked),new Set(created));
  }finally{dom.window.close();}
 });
-test('Choose files only opens the picker and dropping more images appends tokens',async()=>{
+test('Choose files only opens the picker and dropping more images reveals the newest token first',async()=>{
  const {dom,w,d,open,choose}=await setup();try{
   await open();let pickerClicks=0,submits=0;d.querySelector('dialog input[type=file]').addEventListener('click',()=>pickerClicks++);d.querySelector('dialog form').addEventListener('submit',()=>submits++);
   [...d.querySelectorAll('dialog button')].find(button=>button.textContent==='Choose files').click();assert.equal(pickerClicks,1);assert.equal(submits,0);
-  await choose('first.png');const drop=new w.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(drop,'dataTransfer',{value:{files:[new w.File(['data'],'second.jpg',{lastModified:Date.UTC(2026,10,3)})]}});d.querySelector('.kyc-upload-dropzone').dispatchEvent(drop);await settle();
-  assert.equal(drop.defaultPrevented,true);assert.deepEqual([...d.querySelectorAll('.kyc-upload-name')].map(node=>node.textContent),['first.png','second.jpg']);
+  await choose('first.png');const body=d.querySelector('.app-modal-body');body.scrollTop=150;
+  const drop=new w.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(drop,'dataTransfer',{value:{files:[new w.File(['data'],'second.jpg',{lastModified:Date.UTC(2026,10,3)})]}});d.querySelector('.kyc-upload-dropzone').dispatchEvent(drop);await settle();
+  assert.equal(drop.defaultPrevented,true);assert.equal(body.scrollTop,0);assert.deepEqual([...d.querySelectorAll('.kyc-upload-name')].map(node=>node.textContent),['second.jpg','first.png']);
  }finally{dom.window.close();}
 });
 test('the active file token shows uploading state and one batch announcement',async()=>{
