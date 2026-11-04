@@ -82,6 +82,15 @@
             const header = node('div', undefined, 'app-modal-header'), title = node('h2', link.textContent.trim(), 'erp-panel-title');title.id = 'profile-upload-title';
             const dismiss = node('button', '×', 'app-modal-close');dismiss.type = 'button';dismiss.setAttribute('aria-label', labels.close);dismiss.addEventListener('click', close);
             header.append(title, dismiss);const body = node('div', undefined, 'app-modal-body');dialog.append(header, body);document.body.append(dialog);
+            const portalNav = document.querySelector('.client-portal > .portal-nav');
+            const alignWithPortal = () => {
+                const top = Math.max(0, portalNav.getBoundingClientRect().bottom);
+                dialog.style.setProperty('--shell-modal-top', top + 'px');
+            };
+            if (portalNav) {
+                alignWithPortal();
+                window.addEventListener('resize', alignWithPortal);
+            }
             document.body.style.overflow = 'hidden';document.documentElement.style.overflow = 'hidden';dialog.showModal();
             const fail = message => {
                 let error = body.querySelector('[data-upload-error]');
@@ -99,6 +108,7 @@
             };
             dialog.addEventListener('cancel', event => {if (pending || removing) event.preventDefault();});
             dialog.addEventListener('close', () => {
+                window.removeEventListener('resize', alignWithPortal);
                 controller?.abort();previews.forEach(url => URL.revokeObjectURL(url));restore();if (!accepted) checks.forEach((check,index) => {check.checked = attachmentsChanged ? false : previousChecks[index];check.dispatchEvent(new Event('change',{bubbles:true}));});dialog.remove();document.body.style.overflow = overflow;document.documentElement.style.overflow = rootOverflow;returnFocus?.focus();
             }, {once:true});
             controller = new AbortController();window.AppLoading?.begin(body);

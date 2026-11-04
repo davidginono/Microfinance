@@ -31,21 +31,18 @@
 .kyc-client-form .kyc-checkbox input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; margin: 2px 0 0; }
 .kyc-acknowledgement { display: grid; gap: 6px; min-width: 0; }
 .kyc-section-body > .kyc-acknowledgement { margin-top: 16px; }
-/* Center the native dialog in the viewport, independent of the workspace chrome. */
+/* Keep the native dialog fixed while its body scrolls inside the workspace. */
 .kyc-upload-dialog[open] {
     position: fixed;
-    inset: 0 !important;
     margin: auto;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     width: min(728px, calc(100% - 32px));
-    max-width: none !important;
-    max-height: calc(100dvh - 32px) !important;
     padding: 0;
     overflow: hidden;
 }
-.kyc-upload-dialog[open]::backdrop { inset: 0 !important; }
+.client-portal .kyc-upload-dialog { --shell-modal-left: 0px; }
 .kyc-upload-dialog > .app-modal-body {
     min-height: 0;
     overflow-y: auto;

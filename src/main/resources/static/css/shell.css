@@ -2248,7 +2248,7 @@ body.aws-console {
 .aws-console :is(.app-modal-overlay, .repayment-schedule-modal-overlay, .session-timeout-overlay),
 .aws-console dialog,
 .aws-console dialog::backdrop {
-    inset: var(--shell-nav-height) 0 0 var(--shell-modal-left) !important;
+    inset: var(--shell-modal-top, var(--shell-nav-height)) 0 0 var(--shell-modal-left) !important;
 }
 
 .aws-console :is(.app-modal-overlay, .repayment-schedule-modal-overlay, .session-timeout-overlay) {
@@ -2258,7 +2258,7 @@ body.aws-console {
 .aws-console :is(.app-modal-overlay, .repayment-schedule-modal-overlay, .session-timeout-overlay) > :is(.app-modal-panel, .repayment-schedule-modal-panel, .session-timeout-panel),
 .aws-console dialog {
     max-width: calc(100vw - var(--shell-modal-left) - 32px) !important;
-    max-height: calc(100dvh - var(--shell-nav-height) - 32px) !important;
+    max-height: calc(100dvh - var(--shell-modal-top, var(--shell-nav-height)) - 32px) !important;
 }
 
 .app-modal-panel,
