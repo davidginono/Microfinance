@@ -3005,12 +3005,6 @@
                 radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
                 linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
         }
-        .auth-frame {
-            border-radius: 1rem;
-            border: 1px solid #d7e3ee;
-            background: #ffffff;
-            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
-        }
         .auth-title-stack {
             display: flex;
             flex-direction: column;
@@ -3134,9 +3128,6 @@
         @media (max-width: 640px) {
             .auth-heading {
                 font-size: 1.85rem;
-            }
-            .auth-frame {
-                border-radius: 1rem;
             }
         }
 

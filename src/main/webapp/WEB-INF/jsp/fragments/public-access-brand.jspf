@@ -1,0 +1,3 @@
+<div class="public-access-brand">
+    <%@ include file="microfinance-wordmark.jspf" %>
+</div>

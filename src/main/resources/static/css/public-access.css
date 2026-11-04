@@ -1,0 +1,77 @@
+html:has(body.public-access) {
+    background: #fff;
+    scrollbar-gutter: auto;
+}
+
+body.public-access {
+    --public-access-card-width: 24rem;
+    --public-access-card-padding: clamp(18px, 4vw, 28px);
+    margin: 0;
+    min-height: 100dvh;
+    /* The public portal uses console controls, but its canvas follows the sign-in pages. */
+    background: #fff url("../images/public-access-cubes.png") center bottom / 100% auto no-repeat fixed !important;
+}
+
+.public-access-layout {
+    box-sizing: border-box;
+    display: grid;
+    justify-items: center;
+    align-items: safe center;
+    min-height: 100dvh;
+    padding: 56px 16px 40px;
+}
+
+.public-access-card {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--public-access-card-width);
+    min-width: 0;
+    padding: 36px var(--public-access-card-padding) var(--public-access-card-padding);
+    border: 1px solid #d5dbdb;
+    border-top-color: #eaeded;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: 0 1px 1px #879596;
+    overflow-wrap: anywhere;
+}
+
+.public-access-brand {
+    display: flex;
+    flex-direction: column;
+    width: 10rem;
+    max-width: 100%;
+    margin: 8px auto 48px;
+    color: #232f3e;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.public-access-brand svg {
+    width: 100%;
+    height: 11px;
+    margin-top: 4px;
+    color: #ec7211;
+}
+
+.auth-language {
+    position: absolute;
+    top: 8px;
+    right: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    z-index: 10;
+    font-size: 14px;
+}
+
+.auth-language a { display: inline-flex; align-items: center; min-height: 36px; color: #0972d3; }
+.auth-language a[aria-current] { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+.auth-language a:focus-visible { outline: 2px solid #0972d3; outline-offset: 3px; }
+
+@media (max-width: 639px) {
+    .public-access-layout { padding: 54px 12px 40px; }
+    .public-access-card { padding-top: 24px; }
+    .public-access-brand { margin-bottom: 32px; }
+}

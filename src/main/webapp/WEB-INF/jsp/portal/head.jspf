@@ -3,11 +3,22 @@
 <title><spring:message code="portal.title"/></title>
 <c:forEach items="${['amazon-ember','tailwind','console-components','shell','resource-table','workspace-resources','console-resource-details','ui-loading','date-controls','form-validation','accounting-ledger','client-onboarding','client-portal']}" var="asset"><link rel="stylesheet" href="<c:url value='/css/${asset}.css'/>"/></c:forEach>
 <%@ include file="../fragments/select-enhancer.jspf" %>
+<c:if test="${not portalWorkspace}"><link rel="stylesheet" href="<c:url value='/css/public-access.css'/>"/></c:if>
 <script src="<c:url value='/js/live-search.js'/>"></script>
 <c:forEach items="${['date-controls','form-validation','ui-loading','resource-table','console-resource-details','client-portal']}" var="script"><script src="<c:url value='/js/${script}.js'/>" defer></script></c:forEach>
-</head><body class="aws-console client-portal" data-select-search="<spring:message code='common.search'/>" data-select-load-more="<spring:message code='common.next'/>" data-shell-loading="<spring:message code='shell.control.loading'/>" data-portal-save-error="<spring:message code='portal.error.save'/>" data-portal-error="<spring:message code='portal.error.invalid'/>" data-date-choose="<spring:message code='date.choose'/>" data-date-invalid="<spring:message code='date.invalid'/>">
+</head><body class="aws-console client-portal${portalWorkspace ? '' : ' public-access'}" data-select-search="<spring:message code='common.search'/>" data-select-load-more="<spring:message code='common.next'/>" data-shell-loading="<spring:message code='shell.control.loading'/>" data-portal-save-error="<spring:message code='portal.error.save'/>" data-portal-error="<spring:message code='portal.error.invalid'/>" data-date-choose="<spring:message code='date.choose'/>" data-date-invalid="<spring:message code='date.invalid'/>">
 <%@ include file="../fragments/resource-table-labels.jspf" %>
 <template id="console-resource-labels" data-copy="<spring:message code='common.copy'/>" data-copied="<spring:message code='common.copied'/>" data-copy-failed="<spring:message code='common.copyFailed'/>" data-breadcrumb="<spring:message code='common.breadcrumb'/>" data-sections="<spring:message code='common.detailSections'/>"></template>
-<header class="portal-top"><a href="<c:url value='/client-portal'/>"><spring:message code="portal.title"/></a><nav aria-label="<spring:message code='portal.language'/>"><a href="?lang=en">English</a><a href="?lang=sw">Kiswahili</a></nav><c:if test="${portalWorkspace}"><form method="post" action="<c:url value='/logout'/>"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><button class="app-btn btn-neutral"><spring:message code="login.logout" text="Logout"/></button></form></c:if></header>
-<c:if test="${portalWorkspace}"><aside class="portal-nav"><a href="<c:url value='/client-portal/workspace/profile'/>"><spring:message code="kyc.form.self"/></a><a href="<c:url value='/client-portal/workspace/applications'/>"><spring:message code="portal.applications"/></a></aside></c:if>
-<main class="portal-main" id="main-content"><div class="shell-content-frame">
+<c:choose>
+    <c:when test="${portalWorkspace}">
+        <header class="portal-top"><a href="<c:url value='/client-portal'/>"><spring:message code="portal.title"/></a><nav aria-label="<spring:message code='portal.language'/>"><a href="?lang=en">English</a><a href="?lang=sw">Kiswahili</a></nav><form method="post" action="<c:url value='/logout'/>"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><button class="app-btn btn-neutral"><spring:message code="login.logout" text="Logout"/></button></form></header>
+        <aside class="portal-nav"><a href="<c:url value='/client-portal/workspace/profile'/>"><spring:message code="kyc.form.self"/></a><a href="<c:url value='/client-portal/workspace/applications'/>"><spring:message code="portal.applications"/></a></aside>
+    </c:when>
+    <c:otherwise>
+        <nav class="auth-language" aria-label="<spring:message code='portal.language'/>">
+            <a href="?lang=en" lang="en" hreflang="en" ${pageContext.response.locale.language eq 'en' ? 'aria-current="true"' : ''}>English</a>
+            <a href="?lang=sw" lang="sw" hreflang="sw" ${pageContext.response.locale.language eq 'sw' ? 'aria-current="true"' : ''}>Kiswahili</a>
+        </nav>
+    </c:otherwise>
+</c:choose>
+<main class="portal-main${portalWorkspace ? '' : ' public-access-layout'}" id="main-content"><div class="shell-content-frame">

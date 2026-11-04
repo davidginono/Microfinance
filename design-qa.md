@@ -21,3 +21,15 @@ Local evidence: C:/Users/USER/.codex/visualizations/2026/10/20/01a157e7-bf8f-7f0
 final result: passed — final component comparison and visual recapture completed.
 
 Follow-up heading correction: Loan details no longer includes the Loan ID, and the client container heading shows the client name only. Loan ID and Client Number are labeled summary facts using existing English/Kiswahili messages and the responsive fact grid. The source diff was verified; browser recapture of this text-only correction was unavailable after the Chrome connection disconnected. Earlier screenshots show the prior headings.
+
+## Public access cards — 4 November 2026
+
+Compared the supplied password setup reference with the rendered client portal at 1366 × 800. The paired viewport and card captures exclude browser chrome. The white canvas, bottom cube artwork, card width and inset, thin border, field proportions, Amazon Ember text and full width orange action follow the reference. Microfinance branding, form content, language choices and the breadcrumb above the portal card reflect the application.
+
+The first portal capture showed the console canvas covering the artwork and a shorter action. The recapture confirmed the corrected white canvas and artwork, a 44 px primary action and no horizontal overflow at 360, 768, 1366 or 1920 px. Also checked sign-in tab switching, password visibility and reset dialog, the removed visible login heading, account registration at 360 px, and the Kiswahili portal registration wizard with the breadcrumb outside the card. No live access code was sent.
+
+Verification: 36 focused Java checks passed, including Jasper precompilation of eight affected JSPs and login/portal security checks. The 21 focused JavaScript checks passed.
+
+Local captures: `public-access-comparison.jpg`, `public-access-card-comparison.jpg`, `public-access-portal.jpg` and `public-access-registration-mobile.jpg` in the chat's visualization directory.
+
+final result: passed — no unresolved visual defects in the reviewed card and background.

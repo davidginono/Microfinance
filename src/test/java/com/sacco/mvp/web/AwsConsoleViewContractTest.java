@@ -65,7 +65,11 @@ class AwsConsoleViewContractTest {
                     .doesNotContain("fragments/header.jspf", "fragments/sidebar.jspf");
                 return;
             }
-            assertThat(usesConsoleShell(path, new HashSet<>()) || view.contains("aws-auth.css"))
+            boolean publicLanding = path.equals(JSP_ROOT.resolve("landing.jsp")) && view.contains("landing.css");
+            boolean publicPortal = path.getParent().equals(JSP_ROOT.resolve("portal"))
+                && view.contains("file=\"head.jspf\"")
+                && read(path.getParent().resolve("head.jspf")).contains("public-access.css");
+            assertThat(usesConsoleShell(path, new HashSet<>()) || view.contains("aws-auth.css") || publicLanding || publicPortal)
                 .as("Console or authentication shell for %s", path)
                 .isTrue();
         });

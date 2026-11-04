@@ -2,11 +2,6 @@
 .auth-home-link:hover { text-decoration: underline; }
 .auth-home-link:focus-visible { outline: 3px solid #0972d3; outline-offset: 4px; }
 .auth-access-choices { display: grid; justify-items: center; gap: 8px; }
-.auth-language { position: absolute; top: 8px; right: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 16px; z-index: 10; font-size: 14px; }
-.auth-language a { display: inline-flex; align-items: center; min-height: 36px; }
-.auth-language a[aria-current] { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
-.auth-language a:focus-visible { outline: 2px solid #0972d3; outline-offset: 3px; }
-body.auth-shell.aws-auth-shell.auth-login-page > .min-h-screen { padding-top: 64px !important; }
 
 :root {
     --sacco-topbar: #232f3e;
@@ -36,11 +31,9 @@ body.auth-shell.aws-auth-shell.auth-login-page > .min-h-screen { padding-top: 64
     --aws-orange: #ec7211;
     --aws-success: #037f0c;
     --aws-danger: #d13212;
-    --auth-card-max-width: 28rem;
 }
 
-html,
-body.aws-auth-shell {
+body.aws-auth-shell:not(.public-access) {
     min-height: 100%;
     background: var(--aws-bg) !important;
 }
@@ -74,7 +67,7 @@ body.auth-shell.aws-auth-shell::before {
     content: none;
 }
 
-body.aws-auth-shell main,
+body.aws-auth-shell main:not(.public-access-layout),
 body.aws-auth-shell > .min-h-screen {
     padding-top: 68px !important;
     background: transparent !important;
@@ -167,19 +160,13 @@ body.aws-auth-shell .auth-form-fields > label {
     text-align: right;
 }
 
-body.auth-registration-page {
-    --auth-card-max-width: 28rem;
-}
-
-body.auth-registration-page main.auth-form-page {
-    padding: 32px 16px !important;
-}
-
 .registration-initializing .registration-layout { visibility: hidden; }
-.registration-layout { max-width: var(--auth-card-max-width); }
+.public-access .registration-layout {
+    --public-access-card-width: 28rem;
+    max-width: var(--public-access-card-width);
+}
 .registration-heading { margin-bottom: 20px; }
 .registration-heading h1 { margin: 0; }
-.registration-card { padding: 24px; }
 .registration-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .registration-fields > div, .registration-name-fields > div { min-width: 0; }
 .registration-names { min-width: 0; margin: 0; border: 0; padding: 0; }
@@ -212,10 +199,6 @@ body.auth-registration-page .registration-actions button:disabled:not(.is-loadin
     .auth-form-card,
     .auth-form-section {
         padding: 20px 16px;
-    }
-
-    body.auth-registration-page main.auth-form-page {
-        padding: 20px 12px !important;
     }
 
     .registration-name-fields { grid-template-columns: minmax(0, 1fr); }
@@ -472,7 +455,7 @@ body.aws-auth-shell [role="tabpanel"][hidden] {
     margin-bottom: 20px;
 }
 
-.auth-login-layout { width:100%;max-width:var(--auth-card-max-width);min-width:0; }
+.auth-login-layout { width: 100%; max-width: var(--public-access-card-width); min-width: 0; }
 .auth-login-notice:not(.hidden) { margin-bottom:16px; }
 
 .auth-notification-rail:empty { display: none; }
@@ -521,7 +504,6 @@ body.aws-auth-shell .auth-notification-bar .app-toast-close-icon {
     flex: 0 0 14px;
 }
 
-body.aws-auth-shell .auth-frame,
 body.aws-auth-shell .error-card,
 body.aws-auth-shell .forgot-password-dialog {
     overflow: hidden;
@@ -531,8 +513,34 @@ body.aws-auth-shell .forgot-password-dialog {
     box-shadow: 0 1px 1px rgba(0, 28, 36, .12) !important;
 }
 
-body.auth-shell.aws-auth-shell .auth-frame {
-    max-width: var(--auth-card-max-width) !important;
+body.aws-auth-shell.public-access .auth-heading { letter-spacing: normal; }
+body.aws-auth-shell.public-access .public-access-card label {
+    color: var(--aws-ink) !important;
+    font-size: 14px !important;
+    text-transform: none;
+}
+
+body.aws-auth-shell.public-access .public-access-card :is(.auth-input, .registration-field:not(.sr-only), .registration-select) {
+    height: 34px !important;
+    border-color: #aab7b8 !important;
+}
+
+body.aws-auth-shell.public-access .public-access-card :is(.auth-input, .registration-field, .registration-select):focus {
+    border-color: var(--aws-blue) !important;
+}
+
+body.aws-auth-shell.public-access .public-access-card :is([data-login-submit-button], .registration-actions button) {
+    min-height: 44px !important;
+    height: auto !important;
+    font-size: 15px !important;
+    line-height: 1.25 !important;
+    padding: 8px 12px !important;
+}
+
+.public-access-card .registration-actions button { width: 100%; }
+
+.public-access-card .auth-mode-title {
+    text-align: start;
 }
 
 body.aws-auth-shell .forgot-password-dialog {
@@ -672,7 +680,7 @@ body.aws-auth-shell .auth-ellipsis-loader > span:nth-child(3) {
         font-size: 12px;
     }
 
-    body.aws-auth-shell main,
+    body.aws-auth-shell main:not(.public-access-layout),
     body.aws-auth-shell > .min-h-screen {
         align-items: flex-start !important;
         padding: 64px 10px 16px !important;
@@ -682,9 +690,8 @@ body.aws-auth-shell .auth-ellipsis-loader > span:nth-child(3) {
         padding-top: 16px !important;
     }
 
-    body.aws-auth-shell .auth-frame,
     body.aws-auth-shell .error-card,
-    body.aws-auth-shell .auth-form-layout {
+    body.aws-auth-shell .auth-form-layout:not(.registration-layout) {
         width: 100% !important;
         max-width: 100% !important;
     }

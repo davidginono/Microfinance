@@ -18,12 +18,13 @@
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-auth-alerts' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css?v=20261030-auth-alerts' />" />
     <link rel="stylesheet" href="<c:url value='/css/form-validation.css?v=20261030-registration' />" />
+    <link rel="stylesheet" href="<c:url value='/css/public-access.css' />" />
     <script defer src="<c:url value='/js/form-validation.js' />"></script>
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
-<body class="auth-shell aws-auth-shell auth-registration-page min-h-screen font-sans text-slate-900 antialiased">
+<body class="auth-shell aws-auth-shell auth-registration-page public-access min-h-screen font-sans text-slate-900 antialiased">
 <span id="form-validation-labels" hidden
       data-field="<spring:message code='validation.field' htmlEscape='true' />"
       data-required="<spring:message code='validation.required' htmlEscape='true' />"
@@ -32,16 +33,18 @@
       data-maximum="<spring:message code='validation.maximum' htmlEscape='true' />"
       data-short="<spring:message code='validation.short' htmlEscape='true' />"
       data-long="<spring:message code='validation.long' htmlEscape='true' />"></span>
-<main class="auth-form-page">
+<main class="public-access-layout">
 <div class="auth-form-layout registration-layout">
     <a class="auth-home-link" href="<c:url value='/' />"><spring:message code="home.back" /></a>
+    <div class="public-access-card">
+    <%@ include file="fragments/public-access-brand.jspf" %>
     <div class="auth-title-stack registration-heading"><h1 class="auth-heading"><spring:message code="register.member.title" /></h1></div>
     <p class="console-message" data-message-type="info" role="status"><spring:message code="register.member.provisional"/></p>
     <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <c:if test="${not empty errors}"><div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div></c:if>
     <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <section class="auth-form-section registration-card" aria-label="<spring:message code='register.member.title' htmlEscape='true' />">
+        <section aria-label="<spring:message code='register.member.title' htmlEscape='true' />">
             <div class="registration-fields">
                 <fieldset class="registration-names" aria-label="<spring:message code='register.member.fullName' htmlEscape='true' />">
                     <div class="registration-name-fields">
@@ -195,7 +198,6 @@
         <div id="registrationVerifyError" class="hidden" data-auto-scroll-message="true" aria-live="assertive"></div>
         <div id="registrationVerifySuccess" class="hidden" data-auto-scroll-message="true" aria-live="polite"></div>
         <div class="auth-form-actions registration-actions">
-            <a href="/login" class="registration-action auth-secondary-btn inline-flex items-center justify-center text-slate-700"><spring:message code="register.member.back" /></a>
             <button id="memberRegisterRequestOtp" class="otp-request-button auth-primary-btn registration-action inline-flex items-center justify-center gap-2" type="button"
                 data-idle-label="<spring:message code='register.member.sendCode' htmlEscape='true' />"
                 data-loading-label="<spring:message code='register.member.sendingCode' htmlEscape='true' />"
@@ -207,8 +209,10 @@
                 <span id="memberRegisterSubmitLoader" class="auth-ellipsis-loader hidden" aria-hidden="true"><span></span><span></span><span></span></span>
                 <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
             </button>
+            <a href="/login" class="registration-action auth-secondary-btn inline-flex items-center justify-center text-slate-700"><spring:message code="register.member.back" /></a>
         </div>
     </form:form>
+    </div>
 </div>
 </main>
 <script>

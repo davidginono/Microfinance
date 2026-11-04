@@ -20,11 +20,7 @@
 <header class="landing-topbar">
     <div class="landing-width landing-topbar__content">
         <a class="landing-brand" href="<c:url value='/' />" aria-label="<spring:message code='home.title' />">
-            <span>microfinance</span>
-            <svg viewBox="0 0 128 9" fill="none" aria-hidden="true" focusable="false">
-                <path d="M2 2.5C32 9 79 9 111 3.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-                <path d="m115 4 3 3 8-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
+            <%@ include file="fragments/microfinance-wordmark.jspf" %>
         </a>
         <nav class="landing-language" aria-label="<spring:message code='portal.language' />">
             <a href="<c:url value='/'><c:param name='lang' value='en' /></c:url>" lang="en" hreflang="en" ${pageContext.response.locale.language eq 'en' ? 'aria-current="true"' : ''}>English</a>

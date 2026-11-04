@@ -15,6 +15,8 @@
         </c:if>
         <span class="erp-page-path__item" aria-current="page"><spring:message code="${portalEntryTitle}"/></span>
     </nav>
+    <div class="public-access-card">
+    <%@ include file="../fragments/public-access-brand.jspf" %>
     <h1 class="erp-page-title"><spring:message code="${portalEntryTitle}"/></h1>
     <form:form modelAttribute="entryForm" action="${pageContext.request.contextPath}/client-portal/request-code" method="post" cssClass="kyc-client-form" data-accounting-dirty-form="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
@@ -42,7 +44,7 @@
                 </div>
             </c:when>
             <c:otherwise>
-                <section class="erp-resource-section">
+                <section>
                     <h2><spring:message code="portal.existing"/></h2>
                     <div class="kyc-profile-grid">
                         <label class="kyc-field"><span><spring:message code="kyc.field.clientNumber"/></span><form:input path="clientNumber" cssClass="aws-control" maxlength="80" required="true" autocomplete="username"/></label>
@@ -63,6 +65,7 @@
             <button class="app-btn btn-launch" type="submit" data-profile-send><spring:message code="portal.sendCode"/></button>
         </div>
     </form:form>
+    </div>
 </div>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <script src="<c:url value='/js/client-onboarding.js'/>" defer></script>

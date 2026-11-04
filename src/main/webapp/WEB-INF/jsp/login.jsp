@@ -15,9 +15,10 @@
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261030-auth-alerts' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css?v=20261030-auth-alerts' />" />
+    <link rel="stylesheet" href="<c:url value='/css/public-access.css' />" />
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
-<body class="auth-shell aws-auth-shell auth-login-page min-h-screen font-sans text-slate-900 antialiased">
+<body class="auth-shell aws-auth-shell auth-login-page public-access min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
 <nav class="auth-language" aria-label="<spring:message code='portal.language' />">
     <c:forEach items="${['en','sw']}" var="loginLanguage">
@@ -28,15 +29,12 @@
         <a href="${loginLanguageUrl}" lang="${loginLanguage}" hreflang="${loginLanguage}" data-login-language ${pageContext.response.locale.language eq loginLanguage ? 'aria-current="true"' : ''}>${loginLanguage eq 'sw' ? 'Kiswahili' : 'English'}</a>
     </c:forEach>
 </nav>
-<div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
+<main class="public-access-layout">
     <div class="auth-login-layout">
         <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
-    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
-        <div class="mb-6 sm:mb-7">
-            <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'login.heading'}" /></h1>
-            </div>
-        </div>
+    <div class="auth-frame public-access-card">
+        <%@ include file="fragments/public-access-brand.jspf" %>
+        <h1 class="${systemAdminLogin ? 'auth-heading mb-6' : 'sr-only'}"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'home.login'}" /></h1>
         <c:if test="${not systemAdminLogin}">
         <div class="mb-5">
             <div class="auth-tabs mb-5" role="tablist" aria-label="<spring:message code='login.chooseType' />">
@@ -99,7 +97,7 @@
                     <c:when test="${systemAdminLogin}">
                     <button type="button" hidden data-login-tab-toggle="system-admin" data-active="true" aria-hidden="true"></button>
                     <div data-login-tab="system-admin" class="space-y-5">
-                        <div class="auth-mode-card space-y-4">
+                        <div class="space-y-4">
                             <div>
                                 <p class="auth-mode-title"><spring:message code="home.systemAdmin" /></p>
                             </div>
@@ -135,7 +133,7 @@
                     <c:otherwise>
 
                     <div id="memberLoginPanel" role="tabpanel" aria-labelledby="memberLoginTab" data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'member'}">hidden</c:if>>
-                        <div class="auth-mode-card space-y-4">
+                        <div class="space-y-4">
                             <div>
                                 <p class="auth-mode-title"><spring:message code="login.clientPassword" /></p>
                             </div>
@@ -166,7 +164,7 @@
                     </div>
 
                     <div id="staffLoginPanel" role="tabpanel" aria-labelledby="staffLoginTab" data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'staff'}">hidden</c:if>>
-                        <div class="auth-mode-card space-y-4">
+                        <div class="space-y-4">
                             <div>
                                 <p class="auth-mode-title"><spring:message code="login.staffPassword" /></p>
                             </div>
@@ -212,8 +210,7 @@
                     </div>
         </div>
     </div>
-</div>
-    </div>
+</main>
 <div id="forgotPasswordModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/45 px-4 py-8">
     <div class="forgot-password-dialog border border-slate-200 bg-white">
         <div class="flex items-start justify-between border-b border-slate-200 px-5 py-4">
