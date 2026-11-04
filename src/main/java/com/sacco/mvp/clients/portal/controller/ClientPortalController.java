@@ -23,6 +23,7 @@ import java.util.*;
 @Controller @RequiredArgsConstructor @RequestMapping("/client-portal")
 public class ClientPortalController {
     private static final String ROOT="/client-portal",PROFILE=ROOT+"/workspace/profile";
+    private static final String REGISTRATION_CHALLENGE = "clientPortalRegistrationChallenge";
     private final ClientPortalService portal;
     private final OnboardingService onboarding;
     private static String[] entryFields(){return java.util.stream.Stream.concat(java.util.stream.Stream.of("clientNumber","intent","institution","branch","registration.profile.firstName","registration.profile.middleName","registration.profile.lastName","registration.profile.phone","registration.profile.email"),Arrays.stream(OnboardingService.PERSONAL_FIELDS).filter(f->!f.equals("groupId")).map(f->"registration.profile."+f)).toArray(String[]::new);}
@@ -33,7 +34,13 @@ public class ClientPortalController {
     @GetMapping("/register") public String register(Model m){var f=new EntryForm();f.setIntent("REGISTER");m.addAttribute("entryForm",f);return "portal/entry";}
     @GetMapping("/choices") @ResponseBody public ResponseEntity<List<Choice>> choices(@RequestParam(required=false) String institution,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(portal.choices(institution,search,page));}
     @PostMapping("/request-code") public String request(@ModelAttribute("entryForm") EntryForm f,BindingResult errors,HttpServletRequest request,Model m){
-        if(!errors.hasErrors())try{UUID id=portal.request(f,request.getRemoteAddr());request.getSession().setAttribute("clientPortalChallenge",id);return "redirect:"+ROOT+"/verify";}catch(IllegalArgumentException e){
+        if(!errors.hasErrors())try{
+            UUID id=portal.request(f,request.getRemoteAddr());
+            HttpSession session=request.getSession();
+            session.setAttribute("clientPortalChallenge",id);
+            session.setAttribute(REGISTRATION_CHALLENGE,"REGISTER".equals(f.getIntent()) ? id : null);
+            return "redirect:"+ROOT+"/verify";
+        }catch(IllegalArgumentException e){
             String key=Objects.toString(e.getMessage(),"");String field=key.startsWith("kyc.error.")?key.substring("kyc.error.".length()):"";
             if(field.equals("nameParts"))field="firstName";if(field.equals("identityExpiry"))field="identityExpiresOn";
             if(f.getIntent().equals("REGISTER")&&Arrays.asList(entryFields()).contains("registration.profile."+field))errors.rejectValue("registration.profile."+field,key);else errors.reject("portal.error.invalid");
@@ -41,9 +48,14 @@ public class ClientPortalController {
         return "portal/entry";
     }
     @GetMapping("/verify") public String code(HttpSession session){return session.getAttribute("clientPortalChallenge") instanceof UUID?"portal/verify":"redirect:"+ROOT;}
-    @PostMapping("/verify") public String verify(@RequestParam(defaultValue="") String code,HttpServletRequest request,HttpServletResponse response,Model m){
+    @PostMapping("/verify") public String verify(@RequestParam(defaultValue="") String code,HttpServletRequest request,HttpServletResponse response,Model m,RedirectAttributes flash){
         Object challenge=request.getSession().getAttribute("clientPortalChallenge");var result=portal.verify(challenge instanceof UUID id?id:null,code,request.getRemoteAddr());
         if(result.isEmpty()){m.addAttribute("portalError","portal.error.code");return "portal/verify";}
+        HttpSession session=request.getSession();
+        if (challenge instanceof UUID && challenge.equals(session.getAttribute(REGISTRATION_CHALLENGE))) {
+            flash.addFlashAttribute("portalRegistrationVerified",true);
+        }
+        session.removeAttribute(REGISTRATION_CHALLENGE);
         request.changeSessionId();request.getSession().removeAttribute("clientPortalChallenge");
         var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(result.get(),null,List.of()));SecurityContextHolder.setContext(context);new HttpSessionSecurityContextRepository().saveContext(context,request,response);
         response.setHeader("Cache-Control","no-store");return "redirect:"+(result.get().loanAccess()?ROOT+"/workspace/applications":PROFILE);

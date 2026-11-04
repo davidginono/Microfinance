@@ -38,7 +38,7 @@
                 </section>
 <c:set var="client" value="${workspace.client}"/><c:set var="identityReadOnly" value="${true}"/><c:set var="profileValues" value="${selfForm.profile}"/><c:set var="groupLookup" value="${onboardingRoot}/groups"/>
 <c:if test="${not profileReadOnly}"><%@ include file="profile-wizard-labels.jspf" %></c:if>
-<div ${profileReadOnly?'data-profile-tabs':'data-profile-wizard'} data-validation-date="${workspace.validationDate}"><div id="profile-bio" ${profileReadOnly?'data-detail-panel':''}><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}><%@ include file="profile-fields.jspf" %></fieldset>
+<div ${profileReadOnly?'data-profile-tabs':'data-profile-wizard'} data-profile-start="${portalRegistrationVerified ? 'documents' : ''}" data-validation-date="${workspace.validationDate}"><div id="profile-bio" ${profileReadOnly?'data-detail-panel':''}><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2><fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}><%@ include file="profile-fields.jspf" %></fieldset>
                 <section class="erp-resource-section" aria-labelledby="kyc-notice-heading" data-profile-section="documents" ${profileReadOnly?'':'data-profile-confirmations'}>
                     <h2 id="kyc-notice-heading"><spring:message code="kyc.notice"/></h2>
                     <div class="kyc-form-fields">

@@ -2,7 +2,7 @@
 <template data-profile-wizard-labels
           data-personal="<spring:message code='kyc.wizard.personal'/>"
           data-finances="<spring:message code='kyc.wizard.finances'/>"
-          data-documents="<spring:message code='kyc.wizard.documents'/>"
+          data-documents="<spring:message code="${publicProfileRegistration ? 'kyc.documents' : 'kyc.wizard.documents'}"/>"
           data-review="<spring:message code='kyc.wizard.review'/>"
           data-navigation="<spring:message code='kyc.wizard.navigation'/>"
           data-step="<spring:message code='kyc.wizard.step'/>"

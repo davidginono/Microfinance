@@ -5,10 +5,10 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/client-profile-wizard.js','utf8');
 const conditions=readFileSync('src/main/resources/static/js/client-onboarding.js','utf8');
 const validation=readFileSync('src/main/resources/static/js/form-validation.js','utf8');
-async function setup({error='',saved='',name='Asha',registration=false,requiredProfile=false}={}){
+async function setup({error='',saved='',start='',name='Asha',registration=false,requiredProfile=false}={}){
  const dom=new JSDOM(`<form data-onboarding-form="self"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="requestKey" value="request-key">
  <template data-profile-wizard-labels data-personal="Personal details" data-finances="Income and bank details" data-documents="Documents and privacy" data-review="Review and send" data-navigation="Profile steps" data-step="Step" data-edit="Edit" data-empty="Not provided" data-yes="Yes" data-no="No" data-no-documents="No documents" data-documents-error="Upload required documents" data-document-expiry-error="Expired document" data-acknowledgement-error="Accept consent" data-notice-changed-error="Notice changed"></template>
- <div data-profile-wizard><div><fieldset>
+ <div data-profile-wizard data-profile-start="${start}"><div><fieldset>
  <section data-profile-section="personal"><h2>Bio data</h2><label class="kyc-field"><span>First name</span><input name="profile.firstName" required value="${name}"></label><div class="kyc-field"><label for="group">Group</label><select name="profile.groupId" id="group"><option value="">Individual / no group</option></select><button type="button"><span>Individual / no group</span></button></div><select data-profile-marital-status name="profile.maritalStatus"><option value="SINGLE">Single</option><option value="MARRIED">Married</option></select>${error==='field'?'<span class="field-error" id="profile.firstName.errors">Correct your name</span>':''}</section>
  <section data-profile-section="personal" data-profile-spouse-section><h2>Spouse details</h2><fieldset data-profile-spouse-fields><label class="kyc-field"><span>Spouse name</span><input name="profile.spouseName" value="Spouse value"></label></fieldset></section>
  <section data-profile-section="finances"><h2>Income sources</h2><fieldset class="kyc-income-choices"><legend>Business or employment</legend><label class="kyc-checkbox"><input type="checkbox" name="profile.incomeActivities" value="BUSINESS" checked><span>Business</span></label><label class="kyc-checkbox"><input type="checkbox" name="profile.incomeActivities" value="EMPLOYMENT" checked><span>Employment</span></label></fieldset><label class="kyc-field"><span>Other income sources</span><input name="profile.otherIncomeSources" value="Rent"></label></section>
@@ -26,7 +26,7 @@ async function setup({error='',saved='',name='Asha',registration=false,requiredP
   wizard.setAttribute('data-profile-registration','');
   wizard.querySelectorAll('[data-profile-section="documents"]').forEach(section=>section.remove());
   wizard.insertAdjacentHTML('afterbegin','<section data-profile-section="personal"><h2>Institution</h2><label class="kyc-field"><span>Institution</span><select name="institution" required><option value="I1">Synthetic institution</option></select></label></section>');
-  wizard.insertAdjacentHTML('beforeend','<p data-profile-section="review">Verify your contact to add photos and documents.</p>');
+  wizard.insertAdjacentHTML('beforeend','<section data-profile-section="documents"><h2>Attachments and Documents</h2><p>Verify your contact to add photos and documents.</p></section>');
   wizard.querySelectorAll('[name^="profile."]').forEach(field=>field.name='registration.'+field.name);
   d.querySelector('[value="DRAFT"]').remove();
   const send=d.querySelector('[data-profile-send]');send.removeAttribute('name');send.textContent='Send access code';
@@ -52,18 +52,28 @@ test('provisional registration reviews the institution and entered details befor
  const {dom,w,d,form,next,active}=await setup({registration:true});try{
   const firstName=d.querySelector('[name="registration.profile.firstName"]');
   assert.match(active(),/Personal details/);
-  assert.equal(d.querySelectorAll('nav button').length,3);
+  assert.equal(d.querySelectorAll('nav button').length,4);
   assert.equal(d.querySelector('[data-profile-send]').hidden,true);
   const enter=new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});firstName.dispatchEvent(enter);
   assert.equal(enter.defaultPrevented,true);assert.match(active(),/Income and bank/);
+  next();assert.match(active(),/Documents/);
+  assert.match(d.querySelector('#profile-step-documents').textContent,/Verify your contact to add photos and documents/);
   next();assert.match(active(),/Review and send/);
-  assert.match(d.querySelector('#profile-step-review').textContent,/Synthetic institution.*Asha.*Verify your contact/s);
+  assert.match(d.querySelector('#profile-step-review').textContent,/Synthetic institution.*Asha/s);
   let submitted;
   form.addEventListener('submit',event=>{event.preventDefault();submitted=new w.FormData(form,event.submitter);});
   d.querySelector('[data-profile-send]').click();
   assert.equal(submitted.get('institution'),'I1');
   assert.equal(submitted.get('registration.profile.firstName'),'Asha');
   assert.equal(submitted.get('_csrf'),'token');
+ }finally{dom.window.close();}
+});
+test('verified provisional clients start on Documents and can still edit earlier steps',async()=>{
+ const {dom,d,active}=await setup({saved:'review',start:'documents'});try{
+  assert.match(active(),/Documents and privacy/);
+  assert.ok(d.querySelector('#profile-step-documents a[href="/documents/new"]'));
+  d.querySelector('[data-profile-previous]').click();
+  assert.match(active(),/Income and bank details/);
  }finally{dom.window.close();}
 });
 test('steps preserve live controls, both income choices and native draft/submit commands',async()=>{

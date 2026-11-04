@@ -35,7 +35,10 @@
                     <spring:nestedPath path="registration">
                         <%@ include file="../onboarding/profile-fields.jspf" %>
                     </spring:nestedPath>
-                    <p class="kyc-field-hint" data-profile-section="review"><spring:message code="portal.verifyBeforeUpload"/></p>
+                    <section class="erp-resource-section" data-profile-section="documents">
+                        <h2><spring:message code="kyc.attachmentsAndDocuments"/></h2>
+                        <div class="kyc-section-body"><spring:message code="portal.verifyBeforeUpload"/></div>
+                    </section>
                 </div>
             </c:when>
             <c:otherwise>

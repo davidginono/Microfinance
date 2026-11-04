@@ -10,7 +10,7 @@
         const form = wizard.closest('form'), labels = form.querySelector('[data-profile-wizard-labels]')?.dataset;
         if (!labels) return;
         const registration = wizard.hasAttribute('data-profile-registration');
-        const keys = registration ? ['personal', 'finances', 'review'] : ['personal', 'finances', 'documents', 'review'];
+        const keys = ['personal', 'finances', 'documents', 'review'];
         const reviewIndex = keys.indexOf('review'), documentsIndex = keys.indexOf('documents');
         const sections = [...wizard.querySelectorAll('[data-profile-section]')];
         const previous = form.querySelector('[data-profile-previous]'), next = form.querySelector('[data-profile-next]');
@@ -96,6 +96,7 @@
         const review = () => {
             const panel = panels[reviewIndex];panel.querySelectorAll('.kyc-profile-review').forEach(section => section.remove());
             keys.slice(0, reviewIndex).forEach((key, step) => sections.filter(section => section.dataset.profileSection === key && !section.hidden).forEach(section => {
+                if (registration && step === documentsIndex) return;
                 const title = section.querySelector('h2,h3').textContent.trim();
                 const summary = node('section', undefined, 'erp-resource-section kyc-profile-review');
                 const header = node('div', undefined, 'kyc-profile-review-heading'), edit = node('button', labels.edit, 'app-btn btn-neutral');
@@ -131,7 +132,7 @@
         }
         function validateStep(index) {
             syncRequirements();
-            if (index === documentsIndex) {
+            if (!registration && index === documentsIndex) {
                 const evidence = form.querySelector('[data-profile-evidence]');
                 const alert = form.querySelector('[data-workspace-form-error],[data-portal-form-error]');
                 if (evidence && alert && [labels.documentsError, labels.documentExpiryError].some(text => text && alert.textContent.includes(text))) alert.remove();
@@ -230,6 +231,7 @@
         if (!registration) {
             try {saved = sessionStorage.getItem(storageKey);} catch {/* Start with personal details. */}
         }
-        const error = errorStep();show(error >= 0 ? error : Math.max(0, keys.indexOf(saved)), false);
+        const initialStep = wizard.dataset.profileStart || saved;
+        const error = errorStep();show(error >= 0 ? error : Math.max(0, keys.indexOf(initialStep)), false);
     }));
 })();
