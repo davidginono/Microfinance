@@ -3,9 +3,8 @@
 <div data-profile-document-list><c:forEach items="${profileDocuments}" var="doc"><p data-profile-document><spring:message code="kyc.category.${doc.category}"/>: <c:choose><c:when test="${canReadProfileDocuments}"><a class="resource-table-id-link" href="<c:url value='${documentRoot}/${doc.id}'/>"><c:out value="${doc.name}"/></a></c:when><c:otherwise><c:out value="${doc.name}"/></c:otherwise></c:choose></p></c:forEach>
 <c:if test="${empty profileDocuments}"><p><spring:message code="kyc.noDocuments"/></p></c:if>
 <c:if test="${not empty profileDocuments and profileDocuments.size()>=100}"><p class="kyc-field-hint"><spring:message code="kyc.recentDocuments"/></p></c:if>
-</div><c:choose><c:when test="${not empty client and client.state=='DRAFT'}"><a class="app-btn btn-neutral" ${formKind=='self'?'data-profile-add-documents':''} href="<c:url value='${uploadPath}'/>"><spring:message code="kyc.addDocument"/></a></c:when><c:otherwise><c:if test="${client.state!='SUBMITTED'}"><p><spring:message code="${publicProfileRegistration?'portal.verifyBeforeUpload':'kyc.saveBeforeUpload'}"/></p></c:if></c:otherwise></c:choose>
+</div><c:choose><c:when test="${not empty client and client.state=='DRAFT'}"><a class="app-btn btn-neutral" ${formKind=='self'?'data-profile-add-documents':''} href="<c:url value='${uploadPath}'/>"><spring:message code="kyc.addDocument"/></a></c:when><c:otherwise><c:if test="${client.state!='SUBMITTED'}"><p><spring:message code="kyc.saveBeforeUpload"/></p></c:if></c:otherwise></c:choose>
 <c:if test="${formKind=='self' and not profileReadOnly}">
-    <p class="kyc-field-hint"><spring:message code="kyc.beforeSubmit"/></p>
     <div class="kyc-acknowledgement" data-profile-declaration>
         <label class="kyc-checkbox"><form:checkbox path="declarationAccepted" required="true"/><span><spring:message code="kyc.acceptDeclaration"/></span></label>
         <form:errors path="declarationAccepted" cssClass="coa-error"/>

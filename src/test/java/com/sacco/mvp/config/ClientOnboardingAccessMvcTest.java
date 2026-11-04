@@ -81,13 +81,28 @@ class ClientOnboardingAccessMvcTest {
 
     @Test void onboardingAndRecoveryPagesRemainAvailableWithoutRedirectLoops() throws Exception {
         for (String path : new String[]{"/app/onboarding", "/app/onboarding/edit", "/app/onboarding/versions/1",
-            "/app/settings", "/app/support", "/app/notifications"}) {
+            "/app/settings", "/app/support", "/app/notifications", "/account/security", "/profile"}) {
             mvc.perform(get(path).with(user(client))).andExpect(status().isOk())
                 .andExpect(content().string("onboarding required"));
         }
         mvc.perform(post("/app/onboarding/edit").with(user(client)).with(csrf()))
             .andExpect(status().isOk());
         mvc.perform(post("/logout").with(user(client)).with(csrf())).andExpect(status().is3xxRedirection());
+    }
+
+    @Test void sharedAccountPagesReflectVerificationChangesInTheSameSession() throws Exception {
+        var session = new MockHttpSession();
+        when(onboarding.ownStatus(client)).thenReturn(new OwnStatus("DRAFT", null));
+        for (String path : new String[]{"/app/onboarding", "/account/security", "/profile"}) {
+            mvc.perform(get(path).session(session).with(user(client))).andExpect(status().isOk())
+                .andExpect(request().attribute("clientOnboardingRequired", true));
+        }
+        when(onboarding.ownStatus(client)).thenReturn(new OwnStatus("VERIFY", null));
+        mvc.perform(get("/account/security").session(session).with(user(client))).andExpect(status().isOk())
+            .andExpect(request().attribute("clientOnboardingRequired", false));
+        when(onboarding.ownStatus(client)).thenReturn(new OwnStatus("REVOKE", null));
+        mvc.perform(get("/profile").session(session).with(user(client))).andExpect(status().isOk())
+            .andExpect(request().attribute("clientOnboardingRequired", true));
     }
 
     @Test void csrfAndExistingPermissionsAreStillRequired() throws Exception {
@@ -124,6 +139,8 @@ class ClientOnboardingAccessMvcTest {
             .position(Position.MANAGER).memberAccount(true).staffAccessStatus(StaffAccessStatus.ACTIVE)
             .status(MemberStatus.ACTIVE).build(), EnumSet.allOf(UserClaim.class), true);
         mvc.perform(get("/manager/dashboard").with(user(staff))).andExpect(status().isOk());
+        mvc.perform(get("/account/security").with(user(staff))).andExpect(status().isOk())
+            .andExpect(result -> assertThat(result.getRequest().getAttribute("clientOnboardingRequired")).isNull());
         mvc.perform(get("/app/dashboard")).andExpect(status().is3xxRedirection());
         verifyNoInteractions(onboarding);
     }
@@ -149,7 +166,8 @@ class ClientOnboardingAccessMvcTest {
         @GetMapping({"/app/dashboard", "/app/loan-products", "/app/loan-applications/new",
             "/app/guarantee-requests", "/app/group-loans", "/app/group-coverage", "/app/onboarding-bypass",
             "/app/onboarding", "/app/onboarding/edit", "/app/onboarding/versions/1",
-            "/app/settings", "/app/support", "/app/notifications", "/manager/dashboard"})
+            "/app/settings", "/app/support", "/app/notifications", "/manager/dashboard",
+            "/account/security", "/profile"})
         String page(HttpServletRequest request) {
             return Boolean.TRUE.equals(request.getAttribute("clientOnboardingRequired"))
                 ? "onboarding required" : "borrower workspace";

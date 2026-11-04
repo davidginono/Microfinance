@@ -110,7 +110,7 @@
                     <button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formaction="<c:url value='${onboardingRoot}/edit'/>" formnovalidate><spring:message code="kyc.saveDraft"/></button>
                     <button class="app-btn btn-neutral" type="button" data-profile-previous hidden><spring:message code="common.previous"/></button>
                     <button class="app-btn btn-launch" type="button" data-profile-next hidden><spring:message code="common.next"/></button>
-                    <button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED" formaction="<c:url value='${onboardingRoot}/edit'/>"><spring:message code="kyc.submit"/></button>
+                    <button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED" data-profile-send formaction="<c:url value='${onboardingRoot}/edit'/>"><spring:message code="kyc.submit"/></button>
                 </c:when>
                 <c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="kyc.addDocument"/></button></c:otherwise>
             </c:choose>

@@ -5,7 +5,7 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/client-profile-wizard.js','utf8');
 const conditions=readFileSync('src/main/resources/static/js/client-onboarding.js','utf8');
 const validation=readFileSync('src/main/resources/static/js/form-validation.js','utf8');
-async function setup({error='',saved='',name='Asha'}={}){
+async function setup({error='',saved='',name='Asha',registration=false}={}){
  const dom=new JSDOM(`<form data-onboarding-form="self"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="requestKey" value="request-key">
  <template data-profile-wizard-labels data-personal="Personal details" data-finances="Income and bank details" data-documents="Documents and privacy" data-review="Review and send" data-navigation="Profile steps" data-step="Step" data-edit="Edit" data-empty="Not provided" data-yes="Yes" data-no="No" data-no-documents="No documents" data-documents-error="Upload required documents" data-document-expiry-error="Expired document" data-acknowledgement-error="Accept consent" data-notice-changed-error="Notice changed"></template>
  <div data-profile-wizard><div><fieldset>
@@ -15,14 +15,42 @@ async function setup({error='',saved='',name='Asha'}={}){
  </fieldset><section data-profile-section="documents"><h2>Privacy notice</h2><label class="kyc-checkbox"><input type="checkbox" name="noticeAcknowledged" required checked><span>I agree to data use</span></label></section></div>
  <section data-profile-section="documents"><h3>Attachments and Documents</h3><p data-profile-document>Identity: identity.png</p><a href="/documents/new">Add document</a><label class="kyc-checkbox"><input type="checkbox" name="declarationAccepted" required checked><span>I confirm accuracy</span></label></section></div>
  ${error==='documents'?'<div data-workspace-form-error role="alert">Upload required documents</div>':''}
- <a href="/profile">Cancel</a><button type="submit" name="action" value="DRAFT" formnovalidate>Save draft</button><button type="button" data-profile-previous hidden>Previous</button><button type="button" data-profile-next hidden>Next</button><button type="submit" name="action" value="SUBMITTED">Send for review</button></form>`,{url:'http://localhost/app/onboarding',runScripts:'outside-only',pretendToBeVisual:true});
+ <a href="/profile">Cancel</a><button type="submit" name="action" value="DRAFT" formnovalidate>Save draft</button><button type="button" data-profile-previous hidden>Previous</button><button type="button" data-profile-next hidden>Next</button><button type="submit" name="action" value="SUBMITTED" data-profile-send>Send for review</button></form>`,{url:registration?'http://localhost/client-portal/register':'http://localhost/app/onboarding',runScripts:'outside-only',pretendToBeVisual:true});
  const {window:w}=dom,d=w.document;
+ if(registration){
+  const wizard=d.querySelector('[data-profile-wizard]');
+  wizard.setAttribute('data-profile-registration','');
+  wizard.querySelectorAll('[data-profile-section="documents"]').forEach(section=>section.remove());
+  wizard.insertAdjacentHTML('afterbegin','<section data-profile-section="personal"><h2>Institution</h2><label class="kyc-field"><span>Institution</span><select name="institution" required><option value="I1">Synthetic institution</option></select></label></section>');
+  wizard.insertAdjacentHTML('beforeend','<p data-profile-section="review">Verify your contact to add photos and documents.</p>');
+  wizard.querySelectorAll('[name^="profile."]').forEach(field=>field.name='registration.'+field.name);
+  d.querySelector('[value="DRAFT"]').remove();
+  const send=d.querySelector('[data-profile-send]');send.removeAttribute('name');send.textContent='Send access code';
+ }
  if(saved)w.sessionStorage.setItem('client-profile-step:v1:/app/onboarding',saved);
  w.eval(conditions);w.eval(validation);w.eval(source);
  await new Promise(resolve=>d.addEventListener('DOMContentLoaded',resolve,{once:true}));await Promise.resolve();
  const next=()=>d.querySelector('[data-profile-next]').click();
  return {dom,w,d,form:d.querySelector('form'),next,active:()=>d.querySelector('[aria-current="step"]').textContent};
 }
+test('provisional registration reviews the institution and entered details before requesting an access code',async()=>{
+ const {dom,w,d,form,next,active}=await setup({registration:true});try{
+  const firstName=d.querySelector('[name="registration.profile.firstName"]');
+  assert.match(active(),/Personal details/);
+  assert.equal(d.querySelectorAll('nav button').length,3);
+  assert.equal(d.querySelector('[data-profile-send]').hidden,true);
+  const enter=new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});firstName.dispatchEvent(enter);
+  assert.equal(enter.defaultPrevented,true);assert.match(active(),/Income and bank/);
+  next();assert.match(active(),/Review and send/);
+  assert.match(d.querySelector('#profile-step-review').textContent,/Synthetic institution.*Asha.*Verify your contact/s);
+  let submitted;
+  form.addEventListener('submit',event=>{event.preventDefault();submitted=new w.FormData(form,event.submitter);});
+  d.querySelector('[data-profile-send]').click();
+  assert.equal(submitted.get('institution'),'I1');
+  assert.equal(submitted.get('registration.profile.firstName'),'Asha');
+  assert.equal(submitted.get('_csrf'),'token');
+ }finally{dom.window.close();}
+});
 test('steps preserve live controls, both income choices and native draft/submit commands',async()=>{
  const {dom,w,d,form,next,active}=await setup();try{
   const input=d.querySelector('[name="profile.firstName"]');input.value='Changed client';

@@ -24,12 +24,14 @@ public class ClientOnboardingFilter extends OncePerRequestFilter {
         if (path.isEmpty()) {
             path = request.getRequestURI().substring(request.getContextPath().length());
         }
+        boolean borrowerRoute = within(path, "/app");
+        boolean sharedAccountPage = path.equals("/account/security") || path.equals("/profile");
         if (authentication != null && authentication.getPrincipal() instanceof AppUserPrincipal actor
-            && actor.isMemberAccess() && !actor.isStaffSession() && within(path, "/app")) {
+            && actor.isMemberAccess() && !actor.isStaffSession() && (borrowerRoute || sharedAccountPage)) {
             var status = onboarding.ownStatus(actor);
             boolean required = status == null || !"VERIFY".equals(status.state());
             request.setAttribute("clientOnboardingRequired", required);
-            if (required && !within(path, "/app/onboarding") && !within(path, "/app/settings")
+            if (required && borrowerRoute && !within(path, "/app/onboarding") && !within(path, "/app/settings")
                 && !within(path, "/app/support") && !within(path, "/app/notifications")) {
                 String destination = request.getContextPath() + "/app/onboarding";
                 response.setHeader("Cache-Control", "no-store");

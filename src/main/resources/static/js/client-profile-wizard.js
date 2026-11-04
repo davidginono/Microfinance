@@ -9,10 +9,12 @@
         if (wizard.dataset.wizardReady) return;
         const form = wizard.closest('form'), labels = form.querySelector('[data-profile-wizard-labels]')?.dataset;
         if (!labels) return;
-        const keys = ['personal', 'finances', 'documents', 'review'];
+        const registration = wizard.hasAttribute('data-profile-registration');
+        const keys = registration ? ['personal', 'finances', 'review'] : ['personal', 'finances', 'documents', 'review'];
+        const reviewIndex = keys.indexOf('review'), documentsIndex = keys.indexOf('documents');
         const sections = [...wizard.querySelectorAll('[data-profile-section]')];
         const previous = form.querySelector('[data-profile-previous]'), next = form.querySelector('[data-profile-next]');
-        const send = form.querySelector('button[name="action"][value="SUBMITTED"]');
+        const send = form.querySelector('[data-profile-send]');
         if (!previous || !next || !send) return;
         wizard.dataset.wizardReady = 'true';wizard.classList.add('kyc-profile-wizard');
         const node = (tag, text, className) => {
@@ -54,8 +56,8 @@
             return control.value || labels.empty;
         };
         const review = () => {
-            const panel = panels[3];panel.querySelectorAll('.kyc-profile-review').forEach(section => section.remove());
-            keys.slice(0, 3).forEach((key, step) => sections.filter(section => section.dataset.profileSection === key && !section.hidden).forEach(section => {
+            const panel = panels[reviewIndex];panel.querySelectorAll('.kyc-profile-review').forEach(section => section.remove());
+            keys.slice(0, reviewIndex).forEach((key, step) => sections.filter(section => section.dataset.profileSection === key && !section.hidden).forEach(section => {
                 const title = section.querySelector('h2,h3').textContent.trim();
                 const summary = node('section', undefined, 'erp-resource-section kyc-profile-review');
                 const header = node('div', undefined, 'kyc-profile-review-heading'), edit = node('button', labels.edit, 'app-btn btn-neutral');
@@ -71,7 +73,7 @@
                     const documents = [...section.querySelectorAll('[data-profile-document]')].map(doc => doc.textContent.trim());
                     const fact = node('div');fact.append(node('dt', title), node('dd', documents.join('\n') || labels.noDocuments));facts.prepend(fact);
                 }
-                summary.append(facts);panel.append(summary);
+                summary.append(facts);panel.insertBefore(summary, panel.querySelector('[data-profile-section="review"]'));
             }));
         };
         function show(index, focus = true) {
@@ -81,22 +83,25 @@
                 button.disabled = i > furthest;
                 if (i === index) button.setAttribute('aria-current', 'step');else button.removeAttribute('aria-current');
             });
-            previous.hidden = index === 0;next.hidden = index === 3;send.hidden = index !== 3;
-            if (index === 3) review();
-            try {sessionStorage.setItem(storageKey, keys[index]);} catch {/* Navigation also works without storage. */}
+            previous.hidden = index === 0;next.hidden = index === reviewIndex;send.hidden = index !== reviewIndex;
+            if (index === reviewIndex) review();
+            if (!registration) {
+                try {sessionStorage.setItem(storageKey, keys[index]);} catch {/* Navigation also works without storage. */}
+            }
             if (focus) {const heading = panels[index].querySelector('h2');heading.focus({preventScroll:true});heading.scrollIntoView?.({block:'start'});}
         }
         const advance = () => {
-            if (active === 2 && !form.dispatchEvent(new CustomEvent('profile:before-review', {cancelable:true}))) return;
+            if (active === documentsIndex && !form.dispatchEvent(new CustomEvent('profile:before-review', {cancelable:true}))) return;
             const invalid = [...panels[active].querySelectorAll('input,select,textarea')].find(control => control.willValidate && !control.checkValidity());
             if (invalid) {invalid.reportValidity();return;}
-            if (active < 3) show(active + 1);
+            if (active < reviewIndex) show(active + 1);
         };
         previous.addEventListener('click', () => show(Math.max(0, active - 1)));
         next.addEventListener('click', advance);
         buttons.forEach((button, index) => button.addEventListener('click', () => show(index)));
         form.addEventListener('keydown', event => {
-            if (event.key === 'Enter' && !event.isComposing && event.target.matches('input[name^="profile."]:not([type="checkbox"]):not([type="radio"])') && active < 3) {
+            if (event.key === 'Enter' && !event.isComposing && active < reviewIndex &&
+                panels[active].contains(event.target) && event.target.matches('input[name]:not([type="hidden"],[type="checkbox"],[type="radio"])')) {
                 event.preventDefault();advance();
             }
         });
@@ -106,20 +111,23 @@
             if (index >= 0) {invalidPending = true;show(index, false);setTimeout(() => invalidPending = false, 0);}
         }, true);
         form.addEventListener('submit', event => {
-            if (event.submitter === send && active !== 3) {event.preventDefault();show(3);}
+            if (event.submitter === send && active !== reviewIndex) {event.preventDefault();show(reviewIndex);}
         });
         const documentErrors = [labels.documentsError, labels.documentExpiryError, labels.acknowledgementError, labels.noticeChangedError];
         const errorStep = () => {
             const field = [...wizard.querySelectorAll('[aria-invalid="true"],.field-error:not(:empty),.coa-error:not(:empty)')].find(field => !field.hidden);
             if (field) return panels.findIndex(panel => panel.contains(field));
             const error = form.querySelector('[data-workspace-form-error]');
-            if (error) return documentErrors.some(text => error.textContent.includes(text)) ? 2 : 3;
+            if (error) return documentsIndex >= 0 && documentErrors.some(text => error.textContent.includes(text)) ? documentsIndex : reviewIndex;
             return -1;
         };
         document.addEventListener('workspace:form-settled', event => {
             if (event.detail.form === form && form.isConnected) {const index = errorStep();if (index >= 0) show(index, false);}
         });
-        let saved;try {saved = sessionStorage.getItem(storageKey);} catch {/* Start with personal details. */}
+        let saved;
+        if (!registration) {
+            try {saved = sessionStorage.getItem(storageKey);} catch {/* Start with personal details. */}
+        }
         const error = errorStep();show(error >= 0 ? error : Math.max(0, keys.indexOf(saved)), false);
     }));
 })();

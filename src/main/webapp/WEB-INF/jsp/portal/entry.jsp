@@ -4,7 +4,7 @@
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <%@ include file="head.jspf" %>
 <c:set var="publicProfileRegistration" value="${entryForm.intent=='REGISTER'}"/>
-<div class="portal-entry" data-resource-form-page ${publicProfileRegistration?'data-resource-details-page':''}>
+<div class="portal-entry ${publicProfileRegistration?'portal-registration':''}" data-resource-form-page>
     <h1 class="erp-page-title"><spring:message code="${publicProfileRegistration?'portal.register':'portal.title'}"/></h1>
     <nav class="portal-entry-links">
         <a href="<c:url value='/'/>"><spring:message code="home.back"/></a>
@@ -17,23 +17,21 @@
         <c:choose>
             <c:when test="${publicProfileRegistration}">
                 <form:hidden path="intent"/>
-                <section class="erp-resource-section">
-                    <h2><spring:message code="portal.institution"/></h2>
-                    <div class="kyc-profile-grid">
-                        <label class="kyc-field"><span><spring:message code="portal.institution"/></span><form:select path="institution" cssClass="aws-control" required="required" data-portal-institution="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.institution}"><form:option value="${entryForm.institution}"><c:out value="${entryForm.institution}"/></form:option></c:if></form:select></label>
-                        <label class="kyc-field"><span><spring:message code="portal.branch"/></span><form:select path="branch" cssClass="aws-control" required="required" data-portal-branch="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.branch}"><form:option value="${entryForm.branch}"><c:out value="${entryForm.branch}"/></form:option></c:if></form:select></label>
-                    </div>
-                </section>
-                <c:set var="identityReadOnly" value="${false}"/>
-                <c:set var="profileValues" value="${entryForm.registration.profile}"/>
-                <div data-profile-tabs>
-                    <div id="profile-bio" data-detail-panel>
-                        <h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2>
-                        <spring:nestedPath path="registration">
-                            <%@ include file="../onboarding/profile-fields.jspf" %>
-                        </spring:nestedPath>
-                    </div>
-                    <%@ include file="../onboarding/profile-attachments.jspf" %>
+                <%@ include file="../onboarding/profile-wizard-labels.jspf" %>
+                <div data-profile-wizard data-profile-registration>
+                    <section class="erp-resource-section" data-profile-section="personal">
+                        <h2><spring:message code="portal.institution"/></h2>
+                        <div class="kyc-profile-grid">
+                            <label class="kyc-field"><span><spring:message code="portal.institution"/></span><form:select path="institution" cssClass="aws-control" required="required" data-portal-institution="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.institution}"><form:option value="${entryForm.institution}"><c:out value="${entryForm.institution}"/></form:option></c:if></form:select><form:errors path="institution" cssClass="field-error"/></label>
+                            <label class="kyc-field"><span><spring:message code="portal.branch"/></span><form:select path="branch" cssClass="aws-control" required="required" data-portal-branch="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.branch}"><form:option value="${entryForm.branch}"><c:out value="${entryForm.branch}"/></form:option></c:if></form:select><form:errors path="branch" cssClass="field-error"/></label>
+                        </div>
+                    </section>
+                    <c:set var="identityReadOnly" value="${false}"/>
+                    <c:set var="profileValues" value="${entryForm.registration.profile}"/>
+                    <spring:nestedPath path="registration">
+                        <%@ include file="../onboarding/profile-fields.jspf" %>
+                    </spring:nestedPath>
+                    <p class="kyc-field-hint" data-profile-section="review"><spring:message code="portal.verifyBeforeUpload"/></p>
                 </div>
             </c:when>
             <c:otherwise>
@@ -46,10 +44,20 @@
                 </section>
             </c:otherwise>
         </c:choose>
-        <form:errors path="*" cssClass="field-error" element="p" role="alert"/>
-        <div class="accounting-form-actions"><button class="app-btn btn-launch"><spring:message code="portal.sendCode"/></button></div>
+        <c:choose>
+            <c:when test="${publicProfileRegistration}"><form:errors cssClass="field-error" element="p" role="alert" data-workspace-form-error="true"/></c:when>
+            <c:otherwise><form:errors path="*" cssClass="field-error" element="p" role="alert"/></c:otherwise>
+        </c:choose>
+        <div class="accounting-form-actions">
+            <c:if test="${publicProfileRegistration}">
+                <button class="app-btn btn-neutral" type="button" data-profile-previous hidden><spring:message code="common.previous"/></button>
+                <button class="app-btn btn-launch" type="button" data-profile-next hidden><spring:message code="common.next"/></button>
+            </c:if>
+            <button class="app-btn btn-launch" type="submit" data-profile-send><spring:message code="portal.sendCode"/></button>
+        </div>
     </form:form>
 </div>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <script src="<c:url value='/js/client-onboarding.js'/>" defer></script>
+<c:if test="${publicProfileRegistration}"><script src="<c:url value='/js/client-profile-wizard.js'/>" defer></script></c:if>
 <%@ include file="foot.jspf" %>
