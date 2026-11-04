@@ -26,7 +26,7 @@ async function setup({error='',saved='',start='',name='Asha',registration=false,
   wizard.setAttribute('data-profile-registration','');
   wizard.querySelectorAll('[data-profile-section="documents"]').forEach(section=>section.remove());
   wizard.insertAdjacentHTML('afterbegin','<section data-profile-section="personal"><h2>Institution</h2><label class="kyc-field"><span>Institution</span><select name="institution" required><option value="I1">Synthetic institution</option></select></label></section>');
-  wizard.insertAdjacentHTML('beforeend','<section data-profile-section="documents"><h2>Attachments and Documents</h2><p>Verify your contact to add photos and documents.</p></section>');
+  wizard.insertAdjacentHTML('beforeend','<p data-profile-section="review">Verify your contact with an access code. You can then add photos and documents.</p>');
   wizard.querySelectorAll('[name^="profile."]').forEach(field=>field.name='registration.'+field.name);
   d.querySelector('[value="DRAFT"]').remove();
   const send=d.querySelector('[data-profile-send]');send.removeAttribute('name');send.textContent='Send access code';
@@ -52,13 +52,13 @@ test('provisional registration reviews the institution and entered details befor
  const {dom,w,d,form,next,active}=await setup({registration:true});try{
   const firstName=d.querySelector('[name="registration.profile.firstName"]');
   assert.match(active(),/Personal details/);
-  assert.equal(d.querySelectorAll('nav button').length,4);
+  assert.equal(d.querySelectorAll('nav button').length,3);
   assert.equal(d.querySelector('[data-profile-send]').hidden,true);
   const enter=new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});firstName.dispatchEvent(enter);
   assert.equal(enter.defaultPrevented,true);assert.match(active(),/Income and bank/);
-  next();assert.match(active(),/Documents/);
-  assert.match(d.querySelector('#profile-step-documents').textContent,/Verify your contact to add photos and documents/);
   next();assert.match(active(),/Review and send/);
+  assert.equal(d.querySelector('#profile-step-documents'),null);
+  assert.match(d.querySelector('#profile-step-review').textContent,/You can then add photos and documents/);
   assert.match(d.querySelector('#profile-step-review').textContent,/Synthetic institution.*Asha/s);
   let submitted;
   form.addEventListener('submit',event=>{event.preventDefault();submitted=new w.FormData(form,event.submitter);});
