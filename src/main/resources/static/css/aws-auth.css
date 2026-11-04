@@ -529,7 +529,7 @@ body.aws-auth-shell.public-access .public-access-card :is(.auth-input, .registra
     border-color: var(--aws-blue) !important;
 }
 
-body.aws-auth-shell.public-access .public-access-card :is([data-login-submit-button], .registration-actions button) {
+body.aws-auth-shell.public-access .public-access-card :is([data-login-submit-button], .registration-actions .registration-action) {
     min-height: 44px !important;
     height: auto !important;
     font-size: 15px !important;
@@ -537,7 +537,11 @@ body.aws-auth-shell.public-access .public-access-card :is([data-login-submit-but
     padding: 8px 12px !important;
 }
 
-.public-access-card .registration-actions button { width: 100%; }
+.registration-actions .registration-action {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
 
 .public-access-card .auth-mode-title {
     text-align: start;

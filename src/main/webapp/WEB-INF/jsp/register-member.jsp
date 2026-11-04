@@ -198,6 +198,7 @@
         <div id="registrationVerifyError" class="hidden" data-auto-scroll-message="true" aria-live="assertive"></div>
         <div id="registrationVerifySuccess" class="hidden" data-auto-scroll-message="true" aria-live="polite"></div>
         <div class="auth-form-actions registration-actions">
+            <a href="/login" class="registration-action auth-secondary-btn inline-flex items-center justify-center text-slate-700"><spring:message code="register.member.back" /></a>
             <button id="memberRegisterRequestOtp" class="otp-request-button auth-primary-btn registration-action inline-flex items-center justify-center gap-2" type="button"
                 data-idle-label="<spring:message code='register.member.sendCode' htmlEscape='true' />"
                 data-loading-label="<spring:message code='register.member.sendingCode' htmlEscape='true' />"
@@ -209,7 +210,6 @@
                 <span id="memberRegisterSubmitLoader" class="auth-ellipsis-loader hidden" aria-hidden="true"><span></span><span></span><span></span></span>
                 <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
             </button>
-            <a href="/login" class="registration-action auth-secondary-btn inline-flex items-center justify-center text-slate-700"><spring:message code="register.member.back" /></a>
         </div>
     </form:form>
     </div>

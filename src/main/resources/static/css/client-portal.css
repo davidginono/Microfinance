@@ -33,8 +33,9 @@
     justify-content: flex-end;
     margin-top: 20px;
 }
-.portal-entry .accounting-form-actions { flex-wrap: wrap; margin-top: 24px; }
-.client-portal .portal-entry .app-btn.btn-launch {
+.portal-entry .accounting-form-actions { flex-wrap: wrap; }
+.portal-registration .accounting-form-actions { margin-top: 0; }
+.client-portal .portal-entry:not(.portal-registration) .app-btn.btn-launch {
     width: 100%;
     min-height: 44px !important;
     height: auto !important;
