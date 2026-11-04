@@ -50,7 +50,13 @@ public class ClientPortalController {
     }
     @GetMapping("/workspace/profile") public String profile(@AuthenticationPrincipal Session session,Model m){var actor=portal.actor(session,false);m.addAttribute("selfForm",onboarding.ownForm(actor));return profilePage(session,m);}
     @PostMapping("/workspace/profile/edit") public String profile(@AuthenticationPrincipal Session session,@ModelAttribute("selfForm") SelfForm f,BindingResult errors,Model m,RedirectAttributes flash){
-        var actor=portal.actor(session,false);if(!errors.hasErrors())try{onboarding.saveOwn(actor,f);flash.addFlashAttribute("onboardingSaved",true);return "redirect:"+PROFILE;}catch(IllegalArgumentException e){reject(errors,e);}
+        var actor=portal.actor(session,false);if(!errors.hasErrors())try{onboarding.saveOwn(actor,f);flash.addFlashAttribute("onboardingSaved",true);return "redirect:"+PROFILE;}catch(IllegalArgumentException e){
+            String code=Objects.toString(e.getMessage(),"");
+            String field=code.startsWith("kyc.error.")?code.substring("kyc.error.".length()):"";
+            if ("identityExpiry".equals(field)) field="identityExpiresOn";
+            if (Arrays.asList(OnboardingService.PERSONAL_FIELDS).contains(field)) errors.rejectValue("profile."+field,code);
+            else reject(errors,e);
+        }
         return profilePage(session,m);
     }
     @GetMapping("/workspace/profile/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal Session session,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){var a=portal.actor(session,false);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(onboarding.groups(a,a.getMemberId(),search,page));}

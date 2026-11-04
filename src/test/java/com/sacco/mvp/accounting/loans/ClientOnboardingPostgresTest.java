@@ -166,6 +166,12 @@ class ClientOnboardingPostgresTest {
     @Test void removingAnAttachmentKeepsEarlierSubmissionAndFallsBackToRemainingEvidence() {
         var owner=owner(f.client);
         service.saveOwn(owner,ownProfile(owner));
+        var photo=service.ownDocumentForm(owner);
+        photo.setCategory("PROFILE_PHOTO");
+        service.attachOwn(owner,photo,image());
+        assertThat(service.ownWorkspace(owner,0,null).evidenceRequirements()).containsExactly(
+            new EvidenceRequirement("IDENTITY","missing"),new EvidenceRequirement("ADDRESS","missing"),
+            new EvidenceRequirement("ACTIVITY","missing"));
         UUID older=service.attachOwn(owner,service.ownDocumentForm(owner),image());
         UUID selected=service.attachOwn(owner,service.ownDocumentForm(owner),image());
         for (String category:List.of("ADDRESS","ACTIVITY")) {

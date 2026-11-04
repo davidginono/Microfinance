@@ -12,6 +12,8 @@
           data-no="<spring:message code='kyc.no'/>"
           data-no-documents="<spring:message code='kyc.noDocuments'/>"
           data-documents-error="<spring:message code='kyc.error.documents'/>"
+          data-identity-expiry="<spring:message code='kyc.error.identityExpiry'/>"
+          data-income-required="<spring:message code='kyc.income.required'/>"
           data-document-expiry-error="<spring:message code='kyc.error.documentExpiry'/>"
           data-acknowledgement-error="<spring:message code='kyc.error.acknowledgement'/>"
           data-notice-changed-error="<spring:message code='kyc.error.noticeChanged'/>"

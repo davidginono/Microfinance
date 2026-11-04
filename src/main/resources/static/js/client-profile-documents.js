@@ -103,7 +103,8 @@
                 choose.dataset.profileChoose = '';
                 const saved = node('section', undefined, 'kyc-upload-saved');
                 if (savedList.querySelector('[data-profile-document]')) {
-                    saved.append(node('h3', labels.uploadedFiles), ...Array.from(savedList.childNodes, child => child.cloneNode(true)));
+                    saved.append(node('h3', labels.uploadedFiles), ...[...savedList.children]
+                        .filter(child => !child.matches('[data-profile-evidence]')).map(child => child.cloneNode(true)));
                 } else {
                     saved.hidden = true;
                 }
@@ -191,7 +192,7 @@
             }
         });
         profile.addEventListener('submit', event => {
-            if (removing || (event.submitter?.value === 'SUBMITTED' && checks.some(check => !check.checked))) {
+            if (!event.defaultPrevented && (removing || (event.submitter?.value === 'SUBMITTED' && checks.some(check => !check.checked)))) {
                 event.preventDefault();event.stopPropagation();
                 if (!removing) void open();
             }

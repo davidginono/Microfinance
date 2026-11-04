@@ -61,12 +61,12 @@ class ClientOnboardingMvcTest {
         when(service.download(staff,id,doc)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));mvc.perform(get(root+"/"+id+"/documents/"+doc).with(user(staff))).andExpect(status().isForbidden());
     }
     @Test void ownStatusUsesAuthenticatedIdentityAndDoesNotReturnStaffEvidence()throws Exception {
-        when(service.ownWorkspace(client,0,null)).thenReturn(new OwnWorkspace(new Client(client.getMemberId(),"C1","Synthetic client",null,null,"NOT_STARTED",null,0,null),null,List.of(),null,new Page<>(List.of(),0,false),false));
+        when(service.ownWorkspace(client,0,null)).thenReturn(new OwnWorkspace(new Client(client.getMemberId(),"C1","Synthetic client",null,null,"NOT_STARTED",null,0,null),null,List.of(),null,new Page<>(List.of(),0,false),false,List.of(),java.time.LocalDate.of(2026,11,4)));
         mvc.perform(get("/app/onboarding").with(user(client)).param("clientId",staff.getMemberId().toString())).andExpect(view().name("onboarding/self-form")).andExpect(model().attributeDoesNotExist("revision","documents","decisions"));verify(service).ownWorkspace(client,0,null);
         verify(service).ownForm(client);
     }
     @Test void submittedClientOpensTheSameProfileReadOnlyAndOldDetailsLinksReturnThere()throws Exception {
-        when(service.ownWorkspace(client,0,null)).thenReturn(new OwnWorkspace(new Client(client.getMemberId(),"C1","Synthetic client",null,null,"SUBMITTED",UUID.randomUUID(),2,null),null,List.of(),null,new Page<>(List.of(),0,false),false));
+        when(service.ownWorkspace(client,0,null)).thenReturn(new OwnWorkspace(new Client(client.getMemberId(),"C1","Synthetic client",null,null,"SUBMITTED",UUID.randomUUID(),2,null),null,List.of(),null,new Page<>(List.of(),0,false),false,List.of(),java.time.LocalDate.of(2026,11,4)));
         mvc.perform(get("/app/onboarding").with(user(client))).andExpect(view().name("onboarding/self-form")).andExpect(model().attribute("profileReadOnly",true));
         verify(service,never()).ownNotice(client);
         mvc.perform(get("/app/onboarding/versions/1").with(user(client))).andExpect(redirectedUrl("/app/onboarding"));

@@ -38,7 +38,9 @@ public final class OnboardingDtos {
     public record OwnRevision(int sequence, ClientProfile profile, String noticeVersion, String noticeEnglish,
                               String noticeKiswahili, boolean acknowledged, OffsetDateTime acknowledgedAt) {}
     public record OwnWorkspace(Client client, OwnRevision revision, List<OwnDocument> documents,
-                               Feedback feedback, Page<OwnHistory> history, boolean historical) {}
+                               Feedback feedback, Page<OwnHistory> history, boolean historical,
+                               List<EvidenceRequirement> evidenceRequirements, LocalDate validationDate) {}
+    public record EvidenceRequirement(String category, String status) {}
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)
     @Data public static class ClientProfile {
         private String firstName="", middleName="", lastName="", phone="", email="";

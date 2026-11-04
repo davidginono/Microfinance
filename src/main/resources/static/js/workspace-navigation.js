@@ -322,7 +322,16 @@
             if(!page.body.matches('.aws-console') || !page.querySelector('.shell-main') || !page.querySelector('#appSidebar'))throw new Error('Workspace shell');
             if(recover){
                 const error=page.querySelector('[data-workspace-response-error],[data-toast-type="error"],.shell-main [data-message-type="error"]');
-                if(error){formError(options.submission.form,error.dataset.toastMessage || error.textContent.trim());return true;}
+                if(error){
+                    const form=options.submission.form;
+                    form.inert=false;
+                    const returned=page.querySelector('form[data-onboarding-form="self"]');
+                    if(form.dataset.onboardingForm!=='self'||!returned||
+                        form.dispatchEvent(new CustomEvent('profile:validation-response',{cancelable:true,detail:returned}))) {
+                        formError(form,error.dataset.toastMessage || error.textContent.trim());
+                    }
+                    return true;
+                }
                 const anchor=options.submission.form.dataset.workspaceReturn;
                 if(anchor && finalUrl.pathname===location.pathname && finalUrl.search===location.search)finalUrl.hash=anchor;
                 if(options.submission.form.dataset.workspaceSuccessHash)finalUrl.hash=options.submission.form.dataset.workspaceSuccessHash;

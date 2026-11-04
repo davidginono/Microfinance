@@ -5,7 +5,7 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/client-profile-wizard.js','utf8');
 const conditions=readFileSync('src/main/resources/static/js/client-onboarding.js','utf8');
 const validation=readFileSync('src/main/resources/static/js/form-validation.js','utf8');
-async function setup({error='',saved='',name='Asha',registration=false}={}){
+async function setup({error='',saved='',name='Asha',registration=false,requiredProfile=false}={}){
  const dom=new JSDOM(`<form data-onboarding-form="self"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="requestKey" value="request-key">
  <template data-profile-wizard-labels data-personal="Personal details" data-finances="Income and bank details" data-documents="Documents and privacy" data-review="Review and send" data-navigation="Profile steps" data-step="Step" data-edit="Edit" data-empty="Not provided" data-yes="Yes" data-no="No" data-no-documents="No documents" data-documents-error="Upload required documents" data-document-expiry-error="Expired document" data-acknowledgement-error="Accept consent" data-notice-changed-error="Notice changed"></template>
  <div data-profile-wizard><div><fieldset>
@@ -17,6 +17,10 @@ async function setup({error='',saved='',name='Asha',registration=false}={}){
  ${error==='documents'?'<div data-workspace-form-error role="alert">Upload required documents</div>':''}
  <a href="/profile">Cancel</a><button type="submit" name="action" value="DRAFT" formnovalidate>Save draft</button><button type="button" data-profile-previous hidden>Previous</button><button type="button" data-profile-next hidden>Next</button><button type="submit" name="action" value="SUBMITTED" data-profile-send>Send for review</button></form>`,{url:registration?'http://localhost/client-portal/register':'http://localhost/app/onboarding',runScripts:'outside-only',pretendToBeVisual:true});
  const {window:w}=dom,d=w.document;
+ if(requiredProfile){
+  d.querySelector('[data-profile-section="personal"]').insertAdjacentHTML('beforeend','<label class="kyc-field"><span>Home address</span><input name="profile.address" data-profile-required="true"></label>');
+  d.querySelector('[data-profile-section="finances"]').insertAdjacentHTML('beforeend','<label class="kyc-field"><span>Source of funds</span><input name="profile.sourceOfFunds" data-profile-required="true"></label>');
+ }
  if(registration){
   const wizard=d.querySelector('[data-profile-wizard]');
   wizard.setAttribute('data-profile-registration','');
@@ -33,6 +37,17 @@ async function setup({error='',saved='',name='Asha',registration=false}={}){
  const next=()=>d.querySelector('[data-profile-next]').click();
  return {dom,w,d,form:d.querySelector('form'),next,active:()=>d.querySelector('[aria-current="step"]').textContent};
 }
+test('profile completion requirements are visible and block Next on the step that owns the field',async()=>{
+ const {dom,d,next,active}=await setup({requiredProfile:true});try{
+  const address=d.querySelector('[name="profile.address"]');
+  const funds=d.querySelector('[name="profile.sourceOfFunds"]');
+  assert.equal(address.required,true);assert.match(address.closest('label').textContent,/Home address \*/);
+  next();assert.match(active(),/Personal details/);assert.equal(address.getAttribute('aria-invalid'),'true');
+  address.value='Synthetic address';next();assert.match(active(),/Income and bank/);
+  next();assert.match(active(),/Income and bank/);assert.equal(funds.getAttribute('aria-invalid'),'true');
+  funds.value='Synthetic sales';next();assert.match(active(),/Documents and privacy/);
+ }finally{dom.window.close();}
+});
 test('provisional registration reviews the institution and entered details before requesting an access code',async()=>{
  const {dom,w,d,form,next,active}=await setup({registration:true});try{
   const firstName=d.querySelector('[name="registration.profile.firstName"]');
@@ -131,12 +146,27 @@ test('Save draft bypasses submission-only consent checks in the shared shell',as
   form.dispatchEvent(new w.SubmitEvent('submit',{submitter:d.querySelector('[value="DRAFT"]'),bubbles:true,cancelable:true}));
   assert.equal(validations,0);assert.equal(d.querySelector('.erp-field-error'),null);
   assert.equal(d.querySelector('[name="declarationAccepted"]').checked,false);
-  form.noValidate=true;
   form.dispatchEvent(new w.SubmitEvent('submit',{submitter:d.querySelector('[value="SUBMITTED"]'),bubbles:true,cancelable:true}));
-  assert.equal(validations,0);
-  form.noValidate=false;
-  form.dispatchEvent(new w.SubmitEvent('submit',{submitter:d.querySelector('[value="SUBMITTED"]'),bubbles:true,cancelable:true}));
-  assert.equal(validations,1);assert.equal(d.querySelector('[name="declarationAccepted"]').getAttribute('aria-invalid'),'true');
+  assert.equal(validations,0);assert.equal(d.querySelector('[name="declarationAccepted"]').getAttribute('aria-invalid'),'true');
+ }finally{dom.window.close();}
+});
+test('missing evidence blocks Review before opening confirmations',async()=>{
+ const {dom,w,d,form,next,active}=await setup({saved:'documents'});try{
+  d.querySelector('#profile-step-documents').insertAdjacentHTML('beforeend',
+   '<div data-profile-evidence><h4 tabindex="-1">Required documents</h4><ul><li data-evidence-status="missing">Identity evidence</li><li data-evidence-status="expired">Address evidence</li></ul><p data-evidence-error hidden>Complete the list</p></div>');
+  let checks=0;form.addEventListener('profile:before-review',()=>checks++);
+  next();assert.match(active(),/Documents and privacy/);assert.equal(checks,0);
+  assert.equal(d.querySelector('[data-evidence-error]').hidden,false);
+  assert.equal(d.activeElement.textContent,'Required documents');
+  d.querySelectorAll('[data-evidence-status]').forEach(item=>item.dataset.evidenceStatus='added');
+  next();assert.match(active(),/Review and send/);assert.equal(checks,1);
+  const response=new w.DOMParser().parseFromString(
+   '<form><div data-profile-evidence><h4 tabindex="-1">Required documents</h4><ul><li data-evidence-status="expired">Address evidence</li></ul><p data-evidence-error hidden>Replace expired files</p></div><p data-workspace-form-error>Expired document</p></form>',
+   'text/html');
+  assert.equal(form.dispatchEvent(new w.CustomEvent('profile:validation-response',{cancelable:true,detail:response.querySelector('form')})),false);
+  assert.match(active(),/Documents and privacy/);
+  assert.equal(d.querySelector('[data-evidence-error]').textContent,'Replace expired files');
+  assert.equal(d.querySelector('[data-evidence-error]').hidden,false);
  }finally{dom.window.close();}
 });
 test('Add document remains a navigation link when final-confirmation errors are already visible',async()=>{

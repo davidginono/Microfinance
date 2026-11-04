@@ -37,6 +37,33 @@
         // Move live controls, never clone inputs or persist their values in browser storage.
         sections.forEach(section => panels[keys.indexOf(section.dataset.profileSection)].append(section));
         wizard.replaceChildren(nav, main);
+        const requiredFields = [...wizard.querySelectorAll('[data-profile-required="true"]')];
+        requiredFields.forEach(control => {
+            control.required = true;
+            if (control.type === 'text') control.pattern = '.*\\S.*';
+            control.closest('label')?.querySelector(':scope > span')?.append(' *');
+        });
+        const expiry = form.elements['profile.identityExpiresOn'];
+        const noExpiry = form.elements['profile.identityNoExpiry'];
+        const income = [...form.querySelectorAll('input[name="profile.incomeActivities"]')];
+        if (requiredFields.length) income[0]?.closest('fieldset')?.querySelector('legend')?.append(' *');
+        const syncRequirements = () => {
+            if (!requiredFields.length) return;
+            if (expiry && noExpiry) {
+                expiry.required = !noExpiry.checked;
+                expiry.setCustomValidity(noExpiry.checked === Boolean(expiry.value) ? labels.identityExpiry : '');
+            }
+            if (income.length) {
+                income[0].setCustomValidity(income.some(choice => choice.checked) ? '' : labels.incomeRequired);
+            }
+        };
+        const birth = form.elements['profile.birthDate'];
+        if (requiredFields.length && wizard.dataset.validationDate) {
+            if (birth) {birth.min = '1901-01-01';birth.max = wizard.dataset.validationDate;}
+            if (expiry) expiry.min = wizard.dataset.validationDate;
+        }
+        form.addEventListener('change', syncRequirements, true);
+        syncRequirements();
         const breadcrumb = wizard.closest('.portal-entry')?.querySelector(':scope > .erp-page-path');
         const measureSticky = () => {
             wizard.style.setProperty('--kyc-step-nav-height', nav.offsetHeight + 'px');
@@ -102,15 +129,41 @@
             }
             if (focus) {const heading = panels[index].querySelector('h2');heading.focus({preventScroll:true});heading.scrollIntoView?.({block:'start'});}
         }
-        const advance = () => {
-            if (active === documentsIndex && !form.dispatchEvent(new CustomEvent('profile:before-review', {cancelable:true}))) return;
-            const invalid = [...panels[active].querySelectorAll('input,select,textarea')].find(control => control.willValidate && !control.checkValidity());
-            if (invalid) {invalid.reportValidity();return;}
-            if (active < reviewIndex) show(active + 1);
+        function validateStep(index) {
+            syncRequirements();
+            if (index === documentsIndex) {
+                const evidence = form.querySelector('[data-profile-evidence]');
+                const alert = form.querySelector('[data-workspace-form-error],[data-portal-form-error]');
+                if (evidence && alert && [labels.documentsError, labels.documentExpiryError].some(text => text && alert.textContent.includes(text))) alert.remove();
+                if (evidence?.querySelector('[data-evidence-status="missing"],[data-evidence-status="expired"]')) {
+                    show(index, false);
+                    evidence.querySelector('[data-evidence-error]').hidden = false;
+                    const heading = evidence.querySelector('h4');
+                    heading.focus({preventScroll:true});
+                    heading.scrollIntoView?.({block:'nearest'});
+                    return false;
+                }
+                if (evidence) evidence.querySelector('[data-evidence-error]').hidden = true;
+                if (!form.dispatchEvent(new CustomEvent('profile:before-review', {cancelable:true}))) return false;
+            }
+            const invalid = [...panels[index].querySelectorAll('input,select,textarea')]
+                .filter(control => control.willValidate && !control.validity.valid);
+            if (!invalid.length) return true;
+            show(index, false);
+            invalid[0].reportValidity();
+            invalid.slice(1).forEach(control => control.checkValidity());
+            return false;
+        }
+        const forward = index => {
+            for (let step = active; step < index; step++) {
+                if (!validateStep(step)) return;
+            }
+            show(index);
         };
+        const advance = () => {if (active < reviewIndex) forward(active + 1);};
         previous.addEventListener('click', () => show(Math.max(0, active - 1)));
         next.addEventListener('click', advance);
-        buttons.forEach((button, index) => button.addEventListener('click', () => show(index)));
+        buttons.forEach((button, index) => button.addEventListener('click', () => index > active ? forward(index) : show(index)));
         form.addEventListener('keydown', event => {
             if (event.key === 'Enter' && !event.isComposing && active < reviewIndex &&
                 panels[active].contains(event.target) && event.target.matches('input[name]:not([type="hidden"],[type="checkbox"],[type="radio"])')) {
@@ -123,13 +176,50 @@
             if (index >= 0) {invalidPending = true;show(index, false);setTimeout(() => invalidPending = false, 0);}
         }, true);
         form.addEventListener('submit', event => {
-            if (event.submitter === send && active !== reviewIndex) {event.preventDefault();show(reviewIndex);}
+            if (event.submitter !== send) return;
+            if (active !== reviewIndex) {event.preventDefault();forward(reviewIndex);return;}
+            for (let index = 0; index < reviewIndex; index++) {
+                if (!validateStep(index)) {event.preventDefault();return;}
+            }
         });
         const documentErrors = [labels.documentsError, labels.documentExpiryError, labels.acknowledgementError, labels.noticeChangedError];
+        form.addEventListener('profile:validation-response', event => {
+            const response = event.detail;
+            const evidence = form.querySelector('[data-profile-evidence]');
+            const updated = response.querySelector('[data-profile-evidence]');
+            if (evidence && updated) evidence.replaceWith(updated);
+            const serverAlert = response.querySelector('[data-workspace-form-error]');
+            if (evidence && updated?.querySelector('[data-evidence-status="missing"],[data-evidence-status="expired"]') &&
+                serverAlert && [labels.documentsError, labels.documentExpiryError].some(text => text && serverAlert.textContent.includes(text))) {
+                event.preventDefault();
+                validateStep(documentsIndex);
+                return;
+            }
+            const fields = [...response.querySelectorAll('.field-error[id],.coa-error[id]')];
+            let first;
+            for (const field of fields) {
+                const name = field.id.replace(/\.errors$/, '');
+                const control = form.elements.namedItem(name === 'profile.activity' ? 'profile.incomeActivities' : name);
+                const input = control?.nodeType === 1 ? control : control?.[0];
+                const section = input?.closest('.kyc-field,.kyc-income-choices');
+                const index = section ? panels.findIndex(panel => panel.contains(section)) : -1;
+                if (index < 0 || !field.textContent.trim()) continue;
+                const error = node('span', field.textContent.trim(), 'field-error');
+                error.dataset.fieldErrorFor = input.id || input.name;
+                section.append(error);
+                if (!first) first = {input,index};
+            }
+            if (!first) return;
+            event.preventDefault();
+            form.querySelector('[data-portal-form-error],[data-workspace-form-error]')?.remove();
+            show(first.index, false);
+            window.FormValidation?.refresh(form);
+            if (!window.FormValidation?.focusFirst(form)) first.input.focus();
+        });
         const errorStep = () => {
             const field = [...wizard.querySelectorAll('[aria-invalid="true"],.field-error:not(:empty),.coa-error:not(:empty)')].find(field => !field.hidden);
             if (field) return panels.findIndex(panel => panel.contains(field));
-            const error = form.querySelector('[data-workspace-form-error]');
+            const error = form.querySelector('[data-workspace-form-error],[data-portal-form-error]');
             if (error) return documentsIndex >= 0 && documentErrors.some(text => error.textContent.includes(text)) ? documentsIndex : reviewIndex;
             return -1;
         };

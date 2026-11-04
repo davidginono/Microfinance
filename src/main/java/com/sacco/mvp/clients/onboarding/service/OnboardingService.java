@@ -26,6 +26,7 @@ import java.util.*;
 public class OnboardingService {
     public static final Set<String> IDENTITY_TYPES=Set.of("NATIONAL_ID","PASSPORT","VOTER_ID","DRIVING_LICENCE","OTHER");
     public static final Set<String> DOCUMENT_CATEGORIES=Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT","PROFILE_PHOTO","SPOUSE_PHOTO");
+    private static final List<String> SELF_EVIDENCE=List.of("IDENTITY","ADDRESS","ACTIVITY");
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
     public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber"};
     private final OnboardingRepository records;
@@ -192,7 +193,12 @@ public class OnboardingService {
             .map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn(),d.sizeBytes(),d.contentType(),d.recordedAt())).toList();
         var history=records.history(a,c.id(),page);
         var ownRevision=revision==null?null:new OwnRevision(revision.sequence(),personal(revision.profile()),revision.profile().getNoticeVersion(),revision.profile().getNoticeEnglish(),revision.profile().getNoticeKiswahili(),revision.profile().isNoticeAcknowledged(),revision.profile().getAcknowledgedAt());
-        return new OwnWorkspace(c,ownRevision,documents,records.feedback(a,c.id(),sequence==null?null:revision.id()),new Page<>(history.stream().limit(25).map(h->new OwnHistory(h.sequence(),h.result(),h.recordedAt())).toList(),page,history.size()>25),sequence!=null);
+        LocalDate validationDate=today();
+        var requirements=sequence!=null || "SUBMITTED".equals(c.state()) ? List.<EvidenceRequirement>of()
+            : evidenceRequirements(revision==null?List.of():records.documents(revision.id()),validationDate);
+        return new OwnWorkspace(c,ownRevision,documents,records.feedback(a,c.id(),sequence==null?null:revision.id()),
+            new Page<>(history.stream().limit(25).map(h->new OwnHistory(h.sequence(),h.result(),h.recordedAt())).toList(),page,history.size()>25),
+            sequence!=null,requirements,validationDate);
     }
     @Transactional(readOnly=true)
     public SelfForm ownForm(AppUserPrincipal a) {
@@ -260,8 +266,22 @@ public class OnboardingService {
         check(p.getFirstName().strip().matches("\\S+")&&p.getLastName().strip().matches("\\S+")&&(p.getMiddleName().isBlank()||p.getMiddleName().strip().matches("\\S+")),"nameParts");
     }
     private void checkDocuments(Profile p,List<Document> documents) {
-        check(documents.stream().map(Document::category).collect(java.util.stream.Collectors.toSet()).containsAll(p.isSelfService()?Set.of("IDENTITY","ADDRESS","ACTIVITY"):Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")),"documents");
-        check(documents.stream().noneMatch(d->d.expiresOn()!=null&&d.expiresOn().isBefore(today())),"documentExpiry");
+        var requirements=evidenceRequirements(documents,today());
+        check(requirements.stream().noneMatch(r->"missing".equals(r.status()))
+            && (p.isSelfService()||documents.stream().anyMatch(d->"CONSENT".equals(d.category()))),"documents");
+        check(requirements.stream().noneMatch(r->"expired".equals(r.status())),"documentExpiry");
+    }
+    private List<EvidenceRequirement> evidenceRequirements(List<Document> documents,LocalDate date) {
+        var statusByCategory=new LinkedHashMap<String,String>();
+        SELF_EVIDENCE.forEach(category->statusByCategory.put(category,"missing"));
+        for (Document document:documents) {
+            if (document.expiresOn()!=null && document.expiresOn().isBefore(date)) {
+                statusByCategory.put(document.category(),"expired");
+            } else if (statusByCategory.containsKey(document.category())) {
+                statusByCategory.put(document.category(),"added");
+            }
+        }
+        return statusByCategory.entrySet().stream().map(entry->new EvidenceRequirement(entry.getKey(),entry.getValue())).toList();
     }
     /** Public enrollment accepts the same draft fields; private group choices follow contact verification. */
     public void validateRegistrationProfile(ClientProfile profile) {

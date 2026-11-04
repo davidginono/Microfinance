@@ -2,6 +2,20 @@
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <div id="profile-documents" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.attachmentsAndDocuments"/></h2><section class="erp-resource-section" data-profile-section="documents"><h3><spring:message code="kyc.attachmentsAndDocuments"/></h3><div class="kyc-section-body">
 <div data-profile-document-list data-revision-id="${client.revisionId}" class="kyc-profile-document-list">
+<c:if test="${formKind=='self' and not profileReadOnly}">
+    <div data-profile-evidence>
+        <h4 tabindex="-1"><spring:message code="kyc.evidence.heading"/></h4>
+        <ul class="kyc-evidence-list">
+            <c:forEach items="${workspace.evidenceRequirements}" var="evidence">
+                <li data-evidence-status="${evidence.status}">
+                    <spring:message code="kyc.category.${evidence.category}"/>:
+                    <strong><spring:message code="kyc.evidence.${evidence.status}"/></strong>
+                </li>
+            </c:forEach>
+        </ul>
+        <p data-evidence-error role="alert" hidden><spring:message code="kyc.evidence.fix"/></p>
+    </div>
+</c:if>
 <c:if test="${not empty profileDocuments}">
     <ul class="kyc-upload-queue" aria-label="<spring:message code='kyc.uploadedFiles'/>">
         <c:forEach items="${profileDocuments}" var="doc">
@@ -41,7 +55,6 @@
 <c:if test="${not empty profileDocuments and profileDocuments.size()>=100}"><p class="kyc-field-hint"><spring:message code="kyc.recentDocuments"/></p></c:if>
 </div><c:choose><c:when test="${not empty client and client.state=='DRAFT'}"><a class="app-btn btn-neutral" ${formKind=='self'?'data-profile-add-documents':''} href="<c:url value='${uploadPath}'/>"><spring:message code="kyc.addDocument"/></a></c:when><c:otherwise><c:if test="${client.state!='SUBMITTED'}"><p><spring:message code="kyc.saveBeforeUpload"/></p></c:if></c:otherwise></c:choose>
 <c:if test="${formKind=='self' and not profileReadOnly}">
-    <p class="kyc-field-hint"><spring:message code="kyc.beforeSubmit"/></p>
     <div class="kyc-acknowledgement" data-profile-declaration>
         <label class="kyc-checkbox"><form:checkbox path="declarationAccepted" required="true"/><span><spring:message code="kyc.acceptDeclaration"/></span></label>
         <form:errors path="declarationAccepted" cssClass="coa-error"/>

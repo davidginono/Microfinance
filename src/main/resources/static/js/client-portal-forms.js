@@ -21,6 +21,9 @@
                 document.dispatchEvent(new CustomEvent('workspace:form-settled',{detail:{form:form,saved:true}}));location.assign(destination.href);return;
             }
             var page=new DOMParser().parseFromString(await response.text(),'text/html');
+            var returned=page.querySelector('form[data-onboarding-form="self"]');
+            if(form.dataset.onboardingForm==='self'&&returned&&
+                !form.dispatchEvent(new CustomEvent('profile:validation-response',{cancelable:true,detail:returned})))return;
             var messages=Array.from(page.querySelectorAll('.field-error,[data-message-type="error"]')).map(function(e){return e.textContent.trim();}).filter(Boolean);
             failure(form,messages.length?Array.from(new Set(messages)).join(' '):document.body.dataset.portalSaveError);
         }catch(_){
