@@ -14,10 +14,6 @@
     const states = forms.map(form => ({form, initial:values(form), edited:false,
         restoredErrors:Boolean(form.querySelector('.accounting-error-summary .coa-error, .loan-error-summary, [data-workspace-form-error]')) || form.dataset.unsavedFinancialForm === 'true'}));
     const dirty = except => states.some(state => state !== except && (state.restoredErrors || values(state.form) !== state.initial));
-    document.addEventListener('session:check-work', event => {
-        states.forEach(state => event.detail.forms.add(state.form));
-        if (states.some(state => state.form.isConnected && (state.restoredErrors || values(state.form) !== state.initial))) event.preventDefault();
-    });
     const initialize = (complete = false) => {
         if (initialized) return;
         initialized = complete;

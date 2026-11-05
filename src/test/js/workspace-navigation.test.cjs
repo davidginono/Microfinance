@@ -34,12 +34,14 @@ test('session timing retains the workspace request start across delayed response
  const {dom,w,d,requests}=await setup({holdNavigation:true});
  try{
   let now=10000;w.Date.now=()=>now;
+  const oldPrompt=d.createElement('div');oldPrompt.id='sessionInactivityPrompt';oldPrompt.dataset.warningEnabled='true';d.body.append(oldPrompt);
   const visit=w.WorkspaceNavigation.visit('/admin/users');
   const pending=requests.find(r=>r.url.pathname==='/admin/users');
   now=20000;
-  pending.resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>html('Users').replace('</main>','<div id="sessionInactivityPrompt"></div></main>')});
+  pending.resolve({ok:true,url:'http://localhost/admin/users',headers:{get:()=> 'text/html'},text:async()=>html('Users').replace('</main>','<div id="sessionInactivityPrompt" data-warning-enabled="false"></div></main>')});
   await visit;
   assert.equal(d.getElementById('sessionInactivityPrompt').dataset.clientRequestStartedAt,'10000');
+  assert.equal(d.getElementById('sessionInactivityPrompt').dataset.warningEnabled,'false');assert.equal(oldPrompt.isConnected,false);
  }finally{dom.window.close();}
 });
 

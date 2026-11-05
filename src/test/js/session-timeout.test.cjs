@@ -8,7 +8,6 @@ function setup(warningEnabled = true, {requestStartedAt, navigationStartedAt, in
         <div id="accounting-discard-modal" hidden><div role="dialog"><button data-accounting-keep>Close</button>
         <div class="app-modal-actions"><button data-accounting-keep>Continue editing</button><button data-accounting-discard>Discard</button></div></div></div>
         <div id="sessionInactivityPrompt" class="hidden" data-timeout-ms="120000" data-warning-ms="60000" data-warning-enabled="${warningEnabled}"
-        data-unfinished-work-message="You have unfinished work. Verify to continue."
         data-keepalive-url="/session/keepalive" data-csrf-header="X-CSRF-TOKEN" data-csrf-token="masked-token" data-refresh-error-message="Please retry.">
         <p id="sessionInactivityMessage"></p>
         <span id="sessionInactivityCountdown"></span><div><div id="sessionInactivityProgress"></div></div>
@@ -244,90 +243,57 @@ test('warning off logs out untouched pages automatically without showing the mod
     } finally { s.dom.window.close(); }
 });
 
-test('warning off still protects unsaved changes and keeps the original expiry deadline', () => {
-    const s = setup(false);
-    try {
-        s.form.querySelector('input').value = 'unfinished';
-        s.advance(60000);
-        assert.equal(s.prompt.classList.contains('hidden'), false);
-        assert.equal(s.d.getElementById('sessionInactivityMessage').textContent, 'You have unfinished work. Verify to continue.');
-        s.advance(120000);
-        assert.equal(s.logouts(), 1);
-    } finally { s.dom.window.close(); }
-});
-
-test('an edit during the final minute opens the work warning without extending expiry', () => {
-    const s = setup(false);
-    try {
-        s.advance(60000);
-        assert.equal(s.prompt.classList.contains('hidden'), true);
-        s.advance(90000);
-        const input = s.form.querySelector('input'); input.value = 'unfinished';
-        input.dispatchEvent(new s.w.Event('input', {bubbles:true}));
-        assert.equal(s.prompt.classList.contains('hidden'), false);
-        assert.equal(s.d.getElementById('sessionInactivityCountdown').textContent, '30');
-        s.advance(120000); assert.equal(s.logouts(), 1);
-    } finally { s.dom.window.close(); }
-});
-
-test('reverted edits and GET filters do not trigger the work warning', () => {
-    const s = setup(false);
-    try {
-        const input = s.form.querySelector('input'); input.value = 'edited'; input.value = 'original';
-        const filter = s.d.createElement('form'); filter.innerHTML = '<input name="search" value="">';
-        s.d.body.append(filter); filter.querySelector('input').value = 'filter text';
-        s.advance(60000); assert.equal(s.prompt.classList.contains('hidden'), true);
-        s.advance(120000); assert.equal(s.logouts(), 1);
-    } finally { s.dom.window.close(); }
-});
-
-test('a saved form normalized after initialization uses its shared clean baseline', () => {
-    const s = setup(false);
-    try {
-        s.form.querySelector('input').value = 'initialized saved value';
-        s.form.dispatchEvent(new s.w.Event('accounting:form-refreshed', {bubbles:true}));
-        s.advance(60000); assert.equal(s.prompt.classList.contains('hidden'), true);
-        s.advance(120000); assert.equal(s.logouts(), 1);
-    } finally { s.dom.window.close(); }
-});
-
-test('selected upload files trigger the work warning even when the file control is disabled', () => {
-    const s = setup(false);
-    try {
-        const upload = s.d.createElement('input'); upload.type = 'file'; upload.name = 'document'; upload.disabled = true;
-        Object.defineProperty(upload, 'files', {value:[new s.w.File(['document'], 'evidence.pdf')]});
-        s.form.append(upload);
-        s.advance(60000); assert.equal(s.prompt.classList.contains('hidden'), false);
-        s.advance(120000); assert.equal(s.logouts(), 1);
-    } finally { s.dom.window.close(); }
-});
-
-test('changed checkbox and multi-select values trigger the work warning', () => {
-    for (const markup of ['<input name="enabled" type="checkbox">', '<select name="documents" multiple><option>A</option><option>B</option></select>']) {
-        const s = setup(false);
-        try {
-            s.form.insertAdjacentHTML('beforeend', markup);
-            const field = s.form.lastElementChild;
-            if (field.tagName === 'SELECT') field.options[1].selected = true;
-            else field.checked = true;
-            s.advance(60000); assert.equal(s.prompt.classList.contains('hidden'), false);
-        } finally { s.dom.window.close(); }
+test('warning off never shows a modal for edited forms, validation errors or selected uploads', () => {
+    const cases = [
+        ['edited text', s => {s.form.querySelector('input').value='unfinished';}],
+        ['unsaved financial form', s => {s.form.dataset.unsavedFinancialForm='true';}],
+        ['validation error', s => {s.form.insertAdjacentHTML('beforeend','<p data-workspace-form-error>Correct this value</p>');}],
+        ['checkbox', s => {s.form.insertAdjacentHTML('beforeend','<input type="checkbox" name="enabled">');s.form.lastElementChild.checked=true;}],
+        ['multi-select', s => {s.form.insertAdjacentHTML('beforeend','<select name="documents" multiple><option>A</option><option>B</option></select>');s.form.lastElementChild.options[1].selected=true;}],
+        ['pending upload', s => {
+            const upload=s.d.createElement('input');upload.type='file';upload.name='document';upload.disabled=true;
+            Object.defineProperty(upload,'files',{value:[new s.w.File(['document'],'evidence.pdf')]});s.form.append(upload);
+            s.d.dispatchEvent(new s.w.CustomEvent('workspace:form-pending',{detail:{form:s.form}}));s.form.remove();
+        }]
+    ];
+    for (const [name, edit] of cases) {
+        const s=setup(false);
+        try {edit(s);s.advance(60000);assert.equal(s.prompt.classList.contains('hidden'),true,name);s.advance(120000);assert.equal(s.logouts(),1,name);}
+        finally {s.dom.window.close();}
     }
 });
 
-test('an in-flight upload remains protected while its form is detached and clears on completion', () => {
-    for (const completed of [false, true]) {
-        const s = setup(false);
-        try {
-            const upload = s.d.createElement('input'); upload.type = 'file'; upload.name = 'document';
-            Object.defineProperty(upload, 'files', {value:[new s.w.File(['document'], 'evidence.pdf')]});
-            s.form.append(upload);
-            s.d.dispatchEvent(new s.w.CustomEvent('workspace:form-pending', {detail:{form:s.form}}));
-            s.form.remove();
-            if (completed) s.d.dispatchEvent(new s.w.CustomEvent('workspace:form-settled', {detail:{form:s.form}}));
-            s.advance(60000); assert.equal(s.prompt.classList.contains('hidden'), completed);
-        } finally { s.dom.window.close(); }
-    }
+test('warning off remains off when a field changes during the final minute', () => {
+    const s=setup(false);
+    try {
+        s.advance(60000);s.advance(90000);
+        const input=s.form.querySelector('input');input.value='unfinished';input.dispatchEvent(new s.w.Event('input',{bubbles:true}));
+        assert.equal(s.prompt.classList.contains('hidden'),true);assert.equal(input.value,'unfinished');
+        s.advance(120000);assert.equal(s.logouts(),1);
+    } finally {s.dom.window.close();}
+});
+
+test('trusted activity still renews an edited form when warnings are disabled', async () => {
+    const s=setup(false);
+    try {
+        let requests=0;s.w.fetch=async()=>{requests++;return {ok:true,status:200,json:async()=>({refreshed:true,timeoutMs:120000,warningEnabled:false})};};
+        s.form.querySelector('input').value='unfinished';s.advance(1000);s.interact();s.advance(30000);await settled();
+        assert.equal(requests,1);s.advance(61000);assert.equal(s.prompt.classList.contains('hidden'),true);assert.equal(s.logouts(),0);
+        assert.equal(s.form.querySelector('input').value,'unfinished');s.advance(121000);assert.equal(s.logouts(),1);
+    } finally {s.dom.window.close();}
+});
+
+test('a confirmed warning-off policy closes an already open warning in another tab', () => {
+    let channel;
+    class Channel {constructor(){channel=this;}postMessage(){}close(){}}
+    const s=setup(true,{broadcastChannel:Channel});
+    try {
+        s.advance(60000);assert.equal(s.prompt.classList.contains('hidden'),false);s.advance(61000);
+        channel.onmessage({data:{startedAt:61000,timeoutMs:120000,warningEnabled:false}});
+        assert.equal(s.prompt.classList.contains('hidden'),true);assert.equal(s.d.body.classList.contains('session-timeout-active'),false);
+        s.advance(121000);assert.equal(s.prompt.classList.contains('hidden'),true);assert.equal(s.logouts(),0);
+        s.advance(181000);assert.equal(s.logouts(),1);
+    } finally {s.dom.window.close();}
 });
 
 test('late wake after expiry logs out without granting extra time for unfinished work', () => {

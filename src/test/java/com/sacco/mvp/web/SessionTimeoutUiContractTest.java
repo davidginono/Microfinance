@@ -16,7 +16,7 @@ class SessionTimeoutUiContractTest {
         assertThat(footer).contains("data-timeout-ms=\"${sessionTimeoutMs}\"");
         assertThat(footer).contains("data-warning-ms=\"${sessionTimeoutWarningMs}\"");
         assertThat(footer).contains("data-warning-enabled=\"${sessionTimeoutWarningEnabled}\"");
-        assertThat(footer).contains("session.timeout.unfinishedWork");
+        assertThat(footer).doesNotContain("data-unfinished-work-message");
         assertThat(footer).contains("Verify to continue");
         assertThat(footer).contains("id=\"sessionInactivityPassword\"");
         assertThat(footer).contains("Verify &amp; Stay Logged In");

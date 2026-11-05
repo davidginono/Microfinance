@@ -1694,40 +1694,6 @@
             : 60000;
         let timeoutMs = Math.max(configuredTimeoutMs, warningMs + 1000);
         let warningEnabled = prompt.getAttribute('data-warning-enabled') === 'true';
-        const pendingUploads = new Set();
-        document.addEventListener('workspace:form-pending', function (event) {
-            const form = event.detail.form;
-            if (Array.from(form.querySelectorAll('input[type="file"]')).some(field => field.files.length > 0)) {
-                pendingUploads.add(form);
-            }
-        });
-        document.addEventListener('workspace:form-settled', function (event) {
-            pendingUploads.delete(event.detail.form);
-        });
-        const hasUnfinishedWork = function () {
-            // Share the form guard's baseline after deferred controls have initialized.
-            const workCheck = new CustomEvent('session:check-work', {cancelable: true, detail: {forms: new Set()}});
-            document.dispatchEvent(workCheck);
-            return workCheck.defaultPrevented || pendingUploads.size > 0 || Array.from(document.forms).some(function (form) {
-                if (prompt.contains(form) || form.method.toLowerCase() !== 'post'
-                    || new URL(form.action, location.href).pathname === '/logout') return false;
-                if (form.dataset.unsavedFinancialForm === 'true'
-                    || form.querySelector('[data-workspace-form-error], .accounting-error-summary .coa-error, .loan-error-summary')) return true;
-                return Array.from(form.elements).some(function (field) {
-                    if (!field.name || ['hidden', 'submit', 'button', 'reset'].includes(field.type)) return false;
-                    if (field.type === 'file') return field.files.length > 0;
-                    if (workCheck.detail.forms.has(form)) return false;
-                    if (['checkbox', 'radio'].includes(field.type)) return field.checked !== field.defaultChecked;
-                    if (field.tagName === 'SELECT') {
-                        const defaults = Array.from(field.options).filter(option => option.defaultSelected);
-                        // A single select without a selected attribute initially selects its first option.
-                        if (!field.multiple && !defaults.length) return field.selectedIndex !== (field.options.length ? 0 : -1);
-                        return Array.from(field.options).some(option => option.selected !== option.defaultSelected);
-                    }
-                    return 'defaultValue' in field && field.value !== field.defaultValue;
-                });
-            });
-        };
         const progressShell = progress.parentElement;
         let checkTimer = null;
         let countdownTimer = null;
@@ -1979,7 +1945,7 @@
         };
 
         const showPrompt = function () {
-            if (promptVisible()) {
+            if (!warningEnabled || promptVisible()) {
                 return;
             }
             if (checkTimer) {
@@ -1987,10 +1953,6 @@
                 checkTimer = null;
             }
             deadline = cycleDeadline();
-            if (!warningEnabled) {
-                const message = document.getElementById('sessionInactivityMessage');
-                if (message && prompt.dataset.unfinishedWorkMessage) message.textContent = prompt.dataset.unfinishedWorkMessage;
-            }
             previousFocus = document.activeElement;
             prompt.classList.remove('hidden');
             prompt.classList.add('flex');
@@ -2210,7 +2172,7 @@
                 scheduleFinalMinuteCheck();
                 return;
             }
-            if (warningEnabled || hasUnfinishedWork()) {
+            if (warningEnabled) {
                 showPrompt();
             } else {
                 checkTimer = window.setTimeout(runFinalMinuteCheck, Math.max(cycleDeadline() - now, 0));
