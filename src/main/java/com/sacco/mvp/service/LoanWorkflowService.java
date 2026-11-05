@@ -698,6 +698,10 @@ public class LoanWorkflowService {
     }
 
     public LoanApplication removeApplicationAttachment(UUID appId, UUID memberId, String attachmentId) {
+        return removeApplicationAttachment(appId, memberId, attachmentId, memberId);
+    }
+
+    public LoanApplication removeApplicationAttachment(UUID appId, UUID memberId, String attachmentId, UUID actorId) {
         LoanApplication app = getMine(appId, memberId);
         if (app.getStatus() != LoanStatus.DRAFT && app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
             throw new IllegalStateException("Only draft applications or applications approved by all guarantors can be edited.");
@@ -718,7 +722,7 @@ public class LoanWorkflowService {
             }
             app.setUpdatedAt(OffsetDateTime.now());
             LoanApplication saved = loanApplicationRepository.save(app);
-            auditLoan(saved, memberId, "LOAN_APPLICATION_ATTACHMENT_REMOVED", "Loan application attachment removed", Map.of(
+            auditLoan(saved, actorId, "LOAN_APPLICATION_ATTACHMENT_REMOVED", "Loan application attachment removed", Map.of(
                 "attachmentId", attachmentId,
                 "attachmentName", removal.originalName()
             ));

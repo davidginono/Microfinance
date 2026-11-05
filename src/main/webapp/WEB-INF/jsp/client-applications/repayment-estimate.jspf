@@ -1,0 +1,19 @@
+<details class="application-repayment-estimate" data-repayment-estimate hidden>
+    <summary><spring:message code="repayment.scheduler"/></summary>
+    <div class="erp-table-wrap">
+        <div class="erp-table-scroll erp-table-scroll-sm" tabindex="0" role="region" aria-label="<spring:message code='repayment.scheduler'/>">
+            <table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="repayment-order">
+                <thead><tr>
+                    <th scope="col"><spring:message code="repayment.pmtNo"/></th>
+                    <th scope="col"><spring:message code="applications.repaymentPeriod"/></th>
+                    <th scope="col"><spring:message code="repayment.beginningBalance"/></th>
+                    <th scope="col"><spring:message code="repayment.scheduledPayment"/></th>
+                    <th scope="col"><spring:message code="repayment.principal"/></th>
+                    <th scope="col"><spring:message code="repayment.interest"/></th>
+                    <th scope="col"><spring:message code="repayment.endingBalance"/></th>
+                </tr></thead>
+                <tbody data-repayment-estimate-rows></tbody>
+            </table>
+        </div>
+    </div>
+</details>

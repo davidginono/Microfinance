@@ -3,6 +3,7 @@
     function init() {
         document.querySelectorAll('[data-client-application]:not([data-application-ready])').forEach(function (form) {
             form.dataset.applicationReady = 'true';
+            var borrower = form.dataset.borrowerWorkspace === 'true';
             var root = form.dataset.root, error = form.querySelector('[data-application-error]'), requirements = [], timers = new WeakMap();
             function fail() { error.textContent = error.dataset.errorText; error.hidden = false; }
             function valueLabel(value){var node=form.querySelector('[data-application-value="'+value+'"]');return node?node.textContent:String(value);}
@@ -14,7 +15,7 @@
                 tab.addEventListener('click', function () { panel(tab.dataset.applicationTab); });
                 tab.addEventListener('keydown', function (event) { var tabs = Array.from(form.querySelectorAll('[data-application-tab]')), index = tabs.indexOf(tab); if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); var next = tabs[(index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; next.click(); next.focus(); } });
             });
-            panel('information');
+            panel(form.dataset.initialTab || 'information');
             form.addEventListener('invalid', function (e) { var p = e.target.closest('[data-application-panel]'); if (p) panel(p.dataset.applicationPanel); }, true);
             function reindex(list) {
                 var kind = list.dataset.repeatList;
@@ -84,14 +85,194 @@
                     }
                 } catch (_) { fail(); }
             }
-            form.elements.namedItem('productId').addEventListener('change',function(){product(true);}); product(false);
-            form.querySelector('[data-application-quote]').addEventListener('click',async function () {
-                error.hidden=true;
-                try {
-                    var data=new FormData(form);data.delete('files');var response=await fetch(root+'/quote',{method:'POST',body:data,headers:{Accept:'application/json'}});if(!response.ok)throw new Error();var quote=await response.json(),out=form.querySelector('[data-quote-output]');out.replaceChildren();
-                    ['principalAmount','interestAmount','applicationFee','insuranceFee','processingFee','totalDeductions','periodicRepaymentAmount','interestRate','interestMethod','repaymentFrequency'].forEach(function (key) {var entry=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=form.querySelector('[data-quote-label="'+key+'"]').textContent;dd.textContent=quote[key]===undefined?'':key==='interestRate'?new Intl.NumberFormat(document.documentElement.lang,{maximumFractionDigits:4}).format(Number(quote[key])*100)+'%':valueLabel(quote[key]);entry.append(dt,dd);out.append(entry);});
-                } catch (_) {fail();}
+            if (!borrower) {
+                form.elements.namedItem('productId').addEventListener('change', function () { product(true); });
+                product(false);
+            }
+
+            var quoteButton = form.querySelector('[data-application-quote]');
+            var quoteOutput = form.querySelector('[data-quote-output]');
+            var quoteStatus = form.querySelector('[data-quote-status]');
+            var estimate = form.querySelector('[data-repayment-estimate]');
+            var estimateRows = form.querySelector('[data-repayment-estimate-rows]');
+            var quoteRequest = 0;
+            var snapshot = form.elements.namedItem('financialSnapshotJson');
+            function clearQuote() {
+                quoteRequest++;
+                quoteOutput.replaceChildren();
+                estimate.hidden = true;
+                estimateRows.replaceChildren();
+                quoteStatus.hidden = true;
+                if (snapshot) snapshot.value = '';
+            }
+            form.addEventListener('input', function (event) {
+                if (event.target.closest('[data-application-panel="information"],[data-application-panel="collateral"]')
+                    && event.target.name) clearQuote();
             });
+            form.addEventListener('change', function (event) {
+                if (event.target.closest('[data-application-panel="information"],[data-application-panel="collateral"]')
+                    || event.target === form) clearQuote();
+            });
+            function renderQuote(quote) {
+                form.querySelectorAll('[data-quote-label]').forEach(function (label) {
+                    var key = label.dataset.quoteLabel, value = quote[key];
+                    if (value == null) return;
+                    var entry = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+                    dt.textContent = label.textContent;
+                    dd.textContent = key === 'interestRate'
+                        ? new Intl.NumberFormat(document.documentElement.lang, {style:'percent',maximumFractionDigits:4}).format(Number(value))
+                        : valueLabel(value);
+                    entry.append(dt, dd);
+                    quoteOutput.append(entry);
+                });
+            }
+            function renderSchedule(rows) {
+                rows.forEach(function (row) {
+                    var tr = estimateRows.insertRow();
+                    ['pmtNo','month','beginningBalance','payment','loanAmount','interest','endingBalance'].forEach(function (key) {
+                        tr.insertCell().textContent = row[key];
+                    });
+                });
+                estimate.hidden = rows.length === 0;
+            }
+            async function loadQuote() {
+                error.hidden = true;
+                clearQuote();
+                var sequence = quoteRequest;
+                var data = new URLSearchParams();
+                var quoteFields = new Set([form.dataset.csrfName,'requestKey','applicationId','clientId','productId','loanProductId',
+                    'loanType','topUpLoanId','applicationDate','amount','tenureValue','tenureUnit','income','expenses','otherDebt',
+                    'purpose','business','useOfFunds','collateralDescription','collateralEstimatedValue']);
+                form.querySelectorAll('[data-product-field]').forEach(function (field) { quoteFields.add(field.name); });
+                new FormData(form).forEach(function (value, key) {
+                    if (typeof value === 'string' && (quoteFields.has(key) || key.startsWith('fields['))) data.append(key, value);
+                });
+                quoteButton.disabled = true;
+                quoteButton.setAttribute('aria-busy', 'true');
+                try {
+                    var response = await fetch(root + (borrower ? '/financial-preview' : '/quote'), {
+                        method:'POST', body:data, headers:{Accept:'application/json'}
+                    });
+                    var payload = await response.json().catch(function () { return {}; });
+                    if (sequence !== quoteRequest) return;
+                    if (!response.ok) throw new Error(payload.message || error.dataset.errorText);
+                    renderQuote(borrower ? JSON.parse(payload.snapshotJson) : payload);
+                    renderSchedule(payload.repaymentSchedule || []);
+                    if (borrower) {
+                        snapshot.value = payload.snapshotJson || '';
+                        quoteStatus.textContent = payload.message;
+                        quoteStatus.hidden = false;
+                    }
+                } catch (failure) {
+                    if (sequence === quoteRequest) {
+                        quoteStatus.textContent = failure.message === 'Failed to fetch' ? error.dataset.errorText : failure.message;
+                        quoteStatus.hidden = false;
+                    }
+                } finally {
+                    quoteButton.disabled = false;
+                    quoteButton.removeAttribute('aria-busy');
+                }
+            }
+            quoteButton.addEventListener('click', loadQuote);
+
+            if (borrower) {
+                var serverError = form.querySelector('[data-application-server-error]');
+                if (snapshot.value && !serverError) void loadQuote();
+                if (serverError && form.dataset.initialTab === 'information') serverError.focus();
+                var purpose = form.elements.namedItem('purpose');
+                purpose.setAttribute('aria-describedby', 'application-purpose-help');
+                purpose.addEventListener('input', function () {
+                    var start = purpose.selectionStart, end = purpose.selectionEnd;
+                    purpose.value = purpose.value.toUpperCase();
+                    purpose.setSelectionRange(start, end);
+                    purpose.setCustomValidity(purpose.value.trim().split(/\s+/).length > 10 ? form.dataset.purposeError : '');
+                });
+                var terms = form.elements.namedItem('termsAccepted');
+                form.addEventListener('submit', function (event) {
+                    delete form.dataset.confirmMessage;
+                    if (event.defaultPrevented) return;
+                    if (event.submitter?.value !== 'SEND_TO_GUARANTORS') return;
+                    if (!terms.checked) {
+                        event.preventDefault();
+                        terms.required = true;
+                        terms.reportValidity();
+                        terms.required = false;
+                        return;
+                    }
+                    form.dataset.confirmMessage = form.dataset.submitConfirmation;
+                    form.dataset.confirmTitle = event.submitter.textContent.trim();
+                    form.dataset.confirmProceed = form.dataset.confirmTitle;
+                });
+                bindSignatureOtp(form, root);
+            }
+        });
+    }
+    function bindSignatureOtp(form, root) {
+        var button = form.querySelector('#requestApplicantSignatureOtpButton');
+        if (!button) return;
+        var input = form.elements.namedItem('applicantSignatureOtpCode');
+        var feedback = form.querySelector('#applicantSignatureOtpFeedback');
+        var status = form.querySelector('#applicantSignatureOtpLiveStatus');
+        var statusText = status.querySelector('[data-otp-text]');
+        var spinner = status.querySelector('[data-otp-spinner]');
+        var tick = status.querySelector('[data-otp-tick]');
+        var idle = button.querySelector('.otp-button-label').textContent;
+        var checking = statusText.textContent;
+        var errorText = form.querySelector('[data-application-error]').dataset.errorText;
+        var version = 0;
+
+        async function post(endpoint, otpCode) {
+            var data = new URLSearchParams({
+                [form.dataset.csrfName]: form.elements.namedItem(form.dataset.csrfName).value,
+                applicationId: form.elements.namedItem('applicationId').value
+            });
+            if (otpCode !== undefined) data.set('otpCode', otpCode);
+            var response = await fetch(root + endpoint, {method:'POST',body:data,headers:{Accept:'application/json'}});
+            var payload = await response.json();
+            if (!response.ok || payload.valid === false) throw new Error(payload.message || errorText);
+            return payload;
+        }
+        button.addEventListener('click', async function () {
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            button.querySelector('.otp-button-spinner').classList.remove('hidden');
+            var cooldownStarted = false;
+            try {
+                var payload = await post('/request-signature-otp');
+                feedback.textContent = payload.message;
+                if (window.SaccosOtp) {
+                    window.SaccosOtp.startCooldown(button, payload, {idle:idle});
+                    cooldownStarted = true;
+                    window.SaccosOtp.focusBoxes(input);
+                } else {
+                    input.focus();
+                }
+            } catch (failure) {
+                feedback.textContent = failure.message || errorText;
+            } finally {
+                feedback.classList.remove('hidden');
+                button.querySelector('.otp-button-spinner').classList.add('hidden');
+                button.removeAttribute('aria-busy');
+                if (!cooldownStarted) button.disabled = false;
+            }
+        });
+        input.addEventListener('input', async function () {
+            var code = input.value, request = ++version;
+            status.classList.toggle('hidden', !/^\d{6}$/.test(code));
+            if (status.classList.contains('hidden')) return;
+            spinner.classList.remove('hidden');
+            tick.classList.add('hidden');
+            statusText.textContent = checking;
+            try {
+                var payload = await post('/verify-signature-otp', code);
+                if (request !== version) return;
+                statusText.textContent = payload.message;
+                tick.classList.remove('hidden');
+            } catch (failure) {
+                if (request === version) statusText.textContent = failure.message || errorText;
+            } finally {
+                if (request === version) spinner.classList.add('hidden');
+            }
         });
     }
     if(window.WorkspaceNavigation&&window.WorkspaceNavigation.onReady)window.WorkspaceNavigation.onReady(init);else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

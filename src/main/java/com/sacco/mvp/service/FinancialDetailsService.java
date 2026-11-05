@@ -18,7 +18,14 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,6 +40,40 @@ public class FinancialDetailsService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final ObjectMapper objectMapper;
+
+    public static List<Map<String, String>> previewSchedule(BigDecimal amount, Integer tenorMonths,
+                                                            Map<String, Object> snapshot, MessageSource messageSource) {
+        Object quotedPrincipal = snapshot.get("principalAmount");
+        BigDecimal principal = quotedPrincipal == null ? amount : new BigDecimal(quotedPrincipal.toString());
+        int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
+        LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, snapshot);
+        List<Map<String, String>> rows = new ArrayList<>();
+        BigDecimal scheduledBalance = calculation.totalRepayment();
+        for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("pmtNo", String.valueOf(installment.number()));
+            boolean weekly = "WEEKLY".equals(snapshot.get("repaymentFrequency"));
+            row.put("month", messageSource.getMessage(weekly ? "repayment.period.WEEKLY" : "repayment.period.MONTHLY",
+                new Object[]{installment.number()}, (weekly ? "Week " : "Month ") + installment.number(), LocaleContextHolder.getLocale()));
+            row.put("dueDate", row.get("month"));
+            row.put("beginningBalance",formatTzs(scheduledBalance));
+            scheduledBalance = scheduledBalance.subtract(installment.amount());
+            row.put("endingBalance", formatTzs(scheduledBalance));
+            row.put("outstandingBalance", row.get("endingBalance"));
+            row.put("payment", formatTzs(installment.amount()));
+            row.put("loanAmount", formatTzs(installment.principal()));
+            row.put("interest", formatTzs(installment.interest()));
+            row.put("installment", formatTzs(installment.amount()));
+            row.put("principal", formatTzs(installment.principal()));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static String formatTzs(BigDecimal amount) {
+        DecimalFormat format = new DecimalFormat("#,##0.##", DecimalFormatSymbols.getInstance(Locale.US));
+        return "TSh " + format.format(amount);
+    }
 
     public Map<String, Object> generateSnapshot(String saccoId, UUID memberId, LoanType loanType, BigDecimal amount,
                                                 Integer tenorMonths, UUID topUpSourceLoanId) {

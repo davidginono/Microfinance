@@ -11,7 +11,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void loginApprovalDefaultsGuarantorSearchToMemberNumber() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
 
         assertThat(source.indexOf("<option value=\"number\">"))
             .isLessThan(source.indexOf("<option value=\"name\">"));
@@ -21,7 +21,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void directOtpSwitchesSearchModesAndUsesLocalDirectoryEndpoint() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
 
         assertThat(source)
             .contains("{ value: \"phone\", label: modePhoneLabel")
@@ -31,7 +31,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void directOtpSearchShowsMemberDirectoryOutageInsteadOfNoMatches() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
 
         assertThat(source)
             .contains("const msgMemberDirectoryUnavailable")
@@ -44,7 +44,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void guarantorSearchShowsInlineFormatVerificationOnlyAfterSearchClick() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
         String styles = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
 
         assertThat(source)
@@ -73,10 +73,10 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void selectedGuarantorChipsKeepMemberNumberAndNameLabel() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
 
         assertThat(source)
-            .contains("${item.memberNo} - ${item.fullName}")
+            .contains("<c:out value=\"${item.memberNo}\"/> - <c:out value=\"${item.fullName}\"/>")
             .contains("<div id=\"selectedGuarantorInputs\">")
             .contains("name=\"guarantorSelections\"")
             .contains("value=\"${fn:escapeXml(not empty item.localMemberId ? item.localMemberId : (not empty item.selectionToken ? item.selectionToken : item.id))}\"")
@@ -97,20 +97,22 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void confirmedSubmitKeepsSendActionAndSelectedGuarantors() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
-        String normalizedSource = source.replace("\r\n", "\n");
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
+        String form = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/form.jsp"));
+        String script = Files.readString(Path.of("src/main/resources/static/js/client-applications.js"));
 
-        assertThat(normalizedSource)
-            .contains("function resolveSubmitButton(event)")
-            .contains("form.dataset.pendingFormAction = button.dataset.formAction || \"\";")
-            .contains("const formAction = submitButton.dataset.formAction || form.dataset.pendingFormAction || \"SAVE_DRAFT\";")
-            .contains("actionInput.value = formAction;")
-            .contains("const configuredInitialStep = Number(\"${loanFormInitialStep}\");")
-            .contains("window.SaccosLoanForm.activateStep = activateStep;")
+        assertThat(form)
+            .contains("name=\"action\" value=\"SEND_TO_GUARANTORS\"")
+            .contains("include file=\"borrower-guarantors.jspf\"")
+            .contains("include file=\"../fragments/confirm-modal.jspf\"");
+        assertThat(script)
+            .contains("event.submitter?.value !== 'SEND_TO_GUARANTORS'")
+            .contains("form.dataset.confirmMessage = form.dataset.submitConfirmation");
+        assertThat(source.replace("\r\n", "\n"))
             .contains("function submitAction(event)")
-            .contains("return form.dataset.pendingFormAction || (actionInput ? actionInput.value : \"\");")
+            .contains("return submitter.dataset.formAction;")
             .contains("function blockForGuarantorSelection(event)")
-            .contains("window.SaccosLoanForm?.activateStep?.(3, true);")
+            .contains("form.querySelector('[data-application-tab=\"guarantors\"]').click();")
             .contains("const action = submitAction(event);")
             .contains("renderHiddenInputs();\n                if (selected.size !== required) {\n                    blockForGuarantorSelection(event);");
     }

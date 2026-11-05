@@ -560,7 +560,7 @@ class AwsConsoleViewContractTest {
     void loginAndLoanJourneysExposeProgressiveAwsInteractions() throws Exception {
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
-        String loanApplication = read(JSP_ROOT.resolve("app/loan-new.jsp"));
+        String loanApplication = read(JSP_ROOT.resolve("client-applications/form.jsp"));
         String guarantorSelection = read(JSP_ROOT.resolve("app/guarantor-selection.jsp"));
         String loanDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
         String staffLoanDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
@@ -593,23 +593,12 @@ class AwsConsoleViewContractTest {
             .contains("setCalculatorStage")
             .doesNotContain("activeLoanAwarenessMessage");
         assertThat(loanApplication)
-            .contains("data-loan-flow-step=\"1\"")
-            .contains("data-loan-flow-step=\"5\"")
-            .contains("data-loan-step-next")
-            .contains("<span>Loan Calculations</span>")
-            .contains("<span>Select Guarantor</span>")
-            .contains("<span>Attachments</span>")
-            .contains("<span>Save and Submit</span>")
-            .contains("data-aws-no-refresh=\"true\"")
-            .contains("data-aws-no-titlebar=\"true\"")
-            .contains("loan-summary-table")
-            .contains("Continue to Loan Calculations")
-            .contains("Continue to Select Guarantor")
-            .contains("Continue to Attachments")
-            .contains("Continue to Save and Submit")
-            .doesNotContain("Check affordability")
-            .doesNotContain("Add guarantors and documents")
-            .contains("validateCurrentStep");
+            .contains("data-resource-form-page=\"true\"")
+            .contains("role=\"tablist\"")
+            .contains("['information','guarantors','collateral','documents']")
+            .contains("data-application-quote")
+            .contains("include file=\"repayment-estimate.jspf\"")
+            .doesNotContain("data-loan-flow-step");
         assertThat(guarantorSelection)
             .contains("guarantor-selection-page")
             .contains("loan-guarantor-search-row")
@@ -1019,7 +1008,7 @@ class AwsConsoleViewContractTest {
     void pagesChangedInThisIterationKeepResponsiveScrollAndActionContracts() throws Exception {
         String dashboard = read(JSP_ROOT.resolve("app/dashboard.jsp"));
         String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
-        String loanNew = read(JSP_ROOT.resolve("app/loan-new.jsp"));
+        String loanNew = read(JSP_ROOT.resolve("client-applications/borrower-guarantors.jspf"));
         String memberReports = read(JSP_ROOT.resolve("app/reports.jsp"));
         String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
         String memberDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));

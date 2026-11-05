@@ -51,6 +51,26 @@ public class ClientApplicationService {
     @Transactional(readOnly=true) public ProductForm product(AppUserPrincipal a,UUID id){authorize(a,false);var p=schemas.getSchema(a.getSaccoId(),id,null);return new ProductForm(new Product(p.getId(),p.getDisplayName(),p.getResolvedTenureUnit(),p.getResolvedMinimumTenure(),p.getResolvedMaximumTenure(),p.getGuarantorsRequired(),p.isCollateralRequired(),"PRODUCT",p.getResolvedRepaymentFrequency().name()),schemas.toFormModel(p.getLoanType(),p.getFormSchema()).getFields(),requirements.activeForProduct(id).stream().limit(25).map(r->new Requirement(r.getId(),r.getAttachmentName(),r.getMaxSizeMb())).toList());}
     @Transactional(readOnly=true) public List<Map<String,Object>> documents(AppUserPrincipal a,UUID application){return attachments.parse(details(a,application).attachments());}
     public com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.Download download(AppUserPrincipal a,UUID application,String attachment){var detail=details(a,application);var loaded=attachments.load(application,attachment,detail.attachments());return new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.Download(loaded.getContent(),loaded.getContentType(),loaded.getOriginalName());}
+    @Transactional(timeout = 30)
+    public void removeDraftDocument(AppUserPrincipal actor, UUID id, String file, UUID requestKey, int version) {
+        var detail = details(actor, id);
+        client(actor, detail.clientId(), true);
+        records.lock("CLIENT_APPLICATION_REQUEST/" + actor.getSaccoId() + "/" + actor.getStationId() + "/" + requestKey);
+        String payloadHash = hash(List.of("REMOVE_DOCUMENT", id, file, version));
+        var retry = records.retry(actor, requestKey);
+        if (retry.isPresent()) {
+            check(payloadHash.equals(retry.get().payloadHash()), "retry");
+            return;
+        }
+        records.lock("CLIENT_APPLICATION/" + detail.clientId());
+        detail = details(actor, id);
+        check(detail.status().equals("DRAFT"), "state");
+        check(detail.version() == version, "changed");
+        Form previous = recorded(actor, id);
+        loans.removeApplicationAttachment(id, detail.clientId(), file, actor.getMemberId());
+        records.command(actor, id, detail.clientId(), version + 1, requestKey, payloadHash, json.writeValueAsString(previous), clock.now());
+    }
+
     @Transactional(readOnly=true) public Map<String,Object> quote(AppUserPrincipal a,Form f){client(a,f.getClientId(),false);basic(f);var p=schemas.getSchema(a.getSaccoId(),f.getProductId(),null);var t=new LoanTenure(f.getTenureUnit(),f.getTenureValue());t.validate(p);return financials.generateSnapshot(a.getSaccoId(),f.getClientId(),p,f.getAmount(),t.compatibilityMonths(),null,t);}
     public UUID save(AppUserPrincipal a,Form f,List<MultipartFile> files){
         if(a!=null&&!a.isStaffSession())f.setLoanOfficerId(f.getApplicationId()==null?null:recorded(a,f.getApplicationId()).getLoanOfficerId());

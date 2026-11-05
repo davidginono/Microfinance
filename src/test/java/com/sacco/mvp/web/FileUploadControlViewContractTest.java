@@ -64,24 +64,26 @@ class FileUploadControlViewContractTest {
 
     @Test
     void attachmentDropzonesKeepHiddenInputsAndAwsDragStyling() throws Exception {
-        String loanApplication = read(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String loanApplication = read(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/form.jsp"));
+        String borrowerUploads = read(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-uploads.jspf"));
+        String savedDocuments = read(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/saved-documents.jspf"));
         String managerDetail = read(Path.of("src/main/webapp/WEB-INF/jsp/manager/detail.jsp"));
         String attachmentFragment = read(Path.of("src/main/webapp/WEB-INF/jsp/fragments/attachment-dropzone.jspf"));
         String componentCss = read(Path.of("src/main/resources/static/css/console-components.css"));
 
-        assertThat(loanApplication)
+        assertThat(borrowerUploads)
             .contains("class=\"attachment-dropzone\" data-attachment-dropzone")
             .contains("class=\"attachment-dropzone-input\" data-attachment-input")
-            .contains("existingApplicationAttachments")
-            .contains("Existing Attachments")
-            .contains("/documents/loan-applications/${formValues['applicationId']}/attachments/${file.id}")
-            .contains("data-download-action=\"true\"><spring:message code=\"common.download\"")
-            .contains("form=\"removeAttachment-${file.id}\"")
-            .contains("/app/loan-applications/${formValues['applicationId']}/attachments/${file.id}/delete")
-            .contains("data-confirm-title=\"Remove Attachment\"")
-            .contains("data-confirm-proceed=\"Remove\"")
-            .contains("new URLSearchParams(window.location.search).get(\"step\")")
             .contains("data-existing-attachment-files=\"${fn:escapeXml(existingApplicationAttachmentNames)}\"");
+        assertThat(savedDocuments)
+            .contains("existingApplicationAttachments")
+            .contains("/documents/loan-applications/${applicationForm.applicationId}/attachments/${file.id}")
+            .contains("data-download-action=\"true\"")
+            .contains("form=\"remove-application-file-${index.index}\"");
+        assertThat(loanApplication)
+            .contains("/app/loan-applications/${applicationForm.applicationId}/attachments/${file.id}/delete")
+            .contains("applications.confirmRemoveDocument")
+            .contains("param.step == '4' ? 'documents'");
         assertThat(managerDetail)
             .contains("class=\"attachment-dropzone\" data-attachment-dropzone")
             .contains("class=\"attachment-dropzone-input\"")

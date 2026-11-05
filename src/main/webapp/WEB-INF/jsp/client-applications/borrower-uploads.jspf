@@ -1,0 +1,53 @@
+<div class="application-grid">
+        <c:choose>
+            <c:when test="${not empty requiredAttachmentDefinitions}">
+                <div class="grid gap-3">
+                    <c:forEach items="${requiredAttachmentDefinitions}" var="requirement">
+                        <c:set var="existingAttachmentNames" value="${existingRequiredAttachmentNames[requirement.id]}" />
+                        <div class="loan-attachment-requirement">
+                            <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900"><c:out value="${requirement.attachmentName}" /></p>
+                                    <p class="text-xs text-slate-500"><spring:message code="applications.fileLimit" arguments="${requirement.maxSizeMb}"/></p>
+                        </div>
+                                <c:if test="${existingRequiredAttachmentIds.contains(requirement.id.toString())}">
+                                    <span class="app-badge loan-uploaded-badge"><spring:message code="applications.uploaded"/></span>
+                                </c:if>
+                </div>
+                            <label class="attachment-dropzone" data-attachment-dropzone>
+                                <input type="file" name="requiredAttachmentFiles_${requirement.id}" class="attachment-dropzone-input" data-attachment-input />
+                                <span class="attachment-dropzone-main">
+                                    <span class="attachment-dropzone-copy">
+                                        <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.titleOne" text="Drop file here" /></span>
+                                        <span class="attachment-dropzone-files" data-attachment-files data-existing-attachment-files="${fn:escapeXml(existingAttachmentNames)}">
+                                            <c:choose>
+                                                <c:when test="${not empty existingAttachmentNames}"><c:out value="${existingAttachmentNames}" /></c:when>
+                                                <c:otherwise><spring:message code="attachments.dropzone.none" text="No file selected" /></c:otherwise>
+                                            </c:choose>
+                                        </span>
+                                    </span>
+                                    <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
+                                </span>
+                            </label>
+    </div>
+                    </c:forEach>
+        </div>
+            </c:when>
+        </c:choose>
+                <label class="attachment-dropzone" data-attachment-dropzone>
+                    <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />
+                    <span class="attachment-dropzone-main">
+                        <span class="attachment-dropzone-copy">
+                            <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here" /></span>
+                            <span class="attachment-dropzone-files" data-attachment-files data-existing-attachment-files="${fn:escapeXml(existingApplicationAttachmentNames)}">
+                                <c:choose>
+                                    <c:when test="${not empty existingApplicationAttachmentNames}"><c:out value="${existingApplicationAttachmentNames}" /></c:when>
+                                    <c:otherwise><spring:message code="attachments.dropzone.none" text="No file selected" /></c:otherwise>
+                                </c:choose>
+                            </span>
+                        </span>
+                        <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
+                    </span>
+                </label>
+<div class="application-wide" data-attachment-titles data-label="<spring:message code='applications.documentName'/>"></div>
+</div>

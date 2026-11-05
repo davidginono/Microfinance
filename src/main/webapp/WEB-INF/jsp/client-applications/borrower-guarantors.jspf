@@ -1,0 +1,701 @@
+    <c:if test="${requiredGuarantors gt 0}">
+        <div class="loan-workflow-section loan-guarantor-section">
+            <div class="loan-selection-header">
+                <div>
+                    <h5 class="erp-panel-title">
+                        <c:choose>
+                            <c:when test="${requiredGuarantors eq 1}"><spring:message code="newloan.guarantors.titleSingular" arguments="${requiredGuarantors}" text="Select {0} Guarantor" /></c:when>
+                            <c:otherwise><spring:message code="newloan.guarantors.titlePlural" arguments="${requiredGuarantors}" text="Select {0} Guarantors" /></c:otherwise>
+                        </c:choose>
+                    </h5>
+                </div>
+                <span id="guarantorSelectedCount" class="app-badge loan-selection-counter">
+                    <spring:message code="newloan.guarantors.counter" arguments="${requiredGuarantors}" />
+                </span>
+                </div>
+
+            <div class="loan-guarantor-mode">
+                <div class="loan-control-label">
+                    <spring:message code="newloan.guarantors.approvalMode" text="Guarantor approval mode" />
+            </div>
+                <input type="hidden"
+                       id="guarantorApprovalMode"
+                       name="guarantorApprovalMode"
+                       value="${guarantorApprovalMode eq 'DIRECT_OTP' ? 'DIRECT_OTP' : 'LOGIN'}" />
+                <div class="loan-segmented-control"
+                     role="group"
+                     aria-label="Guarantor approval mode">
+                    <button type="button"
+                            class="guarantor-approval-mode-option loan-segmented-control__button ${guarantorApprovalMode ne 'DIRECT_OTP' ? 'is-active' : ''}"
+                            data-guarantor-approval-mode-option="LOGIN"
+                            aria-pressed="${guarantorApprovalMode ne 'DIRECT_OTP'}">
+                        <spring:message code="newloan.guarantors.loginApproval" text="Login approval" />
+                    </button>
+                    <button type="button"
+                            class="guarantor-approval-mode-option loan-segmented-control__button ${guarantorApprovalMode eq 'DIRECT_OTP' ? 'is-active' : ''}"
+                            data-guarantor-approval-mode-option="DIRECT_OTP"
+                            aria-pressed="${guarantorApprovalMode eq 'DIRECT_OTP'}">
+                        <spring:message code="newloan.guarantors.directOtp" text="Direct OTP" />
+                    </button>
+            </div>
+            </div>
+
+            <div class="loan-guarantor-search-row">
+                    <select id="guarantorSearchMode"
+                        data-native-select="true"
+                        class="fcms-control loan-guarantor-search-mode"
+                        aria-label="Guarantor search field">
+                    <option value="number"><spring:message code="newloan.guarantors.modeNumber" /></option>
+                    <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
+                </select>
+                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.placeholder' />"
+                       class="fcms-control loan-guarantor-search-input"
+                       aria-describedby="guarantorHint guarantorFormatMessage" />
+                <span id="guarantorFormatIndicator"
+                      class="loan-guarantor-format-indicator"
+                      aria-hidden="true"></span>
+                <button id="guarantorSearchButton" type="button" class="app-btn btn-primary loan-guarantor-search-action">
+                    <span class="loan-guarantor-search-spinner hidden" data-guarantor-search-spinner aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                    <span><spring:message code="common.search" /></span>
+                </button>
+                <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
+        </div>
+
+            <p id="guarantorFormatMessage" class="loan-guarantor-format-message hidden" aria-live="polite"></p>
+
+            <p id="guarantorHint" class="mt-2 text-sm text-slate-500"></p>
+
+            <div id="selectedGuarantors" class="loan-selected-guarantors" aria-live="polite">
+                <c:forEach items="${selectedGuarantorItems}" var="item">
+                    <button type="button"
+                            class="selected-guarantor-chip"
+                            data-id="<c:out value='${item.id}'/>"
+                            data-selection-key="<c:out value='${item.selectionKey}'/>"
+                            data-selection-token="${fn:escapeXml(item.selectionToken)}"
+                            data-source="<c:out value='${item.source}'/>"
+                            data-local-member-id="<c:out value='${item.localMemberId}'/>"
+                            data-member-no="<c:out value='${item.memberNo}'/>"
+                            data-station-id="<c:out value='${item.stationId}'/>"
+                            data-full-name="<c:out value='${item.fullName}'/>"
+                            data-email="<c:out value='${item.email}'/>"
+                            data-phone="<c:out value='${item.phone}'/>"
+                            data-lookup-by="<c:out value='${item.lookupBy}'/>"
+                            data-lookup-value="<c:out value='${item.lookupValue}'/>"
+                            aria-label="<spring:message code='applications.remove'/> <c:out value='${item.fullName}'/>">
+                        <span><c:out value="${item.memberNo}"/> - <c:out value="${item.fullName}"/></span>
+                        <span class="selected-guarantor-remove" aria-hidden="true">&times;</span>
+                    </button>
+                </c:forEach>
+        </div>
+            <div id="selectedGuarantorInputs">
+                <c:forEach items="${selectedGuarantorItems}" var="item">
+                    <input type="hidden"
+                           name="guarantorSelections"
+                           value="${fn:escapeXml(not empty item.localMemberId ? item.localMemberId : (not empty item.selectionToken ? item.selectionToken : item.id))}" />
+                </c:forEach>
+            </div>
+            <input type="hidden" id="selectedGuarantorState" name="guarantorSelectionState" value="" />
+            <c:if test="${not empty guarantorValidationErrorId}">
+                <div id="guarantorValidationErrorMarker"
+                     hidden
+                     data-guarantor-id="${fn:escapeXml(guarantorValidationErrorId)}"
+                     data-message="${fn:escapeXml(guarantorValidationErrorMessage)}"></div>
+            </c:if>
+        </div>
+    </c:if>
+
+    <c:if test="${requiredGuarantors le 0}">
+        <div class="loan-empty-state" role="status">
+            <spring:message code="applications.noGuarantors"/>
+        </div>
+    </c:if>
+
+<c:if test="${requiredGuarantors gt 0}">
+    <script>
+        function initBorrowerGuarantors() {
+            const form = document.querySelector('form[data-borrower-workspace="true"]');
+            if (!form || form.dataset.borrowerGuarantorsReady || !form.querySelector('#guarantorSearchMode')) return;
+            form.dataset.borrowerGuarantorsReady = 'true';
+            const required = Number("${requiredGuarantors}");
+            const searchMode = document.getElementById("guarantorSearchMode");
+            const searchInput = document.getElementById("guarantorSearch");
+            const searchButton = document.getElementById("guarantorSearchButton");
+            const searchButtonSpinner = searchButton ? searchButton.querySelector("[data-guarantor-search-spinner]") : null;
+            const formatIndicator = document.getElementById("guarantorFormatIndicator");
+            const formatMessage = document.getElementById("guarantorFormatMessage");
+            const dropdown = document.getElementById("guarantorDropdown");
+            const hint = document.getElementById("guarantorHint");
+            const counter = document.getElementById("guarantorSelectedCount");
+            const selectedContainer = document.getElementById("selectedGuarantors");
+            const hiddenInputs = document.getElementById("selectedGuarantorInputs");
+            const selectionStateInput = document.getElementById("selectedGuarantorState");
+
+            const approvalModeInput = document.getElementById("guarantorApprovalMode");
+            const approvalModeButtons = Array.from(document.querySelectorAll("[data-guarantor-approval-mode-option]"));
+            const validationMarker = document.getElementById("guarantorValidationErrorMarker");
+            const serverGuarantorErrorId = validationMarker ? validationMarker.dataset.guarantorId : "";
+            const serverGuarantorErrorMessage = validationMarker ? validationMarker.dataset.message : "";
+            let serverGuarantorErrorRevealed = false;
+            const selected = new Map();
+            let searchBinding, searchVersion = 0, searchController;
+            const invalidateSearch = () => {searchVersion++; searchController?.abort(); setSearchLoading(false);};
+            const msgSelectedSuffix = "<spring:message code='newloan.js.selectedSuffix' />";
+            const msgNoMatches = "<spring:message code='newloan.js.noMatches' />";
+            const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' />";
+            const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' />";
+            const msgEnterMemberNumber = "<spring:message code='newloan.js.enterMemberNumber' />";
+            const msgEnterGuarantorName = "<spring:message code='newloan.js.enterGuarantorName' />";
+            const msgEnterGuarantorPhone = "<spring:message code='newloan.js.enterGuarantorPhone' text='Enter a Tanzania phone number, for example 255746359369 or 0746359369.' />";
+            const msgEnterGuarantorEmail = "<spring:message code='newloan.js.enterGuarantorEmail' text='Enter a valid email address to search.' />";
+            const msgValidGuarantorSearch = "<spring:message code='newloan.js.validGuarantorSearch' text='Ready to search.' />";
+            const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
+            const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
+            const msgMemberDirectoryUnavailable = "<spring:message code='newloan.js.memberDirectoryUnavailable' text='Client directory is unavailable right now. Please try again later.' />";
+            const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
+            const msgDirectOtpSearchModeChanged = "<spring:message code='newloan.js.directOtpSearchModeChanged' text='Select guarantors again for this approval mode.' />";
+            const modeNumberLabel = "<spring:message code='newloan.guarantors.modeNumber' />";
+            const modeNameLabel = "<spring:message code='newloan.guarantors.modeName' />";
+            const modePhoneLabel = "<spring:message code='newloan.guarantors.modePhone' text='Phone Number' />";
+            const modeEmailLabel = "<spring:message code='newloan.guarantors.modeEmail' text='Email' />";
+            const numberPlaceholder = "<spring:message code='newloan.guarantors.placeholder' />";
+            const namePlaceholder = "<spring:message code='newloan.guarantors.namePlaceholder' />";
+            const phonePlaceholder = "<spring:message code='newloan.guarantors.phonePlaceholder' text='Enter guarantor phone number' />";
+            const emailPlaceholder = "<spring:message code='newloan.guarantors.emailPlaceholder' text='Enter guarantor email address' />";
+            const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
+            const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
+            const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Use Tanzania format 255XXXXXXXXX or 0XXXXXXXXX, for example 255746359369.' />";
+            const emailHint = "<spring:message code='newloan.guarantors.emailHint' text='Direct OTP searches the client profile portal by email address.' />";
+            const searchConfigurations = {
+                LOGIN: [
+                    { value: "number", label: modeNumberLabel, placeholder: numberPlaceholder, hint: numberHint },
+                    { value: "name", label: modeNameLabel, placeholder: namePlaceholder, hint: nameHint }
+                ],
+                DIRECT_OTP: [
+                    { value: "phone", label: modePhoneLabel, placeholder: phonePlaceholder, hint: phoneHint },
+                    { value: "email", label: modeEmailLabel, placeholder: emailPlaceholder, hint: emailHint }
+                ]
+            };
+
+            function escapeHtml(value) {
+                return String(value == null ? "" : value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function itemKey(item) {
+                return item.selectionKey || item.id;
+            }
+
+            function localMemberId(item) {
+                if (item.localMemberId) {
+                    return item.localMemberId;
+                }
+                if (item.source === "LMS" && /^[0-9a-f-]{36}$/i.test(item.id || "")) {
+                    return item.id;
+                }
+                return "";
+            }
+
+            function currentApprovalMode() {
+                return approvalModeInput && approvalModeInput.value === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
+            }
+
+            function searchConfigForCurrentMode() {
+                return (searchConfigurations[currentApprovalMode()] || searchConfigurations.LOGIN)
+                    .find(function (item) { return item.value === searchMode.value; });
+            }
+
+            function searchFormatMessage() {
+                const approvalMode = currentApprovalMode();
+                const mode = searchMode.value;
+                if (approvalMode === "DIRECT_OTP" && mode === "email") {
+                    return msgEnterGuarantorEmail;
+                }
+                if (approvalMode === "DIRECT_OTP") {
+                    return msgEnterGuarantorPhone;
+                }
+                if (mode === "name") {
+                    return msgEnterGuarantorName;
+                }
+                return msgEnterMemberNumber;
+            }
+
+            function normalizePhoneSearch(value) {
+                const digits = String(value || "").replace(/[^0-9]/g, "");
+                if (/^0[0-9]{9}$/.test(digits)) {
+                    return "255" + digits.substring(1);
+                }
+                return /^255[0-9]{9}$/.test(digits) ? digits : "";
+            }
+
+            function validateSearchTerm(showEmpty) {
+                const approvalMode = currentApprovalMode();
+                const mode = searchMode.value;
+                const raw = searchInput.value.trim();
+                const emptyMessage = searchFormatMessage();
+                if (!raw) {
+                    return { valid: !showEmpty, empty: true, message: showEmpty ? emptyMessage : "", term: "" };
+                }
+                if (approvalMode === "DIRECT_OTP" && mode === "email") {
+                    const email = raw.toLowerCase();
+                    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)
+                        ? { valid: true, message: "", term: email }
+                        : { valid: false, message: msgEnterGuarantorEmail, term: "" };
+                }
+                if (approvalMode === "DIRECT_OTP") {
+                    const phone = normalizePhoneSearch(raw);
+                    return phone
+                        ? { valid: true, message: "", term: phone }
+                        : { valid: false, message: msgEnterGuarantorPhone, term: "" };
+                }
+                if (mode === "name") {
+                    const name = raw.toLowerCase();
+                    return name.length >= 2
+                        ? { valid: true, message: "", term: name }
+                        : { valid: false, message: msgEnterGuarantorName, term: "" };
+                }
+                return { valid: true, message: "", term: raw.toUpperCase() };
+            }
+
+            function clearSearchValidation() {
+                searchInput.classList.remove("field-error-input", "is-format-valid");
+                searchInput.removeAttribute("aria-invalid");
+                if (formatIndicator) {
+                    formatIndicator.className = "loan-guarantor-format-indicator";
+                    formatIndicator.removeAttribute("title");
+                }
+                if (formatMessage) {
+                    formatMessage.textContent = "";
+                    formatMessage.classList.add("hidden");
+                }
+            }
+
+            function setSearchValidationState(result, forceMessage) {
+                const hasValue = searchInput.value.trim().length > 0;
+                clearSearchValidation();
+                if (!hasValue && !forceMessage) {
+                    return;
+                }
+                if (result.valid && hasValue) {
+                    searchInput.classList.add("is-format-valid");
+                    if (formatIndicator) {
+                        formatIndicator.classList.add("is-valid");
+                        formatIndicator.setAttribute("title", msgValidGuarantorSearch);
+                    }
+                    return;
+                }
+                if (!result.valid && forceMessage) {
+                    searchInput.classList.add("field-error-input");
+                    searchInput.setAttribute("aria-invalid", "true");
+                    if (formatIndicator) {
+                        formatIndicator.classList.add("is-invalid");
+                        formatIndicator.setAttribute("title", result.message);
+                    }
+                    if (formatMessage) {
+                        formatMessage.textContent = result.message;
+                        formatMessage.classList.remove("hidden");
+                    }
+                }
+            }
+
+            function refreshSearchValidation(forceMessage) {
+                const result = validateSearchTerm(forceMessage);
+                setSearchValidationState(result, forceMessage);
+                return result;
+            }
+
+            function configureSearchForApprovalMode(mode, preserveValue) {
+                const config = searchConfigurations[mode] || searchConfigurations.LOGIN;
+                const current = preserveValue ? searchMode.value : "";
+                searchMode.innerHTML = "";
+                config.forEach(function (item) {
+                    const option = document.createElement("option");
+                    option.value = item.value;
+                    option.textContent = item.label;
+                    searchMode.appendChild(option);
+                });
+                const selectedOption = config.find(function (item) { return item.value === current; }) || config[0];
+                searchMode.value = selectedOption.value;
+                searchInput.placeholder = selectedOption.placeholder;
+                hint.textContent = selectedOption.hint;
+                clearSearchValidation();
+            }
+
+            function setApprovalMode(mode) {
+                searchBinding?.cancel(); invalidateSearch();
+                const previous = currentApprovalMode();
+                const normalized = mode === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
+                if (approvalModeInput) {
+                    approvalModeInput.value = normalized;
+                }
+                approvalModeButtons.forEach(function (button) {
+                    const selectedMode = button.dataset.guarantorApprovalModeOption === normalized;
+                    button.setAttribute("aria-pressed", selectedMode ? "true" : "false");
+                    button.classList.toggle("is-active", selectedMode);
+                });
+                configureSearchForApprovalMode(normalized, previous === normalized);
+                searchInput.value = "";
+                clearSearchValidation();
+                hideDropdown();
+                if (previous !== normalized && selected.size > 0) {
+                    selected.clear();
+                    renderSelected();
+                    hint.textContent = msgDirectOtpSearchModeChanged;
+                }
+            }
+
+            approvalModeButtons.forEach(function (button) {
+                button.addEventListener("click", function () {
+                    setApprovalMode(button.dataset.guarantorApprovalModeOption);
+                });
+            });
+            setApprovalMode(approvalModeInput ? approvalModeInput.value : "LOGIN");
+
+            function updateCounter() {
+                counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
+            }
+
+            function selectionTokenForItem(item) {
+                return item.selectionToken || item.localMemberId || item.id || "";
+            }
+
+            function putPayloadValue(payload, key, value) {
+                const normalized = String(value == null ? "" : value).trim();
+                if (normalized && normalized !== "-") {
+                    payload[key] = normalized;
+                }
+            }
+
+            function selectionPayloadForItem(item) {
+                if (!item) {
+                    return null;
+                }
+                const source = "LMS";
+                const payload = { source: source };
+                const localId = item.localMemberId || (source === "LMS" && /^[0-9a-f-]{36}$/i.test(item.id || "") ? item.id : "");
+                if (localId) {
+                    payload.id = localId;
+                }
+                putPayloadValue(payload, "memberNo", item.memberNo);
+                putPayloadValue(payload, "stationId", item.stationId);
+                putPayloadValue(payload, "fullName", item.fullName);
+                putPayloadValue(payload, "email", item.email);
+                putPayloadValue(payload, "phone", item.phone);
+                putPayloadValue(payload, "lookupBy", item.lookupBy);
+                putPayloadValue(payload, "lookupValue", item.lookupValue);
+                return payload;
+            }
+
+            function itemFromChip(chip) {
+                const key = chip.dataset.selectionKey || chip.dataset.id || chip.dataset.guarantorId || "";
+                if (!key) {
+                    return null;
+                }
+                return {
+                    id: chip.dataset.id || chip.dataset.guarantorId || key,
+                    selectionKey: key,
+                    selectionToken: chip.dataset.selectionToken || chip.dataset.localMemberId || chip.dataset.id || chip.dataset.guarantorId || key,
+                    source: chip.dataset.source || "LMS",
+                    localMemberId: chip.dataset.localMemberId || "",
+                    memberNo: chip.dataset.memberNo || "-",
+                    stationId: chip.dataset.stationId || "",
+                    fullName: chip.dataset.fullName || "Guarantor",
+                    email: chip.dataset.email || "",
+                    phone: chip.dataset.phone || "",
+                    lookupBy: chip.dataset.lookupBy || "",
+                    lookupValue: chip.dataset.lookupValue || ""
+                };
+            }
+
+            function syncSelectedFromRenderedChips() {
+                let changed = false;
+                Array.from(selectedContainer.querySelectorAll(".selected-guarantor-chip")).forEach(function (chip) {
+                    const item = itemFromChip(chip);
+                    if (item && !selected.has(item.selectionKey)) {
+                        selected.set(item.selectionKey, item);
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    updateCounter();
+                }
+            }
+
+            function renderHiddenInputs() {
+                syncSelectedFromRenderedChips();
+                hiddenInputs.innerHTML = "";
+                const selectionPayloads = Array.from(selected.values())
+                    .map(selectionPayloadForItem)
+                    .filter(function (payload) { return payload && (payload.id || payload.memberNo); });
+                selectionPayloads.forEach(function (payload) {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "guarantorSelections";
+                    input.value = JSON.stringify(payload);
+                    hiddenInputs.appendChild(input);
+                });
+                if (selectionStateInput) {
+                    selectionStateInput.value = JSON.stringify(selectionPayloads);
+                }
+            }
+
+            function submitAction(event) {
+                const submitter = event.submitter || document.activeElement;
+                if (submitter && submitter.dataset && submitter.dataset.formAction) {
+                    return submitter.dataset.formAction;
+                }
+                return "SAVE_DRAFT";
+            }
+
+            function renderSelected() {
+                selectedContainer.innerHTML = "";
+                Array.from(selected.values()).forEach(function (item) {
+                    const chip = document.createElement("button");
+                    chip.type = "button";
+                    const hasServerError = serverGuarantorErrorId && item.localMemberId === serverGuarantorErrorId;
+                    const selectionKey = item.selectionKey || item.id;
+                    const selectionToken = selectionTokenForItem(item);
+                    chip.className = "selected-guarantor-chip" + (hasServerError ? " has-error" : "");
+                    chip.dataset.id = item.id || "";
+                    chip.dataset.selectionKey = selectionKey || "";
+                    chip.dataset.selectionToken = selectionToken || "";
+                    chip.dataset.source = item.source || "LMS";
+                    chip.dataset.localMemberId = item.localMemberId || "";
+                    chip.dataset.memberNo = item.memberNo || "-";
+                    chip.dataset.stationId = item.stationId || "";
+                    chip.dataset.fullName = item.fullName || "Guarantor";
+                    chip.dataset.email = item.email || "";
+                    chip.dataset.phone = item.phone || "";
+                    chip.dataset.lookupBy = item.lookupBy || "";
+                    chip.dataset.lookupValue = item.lookupValue || "";
+                    chip.dataset.guarantorId = item.localMemberId || item.id;
+                    chip.setAttribute("aria-label", "Remove " + item.fullName);
+                    chip.innerHTML = "<span>" + escapeHtml(item.memberNo) + " - " + escapeHtml(item.fullName) + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
+                    chip.addEventListener("click", function () {
+                        selected.delete(selectionKey);
+                        renderSelected();
+                    });
+                    selectedContainer.appendChild(chip);
+                });
+                renderHiddenInputs();
+                updateCounter();
+            }
+
+            function revealServerGuarantorError() {
+                if (serverGuarantorErrorRevealed || !serverGuarantorErrorId) {
+                    return;
+                }
+                const row = Array.from(selectedContainer.querySelectorAll("[data-guarantor-id]")).find(function (candidate) {
+                    return candidate.dataset.guarantorId === serverGuarantorErrorId;
+                });
+                if (!row) {
+                    return;
+                }
+                serverGuarantorErrorRevealed = true;
+                row.scrollIntoView({ behavior: "smooth", block: "center" });
+                if (serverGuarantorErrorMessage) {
+                    hint.textContent = serverGuarantorErrorMessage;
+                }
+            }
+
+            syncSelectedFromRenderedChips();
+            renderSelected();
+            if (serverGuarantorErrorId) {
+                form.querySelector('[data-application-tab="guarantors"]').click();
+                window.setTimeout(revealServerGuarantorError, 120);
+            }
+
+            function blockForGuarantorSelection(event) {
+                const warning = msgSelectGuarantorsDraft.replace("{0}", required);
+                event.preventDefault();
+                renderHiddenInputs();
+                form.querySelector('[data-application-tab="guarantors"]').click();
+                searchInput.focus();
+                hint.textContent = warning;
+                window.showToast?.("error", warning);
+            }
+
+            function hideDropdown() {
+                dropdown.classList.add("hidden");
+                dropdown.innerHTML = "";
+            }
+
+            function setSearchLoading(loading) {
+                if (!searchButton) {
+                    return;
+                }
+                if (searchButtonSpinner) {
+                    searchButtonSpinner.classList.toggle("hidden", !loading);
+                }
+                searchButton.disabled = loading;
+                searchButton.classList.toggle("is-loading", loading);
+                searchButton.setAttribute("aria-busy", loading ? "true" : "false");
+            }
+
+            function selectCandidate(item) {
+                searchBinding.cancel(); invalidateSearch();
+                if (selected.size >= required) {
+                    hint.textContent = msgOnlySelectGuarantors.replace("{0}", required);
+                    hideDropdown();
+                    return;
+                }
+                const key = itemKey(item);
+                selected.set(key, {
+                    id: item.id,
+                    selectionKey: key,
+                    selectionToken: item.selectionToken || item.id,
+                    source: item.source || "LMS",
+                    localMemberId: localMemberId(item),
+                    memberNo: item.memberNo || "-",
+                    stationId: item.stationId || "",
+                    fullName: item.fullName || "Guarantor",
+                    email: item.email || "",
+                    phone: item.phone || "",
+                    lookupBy: item.lookupBy || "",
+                    lookupValue: item.lookupValue || ""
+                });
+                renderSelected();
+                searchInput.value = "";
+                clearSearchValidation();
+                hint.textContent = msgGuarantorSelected;
+                hideDropdown();
+            }
+
+            function showResults(items, emptyMessage, emptyIsError) {
+                dropdown.innerHTML = "";
+                if (!items.length) {
+                    const empty = document.createElement("div");
+                    empty.className = emptyIsError
+                        ? "px-4 py-3 text-sm text-rose-700 bg-rose-50"
+                        : "px-4 py-3 text-sm text-slate-500";
+                    empty.textContent = emptyMessage || msgNoMatches;
+                    dropdown.appendChild(empty);
+                } else {
+                    items.forEach(function (item) {
+                        const row = document.createElement("div");
+                        const eligible = item.eligible !== "false" && item.eligible !== false;
+                        const directOtp = currentApprovalMode() === "DIRECT_OTP";
+                        const candidateLabel = directOtp
+                            ? escapeHtml(item.fullName || "Guarantor")
+                            : escapeHtml(item.memberNo || "-") + " - " + escapeHtml(item.fullName || "Guarantor");
+                        row.className = "border-b border-slate-100 px-4 py-3 text-sm " + (eligible ? "text-slate-700" : "bg-slate-50 text-slate-400");
+                        row.innerHTML = "<div class='flex flex-wrap items-start justify-between gap-3'>"
+                            + "<div><span class='block font-semibold'>" + candidateLabel + "</span>"
+                            + (!eligible && item.disabledReason ? "<span class='mt-1 block text-xs text-rose-600'>" + escapeHtml(item.disabledReason) + "</span>" : "")
+                            + "</div>"
+                            + "<button type='button' class='app-btn " + (eligible ? "btn-primary" : "btn-neutral") + " px-3 py-1 text-xs' data-select-guarantor " + (eligible ? "" : "disabled") + ">Select</button>"
+                            + "</div>";
+                        row.querySelector("[data-select-guarantor]").addEventListener("click", function () {
+                            if (!eligible) {
+                                hint.textContent = item.disabledReason || "<spring:message code='newloan.js.guarantorDisabled' text='This guarantor is disabled by institution policy.' />";
+                                return;
+                            }
+                            selectCandidate(item);
+                        });
+                        dropdown.appendChild(row);
+                    });
+                }
+                dropdown.classList.remove("hidden");
+            }
+
+            async function runSearch() {
+                const version = ++searchVersion;
+                searchController = new AbortController();
+                const approvalMode = currentApprovalMode();
+                const mode = searchMode.value;
+                const validation = refreshSearchValidation(false);
+                if (!validation.valid) {
+                    hint.textContent = validation.message;
+                    hideDropdown();
+                    return;
+                }
+                const term = validation.term;
+                setSearchLoading(true);
+                const query = new URLSearchParams({ q: term, searchBy: mode, loanProductId: "${loanProductId}", loanType: "${loanType}" });
+                const endpoint = approvalMode === "DIRECT_OTP" ? "/app/guarantors/direct-otp/search" : "/app/guarantors/search";
+                const unavailableMessage = approvalMode === "DIRECT_OTP" ? msgMemberDirectoryUnavailable : msgUnableSearchGuarantors;
+                try {
+                    const response = await fetch(endpoint + "?" + query.toString(), {
+                        signal:searchController.signal, cache:"no-store",
+                        headers: {"X-Requested-With":"XMLHttpRequest"
+                        }
+                    });
+                    const payload = await response.json().catch(function () { return approvalMode === "DIRECT_OTP" ? { items: [], message: unavailableMessage } : []; });
+                    if (version !== searchVersion) return;
+                    if (!response.ok) {
+                        const message = payload.message || unavailableMessage;
+                        hint.textContent = message;
+                        showResults([], message, true);
+                        window.showToast?.("error", message);
+                        return;
+                    }
+                    const data = Array.isArray(payload) ? payload : (payload.items || []);
+                    const filtered = data.filter(function (item) { return !selected.has(itemKey(item)); });
+                    hint.textContent = filtered.length + " " + msgMatchingMembers;
+                    showResults(filtered);
+                } catch (error) {
+                    if (version === searchVersion && error.name !== "AbortError") {
+                        hint.textContent = unavailableMessage; showResults([], unavailableMessage, true);
+                        searchBinding.cancel();
+                    }
+                } finally {
+                    if (version === searchVersion) setSearchLoading(false);
+                }
+            }
+
+            searchBinding = window.AppSearch.bind(searchInput, () => void runSearch(), () => {
+                invalidateSearch(); refreshSearchValidation(false); hideDropdown();
+            });
+            searchButton.addEventListener("click", function () {
+                refreshSearchValidation(true); searchBinding.run();
+            });
+
+            searchMode.addEventListener("change", function () {
+                searchBinding.cancel(); invalidateSearch();
+                const config = searchConfigForCurrentMode();
+                searchInput.value = "";
+                searchInput.placeholder = config ? config.placeholder : numberPlaceholder;
+                hint.textContent = config ? config.hint : numberHint;
+                clearSearchValidation();
+                hideDropdown();
+                searchInput.focus();
+            });
+
+            const draftButton = document.querySelector("button[type='submit'][data-form-action='SAVE_DRAFT']");
+            if (draftButton) {
+                draftButton.addEventListener("click", function (event) {
+                    if (selected.size !== required) {
+                        blockForGuarantorSelection(event);
+                    }
+                });
+            }
+
+            form.addEventListener("submit", function (event) {
+                const action = submitAction(event);
+                if (action !== "SAVE_DRAFT" && action !== "SEND_TO_GUARANTORS") {
+                    return;
+                }
+                renderHiddenInputs();
+                if (selected.size !== required) {
+                    blockForGuarantorSelection(event);
+                    return;
+                }
+            }, true);
+
+            document.addEventListener("click", function (event) {
+                if (!dropdown.contains(event.target) && event.target !== searchInput) {
+                    hideDropdown();
+                }
+            });
+        }
+        if (window.WorkspaceNavigation) window.WorkspaceNavigation.onReady(initBorrowerGuarantors);
+        else document.addEventListener("DOMContentLoaded", initBorrowerGuarantors, {once:true});
+    </script>
+</c:if>

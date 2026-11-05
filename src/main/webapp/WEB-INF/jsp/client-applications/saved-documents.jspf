@@ -1,0 +1,20 @@
+<c:if test="${not empty existingApplicationAttachments}">
+    <div class="application-saved-documents">
+        <h3><spring:message code="applications.savedDocuments"/></h3>
+        <ul>
+            <c:forEach items="${existingApplicationAttachments}" var="file" varStatus="index">
+                <c:choose><c:when test="${borrowerWorkspace}">
+                    <c:url value="/documents/loan-applications/${applicationForm.applicationId}/attachments/${file.id}" var="fileUrl"/>
+                </c:when><c:otherwise>
+                    <c:url value="${applicationRoot}/${applicationForm.applicationId}/documents/${file.id}" var="fileUrl"/>
+                </c:otherwise></c:choose>
+                <li>
+                    <a class="resource-table-id-link" href="${fileUrl}" data-download-action="true"><c:out value="${empty file.documentTitle ? file.originalName : file.documentTitle}"/></a>
+                    <span><c:out value="${file.sizeLabel}"/></span>
+                    <button type="submit" class="app-btn btn-neutral" form="remove-application-file-${index.index}" formnovalidate
+                            aria-label="<spring:message code='applications.remove'/> <c:out value='${empty file.documentTitle ? file.originalName : file.documentTitle}'/>"><spring:message code="applications.remove"/></button>
+                </li>
+            </c:forEach>
+        </ul>
+    </div>
+</c:if>

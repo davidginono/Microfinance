@@ -74,6 +74,145 @@ class ClientApplicationEndToEndPostgresTest {
             int seconds=Integer.getInteger("microfinance.portal.browser-seconds",0);if(seconds>0){System.out.println("CLIENT_PORTAL_BROWSER_QA="+base);System.out.println("CLIENT_PORTAL_BROWSER_NUMBER="+number);System.out.println("CLIENT_PORTAL_BROWSER_INSTITUTION="+fixture.f.institution);System.out.println("CLIENT_PORTAL_BROWSER_PRODUCT="+fixture.f.product);var stop=java.nio.file.Path.of("target/client-portal-browser-stop");java.nio.file.Files.deleteIfExists(stop);for(int i=0;i<Math.min(seconds,900)&&!java.nio.file.Files.exists(stop);i++)Thread.sleep(1000);}
         }finally{if(app!=null)app.close();fixture.stop();}
     }
+    @Test
+    void staffAndBorrowerUseTheSharedApplicationForm() throws Exception {
+        var fixture = new ClientOnboardingPostgresTest();
+        fixture.start();
+        ConfigurableApplicationContext app = null;
+        try {
+            fixture.fixture();
+            fixture.f.jdbc.update("update loan_product_settings set application_fee=0, processing_fee_rate=0, insurance_rate=0, affordability_check_required=true where id=?", fixture.f.product);
+            fixture.f.jdbc.update("insert into member_staff_roles(member_id,role_name) values(?,'MANAGER') on conflict do nothing", fixture.f.actor.getMemberId());
+            for (String claim : List.of("CLIENT_ONBOARDING_VIEW", "CLIENT_ONBOARDING_UPDATE")) {
+                fixture.f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?) on conflict do nothing",
+                    fixture.f.actor.getMemberId(), claim);
+            }
+            app = new SpringApplicationBuilder(MicrofinanceApplication.class, DeliveryConfig.class).run(
+                "--server.port=0", "--spring.config.import=", "--spring.datasource.url=" + System.getenv("MICROFINANCE_RECORDING_TEST_URL"),
+                "--spring.datasource.username=microfinance_test", "--spring.datasource.password=",
+                "--spring.datasource.hikari.minimum-idle=1", "--spring.datasource.hikari.maximum-pool-size=6",
+                "--app.outbox.scheduler-enabled=false", "--app.sms.enabled=false", "--app.retention.cleanup-enabled=false",
+                "--app.uploads.root=target/client-portal-test-uploads", "--spring.devtools.restart.enabled=false");
+            var encoder = app.getBean(org.springframework.security.crypto.password.PasswordEncoder.class);
+            String password = "Synthetic-Application-Only-25!";
+            String staffLogin = "staff-" + UUID.randomUUID() + "@example.invalid";
+            String borrowerLogin = "borrower-" + UUID.randomUUID() + "@example.invalid";
+            fixture.f.jdbc.update("update members set email=?, password_hash=? where id=?",
+                staffLogin, encoder.encode(password), fixture.f.actor.getMemberId());
+            UUID borrower = fixture.f.client;
+            fixture.f.jdbc.update("update members set email=? where id=?", borrowerLogin, borrower);
+            UUID submittedBorrowerProfile = fixture.submitted(borrower, "TZ-BORROWER-" + UUID.randomUUID());
+            fixture.service.review(fixture.f.operator("B1"), borrower, fixture.decision(submittedBorrowerProfile));
+            fixture.f.jdbc.update("update members set client_portal_enabled=true, password_hash=? where id=?", encoder.encode(password), borrower);
+            for (String claim : List.of("MEMBER_LOANS_CREATE", "MEMBER_LOANS_UPDATE", "MEMBER_LOANS_VIEW")) {
+                fixture.f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?) on conflict do nothing",
+                    borrower, claim);
+            }
+            var userSettings = app.getBean(com.sacco.mvp.service.UserSettingsService.class);
+            userSettings.updateOtpPreferences(fixture.f.actor.getMemberId(), false, true);
+            userSettings.updateOtpPreferences(borrower, false, true);
+            String base = "http://127.0.0.1:" + ((WebServerApplicationContext) app).getWebServer().getPort();
+            var applications = app.getBean(ClientApplicationService.class);
+            UUID assistedClient = UUID.randomUUID();
+            fixture.f.jdbc.update("""
+                insert into members (id,sacco_id,station_id,member_no,full_name,status,position,is_member,password_hash,
+                    phone,client_portal_enabled,created_at)
+                values (?,?,'B1',?,'Synthetic assisted client','ACTIVE','MEMBER',true,'!NO_PORTAL_ACCESS',?,false,now())
+                """, assistedClient, fixture.f.institution, assistedClient.toString(), fixture.phone());
+            var draft = applications.form(fixture.f.actor, assistedClient, null);
+            draft.setProductId(fixture.f.product);
+            draft.setAmount(new BigDecimal("100000.00"));
+            draft.setTenureValue(2);
+            draft.setDocumentNames(new ArrayList<>(List.of("Signed synthetic application", "Temporary synthetic evidence")));
+            draft.setDocumentTypes(new ArrayList<>(List.of("SIGNED_APPLICATION", "OTHER")));
+            draft.setRequiredAttachmentIds(new ArrayList<>(List.of("", "")));
+            var file = new MockMultipartFile("files", "application.png", "image/png", fixture.image);
+            UUID id = applications.save(fixture.f.actor, draft, List.of(file, file));
+            var staffHttp = login(base, staffLogin, password, true);
+            String staffForm = get(staffHttp, base + "/finance/client-applications/" + id + "/edit");
+            assertThat(staffForm).contains("Record application", "Preferred loan officer",
+                "data-application-panel=\"guarantors\"", "data-repayment-estimate", "Signed synthetic application");
+            var staffQuote = ClientOnboardingRenderedPostgresTest.hidden(staffForm);
+            staffQuote.put("productId", fixture.f.product.toString());
+            staffQuote.put("amount", "100000.00");
+            staffQuote.put("tenureUnit", "MONTHS");
+            staffQuote.put("tenureValue", "2");
+            staffQuote.put("applicationDate", fixture.day.toString());
+            var quoted = ClientOnboardingRenderedPostgresTest.submit(staffHttp, base + "/finance/client-applications/quote", staffQuote, false);
+            assertThat(quoted.statusCode()).as(quoted.body()).isEqualTo(200);
+            assertThat(quoted.body()).contains("repaymentSchedule", "principalAmount", "Month 2");
+            String extraDocument = applications.documents(fixture.f.actor, id).stream()
+                .filter(document -> "OTHER".equals(document.get("documentPurpose"))).findFirst().orElseThrow().get("id").toString();
+            var remove = ClientOnboardingRenderedPostgresTest.hidden(staffForm);
+            String removeUrl = base + "/finance/client-applications/" + id + "/documents/" + extraDocument + "/remove";
+            var withoutCsrf = new LinkedHashMap<>(remove);
+            withoutCsrf.remove("_csrf");
+            assertThat(ClientOnboardingRenderedPostgresTest.submit(staffHttp, removeUrl, withoutCsrf, false).statusCode()).isEqualTo(403);
+            post(staffHttp, removeUrl, remove);
+            post(staffHttp, removeUrl, remove);
+            assertThat(applications.details(fixture.f.actor, id).version()).isEqualTo(2);
+            assertThat(applications.documents(fixture.f.actor, id)).extracting(document -> document.get("documentTitle"))
+                .containsExactly("Signed synthetic application");
+            var borrowerHttp = login(base, borrowerLogin, password, false);
+            String borrowerPath = "/app/loan-applications";
+            String borrowerForm = get(borrowerHttp, base + borrowerPath + "/new?loanProductId=" + fixture.f.product);
+            assertThat(borrowerForm).contains("data-borrower-workspace=\"true\"", "Application information",
+                "Guarantors", "Collateral", "Documents", "data-repayment-estimate")
+                .doesNotContain("data-loan-flow-step", "Preferred loan officer", "Signed application");
+            var borrowerFields = ClientOnboardingRenderedPostgresTest.hidden(borrowerForm);
+            borrowerFields.put("amount", "120000.00");
+            borrowerFields.put("tenureUnit", "MONTHS");
+            borrowerFields.put("tenureValue", "2");
+            borrowerFields.put("income", "1500000.00");
+            borrowerFields.put("expenses", "200000.00");
+            borrowerFields.put("otherDebt", "0");
+            borrowerFields.put("purpose", "STOCK");
+            borrowerFields.put("useOfFunds", "Borrower shared form inventory");
+            borrowerFields.put("action", "SAVE_DRAFT");
+            var borrowerQuote = ClientOnboardingRenderedPostgresTest.submit(borrowerHttp, base + borrowerPath + "/financial-preview", borrowerFields, false);
+            assertThat(borrowerQuote.statusCode()).as(borrowerQuote.body()).isEqualTo(200);
+            assertThat(borrowerQuote.body()).contains("repaymentSchedule", "Month 2", "DECLARED_NOT_VERIFIED");
+            var borrowerDraft = ClientOnboardingRenderedPostgresTest.submit(borrowerHttp, base + borrowerPath, borrowerFields, false);
+            assertThat(borrowerDraft.statusCode()).as(borrowerDraft.body()).isEqualTo(302);
+            String borrowerEdit = borrowerDraft.headers().firstValue("Location").orElseThrow();
+            assertThat(URI.create(borrowerEdit).getPath()).startsWith(borrowerPath + "/").endsWith("/edit");
+            assertThat(get(borrowerHttp, URI.create(base).resolve(borrowerEdit).toString()))
+                .contains("Borrower shared form inventory", "120000.00", "name=\"action\" value=\"SEND_TO_GUARANTORS\"");
+            assertThat(fixture.f.jdbc.queryForObject("select form_data->>'monthlyIncome' from loan_applications where applicant_member_id=?", String.class, borrower))
+                .isEqualTo("1500000.00");
+            int seconds = Integer.getInteger("microfinance.portal.browser-seconds", 0);
+            if (seconds > 0) {
+                System.out.println("SHARED_APPLICATION_BROWSER_QA=" + base);
+                System.out.println("APPLICATION_BROWSER_STAFF=" + staffLogin);
+                System.out.println("APPLICATION_BROWSER_BORROWER=" + borrowerLogin);
+                System.out.println("APPLICATION_BROWSER_EDIT=" + borrowerEdit);
+                System.out.println("CLIENT_PORTAL_BROWSER_PRODUCT=" + fixture.f.product);
+                var stop = java.nio.file.Path.of("target/shared-application-browser-stop");
+                java.nio.file.Files.deleteIfExists(stop);
+                for (int elapsed = 0; elapsed < Math.min(seconds, 600) && !java.nio.file.Files.exists(stop); elapsed++) {
+                    Thread.sleep(1000);
+                }
+            }
+        } finally {
+            if (app != null) app.close();
+            fixture.stop();
+        }
+    }
+
+    private static HttpClient login(String base, String identifier, String password, boolean staff) throws Exception {
+        var http = HttpClient.newBuilder().cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+            .connectTimeout(Duration.ofSeconds(10)).build();
+        var fields = ClientOnboardingRenderedPostgresTest.hidden(get(http, base + "/login"));
+        fields.keySet().retainAll(Set.of("_csrf"));
+        fields.put("username", identifier);
+        fields.put("password", password);
+        if (staff) fields.put("loginType", "staff-password");
+        var login = ClientOnboardingRenderedPostgresTest.submit(http, base + "/login", fields, false);
+        assertThat(login.statusCode()).isEqualTo(302);
+        assertThat(login.headers().firstValue("Location").orElseThrow()).doesNotContain("error");
+        return http;
+    }
+
     static String get(HttpClient http,String url)throws Exception{var r=http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(90)).GET().build(),HttpResponse.BodyHandlers.ofString());assertThat(r.statusCode()).as("GET %s: %s",url,r.body()).isEqualTo(200);return r.body();}
     static void post(HttpClient http,String url,Map<String,String> fields)throws Exception{ClientOnboardingRenderedPostgresTest.post(http,url,fields,false);}
     @TestConfiguration static class DeliveryConfig {

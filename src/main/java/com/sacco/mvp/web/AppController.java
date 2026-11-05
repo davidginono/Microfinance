@@ -5,7 +5,8 @@ import com.sacco.mvp.config.MemberLocaleInterceptor;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EligibilityService;
 import com.sacco.mvp.service.FinancialDetailsService;
-import com.sacco.mvp.service.LoanAmortizationCalculator;
+import com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Form;
+import com.sacco.mvp.service.LoanTenure;
 import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.AdminService;
 import com.sacco.mvp.service.ActiveLoanDisplayService;
@@ -31,7 +32,6 @@ import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.service.SmsUnitTransactionService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserSettingsService;
-import com.sacco.mvp.service.dto.FormModel;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -1179,8 +1179,8 @@ public class AppController {
     public String createDraft(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam(required = false) UUID loanProductId,
                               @RequestParam(required = false) LoanType loanType,
-                              @RequestParam BigDecimal amount,
-                              @RequestParam Integer tenorMonths,
+                              @RequestParam(required = false) BigDecimal amount,
+                              @RequestParam(required = false) Integer tenorMonths,
                               @RequestParam(required = false) UUID applicationId,
                               @RequestParam(required = false) String action,
                               @RequestParam(required = false) String applicantSignatureOtpCode,
@@ -1203,12 +1203,14 @@ public class AppController {
         formPayload.remove("applicationId");
         formPayload.remove("action");
         formPayload.remove("termsAccepted");
+        formPayload.remove("applicantSignatureOtpCode");
         formPayload.remove("guarantorIds");
         formPayload.remove("guarantorSelections");
         formPayload.remove("guarantorSelectionState");
         formPayload.remove("financialSnapshotJson");
         formPayload.remove("topUpLoanId");
         formPayload.remove("_csrf");
+        applySharedApplicationFields(formPayload);
         Map<UUID, List<MultipartFile>> requiredAttachmentFiles = requiredAttachmentFiles(request);
         LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
         LoanType resolvedLoanType = product.getLoanType();
@@ -1220,6 +1222,7 @@ public class AppController {
         );
 
         try {
+            tenorMonths = applicationTenorMonths(tenorMonths, formPayload);
             if ("SEND_TO_GUARANTORS".equalsIgnoreCase(action)) {
                 if (applicationId == null) {
                     throw new IllegalStateException("Save the application as a draft before submitting it.");
@@ -1230,7 +1233,10 @@ public class AppController {
                 }
                 UUID applicantSignatureOtpTokenId = null;
                 if (submitsDirectlyToStaff) {
-                    applicantSignatureOtpTokenId = validateApplicantSignatureOtp(principal.getMemberId(), applicantSignatureOtpCode);
+                    requireMemberWithSavedSignature(principal.getMemberId());
+                    if (stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId(), principal.getSaccoId(), principal.getStationId())) {
+                        applicantSignatureOtpTokenId = validateApplicantSignatureOtp(principal.getMemberId(), applicantSignatureOtpCode);
+                    }
                 }
                 LoanApplication submitted = loanWorkflowService.saveAndSubmit(
                     principal.getSaccoId(),
@@ -1771,11 +1777,14 @@ public class AppController {
                                                                 @RequestParam(required = false) UUID loanProductId,
                                                                 @RequestParam(required = false) LoanType loanType,
                                                                 @RequestParam BigDecimal amount,
-                                                                @RequestParam Integer tenorMonths,
+                                                                @RequestParam(required = false) Integer tenorMonths,
                                                                 @RequestParam(required = false) UUID applicationId,
                                                                 @RequestParam(required = false) UUID topUpLoanId,
                                                                 @RequestParam Map<String, String> requestParams) {
         try {
+            requestParams = new LinkedHashMap<>(requestParams);
+            applySharedApplicationFields(requestParams);
+            tenorMonths = applicationTenorMonths(tenorMonths, requestParams);
             loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId, applicationId);
             LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
             Map<String, Object> snapshot = requestParams.containsKey("tenureUnit") ? financialDetailsService.generateSnapshot(
@@ -1806,7 +1815,7 @@ public class AppController {
             }
             response.put("principalPlusInterest", principalPlusInterest == null ? "" : principalPlusInterest.setScale(2, RoundingMode.HALF_UP).toPlainString());
             response.put("principalPlusInterestLabel", principalPlusInterest == null ? "" : formatTzs(principalPlusInterest));
-            response.put("repaymentSchedule", previewRepaymentSchedule(effectiveAmount, tenorMonths, snapshot));
+            response.put("repaymentSchedule", FinancialDetailsService.previewSchedule(effectiveAmount, tenorMonths, snapshot, messageSource));
             Map<String, Object> eligibilityMap = new LinkedHashMap<>();
             eligibilityMap.put("eligible", eligibility.eligible());
             eligibilityMap.put("verificationStatus", "DECLARED_NOT_VERIFIED");
@@ -2520,65 +2529,98 @@ public class AppController {
                                        Integer requiredGuarantorsOverride,
                                        Model model) {
         LoanType loanType = schema.getLoanType();
-        FormModel form = formSchemaService.toFormModel(loanType, schema.getFormSchema());
         int requiredGuarantors = requiredGuarantorsOverride == null
             ? schema.getGuarantorsRequired()
             : Math.max(requiredGuarantorsOverride, 0);
-        EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-            principal.getSaccoId(), principal.getMemberId(), schema, BigDecimal.ZERO);
         List<Map<String, Object>> existingApplicationAttachments = existingApplicationForForm(principal.getMemberId(), formValues)
             .map(app -> loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()))
             .orElseGet(List::of);
-        Map<UUID, String> requiredAttachmentNamesByRequirement = requiredAttachmentNamesByRequirement(existingApplicationAttachments);
+        Map<UUID, String> requiredAttachmentNames = requiredAttachmentNamesByRequirement(existingApplicationAttachments);
 
-        model.addAttribute("formModel", form);
+        var form = new Form();
+        form.setClientId(principal.getMemberId());
+        form.setProductId(schema.getId());
+        String applicationId = firstNonBlank(formValues.get("applicationId"));
+        if (applicationId != null) {
+            form.setApplicationId(UUID.fromString(applicationId));
+        }
+        form.setAmount(readBigDecimal(formValues.get("amount")));
+        form.setTenureUnit(formValues.getOrDefault("tenureUnit", schema.getResolvedTenureUnit()));
+        form.setTenureValue(readTenureValue(formValues.get("tenureValue"), schema.getResolvedMinimumTenure()));
+        form.setApplicationDate(applicationDate(formValues.get("applicationDate")));
+        form.setIncome(readBigDecimal(firstNonBlank(formValues.get("income"), formValues.get("monthlyIncome"))));
+        form.setExpenses(readBigDecimal(firstNonBlank(formValues.get("expenses"), formValues.get("monthlyExpenses"))));
+        form.setOtherDebt(readBigDecimal(firstNonBlank(formValues.get("otherDebt"), formValues.get("otherDebtRepayments"))));
+        form.setPurpose(defaultString(formValues.get("purpose")));
+        form.setBusiness(defaultString(formValues.get("business")));
+        form.setUseOfFunds(defaultString(formValues.get("useOfFunds")));
+        var fields = formSchemaService.toFormModel(loanType, schema.getFormSchema()).getFields();
+        fields.forEach(field -> form.getFields().put(field.getName(), formValues.get(field.getName())));
+
+        model.addAttribute("borrowerWorkspace", true);
+        model.addAttribute("applicationRoot", "/app/loan-applications");
+        model.addAttribute("applicationForm", form);
+        model.addAttribute("borrowerProductFields", fields);
         model.addAttribute("product", schema);
+        model.addAttribute("minimumAmountLabel", schema.getMinimumAmount() == null ? "-" : formatTzs(schema.getMinimumAmount()));
+        model.addAttribute("maximumAmountLabel", schema.getMaximumAmount() == null ? "-" : formatTzs(schema.getMaximumAmount()));
         model.addAttribute("requiredAttachmentDefinitions", requiredAttachmentService.activeForProduct(schema.getId()));
         model.addAttribute("existingApplicationAttachments", existingApplicationAttachments);
         model.addAttribute("existingApplicationAttachmentNames", attachmentDisplayNames(existingApplicationAttachments));
-        model.addAttribute("existingRequiredAttachmentIds", existingRequiredAttachmentIds(requiredAttachmentNamesByRequirement));
-        model.addAttribute("existingRequiredAttachmentNames", requiredAttachmentNamesByRequirement);
+        model.addAttribute("existingRequiredAttachmentIds", existingRequiredAttachmentIds(requiredAttachmentNames));
+        model.addAttribute("existingRequiredAttachmentNames", requiredAttachmentNames);
         model.addAttribute("loanType", loanType);
         model.addAttribute("loanProductId", schema.getId());
-        model.addAttribute("loanProductName", schema.getDisplayName());
-        model.addAttribute("loanProductCode", schema.getDisplayCode());
-        model.addAttribute("loanProductDescription", schema.getDisplayDescription());
         model.addAttribute("requiredGuarantors", requiredGuarantors);
-        model.addAttribute("formValues", formValues == null ? Collections.emptyMap() : formValues);
-        model.addAttribute("guarantorApprovalMode", normalizeGuarantorApprovalMode(
-            formValues == null ? null : formValues.get(GUARANTOR_APPROVAL_MODE_FIELD)
-        ));
-        model.addAttribute("selectedGuarantorLookup", Collections.emptyMap());
+        model.addAttribute("formValues", formValues);
+        model.addAttribute("guarantorApprovalMode", normalizeGuarantorApprovalMode(formValues.get(GUARANTOR_APPROVAL_MODE_FIELD)));
         model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorSelections));
-        model.addAttribute("savingsLabel", formatTzs(eligibility.savings()));
-        model.addAttribute("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
-        model.addAttribute("savingsLimitCheckRequired", eligibility.savingsLimitCheckRequired());
-        model.addAttribute("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
-        model.addAttribute("ratioPercentLabel",
-            eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
-        model.addAttribute("exampleAmountLabel", formatTzs(exampleAmount(eligibility.maxAllowed())));
-        model.addAttribute("exampleAmountRaw", exampleAmount(eligibility.maxAllowed()).toPlainString());
-        model.addAttribute("minimumAmountLabel",
-            schema.getMinimumAmount() == null ? "-" : formatTzs(schema.getMinimumAmount()));
-        model.addAttribute("maximumAmountLabel",
-            schema.getMaximumAmount() == null ? "Not set" : formatTzs(schema.getMaximumAmount()));
-        String annualInterestPercentLabel = (schema.getInterestRate() == null
-            ? BigDecimal.ZERO
-            : schema.getInterestRate().multiply(BigDecimal.valueOf(100))).stripTrailingZeros().toPlainString() + "%";
-        model.addAttribute("annualInterestPercentLabel", annualInterestPercentLabel);
-        model.addAttribute("allowApplicationWithActiveLoan", schema.isApplicationWithActiveLoanAllowed());
-        model.addAttribute("financialSnapshotDisplay",
-            loanPresentationService.parseFinancialFields(formValues == null ? null : formValues.get("financialSnapshotJson")));
-        model.addAttribute("financialSnapshotSections",
-            loanPresentationService.parseFinancialFieldSections(formValues == null ? null : formValues.get("financialSnapshotJson")));
-        model.addAttribute("repaymentSchedulePreviewRows", draftRepaymentSchedulePreview(formValues));
+        model.addAttribute("applicantOtpRequired", requiredGuarantors <= 0
+            && stationOtpSettingsService.requiresApprovalOtp(principal.getMemberId(), principal.getSaccoId(), principal.getStationId()));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
-        String topUpLoanId = formValues == null ? null : formValues.get("topUpLoanId");
-        LoanApplication topUpSourceLoan = resolveTopUpSourceLoan(principal.getMemberId(), topUpLoanId);
+        String topUpLoanId = formValues.get("topUpLoanId");
         model.addAttribute("topUpLoanId", topUpLoanId);
-        model.addAttribute("topUpMode", topUpSourceLoan != null);
-        model.addAttribute("topUpSourceLoan", topUpSourceLoan);
-        return "app/loan-new";
+        model.addAttribute("topUpSourceLoan", resolveTopUpSourceLoan(principal.getMemberId(), topUpLoanId));
+        return "client-applications/form";
+    }
+
+    private LocalDate applicationDate(String value) {
+        if (value == null || value.isBlank()) {
+            return applicationClock.today();
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (java.time.format.DateTimeParseException ex) {
+            return null;
+        }
+    }
+
+    private Integer readTenureValue(String value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static void applySharedApplicationFields(Map<String, String> fields) {
+        Map.of("income", "monthlyIncome", "expenses", "monthlyExpenses", "otherDebt", "otherDebtRepayments")
+            .forEach((source, target) -> {
+                String value = fields.remove(source);
+                if (value != null) {
+                    fields.put(target, value);
+                }
+            });
+    }
+
+    private static int applicationTenorMonths(Integer legacyMonths, Map<String, String> fields) {
+        if (legacyMonths != null) {
+            return legacyMonths;
+        }
+        return LoanTenure.from(fields, 0).compatibilityMonths();
     }
 
     private Map<UUID, List<MultipartFile>> requiredAttachmentFiles(HttpServletRequest request) {
@@ -2670,25 +2712,6 @@ public class AppController {
             .collect(Collectors.joining(", "));
     }
 
-    private List<Map<String, String>> draftRepaymentSchedulePreview(Map<String, String> formValues) {
-        if (formValues == null || formValues.get("financialSnapshotJson") == null || formValues.get("financialSnapshotJson").isBlank()) {
-            return Collections.emptyList();
-        }
-        try {
-            BigDecimal amount = readBigDecimal(formValues.get("amount"));
-            Integer tenorMonths = formValues.get("tenorMonths") == null || formValues.get("tenorMonths").isBlank()
-                ? null
-                : Integer.valueOf(formValues.get("tenorMonths"));
-            Map<String, Object> snapshot = objectMapper.readValue(
-                formValues.get("financialSnapshotJson"),
-                new TypeReference<Map<String, Object>>() {}
-            );
-            return previewRepaymentSchedule(amount, tenorMonths, snapshot);
-        } catch (Exception ex) {
-            return Collections.emptyList();
-        }
-    }
-
     private Integer resolveDraftRequiredGuarantors(UUID memberId, UUID applicationId) {
         if (applicationId == null) {
             return null;
@@ -2716,37 +2739,6 @@ public class AppController {
         }
         BigDecimal half = maxAllowed.multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.DOWN);
         return half.compareTo(BigDecimal.ZERO) > 0 ? half : maxAllowed.setScale(2, RoundingMode.DOWN);
-    }
-
-    private List<Map<String, String>> previewRepaymentSchedule(BigDecimal amount,
-                                                               Integer tenorMonths,
-                                                               Map<String, Object> snapshot) {
-        BigDecimal principal = Optional.ofNullable(readBigDecimal(snapshot.get("principalAmount")))
-            .orElse(amount == null ? BigDecimal.ZERO : amount)
-            .setScale(2, RoundingMode.HALF_UP);
-        int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
-        LoanAmortizationCalculator.Result calculation = LoanAmortizationCalculator.estimate(principal, months, snapshot);
-        List<Map<String, String>> rows = new ArrayList<>();
-        BigDecimal scheduledBalance = calculation.totalRepayment();
-        for (LoanAmortizationCalculator.Installment installment : calculation.rows()) {
-            Map<String, String> row = new LinkedHashMap<>();
-            row.put("pmtNo", String.valueOf(installment.number()));
-            boolean weekly = "WEEKLY".equals(snapshot.get("repaymentFrequency"));
-            row.put("month", messageSource.getMessage(weekly ? "repayment.period.WEEKLY" : "repayment.period.MONTHLY",
-                new Object[]{installment.number()}, (weekly ? "Week " : "Month ") + installment.number(), LocaleContextHolder.getLocale()));
-            row.put("dueDate",row.get("month"));
-            row.put("beginningBalance",formatTzs(scheduledBalance));
-            scheduledBalance = scheduledBalance.subtract(installment.amount());
-            row.put("endingBalance", formatTzs(scheduledBalance));
-            row.put("outstandingBalance",row.get("endingBalance"));
-            row.put("payment", formatTzs(installment.amount()));
-            row.put("loanAmount", formatTzs(installment.principal()));
-            row.put("interest", formatTzs(installment.interest()));
-            row.put("installment", formatTzs(installment.amount()));
-            row.put("principal", formatTzs(installment.principal()));
-            rows.add(row);
-        }
-        return rows;
     }
 
     private String formatTzs(BigDecimal amount) {
