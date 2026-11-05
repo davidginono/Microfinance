@@ -87,9 +87,32 @@ test('required fields have independent messages and reveal a missing receiving a
   const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:null,reference:'',rows:[{loanId:'loan',amount:null,description:''}]};
   const {dom,d}=await setup(()=>{},{failureKey:'voucher.error.text',form});try{
     assert.deepEqual(visible(d).map(issue=>issue.textContent).sort(),['Select receiving account.','Enter payment amount.','Enter collection reference.'].sort());
-    assert.equal(d.querySelector('.batch-detail-row').hidden,false);assert.equal(d.querySelector('.batch-expand').getAttribute('aria-expanded'),'true');
+    assert.equal(d.querySelector('.batch-detail-row').hidden,true);assert.equal(d.querySelector('.batch-expand').getAttribute('aria-expanded'),'false');
+    assert.equal(d.querySelector('[aria-label="receivingAccount"]').closest('tr').className,'batch-row');
     assert.equal(new Set([...d.querySelectorAll('.batch-field-error')].map(issue=>issue.id)).size,d.querySelectorAll('.batch-field-error').length);
   }finally{dom.window.close();}
+});
+test('clearing a receipt account uses the batch default while explicit overrides remain selected',async()=>{
+  const {dom,w,d,save}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'Bank',lines:[]})));
+  try{
+    const defaults=d.querySelector('[data-default-account]');defaults.add(new w.Option('Bank','bank'));defaults.value='bank';
+    const original=w.fetch,calls=[];w.fetch=async(url,options)=>{if(options?.method==='PUT')calls.push(JSON.parse(options.body).form);return original(url,options);};
+    const account=d.querySelector('[aria-label="receivingAccount"]');account.add(new w.Option('Mobile money','mobile'));account.value='mobile';account.dispatchEvent(new w.Event('change'));await save();
+    assert.equal(calls.at(-1).moneyAccountId,'mobile');assert.equal(account.value,'mobile');
+    account.value='';account.dispatchEvent(new w.Event('change'));await save();
+    assert.equal(calls.at(-1).moneyAccountId,'bank');assert.equal(account.value,'bank');assert.equal(account.selectedOptions[0].textContent,'Bank');
+    assert.equal(calls.at(-1).reference,'RV-009');assert.equal(calls.at(-1).rows[0].amount,'500.00');
+  }finally{dom.window.close();}
+});
+test('choosing a batch default fills an empty receipt account without replacing a saved account',async()=>{
+  for(const current of [null,'cash']){
+    const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:current,reference:'RV-009',rows:[{loanId:'loan',amount:'500.00',description:''}]};
+    const {dom,w,d}=await setup(()=>{},{form});try{
+      const defaults=d.querySelector('[data-default-account]');defaults.add(new w.Option('Bank','bank'));defaults.value='bank';defaults.dispatchEvent(new w.Event('change'));
+      await settle();
+      assert.equal(d.querySelector('[aria-label="receivingAccount"]').value,current || 'bank');
+    }finally{dom.window.close();}
+  }
 });
 test('multi-loan errors identify only the incomplete transaction and open its details',async()=>{
   const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:'cash',reference:'RV-009',rows:[{loanId:'loan',amount:'500.00',description:''},{loanId:'loan2',amount:null,description:''}]};
