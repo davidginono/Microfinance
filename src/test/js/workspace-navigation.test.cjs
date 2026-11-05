@@ -390,6 +390,12 @@ test('a first visit uses the normal workspace spinner and restores inputs on fai
   assert.equal(main.classList.contains('is-workspace-pending'),false);assert.equal(main.hasAttribute('aria-busy'),false);
   assert.equal(input.value,'Keep my entry');assert.equal(d.querySelector('.app-loading-spinner'),null);
   assert.equal(d.querySelector('[role=alert] button').textContent,'Try again');
+  const dismiss=d.querySelector('[role=alert] .workspace-navigation-dismiss');
+  assert.equal(dismiss.getAttribute('aria-label'),'Dismiss notification');
+  dismiss.focus();dismiss.click();
+  assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+  assert.equal(d.activeElement,main.querySelector('h1'));
+  assert.equal(input.value,'Keep my entry');
   const cancelled=w.WorkspaceNavigation.visit('/admin/users');const last=requests.at(-1);
   await w.WorkspaceNavigation.visit('/admin/dashboard');last.resolve({ok:false});await cancelled;
   assert.equal(last.options.signal.aborted,true);assert.equal(main.classList.contains('is-workspace-pending'),false);
@@ -498,6 +504,27 @@ test('existing local form handlers, downloads, print and modified links retain t
   link.href='/admin/users';link.target='_blank';assert.equal(w.WorkspaceNavigation.handles(link),false);
   link.target='';link.href=d.location.href+'#section';assert.equal(w.WorkspaceNavigation.handles(link),false);
   form.method='post';form.removeAttribute('data-workspace-submit');assert.equal(w.WorkspaceNavigation.handlesForm(form),false);
+ }finally{dom.window.close();}
+});
+
+test('onboarding attachments download without navigating or discarding edits',async()=>{
+ const {dom,w,d}=await setup({guard:true});try{
+  const form=d.querySelector('form'), input=form.querySelector('input');
+  input.value='Unsaved review';
+  const link=d.createElement('a');link.href='/finance/clients/onboarding/client/documents/file';link.download='';link.textContent='Evidence.png';form.after(link);
+  const requests=[];
+  w.URL.createObjectURL=()=> 'blob:attachment';w.URL.revokeObjectURL=()=>{};
+  w.fetch=async(url,options)=>{requests.push({url,options});return new Response('image data',{headers:{'Content-Disposition':'attachment; filename="Evidence.png"'}});};
+  const downloads=[];
+  const click=w.HTMLAnchorElement.prototype.click;
+  w.HTMLAnchorElement.prototype.click=function(){if(this.protocol==='blob:'){downloads.push(this.download);return;}return click.call(this);};
+  link.click();
+  await until(()=>downloads.length===1);
+  assert.deepEqual(downloads,['Evidence.png']);assert.equal(requests.length,1);
+  assert.equal(requests[0].url,link.href);assert.equal(requests[0].options.headers,undefined);
+  assert.equal(d.querySelector('#accounting-discard-modal').hidden,true);
+  assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+  assert.equal(d.querySelector('form'),form);assert.equal(input.value,'Unsaved review');
  }finally{dom.window.close();}
 });
 

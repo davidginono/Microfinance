@@ -86,7 +86,7 @@
     });
     document.addEventListener('click', event => {
         const link = event.target.closest('a[href]');
-        if (!link || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || submitting || discarding || !dirty() || link.target === '_blank' || link.getAttribute('href').startsWith('#')) return;
+        if (!link || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || submitting || discarding || !dirty() || link.hasAttribute('download') || link.target === '_blank' || link.getAttribute('href').startsWith('#')) return;
         event.preventDefault(); confirmDiscard(() => link.click());
     });
     document.addEventListener('workspace:before-navigate', event => {

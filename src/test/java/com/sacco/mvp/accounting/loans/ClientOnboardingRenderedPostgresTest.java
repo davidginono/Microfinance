@@ -89,6 +89,13 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(renderedReview)
                 .containsPattern("(?s)class=\"erp-detail-facts kyc-document-facts\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
                 .doesNotContain("\u00c2\u00b7");
+            var attachmentLink=Pattern.compile("href=\"([^\"]+/documents/[a-f0-9-]+)\" download>evidence\\.png</a>").matcher(renderedReview);
+            assertThat(attachmentLink.find()).isTrue();
+            var attachment=client.send(HttpRequest.newBuilder(URI.create(base+attachmentLink.group(1)))
+                .header("X-Onboarding-Test-Actor","reviewer").GET().build(),HttpResponse.BodyHandlers.ofByteArray());
+            assertThat(attachment.statusCode()).isEqualTo(200);
+            assertThat(attachment.headers().firstValue("Content-Disposition")).hasValueSatisfying(value->assertThat(value).startsWith("attachment;").contains("evidence.png"));
+            assertThat(attachment.body()).isEqualTo(domain.image);
             var review=hidden(renderedReview);review.put("kind","RETURN");review.put("reason","INTERNAL-SCREENING-SECRET");review.put("clientMessage","Please correct your home address.");post(client,reviewUrl,review,true);
             String returned=get(client,base+"/app/onboarding",false);assertThat(returned).contains("Please correct your home address.").doesNotContain("INTERNAL-SCREENING-SECRET");
             assertThat(returned).contains("data-resource-status=\"WARNING\"","data-message-type=\"warning\"");

@@ -99,8 +99,17 @@
     padding-block:6px!important;
 }
 .aws-console .workspace-navigation-feedback[role="alert"] > span {flex:1 1 16rem;min-width:0;}
-.aws-console .workspace-navigation-feedback[role="alert"] > button {flex:0 0 auto;margin-inline-start:auto;}
+.aws-console .workspace-navigation-actions {display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-inline-start:auto;}
+.aws-console .workspace-navigation-dismiss {
+    display:grid;place-items:center;width:32px;height:32px;padding:0;
+    border:0;background:transparent;color:#545b64;cursor:pointer;
+}
+.aws-console .workspace-navigation-dismiss:hover {color:#16191f;background:#eaeded;}
+.aws-console .workspace-navigation-dismiss:focus-visible {outline:2px solid #0073bb;outline-offset:2px;}
 .aws-console .workspace-navigation-feedback[role="alert"] > .console-message-icon {top:50%;transform:translateY(-50%);}
+@media(max-width:600px) {
+    .aws-console .workspace-navigation-feedback[role="alert"] > .console-message-icon {top:12px;transform:none;}
+}
 
 /* Persistent command results stay in the workspace and use the shared toast lifecycle. */
 .workspace-flashbar:empty {display:none;}

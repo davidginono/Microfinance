@@ -178,11 +178,26 @@
                     if(box.isConnected && layoutKey(url,main)!==key)feedback(false,url);
                 });layoutObserver.observe(main);
             }
-        }else{const label=document.createElement('span');label.textContent=document.body.dataset.navigationError;box.append(label);}
-        if(failed){const retry=document.createElement('button');retry.type='button';retry.className='app-btn btn-neutral';retry.textContent=document.body.dataset.navigationRetry;retry.onclick=()=>{
-            if(!options.submission)return visit(url,{force:true});
-            const {form,submitter}=options.submission;if(submitter)form.requestSubmit(submitter);else form.requestSubmit();
-        };box.append(retry);}
+        }else{
+            const label=document.createElement('span');label.textContent=document.body.dataset.navigationError;
+            const actions=document.createElement('div');actions.className='workspace-navigation-actions';
+            const retry=document.createElement('button');retry.type='button';retry.className='app-btn btn-neutral';retry.textContent=document.body.dataset.navigationRetry;
+            retry.onclick=()=>{
+                if(!options.submission)return visit(url,{force:true});
+                const {form,submitter}=options.submission;if(submitter)form.requestSubmit(submitter);else form.requestSubmit();
+            };
+            const dismiss=document.createElement('button');dismiss.type='button';dismiss.className='workspace-navigation-dismiss';
+            dismiss.title=document.body.dataset.dismissNotification || 'Dismiss notification';
+            dismiss.setAttribute('aria-label',dismiss.title);
+            dismiss.innerHTML='<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+            dismiss.onclick=()=>{
+                const heading=main.querySelector('.erp-page-title,h1,[data-workspace-title]') || main;
+                if(!heading.hasAttribute('tabindex'))heading.tabIndex=-1;
+                clearFeedback();
+                heading.focus({preventScroll:true});
+            };
+            actions.append(retry,dismiss);box.append(label,actions);
+        }
         main.prepend(box);
     };
     native.add.call(window,'resize',()=>{
