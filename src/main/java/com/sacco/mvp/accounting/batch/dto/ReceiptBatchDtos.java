@@ -27,6 +27,8 @@ public final class ReceiptBatchDtos {
                            @JsonFormat(shape=STRING) BigDecimal dueInterest,@JsonFormat(shape=STRING) BigDecimal principal,
                            @JsonFormat(shape=STRING) BigDecimal interest,@JsonFormat(shape=STRING) BigDecimal principalBalance,String principalAccount,UUID principalAccountId,UUID interestAccountId,String interestAccount,String product,
                            LocalDate paymentDate,List<com.sacco.mvp.service.LoanRepaymentLedgerService.PreviewAllocation> servicingAllocations) {
+        @JsonProperty(access=JsonProperty.Access.READ_ONLY) @JsonFormat(shape=STRING)
+        public BigDecimal totalLoanOutstanding(){return outstandingPrincipal==null || dueInterest==null?null:outstandingPrincipal.add(dueInterest);}
         public PlanLine(UUID id,String number,BigDecimal amount,BigDecimal outstanding,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal principal,BigDecimal interest,BigDecimal balance,String account,UUID principalId,UUID interestId,String interestAccount,String product){this(id,number,amount,outstanding,duePrincipal,dueInterest,principal,interest,balance,account,principalId,interestId,interestAccount,product,null,null);}
         public PlanLine(UUID id,String number,BigDecimal amount,BigDecimal outstanding,BigDecimal duePrincipal,BigDecimal dueInterest,BigDecimal principal,BigDecimal interest,BigDecimal balance,String account){this(id,number,amount,outstanding,duePrincipal,dueInterest,principal,interest,balance,account,null,null,null,null);}
     }
@@ -35,6 +37,9 @@ public final class ReceiptBatchDtos {
         @JsonProperty @JsonFormat(shape=STRING) public BigDecimal remainingTotal(){return total.subtract(postedTotal);}
     }
     public record Balances(UUID id,String number,@JsonFormat(shape=STRING) BigDecimal outstandingPrincipal,
-                           @JsonFormat(shape=STRING) BigDecimal duePrincipal,@JsonFormat(shape=STRING) BigDecimal dueInterest) {}
+                           @JsonFormat(shape=STRING) BigDecimal duePrincipal,@JsonFormat(shape=STRING) BigDecimal dueInterest) {
+        @JsonProperty(access=JsonProperty.Access.READ_ONLY) @JsonFormat(shape=STRING)
+        public BigDecimal totalLoanOutstanding(){return outstandingPrincipal==null || dueInterest==null?null:outstandingPrincipal.add(dueInterest);}
+    }
     public record Page<T>(List<T> rows,int page,boolean hasNext) {}
 }

@@ -29,7 +29,7 @@ async function setup(estimate,patch={}){
     if(url.includes('/items?'))return response({rows:[structuredClone(item)],hasNext:false});
     if(options?.method==='PUT')return response({...item,version:1});
     if(url.endsWith('/estimate'))return estimate(response);
-    if(url.includes('/loan-context?'))return response([{outstandingPrincipal:'1000.00',duePrincipal:'0.00',dueInterest:'0.00'}]);
+    if(url.includes('/loan-context?'))return response([{outstandingPrincipal:'1000.00',duePrincipal:'100.00',dueInterest:'25.50',totalLoanOutstanding:'1025.50'}]);
     if(url.includes('/choices/'))return response([]);
     throw Error('Unexpected request '+url);
   };
@@ -37,6 +37,15 @@ async function setup(estimate,patch={}){
   return {dom,w,d,async edit(value){const input=d.querySelector('input[type="number"]');input.value=value;input.dispatchEvent(new w.Event('input'));},async save(){const callback=autosave;autosave=undefined;callback();await settle();}};
 }
 const visible=d=>[...d.querySelectorAll('.batch-field-error:not([hidden])')];
+test('balances show total loan outstanding and retain the separate amounts due before and after preview',async()=>{
+  const line={loanNumber:'LN-001',outstandingPrincipal:'1000.00',duePrincipal:'100.00',dueInterest:'25.50',totalLoanOutstanding:'1025.50',principal:'24.50',interest:'25.50',principalBalance:'975.50'};
+  const {dom,d,edit,save}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'Cash',lines:[line]})));
+  try{
+    const balance=()=>d.querySelector('.batch-row td:nth-child(4)').textContent;
+    assert.match(balance(),/totalLoanOutstanding 1,025.50/);assert.match(balance(),/principalDue 100.00/);assert.match(balance(),/interestDue 25.50/);assert.doesNotMatch(balance(),/principalOutstanding/);
+    await edit('50.00');await save();assert.match(balance(),/totalLoanOutstanding 1,025.50/);assert.match(balance(),/principalDue 100.00/);assert.match(balance(),/interestDue 25.50/);
+  }finally{dom.window.close();}
+});
 test('retained errors are short, field-specific and accessible under the date control',async()=>{
   const {dom,d}=await setup(()=>{});try{
     assert.equal(d.querySelector('[data-batch-state]'),null);

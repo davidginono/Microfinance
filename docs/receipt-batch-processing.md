@@ -14,6 +14,8 @@ The batch state and receipt totals appear in a framed Batch details section. The
 
 Draft estimates use recorded balances. Batch validation processes receipts in payment-date/entry order and includes earlier unposted allocations for repeated loans. These projections are explicitly labelled, and never reduce a recorded balance. The accountant reviews the calculated principal/interest split, loan-owned principal account, receiving account and configured interest collections account before direct posting. Validation is a technical check, not a checker/approval stage.
 
+The Balances column shows **Total loan outstanding**: all unpaid principal plus unpaid interest due for the selected payment date, excluding future unearned interest. **Principal due** is the unpaid principal in instalments due on or before that date; it is already part of the total principal and is not added twice. **Interest due** follows the loan's retained servicing terms (earned interest for supported contracts, due-date rules for legacy contracts). The initial lookup and validated previews use the same decimal total; missing ledger balances remain unavailable. This display change does not change allocation or posting rules.
+
 ## Protected repayment definitions and policy
 
 Migration V66 provisions the immutable **Loan repayment** activity and standard **Principal repayment** / **Interest repayment** transaction definitions for existing and new institutions. Services and database triggers prevent edits, deactivation, ownership changes and ordinary posting templates for these definitions. Explicit receipt purpose and stable system keys select them; activity names do not authorise lending operations.

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
     const el = (tag, text, cls) => {const node = document.createElement(tag);if(text != null)node.textContent = text;if(cls)node.className = cls;return node;};
     const money = value => {const [whole, fraction = ''] = String(value ?? '0').split('.');return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + fraction.padEnd(2, '0').slice(0, 2);};
+    const loanOutstanding = balance => balance.totalLoanOutstanding == null ? '—' : money(balance.totalLoanOutstanding);
     async function api(url, method = 'GET', body) {
         const headers = {Accept:'application/json'};if(csrf)headers[csrfHeader] = csrf;if(body !== undefined)headers['Content-Type'] = 'application/json';
         const response = await fetch(url, {method, headers, body:body === undefined ? undefined : JSON.stringify(body), cache:'no-store', credentials:'same-origin'});
@@ -181,13 +182,13 @@ document.addEventListener('DOMContentLoaded', () => {
         item.mapping.replaceChildren(el('span',t('policyVersion') + ' ' + plan.policyVersion + ' · ' + t('order.' + plan.allocationOrder) + ' · ' + plan.moneyAccount));
         item.balance.replaceChildren();item.allocation.replaceChildren();
         item.balance.append(el('small',t(item.state === 'POSTED'?'beforePosting':item.estimated?'recordedBalances':'projectedBalances')));
-        for(const line of plan.lines){const b = el('span',line.loanNumber + ': ' + t('principalOutstanding') + ' ' + money(line.outstandingPrincipal) + ' · ' + t('principalDue') + ' ' + money(line.duePrincipal) + ' · ' + t('interestDue') + ' ' + money(line.dueInterest),'batch-balance');item.balance.append(b);
+        for(const line of plan.lines){const b = el('span',line.loanNumber + ': ' + t('totalLoanOutstanding') + ' ' + loanOutstanding(line) + ' · ' + t('principalDue') + ' ' + money(line.duePrincipal) + ' · ' + t('interestDue') + ' ' + money(line.dueInterest),'batch-balance');item.balance.append(b);
             item.allocation.append(el('span',line.loanNumber + (line.product ? ' - ' + line.product : '') + ': ' + t('principal') + ' ' + money(line.principal) + ' · ' + t('interest') + ' ' + money(line.interest) + ' · ' + t('after') + ' ' + money(line.principalBalance),'batch-allocation'));
         }item.allocation.append(el('small',t(item.estimated?'recordedPreview':'batchPreview')));
     }
     async function context(item, loan, target){
         if(!loan.loanId || !item.form.effectiveDate)return;const generation = item.generation;
-        try {const data = await api(base + '/loan-context?' + new URLSearchParams({loanId:loan.loanId,date:item.form.effectiveDate}));if(generation !== item.generation || !target.isConnected)return;const b = data[0];target.textContent = t('recordedBalances') + ' · ' + t('principalOutstanding') + ' ' + money(b.outstandingPrincipal) + ' · ' + t('principalDue') + ' ' + money(b.duePrincipal) + ' · ' + t('interestDue') + ' ' + money(b.dueInterest) + ' · ' + t('charges') + ' ' + money(b.charges || '0.00');}
+        try {const data = await api(base + '/loan-context?' + new URLSearchParams({loanId:loan.loanId,date:item.form.effectiveDate}));if(generation !== item.generation || !target.isConnected)return;const b = data[0];target.textContent = t('recordedBalances') + ' · ' + t('totalLoanOutstanding') + ' ' + loanOutstanding(b) + ' · ' + t('principalDue') + ' ' + money(b.duePrincipal) + ' · ' + t('interestDue') + ' ' + money(b.dueInterest);}
         catch(error){if(generation === item.generation && target.isConnected)showIssue(item,error.message,false,error.code || 'recording.error.state');}
     }
     function renderItem(item) {
