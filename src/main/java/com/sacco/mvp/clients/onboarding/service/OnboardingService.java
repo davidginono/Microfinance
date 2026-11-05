@@ -141,21 +141,24 @@ public class OnboardingService {
         authorize(a,"REVIEW");records.client(a,client,today());
         // A combined confirmation is equivalent to all five checks on an older form.
         if ("VERIFY".equals(f.getKind()) && f.isChecksConfirmed()) f.confirmChecks();
-        String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_decision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+        check(f.getRequestKey()!=null,"request");
+        records.lock("client_onboarding_decision/"+a.getSaccoId()+"/"+a.getStationId()+"/"+f.getRequestKey());
+        var old=records.retryReview(a,client,f);if(old.isPresent())return old.get();
+        // Retired inputs cannot imply that screening was completed.
+        f.setScreening("UNAVAILABLE");f.setScreeningReference("");f.setPolicyReference("");f.setReviewDue(null);
+        String hash=hash(List.of(client,f));
         records.lock(client);var c=records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRevisionId().equals(c.revisionId()),"changed");
         check(Set.of("VERIFY","RETURN","REJECT","REVOKE").contains(f.getKind()),"action");
         check(f.getKind().equals("REVOKE")?Set.of("VERIFY","EXPIRED","STALE").contains(c.state()):c.state().equals("SUBMITTED"),"state");
-        text(f.getReason(),1000,"reason",true);text(f.getScreeningReference(),1000,"screeningReference",false);text(f.getPolicyReference(),500,"policyReference",false);
+        text(f.getReason(),1000,"reason",true);
         text(f.getClientMessage(),1000,"clientMessage",Set.of("RETURN","REJECT","REVOKE").contains(f.getKind()));
-        check(Set.of("CLEARED","ESCALATED","UNAVAILABLE").contains(f.getScreening()),"screening");var r=records.latest(a,client).orElseThrow();
+        var r=records.latest(a,client).orElseThrow();
         if(f.getKind().equals("VERIFY")) {
             check(!client.equals(a.getMemberId())&&!r.maker().equals(a.getMemberId())&&!records.contributed(r.id(),a.getMemberId()),"independent");
             validate(r.profile(),true);checkDocuments(r.profile(),records.documents(r.id()));
             check(Objects.equals(c.name(),r.profile().getFullName())&&Objects.equals(c.phone(),r.profile().getPhone())&&Objects.equals(c.email(),r.profile().getEmail()),"contactChanged");
             check(f.isIdentityChecked()&&f.isAddressChecked()&&f.isActivityChecked()&&f.isContactChecked()&&f.isDuplicatesChecked(),"checks");
-            check(f.getScreening().equals("CLEARED")&&!f.getScreeningReference().isBlank(),"screening");text(f.getPolicyReference(),500,"policyReference",true);
             check(f.getCheckedOn()!=null&&!f.getCheckedOn().isAfter(today())&&!f.getCheckedOn().isBefore(r.recordedAt().toLocalDate()),"checkedOn");
-            check(f.getReviewDue()!=null&&!f.getReviewDue().isBefore(today())&&!f.getReviewDue().isBefore(f.getCheckedOn()),"reviewDue");
             String identity=identity(r.profile());records.lock("CLIENT_IDENTITY/"+a.getSaccoId()+"/"+identity);check(!records.duplicate(a.getSaccoId(),identity,client),"duplicate");
         }
         UUID id=UUID.randomUUID();records.decision(a,client,id,f,hash,clock.now());

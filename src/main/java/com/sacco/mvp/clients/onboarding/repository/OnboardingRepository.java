@@ -28,7 +28,7 @@ public class OnboardingRepository {
     }
     private static final String CLIENT_SELECT="""
         select m.id,m.member_no,m.full_name,m.phone,m.email,m.client_portal_enabled,c.id revision_id,coalesce((select max(sequence) from client_onboarding_revision r where r.client_id=m.id),0) sequence,c.review_due,
-          case when c.state='VERIFY' and (m.full_name is distinct from c.profile->>'fullName' or m.phone is distinct from c.profile->>'phone' or m.email is distinct from c.profile->>'email') then 'STALE' when c.state='VERIFY' and (c.review_due<? or (c.profile->>'identityExpiresOn')::date<? or (c.profile->>'retentionReviewOn')::date<?
+          case when c.state='VERIFY' and (m.full_name is distinct from c.profile->>'fullName' or m.phone is distinct from c.profile->>'phone' or m.email is distinct from c.profile->>'email') then 'STALE' when c.state='VERIFY' and ((c.profile->>'identityExpiresOn')::date<? or (c.profile->>'retentionReviewOn')::date<?
             or exists(select 1 from client_onboarding_document_link x join client_onboarding_document d on d.id=x.document_id where x.revision_id=c.id and d.expires_on<?))
             then 'EXPIRED' else coalesce(c.state,'NOT_STARTED') end state
         from members m left join lateral(select * from client_onboarding_current where client_id=m.id limit 1) c on c.sacco_id=m.sacco_id and c.station_id=m.station_id
@@ -37,10 +37,10 @@ public class OnboardingRepository {
     private final RowMapper<Client> clientMapper=(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getString("phone"),r.getString("email"),r.getString("state"),r.getObject("revision_id",UUID.class),r.getInt("sequence"),r.getObject("review_due",LocalDate.class),r.getBoolean("client_portal_enabled"));
     public List<Client> clients(AppUserPrincipal a,String search,String state,int page,String order,LocalDate day) {
         return jdbc.query("select * from ("+CLIENT_SELECT+" and (m.member_no ilike ? escape '!' or m.full_name ilike ? escape '!')) q where (?='' or state=?) order by "+order+",id limit 26 offset ?",
-            clientMapper,day,day,day,day,a.getSaccoId(),a.getStationId(),pattern(search),pattern(search),state,state,page*25);
+            clientMapper,day,day,day,a.getSaccoId(),a.getStationId(),pattern(search),pattern(search),state,state,page*25);
     }
     public Client client(AppUserPrincipal a,UUID id,LocalDate day) {
-        return jdbc.query(CLIENT_SELECT+" and m.id=?",clientMapper,day,day,day,day,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Client unavailable"));
+        return jdbc.query(CLIENT_SELECT+" and m.id=?",clientMapper,day,day,day,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Client unavailable"));
     }
     public Optional<Revision> latest(AppUserPrincipal a,UUID client) {
         return jdbc.query("select r.*,m.full_name maker from client_onboarding_revision r join members m on m.id=r.actor_id where r.client_id=? and r.sacco_id=? and r.station_id=? order by r.sequence desc limit 1",
@@ -67,6 +67,20 @@ public class OnboardingRepository {
         var rows=jdbc.query("select id,case when actor_id=? then payload_hash else '' end from "+table+" where sacco_id=? and station_id=? and request_key=?",(r,n)->Map.entry(r.getObject(1,UUID.class),r.getString(2)),a.getMemberId(),a.getSaccoId(),a.getStationId(),request);
         if(rows.isEmpty())return Optional.empty();
         if(!rows.getFirst().getValue().equals(hash))throw new IllegalArgumentException("kyc.error.retry");
+        return Optional.of(rows.getFirst().getKey());
+    }
+    public Optional<UUID> retryReview(AppUserPrincipal a,UUID client,ReviewForm f) {
+        var rows=jdbc.query("""
+            select id, actor_id=? and client_id=? and revision_id=? and kind=? and reason=?
+                and client_message=? and identity_checked=? and address_checked=? and activity_checked=?
+                and contact_checked=? and duplicates_checked=? and checked_on is not distinct from ?::date
+            from client_onboarding_decision where sacco_id=? and station_id=? and request_key=?
+            """,(r,n)->Map.entry(r.getObject(1,UUID.class),r.getBoolean(2)),
+            a.getMemberId(),client,f.getRevisionId(),f.getKind(),Objects.toString(f.getReason(),"").strip(),
+            Objects.toString(f.getClientMessage(),"").strip(),f.isIdentityChecked(),f.isAddressChecked(),f.isActivityChecked(),
+            f.isContactChecked(),f.isDuplicatesChecked(),f.getCheckedOn(),a.getSaccoId(),a.getStationId(),f.getRequestKey());
+        if(rows.isEmpty())return Optional.empty();
+        if(!rows.getFirst().getValue())throw new IllegalArgumentException("kyc.error.retry");
         return Optional.of(rows.getFirst().getKey());
     }
     public UUID created(UUID request) {return jdbc.queryForObject("select client_id from client_onboarding_creation where id=?",UUID.class,request);}

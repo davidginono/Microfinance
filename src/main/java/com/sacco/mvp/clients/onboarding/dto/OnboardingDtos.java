@@ -115,10 +115,12 @@ public final class OnboardingDtos {
     @Data public static class ReviewForm {
         private UUID requestKey=UUID.randomUUID();
         private UUID revisionId;
-        private String kind="VERIFY", reason="", clientMessage="", screening="UNAVAILABLE", screeningReference="", policyReference="";
+        private String kind="VERIFY", reason="", clientMessage="";
+        @com.fasterxml.jackson.annotation.JsonIgnore private String screening="UNAVAILABLE", screeningReference="", policyReference="";
         private boolean identityChecked, addressChecked, activityChecked, contactChecked, duplicatesChecked;
         @com.fasterxml.jackson.annotation.JsonIgnore private boolean checksConfirmed;
-        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate checkedOn, reviewDue;
+        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate checkedOn;
+        @com.fasterxml.jackson.annotation.JsonIgnore private LocalDate reviewDue;
 
         public void confirmChecks() {
             identityChecked = addressChecked = activityChecked = contactChecked = duplicatesChecked = true;

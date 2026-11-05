@@ -89,7 +89,13 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(renderedReview)
                 .contains("name=\"checksConfirmed\"", "Save review")
                 .containsPattern("(?s)class=\"erp-detail-facts kyc-document-facts\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
-                .doesNotContain("Verification checks", "name=\"identityChecked\"", "name=\"addressChecked\"", "\u00c2\u00b7");
+                .doesNotContain("Verification checks", "name=\"identityChecked\"", "name=\"addressChecked\"", "name=\"screening\"", "name=\"screeningReference\"", "name=\"policyReference\"", "name=\"reviewDue\"", "\u00c2\u00b7");
+            int reviewSeconds=Integer.getInteger("microfinance.onboarding.review-browser-seconds",0);
+            if(reviewSeconds>0){
+                System.out.println("ONBOARDING_REVIEW_BROWSER_QA="+reviewUrl);
+                var stop=Path.of("target/onboarding-review-browser-stop");Files.deleteIfExists(stop);
+                for(int elapsed=0;elapsed<Math.min(reviewSeconds,300)&&!Files.exists(stop);elapsed++)Thread.sleep(1000);
+            }
             var attachmentLink=Pattern.compile("href=\"([^\"]+/documents/[a-f0-9-]+)\" download>evidence\\.png</a>").matcher(renderedReview);
             assertThat(attachmentLink.find()).isTrue();
             var attachment=client.send(HttpRequest.newBuilder(URI.create(base+attachmentLink.group(1)))
@@ -102,10 +108,10 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(returned).contains("data-resource-status=\"WARNING\"","data-message-type=\"warning\"");
             var correction=hidden(get(client,base+"/app/onboarding/edit",false));values.forEach((key,value)->{if(key.startsWith("profile."))correction.put(key,value);});correction.put("profile.address","Synthetic corrected address");correction.put("action","SUBMITTED");correction.put("noticeAcknowledged","true");correction.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",correction,false);
             var verification=hidden(get(client,reviewUrl,true));verification.put("kind","VERIFY");verification.put("reason","Synthetic independent checks complete");
-            verification.put("screening","CLEARED");verification.put("screeningReference","Synthetic dated manual screening evidence");verification.put("policyReference","Approved synthetic policy");verification.put("checkedOn",domain.day.toString());verification.put("reviewDue",domain.day.plusMonths(6).toString());
+            verification.put("checkedOn",domain.day.toString());
             var incomplete=submit(client,reviewUrl,verification,true);
             assertThat(incomplete.statusCode()).isEqualTo(200);
-            assertThat(incomplete.body()).contains("Confirm the checks before verifying this client.","Synthetic dated manual screening evidence");
+            assertThat(incomplete.body()).contains("Confirm the checks before verifying this client.","Synthetic independent checks complete");
             verification.put("checksConfirmed","true");
             var completed=submit(client,reviewUrl,verification,true);
             assertThat(completed.statusCode()).as(completed.body()).isEqualTo(302);

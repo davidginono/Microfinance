@@ -56,10 +56,8 @@
                     <label class="kyc-checkbox"><form:checkbox path="checksConfirmed" required="required"/><span><spring:message code="kyc.field.checksConfirmed"/></span></label>
                     <form:errors path="checksConfirmed" cssClass="field-error" role="alert" data-workspace-form-error="true" data-workspace-response-error="true"/>
                 </div>
-                <label class="kyc-field"><span><spring:message code="kyc.field.screening"/></span><form:select path="screening" cssClass="aws-control"><c:forEach items="${['UNAVAILABLE','ESCALATED','CLEARED']}" var="result"><form:option value="${result}"><spring:message code="kyc.screening.${result}"/></form:option></c:forEach></form:select><form:errors path="screening" cssClass="field-error"/></label>
-                <c:forEach items="${['screeningReference','policyReference']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:textarea path="${field}" cssClass="aws-control" rows="3" maxlength="${field=='policyReference'?500:1000}" required="required"/><form:errors path="${field}" cssClass="field-error"/></label></c:forEach>
                 <div class="kyc-field-pair">
-                    <c:forEach items="${['checkedOn','reviewDue']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:input path="${field}" type="date" cssClass="aws-control" required="required"/><form:errors path="${field}" cssClass="field-error"/></label></c:forEach>
+                    <label class="kyc-field"><span><spring:message code="kyc.field.checkedOn"/></span><form:input path="checkedOn" type="date" cssClass="aws-control" required="required"/><form:errors path="checkedOn" cssClass="field-error"/></label>
                 </div>
             </div>
             </c:if>

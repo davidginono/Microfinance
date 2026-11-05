@@ -2,5 +2,5 @@
     <c:forEach items="${['number','name','phone','email']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:out value="${client[field]}"/></dd></div></c:forEach>
     <div><dt><spring:message code="kyc.field.state"/></dt><dd><spring:message code="kyc.state.${empty viewState?client.state:viewState}"/></dd></div>
     <div><dt><spring:message code="kyc.loan.portal"/></dt><dd><spring:message code="${client.portalEnabled?'kyc.loan.portalEnabled':'kyc.loan.noPortal'}"/></dd></div>
-    <div><dt><spring:message code="kyc.field.due"/></dt><dd><c:out value="${appTime:display(historical?viewReviewDue:client.reviewDue)}"/></dd></div>
+    <c:if test="${historical and not empty viewReviewDue}"><div><dt><spring:message code="kyc.field.due"/></dt><dd><c:out value="${appTime:display(viewReviewDue)}"/></dd></div></c:if>
 </dl></section>

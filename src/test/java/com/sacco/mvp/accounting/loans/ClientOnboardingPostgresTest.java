@@ -45,7 +45,7 @@ class ClientOnboardingPostgresTest {
         for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")){var form=new DocumentForm();form.setRevisionId(revision);form.setCategory(category);service.attach(f.actor,client,form,image());}
     }
     UUID submitted(UUID client,String identity){UUID draft=draft(client,identity);documents(client,draft);var form=profile(client,identity);form.setAction("SUBMITTED");return service.save(f.actor,client,form);}
-    ReviewForm decision(UUID revision){var form=new ReviewForm();form.setRevisionId(revision);form.setIdentityChecked(true);form.setAddressChecked(true);form.setActivityChecked(true);form.setContactChecked(true);form.setDuplicatesChecked(true);form.setReason("Synthetic independent evidence review");form.setClientMessage("Please provide a current address document.");form.setScreening("CLEARED");form.setScreeningReference("Synthetic manually checked PEP and sanctions sources, dated result");form.setPolicyReference("Synthetic approved KYC policy");form.setCheckedOn(day);form.setReviewDue(day.plusMonths(6));return form;}
+    ReviewForm decision(UUID revision){var form=new ReviewForm();form.setRevisionId(revision);form.setIdentityChecked(true);form.setAddressChecked(true);form.setActivityChecked(true);form.setContactChecked(true);form.setDuplicatesChecked(true);form.setReason("Synthetic independent evidence review");form.setClientMessage("Please provide a current address document.");form.setCheckedOn(day);return form;}
     void policy(){var controls=f.context.getBean(CreditControlService.class);var p=new PolicyForm();p.setExpectedRevision(controls.policy(f.actor).revision());p.setKycRequired(true);p.setReference("Synthetic approved branch KYC gate");p.setVerified(true);controls.configure(f.actor,p);}
     String gate(){return f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day);}
     @Test void workspaceStatusTracksIndependentVerificationExpiryContactChangesAndRevocation() {
@@ -59,7 +59,7 @@ class ClientOnboardingPostgresTest {
         f.jdbc.update("update members set phone=? where id=?",phone(),f.client);
         assertThat(service.ownStatus(owner).state()).isEqualTo("STALE");
         f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);
-        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day.plusMonths(7));
+        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day.plusYears(1).plusDays(1));
         assertThat(service.ownStatus(owner).state()).isEqualTo("EXPIRED");
         when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day);
         var revoked=decision(revision);revoked.setKind("REVOKE");service.review(reviewer,f.client,revoked);
@@ -85,15 +85,44 @@ class ClientOnboardingPostgresTest {
         assertThatThrownBy(()->f.jdbc.update("delete from client_onboarding_decision where id=?",saved)).isInstanceOf(DataAccessException.class);
         assertThatThrownBy(()->f.jdbc.execute("truncate client_onboarding_revision cascade")).isInstanceOf(DataAccessException.class);
     }
-    @Test void unavailableScreeningCannotBecomeAFalseCleanRecordAndReturnedDraftCanBeCorrected(){
-        UUID submitted=submitted(f.client,"TZ-1234");var verifier=f.operator("B1");var review=decision(submitted);review.setScreening("UNAVAILABLE");assertThatThrownBy(()->service.review(verifier,f.client,review)).hasMessage("kyc.error.screening");
+    @Test void verificationRetainsUnknownScreeningAndRetriesIgnoreOnlyRetiredInputs(){
+        UUID revision=submitted(f.client,"TZ-SIMPLE-"+UUID.randomUUID());var reviewer=f.operator("B1");var review=decision(revision);
+        review.setChecksConfirmed(true);review.setScreening("CLEARED");review.setScreeningReference("Discarded old input");review.setPolicyReference("Discarded old input");review.setReviewDue(day.plusDays(1));
+        UUID saved=service.review(reviewer,f.client,review);
+        var row=f.jdbc.queryForMap("select screening,screening_reference,policy_reference,review_due,checked_on from client_onboarding_decision where id=?",saved);
+        assertThat(row.get("screening")).isEqualTo("UNAVAILABLE");assertThat(row.get("screening_reference")).isEqualTo("");assertThat(row.get("policy_reference")).isEqualTo("");assertThat(row.get("review_due")).isNull();
+        assertThat(service.review(reviewer,f.client,review)).isEqualTo(saved);
+        review.setScreening("ESCALATED");review.setScreeningReference("Changed retired input");review.setReviewDue(day.plusDays(2));
+        assertThat(service.review(reviewer,f.client,review)).isEqualTo(saved);
+        review.setReason("Changed active reason");assertThatThrownBy(()->service.review(reviewer,f.client,review)).hasMessage("kyc.error.retry");
+        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day.plusMonths(7));
+        assertThat(service.client(f.actor,f.client).state()).isEqualTo("VERIFY");
+        assertThat(f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day.plusMonths(7))).isNull();
+    }
+    @Test void historicalReviewEvidenceAndExactRetrySurviveRetiredInputs(){
+        UUID revision=submitted(f.client,"TZ-HISTORY-"+UUID.randomUUID());var reviewer=f.operator("B1");var review=decision(revision);
+        review.setScreening("CLEARED");review.setScreeningReference("Historical manual sources");review.setPolicyReference("Historical approved policy");review.setReviewDue(day.plusDays(1));
+        UUID saved=UUID.randomUUID();
+        var tx=new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        tx.executeWithoutResult(status->f.context.getBean(com.sacco.mvp.clients.onboarding.repository.OnboardingRepository.class).decision(reviewer,f.client,saved,review,"0".repeat(64),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3))));
+        assertThat(service.review(reviewer,f.client,review)).isEqualTo(saved);
+        var history=service.versionDecisions(f.actor,f.client,2).getFirst();
+        assertThat(history.screening()).isEqualTo("CLEARED");assertThat(history.screeningReference()).isEqualTo("Historical manual sources");
+        assertThat(history.policyReference()).isEqualTo("Historical approved policy");assertThat(history.reviewDue()).isEqualTo(day.plusDays(1));
+        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day.plusDays(2));
+        assertThat(service.client(f.actor,f.client).state()).isEqualTo("VERIFY");
+        assertThat(f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day.plusDays(2))).isNull();
+        assertThatThrownBy(()->f.jdbc.update("update client_onboarding_decision set screening='UNAVAILABLE' where id=?",saved)).isInstanceOf(DataAccessException.class);
+    }
+    @Test void returnedDraftCanBeCorrectedWithoutRetiredVerificationInputs(){
+        UUID submitted=submitted(f.client,"TZ-1234");var verifier=f.operator("B1");var review=decision(submitted);review.setIdentityChecked(false);assertThatThrownBy(()->service.review(verifier,f.client,review)).hasMessage("kyc.error.checks");review.setIdentityChecked(true);
         review.setKind("RETURN");service.review(verifier,f.client,review);assertThat(gate()).isEqualTo("kyc.error.required");
         UUID corrected=submitted(f.client,"TZ-5678");service.review(verifier,f.client,decision(corrected));assertThat(gate()).isNull();assertThat(service.versionDecisions(f.actor,f.client,2).getFirst().kind()).isEqualTo("RETURN");assertThat(service.history(f.actor,f.client,0).rows()).hasSize(4);
     }
     @Test void changedContactsExpiryAndRevocationBlockFurtherCreditButKeepEvidence(){
         UUID submitted=submitted(f.client,"TZ-REVIEW");var verifier=f.operator("B1");service.review(verifier,f.client,decision(submitted));
         f.jdbc.update("update members set phone='255700000111' where id=?",f.client);assertThat(gate()).isEqualTo("kyc.error.contactChanged");assertThat(service.client(f.actor,f.client).state()).isEqualTo("STALE");
-        f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);assertThat(f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day.plusYears(1))).isEqualTo("kyc.error.expired");
+        f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);assertThat(f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day.plusYears(1).plusDays(1))).isEqualTo("kyc.error.expired");
         var revoke=decision(submitted);revoke.setKind("REVOKE");service.review(verifier,f.client,revoke);assertThat(gate()).isEqualTo("kyc.error.required");assertThat(service.decisions(f.actor,f.client)).hasSize(2);
     }
     @Test void exactNormalizedIdentityDuplicatesAcrossBranchesAreBlockedWithoutLeakingTheOtherProfile(){
