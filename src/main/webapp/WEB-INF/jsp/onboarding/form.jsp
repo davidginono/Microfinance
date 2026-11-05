@@ -8,8 +8,9 @@
 <c:if test="${not empty client}"><%@ include file="facts.jspf" %></c:if>
 
 <c:url value="/finance/clients/onboarding/contact-check" var="contactCheckUrl"/>
-<form:form data-contact-check-url="${contactCheckUrl}" data-contact-client-id="${client.id}" id="client-onboarding-form" method="post" enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="kyc-client-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
+<form:form data-contact-check-url="${contactCheckUrl}" data-contact-client-id="${client.id}" id="client-onboarding-form" method="post" enctype="${formKind=='document' or formKind=='create'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="kyc-client-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/>
+    <c:if test="${formKind=='create'}"><template data-creation-labels data-draft-saved="<spring:message code='kyc.sessionDraftSaved'/>" data-draft-files="<spring:message code='kyc.draftFilesPending'/>" data-draft-error="<spring:message code='kyc.draftSaveError'/>" data-draft-uncertain="<spring:message code='kyc.draftSaveUncertain'/>" data-file-error="<spring:message code='kyc.error.file'/>" data-limit-error="<spring:message code='kyc.error.uploadLimit'/>"></template></c:if>
 
     <c:choose><c:when test="${formKind=='create' or formKind=='profile'}">
 <c:set var="identityReadOnly" value="${not empty client and client.portalEnabled}"/><c:set var="profileValues" value="${formKind=='create'?createForm.profile:profileForm.profile}"/>

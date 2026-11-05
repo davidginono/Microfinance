@@ -59,7 +59,7 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(blocked.statusCode()).isEqualTo(302);assertThat(blocked.headers().firstValue("Location")).contains("/app/onboarding");
             assertThat(get(client,base+"/app/onboarding",false)).contains("My profile","Bio data","Complete your profile and wait for verification").doesNotContain("Loan request","Complete profile","/app/onboarding/loan");
             String form=get(client,base+"/app/onboarding/edit",false);
-            assertThat(form).contains("Do you have a business?","name=\"profile.hasBusiness\"","Profile status","data-resource-status=\"DRAFT\"","class=\"kyc-field-hint\"").doesNotContain("data-message-type=\"info\"");
+            assertThat(form).contains("Do you have a business?","name=\"profile.hasBusiness\"","Profile status","data-resource-status=\"PENDING\">Not started","class=\"kyc-field-hint\"").doesNotContain("data-message-type=\"info\"");
             assertThat(form).contains("My profile","Privacy notice","We protect your personal information","Bio data","Business details","Spouse details","Bank details","Attachments and Documents","name=\"profile.dailySales\"","name=\"profile.bankAccountNumber\"").doesNotContain("id=\"profile-photo\"","name=\"profile.lawfulBasis\"","name=\"profile.retentionReference\"", "Onboarding notice", "kyc.error.noticeUnavailable");
             assertThat(form).contains("name=\"profile.incomeActivities\"", "value=\"BUSINESS\"", "value=\"EMPLOYMENT\"");
             assertThat(form.indexOf("name=\"profile.incomeActivities\"")).isLessThan(form.indexOf("name=\"profile.otherIncomeSources\""));
@@ -84,15 +84,16 @@ class ClientOnboardingRenderedPostgresTest {
             }
             form=get(client,base+"/app/onboarding/edit",false);var submitted=hidden(form);values.forEach((key,value)->{if(key.startsWith("profile."))submitted.put(key,value);});submitted.put("action","SUBMITTED");submitted.put("noticeAcknowledged","true");submitted.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",submitted,false);
             assertThat(get(client,base+"/app/onboarding",false)).contains("awaiting review","<fieldset class=\"kyc-profile-fields\" disabled").doesNotContain("value=\"SUBMITTED\"", "value=\"DRAFT\"", "data-profile-wizard");
-            String reviewUrl=base+"/finance/clients/onboarding/"+domain.f.client+"/review";
-            String renderedReview=get(client,reviewUrl,true);
+            String staffDetailsUrl=base+"/finance/clients/onboarding/"+domain.f.client;
+            String reviewUrl=staffDetailsUrl+"/review";
+            String renderedReview=get(client,staffDetailsUrl,true);
             assertThat(renderedReview)
                 .contains("name=\"checksConfirmed\"", "Save review")
                 .containsPattern("(?s)class=\"erp-detail-facts kyc-document-facts\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
                 .doesNotContain("Verification checks", "name=\"identityChecked\"", "name=\"addressChecked\"", "name=\"screening\"", "name=\"screeningReference\"", "name=\"policyReference\"", "name=\"reviewDue\"", "\u00c2\u00b7");
             int reviewSeconds=Integer.getInteger("microfinance.onboarding.review-browser-seconds",0);
             if(reviewSeconds>0){
-                System.out.println("ONBOARDING_REVIEW_BROWSER_QA="+reviewUrl);
+                System.out.println("ONBOARDING_REVIEW_BROWSER_QA="+staffDetailsUrl);
                 var stop=Path.of("target/onboarding-review-browser-stop");Files.deleteIfExists(stop);
                 for(int elapsed=0;elapsed<Math.min(reviewSeconds,300)&&!Files.exists(stop);elapsed++)Thread.sleep(1000);
             }
@@ -107,7 +108,7 @@ class ClientOnboardingRenderedPostgresTest {
             String returned=get(client,base+"/app/onboarding",false);assertThat(returned).contains("Please correct your home address.").doesNotContain("INTERNAL-SCREENING-SECRET");
             assertThat(returned).contains("data-resource-status=\"WARNING\"","data-message-type=\"warning\"");
             var correction=hidden(get(client,base+"/app/onboarding/edit",false));values.forEach((key,value)->{if(key.startsWith("profile."))correction.put(key,value);});correction.put("profile.address","Synthetic corrected address");correction.put("action","SUBMITTED");correction.put("noticeAcknowledged","true");correction.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",correction,false);
-            var verification=hidden(get(client,reviewUrl,true));verification.put("kind","VERIFY");verification.put("reason","Synthetic independent checks complete");
+            var verification=hidden(get(client,staffDetailsUrl,true));verification.put("kind","VERIFY");verification.put("reason","Synthetic independent checks complete");
             verification.put("checkedOn",domain.day.toString());
             var incomplete=submit(client,reviewUrl,verification,true);
             assertThat(incomplete.statusCode()).isEqualTo(200);
@@ -131,9 +132,22 @@ class ClientOnboardingRenderedPostgresTest {
             var retiredNotice=client.send(HttpRequest.newBuilder(URI.create(base+"/finance/clients/onboarding/notice")).header("X-Onboarding-Test-Actor","reviewer").GET().build(),HttpResponse.BodyHandlers.ofString());
             assertThat(retiredNotice.statusCode()).isEqualTo(302);assertThat(retiredNotice.headers().firstValue("Location")).contains("/finance/clients/onboarding");
             assertThat(get(client,base+"/app/onboarding/edit?lang=sw",false)).contains("Taarifa zangu","Tunalinda taarifa zako binafsi", "data-personal=\"Taarifa binafsi\"", "data-review=\"Kagua na tuma\"");get(client,base+"/app/onboarding?lang=en",false);
-            String creation=get(client,base+"/finance/clients/onboarding/new",true);assertThat(creation).contains("Generated automatically","Business TIN","Daily sales (TZS)","Spouse details","Bank details");
+            String creation=get(client,base+"/finance/clients/onboarding/new",true);assertThat(creation).contains("Business TIN","Daily sales (TZS)","Spouse details","Bank details").doesNotContain("name=\"profile.clientNumber\"");
+            assertThat(creation).contains("Optional. You can create the client without uploading documents.","name=\"documents[0].file\"","enctype=\"multipart/form-data\"").doesNotContain("Create the client before adding documents.");
+            var sessionDraft=hidden(creation);sessionDraft.put("action","DRAFT");sessionDraft.put("profile.city","Synthetic draft city");
+            var draftData=new StringJoiner("&");sessionDraft.forEach((key,value)->draftData.add(URLEncoder.encode(key,StandardCharsets.UTF_8)+"="+URLEncoder.encode(value,StandardCharsets.UTF_8)));
+            var acknowledged=client.send(HttpRequest.newBuilder(URI.create(base+"/finance/clients/onboarding/new")).header("X-Onboarding-Test-Actor","reviewer").header("X-Profile-Draft","save").header("Accept","application/json").header("Content-Type","application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(draftData.toString())).build(),HttpResponse.BodyHandlers.ofString());
+            assertThat(acknowledged.statusCode()).as(acknowledged.body()).isEqualTo(200);assertThat(acknowledged.body()).contains("\"saved\":true",sessionDraft.get("requestKey")).doesNotContain("<html");
+            assertThat(get(client,base+"/finance/clients/onboarding/new",true)).contains("Synthetic draft city");
             var created=hidden(creation);created.put("profile.firstName","Rendered");created.put("profile.lastName","Borrower");created.put("profile.phone",domain.phone());created.put("profile.city","Rendered city");created.put("profile.businessName","Rendered business");created.put("profile.dailyExpenditure","99.50");
             post(client,base+"/finance/clients/onboarding/new",created,true);
+            var withDocument=hidden(get(client,base+"/finance/clients/onboarding/new",true));withDocument.put("profile.firstName","Optional");withDocument.put("profile.lastName","Documents");withDocument.put("profile.phone",domain.phone());withDocument.put("documents[0].category","IDENTITY");
+            String creationBoundary="creation-"+UUID.randomUUID();var creationBytes=new ByteArrayOutputStream();
+            for(var field:withDocument.entrySet())creationBytes.write(("--"+creationBoundary+"\r\nContent-Disposition: form-data; name=\""+field.getKey()+"\"\r\n\r\n"+field.getValue()+"\r\n").getBytes(StandardCharsets.UTF_8));
+            creationBytes.write(("--"+creationBoundary+"\r\nContent-Disposition: form-data; name=\"documents[0].file\"; filename=\"optional-evidence.png\"\r\nContent-Type: image/png\r\n\r\n").getBytes(StandardCharsets.UTF_8));creationBytes.write(domain.image);creationBytes.write(("\r\n--"+creationBoundary+"--\r\n").getBytes(StandardCharsets.UTF_8));
+            var uploadedCreation=client.send(HttpRequest.newBuilder(URI.create(base+"/finance/clients/onboarding/new")).header("X-Onboarding-Test-Actor","reviewer").header("Content-Type","multipart/form-data; boundary="+creationBoundary).POST(HttpRequest.BodyPublishers.ofByteArray(creationBytes.toByteArray())).build(),HttpResponse.BodyHandlers.ofString());
+            assertThat(uploadedCreation.statusCode()).as(uploadedCreation.body()).isEqualTo(302);
+            assertThat(get(client,base+uploadedCreation.headers().firstValue("Location").orElseThrow(),true)).contains("optional-evidence.png","id=\"client-profile\"","id=\"client-business\"","id=\"client-documents\"","id=\"client-review\"");
             String ownDetails=get(client,base+"/app/onboarding",false);assertThat(ownDetails).contains("Rendered synthetic shop","12345.67","9876543210");
             var conditional=hidden(get(client,base+"/app/onboarding/edit",false));conditional.put("action","DRAFT");conditional.put("profile.hasBusiness","false");conditional.put("profile.maritalStatus","SINGLE");conditional.put("profile.businessName","Inactive shop");conditional.put("profile.spousePhone","Not applicable");post(client,base+"/app/onboarding/edit",conditional,false);
             String conditionalForm=get(client,base+"/app/onboarding",false);assertThat(conditionalForm).contains("value=\"false\" selected=\"selected\"","data-profile-business-fields hidden","data-profile-spouse-section hidden").doesNotContain("Inactive shop","Not applicable");

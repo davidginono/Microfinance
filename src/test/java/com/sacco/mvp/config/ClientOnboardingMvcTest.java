@@ -62,6 +62,27 @@ class ClientOnboardingMvcTest {
         mvc.perform(post(root+"/new").session(http).with(user(staff)).with(csrf()).param("action","CREATE")).andExpect(redirectedUrl(root+"/"+id));
         assertThat(http.getAttribute("clientProfileStaffDraft")).isNull();
     }
+    @Test void staffDraftAcknowledgesPersistenceWithoutRenderingOrRedirecting() throws Exception {
+        var http=new org.springframework.mock.web.MockHttpSession();UUID key=UUID.randomUUID();when(service.encodeProfileDraft(any())).thenReturn("encoded");
+        mvc.perform(post(root+"/new").header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON).session(http).with(user(staff)).with(csrf()).param("action","DRAFT").param("requestKey",key.toString()).param("profile.city","Arusha"))
+            .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.saved").value(true)).andExpect(jsonPath("$.requestKey").value(key.toString())).andExpect(header().doesNotExist("Location"));
+        assertThat(((ProfileDraft)http.getAttribute("clientProfileStaffDraft")).profile()).isEqualTo("encoded");verify(service,never()).create(any(),any());
+        mvc.perform(post(root+"/new").header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON).with(user(staff)).param("action","DRAFT")).andExpect(status().isForbidden());
+    }
+    @Test void optionalCreationFilesBindOnlyTheirAllowedMetadataAndFile() throws Exception {
+        when(service.create(eq(staff),any())).thenReturn(id);
+        mvc.perform(multipart(root+"/new").file(new org.springframework.mock.web.MockMultipartFile("documents[0].file","id.png","image/png",new byte[]{1,2}))
+            .with(user(staff)).with(csrf()).param("action","CREATE").param("documents[0].category","IDENTITY").param("documents[0].expiresOn","2027-01-01").param("documents[0].revisionId",UUID.randomUUID().toString()).param("profile.firstName","Asha"))
+            .andExpect(redirectedUrl(root+"/"+id));
+        verify(service).create(eq(staff),argThat(f->f.getDocuments().size()==1&&f.getDocuments().getFirst().getCategory().equals("IDENTITY")&&f.getDocuments().getFirst().getFile().getOriginalFilename().equals("id.png")&&f.getDocuments().getFirst().getExpiresOn().equals(java.time.LocalDate.of(2027,1,1))));
+    }
+    @Test void rejectedDraftAcknowledgementPreservesThePreviousDraft() throws Exception {
+        var http=new org.springframework.mock.web.MockHttpSession();var prior=new ProfileDraft("saved",staff.getMemberId(),"I1","B1",UUID.randomUUID());http.setAttribute("clientProfileStaffDraft",prior);
+        when(service.encodeProfileDraft(any())).thenThrow(new IllegalArgumentException("kyc.error.phone"));
+        mvc.perform(post(root+"/new").header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON).locale(Locale.ENGLISH).session(http).with(user(staff)).with(csrf()).param("action","DRAFT").param("profile.phone","123"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.saved").value(false)).andExpect(jsonPath("$.message").isNotEmpty());
+        assertThat(http.getAttribute("clientProfileStaffDraft")).isSameAs(prior);verify(service,never()).create(any(),any());
+    }
     @Test void onboardingStatesUseSharedStatusIconsRatherThanCopyControls() throws Exception {
         String fragment=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/status.jspf"));
         int start=fragment.indexOf("value=\"${")+9;int end=fragment.indexOf("}\"",start);
@@ -227,6 +248,7 @@ class ClientOnboardingMvcTest {
         assertThat(json.readValue(snapshot,ClientProfile.class).getActivity()).isEqualTo(p.getActivity());
     }
     @Configuration @EnableWebMvc static class Config {
+        @Bean org.springframework.context.MessageSource messageSource(){var messages=new org.springframework.context.support.ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");return messages;}
         @Bean OnboardingController controller(OnboardingService service){return new OnboardingController(service);}
         @Bean ClientOnboardingController clientController(OnboardingService service){return new ClientOnboardingController(service);}
     }

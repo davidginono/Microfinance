@@ -24,7 +24,7 @@ public class OnboardingController {
     private static final String PROFILE_DRAFT="clientProfileStaffDraft";
     private final OnboardingService service;
 
-    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email"));}
+    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(DocumentForm.MAX_FILES);b.setAllowedFields(fields("requestKey","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","documents[*].category","documents[*].expiresOn","documents[*].file"));}
     @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","expectedSequence","action","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","profile.legalHoldReference"));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","checksConfirmed","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","checkedOn");}
@@ -52,6 +52,17 @@ public class OnboardingController {
             var id=service.create(a,f);session.removeAttribute(PROFILE_DRAFT);return "redirect:"+ROOT+"/"+id;
         }catch(IllegalArgumentException e){reject(errors,e);}catch(org.springframework.dao.DataIntegrityViolationException e){errors.reject("kyc.error.registration");}
         return form(m,"create");
+    }
+    @PostMapping(value="/new",params="action=DRAFT",headers="X-Profile-Draft=save",produces=MediaType.APPLICATION_JSON_VALUE) @ResponseBody
+    public ResponseEntity<Map<String,Object>> draft(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("createForm") CreateForm f,BindingResult errors,HttpSession session,jakarta.servlet.http.HttpServletRequest request) {
+        service.authorize(a,"CREATE");
+        if(f.getRequestKey()==null)errors.reject("kyc.error.request");
+        if(!errors.hasErrors())try {
+            session.setAttribute(PROFILE_DRAFT,new ProfileDraft(service.encodeProfileDraft(f.getProfile()),a.getMemberId(),a.getSaccoId(),a.getStationId(),f.getRequestKey()));
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("saved",true,"requestKey",f.getRequestKey()));
+        }catch(IllegalArgumentException e){reject(errors,e);}
+        var context=new org.springframework.web.servlet.support.RequestContext(request);
+        return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(Map.of("saved",false,"message",errors.getAllErrors().stream().map(context::getMessage).collect(java.util.stream.Collectors.joining("\n"))));
     }
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model m) {
         context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));

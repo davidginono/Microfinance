@@ -75,6 +75,20 @@ class ClientOnboardingPostgresTest {
         UUID id=service.create(f.actor,form);assertThat(service.create(f.actor,form)).isEqualTo(id);assertThat(service.client(f.actor,id).state()).isEqualTo("NOT_STARTED");assertThat(f.jdbc.queryForObject("select phone_verified_at from members where id=?",OffsetDateTime.class,id)).isNull();assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_revision where client_id=?",Integer.class,id)).isZero();
         assertThat(f.jdbc.queryForObject("select signature_text from members where id=?",String.class,id)).isNull();assertThat(f.jdbc.queryForObject("select count(*) from sacco_settings where sacco_id=?",Integer.class,f.institution)).isZero();
     }
+    @Test void optionalCreationDocumentsAreScopedAtomicAndIdempotentWithoutVerifyingTheClient() {
+        var form=new CreateForm();form.getProfile().setFirstName("Synthetic");form.getProfile().setLastName("Upload");form.getProfile().setPhone(phone());
+        for(String category:List.of("IDENTITY","ADDRESS")){var document=new CreationDocumentForm();document.setCategory(category);document.setFile(image());form.getDocuments().add(document);}
+        UUID client=service.create(f.actor,form);assertThat(service.create(f.actor,form)).isEqualTo(client);
+        assertThat(service.client(f.actor,client).state()).isEqualTo("DRAFT");assertThat(service.documents(f.actor,client)).hasSize(2);
+        assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_document where client_id=?",Integer.class,client)).isEqualTo(2);
+        assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_decision where client_id=?",Integer.class,client)).isZero();
+        var other=f.operator("B2");assertThatThrownBy(()->service.documents(other,client)).isInstanceOf(AccessDeniedException.class);
+        form.getDocuments().getFirst().setCategory("CONSENT");assertThatThrownBy(()->service.create(f.actor,form)).isInstanceOf(IllegalArgumentException.class);
+        var bad=new CreateForm();bad.getProfile().setFirstName("Synthetic");bad.getProfile().setLastName("Invalid");bad.getProfile().setPhone(phone());
+        var invalid=new CreationDocumentForm();invalid.setFile(new MockMultipartFile("file","fake.png","image/png",new byte[]{1,2,3}));bad.getDocuments().add(invalid);
+        int before=f.jdbc.queryForObject("select count(*) from members where sacco_id=?",Integer.class,f.institution);
+        assertThatThrownBy(()->service.create(f.actor,bad)).hasMessage("kyc.error.file");assertThat(f.jdbc.queryForObject("select count(*) from members where sacco_id=?",Integer.class,f.institution)).isEqualTo(before);
+    }
     @Test void draftsNeedCurrentEvidenceAndVerificationNeedsIndependentStaff(){
         var empty=new ProfileForm();UUID draft=service.save(f.actor,f.client,empty);assertThat(service.save(f.actor,f.client,empty)).isEqualTo(draft);
         f.jdbc.update("update members set phone=null where id=?",f.client);var missingContact=profile(f.client,"TZ-0000-1234");missingContact.setAction("SUBMITTED");assertThatThrownBy(()->service.save(f.actor,f.client,missingContact)).hasMessage("kyc.error.phone");f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);

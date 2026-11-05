@@ -17,6 +17,10 @@
 .kyc-client-form > [data-profile-tabs] > .console-detail-tabs { margin-top: 0; }
 .kyc-client-form { display: grid; gap: 20px; min-width: 0; }
 .kyc-detail-group { display: grid; gap: 16px; min-width: 0; }
+[data-creation-documents] { display: grid; gap: 16px; }
+.kyc-creation-document { display: grid; gap: 12px; min-width: 0; padding-bottom: 16px; border-bottom: 1px solid #eaeded; }
+.kyc-creation-document input { max-width: 100%; min-width: 0; }
+.kyc-creation-document [data-creation-remove] { justify-self: start; }
 .kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
 .kyc-review-fields { display: grid; gap: 16px; min-width: 0; }
 .kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }

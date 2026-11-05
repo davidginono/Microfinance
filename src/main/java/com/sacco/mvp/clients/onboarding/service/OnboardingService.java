@@ -74,18 +74,41 @@ public class OnboardingService {
     @Transactional(readOnly=true) public Page<History> history(AppUserPrincipal a,UUID client,int page) {client(a,client);page(page);var rows=records.history(a,client,page);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional(readOnly=true) public boolean duplicate(AppUserPrincipal a,UUID client) {var r=latest(a,client);return r.isPresent()&&!identity(r.get().profile()).isBlank()&&records.duplicate(a.getSaccoId(),identity(r.get().profile()),client);}
 
-    @Transactional(timeout=30)
     public UUID create(AppUserPrincipal a,CreateForm f) {
+        authorize(a,"CREATE");check(f.getDocuments()!=null&&f.getDocuments().size()<=DocumentForm.MAX_FILES,"uploadLimit");
+        var documents=new ArrayList<PreparedCreationDocument>();long bytes=0;
+        for(var document:f.getDocuments()) {
+            check(document!=null,"file");if(document.getFile()==null||document.getFile().isEmpty())continue;
+            check(DOCUMENT_CATEGORIES.contains(document.getCategory()),"category");
+            check(!PHOTO_CATEGORIES.contains(document.getCategory())||document.getExpiresOn()==null,"photoExpiry");
+            check(document.getExpiresOn()==null||!document.getExpiresOn().isBefore(today()),"documentExpiry");
+            var content=prepare(document.getFile());bytes+=content.bytes().length;check(bytes<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
+            var metadata=new DocumentForm();metadata.setRequestKey(UUID.nameUUIDFromBytes((f.getRequestKey()+"/document/"+documents.size()).getBytes(StandardCharsets.UTF_8)));metadata.setCategory(document.getCategory());metadata.setExpiresOn(document.getExpiresOn());
+            documents.add(new PreparedCreationDocument(metadata,content,hash(content.bytes())));
+        }
+        var tx=new TransactionTemplate(transactions);tx.setTimeout(30);
+        return tx.execute(status->create(a,f,documents));
+    }
+    private record PreparedCreationDocument(DocumentForm metadata,Download content,String checksum) {}
+    private UUID create(AppUserPrincipal a,CreateForm f,List<PreparedCreationDocument> documents) {
         authorize(a,"CREATE");check(f.getProfile()!=null,"profile");text(f.getName(),255,"name",true);text(f.getEmail(),255,"email",false);
         check(f.getName().strip().split("\\s+").length>=2,"name");check(f.getEmail().isBlank()||f.getEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"),"email");
         boolean structured=!f.getProfile().getFirstName().isBlank()||!f.getProfile().getLastName().isBlank();if(structured)names(f.getProfile());
         try {String phone=TanzaniaPhoneNumber.normalizeRequired(f.getPhone());f.setPhone(phone);if(structured)f.getProfile().setPhone(phone);}catch(IllegalStateException e){throw invalid("phone");}
-        String hash=hash(f);var old=retry(a,"client_onboarding_creation",f.getRequestKey(),hash);if(old.isPresent())return records.created(old.get());
+        String hash=documents.isEmpty()?hash(f):hash(List.of(f,documents.stream().map(d->List.of(d.metadata().getCategory(),Objects.toString(d.metadata().getExpiresOn(),""),d.content().name(),d.checksum())).toList()));var old=retry(a,"client_onboarding_creation",f.getRequestKey(),hash);if(old.isPresent())return records.created(old.get());
         var form=new MemberRegistrationForm();form.setEmail(f.getEmail());form.setPhone(f.getPhone());form.setSaccoId(a.getSaccoId());form.setStationId(a.getStationId());
         UUID client;
         try {client=registration.registerAssisted(form,f.getName(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
         records.creation(a,client,UUID.randomUUID(),f.getRequestKey(),hash,clock.now());event(a,client,"CLIENT_ASSISTED_REGISTRATION");
-        if(structured){var draft=new ProfileForm();draft.setRequestKey(f.getRequestKey());draft.setProfile(json.readValue(json.writeValueAsString(f.getProfile()),Profile.class));saveRevision(a,client,draft,hash(List.of(client,draft)));}
+        if(structured||!documents.isEmpty()){var draft=new ProfileForm();draft.setRequestKey(f.getRequestKey());draft.setProfile(json.readValue(json.writeValueAsString(f.getProfile()),Profile.class));saveRevision(a,client,draft,hash(List.of(client,draft)));}
+        if(!documents.isEmpty()) {
+            var c=records.client(a,client,today());
+            for(var document:documents) {
+                UUID id=UUID.randomUUID();var content=document.content();var metadata=document.metadata();metadata.setRevisionId(c.revisionId());
+                var upload=uploads.store(null,"CLIENT_KYC",id.toString(),metadata.getCategory(),content.name(),content.contentType(),content.bytes());
+                records.document(a,client,c.revisionId(),id,upload.getId(),metadata,hash(List.of(client,metadata,document.checksum())),clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");
+            }
+        }
         return client;
     }
     @Transactional(readOnly=true) public ProfileForm profileForm(AppUserPrincipal a,UUID id) {

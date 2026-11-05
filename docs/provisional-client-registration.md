@@ -65,6 +65,14 @@ The packaged WAR started successfully on loopback port 8092 against the fresh sm
 
 ## Extended registration and profile fields
 
+### Optional staff attachments and draft feedback (2026-11-05)
+
+Staff may register a provisional client without uploading documents. The creation form also accepts optional categorized PNG/JPEG attachments before the client exists, within the existing 10-image, 1 MB per image and 10 MB total limits. Image validation runs before the creation transaction; the client, initial profile, attachments and audit events commit together. Repeating the same creation request does not duplicate the client or its attachments. Uploading a copy does not establish verification, consent or portal access; independent review and borrower evidence requirements retain their existing rules.
+
+The enhanced staff Save draft command receives a scoped, no-store server acknowledgement and displays the shared success Flashbar while retaining the live form and selected local files. The session draft stores profile fields only. Local files attach on Create client and must be reselected after leaving or reloading; the successful draft notice explains this when files are selected. Invalid or unconfirmed saves retain the entries and recovery controls, and never show success without acknowledgement. Native browser draft submissions retain their redirect and server-rendered success notice.
+
+Verification: 97 focused JavaScript checks and 83 Java/JSP/PostgreSQL checks passed, including real HTTP draft acknowledgements and multipart staff creation on an owned disposable PostgreSQL 17.9 database at `127.0.0.1:55579`. The rendered test now uses Client details for review and the shared pending status indicator. Browser visual checks remain pending because browser access was unavailable; no throughput claim is made.
+
 The staff-assisted creation form and both profile editors share the requested bio data, contact, business, spouse and bank sections. First and last names and the phone number identify a new assisted client; middle name and assisted email are optional. Existing portal users retain the protected account-contact change flow. The client number is read-only and uses the same shared allocation sequence. Saving a structured assisted registration atomically creates its first profile draft without a second client identity.
 
 Group is an optional, branch-scoped selection of an existing active lending group. The selection is a declared profile association: it does not enroll the client, establish borrowing authority or create guarantee liability. Lookups return at most 26 choices per page; the database also rejects a foreign or inactive group on a new snapshot. Existing snapshot names, documents and decisions remain unchanged.

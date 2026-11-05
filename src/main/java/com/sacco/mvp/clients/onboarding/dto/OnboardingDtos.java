@@ -106,12 +106,18 @@ public final class OnboardingDtos {
         private UUID requestKey=UUID.randomUUID();
         private String name="", phone="", email="";
         private ClientProfile profile=new ClientProfile();
+        @com.fasterxml.jackson.annotation.JsonIgnore private List<CreationDocumentForm> documents=new ArrayList<>();
         public String getName() {
             return profile!=null&&(!profile.getFirstName().isBlank()||!profile.getLastName().isBlank())
                 ? java.util.stream.Stream.of(profile.getFirstName(),profile.getMiddleName(),profile.getLastName()).filter(v->v!=null&&!v.isBlank()).map(String::strip).collect(java.util.stream.Collectors.joining(" ")):name;
         }
         public String getPhone() {return profile!=null&&!profile.getPhone().isBlank()?profile.getPhone():phone;}
         public String getEmail() {return profile!=null&&!profile.getEmail().isBlank()?profile.getEmail():email;}
+    }
+    @Data public static class CreationDocumentForm {
+        private String category="IDENTITY";
+        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate expiresOn;
+        private org.springframework.web.multipart.MultipartFile file;
     }
     public record GroupChoice(UUID id,String label) {}
     @Data public static class ReviewForm {

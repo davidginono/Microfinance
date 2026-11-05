@@ -1,0 +1,7 @@
+<%@ page pageEncoding="UTF-8" %>
+<div class="kyc-creation-document" data-creation-document-row>
+    <label class="kyc-field"><span><spring:message code="kyc.field.category"/></span><select name="documents[0].category" class="aws-control"><c:forEach items="${['IDENTITY','ADDRESS','ACTIVITY','CONSENT','PROFILE_PHOTO','SPOUSE_PHOTO']}" var="category"><option value="${category}"><spring:message code="kyc.category.${category}"/></option></c:forEach></select></label>
+    <label class="kyc-field"><span><spring:message code="kyc.field.file"/></span><input type="file" name="documents[0].file" class="aws-control" accept=".png,.jpg,.jpeg"/></label>
+    <label class="kyc-field"><span><spring:message code="kyc.field.expiresOn"/></span><input type="date" name="documents[0].expiresOn" class="aws-control"/></label>
+    <button type="button" class="app-btn btn-neutral" data-creation-remove hidden><spring:message code="kyc.removeFile"/></button>
+</div>

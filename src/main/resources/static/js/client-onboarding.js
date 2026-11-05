@@ -1,5 +1,55 @@
 (() => {
     'use strict';
+    function creation(form) {
+        const labels=form.querySelector('[data-creation-labels]')?.dataset;
+        if(form.dataset.onboardingForm!=='create' || !labels || form.dataset.creationReady)return;
+        form.dataset.creationReady='true';
+        const rows=form.querySelector('[data-creation-documents]'),template=form.querySelector('[data-creation-document-template]'),add=form.querySelector('[data-creation-add]');
+        const allRows=()=>[...rows.querySelectorAll('[data-creation-document-row]')];
+        const validate=()=>{
+            const inputs=allRows().map(row=>row.querySelector('input[type=file]'));
+            const bytes=inputs.reduce((total,input)=>total+(input.files[0]?.size || 0),0);
+            inputs.forEach(input=>{const file=input.files[0];input.setCustomValidity(file && (!/\.(png|jpe?g)$/i.test(file.name) || file.size>1048576)?labels.fileError:bytes>10485760?labels.limitError:'');});
+        };
+        const renumber=()=>{allRows().forEach((row,index)=>row.querySelectorAll('[name]').forEach(input=>input.name=input.name.replace(/documents\[\d+\]/,'documents['+index+']')));add.disabled=allRows().length>=10;validate();};
+        const bind=row=>{
+            const category=row.querySelector('select'),expiry=row.querySelector('input[type=date]'),remove=row.querySelector('[data-creation-remove]');
+            const refresh=()=>{const photo=['PROFILE_PHOTO','SPOUSE_PHOTO'].includes(category.value);expiry.disabled=photo;expiry.closest('label').hidden=photo;if(photo)expiry.value='';};
+            category.addEventListener('change',refresh);row.querySelector('input[type=file]').addEventListener('change',validate);refresh();remove.hidden=false;
+            remove.addEventListener('click',()=>{row.remove();if(!allRows().length)append();renumber();add.focus();form.dispatchEvent(new Event('change',{bubbles:true}));});
+        };
+        const append=()=>{const row=template.content.firstElementChild.cloneNode(true);rows.append(row);renumber();bind(row);window.refreshEnhancedSelects?.(row);};
+        allRows().forEach(bind);add.hidden=false;add.addEventListener('click',()=>{if(allRows().length<10)append();});
+        let pending=false,request;
+        const failure=(message,kind)=>{
+            form.querySelectorAll('[data-creation-draft-error]').forEach(error=>error.remove());
+            const error=document.createElement('div');error.className='console-message';error.dataset.creationDraftError='';error.dataset.messageType=kind;error.setAttribute('role',kind==='error'?'alert':'status');error.tabIndex=-1;error.textContent=message;
+            form.querySelector('[data-form-actions]').before(error);window.ConsoleResourceDetails?.init(form);error.focus();
+        };
+        form.addEventListener('submit',async event=>{
+            if(event.submitter?.value!=='DRAFT' || !window.showToast)return;
+            event.preventDefault();event.stopPropagation();if(pending)return;
+            const data=new URLSearchParams();for(const [name,value] of new FormData(form))if(typeof value==='string'&&!name.startsWith('documents['))data.append(name,value);data.set('action','DRAFT');
+            const controls=[...form.querySelectorAll('button[type=submit]')].filter(button=>!button.disabled);
+            pending=true;request=new AbortController();const timeout=setTimeout(()=>request.abort(),20000);
+            document.dispatchEvent(new CustomEvent('workspace:form-pending',{detail:{form}}));
+            const finish=window.AppLoading?.action(event.submitter);form.inert=true;form.setAttribute('aria-busy','true');controls.forEach(button=>button.disabled=true);
+            let saved=false;
+            try {
+                const response=await fetch(event.submitter.formAction || form.action || location.href,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json','X-Profile-Draft':'save'},body:data,signal:request.signal});
+                if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Unconfirmed draft');
+                const result=await response.json();
+                if(!response.ok || result.saved!==true){form.inert=false;failure(result.message || labels.draftError,'error');return;}
+                if(result.requestKey!==data.get('requestKey'))throw new Error('Unconfirmed draft');
+                saved=true;form.querySelectorAll('[data-creation-draft-error],[data-workspace-form-error]').forEach(error=>error.remove());
+                const files=allRows().some(row=>row.querySelector('input[type=file]').files.length);
+                const feedback=window.showToast('success',files?labels.draftFiles:labels.draftSaved,{placement:'workspace'});
+                if(feedback?.element)window.scrollToFeedback?.(feedback.element);
+            } catch {if(form.isConnected){form.inert=false;failure(labels.draftUncertain,'warning');}}
+            finally {clearTimeout(timeout);finish?.();pending=false;form.inert=false;form.removeAttribute('aria-busy');controls.forEach(button=>button.disabled=false);document.dispatchEvent(new CustomEvent('workspace:form-settled',{detail:{form,saved:saved&&!allRows().some(row=>row.querySelector('input[type=file]').files.length)}}));}
+        });
+        window.addEventListener('pagehide',()=>request?.abort());
+    }
     function contacts(form) {
         if (!form.dataset.contactCheckUrl || form.dataset.contactCheckReady) return;
         form.dataset.contactCheckReady = 'true';
@@ -64,6 +114,7 @@
     }
     const ready = window.WorkspaceNavigation?.onReady || (fn => document.addEventListener('DOMContentLoaded', fn, {once: true}));
     ready(() => document.querySelectorAll('form').forEach(form => {
+        creation(form);
         contacts(form);
         const business=form.querySelector('[data-profile-business-choice]'), businessFields=form.querySelector('[data-profile-business-fields]');
         const marital=form.querySelector('[data-profile-marital-status]'), spouse=form.querySelector('[data-profile-spouse-section]'), spouseFields=form.querySelector('[data-profile-spouse-fields]');

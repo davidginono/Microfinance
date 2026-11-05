@@ -89,6 +89,7 @@
             if (!controls.length) return null;
             if (field.matches('.kyc-income-choices')) return controls.filter(control => control.checked).map(control => fieldText(control.closest('label'))).join(', ') || labels.empty;
             const control = controls[0];
+            if (control.type === 'file') return [...control.files].map(file => file.name).join(', ') || labels.noDocuments;
             if (control.type === 'checkbox') return control.checked ? labels.yes : labels.no;
             if (control.tagName === 'SELECT' && (control.value || control.name === 'profile.groupId')) return control.selectedOptions[0]?.textContent.trim() || labels.empty;
             return control.value || labels.empty;
