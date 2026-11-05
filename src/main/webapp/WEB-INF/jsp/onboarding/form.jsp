@@ -6,7 +6,8 @@
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="kyc.form.${formKind}"/></h1></div>
 <c:if test="${not empty client}"><%@ include file="facts.jspf" %></c:if>
 
-<form:form id="client-onboarding-form" method="post" enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="kyc-client-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
+<c:url value="/finance/clients/onboarding/contact-check" var="contactCheckUrl"/>
+<form:form data-contact-check-url="${contactCheckUrl}" data-contact-client-id="${client.id}" id="client-onboarding-form" method="post" enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="kyc-client-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/>
 
     <c:choose><c:when test="${formKind=='create' or formKind=='profile'}">

@@ -45,6 +45,15 @@ public class OnboardingService {
         if(!action.equals("VIEW"))access.requireActor(a,"CLIENT_ONBOARDING_"+action);
     }
     public LocalDate today() {return clock.today();}
+    @Transactional(readOnly=true) public ContactCheck checkContact(AppUserPrincipal a,UUID client,String field,String value) {
+        authorize(a,client==null?"CREATE":"UPDATE");
+        check(Set.of("phone","email").contains(field),"query");
+        if(value==null || value.length()>(field.equals("phone")?16:255))return new ContactCheck(false,false);
+        String normalized=value.strip().toLowerCase(Locale.ROOT);
+        if(field.equals("phone"))normalized=TanzaniaPhoneNumber.normalizeOptional(value);
+        if(normalized==null || (field.equals("phone") && normalized.isBlank()) || (field.equals("email") && !normalized.isBlank() && !normalized.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")))return new ContactCheck(false,false);
+        return new ContactCheck(true,registration.contactRegistered(a,client,field,normalized));
+    }
     @Transactional(readOnly=true)
     public Page<Client> clients(AppUserPrincipal a,String search,String state,int page,String sort) {
         authorize(a,"VIEW");check(search!=null&&search.length()<=100,"query");page(page);

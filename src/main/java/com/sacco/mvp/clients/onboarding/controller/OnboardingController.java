@@ -27,6 +27,9 @@ public class OnboardingController {
     @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","checksConfirmed","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","checkedOn");}
 
     private static String[] fields(String... base) {return java.util.stream.Stream.concat(Arrays.stream(base),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new);}
+    @PostMapping("/contact-check") @ResponseBody public ResponseEntity<ContactCheck> contactCheck(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID clientId,@RequestParam String field,@RequestParam String value) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.checkContact(a,clientId,field,value));
+    }
     @GetMapping("/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID clientId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.groups(a,clientId,search,page));}
     @GetMapping("/{id}/photos/{document}") public ResponseEntity<byte[]> photo(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID document) {var f=service.photo(a,id,document);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox").contentType(MediaType.parseMediaType(f.contentType())).body(f.bytes());}
     @GetMapping("/notice") public String retiredNotice(@AuthenticationPrincipal AppUserPrincipal a) {service.authorize(a,"VIEW");return "redirect:"+ROOT;}

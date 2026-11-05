@@ -35,7 +35,7 @@
         const label = control.labels?.[0] || proxy(control).labels?.[0];
         if (!label) return labels().field;
         const copy = label.cloneNode(true);
-        copy.querySelectorAll('input,select,textarea,button,small,svg,.erp-field-error,.coa-error,.field-error-text').forEach(el => el.remove());
+        copy.querySelectorAll('input,select,textarea,button,small,svg,[role=status],.erp-field-error,.coa-error,.field-error-text').forEach(el => el.remove());
         return copy.textContent.replace(/\s+/g, ' ').replace(/\s*\*\s*$/, '').trim() || labels().field;
     }
     function message(control) {
@@ -146,5 +146,9 @@
         for (const record of records) record.addedNodes.forEach(node => {if (node.nodeType === 1) scan(node);});
         for (const [control, state] of states) if (!control.isConnected || !state.error.isConnected) {clear(control); states.delete(control);}
     }).observe(document.body, {childList:true, subtree:true});
-    window.FormValidation = {refresh:scan, focusFirst};
+    window.FormValidation = {refresh:scan, focusFirst, setError(control, text) {
+        if (!eligible(control)) return;
+        control.setCustomValidity(text);
+        if (text) show(control, text); else clear(control);
+    }};
 })();

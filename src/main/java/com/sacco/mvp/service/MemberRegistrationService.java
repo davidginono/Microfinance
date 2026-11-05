@@ -200,6 +200,21 @@ public class MemberRegistrationService {
         auditService.logEvent("CLIENT",id,"CLIENT_PROVISIONAL_CONTACT_CORRECTED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Provisional client details updated","CLIENT",id.toString(),actor.getSaccoId(),actor.getStationId(),java.util.Map.of());
     }
 
+    /** Boolean-only check against the same system-wide contact keys used when saving. */
+    @Transactional(readOnly=true)
+    public boolean contactRegistered(com.sacco.mvp.security.AppUserPrincipal actor,UUID excludedClient,String field,String value) {
+        if(actor==null || !actor.isStaffSession() || !actor.getClaims().contains("CLIENT_ONBOARDING_VIEW") || !actor.getClaims().contains(excludedClient==null?"CLIENT_ONBOARDING_CREATE":"CLIENT_ONBOARDING_UPDATE"))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
+        if(excludedClient!=null) {
+            var current=memberRepository.findByIdAndSaccoIdAndStationIdIgnoreCase(excludedClient,actor.getSaccoId(),actor.getStationId()).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
+            if(current.isClientPortalEnabled() || !current.getStaffRolesResolved().isEmpty())throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
+        }
+        return switch(field) {
+            case "phone" -> excludedClient==null?memberRepository.existsByPhone(value):memberRepository.existsByPhoneAndIdNot(value,excludedClient);
+            case "email" -> !value.isBlank() && (excludedClient==null?memberRepository.existsByEmailIgnoreCase(value):memberRepository.existsByEmailIgnoreCaseAndIdNot(value,excludedClient));
+            default -> throw new IllegalArgumentException("Unsupported contact field");
+        };
+    }
+
     public VerifiedExternalMember verifyExternalMember(MemberRegistrationForm form) {
         String email = normalizeEmail(form.getEmail());
         if (java.util.stream.Stream.of(form.getFirstName(), form.getLastName())

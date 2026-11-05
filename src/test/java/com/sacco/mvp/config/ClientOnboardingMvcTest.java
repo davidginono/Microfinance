@@ -88,10 +88,18 @@ class ClientOnboardingMvcTest {
         verify(service).authorize(staff,"REVIEW");verify(service).review(eq(staff),eq(id),argThat(f->f.getKind().equals("REVOKE")&&f.getReason().equals("Recorded reason")));
     }
     @Test void everyStaffWriteRequiresCsrfAndRejectsClientSessions()throws Exception {
-        for(String path:List.of(root+"/new",root+"/"+id+"/edit",root+"/"+id+"/review",root+"/"+id+"/documents/new")) {
+        for(String path:List.of(root+"/contact-check",root+"/new",root+"/"+id+"/edit",root+"/"+id+"/review",root+"/"+id+"/documents/new")) {
             mvc.perform(post(path).with(user(staff))).andExpect(status().isForbidden());
             mvc.perform(post(path).with(user(client)).with(csrf())).andExpect(status().isForbidden());
         }
+    }
+    @Test void contactChecksArePrivateCsrfProtectedPostsWithBooleanResultsOnly() throws Exception {
+        when(service.checkContact(staff,id,"phone","0712345678")).thenReturn(new ContactCheck(true,false));
+        mvc.perform(post(root+"/contact-check").with(user(staff)).with(csrf()).param("clientId",id.toString()).param("field","phone").param("value","0712345678").accept("application/json"))
+            .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+            .andExpect(content().json("{\"valid\":true,\"exists\":false}"));
+        verify(service).checkContact(staff,id,"phone","0712345678");
+        mvc.perform(get(root+"/contact-check").with(user(staff))).andExpect(status().is4xxClientError());
     }
     @Test void submittedProfileCannotBindServerFullNameScopeOrVerification()throws Exception {
         mvc.perform(post(root+"/"+id+"/edit").with(user(staff)).with(csrf()).param("action","SUBMITTED").param("profile.address","Keep this address").param("profile.fullName","Forged name").param("profile.phone","Forged phone").param("saccoId","FOREIGN").param("actorId",client.getMemberId().toString()).param("state","VERIFY"))

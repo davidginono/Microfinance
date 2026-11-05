@@ -150,3 +150,5 @@
 }
 
 [data-group-open-on-row] [data-group-row] { cursor: pointer; }
+.kyc-contact-result { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; line-height: 20px; min-width: 0; }
+.kyc-contact-result[hidden] { display: none; }
