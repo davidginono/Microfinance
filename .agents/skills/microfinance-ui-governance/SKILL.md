@@ -42,6 +42,8 @@ Use the shared [split-view contract](../microfinance-table-standard/SKILL.md#aws
 
 ## Resource Creation And Details
 
+- Staff can create provisional client records. Clients register and activate their own user accounts. Keep these actions distinct in labels and help text.
+
 ### Create and page-edit navigation (2026-10-29)
 
 Follow the successful, unsuccessful and validation flow charts in Cloudscape [Create resource](https://cloudscape.design/patterns/resource-management/create/) and [Page edit](https://cloudscape.design/patterns/resource-management/edit/page-edit/) through the existing JSP shell.
