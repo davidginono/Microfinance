@@ -8,15 +8,19 @@
         <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_CREATE')"><a class="app-btn btn-launch" href="${registerUrl}/new"><spring:message code="kyc.create"/></a></sec:authorize>
     </div>
     <form method="get" action="${registerUrl}" data-table-filter-for="client-onboarding">
-        <label class="sr-only" for="kycSearch"><spring:message code="common.search"/></label>
-        <input class="aws-control" id="kycSearch" name="search" value="<c:out value='${search}'/>" maxlength="100"/>
-        <label class="sr-only" for="kycState"><spring:message code="kyc.field.state"/></label>
-        <select class="aws-control" id="kycState" name="state"><option value=""><spring:message code="kyc.allStates"/></option><c:forEach items="${['NOT_STARTED','DRAFT','SUBMITTED','VERIFY','RETURN','REJECT','REVOKE','EXPIRED','STALE']}" var="s"><option value="${s}" ${state==s?'selected':''}><spring:message code="kyc.state.${s}"/></option></c:forEach></select>
+        <label>
+            <span class="sr-only"><spring:message code="common.search"/></span>
+            <input class="aws-control" type="search" id="kycSearch" name="search" placeholder="<spring:message code='common.search' htmlEscape='true'/>" value="<c:out value='${search}'/>" maxlength="100"/>
+        </label>
+        <label>
+            <span class="sr-only"><spring:message code="kyc.field.state"/></span>
+            <select class="aws-control" id="kycState" name="state"><option value=""><spring:message code="kyc.allStates"/></option><c:forEach items="${['NOT_STARTED','DRAFT','SUBMITTED','VERIFY','RETURN','REJECT','REVOKE','EXPIRED','STALE']}" var="s"><option value="${s}" ${state==s?'selected':''}><spring:message code="kyc.state.${s}"/></option></c:forEach></select>
+        </label>
         <input type="hidden" name="sort" value="<c:out value='${sort}'/>"/>
         <button class="app-btn btn-neutral" type="submit"><spring:message code="common.search"/></button>
     </form>
     <div class="erp-table-scroll"><table class="erp-table"><thead><tr>
-        <th><span class="sr-only"><spring:message code="voucher.select"/></span></th>
+        <th scope="col"><span class="sr-only"><spring:message code="voucher.select"/></span></th>
         <c:forEach items="${['number','name','state','due']}" var="field"><th scope="col" data-table-sort-asc="${field}_asc" data-table-sort-desc="${field}_desc"><spring:message code="kyc.field.${field}"/></th></c:forEach>
     </tr></thead><tbody>
         <c:forEach items="${records.rows}" var="row"><tr data-group-row="${row.id}" data-target="${registerUrl}/${row.id}">

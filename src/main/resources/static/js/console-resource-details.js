@@ -77,6 +77,9 @@
             if(value.querySelector('[data-resource-status]'))return;
             const text=value.textContent.trim();
             const content=document.createElement('span');content.className='console-detail-value';content.append(...value.childNodes);
+            // JSP indentation is outside the fact. Keep intentional line breaks within the value.
+            if (content.firstChild?.nodeType === Node.TEXT_NODE) content.firstChild.data = content.firstChild.data.trimStart();
+            if (content.lastChild?.nodeType === Node.TEXT_NODE) content.lastChild.data = content.lastChild.data.trimEnd();
             const button=document.createElement('button');button.type='button';button.className='console-copy';button.append(icon('copy'));
             const term=value.previousElementSibling?.textContent.trim() || '';
             button.setAttribute('aria-label',(label().copy || 'Copy')+(term?': '+term:''));button.title=button.getAttribute('aria-label');

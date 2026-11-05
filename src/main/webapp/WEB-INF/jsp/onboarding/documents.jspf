@@ -1,6 +1,6 @@
 <section class="erp-resource-section"><h2><spring:message code="kyc.documents"/></h2>
     <c:if test="${empty documents}"><p><spring:message code="kyc.noDocuments"/></p></c:if>
-    <c:forEach items="${documents}" var="doc"><dl class="erp-detail-facts">
+    <c:forEach items="${documents}" var="doc"><dl class="erp-detail-facts kyc-document-facts">
         <div><dt><spring:message code="kyc.category.${doc.category}"/></dt><dd>
             <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_DOCUMENTS')" var="canReadKycDocuments"/>
             <c:choose><c:when test="${canReadKycDocuments}"><c:if test="${doc.category=='PROFILE_PHOTO' or doc.category=='SPOUSE_PHOTO'}"><div class="kyc-photo"><img src="<c:url value='/finance/clients/onboarding/${client.id}/photos/${doc.id}'/>" alt="<spring:message code='kyc.category.${doc.category}'/>" loading="lazy"/></div></c:if><a class="resource-table-id-link" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/${doc.id}'/>"><c:out value="${doc.name}"/></a></c:when><c:otherwise><c:out value="${doc.name}"/></c:otherwise></c:choose>

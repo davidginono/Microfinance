@@ -19,10 +19,19 @@
 .kyc-client-form { display: grid; gap: 20px; min-width: 0; }
 .kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
 .kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.kyc-review-evidence > summary {
+    width: fit-content;
+    color: var(--aws-blue, #0073bb);
+    font-weight: 700;
+    cursor: pointer;
+}
+.kyc-review-evidence[open] > summary { margin-bottom: 16px; }
+.kyc-document-facts + .kyc-document-facts { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eaeded; }
 .kyc-income-choices { border: 0; margin: 0; padding: 0; min-width: 0; }
 .kyc-income-choices legend { padding: 0; margin-bottom: 6px; font-size: 14px; line-height: 20px; font-weight: 700; }
 .kyc-income-options { display: flex; flex-flow: row wrap; align-items: center; gap: 8px 16px; min-width: 0; min-height: 32px; }
 .kyc-client-form .kyc-field { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.kyc-client-form .kyc-field[hidden] { display: none; }
 .kyc-client-form :is(label, .kyc-notice-text, .kyc-field-hint) { font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
 .kyc-client-form .kyc-field > span:first-child { color: var(--aws-ink, #16191f); font-weight: 700; }
 .aws-console .kyc-client-form :is(.aws-control, .neo-select-button) { max-width: 100%; min-width: 0; font-size: 14px !important; }
