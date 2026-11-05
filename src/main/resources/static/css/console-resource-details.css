@@ -30,8 +30,8 @@
 .aws-console .console-status[data-status-type=warning] {color:#906806!important;}
 .aws-console .console-status[data-status-type=info] {color:#0073bb!important;}
 .aws-console .console-status:is([data-status-type=pending],[data-status-type=stopped],[data-status-type=in-progress]) {color:#545b64!important;}
-.aws-console .console-detail-tabs {display:flex;align-items:stretch;min-width:0;max-width:100%;overflow-x:auto;border-bottom:1px solid #aab7b8;margin:28px 0 16px;padding:0;background:transparent;scrollbar-width:thin;}
-.aws-console .console-detail-tabs>[role=tab] {position:relative;flex:none;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:12px 20px 14px;color:#545b64;font-family:inherit;font-size:14px;line-height:20px;font-weight:700;white-space:nowrap;cursor:pointer;}
+.aws-console .console-detail-tabs {display:flex;flex-wrap:wrap;align-items:stretch;min-width:0;max-width:100%;border-bottom:1px solid #aab7b8;margin:28px 0 16px;padding:0;background:transparent;}
+.aws-console .console-detail-tabs>[role=tab] {position:relative;flex:0 1 auto;min-width:0;max-width:100%;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:12px 20px 14px;color:#545b64;font-family:inherit;font-size:14px;line-height:20px;font-weight:700;white-space:normal;overflow-wrap:anywhere;cursor:pointer;}
 .aws-console .console-detail-tabs>[role=tab]:not(:last-child)::after {content:"";position:absolute;right:0;top:8px;bottom:10px;border-right:1px solid #d5dbdb;}
 .aws-console .console-detail-tabs>[role=tab][aria-selected=true] {border-bottom-color:#16191f;color:#0073bb;}
 .aws-console .console-detail-tabs>[role=tab]:hover {color:#0073bb;}

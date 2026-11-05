@@ -1,5 +1,5 @@
 <%@ page pageEncoding="UTF-8" %>
-<c:forEach items="${['bio','contact','business','spouse','bank']}" var="profileSection">
+<c:forEach items="${profileSections}" var="profileSection">
     <c:choose>
         <c:when test="${profileSection=='bio'}"><c:set var="profileFields" value="${['gender','maritalStatus','dependants','familiarName','groupName']}"/></c:when>
         <c:when test="${profileSection=='contact'}"><c:set var="profileFields" value="${['postalAddress','city','ward','villageStreet','nearbyPlace']}"/></c:when>

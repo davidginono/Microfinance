@@ -12,8 +12,25 @@
 <c:if test="${duplicate}"><p class="console-message" data-message-type="warning" role="status"><spring:message code="kyc.error.duplicate"/></p></c:if>
 <%@ include file="facts.jspf" %>
 <c:if test="${not empty revision}">
+    <div id="client-profile" class="kyc-detail-group" data-detail-panel>
+    <h2 class="sr-only"><spring:message code="kyc.tab.profile"/></h2>
     <%@ include file="profile.jspf" %>
+    <c:set var="profileValues" value="${revision.profile}"/>
+    <c:set var="profileSections" value="${['bio','contact','spouse']}"/>
+    <%@ include file="profile-details.jspf" %>
+    </div>
+    <div id="client-business" class="kyc-detail-group" data-detail-panel>
+    <h2 class="sr-only"><spring:message code="kyc.tab.business"/></h2>
+    <c:set var="profileSections" value="${['business','bank']}"/>
+    <%@ include file="profile-details.jspf" %>
+    </div>
+    <div id="client-documents" data-detail-panel>
     <%@ include file="documents.jspf" %>
+    </div>
+</c:if>
+<div id="client-review" class="kyc-detail-group" data-detail-panel>
+<h2 class="sr-only"><spring:message code="kyc.review"/></h2>
+<c:if test="${not empty revision}">
     <c:forEach items="${decisions}" var="decision"><section class="erp-resource-section"><h2><spring:message code="kyc.review"/></h2><dl class="erp-detail-facts">
         <div><dt><spring:message code="kyc.field.state"/></dt><dd><c:set var="onboardingStatusState" value="${decision.kind}"/><%@ include file="status.jspf" %></dd></div>
         <c:forEach items="${historical ? ['reason','clientMessage','screening','screeningReference','checkedOn','reviewDue','policyReference'] : ['reason','clientMessage','checkedOn']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:choose><c:when test="${field=='screening'}"><spring:message code="kyc.screening.${decision.screening}"/></c:when><c:otherwise><c:out value="${decision[field]}"/></c:otherwise></c:choose></dd></div></c:forEach>
@@ -29,6 +46,7 @@
     <c:if test="${history.page>0}"><a href="?page=${history.page-1}"><spring:message code="common.previous"/></a></c:if>
     <c:if test="${history.hasNext}"><a href="?page=${history.page+1}"><spring:message code="common.next"/></a></c:if>
 </section>
+</div>
 </div>
 <script src="<c:url value='/js/client-onboarding.js'/>" defer></script>
 <%@ include file="../accounting/accounting-form-support.jspf" %>

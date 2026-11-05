@@ -10,6 +10,28 @@ async function setup(markup,query=''){
 }
 const sections='<section class="accounting-section"><h2>Summary</h2><dl class="erp-detail-facts"><div><dt>Loan</dt><dd>L001</dd></div></dl></section><section id="schedule" class="erp-table-wrap"><h2>Schedule</h2><input value="draft"><form method="post"><input name="_csrf" value="token"></form></section><section id="history" class="erp-table-wrap"><h2>History</h2><a href="/receipt">Receipt</a></section>';
 
+test('grouped client sections stay together without multiplying tabs and reveal nested review errors',async()=>{
+ const summary=sections.slice(0,sections.indexOf('<section id="schedule"'));
+ const card=title=>'<section class="erp-resource-section"><h2>'+title+'</h2><p>Recorded evidence</p></section>';
+ const group=(id,title,content)=>'<div id="'+id+'" data-detail-panel><h2 class="sr-only">'+title+'</h2>'+content+'</div>';
+ const markup=summary+group('client-profile','Profile',['Recorded profile','Privacy notice','Bio data','Contact details','Spouse details'].map(card).join(''))
+  +group('client-business','Business',card('Business details')+card('Bank details'))+group('client-documents','Documents',card('Documents'))
+  +group('client-review','Review',card('Review')+card('Review')+'<form data-detail-panel><section class="erp-resource-section"><h2>Review</h2><input name="reason" value="draft" required><input type="hidden" name="_csrf" value="token"></section></form>'+card('History'));
+ const {dom,w,d}=await setup(markup,'?detailTab=client-business');
+ try {
+  assert.deepEqual([...d.querySelectorAll('[role=tab]')].map(tab=>tab.textContent),['Profile','Business','Documents','Review']);
+  assert.equal(d.querySelector('#client-business').hidden,false);assert.equal(d.querySelector('#client-business').querySelectorAll('section').length,2);
+  const input=d.querySelector('[name=reason]'),form=input.form;input.value='Unsaved review';
+  d.querySelector('[aria-controls=client-review]').click();d.querySelector('[aria-controls=client-profile]').click();
+  input.dispatchEvent(new w.Event('invalid',{bubbles:false}));
+  assert.equal(d.querySelector('#client-review').hidden,false);assert.equal(d.querySelector('[aria-controls=client-review]').getAttribute('aria-selected'),'true');
+  assert.equal(input.form,form);assert.equal(input.value,'Unsaved review');assert.equal(form.elements._csrf.value,'token');
+  assert.equal(w.sessionStorage.getItem('workspace-detail-tab:v1:/details'),'client-review');
+  d.querySelector('[aria-controls=client-review]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Home',bubbles:true}));
+  assert.equal(d.activeElement,d.querySelector('[aria-controls=client-profile]'));assert.equal(d.querySelector('#client-profile').querySelectorAll('section').length,5);
+ } finally {dom.window.close();}
+});
+
 test('server flashbars dismiss with keyboard focus recovery without removing contextual warnings',async()=>{
  const {dom,w,d}=await setup('<div data-workspace-flashbar><div data-app-toast data-message-type="success" role="status"><p>Profile saved.</p><button type="button" data-feedback-dismiss aria-label="Funga taarifa">×</button></div></div><h1>My profile</h1><section><p data-message-type="warning">Correct your address.</p><input value="unsaved"></section>');
  try {
