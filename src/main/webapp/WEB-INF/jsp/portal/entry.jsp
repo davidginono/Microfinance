@@ -17,28 +17,15 @@
     </nav>
     <div class="public-access-card">
     <%@ include file="../fragments/public-access-brand.jspf" %>
+    <%@ include file="../onboarding/profile-draft-notice.jspf" %>
     <h1 class="erp-page-title"><spring:message code="${portalEntryTitle}"/></h1>
     <form:form modelAttribute="entryForm" action="${pageContext.request.contextPath}/client-portal/request-code" method="post" cssClass="kyc-client-form" data-accounting-dirty-form="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
         <c:choose>
             <c:when test="${publicProfileRegistration}">
                 <form:hidden path="intent"/>
-                <%@ include file="../onboarding/profile-wizard-labels.jspf" %>
-                <div data-profile-wizard data-profile-registration>
-                    <section class="erp-resource-section" data-profile-section="personal">
-                        <h2><spring:message code="portal.institution"/></h2>
-                        <div class="kyc-profile-grid">
-                            <label class="kyc-field"><span><spring:message code="portal.institution"/></span><form:select path="institution" cssClass="aws-control" required="required" data-portal-institution="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.institution}"><form:option value="${entryForm.institution}"><c:out value="${entryForm.institution}"/></form:option></c:if></form:select><form:errors path="institution" cssClass="field-error"/></label>
-                            <label class="kyc-field"><span><spring:message code="portal.branch"/></span><form:select path="branch" cssClass="aws-control" required="required" data-portal-branch="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.branch}"><form:option value="${entryForm.branch}"><c:out value="${entryForm.branch}"/></form:option></c:if></form:select><form:errors path="branch" cssClass="field-error"/></label>
-                        </div>
-                    </section>
-                    <c:set var="identityReadOnly" value="${false}"/>
-                    <c:set var="profileValues" value="${entryForm.registration.profile}"/>
-                    <spring:nestedPath path="registration">
-                        <%@ include file="../onboarding/profile-fields.jspf" %>
-                    </spring:nestedPath>
-                    <p class="kyc-profile-note" data-profile-section="review"><spring:message code="portal.verifyBeforeUpload"/></p>
-                </div>
+                <c:set var="identityReadOnly" value="${false}"/><c:set var="profileValues" value="${entryForm.registration.profile}"/>
+                <%@ include file="../onboarding/profile-editor.jspf" %>
             </c:when>
             <c:otherwise>
                 <section>
@@ -54,13 +41,11 @@
             <c:when test="${publicProfileRegistration}"><form:errors cssClass="field-error" element="p" role="alert" data-workspace-form-error="true"/></c:when>
             <c:otherwise><form:errors path="*" cssClass="field-error" element="p" role="alert"/></c:otherwise>
         </c:choose>
-        <div class="accounting-form-actions">
-            <c:if test="${publicProfileRegistration}">
-                <button class="app-btn btn-neutral" type="button" data-profile-previous hidden><spring:message code="common.previous"/></button>
-                <button class="app-btn btn-launch" type="button" data-profile-next hidden><spring:message code="common.next"/></button>
-            </c:if>
-            <button class="app-btn btn-launch" type="submit" data-profile-send><spring:message code="portal.sendCode"/></button>
-        </div>
+        <c:choose><c:when test="${publicProfileRegistration}">
+            <c:url value="/client-portal" var="profileCancelUrl"/><c:url value="/client-portal/register/draft" var="profileDraftUrl"/><c:url value="/client-portal/request-code" var="profileSubmitUrl"/>
+            <c:set var="profileSubmitValue" value="REGISTER"/><c:set var="profileSubmitLabel" value="portal.sendCode"/>
+            <%@ include file="../onboarding/profile-actions.jspf" %>
+        </c:when><c:otherwise><div class="accounting-form-actions"><button class="app-btn btn-launch" type="submit"><spring:message code="portal.sendCode"/></button></div></c:otherwise></c:choose>
     </form:form>
     </div>
 </div>

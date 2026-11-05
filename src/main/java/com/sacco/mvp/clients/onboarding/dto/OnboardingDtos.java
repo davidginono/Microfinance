@@ -9,6 +9,7 @@ public final class OnboardingDtos {
     private OnboardingDtos() {}
     public record Page<T>(List<T> rows, int page, boolean hasNext) {}
     public record ContactCheck(boolean valid, boolean exists) {}
+    public record ProfileDraft(String profile,UUID actor,String institution,String branch,UUID requestKey) implements java.io.Serializable {}
     public record Client(UUID id, String number, String name, String phone, String email, String state,
                          UUID revisionId, int sequence, LocalDate reviewDue, boolean portalEnabled) {
         public Client(UUID id,String number,String name,String phone,String email,String state,UUID revisionId,int sequence,LocalDate reviewDue) {

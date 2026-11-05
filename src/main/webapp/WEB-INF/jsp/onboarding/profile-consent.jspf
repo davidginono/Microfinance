@@ -1,0 +1,31 @@
+<%@ page pageEncoding="UTF-8" %>
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
+<c:if test="${formKind=='self'}">
+                <section class="erp-resource-section" aria-labelledby="kyc-notice-heading" data-profile-section="documents" ${profileReadOnly?'':'data-profile-confirmations'}>
+                    <h2 id="kyc-notice-heading"><spring:message code="kyc.notice"/></h2>
+                    <div class="kyc-form-fields">
+                        <c:if test="${workspace.client.state!='VERIFY'}"><p class="kyc-field-hint"><spring:message code="kyc.declaredMeaning"/></p></c:if>
+                        <c:choose>
+                            <c:when test="${profileReadOnly and not empty workspace.revision}">
+                                <div class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?workspace.revision.noticeKiswahili:workspace.revision.noticeEnglish}"/></div>
+                                <p><spring:message code="kyc.acknowledged"/>: <spring:message code="${workspace.revision.acknowledged?'kyc.yes':'kyc.no'}"/> &#183; <c:out value="${appTime:display(workspace.revision.acknowledgedAt)}"/></p>
+                            </c:when>
+                            <c:when test="${not empty notice}">
+                                <div class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?notice.kiswahili:notice.english}"/></div>
+                                <div class="kyc-acknowledgement">
+                                    <label class="kyc-checkbox">
+                                        <form:checkbox path="noticeAcknowledged" required="true"/>
+                                        <span><spring:message code="kyc.acceptConsent"/></span>
+                                    </label>
+                                    <form:errors path="noticeAcknowledged" cssClass="coa-error"/>
+                                </div>
+                            </c:when>
+                        </c:choose>
+                    </div>
+                </section>
+</c:if>
+<c:if test="${formKind=='profile'}"><section class="erp-resource-section" data-profile-section="documents"><h2><spring:message code="kyc.notice"/></h2><div class="kyc-form-fields">
+    <p class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?notice.kiswahili:notice.english}"/></p>
+    <p class="kyc-field-hint"><spring:message code="kyc.assistedConsent"/></p>
+    <label class="kyc-field"><span><spring:message code="kyc.field.legalHoldReference"/></span><form:textarea path="profile.legalHoldReference" cssClass="aws-control" rows="3" maxlength="500"/><form:errors path="profile.legalHoldReference" cssClass="coa-error"/></label>
+</div></section></c:if>

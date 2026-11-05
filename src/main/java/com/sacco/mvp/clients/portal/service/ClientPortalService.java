@@ -3,6 +3,7 @@ package com.sacco.mvp.clients.portal.service;
 import com.sacco.mvp.clients.portal.dto.ClientPortalDtos.*;
 import com.sacco.mvp.clients.portal.repository.ClientPortalRepository;
 import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.SelfForm;
+import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.ProfileDraft;
 import com.sacco.mvp.clients.onboarding.service.OnboardingService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -37,6 +38,10 @@ public class ClientPortalService {
     @Transactional(timeout=10) public void pruneExpiredChallenges(){records.prune(clock.now().minusDays(1));}
 
     @Transactional(readOnly=true) public List<Choice> choices(String institution,String search,int page){check(search!=null&&search.length()<=100&&page>=0&&page<=10000);check(institution==null||institution.length()<=255);return records.choices(institution,search,page);}
+    public ProfileDraft registrationDraft(EntryForm f) {
+        check(f.getInstitution()!=null&&f.getInstitution().length()<=255&&f.getBranch()!=null&&f.getBranch().length()<=255);
+        return new ProfileDraft(onboarding.encodeProfileDraft(f.getRegistration().getProfile()),null,f.getInstitution(),f.getBranch(),f.getRegistration().getRequestKey());
+    }
     /** Delivery runs after the short challenge/rate transaction, never under a database lock. */
     public UUID request(EntryForm f,String address) {
         check(f!=null&&Set.of("REGISTER","PROFILE","LOAN").contains(f.getIntent()));

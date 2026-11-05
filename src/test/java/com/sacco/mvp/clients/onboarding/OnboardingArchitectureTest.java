@@ -8,6 +8,15 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OnboardingArchitectureTest {
+    @Test void allProfileEntryPagesUseTheSameEditorAndDraftActions() throws Exception {
+        var root=java.nio.file.Path.of("src/main/webapp/WEB-INF/jsp");
+        for(String page:List.of("portal/entry.jsp","onboarding/self-form.jsp","onboarding/form.jsp")) {
+            String source=java.nio.file.Files.readString(root.resolve(page));
+            assertThat(source).as(page).contains("profile-editor.jspf","profile-actions.jspf").doesNotContain("profile-fields.jspf","profile-wizard-labels.jspf");
+        }
+        assertThat(java.nio.file.Files.readString(root.resolve("onboarding/profile-actions.jspf"))).contains("value=\"DRAFT\"","formnovalidate","data-profile-save-draft");
+        assertThat(java.nio.file.Files.readString(root.resolve("onboarding/profile-fields.jspf"))).doesNotContain("kyc.field.clientNumber","kyc.automaticNumber");
+    }
     @Test void onlyOwningServicesDependOnRepositoriesAndControllersNeverUsePersistence() throws Exception {
         var resources=new PathMatchingResourcePatternResolver().getResources("classpath*:com/sacco/mvp/clients/onboarding/**/*.class");
         var violations=new ArrayList<String>();

@@ -28,7 +28,7 @@ async function setup({error='',saved='',start='',name='Asha',registration=false,
   wizard.insertAdjacentHTML('afterbegin','<section data-profile-section="personal"><h2>Institution</h2><label class="kyc-field"><span>Institution</span><select name="institution" required><option value="I1">Synthetic institution</option></select></label></section>');
   wizard.insertAdjacentHTML('beforeend','<p data-profile-section="review">Verify your contact with an access code. You can then add photos and documents.</p>');
   wizard.querySelectorAll('[name^="profile."]').forEach(field=>field.name='registration.'+field.name);
-  d.querySelector('[value="DRAFT"]').remove();
+  d.querySelector('[value="DRAFT"]').setAttribute('formaction','/client-portal/register/draft');
   const send=d.querySelector('[data-profile-send]');send.removeAttribute('name');send.textContent='Send access code';
  }
  if(saved)w.sessionStorage.setItem('client-profile-step:v1:/app/onboarding',saved);
@@ -37,6 +37,15 @@ async function setup({error='',saved='',start='',name='Asha',registration=false,
  const next=()=>d.querySelector('[data-profile-next]').click();
  return {dom,w,d,form:d.querySelector('form'),next,active:()=>d.querySelector('[aria-current="step"]').textContent};
 }
+test('registration draft stays available on every step and bypasses completion and OTP submission',async()=>{
+ const {dom,w,d,form,next}=await setup({registration:true,name:''});try{
+  const draft=d.querySelector('[value="DRAFT"]');assert.equal(draft.formNoValidate,true);assert.equal(draft.getAttribute('formaction'),'/client-portal/register/draft');assert.equal(draft.hidden,false);
+  const event=new w.SubmitEvent('submit',{submitter:draft,bubbles:true,cancelable:true});assert.equal(form.dispatchEvent(event),true);
+  const data=new w.FormData(form,draft);assert.equal(data.get('action'),'DRAFT');assert.equal(data.get('registration.profile.firstName'),'');assert.equal(d.querySelector('[data-profile-send]').hidden,true);
+  d.querySelector('[name="registration.profile.firstName"]').value='Asha';next();assert.equal(draft.hidden,false);next();assert.equal(draft.hidden,false);
+ }finally{dom.window.close();}
+});
+
 test('profile completion requirements are visible and block Next on the step that owns the field',async()=>{
  const {dom,d,next,active}=await setup({requiredProfile:true});try{
   const address=d.querySelector('[name="profile.address"]');

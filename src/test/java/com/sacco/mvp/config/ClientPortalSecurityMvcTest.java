@@ -27,12 +27,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,ClientPortalSecurityMvcTest.Config.class})
 class ClientPortalSecurityMvcTest {
-    @Autowired WebApplicationContext context;@Autowired ClientPortalService portal;MockMvc mvc;
+    @Autowired WebApplicationContext context;@Autowired ClientPortalService portal;@Autowired com.sacco.mvp.clients.onboarding.service.OnboardingService onboarding;MockMvc mvc;
     Session session(){return new Session(UUID.randomUUID(),"I1","B1","fingerprint",true,OffsetDateTime.now().plusMinutes(15));}
-    @BeforeEach void setup(){reset(portal);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
+    @BeforeEach void setup(){reset(portal);clearInvocations(onboarding);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
     @Test void publicEntryIsVisibleAndAllOtpPostsRequireCsrf()throws Exception{
         mvc.perform(get("/client-portal")).andExpect(status().isOk()).andExpect(view().name("portal/entry"));
-        mvc.perform(post("/client-portal/request-code")).andExpect(status().isForbidden());mvc.perform(post("/client-portal/verify").param("code","123456")).andExpect(status().isForbidden());verifyNoInteractions(portal);
+        mvc.perform(post("/client-portal/request-code")).andExpect(status().isForbidden());mvc.perform(post("/client-portal/verify").param("code","123456")).andExpect(status().isForbidden());mvc.perform(post("/client-portal/register/draft")).andExpect(status().isForbidden());verifyNoInteractions(portal);
+    }
+    @Test void publicRegistrationDraftDoesNotCreateAnAccountOrSendAnOtpAndResumesInTheSameSession() throws Exception {
+        var http=new MockHttpSession();var draft=new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.ProfileDraft("private draft",null,"I1","B1",UUID.randomUUID());
+        when(portal.registrationDraft(any())).thenReturn(draft);var profile=new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.ClientProfile();profile.setCity("Arusha");when(onboarding.decodeProfileDraft("private draft")).thenReturn(profile);
+        mvc.perform(post("/client-portal/register/draft").session(http).with(csrf()).param("registration.profile.city","Arusha"))
+            .andExpect(redirectedUrl("/client-portal/register")).andExpect(flash().attribute("profileDraftSaved",true));
+        verify(portal,never()).request(any(),anyString());verify(onboarding,never()).saveOwn(any(),any());
+        var result=mvc.perform(get("/client-portal/register").session(http)).andExpect(view().name("portal/entry")).andReturn();
+        var form=(com.sacco.mvp.clients.portal.dto.ClientPortalDtos.EntryForm)result.getModelAndView().getModel().get("entryForm");assertThat(form.getIntent()).isEqualTo("REGISTER");assertThat(form.getRegistration().getProfile().getCity()).isEqualTo("Arusha");assertThat(form.getInstitution()).isEqualTo("I1");
+        var fresh=mvc.perform(get("/client-portal/register")).andReturn();assertThat(((com.sacco.mvp.clients.portal.dto.ClientPortalDtos.EntryForm)fresh.getModelAndView().getModel().get("entryForm")).getRegistration().getProfile().getCity()).isEmpty();
     }
     @Test void provisionalAuthenticationIsRestrictedEvenOnOtherwiseAuthenticatedRoutes()throws Exception{
         var auth=UsernamePasswordAuthenticationToken.authenticated(session(),null,List.of());

@@ -1,8 +1,9 @@
 <%@ include file="head.jspf" %>
 <c:set var="returnPath" value="${empty client?'/finance/clients/onboarding':'/finance/clients/onboarding/'}${empty client?'':client.id}"/>
 <c:set var="modelName" value="${formKind=='create'?'createForm':formKind=='profile'?'profileForm':'documentForm'}"/>
-<div class="accounting-workspace accounting-create" data-resource-form-page ${formKind=='create' or formKind=='profile'?'data-resource-details-page':''}>
-<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="<c:url value='${returnPath}'/>"><spring:message code="kyc.details"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="kyc.form.${formKind}"/></span></nav>
+<div class="accounting-workspace accounting-create kyc-form-workspace" data-resource-form-page>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="<c:url value='${returnPath}'/>"><spring:message code="${empty client?'kyc.title':'kyc.details'}"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="kyc.form.${formKind}"/></span></nav>
+<%@ include file="profile-draft-notice.jspf" %>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="kyc.form.${formKind}"/></h1></div>
 <c:if test="${not empty client}"><%@ include file="facts.jspf" %></c:if>
 
@@ -14,17 +15,9 @@
 <c:set var="identityReadOnly" value="${not empty client and client.portalEnabled}"/><c:set var="profileValues" value="${formKind=='create'?createForm.profile:profileForm.profile}"/>
 <c:set var="groupLookup" value="/finance/clients/onboarding/groups"/>
 <c:if test="${formKind=='profile'}"><form:hidden path="expectedSequence"/><c:set var="groupLookup" value="/finance/clients/onboarding/groups?clientId=${client.id}"/></c:if>
-<div data-profile-tabs><div id="profile-bio" data-detail-panel><h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2>
-<%@ include file="profile-fields.jspf" %>
-<c:if test="${formKind=='profile'}"><section class="erp-resource-section"><h2><spring:message code="kyc.notice"/></h2><div class="kyc-form-fields">
-    <p class="kyc-notice-text"><c:out value="${pageContext.response.locale.language=='sw'?notice.kiswahili:notice.english}"/></p>
-    <p class="kyc-field-hint"><spring:message code="kyc.assistedConsent"/></p>
-    <label class="kyc-field"><span><spring:message code="kyc.field.legalHoldReference"/></span><form:textarea path="profile.legalHoldReference" cssClass="aws-control" rows="3" maxlength="500"/><form:errors path="profile.legalHoldReference" cssClass="coa-error"/></label>
-</div></section></c:if>
-</div>
 <c:set var="profileDocuments" value="${documents}"/><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_DOCUMENTS')" var="canReadProfileDocuments"/>
 <c:set var="uploadPath" value="/finance/clients/onboarding/${client.id}/documents/new"/><c:set var="documentRoot" value="/finance/clients/onboarding/${client.id}/documents"/>
-<%@ include file="profile-attachments.jspf" %></div>
+<%@ include file="profile-editor.jspf" %>
 </c:when><c:when test="${formKind=='document'}">
     <section class="erp-resource-section"><h2><spring:message code="kyc.form.document"/></h2><div class="kyc-form-fields">
             <form:hidden path="revisionId"/>
@@ -39,11 +32,14 @@
     <spring:bind path="${modelName}"><c:if test="${not empty status.errors.globalErrors}"><div class="console-message" data-message-type="error" data-workspace-form-error data-workspace-response-error role="alert" tabindex="-1"><c:forEach items="${status.errors.globalErrors}" var="error"><p><spring:message message="${error}"/></p></c:forEach></div></c:if></spring:bind>
     <c:if test="${formKind=='document'}"><form:errors path="*" cssClass="field-error" element="p" role="alert"/></c:if>
 
-    <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='${returnPath}'/>"><spring:message code="common.cancel"/></a>
-        <c:choose><c:when test="${formKind=='profile'}"><button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formnovalidate><spring:message code="kyc.saveDraft"/></button><button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED"><spring:message code="kyc.submit"/></button></c:when><c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="credit.save"/></button></c:otherwise></c:choose>
-    </div>
+    <c:choose><c:when test="${formKind=='create' or formKind=='profile'}">
+        <c:url value="${returnPath}" var="profileCancelUrl"/><c:url value="${formKind=='create'?'/finance/clients/onboarding/new':'/finance/clients/onboarding/'.concat(client.id).concat('/edit')}" var="profileDraftUrl"/>
+        <c:set var="profileSubmitUrl" value="${profileDraftUrl}"/><c:set var="profileSubmitValue" value="${formKind=='create'?'CREATE':'SUBMITTED'}"/><c:set var="profileSubmitLabel" value="${formKind=='create'?'kyc.create':'kyc.submit'}"/>
+        <%@ include file="profile-actions.jspf" %>
+    </c:when><c:otherwise><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='${returnPath}'/>"><spring:message code="common.cancel"/></a><button class="app-btn btn-launch" type="submit"><spring:message code="credit.save"/></button></div></c:otherwise></c:choose>
 </form:form>
 </div>
 <script src="<c:url value='/js/client-onboarding.js'/>" defer></script><script src="<c:url value='/js/loan-recording.js'/>" defer></script>
+<c:if test="${formKind=='create' or formKind=='profile'}"><script src="<c:url value='/js/client-profile-wizard.js'/>" defer></script></c:if>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

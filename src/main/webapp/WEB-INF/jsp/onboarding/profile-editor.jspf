@@ -1,0 +1,14 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:if test="${not profileReadOnly}"><%@ include file="profile-wizard-labels.jspf" %></c:if>
+<div ${profileReadOnly?'data-profile-tabs':'data-profile-wizard'} ${publicProfileRegistration?'data-profile-registration':''} data-profile-start="${portalRegistrationVerified ? 'documents' : ''}" data-validation-date="${empty profileValidationDate?workspace.validationDate:profileValidationDate}">
+    <div id="profile-bio" ${profileReadOnly?'data-detail-panel':''}>
+        <h2 class="sr-only"><spring:message code="kyc.section.bio"/></h2>
+        <c:if test="${publicProfileRegistration}"><%@ include file="profile-registration-context.jspf" %></c:if>
+        <fieldset class="kyc-profile-fields" ${profileReadOnly?'disabled':''}>
+            <spring:nestedPath path="${publicProfileRegistration?'registration':''}"><%@ include file="profile-fields.jspf" %></spring:nestedPath>
+        </fieldset>
+        <%@ include file="profile-consent.jspf" %>
+    </div>
+    <c:choose><c:when test="${publicProfileRegistration}"><p class="kyc-profile-note" data-profile-section="review"><spring:message code="portal.verifyBeforeUpload"/></p></c:when>
+    <c:otherwise><%@ include file="profile-attachments.jspf" %></c:otherwise></c:choose>
+</div>

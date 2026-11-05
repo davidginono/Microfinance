@@ -24,6 +24,7 @@ import java.util.*;
 public class ClientPortalController {
     private static final String ROOT="/client-portal",PROFILE=ROOT+"/workspace/profile";
     private static final String REGISTRATION_CHALLENGE = "clientPortalRegistrationChallenge";
+    private static final String REGISTRATION_DRAFT = "clientProfileRegistrationDraft";
     private final ClientPortalService portal;
     private final OnboardingService onboarding;
     private static String[] entryFields(){return java.util.stream.Stream.concat(java.util.stream.Stream.of("clientNumber","intent","institution","branch","registration.profile.firstName","registration.profile.middleName","registration.profile.lastName","registration.profile.phone","registration.profile.email"),Arrays.stream(OnboardingService.PERSONAL_FIELDS).filter(f->!f.equals("groupId")).map(f->"registration.profile."+f)).toArray(String[]::new);}
@@ -31,7 +32,16 @@ public class ClientPortalController {
     @InitBinder("selfForm") void selfBinder(WebDataBinder b){b.setAllowedFields(java.util.stream.Stream.concat(java.util.stream.Stream.of("requestKey","expectedSequence","action","noticeId","noticeAcknowledged","declarationAccepted"),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b){b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @GetMapping public String entry(Model m){m.addAttribute("entryForm",new EntryForm());return "portal/entry";}
-    @GetMapping("/register") public String register(Model m){var f=new EntryForm();f.setIntent("REGISTER");m.addAttribute("entryForm",f);return "portal/entry";}
+    @GetMapping("/register") public String register(Model m,HttpSession session){
+        var f=new EntryForm();f.setIntent("REGISTER");
+        if(session.getAttribute(REGISTRATION_DRAFT) instanceof ProfileDraft draft){f.setInstitution(draft.institution());f.setBranch(draft.branch());f.getRegistration().setProfile(onboarding.decodeProfileDraft(draft.profile()));}
+        m.addAttribute("entryForm",f);m.addAttribute("profileValidationDate",onboarding.today());return "portal/entry";
+    }
+    @PostMapping("/register/draft") public String registrationDraft(@ModelAttribute("entryForm") EntryForm f,BindingResult errors,HttpSession session,Model m,RedirectAttributes flash) {
+        f.setIntent("REGISTER");
+        if(!errors.hasErrors())try{session.setAttribute(REGISTRATION_DRAFT,portal.registrationDraft(f));flash.addFlashAttribute("profileDraftSaved",true);return "redirect:"+ROOT+"/register";}catch(IllegalArgumentException e){registrationError(f,errors,e);}
+        m.addAttribute("profileValidationDate",onboarding.today());return "portal/entry";
+    }
     @GetMapping("/choices") @ResponseBody public ResponseEntity<List<Choice>> choices(@RequestParam(required=false) String institution,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(portal.choices(institution,search,page));}
     @PostMapping("/request-code") public String request(@ModelAttribute("entryForm") EntryForm f,BindingResult errors,HttpServletRequest request,Model m){
         if(!errors.hasErrors())try{
@@ -40,12 +50,14 @@ public class ClientPortalController {
             session.setAttribute("clientPortalChallenge",id);
             session.setAttribute(REGISTRATION_CHALLENGE,"REGISTER".equals(f.getIntent()) ? id : null);
             return "redirect:"+ROOT+"/verify";
-        }catch(IllegalArgumentException e){
-            String key=Objects.toString(e.getMessage(),"");String field=key.startsWith("kyc.error.")?key.substring("kyc.error.".length()):"";
-            if(field.equals("nameParts"))field="firstName";if(field.equals("identityExpiry"))field="identityExpiresOn";
-            if(f.getIntent().equals("REGISTER")&&Arrays.asList(entryFields()).contains("registration.profile."+field))errors.rejectValue("registration.profile."+field,key);else errors.reject("portal.error.invalid");
-        }
+        }catch(IllegalArgumentException e){registrationError(f,errors,e);}
+        m.addAttribute("profileValidationDate",onboarding.today());
         return "portal/entry";
+    }
+    private void registrationError(EntryForm f,BindingResult errors,IllegalArgumentException e) {
+        String key=Objects.toString(e.getMessage(),"");String field=key.startsWith("kyc.error.")?key.substring("kyc.error.".length()):"";
+        if(field.equals("nameParts"))field="firstName";if(field.equals("identityExpiry"))field="identityExpiresOn";
+        if(f.getIntent().equals("REGISTER")&&Arrays.asList(entryFields()).contains("registration.profile."+field))errors.rejectValue("registration.profile."+field,key);else errors.reject("portal.error.invalid");
     }
     @GetMapping("/verify") public String code(HttpSession session){return session.getAttribute("clientPortalChallenge") instanceof UUID?"portal/verify":"redirect:"+ROOT;}
     @PostMapping("/verify") public String verify(@RequestParam(defaultValue="") String code,HttpServletRequest request,HttpServletResponse response,Model m,RedirectAttributes flash){
@@ -54,6 +66,7 @@ public class ClientPortalController {
         HttpSession session=request.getSession();
         if (challenge instanceof UUID && challenge.equals(session.getAttribute(REGISTRATION_CHALLENGE))) {
             flash.addFlashAttribute("portalRegistrationVerified",true);
+            session.removeAttribute(REGISTRATION_DRAFT);
         }
         session.removeAttribute(REGISTRATION_CHALLENGE);
         request.changeSessionId();request.getSession().removeAttribute("clientPortalChallenge");

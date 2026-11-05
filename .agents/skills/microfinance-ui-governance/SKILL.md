@@ -43,6 +43,7 @@ Use the shared [split-view contract](../microfinance-table-standard/SKILL.md#aws
 
 ## Resource Creation And Details
 
+- Profile entry uses the common editor, fields, actions and wizard listed in `AGENTS.md` across Portal registration, Complete Profile and Staff Client Profile. Extend those sources instead of introducing another profile layout or footer. The Client Number is generated and belongs in authorized details, not a profile-entry control. Save draft bypasses completeness checks while retaining supplied-value validation, scope and verification gates.
 - Staff can create provisional client records. Clients register and activate their own user accounts. Keep these actions distinct in labels and help text.
 
 ### Create and page-edit navigation (2026-10-29)

@@ -298,6 +298,17 @@ public class OnboardingService {
         }
         return statusByCategory.entrySet().stream().map(entry->new EvidenceRequirement(entry.getKey(),entry.getValue())).toList();
     }
+    /** Validate incomplete profile input before retaining a single server-session draft. */
+    public String encodeProfileDraft(ClientProfile profile) {
+        check(profile!=null,"profile");var copy=json.readValue(json.writeValueAsString(profile),Profile.class);
+        for(var entry:Map.of("firstName",copy.getFirstName(),"middleName",copy.getMiddleName(),"lastName",copy.getLastName()).entrySet()) {
+            text(entry.getValue(),80,entry.getKey(),false);check(entry.getValue().isBlank()||entry.getValue().strip().matches("\\S+"),"nameParts");
+        }
+        text(copy.getPhone(),16,"phone",false);check(copy.getPhone().isBlank()||TanzaniaPhoneNumber.normalizeOptional(copy.getPhone())!=null,"phone");
+        text(copy.getEmail(),255,"email",false);check(copy.getEmail().isBlank()||copy.getEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"),"email");
+        validate(copy,false);return json.writeValueAsString(personal(copy));
+    }
+    public ClientProfile decodeProfileDraft(String profile) {return json.readValue(profile,ClientProfile.class);}
     /** Public enrollment accepts the same draft fields; private group choices follow contact verification. */
     public void validateRegistrationProfile(ClientProfile profile) {
         check(profile!=null,"profile");names(profile);check(profile.getGroupId()==null,"groupId");

@@ -13,12 +13,15 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.*;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/finance/clients/onboarding")
 public class OnboardingController {
     private static final String ROOT="/finance/clients/onboarding";
+    private static final String PROFILE_DRAFT="clientProfileStaffDraft";
     private final OnboardingService service;
 
     @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email"));}
@@ -37,9 +40,17 @@ public class OnboardingController {
     @GetMapping public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="number_asc") String sort,Model m) {
         m.addAttribute("records",service.clients(a,search,state,page,sort));m.addAttribute("search",search);m.addAttribute("state",state);m.addAttribute("sort",sort);return "onboarding/register";
     }
-    @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,Model m) {service.authorize(a,"CREATE");m.addAttribute("createForm",new CreateForm());return form(m,"create");}
-    @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("createForm") CreateForm f,BindingResult errors,Model m) {
-        service.authorize(a,"CREATE");if(!errors.hasErrors())try{return "redirect:"+ROOT+"/"+service.create(a,f);}catch(IllegalArgumentException e){reject(errors,e);}catch(org.springframework.dao.DataIntegrityViolationException e){errors.reject("kyc.error.registration");}
+    @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,Model m,HttpSession session) {
+        service.authorize(a,"CREATE");var f=new CreateForm();
+        if(session.getAttribute(PROFILE_DRAFT) instanceof ProfileDraft draft && Objects.equals(draft.actor(),a.getMemberId()) && Objects.equals(draft.institution(),a.getSaccoId()) && Objects.equals(draft.branch(),a.getStationId())) {f.setProfile(service.decodeProfileDraft(draft.profile()));f.setRequestKey(draft.requestKey());}
+        m.addAttribute("createForm",f);return form(m,"create");
+    }
+    @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("createForm") CreateForm f,BindingResult errors,@RequestParam(defaultValue="CREATE") String action,Model m,HttpSession session,RedirectAttributes flash) {
+        service.authorize(a,"CREATE");if(!errors.hasErrors())try{
+            if(action.equals("DRAFT")) {session.setAttribute(PROFILE_DRAFT,new ProfileDraft(service.encodeProfileDraft(f.getProfile()),a.getMemberId(),a.getSaccoId(),a.getStationId(),f.getRequestKey()));flash.addFlashAttribute("profileDraftSaved",true);return "redirect:"+ROOT+"/new";}
+            if(!action.equals("CREATE"))throw new IllegalArgumentException("kyc.error.action");
+            var id=service.create(a,f);session.removeAttribute(PROFILE_DRAFT);return "redirect:"+ROOT+"/"+id;
+        }catch(IllegalArgumentException e){reject(errors,e);}catch(org.springframework.dao.DataIntegrityViolationException e){errors.reject("kyc.error.registration");}
         return form(m,"create");
     }
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model m) {
@@ -82,7 +93,7 @@ public class OnboardingController {
             .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.name()).build().toString()).contentType(MediaType.parseMediaType(file.contentType())).body(file.bytes());
     }
     private void context(AppUserPrincipal a,UUID id,Model m) {m.addAttribute("client",service.client(a,id));m.addAttribute("revision",service.latest(a,id).orElse(null));m.addAttribute("documents",service.documents(a,id));}
-    private String form(Model m,String kind) {m.addAttribute("formKind",kind);return "onboarding/form";}
+    private String form(Model m,String kind) {m.addAttribute("formKind",kind);m.addAttribute("profileValidationDate",service.today());return "onboarding/form";}
     private static void reject(BindingResult errors,IllegalArgumentException e) {
         String key=key(e);
         if (errors.getObjectName().equals("reviewForm") && key.equals("kyc.error.checks")) {

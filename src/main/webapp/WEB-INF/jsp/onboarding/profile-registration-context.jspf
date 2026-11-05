@@ -1,0 +1,8 @@
+<%@ page pageEncoding="UTF-8" %>
+                    <section class="erp-resource-section" data-profile-section="personal">
+                        <h2><spring:message code="portal.institution"/></h2>
+                        <div class="kyc-profile-grid">
+                            <label class="kyc-field"><span><spring:message code="portal.institution"/></span><form:select path="institution" cssClass="aws-control" required="required" data-portal-institution="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.institution}"><form:option value="${entryForm.institution}"><c:out value="${entryForm.institution}"/></form:option></c:if></form:select><form:errors path="institution" cssClass="field-error"/></label>
+                            <label class="kyc-field"><span><spring:message code="portal.branch"/></span><form:select path="branch" cssClass="aws-control" required="required" data-portal-branch="true"><form:option value=""><spring:message code="applications.select"/></form:option><c:if test="${not empty entryForm.branch}"><form:option value="${entryForm.branch}"><c:out value="${entryForm.branch}"/></form:option></c:if></form:select><form:errors path="branch" cssClass="field-error"/></label>
+                        </div>
+                    </section>

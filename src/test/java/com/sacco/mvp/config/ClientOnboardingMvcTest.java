@@ -42,6 +42,26 @@ class ClientOnboardingMvcTest {
         String register=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/register.jsp"));
         assertThat(register).contains("data-group-open-on-row","data-target=\"${registerUrl}/${row.id}\"");
     }
+    @Test void incompleteStaffCreationDraftResumesOnlyInItsActorAndBranchScope() throws Exception {
+        var http=new org.springframework.mock.web.MockHttpSession();UUID request=UUID.randomUUID();
+        when(service.encodeProfileDraft(any())).thenReturn("private profile draft");var profile=new ClientProfile();profile.setCity("Arusha");when(service.decodeProfileDraft("private profile draft")).thenReturn(profile);
+        mvc.perform(post(root+"/new").session(http).with(user(staff)).with(csrf()).param("action","DRAFT").param("requestKey",request.toString()).param("profile.city","Arusha"))
+            .andExpect(redirectedUrl(root+"/new")).andExpect(flash().attribute("profileDraftSaved",true));
+        verify(service,never()).create(any(),any());
+        var result=mvc.perform(get(root+"/new").session(http).with(user(staff))).andExpect(view().name("onboarding/form")).andReturn();
+        var restored=(CreateForm)result.getModelAndView().getModel().get("createForm");assertThat(restored.getProfile().getCity()).isEqualTo("Arusha");assertThat(restored.getRequestKey()).isEqualTo(request);
+        for(var scope:List.of(List.of(UUID.randomUUID().toString(),"I1","B1"),List.of(staff.getMemberId().toString(),"I1","B2"),List.of(staff.getMemberId().toString(),"I2","B1"))) {
+            var other=new AppUserPrincipal(Member.builder().id(UUID.fromString(scope.get(0))).saccoId(scope.get(1)).stationId(scope.get(2)).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
+            var foreign=mvc.perform(get(root+"/new").session(http).with(user(other))).andReturn();
+            assertThat(((CreateForm)foreign.getModelAndView().getModel().get("createForm")).getProfile().getCity()).isEmpty();
+        }
+        verify(service,times(1)).decodeProfileDraft(anyString());
+    }
+    @Test void actualClientCreationClearsTheTemporaryDraft() throws Exception {
+        var http=new org.springframework.mock.web.MockHttpSession();http.setAttribute("clientProfileStaffDraft",new ProfileDraft("profile",staff.getMemberId(),"I1","B1",UUID.randomUUID()));when(service.create(eq(staff),any())).thenReturn(id);
+        mvc.perform(post(root+"/new").session(http).with(user(staff)).with(csrf()).param("action","CREATE")).andExpect(redirectedUrl(root+"/"+id));
+        assertThat(http.getAttribute("clientProfileStaffDraft")).isNull();
+    }
     @Test void onboardingStatesUseSharedStatusIconsRatherThanCopyControls() throws Exception {
         String fragment=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/status.jspf"));
         int start=fragment.indexOf("value=\"${")+9;int end=fragment.indexOf("}\"",start);

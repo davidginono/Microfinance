@@ -101,7 +101,7 @@ public class SecurityConfig {
                 }
                 auth
                 .requestMatchers("/client-portal/workspace/**").access((authentication,context)->new AuthorizationDecision(authentication.get().getPrincipal() instanceof com.sacco.mvp.clients.portal.dto.ClientPortalDtos.Session))
-                .requestMatchers("/client-portal", "/client-portal/register", "/client-portal/choices", "/client-portal/request-code", "/client-portal/verify").permitAll()
+                .requestMatchers("/client-portal", "/client-portal/register", "/client-portal/register/draft", "/client-portal/choices", "/client-portal/request-code", "/client-portal/verify").permitAll()
                 .requestMatchers("/documents/reports/*.xlsx", "/documents/reports/*.csv").denyAll()
                 .requestMatchers("/finance/**", "/reports/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
