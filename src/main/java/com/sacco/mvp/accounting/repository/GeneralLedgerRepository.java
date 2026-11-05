@@ -32,6 +32,9 @@ public class GeneralLedgerRepository {
     public List<Account> accounts(String institution, int offset, int limit) {
         return jdbc.query("select * from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
     }
+    public List<Account> chartRoots(String institution) {
+        return jdbc.query("select * from gl_account where sacco_id=? and code in ('100000','200000','300000','400000','500000') order by code limit 5",this::account,institution);
+    }
     public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit) {
         return chart(institution,filter,offset,limit,"code","asc");
     }

@@ -96,13 +96,31 @@ public class GeneralLedgerService {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");books.lockAccounts(actor.getSaccoId());
         initializeChartRoots(actor);
     }
+    @Transactional(readOnly=true)
+    public boolean chartDefaultsMissing(AppUserPrincipal actor) {
+        requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");
+        var roots=books.chartRoots(actor.getSaccoId());
+        roots.forEach(this::validateChartRoot);
+        return roots.size()<ROOT_TYPES.size();
+    }
+    /** Fixed non-posting defaults grant no permission to create institution-specific accounts. */
+    @Transactional
+    public void provisionChartDefaults(AppUserPrincipal actor) {
+        if(chartDefaultsMissing(actor)) {
+            books.lockAccounts(actor.getSaccoId());
+            initializeChartRoots(actor);
+        }
+    }
+    private void validateChartRoot(Account account) {
+        String type=ROOT_TYPES.get(Integer.parseInt(account.code().substring(0,1))-1);
+        require(mainGroup(account) && account.active() && account.type().equals(type) && account.normalBalance().equals(normalBalance(type)),"mainGroupConflict");
+    }
     private void initializeChartRoots(AppUserPrincipal actor) {
         for(int index=0;index<ROOT_TYPES.size();index++) {
             String code=(index+1)+"00000",type=ROOT_TYPES.get(index);
             var existing=books.accountCode(actor.getSaccoId(),code);
             if(existing.isPresent()) {
-                var a=existing.get();
-                require(mainGroup(a) && a.active() && a.type().equals(type) && a.normalBalance().equals(normalBalance(type)),"mainGroupConflict");
+                validateChartRoot(existing.get());
             } else {
                 persistAccount(actor,new AccountCommand(code,ROOT_NAMES.get(index),type,normalBalance(type),"HEADING","OTHER",null,ROOT_NAMES_SW.get(index),null));
             }

@@ -46,6 +46,32 @@ class ChartOfAccountsMvcTest {
             .andExpect(status().isOk()).andExpect(view().name("accounting/accounts"))
             .andExpect(model().attribute("filter",new AccountFilter("Land","ASSET","POSTING","ACTIVE")));
     }
+    @Test void conflictingDefaultCodesShowAnErrorWithoutRedirectingBackToInitialization() throws Exception {
+        when(ledger.chartDefaultsMissing(any())).thenThrow(new IllegalArgumentException("accounting.error.mainGroupConflict"));
+        mvc.perform(get("/finance/accounts").with(user(accountant)))
+            .andExpect(status().isConflict()).andExpect(header().doesNotExist("Location"))
+            .andExpect(view().name("accounting/error")).andExpect(model().attribute("accountingError","accounting.error.mainGroupConflict"));
+        mvc.perform(get("/finance/accounts/groups/new").with(user(accountant)))
+            .andExpect(status().isConflict()).andExpect(header().doesNotExist("Location")).andExpect(view().name("accounting/error"));
+    }
+    @Test void defaultSetupIsAutomaticButOnlyPostsWithCsrfAndPreservesTheDestination() throws Exception {
+        when(ledger.chartDefaultsMissing(accountant)).thenReturn(true);
+        mvc.perform(get("/finance/accounts?type=ASSET").with(user(accountant)))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/account-defaults"))
+            .andExpect(model().attribute("setupReturnTo","/finance/accounts?type=ASSET"));
+        verify(ledger,never()).provisionChartDefaults(any());
+        var reader=new AppUserPrincipal(Member.builder().id(accountant.getMemberId()).memberNo("READER").saccoId("I1").stationId("B1")
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
+        mvc.perform(post("/finance/accounts/defaults").with(user(reader)).param("returnTo","/finance/accounts"))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/finance/accounts/defaults").with(user(reader)).with(csrf()).param("returnTo","/finance/accounts?type=ASSET"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/accounts?type=ASSET"));
+        verify(ledger).provisionChartDefaults(reader);
+        clearInvocations(ledger);
+        mvc.perform(post("/finance/accounts/defaults").with(user(reader)).with(csrf()).param("returnTo","https://example.com/finance/accounts"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/accounts"));
+        verifyNoInteractions(ledger);
+    }
     @Test void chartPassesRequestedPageSizeWithoutDroppingFilters() throws Exception {
         when(ledger.chart(any(),any(),eq(2),eq(50),eq("code"),eq("asc"))).thenReturn(new Page<>(List.of(),2,false));
         mvc.perform(get("/finance/accounts").param("search","cash").param("state","ACTIVE").param("page","2").param("size","50").with(user(accountant)))

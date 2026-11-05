@@ -31,7 +31,8 @@ public class ChartOfAccountsPageController {
             @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String type,
             @RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="") String state,
             @RequestParam(required=false) UUID parentId,@RequestParam(defaultValue="30") int size,
-            @RequestParam(defaultValue="code") String sort,@RequestParam(defaultValue="asc") String direction,Model model) {
+            @RequestParam(defaultValue="code") String sort,@RequestParam(defaultValue="asc") String direction,Model model,jakarta.servlet.http.HttpServletRequest request) {
+        if(ledger.chartDefaultsMissing(actor))return defaultsPage(request,model);
         var filter=new AccountFilter(search.strip(),type,kind,state,parentId);
         if(parentId!=null) {
             var path=ledger.chartPath(actor,parentId);
@@ -49,6 +50,7 @@ public class ChartOfAccountsPageController {
             BindingResult errors,@RequestParam(defaultValue="") String parentSearch,@RequestParam(defaultValue="0") int parentPage,
             jakarta.servlet.http.HttpServletRequest request,Model model) {
         boolean group=request.getRequestURI().endsWith("/groups/new");
+        if(ledger.chartDefaultsMissing(actor))return defaultsPage(request,model);
         if(form.getParentId()!=null && !errors.hasErrors()) {
             var parent=ledger.chartParent(actor,form.getParentId(),group);
             if(form.getCode()==null || form.getCode().isBlank())form.setCode(ledger.suggestChartCode(actor,parent.id(),group));
@@ -56,6 +58,20 @@ public class ChartOfAccountsPageController {
                 List.of("ASSET","EXPENSE").contains(parent.type())?"DEBIT":"CREDIT");
         }
         return populateForm(actor,form,group,parentSearch,parentPage,model);
+    }
+    private String defaultsPage(jakarta.servlet.http.HttpServletRequest request,Model model) {
+        String path=request.getRequestURI().substring(request.getContextPath().length());
+        model.addAttribute("setupReturnTo",path+(request.getQueryString()==null?"":"?"+request.getQueryString()));
+        return "accounting/account-defaults";
+    }
+    @PostMapping("/defaults")
+    @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')")
+    String defaults(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam String returnTo) {
+        var destination=java.net.URI.create(returnTo);
+        if(destination.isAbsolute() || destination.getRawAuthority()!=null || returnTo.contains("\\") || returnTo.contains("\r") || returnTo.contains("\n") ||
+                !List.of("/finance/accounts","/finance/accounts/groups/new","/finance/accounts/posting/new").contains(destination.getRawPath()))
+            throw new IllegalArgumentException("accounting.error.validation");
+        ledger.provisionChartDefaults(actor);return "redirect:"+returnTo;
     }
     @GetMapping("/children")
     @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')")
@@ -107,8 +123,11 @@ public class ChartOfAccountsPageController {
     }
     @ExceptionHandler(IllegalArgumentException.class)
     String error(IllegalArgumentException failure,RedirectAttributes flash,jakarta.servlet.http.HttpServletRequest request,
-            jakarta.servlet.http.HttpServletResponse response) {
+            jakarta.servlet.http.HttpServletResponse response,Model model) {
         if(request.getRequestURI().endsWith("/children")) {response.setStatus(400);return "accounting/account-rows";}
+        if("accounting.error.mainGroupConflict".equals(errorKey(failure))) {
+            response.setStatus(409);model.addAttribute("accountingError",errorKey(failure));return "accounting/error";
+        }
         flash.addFlashAttribute("accountingError",errorKey(failure));return "redirect:/finance/accounts";
     }
     @ExceptionHandler(DataIntegrityViolationException.class)

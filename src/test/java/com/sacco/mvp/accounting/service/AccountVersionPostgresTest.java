@@ -38,6 +38,60 @@ class AccountVersionPostgresTest {
         var proxy=new ProxyFactory(new GeneralLedgerService(books,new AccessControlService(),audit,clock,claims,directory,institutions));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));ledger=(GeneralLedgerService)proxy.getProxy();
     }
     @AfterAll void stop(){if(ds!=null)ds.close();}
+    private AppUserPrincipal emptyChartReader() {
+        institution="COA-DEFAULTS-"+UUID.randomUUID();
+        jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,'Synthetic defaults institution',true,now(),now())",institution);
+        when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
+        when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
+        return operator("B1",Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
+    }
+    @Test void firstChartVisitProvisionsOnlyFiveScopedDefaultsAndRepeatedVisitsPreserveThem() {
+        String original=institution;var reader=emptyChartReader();
+        var filter=new AccountFilter("","","","");
+        assertThat(ledger.chartDefaultsMissing(reader)).isTrue();
+        assertThat(ledger.chart(reader,filter,0).rows()).isEmpty();
+        assertThat(ledger.chartParents(reader,true,"",0).rows()).isEmpty();
+        verifyNoInteractions(audit);
+        ledger.provisionChartDefaults(reader);
+        var first=ledger.chart(reader,filter,0);
+        assertThat(first.rows()).extracting(row->row.account().code()).containsExactly("100000","200000","300000","400000","500000");
+        assertThat(first.rows()).extracting(row->row.account().name()).containsExactly("Assets","Liabilities","Equity","Expenses","Income");
+        assertThat(books.chartRoots(institution)).allSatisfy(a->{assertThat(a.kind()).isEqualTo("HEADING");assertThat(a.parentId()).isNull();assertThat(a.active()).isTrue();});
+        clearInvocations(audit);
+        ledger.provisionChartDefaults(reader);
+        assertThat(ledger.chartDefaultsMissing(reader)).isFalse();
+        assertThat(ledger.chart(reader,filter,0).rows()).isEqualTo(first.rows());
+        assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(5);
+        verifyNoInteractions(audit);
+        assertThat(books.accounts(original,0,10)).hasSize(7);
+        assertThat(jdbc.queryForObject("select count(*) from gl_account_version where sacco_id=? and state<>'BASELINE'",Integer.class,institution)).isZero();
+        assertThat(reader.getClaims()).containsExactly("ACCOUNTING_ACCOUNTS_VIEW");
+        assertThatThrownBy(()->ledger.onboardAccount(reader,form(first.rows().getFirst().account().id(),"110000","Unauthorized"),true))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void concurrentFirstVisitsAndDirectParentPickerProvisionEachDefaultOnce() throws Exception {
+        var reader=emptyChartReader();var start=new CountDownLatch(1);
+        try(var executor=Executors.newFixedThreadPool(2)) {
+            var chart=executor.submit(()->{start.await();ledger.provisionChartDefaults(reader);return ledger.chart(reader,new AccountFilter("","","",""),0);});
+            var parents=executor.submit(()->{start.await();ledger.provisionChartDefaults(reader);return ledger.chartParents(reader,true,"",0);});
+            start.countDown();assertThat(chart.get(15,TimeUnit.SECONDS).rows()).hasSize(5);assertThat(parents.get(15,TimeUnit.SECONDS).rows()).hasSize(5);
+        }
+        assertThat(books.accounts(institution,0,10)).hasSize(5);
+    }
+    @Test void defaultProvisioningPreservesExistingMetadataAndRejectsConflictingCodes() {
+        var reader=emptyChartReader();UUID existing=UUID.randomUUID();
+        books.createAccount(institution,existing,new AccountCommand("100000","Institution assets","ASSET","DEBIT","HEADING","OTHER",null,"Mali",null),reader.getMemberId(),now);
+        ledger.provisionChartDefaults(reader);
+        assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(5);
+        assertThat(books.accountCode(institution,"100000").orElseThrow().name()).isEqualTo("Institution assets");
+        var conflicting=emptyChartReader();
+        books.createAccount(institution,UUID.randomUUID(),new AccountCommand("100000","Conflicting account","ASSET","DEBIT","POSTING","OTHER",null,null,null),conflicting.getMemberId(),now);
+        assertThatThrownBy(()->ledger.provisionChartDefaults(conflicting)).hasMessage("accounting.error.mainGroupConflict");
+        assertThat(books.accounts(institution,0,10)).hasSize(1);
+        var noView=operator("B1",Set.of(UserClaim.ACCOUNTANT_QUEUE_VIEW));
+        assertThatThrownBy(()->ledger.provisionChartDefaults(noView)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(books.accounts(institution,0,10)).hasSize(1);
+    }
     @Test void loanPurposesUsePostingAccountsAndNewControlClassificationsAreRejected(){
         var command=form(family,"111099","Loan principal");command.setPurpose("LOAN_PRINCIPAL");command.setKind("CONTROL");
         assertThatThrownBy(()->ledger.onboardAccount(maker,command,false)).hasMessage("accounting.error.accountClassification");
