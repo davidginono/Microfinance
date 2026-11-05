@@ -4,7 +4,7 @@
         document.querySelectorAll('[data-client-application]:not([data-application-ready])').forEach(function (form) {
             form.dataset.applicationReady = 'true';
             var borrower = form.dataset.borrowerWorkspace === 'true';
-            var root = form.dataset.root, error = form.querySelector('[data-application-error]'), requirements = [], timers = new WeakMap();
+            var root = form.dataset.root, error = form.querySelector('[data-application-error]'), requirements = [], lookups = new WeakMap();
             function fail() { error.textContent = error.dataset.errorText; error.hidden = false; }
             function valueLabel(value){var node=form.querySelector('[data-application-value="'+value+'"]');return node?node.textContent:String(value);}
             function panel(name) {
@@ -13,7 +13,7 @@
             }
             form.querySelectorAll('[data-application-tab]').forEach(function (tab) {
                 tab.addEventListener('click', function () { panel(tab.dataset.applicationTab); });
-                tab.addEventListener('keydown', function (event) { var tabs = Array.from(form.querySelectorAll('[data-application-tab]')), index = tabs.indexOf(tab); if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); var next = tabs[(index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; next.click(); next.focus(); } });
+                tab.addEventListener('keydown', function (event) { var tabs = Array.from(form.querySelectorAll('[data-application-tab]')), index = tabs.indexOf(tab); if (['ArrowRight','ArrowLeft','Home','End'].includes(event.key)) { event.preventDefault(); var next = tabs[event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; next.click(); next.focus(); } });
             });
             panel(form.dataset.initialTab || 'information');
             form.addEventListener('invalid', function (e) { var p = e.target.closest('[data-application-panel]'); if (p) panel(p.dataset.applicationPanel); }, true);
@@ -24,8 +24,8 @@
                         if (input.dataset.field) input.name = kind + '[' + i + '].' + input.dataset.field;
                         else if (input.dataset.documentField) input.name = input.dataset.documentField + '[' + i + ']';
                         else if (input.name && kind !== 'documents') input.name = input.name.replace(/\[\d+\]/, '[' + i + ']');
-                        input.id = 'application-' + kind + '-' + i + '-' + fieldIndex;
-                        var label = input.parentElement.querySelector('label'); if (label && input.type !== 'search') label.htmlFor = input.id;
+                        var label = input.labels?.[0] || input.parentElement.querySelector('label');
+                        input.id = 'application-' + kind + '-' + i + '-' + fieldIndex; if (label && input.type !== 'search') label.htmlFor = input.id;
                     });
                 });
             }
@@ -38,29 +38,32 @@
             form.querySelectorAll('[data-add-row]').forEach(function (button) { button.addEventListener('click', function () {
                 var kind = button.dataset.addRow, list = form.querySelector('[data-repeat-list="' + kind + '"]');
                 if (list.children.length >= (kind === 'documents' ? 10 : 20)) return;
-                list.appendChild(form.querySelector('[data-row-template="' + kind + '"]').content.cloneNode(true)); reindex(list); requiredOptions();
-                var first = list.lastElementChild.querySelector('input,select'); if (first) first.focus();
+                list.appendChild(form.querySelector('[data-row-template="' + kind + '"]').content.cloneNode(true)); reindex(list); requiredOptions(); bindChoices(list.lastElementChild);
+                var first = list.lastElementChild.querySelector('.neo-select-button,input:not([type=hidden]):not(.neo-select-native),select:not(.neo-select-native),textarea'); if (first) first.focus();
             }); });
             form.querySelectorAll('[data-repeat-list]').forEach(reindex);
             form.addEventListener('click', function (e) { var remove = e.target.closest('[data-remove-row]'); if (remove) { var list = remove.closest('[data-repeat-list]'); remove.closest('[data-repeat-row]').remove(); reindex(list); form.dispatchEvent(new Event('change', {bubbles:true})); } });
-            function choices(search, select) {
-                if (!select) return;
-                clearTimeout(timers.get(search)); timers.set(search, setTimeout(async function () {
-                    try {
-                        var client = form.elements.namedItem('clientId').value, url = root + '/choices/' + select.dataset.applicationChoice + '?search=' + encodeURIComponent(search.value) + (client ? '&clientId=' + encodeURIComponent(client) : '');
-                        var result = await fetch(url, {credentials:'same-origin',headers:{Accept:'application/json'}}); if (!result.ok) throw new Error();
-                        var rows = await result.json(), selected = select.selectedOptions[0] && select.selectedOptions[0].cloneNode(true);
-                        select.replaceChildren(new Option('', '')); if (selected && selected.value) select.add(selected);
-                        rows.slice(0,25).forEach(function (r) { if (!selected || r.id !== selected.value) select.add(new Option(r.label,r.id)); });
-                        if (selected) select.value = selected.value;
-                        if (window.NeoSelect && typeof window.NeoSelect.refresh === 'function') window.NeoSelect.refresh(select);
-                    } catch (_) { fail(); }
-                },250));
+            function bindChoices(scope) {
+                scope.querySelectorAll('[data-application-choice]').forEach(function (select) {
+                    if (lookups.has(select)) return;
+                    lookups.set(select, window.VoucherSelect.bind(select, {
+                        field: select,
+                        label: function () { return select.selectedOptions[0]?.textContent || ''; },
+                        url: function () {
+                            var endpoint = new URL(root + '/choices/' + select.dataset.applicationChoice, location.origin);
+                            var client = form.elements.namedItem('clientId')?.value;
+                            if (client) endpoint.searchParams.set('clientId', client);
+                            return endpoint.href;
+                        },
+                        choice: function (item) { return {value:String(item.id),label:item.label}; },
+                        changed: function () {},
+                        error: error.dataset.errorText
+                    }));
+                });
             }
-            form.addEventListener('input', function (event) {
-                var input = event.target;
-                if (input.dataset.choiceSearch) choices(input, form.querySelector('#' + input.dataset.choiceSearch));
-                if (input.hasAttribute('data-guarantor-search')) choices(input, input.parentElement.querySelector('select'));
+            bindChoices(form);
+            form.addEventListener('change', function (event) {
+                if (event.target.name === 'clientId') form.querySelectorAll('[data-application-choice="guarantors"]').forEach(function (select) { lookups.get(select)?.cancel(); });
             });
             var standard = new Set(['purpose','business','monthlyIncome','monthlyExpenses','otherDebtRepayments','collateralDescription','collateralEstimatedValue']);
             var productRequest = 0;

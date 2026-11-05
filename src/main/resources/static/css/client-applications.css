@@ -1,8 +1,30 @@
-.application-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}.application-grid label,.application-field-label{display:block;font-weight:600;margin-bottom:5px}.application-grid .aws-control{width:100%;min-width:0}.application-wide{grid-column:1/-1}.application-row{border-bottom:1px solid #d5dbdb;padding:12px 0}.application-row>button{margin:0 16px 12px}.application-tabs{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #aab7b8;margin:16px 0;background:#fff}.application-tabs button{flex:0 0 auto;padding:14px 18px;border-bottom:3px solid transparent;color:#414d5c;font-weight:600}.application-tabs [aria-selected=true]{color:#0073bb;border-bottom-color:#0073bb}.application-panel>p,.application-panel>button,.application-panel>dl,.application-panel>[data-add-row]{margin:16px}.application-panel[hidden]{display:none}.application-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:16px;max-width:920px}.application-footer{justify-content:flex-end;margin-top:20px}.application-row .aws-control{min-width:0}.application-grid input[type=file]{overflow:hidden}@media(max-width:640px){.application-grid{grid-template-columns:minmax(0,1fr)}.application-tabs button{padding:12px}.application-footer{flex-wrap:wrap}.application-declaration{font-size:14px}}
-
-.application-repayment-estimate,.application-saved-documents,.application-panel>.loan-workflow-section{margin:16px}
+/* Application forms use the shared resource sections, tabs and controls. */
+.application-create-workspace{width:100%;max-width:960px;min-width:0}
+.application-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-width:0}
+.application-grid>div{min-width:0}
+.application-grid label,.application-field-label{display:block;font-size:14px;font-weight:400;line-height:20px;margin-bottom:6px}
+.application-grid .aws-control,.application-grid .neo-select{width:100%;min-width:0}
+.application-grid p{margin:6px 0 0}
+.application-grid input[type=file]{overflow:hidden}
+.application-wide{grid-column:1/-1}
+.application-create-workspace [data-application-panel=information]>.application-grid{grid-template-columns:minmax(0,1fr);max-width:728px}
+.application-create-workspace [data-product-fields]:empty{display:none}
+.aws-console .application-tabs{margin:16px 0}
+.application-panel[hidden]{display:none}
+.application-row{border-bottom:1px solid #d5dbdb;padding:0 0 16px;margin-bottom:16px}
+.application-row>button{margin-top:12px}
+.application-panel>p,.application-panel>button,.application-panel>dl{margin:16px 0}
+.application-panel>[data-add-row]{margin:0}
+.application-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:20px}
+.application-declaration input{flex:none;margin-top:3px}
+.application-declaration label{font-size:14px;line-height:20px}
+.application-footer{justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #d5dbdb}
+.application-footer .app-btn{max-width:100%;white-space:normal}
+.application-repayment-estimate,.application-saved-documents,.application-panel>.loan-workflow-section{margin:16px 0}
 .application-repayment-estimate summary{cursor:pointer;font-weight:600;margin-bottom:8px}
 .application-repayment-estimate th,.application-repayment-estimate td{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
 .application-saved-documents ul{padding:0;list-style:none}
 .application-saved-documents li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:8px 0;border-bottom:1px solid #d5dbdb;overflow-wrap:anywhere}
 .application-saved-documents h3{font-size:1rem;font-weight:600}
+@media(max-width:640px){.application-grid{grid-template-columns:minmax(0,1fr)}}
+@media print{.application-create-workspace [data-application-panel][hidden]{display:block!important;margin-top:16px}}
