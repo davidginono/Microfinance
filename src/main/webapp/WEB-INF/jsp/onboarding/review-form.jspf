@@ -1,0 +1,28 @@
+<%@ page pageEncoding="UTF-8" %>
+<form:form id="client-onboarding-form" method="post" action="${reviewUrl}" modelAttribute="reviewForm" cssClass="kyc-client-form" data-detail-panel="true" data-accounting-dirty-form="true" data-onboarding-form="review" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
+    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/>
+    <form:hidden path="revisionId"/>
+    <section class="erp-resource-section">
+        <h2><spring:message code="kyc.review"/></h2>
+        <div class="kyc-form-fields">
+            <label class="kyc-field"><span><spring:message code="kyc.field.decision"/></span><form:select path="kind" cssClass="aws-control" data-kyc-decision="true"><c:forEach items="${client.state=='SUBMITTED'?['VERIFY','RETURN','REJECT']:['REVOKE']}" var="kind"><form:option value="${kind}"><spring:message code="kyc.action.${kind}"/></form:option></c:forEach></form:select><form:errors path="kind" cssClass="field-error"/></label>
+            <label class="kyc-field"><span><spring:message code="kyc.field.reason"/></span><form:textarea path="reason" cssClass="aws-control" rows="3" maxlength="1000" required="required"/><form:errors path="reason" cssClass="field-error"/></label>
+            <label class="kyc-field"><span><spring:message code="kyc.field.clientMessage"/></span><form:textarea path="clientMessage" cssClass="aws-control" rows="3" maxlength="1000"/><form:errors path="clientMessage" cssClass="field-error"/></label>
+            <c:if test="${client.state=='SUBMITTED'}">
+            <div class="kyc-review-fields" data-kyc-verify="true">
+                <div class="kyc-field">
+                    <label class="kyc-checkbox"><form:checkbox path="checksConfirmed" required="required"/><span><spring:message code="kyc.field.checksConfirmed"/></span></label>
+                    <form:errors path="checksConfirmed" cssClass="field-error" role="alert" data-workspace-form-error="true" data-workspace-response-error="true"/>
+                </div>
+                <div class="kyc-field-pair">
+                    <label class="kyc-field"><span><spring:message code="kyc.field.checkedOn"/></span><form:input path="checkedOn" type="date" cssClass="aws-control" required="required"/><form:errors path="checkedOn" cssClass="field-error"/></label>
+                </div>
+            </div>
+            </c:if>
+        </div>
+    </section>
+    <spring:bind path="reviewForm"><c:if test="${not empty status.errors.globalErrors}"><div class="console-message" data-message-type="error" data-detail-error data-workspace-form-error data-workspace-response-error role="alert" tabindex="-1"><c:forEach items="${status.errors.globalErrors}" var="error"><p><spring:message message="${error}"/></p></c:forEach></div></c:if></spring:bind>
+    <form:errors path="requestKey" cssClass="field-error" element="p" role="alert"/>
+    <form:errors path="revisionId" cssClass="field-error" element="p" role="alert"/>
+    <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}'/>"><spring:message code="common.cancel"/></a><button class="app-btn btn-launch" type="submit"><spring:message code="kyc.saveReview"/></button></div>
+</form:form>

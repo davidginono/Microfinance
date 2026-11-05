@@ -23,6 +23,8 @@ Use the [Cloudscape Spinner](https://cloudscape.design/components/spinner/) as t
 
 ## Start With The Shared Shell
 
+- Follow `AGENTS.md`'s removal-at-source rule: delete styles, markup, initialization and assets made unused by a removed UI component. Check shared, generated and dynamic references before deletion; do not leave equivalent hidden controls or obsolete overrides behind the surviving component.
+
 Read the relevant definitions before changing individual pages:
 
 - `src/main/webapp/WEB-INF/jsp/fragments/header.jspf`

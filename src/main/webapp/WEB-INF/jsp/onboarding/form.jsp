@@ -1,19 +1,11 @@
 <%@ include file="head.jspf" %>
 <c:set var="returnPath" value="${empty client?'/finance/clients/onboarding':'/finance/clients/onboarding/'}${empty client?'':client.id}"/>
-<c:set var="modelName" value="${formKind=='create'?'createForm':formKind=='profile'?'profileForm':formKind=='document'?'documentForm':'reviewForm'}"/>
-<div class="accounting-workspace accounting-create ${formKind=='review'?'kyc-form-workspace':''}" data-resource-form-page ${formKind=='create' or formKind=='profile'?'data-resource-details-page':''}>
+<c:set var="modelName" value="${formKind=='create'?'createForm':formKind=='profile'?'profileForm':'documentForm'}"/>
+<div class="accounting-workspace accounting-create" data-resource-form-page ${formKind=='create' or formKind=='profile'?'data-resource-details-page':''}>
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="<c:url value='${returnPath}'/>"><spring:message code="kyc.details"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="kyc.form.${formKind}"/></span></nav>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="kyc.form.${formKind}"/></h1></div>
 <c:if test="${not empty client}"><%@ include file="facts.jspf" %></c:if>
-<c:if test="${formKind=='review'}">
-    <details class="kyc-review-evidence">
-        <summary><spring:message code="kyc.reviewEvidence"/></summary>
-        <div class="accounting-workspace">
-            <%@ include file="profile.jspf" %>
-            <%@ include file="documents.jspf" %>
-        </div>
-    </details>
-</c:if>
+
 <form:form id="client-onboarding-form" method="post" enctype="${formKind=='document'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="kyc-client-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/>
 
@@ -42,36 +34,12 @@
                 data-upload-file-error="<spring:message code='kyc.error.file'/>" data-upload-limit-error="<spring:message code='kyc.error.uploadLimit'/>"/></label>
             <p class="kyc-field-hint"><spring:message code="kyc.fileHelp"/></p>
     </div></section>
-</c:when><c:otherwise>
-    <form:hidden path="revisionId"/>
-    <section class="erp-resource-section">
-        <h2><spring:message code="kyc.review"/></h2>
-        <div class="kyc-form-fields">
-            <label class="kyc-field"><span><spring:message code="kyc.field.decision"/></span><form:select path="kind" cssClass="aws-control" data-kyc-decision="true"><c:forEach items="${client.state=='SUBMITTED'?['VERIFY','RETURN','REJECT']:['REVOKE']}" var="kind"><form:option value="${kind}"><spring:message code="kyc.action.${kind}"/></form:option></c:forEach></form:select><form:errors path="kind" cssClass="field-error"/></label>
-            <label class="kyc-field"><span><spring:message code="kyc.field.reason"/></span><form:textarea path="reason" cssClass="aws-control" rows="3" maxlength="1000" required="required"/><form:errors path="reason" cssClass="field-error"/></label>
-            <label class="kyc-field"><span><spring:message code="kyc.field.clientMessage"/></span><form:textarea path="clientMessage" cssClass="aws-control" rows="3" maxlength="1000"/><form:errors path="clientMessage" cssClass="field-error"/></label>
-            <c:if test="${client.state=='SUBMITTED'}">
-            <div class="kyc-review-fields" data-kyc-verify="true">
-                <div class="kyc-field">
-                    <label class="kyc-checkbox"><form:checkbox path="checksConfirmed" required="required"/><span><spring:message code="kyc.field.checksConfirmed"/></span></label>
-                    <form:errors path="checksConfirmed" cssClass="field-error" role="alert" data-workspace-form-error="true" data-workspace-response-error="true"/>
-                </div>
-                <div class="kyc-field-pair">
-                    <label class="kyc-field"><span><spring:message code="kyc.field.checkedOn"/></span><form:input path="checkedOn" type="date" cssClass="aws-control" required="required"/><form:errors path="checkedOn" cssClass="field-error"/></label>
-                </div>
-            </div>
-            </c:if>
-        </div>
-    </section>
-</c:otherwise></c:choose>
+</c:when></c:choose>
     <spring:bind path="${modelName}"><c:if test="${not empty status.errors.globalErrors}"><div class="console-message" data-message-type="error" data-workspace-form-error data-workspace-response-error role="alert" tabindex="-1"><c:forEach items="${status.errors.globalErrors}" var="error"><p><spring:message message="${error}"/></p></c:forEach></div></c:if></spring:bind>
     <c:if test="${formKind=='document'}"><form:errors path="*" cssClass="field-error" element="p" role="alert"/></c:if>
-    <c:if test="${formKind=='review'}">
-        <form:errors path="requestKey" cssClass="field-error" element="p" role="alert"/>
-        <form:errors path="revisionId" cssClass="field-error" element="p" role="alert"/>
-    </c:if>
+
     <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='${returnPath}'/>"><spring:message code="common.cancel"/></a>
-        <c:choose><c:when test="${formKind=='profile'}"><button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formnovalidate><spring:message code="kyc.saveDraft"/></button><button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED"><spring:message code="kyc.submit"/></button></c:when><c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="${formKind=='review'?'kyc.saveReview':'credit.save'}"/></button></c:otherwise></c:choose>
+        <c:choose><c:when test="${formKind=='profile'}"><button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formnovalidate><spring:message code="kyc.saveDraft"/></button><button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED"><spring:message code="kyc.submit"/></button></c:when><c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="credit.save"/></button></c:otherwise></c:choose>
     </div>
 </form:form>
 </div>

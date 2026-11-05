@@ -54,6 +54,39 @@ class ClientOnboardingMvcTest {
         String facts=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/facts.jspf"));
         assertThat(facts).contains("include file=\"status.jspf\"","data-resource-status=\"${client.portalEnabled?'ENABLED':'DISABLED'}\"");
     }
+    @Test void reviewActionsArePreparedOnClientDetailsForEligibleStatesOnly() throws Exception {
+        var day=java.time.LocalDate.of(2026,11,5);when(service.today()).thenReturn(day);
+        when(service.history(staff,id,0)).thenReturn(new Page<>(List.of(),0,false));
+        for(String state:List.of("SUBMITTED","VERIFY","EXPIRED","STALE","DRAFT")) {
+            UUID revision=UUID.randomUUID();when(service.client(staff,id)).thenReturn(new Client(id,"C1","Synthetic client",null,null,state,revision,1,null));
+            var result=mvc.perform(get(root+"/"+id).with(user(staff))).andExpect(view().name("onboarding/details")).andReturn();
+            var form=(ReviewForm)result.getModelAndView().getModel().get("reviewForm");
+            if(state.equals("DRAFT"))assertThat(form).isNull();
+            else {assertThat(form.getRevisionId()).isEqualTo(revision);assertThat(form.getKind()).isEqualTo(state.equals("SUBMITTED")?"VERIFY":"REVOKE");assertThat(form.getCheckedOn()).isEqualTo(day);}
+        }
+    }
+    @Test void viewOnlyStaffDoNotReceiveReviewControlsAndSeparateReviewPageIsRemoved() throws Exception {
+        var viewer=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.CLIENT_ONBOARDING_VIEW),true);
+        when(service.client(viewer,id)).thenReturn(new Client(id,"C1","Synthetic client",null,null,"SUBMITTED",UUID.randomUUID(),1,null));
+        when(service.history(viewer,id,0)).thenReturn(new Page<>(List.of(),0,false));
+        mvc.perform(get(root+"/"+id).with(user(viewer))).andExpect(view().name("onboarding/details")).andExpect(model().attributeDoesNotExist("reviewForm"));
+        mvc.perform(get(root+"/"+id+"/review").with(user(staff))).andExpect(status().isMethodNotAllowed());
+        verify(service,never()).review(any(),any(),any());
+    }
+    @Test void failedReviewStaysOnClientDetailsWithValuesAndFieldErrors() throws Exception {
+        UUID revision=UUID.randomUUID();when(service.history(staff,id,0)).thenReturn(new Page<>(List.of(),0,false));
+        when(service.client(staff,id)).thenReturn(new Client(id,"C1","Synthetic client",null,null,"SUBMITTED",revision,1,null));
+        when(service.review(any(),any(),any())).thenThrow(new IllegalArgumentException("kyc.error.checks"));
+        var result=mvc.perform(post(root+"/"+id+"/review").with(user(staff)).with(csrf()).param("revisionId",revision.toString()).param("kind","VERIFY").param("reason","Keep the review reason"))
+            .andExpect(view().name("onboarding/details")).andExpect(model().attributeHasFieldErrors("reviewForm","checksConfirmed")).andExpect(model().attributeExists("client","history","decisions")).andReturn();
+        var form=(ReviewForm)result.getModelAndView().getModel().get("reviewForm");assertThat(form.getReason()).isEqualTo("Keep the review reason");assertThat(form.getRevisionId()).isEqualTo(revision);
+        verify(service).authorize(staff,"REVIEW");
+    }
+    @Test void successfulReviewReturnsToClientDetails() throws Exception {
+        mvc.perform(post(root+"/"+id+"/review").with(user(staff)).with(csrf()).param("kind","REVOKE").param("reason","Recorded reason"))
+            .andExpect(redirectedUrl(root+"/"+id));
+        verify(service).authorize(staff,"REVIEW");verify(service).review(eq(staff),eq(id),argThat(f->f.getKind().equals("REVOKE")&&f.getReason().equals("Recorded reason")));
+    }
     @Test void everyStaffWriteRequiresCsrfAndRejectsClientSessions()throws Exception {
         for(String path:List.of(root+"/new",root+"/"+id+"/edit",root+"/"+id+"/review",root+"/"+id+"/documents/new")) {
             mvc.perform(post(path).with(user(staff))).andExpect(status().isForbidden());

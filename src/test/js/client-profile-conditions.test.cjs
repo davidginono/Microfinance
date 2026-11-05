@@ -28,3 +28,19 @@ test('reset restores conditional visibility without clearing typed fields on ord
 test('conditional initialization never enables controls in a submitted read-only profile',async()=>{
  const {dom,d,business,marital,choose}=await setup('profile.',true);try{choose(business,'true');choose(marital,'MARRIED');assert.equal(d.querySelector('[name="profile.businessName"]').matches(':disabled'),true);assert.equal(d.querySelector('[name="profile.spouseName"]').matches(':disabled'),true);}finally{dom.window.close();}
 });
+
+test('inline client review keeps verification checks and feedback tied to the selected decision',async()=>{
+ const dom=new JSDOM(`<body data-resource-details="true"><main><section class="erp-resource-section"><h2>Client</h2><dl class="erp-detail-facts"><dt>Client Number</dt><dd>C1</dd></dl></section><form id="review" data-detail-panel action="/finance/clients/onboarding/client/review" method="post" data-onboarding-form="review"><input name="_csrf" value="token"><section class="erp-resource-section"><h2>Review</h2><select data-kyc-decision name="kind"><option value="VERIFY">Verify</option><option value="RETURN">Return</option><option value="REJECT">Reject</option></select><textarea name="clientMessage">Keep feedback</textarea><div data-kyc-verify><input name="checksConfirmed" type="checkbox" required><input name="checkedOn" type="date" value="2026-11-05" required></div></section><button type="submit">Save review</button></form><section id="history" class="erp-resource-section"><h2>History</h2></section></main></body>`,{url:'http://localhost/finance/clients/onboarding/client',runScripts:'outside-only'});
+ try{
+  dom.window.eval(source);dom.window.eval(readFileSync('src/main/resources/static/js/console-resource-details.js','utf8'));await new Promise(resolve=>dom.window.document.addEventListener('DOMContentLoaded',resolve,{once:true}));
+  const w=dom.window,d=w.document,form=d.querySelector('form'),decision=d.querySelector('[data-kyc-decision]'),checks=d.querySelector('[data-kyc-verify]'),feedback=form.elements.clientMessage;
+  assert.equal(checks.hidden,false);assert.equal(feedback.required,false);assert.equal(form.checkValidity(),false);
+  assert.equal(decision.form,form);assert.equal(form.querySelector('button[type=submit]').form,form);
+  d.querySelector('#history-tab').click();assert.equal(form.hidden,true);d.querySelector('#review-tab').click();assert.equal(form.hidden,false);
+  decision.value='RETURN';decision.dispatchEvent(new w.Event('change',{bubbles:true}));
+  assert.equal(checks.hidden,true);assert.equal(form.elements.checksConfirmed.disabled,true);assert.equal(feedback.required,true);assert.equal(form.checkValidity(),true);
+  let data=new w.FormData(form);assert.equal(data.get('_csrf'),'token');assert.equal(data.get('clientMessage'),'Keep feedback');assert.equal(data.has('checkedOn'),false);
+  decision.value='VERIFY';decision.dispatchEvent(new w.Event('change',{bubbles:true}));form.elements.checksConfirmed.checked=true;
+  assert.equal(form.checkValidity(),true);data=new w.FormData(form);assert.equal(data.get('checkedOn'),'2026-11-05');assert.equal(feedback.value,'Keep feedback');
+ }finally{dom.window.close();}
+});

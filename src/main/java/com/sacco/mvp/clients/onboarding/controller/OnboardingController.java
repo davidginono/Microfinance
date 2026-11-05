@@ -40,7 +40,12 @@ public class OnboardingController {
         return form(m,"create");
     }
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model m) {
-        context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));return "onboarding/details";
+        context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));
+        var c=(Client)m.getAttribute("client");
+        if(a.getClaims().contains("CLIENT_ONBOARDING_REVIEW") && Set.of("SUBMITTED","VERIFY","EXPIRED","STALE").contains(c.state()) && !m.containsAttribute("reviewForm")) {
+            var f=new ReviewForm();f.setRevisionId(c.revisionId());f.setKind(c.state().equals("SUBMITTED")?"VERIFY":"REVOKE");f.setCheckedOn(service.today());m.addAttribute("reviewForm",f);
+        }
+        return "onboarding/details";
     }
     @GetMapping({"/{id}/loan","/{id}/loan/edit","/{id}/loan/products","/{id}/loan/continue"}) public String retiredLoan(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id) {
         service.client(a,id);return "redirect:"+ROOT+"/"+id;
@@ -64,12 +69,9 @@ public class OnboardingController {
         service.authorize(a,"UPDATE");if(!errors.hasErrors())try{service.attach(a,id,f,file);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}
         context(a,id,m);return form(m,"document");
     }
-    @GetMapping("/{id}/review") public String review(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m) {
-        service.authorize(a,"REVIEW");var c=service.client(a,id);var f=new ReviewForm();f.setRevisionId(c.revisionId());f.setKind(Set.of("VERIFY","EXPIRED","STALE").contains(c.state())?"REVOKE":"VERIFY");f.setCheckedOn(service.today());m.addAttribute("reviewForm",f);context(a,id,m);return form(m,"review");
-    }
     @PostMapping("/{id}/review") public String review(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute("reviewForm") ReviewForm f,BindingResult errors,Model m) {
         service.authorize(a,"REVIEW");if(!errors.hasErrors())try{service.review(a,id,f);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}
-        context(a,id,m);return form(m,"review");
+        return details(a,id,0,m);
     }
     @GetMapping("/{id}/documents/{document}") public ResponseEntity<byte[]> download(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID document) {
         var file=service.download(a,id,document);

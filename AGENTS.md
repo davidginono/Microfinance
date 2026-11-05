@@ -214,6 +214,7 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 ## Editing Rules
 
 - Prefer minimal, targeted changes.
+- Removal requests require removal at the source, including code made unused by the change: page templates, route handlers, navigation links, form branches, JavaScript listeners, CSS, imports, assets, labels and obsolete tests. Do not retain an equivalent hidden, disabled, renamed or unreachable implementation. Search static and dynamic references, remove only the affected feature's orphans, and verify the surviving flow. Preserve live shared dependencies, authorization, audit history and financial records; retain compatibility behavior only when it is still required and explain that requirement.
 - After completing and verifying a user-requested change, automatically create a local Git commit unless the user explicitly asks not to commit.
   - stage only files changed for the current request; never include unrelated or pre-existing worktree changes
   - use a concise commit message that describes the completed change
