@@ -44,6 +44,7 @@ public class LoanRecordingService {
     private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
     private final com.sacco.mvp.grouplending.service.GroupSharedLoanService sharedLoans;
     private final com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
+    private final LoanRecordingEvidenceService evidence;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -98,7 +99,7 @@ public class LoanRecordingService {
         authorize(a,"POST");records.record(a,loan,false);return repayments.previewPayment(loan,a,date,amount,prior);
     }
     @Transactional(readOnly=true)
-    public Page<LoanRow> list(AppUserPrincipal a,Filter f){authorize(a,"VIEW");filter(f,false);var rows=records.loans(a,f,clock.today(),26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
+    public Page<LoanRow> list(AppUserPrincipal a,Filter f){authorize(a,"VIEW");filter(f,false);var rows=records.registerLoans(a,f,clock.today(),26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
     @Transactional(readOnly=true)
     public Page<Posting> register(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);var rows=records.posts(a,kind,f,26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
     @Transactional(readOnly=true)
@@ -111,6 +112,10 @@ public class LoanRecordingService {
         default->throw new IllegalArgumentException("recording.error.filter");};}
     @Transactional(readOnly=true)
     public Choice filterProduct(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.filter"));}
+    @Transactional(readOnly=true)
+    public Choice recordClient(AppUserPrincipal actor,UUID id) {
+        authorize(actor,"CREATE");return records.client(actor,id).orElseThrow(()->new AccessDeniedException("Client unavailable"));
+    }
     @Transactional(readOnly=true)
     public Choice recordProduct(AppUserPrincipal a,UUID id){authorize(a,"CREATE");return records.filterProduct(a,id).orElseThrow(()->new IllegalArgumentException("recording.error.product"));}
     @Transactional(readOnly=true)
@@ -202,7 +207,8 @@ public class LoanRecordingService {
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
         validateFiles(files);
-        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);check(f.getApplicationId()==null,"request");if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+        var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
         if(shared.active()>0){
@@ -239,7 +245,7 @@ public class LoanRecordingService {
             .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
             .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();
-        loan.setAttachmentsJson(attachments.store(loan.getId(),files,null));
+        loan.setAttachmentsJson(namedUploads==null?attachments.store(loan.getId(),files,null):attachments.storeNamed(loan.getId(),namedUploads,null));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
         String clientKycError=loans.kycError(id,a.getSaccoId(),a.getStationId(),clock.today());
         if(clientKycError!=null)throw new IllegalArgumentException(clientKycError);
@@ -265,6 +271,25 @@ public class LoanRecordingService {
         return new Detail(records.loan(a,id,clock.today()),record.get("sacco_name").toString(),record.get("branch_name").toString(),record.get("actor_name").toString(),time(record.get("recorded_at")),
             f.getPurpose(),f.getBusiness(),f.getIncome(),f.getExpenses(),f.getOtherDebt(),f.getInformationSource(),f.getGuarantors(),f.getCollateral(),f.getEvidence(),f.getNotes(),
             new BigDecimal(snapshot.get("interestRate").toString()),snapshot.get("interestMethod").toString(),snapshot.get("repaymentFrequency").toString(),loan.getTenorMonths(),loan.getFirstRepaymentDate(),calc.installment(),calc.totalInterest(),schedule,tenure(f).unit(),tenure(f).value(),f.getInterestBasis(),f.getLoanMode(),f.getInterestEntry());
+    }
+    @Transactional(readOnly=true)
+    public ApplicationDetails supportingDetails(AppUserPrincipal actor,UUID id) {
+        authorize(actor,"VIEW");
+        var record=records.record(actor,id,false);
+        return read(record.get("metadata").toString(),RecordForm.class).getApplicationDetails();
+    }
+    @Transactional(readOnly=true)
+    public Map<UUID,String> supportingGuarantors(AppUserPrincipal actor,UUID id) {
+        var details=supportingDetails(actor,id);
+        if(details==null || details.getGuarantors()==null)return Map.of();
+        return records.evidenceClients(actor,details.getGuarantors().stream()
+            .map(com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor::getClientId)
+            .filter(Objects::nonNull).toList());
+    }
+    @Transactional(readOnly=true)
+    public Set<UUID> intakeIds(AppUserPrincipal actor,List<UUID> ids) {
+        authorize(actor,"VIEW");
+        return actor.getClaims().contains("CLIENT_ONBOARDING_VIEW")?records.intakeIds(actor,ids):Set.of();
     }
     @Transactional
     public Posting disburse(AppUserPrincipal a,PostForm f){return disburse(a,f,List.of());}
@@ -469,7 +494,7 @@ public class LoanRecordingService {
         check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
         check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getExpenses(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private void validatePost(PostForm f){check(f!=null && f.getRequestKey()!=null && f.getLoanId()!=null,"request");money(f.getAmount());check(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(clock.today()),"date");text(f.getReference(),100,true);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);}
-    static void filter(Filter f,boolean posting){check(f!=null && f.search()!=null && f.search().length()<=100 && f.page()>=0 && f.page()<=10000 && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),posting?Set.of("number","product","client","date","amount","reference","status"):Set.of("number","product","client","date","amount","balance","status")),"filter");check(f.from()==null || f.through()==null || !f.from().isAfter(f.through()),"date");check((posting?Set.of("","POSTED","REVERSED","REVERSAL"):Set.of("","RECORDED","WITHDRAWN","DISBURSED","PAR","DEFAULTED","PAID","WRITTEN_OFF","DISBURSEMENT_REVERSED")).contains(f.status()),"filter");}
+    static void filter(Filter f,boolean posting){check(f!=null && f.search()!=null && f.search().length()<=100 && f.page()>=0 && f.page()<=10000 && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),posting?Set.of("number","product","client","date","amount","reference","status"):Set.of("number","product","client","date","amount","balance","status")),"filter");check(f.from()==null || f.through()==null || !f.from().isAfter(f.through()),"date");check((posting?Set.of("","POSTED","REVERSED","REVERSAL"):Set.of("","DRAFT","AWAITING_GUARANTORS","ALL_GUARANTORS_APPROVED","READY_FOR_MANAGER","AWAITING_LOAN_OFFICER","AWAITING_CHAIRPERSON","AWAITING_BOARD","AWAITING_CREDIT_COMMITTEE","AWAITING_ACCOUNTANT","READY_FOR_DISBURSEMENT","MANAGER_REJECTED","LOAN_OFFICER_REJECTED","CHAIRPERSON_REJECTED","BOARD_REJECTED","CREDIT_COMMITTEE_REJECTED","ACCOUNTANT_REJECTED","REJECTED","RECORDED","WITHDRAWN","DISBURSED","PAR","DEFAULTED","PAID","WRITTEN_OFF","DISBURSEMENT_REVERSED")).contains(f.status()),"filter");}
     private void kind(String kind){check(Set.of("DISBURSEMENT","PAYMENT","REVERSAL").contains(kind),"filter");}
     private static void money(BigDecimal amount){check(amount!=null && amount.signum()>0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private static void text(String text,int max,boolean required){check(text!=null && text.length()<=max && (!required || !text.isBlank()) && text.chars().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t'),"text");}

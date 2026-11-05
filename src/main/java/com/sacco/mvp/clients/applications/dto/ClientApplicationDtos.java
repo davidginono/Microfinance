@@ -9,6 +9,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 public final class ClientApplicationDtos {
     private ClientApplicationDtos() {}
     @Data public static class Form {
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.RecordForm recordingDraft;
         private UUID requestKey=UUID.randomUUID(),clientId,applicationId,productId,loanOfficerId;
         private int expectedVersion;
         private String command="DRAFT",tenureUnit="MONTHS",purpose="",business="",useOfFunds="";

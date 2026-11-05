@@ -29,6 +29,35 @@ public class LoanRecordingRepository {
         sum(greatest(0,interest-interest_paid-interest_excluded-interest_waived-loan_interest_due(id,?))) future
         from loan_ledger_installments where loan_application_id=a.id) d on true
         """;
+    private static final String APPLICATION_LOANS=LOANS.replace("from accountant_loan_record r join loan_applications a", """
+        from (select loan_id,sacco_id,station_id,product_name,application_date,requested_principal from accountant_loan_record
+          union all
+          select a.id,a.sacco_id,a.station_id,coalesce(nullif(p.product_name,''),p.loan_type),
+            coalesce(nullif(a.form_data->'recordingDetails'->>'applicationDate','')::date,a.created_at::date),a.amount
+          from loan_applications a join members borrower on borrower.id=a.applicant_member_id
+          join loan_product_settings p on p.id=a.loan_product_setting_id and p.sacco_id=a.sacco_id
+          where borrower.client_portal_enabled=false and exists(select 1 from client_application_command c where c.application_id=a.id)
+            and not exists(select 1 from accountant_loan_record recorded where recorded.loan_id=a.id)
+        ) r join loan_applications a
+        """);
+    public Set<UUID> intakeIds(AppUserPrincipal actor,List<UUID> ids) {
+        if(ids.isEmpty())return Set.of();
+        if(ids.size()>26)throw new IllegalArgumentException("recording.error.filter");
+        var found=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+            select a.id from loan_applications a where a.id in(:ids) and a.sacco_id=:institution and a.station_id=:branch
+            and exists(select 1 from client_application_command c where c.application_id=a.id)
+            and not exists(select 1 from accountant_loan_record r where r.loan_id=a.id)
+            """,Map.of("ids",ids,"institution",actor.getSaccoId(),"branch",actor.getStationId()),(row,n)->row.getObject(1,UUID.class));
+        return new HashSet<>(found);
+    }
+    public boolean intakeRequest(AppUserPrincipal actor,UUID key) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from client_application_command where sacco_id=? and station_id=? and request_key=?)",
+            Boolean.class,actor.getSaccoId(),actor.getStationId(),key));
+    }
+    public boolean directRequest(AppUserPrincipal actor,UUID key) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_record where sacco_id=? and station_id=? and request_key=?)",
+            Boolean.class,actor.getSaccoId(),actor.getStationId(),key));
+    }
     private static final String POST_FROM="""
         from accountant_loan_movement p join loan_applications a on a.id=p.loan_id
         join accountant_loan_record r on r.loan_id=p.loan_id and r.sacco_id=p.sacco_id and r.station_id=p.station_id
@@ -95,16 +124,52 @@ public class LoanRecordingRepository {
         """;}
     private Object[] loanArgs(AppUserPrincipal a,Filter f,LocalDate today){return new Object[]{today,today,today,a.getSaccoId(),a.getStationId(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.clientId(),f.clientId(),f.productId(),f.productId()};}
     public List<LoanRow> loans(AppUserPrincipal a,Filter f,LocalDate today,int limit,int offset){
+        return queryLoans(a,f,today,limit,offset,LOANS);
+    }
+    public List<LoanRow> registerLoans(AppUserPrincipal a,Filter f,LocalDate today,int limit,int offset) {
+        return queryLoans(a,f,today,limit,offset,a.getClaims().contains("CLIENT_ONBOARDING_VIEW")?APPLICATION_LOANS:LOANS);
+    }
+    private List<LoanRow> queryLoans(AppUserPrincipal a,Filter f,LocalDate today,int limit,int offset,String source) {
         var args=new ArrayList<>(Arrays.asList(loanArgs(a,f,today)));args.add(limit);args.add(offset);
         String order=RegisterSort.order(f.sort(),Map.of("number","coalesce(a.loan_id,a.application_number::text)","product","r.product_name","client","m.full_name","date","r.application_date","amount","a.amount","balance","coalesce(l.principal-l.principal_paid,0)","status","a.status"),"a.id");
         order=com.sacco.mvp.support.ResourceTableSort.order("client-statement-loans",Map.of("loan","coalesce(a.loan_id,a.application_number::text)","product","r.product_name","status","a.status","principal","outstanding","interest","due_interest","charges","charges","arrears","arrears"),"a.id",order);
-        return jdbc.query(LOANS+loanWhere()+" order by "+order+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>) this::loan,args.toArray());
+        return jdbc.query(source+loanWhere()+" order by "+order+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>) this::loan,args.toArray());
     }
     public List<Choice> clients(AppUserPrincipal a,String search,int page){return jdbc.query("""
-        select id,member_no||' - '||full_name label from members where sacco_id=? and station_id=? and status='ACTIVE' and is_member
+        select id,member_no||' - '||full_name label,case when client_portal_enabled then 'BORROWER' else 'PROVISIONAL' end client_kind from members where sacco_id=? and station_id=? and status='ACTIVE' and is_member
         and strpos(lower(member_no||' '||full_name),?)>0 order by member_no,id limit 26 offset ?
-        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
-    public Optional<Choice> client(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no||' - '||full_name label from members where id=? and sacco_id=? and station_id=? and status='ACTIVE' and is_member",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),""),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("client_kind")),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
+    public List<Choice> officers(AppUserPrincipal actor, String search, int page) {
+        return jdbc.query("""
+            select m.id,m.full_name from members m where m.sacco_id=? and m.station_id=?
+            and m.status='ACTIVE' and m.staff_access_status='ACTIVE'
+            and (m.position='LOAN_OFFICER' or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name='LOAN_OFFICER'))
+            and strpos(lower(m.full_name),?)>0 order by m.full_name,m.id limit 26 offset ?
+            """, (r,n)->new Choice(r.getObject(1,UUID.class),r.getString(2),""),
+            actor.getSaccoId(),actor.getStationId(),search.toLowerCase(Locale.ROOT),page*25);
+    }
+    public boolean officer(AppUserPrincipal actor, UUID id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from members m where m.id=? and m.sacco_id=? and m.station_id=?
+            and m.status='ACTIVE' and m.staff_access_status='ACTIVE' and (m.position='LOAN_OFFICER'
+            or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name='LOAN_OFFICER')))
+            """,Boolean.class,id,actor.getSaccoId(),actor.getStationId()));
+    }
+    public String officerLabel(AppUserPrincipal actor,UUID id) {
+        return jdbc.query("select full_name from members where id=? and sacco_id=? and station_id=?",(row,n)->row.getString(1),
+            id,actor.getSaccoId(),actor.getStationId()).stream().findFirst().orElse("");
+    }
+    public Map<UUID,String> evidenceClients(AppUserPrincipal actor, Collection<UUID> ids) {
+        if(ids.isEmpty())return Map.of();
+        if(ids.size()>20)throw new IllegalArgumentException("applications.error.guarantors");
+        var found=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+            select id,member_no||' - '||full_name from members where id in(:ids) and sacco_id=:institution
+            and station_id=:branch and status='ACTIVE' and is_member=true
+            """,Map.of("ids",ids,"institution",actor.getSaccoId(),"branch",actor.getStationId()),
+            (r,n)->Map.entry(r.getObject(1,UUID.class),r.getString(2)));
+        var labels=new LinkedHashMap<UUID,String>();found.forEach(e->labels.put(e.getKey(),e.getValue()));return labels;
+    }
+    public Optional<Choice> client(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no||' - '||full_name label,case when client_portal_enabled then 'BORROWER' else 'PROVISIONAL' end client_kind from members where id=? and sacco_id=? and station_id=? and status='ACTIVE' and is_member",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("client_kind")),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     // clientId is the retained UI parameter; an organization selection carries its typed borrower party ID.
     private static final String LEDGER_BORROWERS="""
         select m.id,m.member_no,m.full_name,'CLIENT' kind from members m where m.sacco_id=?

@@ -13,6 +13,12 @@ public final class LoanRecordingDtos {
         /** Internal group-origination evidence; deliberately excluded from every browser binder. */
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private com.sacco.mvp.grouplending.dto.GroupDisclosureDtos.Snapshot groupDisclosure;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private ApplicationDetails applicationDetails;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private UUID applicationId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+        private int expectedVersion;
         private UUID requestKey = UUID.randomUUID();
         private UUID clientId;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
@@ -46,6 +52,17 @@ public final class LoanRecordingDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal customProcessingCharge;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal insurancePremium;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String insuranceEvidence;
+    }
+    @Data public static class ApplicationDetails {
+        private UUID loanOfficerId;
+        private String loanOfficerLabel = "";
+        private Map<String,String> fieldLabels = new LinkedHashMap<>();
+        private String useOfFunds = "";
+        private List<com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor> guarantors = new ArrayList<>();
+        private List<com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Collateral> collateral = new ArrayList<>();
+        private Map<String,String> fields = new LinkedHashMap<>();
+        private List<String> documentNames = new ArrayList<>(), documentTypes = new ArrayList<>(), requiredAttachmentIds = new ArrayList<>();
+        private boolean declarationAccepted;
     }
     @Data public static class PostForm {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String sharedPacketHash;

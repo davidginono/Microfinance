@@ -9,7 +9,7 @@ This increment supersedes the retired onboarding loan-request UI. Profile onboar
 - `/client-portal/workspace/profile`: the authenticated client's own profile, documents, submission and review feedback.
 - `/client-portal/workspace/applications`: that client's applications, recording, documents and handoff after guarantor approval.
 - `/finance/clients/onboarding`: staff-assisted provisional profiles and independent profile verification.
-- `/finance/client-applications`: staff recording for a selected provisional client in the current institution and branch. A profile's Record application action carries its client ID into the form.
+- `/finance/loan-records` and `/finance/loan-records/new`: the accountant's existing loan register and Record Loan Application form own staff recording, including provisional intake drafts and supporting evidence. A profile's Record application action carries its client ID into this form. Old `/finance/client-applications` links redirect into this workspace.
 
 Staff access reuses explicit `CLIENT_ONBOARDING_VIEW` and `CLIENT_ONBOARDING_UPDATE` claims. Profile verification retains the separate `CLIENT_ONBOARDING_REVIEW` claim and independent-person rule. No claims are assigned by this increment. Staff cannot edit or upload a profile for a client with an enabled borrower account. Staff user creation remains restricted to staff roles. Full borrower users continue to self-register, complete their profiles and apply in their borrower workspace.
 
@@ -37,7 +37,7 @@ The profile parity correction passed 15 distinct focused cases: real staff/clien
 
 ## Recording and evidence
 
-The reference application's four sections informed the form: application information, guarantors, collateral and documents. Fields include application date, product, amount, explicit repayment period, officer preference, purpose/use of funds, business, declared monthly income/expenses/debt, guarantor relationship/activity/contact, and repeated collateral names, numbers, types, descriptions, owners, contacts, locations and declared values.
+The accountant's recording form retains its configured/custom terms, quote, charges and save controls. Its supporting section also captures the intake evidence. Staff drafts reopen in that same form. Borrower and restricted portal commands render through the shared accounting page family with their existing ownership and approval safeguards. Fields include application date, product, amount, explicit repayment period, officer preference, purpose/use of funds, business, declared monthly income/expenses/debt, guarantor relationship/activity/contact, and repeated collateral names, numbers, types, descriptions, owners, contacts, locations and declared values.
 
 Rates, fees, repayment calculations and approval stages come from the product. A saved draft is explicitly unassessed; missing expenses/debt are never filled with zero. Submission requires current verified KYC, the declaration and an uploaded signed application. Signed paper evidence is retained as evidence, never converted into a fabricated digital signature or an OTP signature event. Existing generated-document signature gates remain in force.
 

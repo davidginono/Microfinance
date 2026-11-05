@@ -11,7 +11,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void loginApprovalDefaultsGuarantorSearchToMemberNumber() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
 
         assertThat(source.indexOf("<option value=\"number\">"))
             .isLessThan(source.indexOf("<option value=\"name\">"));
@@ -21,7 +21,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void directOtpSwitchesSearchModesAndUsesLocalDirectoryEndpoint() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
 
         assertThat(source)
             .contains("{ value: \"phone\", label: modePhoneLabel")
@@ -31,7 +31,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void directOtpSearchShowsMemberDirectoryOutageInsteadOfNoMatches() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
 
         assertThat(source)
             .contains("const msgMemberDirectoryUnavailable")
@@ -44,7 +44,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void guarantorSearchShowsInlineFormatVerificationOnlyAfterSearchClick() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
         String styles = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
 
         assertThat(source)
@@ -73,7 +73,7 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void selectedGuarantorChipsKeepMemberNumberAndNameLabel() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
 
         assertThat(source)
             .contains("<c:out value=\"${item.memberNo}\"/> - <c:out value=\"${item.fullName}\"/>")
@@ -97,14 +97,14 @@ class DirectOtpGuarantorSearchViewContractTest {
 
     @Test
     void confirmedSubmitKeepsSendActionAndSelectedGuarantors() throws Exception {
-        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf"));
-        String form = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/form.jsp"));
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
+        String form = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/application-form.jspf"));
         String script = Files.readString(Path.of("src/main/resources/static/js/client-applications.js"));
 
         assertThat(form)
             .contains("name=\"action\" value=\"SEND_TO_GUARANTORS\"")
             .contains("include file=\"borrower-guarantors.jspf\"")
-            .contains("include file=\"../fragments/confirm-modal.jspf\"");
+            .contains("include file=\"../../fragments/confirm-modal.jspf\"");
         assertThat(script)
             .contains("event.submitter?.value !== 'SEND_TO_GUARANTORS'")
             .contains("form.dataset.confirmMessage = form.dataset.submitConfirmation");

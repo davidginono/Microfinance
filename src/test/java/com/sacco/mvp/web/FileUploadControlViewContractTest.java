@@ -64,9 +64,9 @@ class FileUploadControlViewContractTest {
 
     @Test
     void attachmentDropzonesKeepHiddenInputsAndAwsDragStyling() throws Exception {
-        String loanApplication = read(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/form.jsp"));
-        String borrowerUploads = read(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-uploads.jspf"));
-        String savedDocuments = read(Path.of("src/main/webapp/WEB-INF/jsp/client-applications/saved-documents.jspf"));
+        String loanApplication = read(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/application-form.jspf"));
+        String borrowerUploads = read(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-uploads.jspf"));
+        String savedDocuments = read(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/saved-documents.jspf"));
         String managerDetail = read(Path.of("src/main/webapp/WEB-INF/jsp/manager/detail.jsp"));
         String attachmentFragment = read(Path.of("src/main/webapp/WEB-INF/jsp/fragments/attachment-dropzone.jspf"));
         String componentCss = read(Path.of("src/main/resources/static/css/console-components.css"));

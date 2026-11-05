@@ -560,7 +560,7 @@ class AwsConsoleViewContractTest {
     void loginAndLoanJourneysExposeProgressiveAwsInteractions() throws Exception {
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
-        String loanApplication = read(JSP_ROOT.resolve("client-applications/form.jsp"));
+        String loanApplication = read(JSP_ROOT.resolve("accounting/loans/application-form.jspf"));
         String guarantorSelection = read(JSP_ROOT.resolve("app/guarantor-selection.jsp"));
         String loanDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
         String staffLoanDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
@@ -1008,7 +1008,7 @@ class AwsConsoleViewContractTest {
     void pagesChangedInThisIterationKeepResponsiveScrollAndActionContracts() throws Exception {
         String dashboard = read(JSP_ROOT.resolve("app/dashboard.jsp"));
         String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
-        String loanNew = read(JSP_ROOT.resolve("client-applications/borrower-guarantors.jspf"));
+        String loanNew = read(JSP_ROOT.resolve("accounting/loans/borrower-guarantors.jspf"));
         String memberReports = read(JSP_ROOT.resolve("app/reports.jsp"));
         String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
         String memberDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));

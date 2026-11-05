@@ -1,12 +1,12 @@
-<%@ include file="head.jspf" %>
+<%@ include file="application-head.jspf" %>
 <c:url value="${applicationRoot}" var="root"/>
 <c:set var="formAction" value="${borrowerWorkspace ? root : root.concat('/save')}"/>
-<c:set var="formTitle" value="${borrowerWorkspace ? 'newloan.title' : 'applications.create'}"/>
+<c:set var="formTitle" value="${borrowerWorkspace ? 'newloan.title' : 'recording.create.LOAN'}"/>
 <c:if test="${borrowerWorkspace}">
-    <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <%@ include file="../fragments/attachment-dropzone.jspf" %>
+    <%@ include file="../../fragments/otp-ui-styles.jspf" %>
+    <%@ include file="../../fragments/attachment-dropzone.jspf" %>
 </c:if>
-<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="${root}"><spring:message code="${borrowerWorkspace ? 'apps.title' : 'applications.title'}"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="${formTitle}"/></span></nav>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="${borrowerWorkspace or portalWorkspace ? root : pageContext.request.contextPath.concat('/finance/loan-records')}"><spring:message code="${borrowerWorkspace or portalWorkspace ? 'apps.title' : 'recording.register.LOAN'}"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="${formTitle}"/></span></nav>
 <h1 class="erp-page-title"><spring:message code="${formTitle}"/></h1>
 <form:form id="loanApplicationForm" modelAttribute="applicationForm" method="post" action="${formAction}" enctype="multipart/form-data" cssClass="accounting-create-form" data-workspace-submit="recover" data-resource-form-page="true" data-portal-recover="${portalWorkspace}" data-client-application="true" data-root="${root}"
     data-borrower-workspace="${borrowerWorkspace}" data-csrf-name="${_csrf.parameterName}"
@@ -94,10 +94,10 @@
         </form>
     </c:forEach>
 </c:if>
-<c:if test="${borrowerWorkspace or not empty existingApplicationAttachments}"><%@ include file="../fragments/confirm-modal.jspf" %></c:if>
+<c:if test="${borrowerWorkspace or not empty existingApplicationAttachments}"><%@ include file="../../fragments/confirm-modal.jspf" %></c:if>
 <c:if test="${borrowerWorkspace}">
     <script src="<c:url value='/js/application-attachment-titles.js'/>" defer></script>
 </c:if>
 <script src="<c:url value='/js/client-applications.js'/>" defer></script>
-<%@ include file="../accounting/accounting-form-support.jspf" %>
-<%@ include file="foot.jspf" %>
+<%@ include file="../accounting-form-support.jspf" %>
+<%@ include file="application-foot.jspf" %>

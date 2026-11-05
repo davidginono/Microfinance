@@ -1,7 +1,7 @@
-<%@ include file="head.jspf" %>
+<%@ include file="application-head.jspf" %>
 <c:url value="${applicationRoot}" var="root"/>
 <section class="erp-table-wrap" data-resource-table="client-applications" data-group-register data-table-selection="single">
-<h2><spring:message code="applications.title"/></h2>
+<h2><spring:message code="${portalWorkspace ? 'apps.title' : 'recording.register.LOAN'}"/></h2>
 <div class="accounting-actions" data-table-toolbar-for="client-applications"><button type="button" class="app-btn btn-neutral" data-table-command data-group-command="view" disabled><spring:message code="group.open"/></button><a class="app-btn btn-launch" href="${root}/new"><spring:message code="applications.create"/></a><span class="sr-only" data-group-selection-status aria-live="polite"></span></div>
 <form method="get" action="${root}" data-table-filter-for="client-applications"><label for="applicationSearch" class="sr-only"><spring:message code="common.search"/></label><input class="aws-control" id="applicationSearch" name="search" maxlength="100" value="<c:out value='${search}'/>"/><button class="app-btn btn-neutral"><spring:message code="common.search"/></button></form>
 <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th><span class="sr-only"><spring:message code="voucher.select"/></span></th><c:forEach items="${['number','client','product','amount','status','createdAt']}" var="key"><th><spring:message code="applications.${key}"/></th></c:forEach></tr></thead><tbody>
@@ -9,4 +9,4 @@
 <c:if test="${empty records.rows}"><tr><td colspan="7"><spring:message code="applications.empty"/></td></tr></c:if>
 </tbody></table></div><div data-table-pagination data-page="${records.page}" data-table-for="client-applications"><c:if test="${records.page>0}"><c:url value="${applicationRoot}" var="previous"><c:param name="page" value="${records.page-1}"/><c:param name="search" value="${search}"/></c:url><a data-page-direction="previous" href="${previous}"><spring:message code="common.previous"/></a></c:if><c:if test="${records.hasNext}"><c:url value="${applicationRoot}" var="next"><c:param name="page" value="${records.page+1}"/><c:param name="search" value="${search}"/></c:url><a data-page-direction="next" href="${next}"><spring:message code="common.next"/></a></c:if></div>
 </section><script src="<c:url value='/js/group-lending.js'/>" defer></script>
-<%@ include file="foot.jspf" %>
+<%@ include file="application-foot.jspf" %>

@@ -83,7 +83,7 @@ class ClientApplicationEndToEndPostgresTest {
             fixture.fixture();
             fixture.f.jdbc.update("update loan_product_settings set application_fee=0, processing_fee_rate=0, insurance_rate=0, affordability_check_required=true where id=?", fixture.f.product);
             fixture.f.jdbc.update("insert into member_staff_roles(member_id,role_name) values(?,'MANAGER') on conflict do nothing", fixture.f.actor.getMemberId());
-            for (String claim : List.of("CLIENT_ONBOARDING_VIEW", "CLIENT_ONBOARDING_UPDATE")) {
+            for (String claim : List.of("CLIENT_ONBOARDING_VIEW", "CLIENT_ONBOARDING_UPDATE", "LOAN_RECORDING_VIEW", "LOAN_RECORDING_CREATE")) {
                 fixture.f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?) on conflict do nothing",
                     fixture.f.actor.getMemberId(), claim);
             }
@@ -108,6 +108,7 @@ class ClientApplicationEndToEndPostgresTest {
                 fixture.f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?) on conflict do nothing",
                     borrower, claim);
             }
+            fixture.f.jdbc.update("update loan_product_settings set manager_review_required=true where id=?",fixture.f.product);
             var userSettings = app.getBean(com.sacco.mvp.service.UserSettingsService.class);
             userSettings.updateOtpPreferences(fixture.f.actor.getMemberId(), false, true);
             userSettings.updateOtpPreferences(borrower, false, true);
@@ -129,22 +130,25 @@ class ClientApplicationEndToEndPostgresTest {
             var file = new MockMultipartFile("files", "application.png", "image/png", fixture.image);
             UUID id = applications.save(fixture.f.actor, draft, List.of(file, file));
             var staffHttp = login(base, staffLogin, password, true);
-            String staffForm = get(staffHttp, base + "/finance/client-applications/" + id + "/edit");
-            assertThat(staffForm).contains("Record application", "Preferred loan officer",
-                "data-application-panel=\"guarantors\"", "data-repayment-estimate", "Signed synthetic application");
+            String staffForm = get(staffHttp, base + "/finance/loan-records/new?applicationId=" + id);
+            assertThat(staffForm).contains("Record Loan Application", "Preferred loan officer",
+                "data-recording-evidence", "data-schedule-preview", "Signed synthetic application", "name=\"loanMode\"")
+                .doesNotContain("href=\"/finance/client-applications\"", "data-application-tab");
             var staffQuote = ClientOnboardingRenderedPostgresTest.hidden(staffForm);
             staffQuote.put("productId", fixture.f.product.toString());
-            staffQuote.put("amount", "100000.00");
+            staffQuote.put("principal", "100000.00");
+            staffQuote.put("clientId", assistedClient.toString());
+            staffQuote.put("loanMode", "CONFIGURED");
             staffQuote.put("tenureUnit", "MONTHS");
             staffQuote.put("tenureValue", "2");
             staffQuote.put("applicationDate", fixture.day.toString());
-            var quoted = ClientOnboardingRenderedPostgresTest.submit(staffHttp, base + "/finance/client-applications/quote", staffQuote, false);
+            var quoted = ClientOnboardingRenderedPostgresTest.submit(staffHttp, base + "/finance/loan-recording/quote", staffQuote, false);
             assertThat(quoted.statusCode()).as(quoted.body()).isEqualTo(200);
-            assertThat(quoted.body()).contains("repaymentSchedule", "principalAmount", "Month 2");
+            assertThat(quoted.body()).contains("schedule", "applicationFees", "principalAmount");
             String extraDocument = applications.documents(fixture.f.actor, id).stream()
                 .filter(document -> "OTHER".equals(document.get("documentPurpose"))).findFirst().orElseThrow().get("id").toString();
             var remove = ClientOnboardingRenderedPostgresTest.hidden(staffForm);
-            String removeUrl = base + "/finance/client-applications/" + id + "/documents/" + extraDocument + "/remove";
+            String removeUrl = base + "/finance/loan-records/applications/" + id + "/documents/" + extraDocument + "/remove";
             var withoutCsrf = new LinkedHashMap<>(remove);
             withoutCsrf.remove("_csrf");
             assertThat(ClientOnboardingRenderedPostgresTest.submit(staffHttp, removeUrl, withoutCsrf, false).statusCode()).isEqualTo(403);
@@ -153,6 +157,49 @@ class ClientApplicationEndToEndPostgresTest {
             assertThat(applications.details(fixture.f.actor, id).version()).isEqualTo(2);
             assertThat(applications.documents(fixture.f.actor, id)).extracting(document -> document.get("documentTitle"))
                 .containsExactly("Signed synthetic application");
+            var retired = staffHttp.send(HttpRequest.newBuilder(URI.create(base + "/finance/client-applications")).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertThat(retired.statusCode()).isEqualTo(302);
+            assertThat(retired.headers().firstValue("Location")).hasValueSatisfying(location -> assertThat(location).endsWith("/finance/loan-records"));
+            String register = get(staffHttp, base + "/finance/loan-records");
+            assertThat(register).contains("/finance/loan-records/applications/" + id).doesNotContain("href=\"/finance/client-applications\"");
+
+            String recording = get(staffHttp, base + "/finance/loan-records/new?clientId=" + borrower);
+            assertThat(recording).contains("name=\"loanMode\"", "Configured", "Custom", "data-recording-evidence");
+            var recordedFields = ClientOnboardingRenderedPostgresTest.hidden(recording);
+            recordedFields.put("clientId", borrower.toString());
+            recordedFields.put("productId", fixture.f.product.toString());
+            recordedFields.put("loanMode", "CONFIGURED");
+            recordedFields.put("principal", "80000.00");
+            recordedFields.put("tenureUnit", "MONTHS");
+            recordedFields.put("tenureValue", "2");
+            recordedFields.put("applicationDate", fixture.day.toString());
+            recordedFields.put("purpose", "BUSINESS STOCK");
+            recordedFields.put("informationSource", "DECLARED");
+            recordedFields.put("income","1500000.00");recordedFields.put("expenses","200000.00");recordedFields.put("otherDebt","0.00");
+            recordedFields.put("applicationDetails.useOfFunds", "Recorded inventory");
+            recordedFields.put("applicationDetails.collateral[0].itemName", "Synthetic asset");
+            recordedFields.put("applicationDetails.collateral[0].itemNumber", "ASSET-1");
+            recordedFields.put("applicationDetails.collateral[0].estimatedValue", "100000.00");
+            recordedFields.put("action", "save");
+            post(staffHttp, base + "/finance/loan-records", recordedFields);
+            UUID recordedId = fixture.f.jdbc.queryForObject("select loan_id from accountant_loan_record where sacco_id=? and request_key=?",UUID.class,fixture.f.institution,UUID.fromString(recordedFields.get("requestKey")));
+            assertThat(fixture.f.jdbc.queryForObject("select metadata->'applicationDetails'->>'useOfFunds' from accountant_loan_record where loan_id=?",String.class,recordedId)).isEqualTo("Recorded inventory");
+            assertThat(get(staffHttp,base+"/finance/loan-records/"+recordedId)).contains("ASSET-1","Recorded inventory");
+            // Complete the independent recorded request before exercising the borrower's own draft.
+            fixture.f.jdbc.update("update loan_applications set status='MANAGER_REJECTED' where id=?",recordedId);
+
+            String latestDraft = get(staffHttp,base+"/finance/loan-records/new?applicationId="+id);
+            var draftFields = ClientOnboardingRenderedPostgresTest.hidden(latestDraft);
+            draftFields.putAll(staffQuote);
+            draftFields.put("requestKey",ClientOnboardingRenderedPostgresTest.hidden(latestDraft).get("requestKey"));
+            draftFields.put("expectedVersion","2");
+            draftFields.put("purpose","ASSISTED STOCK");
+            draftFields.put("applicationDetails.useOfFunds","Updated through accountant form");
+            draftFields.put("action","draft");
+            post(staffHttp,base+"/finance/loan-records",draftFields);
+            assertThat(applications.details(fixture.f.actor,id).version()).isEqualTo(3);
+            assertThat(get(staffHttp,base+"/finance/loan-records/new?applicationId="+id)).contains("Updated through accountant form");
+
             var borrowerHttp = login(base, borrowerLogin, password, false);
             String borrowerPath = "/app/loan-applications";
             String borrowerForm = get(borrowerHttp, base + borrowerPath + "/new?loanProductId=" + fixture.f.product);
@@ -178,7 +225,7 @@ class ClientApplicationEndToEndPostgresTest {
             assertThat(URI.create(borrowerEdit).getPath()).startsWith(borrowerPath + "/").endsWith("/edit");
             assertThat(get(borrowerHttp, URI.create(base).resolve(borrowerEdit).toString()))
                 .contains("Borrower shared form inventory", "120000.00", "name=\"action\" value=\"SEND_TO_GUARANTORS\"");
-            assertThat(fixture.f.jdbc.queryForObject("select form_data->>'monthlyIncome' from loan_applications where applicant_member_id=?", String.class, borrower))
+            assertThat(fixture.f.jdbc.queryForObject("select form_data->>'monthlyIncome' from loan_applications where id=?", String.class, UUID.fromString(URI.create(borrowerEdit).getPath().split("/")[3])))
                 .isEqualTo("1500000.00");
             int seconds = Integer.getInteger("microfinance.portal.browser-seconds", 0);
             if (seconds > 0) {

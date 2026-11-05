@@ -1,1 +1,0 @@
-<c:choose><c:when test="${portalWorkspace}"><%@ include file="../portal/foot.jspf" %></c:when><c:otherwise><%@ include file="../fragments/footer.jspf" %></c:otherwise></c:choose>

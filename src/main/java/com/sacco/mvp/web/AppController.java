@@ -2581,7 +2581,7 @@ public class AppController {
         String topUpLoanId = formValues.get("topUpLoanId");
         model.addAttribute("topUpLoanId", topUpLoanId);
         model.addAttribute("topUpSourceLoan", resolveTopUpSourceLoan(principal.getMemberId(), topUpLoanId));
-        return "client-applications/form";
+        return "accounting/loans/record-form";
     }
 
     private LocalDate applicationDate(String value) {

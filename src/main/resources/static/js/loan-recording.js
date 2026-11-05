@@ -21,7 +21,7 @@
         const previous = targetPage ? [...select.options].filter(option => option.value && option.dataset.choicePinned !== 'true' && option.dataset.searchQuery === normalized) : [];
         const options = new Map(previous.map(option => [option.value, option]));
         const productFields = ['tenureUnit','minimumAmount','maximumAmount','minimumTenure','maximumTenure'];
-        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized;productFields.forEach(key=>{if(choice[key]!=null)option.dataset[key]=choice[key];}); options.set(choice.id, option);});
+        choices.slice(0, 25).forEach(choice => {const option = new Option(choice.label, choice.id); option.dataset.searchQuery = normalized;if(box.dataset.category === 'clients')option.dataset.clientKind=choice.purpose;productFields.forEach(key=>{if(choice[key]!=null)option.dataset[key]=choice[key];}); options.set(choice.id, option);});
         const visible = [...options.values()].filter(option => !pinned.some(fixed => fixed.value === option.value)).slice(-100); select.replaceChildren(blank, ...pinned, ...visible);
         if (value && ![...select.options].some(option => option.value === value) && selected) select.add(selected);
         select.value = value; page = targetPage; loadedSearch = query;
@@ -151,6 +151,7 @@
     // Lock only the accepted submission, not the first confirmation request.
     document.addEventListener('submit', event => {
       if (event.target !== form || event.defaultPrevented) return;
+      if (form.dataset.workspaceSubmit === 'recover' && window.WorkspaceNavigation?.handlesForm(form,event.submitter)) return;
       if (submitting) {event.preventDefault(); return;}
       if (event.submitter?.name === 'action') {
         let action = form.querySelector('input[name="action"]');

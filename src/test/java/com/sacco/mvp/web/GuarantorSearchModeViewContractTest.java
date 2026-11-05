@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GuarantorSearchModeViewContractTest {
-    private static final Path LOAN_NEW_JSP = Path.of("src/main/webapp/WEB-INF/jsp/client-applications/borrower-guarantors.jspf");
+    private static final Path LOAN_NEW_JSP = Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf");
     private static final Path SETTINGS_JSP = Path.of("src/main/webapp/WEB-INF/jsp/admin/settings-controls.jsp");
 
     @Test

@@ -35,7 +35,7 @@ class RecordedLoanDetailScheduleTest {
     private final ObjectMapper json=new ObjectMapper();
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges=mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);
     private final LoanRecordingService service=new LoanRecordingService(records,loans,null,null,schedules,null,
-        accounting,null,json,clock,null,null,null,null,null,null,null,null,charges,null,null,null,null);
+        accounting,null,json,clock,null,null,null,null,null,null,null,null,charges,null,null,null,null,null);
     private final LocalDate today=LocalDate.of(2026,10,15);
 
     @Test void exportIsBoundedScopedAndUsesRecordedPaymentHistory()throws Exception {
@@ -77,7 +77,7 @@ class RecordedLoanDetailScheduleTest {
     @Test void reviewPdfAndPrintIncludeTheEstimatedScheduleAndStatus() throws Exception {
         var loan=fixture(false);
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
-        var controller=new LoanRecordingController(service,new LoanRecordingPdfService(new ReportExportLimiter(1)),clock,messages,mock(SaccoLogoStorageService.class));
+        var controller=new LoanRecordingController(service,new LoanRecordingPdfService(new ReportExportLimiter(1)),clock,messages,mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
         var request=new MockHttpServletRequest("GET","/finance/loan-records/"+loan.getId()+"/pdf");
         var response=(ResponseEntity<?>)controller.loanExport(actor,loan.getId(),request,Locale.ENGLISH,new ExtendedModelMap());
         try(var pdf=Loader.loadPDF((byte[])response.getBody())){

@@ -68,6 +68,16 @@ class LoanRecordingMvcTest {
             .andExpect(view().name("accounting/loans/record-form")).andExpect(model().attributeHasFieldErrors("recordForm","principal"))
             .andExpect(model().attribute("selectedProduct",product));
     }
+    @Test void unavailableProductRetainsEnteredValuesAndOriginalValidationErrors() throws Exception {
+        var id=UUID.randomUUID();
+        var evidence=(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService)org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(LoanRecordingController.class),"evidence");
+        when(evidence.product(actor,id)).thenThrow(new IllegalArgumentException("applications.error.product"));
+        mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
+            .param("loanMode","CONFIGURED").param("productId",id.toString()).param("principal","invalid").param("purpose","Retained stock purchase"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/loans/record-form"))
+            .andExpect(model().attributeHasFieldErrors("recordForm","principal"))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("purpose",org.hamcrest.Matchers.is("Retained stock purchase"))));
+    }
     @Test void documentDownloadChecksScopeThroughServiceAndPreventsSniffing() throws Exception {
         var id=UUID.randomUUID();when(service.attachment(eq(actor),eq(id),eq("proof"))).thenReturn(new LoanAttachmentService.AttachmentResource("%PDF synthetic".getBytes(),"proof.pdf","application/pdf"));
         mvc.perform(get("/finance/loan-records/"+id+"/attachments/proof").with(user(actor))).andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(content().contentType("application/pdf"));
@@ -114,6 +124,6 @@ class LoanRecordingMvcTest {
         @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService charges(){return mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}
         @Bean com.sacco.mvp.accounting.charges.controller.LoanChargeController chargeController(com.sacco.mvp.accounting.charges.service.LoanChargeService charges){return new com.sacco.mvp.accounting.charges.controller.LoanChargeController(charges,mock(ApplicationClock.class));}
         @Bean LoanRecordingService service(){return mock(LoanRecordingService.class);}
-        @Bean LoanRecordingController controller(LoanRecordingService service){return new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class));}
+        @Bean LoanRecordingController controller(LoanRecordingService service){return new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));}
     }
 }
