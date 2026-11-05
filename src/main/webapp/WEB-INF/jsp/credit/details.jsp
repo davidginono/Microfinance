@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <%@ include file="head.jspf" %>
 <h1><spring:message code="credit.detail.${detail}"/></h1>
 <c:if test="${not empty loan}"><%@ include file="loan-facts.jspf" %></c:if>

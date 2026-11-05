@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <section class="erp-panel" data-dashboard-widget="usage" data-widget-width="3" data-widget-min-width="2" data-widget-height="480"
  data-dashboard-source="usage" data-dashboard-url="<c:url value='/admin/dashboard/usage-activity' />">
  <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.widget.usage" /></h2></div>

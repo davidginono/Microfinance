@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <section class="erp-resource-section"><h2><spring:message code="kyc.documents"/></h2>
     <c:if test="${empty documents}"><p><spring:message code="kyc.noDocuments"/></p></c:if>
     <c:forEach items="${documents}" var="doc"><dl class="erp-detail-facts kyc-document-facts">

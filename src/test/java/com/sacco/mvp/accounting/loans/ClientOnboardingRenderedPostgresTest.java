@@ -84,7 +84,12 @@ class ClientOnboardingRenderedPostgresTest {
             }
             form=get(client,base+"/app/onboarding/edit",false);var submitted=hidden(form);values.forEach((key,value)->{if(key.startsWith("profile."))submitted.put(key,value);});submitted.put("action","SUBMITTED");submitted.put("noticeAcknowledged","true");submitted.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",submitted,false);
             assertThat(get(client,base+"/app/onboarding",false)).contains("awaiting review","<fieldset class=\"kyc-profile-fields\" disabled").doesNotContain("value=\"SUBMITTED\"", "value=\"DRAFT\"", "data-profile-wizard");
-            String reviewUrl=base+"/finance/clients/onboarding/"+domain.f.client+"/review";var review=hidden(get(client,reviewUrl,true));review.put("kind","RETURN");review.put("reason","INTERNAL-SCREENING-SECRET");review.put("clientMessage","Please correct your home address.");post(client,reviewUrl,review,true);
+            String reviewUrl=base+"/finance/clients/onboarding/"+domain.f.client+"/review";
+            String renderedReview=get(client,reviewUrl,true);
+            assertThat(renderedReview)
+                .containsPattern("(?s)class=\"erp-detail-facts kyc-document-facts\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
+                .doesNotContain("\u00c2\u00b7");
+            var review=hidden(renderedReview);review.put("kind","RETURN");review.put("reason","INTERNAL-SCREENING-SECRET");review.put("clientMessage","Please correct your home address.");post(client,reviewUrl,review,true);
             String returned=get(client,base+"/app/onboarding",false);assertThat(returned).contains("Please correct your home address.").doesNotContain("INTERNAL-SCREENING-SECRET");
             assertThat(returned).contains("data-resource-status=\"WARNING\"","data-message-type=\"warning\"");
             var correction=hidden(get(client,base+"/app/onboarding/edit",false));values.forEach((key,value)->{if(key.startsWith("profile."))correction.put(key,value);});correction.put("profile.address","Synthetic corrected address");correction.put("action","SUBMITTED");correction.put("noticeAcknowledged","true");correction.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",correction,false);

@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
@@ -177,7 +178,7 @@
                         <c:forEach items="${approvalFlowStageLabels}" var="stage" varStatus="status">
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-800 ring-1 ring-slate-200">${stage}</span>
                             <c:if test="${not status.last}">
-                                <span class="text-slate-400">â†’</span>
+                                <span class="text-slate-400">→</span>
                             </c:if>
                         </c:forEach>
                     </div>
