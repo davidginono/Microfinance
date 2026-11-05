@@ -87,8 +87,9 @@ class ClientOnboardingRenderedPostgresTest {
             String reviewUrl=base+"/finance/clients/onboarding/"+domain.f.client+"/review";
             String renderedReview=get(client,reviewUrl,true);
             assertThat(renderedReview)
+                .contains("name=\"checksConfirmed\"", "Save review")
                 .containsPattern("(?s)class=\"erp-detail-facts kyc-document-facts\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
-                .doesNotContain("\u00c2\u00b7");
+                .doesNotContain("Verification checks", "name=\"identityChecked\"", "name=\"addressChecked\"", "\u00c2\u00b7");
             var attachmentLink=Pattern.compile("href=\"([^\"]+/documents/[a-f0-9-]+)\" download>evidence\\.png</a>").matcher(renderedReview);
             assertThat(attachmentLink.find()).isTrue();
             var attachment=client.send(HttpRequest.newBuilder(URI.create(base+attachmentLink.group(1)))
@@ -101,8 +102,20 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(returned).contains("data-resource-status=\"WARNING\"","data-message-type=\"warning\"");
             var correction=hidden(get(client,base+"/app/onboarding/edit",false));values.forEach((key,value)->{if(key.startsWith("profile."))correction.put(key,value);});correction.put("profile.address","Synthetic corrected address");correction.put("action","SUBMITTED");correction.put("noticeAcknowledged","true");correction.put("declarationAccepted","true");post(client,base+"/app/onboarding/edit",correction,false);
             var verification=hidden(get(client,reviewUrl,true));verification.put("kind","VERIFY");verification.put("reason","Synthetic independent checks complete");
+            verification.put("screening","CLEARED");verification.put("screeningReference","Synthetic dated manual screening evidence");verification.put("policyReference","Approved synthetic policy");verification.put("checkedOn",domain.day.toString());verification.put("reviewDue",domain.day.plusMonths(6).toString());
+            var incomplete=submit(client,reviewUrl,verification,true);
+            assertThat(incomplete.statusCode()).isEqualTo(200);
+            assertThat(incomplete.body()).contains("Confirm the checks before verifying this client.","Synthetic dated manual screening evidence");
+            verification.put("checksConfirmed","true");
+            var completed=submit(client,reviewUrl,verification,true);
+            assertThat(completed.statusCode()).as(completed.body()).isEqualTo(302);
+            String detailsPath="/finance/clients/onboarding/"+domain.f.client;
+            assertThat(completed.headers().firstValue("Location")).hasValueSatisfying(location->assertThat(location).endsWith(detailsPath));
+            assertThat(get(client,base+detailsPath,true)).contains("Verified","Synthetic independent checks complete","Revoke verification");
+            // A retry of the same decision from the older form still resolves to the saved record.
+            verification.remove("checksConfirmed");
             for(String check:List.of("identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked"))verification.put(check,"true");
-            verification.put("screening","CLEARED");verification.put("screeningReference","Synthetic dated manual screening evidence");verification.put("policyReference","Approved synthetic policy");verification.put("checkedOn",domain.day.toString());verification.put("reviewDue",domain.day.plusMonths(6).toString());post(client,reviewUrl,verification,true);
+            post(client,reviewUrl,verification,true);
             String verified=get(client,base+"/app/onboarding",false);assertThat(verified).contains("Synthetic corrected address","Loan assessment and approval are separate.").doesNotContain("Please correct your home address.");
             assertThat(verified).contains("data-resource-status=\"SUCCESS\"").doesNotContain("data-message-type=\"info\"");
             assertThat(verified).doesNotContain("Complete your profile and wait for verification");
@@ -128,9 +141,12 @@ class ClientOnboardingRenderedPostgresTest {
         var response=client.send(request.GET().build(),HttpResponse.BodyHandlers.ofString());assertThat(response.statusCode()).as("GET %s: %s",url,response.body()).isEqualTo(200);return response.body();
     }
     static void post(HttpClient client,String url,Map<String,String> fields,boolean staff)throws Exception {
+        var response=submit(client,url,fields,staff);assertThat(response.statusCode()).as("POST %s: %s",url,response.body()).isEqualTo(302);
+    }
+    static HttpResponse<String> submit(HttpClient client,String url,Map<String,String> fields,boolean staff)throws Exception {
         var data=new StringJoiner("&");fields.forEach((key,value)->data.add(URLEncoder.encode(key,StandardCharsets.UTF_8)+"="+URLEncoder.encode(value,StandardCharsets.UTF_8)));
         var request=HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).header("Content-Type","application/x-www-form-urlencoded");if(staff)request.header("X-Onboarding-Test-Actor","reviewer");
-        var response=client.send(request.POST(HttpRequest.BodyPublishers.ofString(data.toString())).build(),HttpResponse.BodyHandlers.ofString());assertThat(response.statusCode()).as("POST %s: %s",url,response.body()).isEqualTo(302);
+        return client.send(request.POST(HttpRequest.BodyPublishers.ofString(data.toString())).build(),HttpResponse.BodyHandlers.ofString());
     }
     static Map<String,String> hidden(String html) {
         var values=new LinkedHashMap<String,String>();var inputs=Pattern.compile("<input[^>]*>").matcher(html);

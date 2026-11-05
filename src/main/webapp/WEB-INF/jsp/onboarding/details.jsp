@@ -8,7 +8,7 @@
     <c:set var="showReview" value="${canReviewOnboarding and (client.state=='SUBMITTED' or client.state=='VERIFY' or client.state=='EXPIRED' or client.state=='STALE')}"/>
     <c:if test="${not client.portalEnabled}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn ${showReview?'btn-neutral':'btn-launch'}" href="<c:url value='/finance/client-applications/new'><c:param name='clientId' value='${client.id}'/></c:url>"><spring:message code="applications.create"/></a></sec:authorize></c:if>
     <c:if test="${not client.portalEnabled and client.state!='SUBMITTED'}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize></c:if>
-    <c:if test="${showReview}"><a class="app-btn btn-launch" href="<c:url value='/finance/clients/onboarding/${client.id}/review'/>"><spring:message code="kyc.review"/></a></c:if>
+    <c:if test="${showReview}"><a class="app-btn btn-launch" href="<c:url value='/finance/clients/onboarding/${client.id}/review'/>"><spring:message code="${client.state=='SUBMITTED'?'kyc.review':'kyc.action.REVOKE'}"/></a></c:if>
 </div></c:if>
 </div>
 <c:if test="${duplicate}"><p class="console-message" data-message-type="warning" role="status"><spring:message code="kyc.error.duplicate"/></p></c:if>

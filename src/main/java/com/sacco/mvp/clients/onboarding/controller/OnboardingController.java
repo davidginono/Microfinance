@@ -24,7 +24,7 @@ public class OnboardingController {
     @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email"));}
     @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","expectedSequence","action","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","profile.legalHoldReference"));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
-    @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","screening","screeningReference","policyReference","checkedOn","reviewDue");}
+    @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","checksConfirmed","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","screening","screeningReference","policyReference","checkedOn","reviewDue");}
 
     private static String[] fields(String... base) {return java.util.stream.Stream.concat(Arrays.stream(base),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new);}
     @GetMapping("/groups") @ResponseBody public ResponseEntity<List<GroupChoice>> groups(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID clientId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.groups(a,clientId,search,page));}
@@ -80,6 +80,10 @@ public class OnboardingController {
     private String form(Model m,String kind) {m.addAttribute("formKind",kind);return "onboarding/form";}
     private static void reject(BindingResult errors,IllegalArgumentException e) {
         String key=key(e);
+        if (errors.getObjectName().equals("reviewForm") && key.equals("kyc.error.checks")) {
+            errors.rejectValue("checksConfirmed",key);
+            return;
+        }
         if(Set.of("createForm","profileForm").contains(errors.getObjectName())) {
             String field=key.substring("kyc.error.".length());if(field.equals("identityExpiry"))field="identityExpiresOn";if(field.equals("nameParts")||field.equals("name"))field="firstName";
             if(Arrays.asList(fields("profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email")).contains("profile."+field)){errors.rejectValue("profile."+field,key);return;}

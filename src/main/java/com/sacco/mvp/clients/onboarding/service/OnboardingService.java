@@ -138,7 +138,10 @@ public class OnboardingService {
     }
     @Transactional(timeout=20)
     public UUID review(AppUserPrincipal a,UUID client,ReviewForm f) {
-        authorize(a,"REVIEW");records.client(a,client,today());String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_decision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+        authorize(a,"REVIEW");records.client(a,client,today());
+        // A combined confirmation is equivalent to all five checks on an older form.
+        if ("VERIFY".equals(f.getKind()) && f.isChecksConfirmed()) f.confirmChecks();
+        String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_decision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
         records.lock(client);var c=records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRevisionId().equals(c.revisionId()),"changed");
         check(Set.of("VERIFY","RETURN","REJECT","REVOKE").contains(f.getKind()),"action");
         check(f.getKind().equals("REVOKE")?Set.of("VERIFY","EXPIRED","STALE").contains(c.state()):c.state().equals("SUBMITTED"),"state");

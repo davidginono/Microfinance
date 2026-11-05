@@ -50,19 +50,19 @@
             <label class="kyc-field"><span><spring:message code="kyc.field.decision"/></span><form:select path="kind" cssClass="aws-control" data-kyc-decision="true"><c:forEach items="${client.state=='SUBMITTED'?['VERIFY','RETURN','REJECT']:['REVOKE']}" var="kind"><form:option value="${kind}"><spring:message code="kyc.action.${kind}"/></form:option></c:forEach></form:select><form:errors path="kind" cssClass="field-error"/></label>
             <label class="kyc-field"><span><spring:message code="kyc.field.reason"/></span><form:textarea path="reason" cssClass="aws-control" rows="3" maxlength="1000" required="required"/><form:errors path="reason" cssClass="field-error"/></label>
             <label class="kyc-field"><span><spring:message code="kyc.field.clientMessage"/></span><form:textarea path="clientMessage" cssClass="aws-control" rows="3" maxlength="1000"/><form:errors path="clientMessage" cssClass="field-error"/></label>
-        </div>
-    </section>
-    <section class="erp-resource-section" data-kyc-verify="true">
-        <h2><spring:message code="kyc.verificationChecks"/></h2>
-        <div class="kyc-form-fields">
-            <div class="kyc-field-pair">
-                <c:forEach items="${['identityChecked','addressChecked','activityChecked','contactChecked','duplicatesChecked']}" var="field"><div class="kyc-field"><label class="aws-settings-checkbox-row"><form:checkbox path="${field}"/><span><spring:message code="kyc.field.${field}"/></span></label><form:errors path="${field}" cssClass="field-error"/></div></c:forEach>
+            <c:if test="${client.state=='SUBMITTED'}">
+            <div class="kyc-review-fields" data-kyc-verify="true">
+                <div class="kyc-field">
+                    <label class="kyc-checkbox"><form:checkbox path="checksConfirmed" required="required"/><span><spring:message code="kyc.field.checksConfirmed"/></span></label>
+                    <form:errors path="checksConfirmed" cssClass="field-error" role="alert" data-workspace-form-error="true" data-workspace-response-error="true"/>
+                </div>
+                <label class="kyc-field"><span><spring:message code="kyc.field.screening"/></span><form:select path="screening" cssClass="aws-control"><c:forEach items="${['UNAVAILABLE','ESCALATED','CLEARED']}" var="result"><form:option value="${result}"><spring:message code="kyc.screening.${result}"/></form:option></c:forEach></form:select><form:errors path="screening" cssClass="field-error"/></label>
+                <c:forEach items="${['screeningReference','policyReference']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:textarea path="${field}" cssClass="aws-control" rows="3" maxlength="${field=='policyReference'?500:1000}" required="required"/><form:errors path="${field}" cssClass="field-error"/></label></c:forEach>
+                <div class="kyc-field-pair">
+                    <c:forEach items="${['checkedOn','reviewDue']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:input path="${field}" type="date" cssClass="aws-control" required="required"/><form:errors path="${field}" cssClass="field-error"/></label></c:forEach>
+                </div>
             </div>
-            <label class="kyc-field"><span><spring:message code="kyc.field.screening"/></span><form:select path="screening" cssClass="aws-control"><c:forEach items="${['UNAVAILABLE','ESCALATED','CLEARED']}" var="result"><form:option value="${result}"><spring:message code="kyc.screening.${result}"/></form:option></c:forEach></form:select><form:errors path="screening" cssClass="field-error"/></label>
-            <c:forEach items="${['screeningReference','policyReference']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:textarea path="${field}" cssClass="aws-control" rows="3" maxlength="${field=='policyReference'?500:1000}"/><form:errors path="${field}" cssClass="field-error"/></label></c:forEach>
-            <div class="kyc-field-pair">
-                <c:forEach items="${['checkedOn','reviewDue']}" var="field"><label class="kyc-field"><span><spring:message code="kyc.field.${field}"/></span><form:input path="${field}" type="date" cssClass="aws-control"/><form:errors path="${field}" cssClass="field-error"/></label></c:forEach>
-            </div>
+            </c:if>
         </div>
     </section>
 </c:otherwise></c:choose>
@@ -73,7 +73,7 @@
         <form:errors path="revisionId" cssClass="field-error" element="p" role="alert"/>
     </c:if>
     <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='${returnPath}'/>"><spring:message code="common.cancel"/></a>
-        <c:choose><c:when test="${formKind=='profile'}"><button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formnovalidate><spring:message code="kyc.saveDraft"/></button><button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED"><spring:message code="kyc.submit"/></button></c:when><c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="credit.save"/></button></c:otherwise></c:choose>
+        <c:choose><c:when test="${formKind=='profile'}"><button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formnovalidate><spring:message code="kyc.saveDraft"/></button><button class="app-btn btn-launch" type="submit" name="action" value="SUBMITTED"><spring:message code="kyc.submit"/></button></c:when><c:otherwise><button class="app-btn btn-launch" type="submit"><spring:message code="${formKind=='review'?'kyc.saveReview':'credit.save'}"/></button></c:otherwise></c:choose>
     </div>
 </form:form>
 </div>

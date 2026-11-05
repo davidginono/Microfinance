@@ -117,7 +117,12 @@ public final class OnboardingDtos {
         private UUID revisionId;
         private String kind="VERIFY", reason="", clientMessage="", screening="UNAVAILABLE", screeningReference="", policyReference="";
         private boolean identityChecked, addressChecked, activityChecked, contactChecked, duplicatesChecked;
+        @com.fasterxml.jackson.annotation.JsonIgnore private boolean checksConfirmed;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate checkedOn, reviewDue;
+
+        public void confirmChecks() {
+            identityChecked = addressChecked = activityChecked = contactChecked = duplicatesChecked = true;
+        }
     }
     @Data public static class DocumentForm {
         public static final int MAX_FILES=10, MAX_FILE_BYTES=1024*1024, MAX_TOTAL_BYTES=MAX_FILES*MAX_FILE_BYTES;

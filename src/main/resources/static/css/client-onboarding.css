@@ -1,6 +1,5 @@
-[data-kyc-verify] { grid-column: 1 / -1; }
 .kyc-profile-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
-[data-kyc-verify][hidden] { display: none !important; }
+.kyc-review-fields[hidden] { display: none; }
 
 .kyc-section-body { padding: 1rem; min-width: 0; overflow-wrap: anywhere; }
 .kyc-notice-text { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -18,6 +17,7 @@
 .kyc-client-form > [data-profile-tabs] > .console-detail-tabs { margin-top: 0; }
 .kyc-client-form { display: grid; gap: 20px; min-width: 0; }
 .kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
+.kyc-review-fields { display: grid; gap: 16px; min-width: 0; }
 .kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .kyc-review-evidence > summary {
     width: fit-content;
