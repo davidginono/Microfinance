@@ -1,6 +1,6 @@
 <%@ include file="head.jspf" %>
 <c:url value="/finance/clients/onboarding" var="registerUrl"/>
-<section class="erp-table-wrap" data-resource-table="client-onboarding" data-group-register data-table-selection="single">
+<section class="erp-table-wrap" data-resource-table="client-onboarding" data-group-register data-group-open-on-row data-table-selection="single">
     <h2><spring:message code="kyc.title"/></h2>
     <div class="accounting-actions" data-table-toolbar-for="client-onboarding">
         <button type="button" class="app-btn btn-neutral" data-table-command data-group-command="view" disabled><spring:message code="group.open"/></button>
@@ -26,7 +26,7 @@
         <c:forEach items="${records.rows}" var="row"><tr data-group-row="${row.id}" data-target="${registerUrl}/${row.id}">
             <td><input type="checkbox" aria-label="<spring:message code='voucher.select'/> <c:out value='${row.number}'/>"/></td>
             <td data-group-identity><a class="resource-table-id-link" href="${registerUrl}/${row.id}"><c:out value="${row.number}"/></a></td><td><c:out value="${row.name}"/></td>
-            <td><spring:message code="kyc.state.${row.state}"/></td>
+            <td><c:set var="onboardingStatusState" value="${row.state}"/><%@ include file="status.jspf" %></td>
         </tr></c:forEach>
         <c:if test="${empty records.rows}"><tr><td colspan="4"><spring:message code="${empty search and empty state?'kyc.empty':'credit.noMatches'}"/></td></tr></c:if>
     </tbody></table></div>

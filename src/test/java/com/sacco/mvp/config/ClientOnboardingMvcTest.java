@@ -34,6 +34,26 @@ class ClientOnboardingMvcTest {
         client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
         when(service.client(any(),any())).thenReturn(new Client(id,"C1","Synthetic client",null,null,"DRAFT",UUID.randomUUID(),1,null));when(service.latest(any(),any())).thenReturn(Optional.empty());
     }
+    @Test void clientListTargetOpensTheExistingFullDetailsPageDirectly() throws Exception {
+        when(service.history(staff,id,0)).thenReturn(new Page<>(List.of(),0,false));
+        mvc.perform(get(root+"/"+id).with(user(staff))).andExpect(status().isOk())
+            .andExpect(view().name("onboarding/details")).andExpect(model().attributeExists("client","history","decisions"));
+        verify(service).client(staff,id);verify(service).latest(staff,id);verify(service).documents(staff,id);
+        String register=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/register.jsp"));
+        assertThat(register).contains("data-group-open-on-row","data-target=\"${registerUrl}/${row.id}\"");
+    }
+    @Test void onboardingStatesUseSharedStatusIconsRatherThanCopyControls() throws Exception {
+        String fragment=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/status.jspf"));
+        int start=fragment.indexOf("value=\"${")+9;int end=fragment.indexOf("}\"",start);
+        String expression=fragment.substring(start,end);
+        var expected=Map.of("NOT_STARTED","PENDING","DRAFT","PENDING","SUBMITTED","PENDING","VERIFY","SUCCESS","RETURN","WARNING","REJECT","ERROR","REVOKE","ERROR","EXPIRED","WARNING","STALE","WARNING");
+        for(var entry:expected.entrySet()){
+            var el=new jakarta.el.ELProcessor();el.defineBean("onboardingStatusState",entry.getKey());
+            assertThat((String)el.eval(expression)).as(entry.getKey()).isEqualTo(entry.getValue());
+        }
+        String facts=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/facts.jspf"));
+        assertThat(facts).contains("include file=\"status.jspf\"","data-resource-status=\"${client.portalEnabled?'ENABLED':'DISABLED'}\"");
+    }
     @Test void everyStaffWriteRequiresCsrfAndRejectsClientSessions()throws Exception {
         for(String path:List.of(root+"/new",root+"/"+id+"/edit",root+"/"+id+"/review",root+"/"+id+"/documents/new")) {
             mvc.perform(post(path).with(user(staff))).andExpect(status().isForbidden());

@@ -27,7 +27,7 @@
                 <section class="erp-resource-section" aria-labelledby="kyc-verification-heading" data-detail-persistent>
                     <h2 id="kyc-verification-heading"><spring:message code="kyc.verification"/></h2>
                     <div class="kyc-form-fields">
-                        <span data-resource-status="${workspace.client.state=='VERIFY'?'SUCCESS':workspace.client.state=='SUBMITTED'?'PENDING':workspace.client.state=='REJECT' or workspace.client.state=='REVOKE'?'ERROR':workspace.client.state=='RETURN' or workspace.client.state=='EXPIRED' or workspace.client.state=='STALE'?'WARNING':'DRAFT'}"><spring:message code="kyc.state.${workspace.client.state}"/></span>
+                        <c:set var="onboardingStatusState" value="${workspace.client.state}"/><%@ include file="status.jspf" %>
                         <c:choose>
                             <c:when test="${profileReadOnly}"><p class="kyc-field-hint"><spring:message code="kyc.awaitingReview"/></p></c:when>
                             <c:when test="${workspace.client.state=='VERIFY'}"><p class="kyc-field-hint"><spring:message code="kyc.verifiedMeaning"/></p></c:when>

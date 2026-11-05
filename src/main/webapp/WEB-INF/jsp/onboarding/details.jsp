@@ -17,13 +17,13 @@
     <%@ include file="profile.jspf" %>
     <%@ include file="documents.jspf" %>
     <c:forEach items="${decisions}" var="decision"><section class="erp-resource-section"><h2><spring:message code="kyc.review"/></h2><dl class="erp-detail-facts">
-        <div><dt><spring:message code="kyc.field.state"/></dt><dd><spring:message code="kyc.state.${decision.kind}"/></dd></div>
+        <div><dt><spring:message code="kyc.field.state"/></dt><dd><c:set var="onboardingStatusState" value="${decision.kind}"/><%@ include file="status.jspf" %></dd></div>
         <c:forEach items="${historical ? ['reason','clientMessage','screening','screeningReference','checkedOn','reviewDue','policyReference'] : ['reason','clientMessage','checkedOn']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:choose><c:when test="${field=='screening'}"><spring:message code="kyc.screening.${decision.screening}"/></c:when><c:otherwise><c:out value="${decision[field]}"/></c:otherwise></c:choose></dd></div></c:forEach>
         <div><dt><spring:message code="kyc.recordedBy"/></dt><dd><c:out value="${decision.actorName}"/> &#183; <c:out value="${appTime:display(decision.recordedAt)}"/></dd></div>
     </dl></section></c:forEach>
 </c:if>
 <section class="erp-resource-section"><h2><spring:message code="kyc.history"/></h2>
-    <c:forEach items="${history.rows}" var="entry"><p><a class="resource-table-id-link" href="<c:url value='/finance/clients/onboarding/${client.id}/versions/${entry.sequence}'/>"><spring:message code="kyc.version"/> <c:out value="${entry.sequence}"/></a> &#183; <spring:message code="kyc.state.${entry.result}"/> &#183; <c:out value="${entry.actor}"/> &#183; <c:out value="${appTime:display(entry.recordedAt)}"/></p></c:forEach>
+    <c:forEach items="${history.rows}" var="entry"><p><a class="resource-table-id-link" href="<c:url value='/finance/clients/onboarding/${client.id}/versions/${entry.sequence}'/>"><spring:message code="kyc.version"/> <c:out value="${entry.sequence}"/></a> &#183; <c:set var="onboardingStatusState" value="${entry.result}"/><%@ include file="status.jspf" %> &#183; <c:out value="${entry.actor}"/> &#183; <c:out value="${appTime:display(entry.recordedAt)}"/></p></c:forEach>
     <c:if test="${history.page>0}"><a href="?page=${history.page-1}"><spring:message code="common.previous"/></a></c:if>
     <c:if test="${history.hasNext}"><a href="?page=${history.page+1}"><spring:message code="common.next"/></a></c:if>
 </section>

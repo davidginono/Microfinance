@@ -1,7 +1,8 @@
 (() => {
     'use strict';
     const ready = window.WorkspaceNavigation?.onReady || (fn => document.addEventListener('DOMContentLoaded', fn, {once:true}));
-    ready(() => document.querySelectorAll('[data-group-register]').forEach(region => {
+    ready(() => document.querySelectorAll('[data-group-register]:not([data-group-ready])').forEach(region => {
+        region.dataset.groupReady = 'true';
         let selected;
         const commands = [...region.querySelectorAll('[data-group-command]')];
         const status = region.querySelector('[data-group-selection-status]');
@@ -17,6 +18,12 @@
         region.addEventListener('click', event => {
             const row = event.target.closest('[data-group-row]');
             if (!row || event.target.closest('a,button,select,textarea,input:not([type="checkbox"])')) return;
+            if (region.hasAttribute('data-group-open-on-row') && !event.target.closest('input,label') && event.target.closest('td')?.cellIndex !== 0) {
+                if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || window.getSelection()?.toString()) return;
+                event.preventDefault();
+                window.WorkspaceNavigation.navigate(row.dataset.target);
+                return;
+            }
             const next = selected === row.dataset.groupRow ? null : row;
             clear();
             if (!next) return;

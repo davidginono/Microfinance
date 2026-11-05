@@ -155,3 +155,5 @@
 @media (max-width: 640px) {
     .kyc-profile-review dl { grid-template-columns: minmax(0, 1fr); }
 }
+
+[data-group-open-on-row] [data-group-row] { cursor: pointer; }
