@@ -1,5 +1,4 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:choose><c:when test="${not empty applicationForm}"><%@ include file="application-form.jspf" %></c:when><c:otherwise>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
 <nav class="erp-page-path"><a href="<c:url value='/finance/loan-records' />"><spring:message code="recording.register.LOAN" /></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="${empty recordForm.topUpSourceLoanId ? 'recording.create.LOAN' : 'recording.topUp.create'}" /></span></nav>
@@ -52,5 +51,3 @@
 </form>
 </c:forEach><%@ include file="../../fragments/confirm-modal.jspf" %></c:if>
 </div><%@ include file="../../fragments/attachment-dropzone.jspf" %><%@ include file="../accounting-form-support.jspf" %><script src="<c:url value='/js/loan-recording.js' />" defer></script><script src="<c:url value='/js/loan-recording-evidence.js' />" defer></script><script src="<c:url value='/js/loan-charges.js' />" defer></script><script src="<c:url value='/js/loan-topup.js' />" defer></script><%@ include file="../../fragments/footer.jspf" %>
-
-</c:otherwise></c:choose>

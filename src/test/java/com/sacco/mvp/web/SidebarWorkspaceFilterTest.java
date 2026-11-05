@@ -11,6 +11,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SidebarWorkspaceFilterTest {
     private static final Path SIDEBAR_FRAGMENT = Path.of("src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf");
 
+    @Test void loanRecordingExistsOnlyInAccountantNavigation() throws IOException {
+        String sidebar=sidebarFragment();
+        String finance=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/finance-navigation.jspf"));
+        assertThat(sidebar).doesNotContain("value='/finance/loan-records'","value='/finance/client-applications'");
+        assertThat(finance).contains("@access.has(principal, 'LOAN_RECORDING_VIEW')");
+        assertThat(java.util.regex.Pattern.compile("value='/finance/loan-records'").matcher(finance).results().count()).isEqualTo(1);
+        String form=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/record-form.jsp"));
+        assertThat(form).doesNotContain("applicationForm","data-application-tab","application-form.jspf");
+    }
     @Test void institutionConfigurationBelongsToItsClaimGatedDomainAndNeverPersonalSettings() throws IOException {
         String sidebar=sidebarFragment();
         String finance=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/finance-navigation.jspf"));

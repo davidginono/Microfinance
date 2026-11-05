@@ -560,7 +560,7 @@ class AwsConsoleViewContractTest {
     void loginAndLoanJourneysExposeProgressiveAwsInteractions() throws Exception {
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
-        String loanApplication = read(JSP_ROOT.resolve("accounting/loans/application-form.jspf"));
+        String loanApplication = read(JSP_ROOT.resolve("accounting/loans/borrower-form.jsp"));
         String guarantorSelection = read(JSP_ROOT.resolve("app/guarantor-selection.jsp"));
         String loanDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
         String staffLoanDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));

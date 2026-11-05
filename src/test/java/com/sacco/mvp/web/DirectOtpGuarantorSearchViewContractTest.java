@@ -98,7 +98,7 @@ class DirectOtpGuarantorSearchViewContractTest {
     @Test
     void confirmedSubmitKeepsSendActionAndSelectedGuarantors() throws Exception {
         String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-guarantors.jspf"));
-        String form = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/application-form.jspf"));
+        String form = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-form.jsp"));
         String script = Files.readString(Path.of("src/main/resources/static/js/client-applications.js"));
 
         assertThat(form)
