@@ -12,6 +12,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.*;
 
 @Controller
@@ -40,10 +41,12 @@ public class OnboardingController {
     @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,Model m) {
         service.authorize(a,"CREATE");m.addAttribute("createForm",new CreateForm());return form(m,"create");
     }
-    @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("createForm") CreateForm f,BindingResult errors,@RequestParam(defaultValue="CREATE") String action,Model m) {
+    @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("createForm") CreateForm f,BindingResult errors,@RequestParam(defaultValue="CREATE") String action,Model m,RedirectAttributes flash) {
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
             if(!action.equals("CREATE"))throw new IllegalArgumentException("kyc.error.action");
-            return "redirect:"+ROOT+"/"+service.create(a,f);
+            UUID id=service.create(a,f);
+            flash.addFlashAttribute("provisionalClientCreated",true);
+            return "redirect:"+ROOT+"/"+id;
         }catch(IllegalArgumentException e){reject(errors,e);}catch(org.springframework.dao.DataIntegrityViolationException e){errors.reject("kyc.error.registration");}
         return form(m,"create");
     }

@@ -9,6 +9,12 @@
     <c:if test="${not client.portalEnabled and client.state!='SUBMITTED'}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize></c:if>
 </div></c:if>
 </div>
+<c:if test="${provisionalClientCreated}">
+    <div class="workspace-flashbar" data-workspace-flashbar><div class="app-notification-bar console-message" data-message-type="success" data-app-toast role="status" tabindex="-1">
+        <p data-toast-text><spring:message code="kyc.provisionalCreated"/></p>
+        <button type="button" class="app-toast-close" data-feedback-dismiss aria-label="<spring:message code='form.notification.dismiss'/>"><svg class="app-toast-close-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+    </div></div>
+</c:if>
 <c:if test="${duplicate}"><p class="console-message" data-message-type="warning" role="status"><spring:message code="kyc.error.duplicate"/></p></c:if>
 <%@ include file="facts.jspf" %>
 <c:if test="${not empty revision}">
@@ -29,7 +35,7 @@
     </div>
 </c:if>
 <div id="client-review" class="kyc-detail-group" data-detail-panel>
-<h2 class="sr-only"><spring:message code="kyc.review"/></h2>
+<h2 class="sr-only"><spring:message code="${empty reviewForm and empty decisions?'kyc.history':'kyc.review'}"/></h2>
 <c:if test="${not empty revision}">
     <c:forEach items="${decisions}" var="decision"><section class="erp-resource-section"><h2><spring:message code="kyc.review"/></h2><dl class="erp-detail-facts">
         <div><dt><spring:message code="kyc.field.state"/></dt><dd><c:set var="onboardingStatusState" value="${decision.kind}"/><%@ include file="status.jspf" %></dd></div>
