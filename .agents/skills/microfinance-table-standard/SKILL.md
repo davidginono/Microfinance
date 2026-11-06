@@ -80,6 +80,7 @@ Use the existing JSP table contract rather than introducing a React/Cloudscape a
 
 ## Loan And Financial Columns
 
+- Use informal, very simple English ("baby English") and equally simple Kiswahili for table names, headings, filters, buttons and value labels. Use short, everyday words such as `Client type`; keep financial distinctions clear.
 - Use short concrete headers and client-facing identifiers: Loan ID, Client Number, Branch, Due Date, Payment Date, Reference, Principal, Interest, Fees, Amount, and Status as relevant.
 - Workspace table headings and values share the left leading edge, including Debit, Credit and monetary columns, so values do not drift to the far edge of wide columns. Use consistent precision and tabular numerals. Explicit centered selection/utility columns may remain centered in both header and body. Standalone PDF/print stationery retains its financial layout. State `TZS` in a visible column heading or shared context; distinguish zero from unavailable data.
 - In repayment tables, distinguish actual received payments, allocation components, unapplied amounts, reversals, and projected instalments. Do not mix a repayment schedule into transaction history without clear separation.

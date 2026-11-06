@@ -58,7 +58,7 @@ public class OnboardingService {
     public Page<Client> clients(AppUserPrincipal a,String search,String state,int page,String sort) {
         authorize(a,"VIEW");check(search!=null&&search.length()<=100,"query");page(page);
         check(Set.of("","NOT_STARTED","DRAFT","RECORDED","SUBMITTED","VERIFY","RETURN","REJECT","REVOKE","EXPIRED","STALE").contains(state),"query");
-        var columns=Map.of("number","member_no","name","full_name","state","state","due","review_due");
+        var columns=Map.of("number","member_no","name","full_name","state","state","due","review_due","clientType","client_portal_enabled");
         String value=sort==null||sort.isBlank()?"number_asc":sort;int split=value.lastIndexOf('_');check(split>0,"query");
         String column=columns.get(value.substring(0,split)),direction=value.substring(split+1);check(column!=null&&Set.of("asc","desc").contains(direction),"query");
         var rows=records.clients(a,search,state,page,column+" "+direction+" nulls last",today());

@@ -199,9 +199,7 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
   - keep page-header explanations brief
   - keep card-header helper text brief or omit it when the title already explains the section
   - avoid stacking multiple instructional sentences when one short line is enough
-- Prefer plain-language labels for non-technical microfinance staff and clients:
-  - avoid exposing internal codes or technical identifiers unless they are truly needed for the task
-  - choose wording a layperson can understand at first glance
+- Use informal, very simple English ("baby English") for user-facing names and labels on pages, menus, buttons, fields, columns and statuses. Use short, everyday words such as `Client type` and `Save changes`. Match that simplicity in Kiswahili. Keep the tone respectful, retain required financial terms and disclosures, and keep internal codes out of labels unless needed.
 - Show principal, due interest, fees, arrears, and total outstanding separately. Do not label the sum of future scheduled payments as today's settlement amount.
 - Use `TZS` for monetary context and distinguish transaction dates from instalment due dates. Keep approved rates and their time basis visible where clients make lending decisions.
 - Use the existing English/Kiswahili message bundles; do not hardcode English-only labels or invent untranslated regulatory disclosures. The default-language and digital-lending release requirements are tracked in the conversion backlog.
