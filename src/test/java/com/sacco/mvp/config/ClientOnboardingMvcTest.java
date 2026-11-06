@@ -124,9 +124,9 @@ class ClientOnboardingMvcTest {
         mvc.perform(get(root+"/contact-check").with(user(staff))).andExpect(status().is4xxClientError());
     }
     @Test void submittedProfileCannotBindServerFullNameScopeOrVerification()throws Exception {
-        mvc.perform(post(root+"/"+id+"/edit").with(user(staff)).with(csrf()).param("action","SUBMITTED").param("profile.address","Keep this address").param("profile.fullName","Forged name").param("profile.phone","Forged phone").param("saccoId","FOREIGN").param("actorId",client.getMemberId().toString()).param("state","VERIFY"))
+        mvc.perform(post(root+"/"+id+"/edit").with(user(staff)).with(csrf()).param("action","RECORDED").param("profile.address","Keep this address").param("profile.fullName","Forged name").param("profile.phone","Forged phone").param("saccoId","FOREIGN").param("actorId",client.getMemberId().toString()).param("state","VERIFY"))
             .andExpect(redirectedUrl(root+"/"+id));
-        verify(service).save(eq(staff),eq(id),argThat(f->f.getAction().equals("SUBMITTED")&&f.getProfile().getAddress().equals("Keep this address")&&f.getProfile().getFullName().isEmpty()&&f.getProfile().getPhone().equals("Forged phone")));
+        verify(service).save(eq(staff),eq(id),argThat(f->f.getAction().equals("RECORDED")&&f.getProfile().getAddress().equals("Keep this address")&&f.getProfile().getFullName().isEmpty()&&f.getProfile().getPhone().equals("Forged phone")));
     }
     @Test void failedProfileKeepsValuesAndReportsSafeError()throws Exception {
         when(service.save(any(),any(),any())).thenThrow(new IllegalArgumentException("kyc.error.documents"));

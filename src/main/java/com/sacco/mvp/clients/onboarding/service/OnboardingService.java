@@ -57,7 +57,7 @@ public class OnboardingService {
     @Transactional(readOnly=true)
     public Page<Client> clients(AppUserPrincipal a,String search,String state,int page,String sort) {
         authorize(a,"VIEW");check(search!=null&&search.length()<=100,"query");page(page);
-        check(Set.of("","NOT_STARTED","DRAFT","SUBMITTED","VERIFY","RETURN","REJECT","REVOKE","EXPIRED","STALE").contains(state),"query");
+        check(Set.of("","NOT_STARTED","DRAFT","RECORDED","SUBMITTED","VERIFY","RETURN","REJECT","REVOKE","EXPIRED","STALE").contains(state),"query");
         var columns=Map.of("number","member_no","name","full_name","state","state","due","review_due");
         String value=sort==null||sort.isBlank()?"number_asc":sort;int split=value.lastIndexOf('_');check(split>0,"query");
         String column=columns.get(value.substring(0,split)),direction=value.substring(split+1);check(column!=null&&Set.of("asc","desc").contains(direction),"query");
@@ -100,7 +100,7 @@ public class OnboardingService {
         UUID client;
         try {client=registration.registerAssisted(form,f.getName(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
         records.creation(a,client,UUID.randomUUID(),f.getRequestKey(),hash,clock.now());event(a,client,"CLIENT_ASSISTED_REGISTRATION");
-        if(structured||!documents.isEmpty()){var draft=new ProfileForm();draft.setRequestKey(f.getRequestKey());draft.setProfile(json.readValue(json.writeValueAsString(f.getProfile()),Profile.class));saveRevision(a,client,draft,hash(List.of(client,draft)));}
+        if(structured||!documents.isEmpty()){var profile=new ProfileForm();profile.setRequestKey(f.getRequestKey());profile.setAction("RECORDED");profile.setProfile(json.readValue(json.writeValueAsString(f.getProfile()),Profile.class));saveRevision(a,client,profile,hash(List.of(client,profile)));}
         if(!documents.isEmpty()) {
             var c=records.client(a,client,today());
             for(var document:documents) {
@@ -112,7 +112,10 @@ public class OnboardingService {
         return client;
     }
     @Transactional(readOnly=true) public ProfileForm profileForm(AppUserPrincipal a,UUID id) {
-        authorize(a,"UPDATE");var c=records.client(a,id,today());check(!c.portalEnabled(),"selfServiceOnly");var f=new ProfileForm();f.setExpectedSequence(c.sequence());records.latest(a,id).ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);return f;
+        authorize(a,"UPDATE");var c=records.client(a,id,today());check(!c.portalEnabled(),"selfServiceOnly");var f=new ProfileForm();f.setExpectedSequence(c.sequence());var latest=records.latest(a,id);check(!"SUBMITTED".equals(c.state())||latest.filter(r->isStaffSubmission(c,r)).isPresent(),"state");latest.ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);return f;
+    }
+    public static boolean isStaffSubmission(Client c,Revision r) {
+        return !c.portalEnabled() && "SUBMITTED".equals(c.state()) && r!=null && !r.profile().isSelfService() && !c.id().equals(r.maker());
     }
     @Transactional(readOnly=true) public List<GroupChoice> groups(AppUserPrincipal a,UUID client,String search,int page) {
         if(a!=null&&!a.isStaffSession()){requireOwner(a);check(Objects.equals(a.getMemberId(),client),"scope");}
@@ -122,20 +125,19 @@ public class OnboardingService {
     @Transactional(timeout=20)
     public UUID save(AppUserPrincipal a,UUID client,ProfileForm f) {
         authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");
+        check("DRAFT".equals(f.getAction())||"RECORDED".equals(f.getAction()),"action");
         String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
         var command=json.readValue(json.writeValueAsString(f),ProfileForm.class);
         check(command.getProfile()!=null,"profile");var p=command.getProfile();standardNotice(p,records.notice());p.setSelfService(false);
-        if(command.getAction().equals("SUBMITTED")) {
-            var c=records.client(a,client,today());check(c.phone()!=null&&c.phone().matches("255[0-9]{9}"),"phone");check(c.revisionId()!=null,"documents");
-            var consent=records.documents(c.revisionId()).stream().filter(d->d.category().equals("CONSENT")).findFirst().orElseThrow(()->invalid("documents"));
-            p.setConsentReference("Client consent document / "+consent.id());p.setConsentOn(consent.recordedAt().atZoneSameInstant(ZoneId.of("Africa/Dar_es_Salaam")).toLocalDate());
-        }
         return saveRevision(a,client,command,hash);
     }
     private UUID saveRevision(AppUserPrincipal a,UUID client,ProfileForm f,String hash) {
         records.client(a,client,today());var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
-        records.lock(client);var c=records.client(a,client,today());check(!c.state().equals("SUBMITTED"),"state");check(c.sequence()==f.getExpectedSequence(),"changed");
-        check(Set.of("DRAFT","SUBMITTED").contains(f.getAction()),"action");check(f.getProfile()!=null,"profile");var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);
+        records.lock(client);var c=records.client(a,client,today());
+        if(a.isStaffSession())check(!c.portalEnabled(),"selfServiceOnly");
+        if(c.state().equals("SUBMITTED"))check(a.isStaffSession()&&isStaffSubmission(c,records.latest(a,client).orElse(null)),"state");
+        check(c.sequence()==f.getExpectedSequence(),"changed");
+        check(f.getProfile()!=null,"profile");var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);
         if(p.isSelfService())records.latest(a,client).ifPresent(previous->p.setLegalHoldReference(previous.profile().getLegalHoldReference()));
         if(a.isStaffSession()&&!c.portalEnabled()&&(!p.getFirstName().isBlank()||!p.getLastName().isBlank())) {
             names(p);String fullName=java.util.stream.Stream.of(p.getFirstName(),p.getMiddleName(),p.getLastName()).filter(v->!v.isBlank()).map(String::strip).collect(java.util.stream.Collectors.joining(" "));
@@ -144,6 +146,7 @@ public class OnboardingService {
         }
         identityFields(p,c);p.setGroupName(p.getGroupId()==null?"":records.group(a,p.getGroupId()).orElseThrow(()->invalid("groupId")).label());
         p.setFullName(c.name());p.setPhone(c.phone());p.setEmail(c.email());p.setClientNumber(c.number());validate(p,f.getAction().equals("SUBMITTED"));
+        if("RECORDED".equals(f.getAction()))check(c.phone()!=null&&c.phone().matches("255[0-9]{9}"),"phone");
         if(f.getAction().equals("SUBMITTED")) {
             check(c.revisionId()!=null,"documents");checkDocuments(p,records.documents(c.revisionId()));
         }
@@ -163,7 +166,7 @@ public class OnboardingService {
             if(own)requireOwner(a);else authorize(a,"UPDATE");records.client(a,client,today());var old=retry(a,"client_onboarding_document",f.getRequestKey(),hash);if(old.isPresent())return old.get();
             var before=records.uploadUsage(a,client);check(before.files()<DocumentForm.MAX_FILES&&before.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             UUID id=UUID.randomUUID();var upload=uploads.store(null,"CLIENT_KYC",id.toString(),f.getCategory(),content.name(),content.contentType(),content.bytes());
-            records.lock(client);var c=records.client(a,client,today());check(c.state().equals("DRAFT")&&f.getRevisionId().equals(c.revisionId()),"changed");
+            records.lock(client);var c=records.client(a,client,today());if(!own)check(!c.portalEnabled(),"selfServiceOnly");check((c.state().equals("DRAFT")||!own&&c.state().equals("RECORDED"))&&f.getRevisionId().equals(c.revisionId()),"changed");
             var usage=records.uploadUsage(a,client);check(usage.files()<DocumentForm.MAX_FILES&&usage.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             records.document(a,client,c.revisionId(),id,upload.getId(),f,hash,clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");return id;
         });
@@ -185,6 +188,7 @@ public class OnboardingService {
         text(f.getReason(),1000,"reason",true);
         text(f.getClientMessage(),1000,"clientMessage",Set.of("RETURN","REJECT","REVOKE").contains(f.getKind()));
         var r=records.latest(a,client).orElseThrow();
+        check(!isStaffSubmission(c,r),"state");
         if(f.getKind().equals("VERIFY")) {
             check(!client.equals(a.getMemberId())&&!r.maker().equals(a.getMemberId())&&!records.contributed(r.id(),a.getMemberId()),"independent");
             validate(r.profile(),true);checkDocuments(r.profile(),records.documents(r.id()));
@@ -249,7 +253,7 @@ public class OnboardingService {
     public Notice staffNotice(AppUserPrincipal a) {authorize(a,"UPDATE");return records.notice();}
     @Transactional(timeout=20)
     public UUID saveOwn(AppUserPrincipal a,SelfForm f) {
-        requireOwner(a);check(f.getProfile()!=null,"profile");String hash=hash(List.of(a.getMemberId(),f));
+        requireOwner(a);check("DRAFT".equals(f.getAction())||"SUBMITTED".equals(f.getAction()),"action");check(f.getProfile()!=null,"profile");String hash=hash(List.of(a.getMemberId(),f));
         var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
         var n=records.notice();var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);p.setSelfService(true);standardNotice(p,n);
         if(f.getAction().equals("SUBMITTED")) {
@@ -280,7 +284,7 @@ public class OnboardingService {
     public DocumentForm ownDocumentForm(AppUserPrincipal a) {
         requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(c.state().equals("DRAFT"),"state");return uploadForm(a,c);
     }
-    @Transactional(readOnly=true) public DocumentForm documentForm(AppUserPrincipal a,UUID client) {authorize(a,"UPDATE");return uploadForm(a,records.client(a,client,today()));}
+    @Transactional(readOnly=true) public DocumentForm documentForm(AppUserPrincipal a,UUID client) {authorize(a,"UPDATE");var c=records.client(a,client,today());check(!c.portalEnabled(),"selfServiceOnly");check(Set.of("DRAFT","RECORDED").contains(c.state()),"state");return uploadForm(a,c);}
     private DocumentForm uploadForm(AppUserPrincipal a,Client c) {var usage=records.uploadUsage(a,c.id());var f=new DocumentForm();f.setRevisionId(c.revisionId());f.setRemainingFiles((int)Math.max(0,DocumentForm.MAX_FILES-usage.files()));f.setRemainingBytes(Math.max(0,DocumentForm.MAX_TOTAL_BYTES-usage.bytes()));return f;}
     @Transactional(timeout=20)
     public Download downloadOwn(AppUserPrincipal a,UUID document) {

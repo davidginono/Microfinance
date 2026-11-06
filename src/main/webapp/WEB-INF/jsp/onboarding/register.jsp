@@ -14,7 +14,7 @@
         </label>
         <label>
             <span class="sr-only"><spring:message code="kyc.field.state"/></span>
-            <select class="aws-control" id="kycState" name="state"><option value=""><spring:message code="kyc.allStates"/></option><c:forEach items="${['NOT_STARTED','DRAFT','SUBMITTED','VERIFY','RETURN','REJECT','REVOKE','EXPIRED','STALE']}" var="s"><option value="${s}" ${state==s?'selected':''}><spring:message code="kyc.state.${s}"/></option></c:forEach></select>
+            <select class="aws-control" id="kycState" name="state"><option value=""><spring:message code="kyc.allStates"/></option><c:forEach items="${['NOT_STARTED','DRAFT','RECORDED','SUBMITTED','VERIFY','RETURN','REJECT','REVOKE','EXPIRED','STALE']}" var="s"><option value="${s}" ${state==s?'selected':''}><spring:message code="kyc.state.${s}"/></option></c:forEach></select>
         </label>
         <input type="hidden" name="sort" value="<c:out value='${sort}'/>"/>
         <button class="app-btn btn-neutral" type="submit"><spring:message code="common.search"/></button>

@@ -34,7 +34,7 @@
     <c:choose><c:when test="${formKind=='create' or formKind=='profile'}">
         <c:url value="${returnPath}" var="profileCancelUrl"/><c:url value="${formKind=='create'?'/finance/clients/onboarding/new':'/finance/clients/onboarding/'.concat(client.id).concat('/edit')}" var="profileSubmitUrl"/>
         <c:if test="${formKind=='profile'}"><c:set var="profileDraftUrl" value="${profileSubmitUrl}"/></c:if>
-        <c:set var="profileSubmitValue" value="${formKind=='create'?'CREATE':'SUBMITTED'}"/><c:set var="profileSubmitLabel" value="${formKind=='create'?'kyc.create':'kyc.submit'}"/>
+        <c:set var="profileSubmitValue" value="${formKind=='create'?'CREATE':'RECORDED'}"/><c:set var="profileSubmitLabel" value="${formKind=='create'?'kyc.create':'kyc.saveChanges'}"/>
         <%@ include file="profile-actions.jspf" %>
     </c:when><c:otherwise><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='${returnPath}'/>"><spring:message code="common.cancel"/></a><button class="app-btn btn-launch" type="submit"><spring:message code="credit.save"/></button></div></c:otherwise></c:choose>
 </form:form>

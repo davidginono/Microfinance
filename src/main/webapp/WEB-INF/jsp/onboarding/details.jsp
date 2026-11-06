@@ -4,9 +4,9 @@
 <div class="erp-page-header erp-detail-header" data-aws-page-header>
 <h1 class="erp-page-title"><spring:message code="kyc.details"/></h1>
 <c:if test="${not historical}"><div class="accounting-actions" data-aws-action-pin="true">
-    <c:set var="showReview" value="${not empty reviewForm}"/>
+    <c:set var="showReview" value="${not staffSubmission and not empty reviewForm}"/>
     <c:if test="${not client.portalEnabled}"><sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><a class="app-btn ${showReview?'btn-neutral':'btn-launch'}" href="<c:url value='/finance/loan-records/new'><c:param name='clientId' value='${client.id}'/></c:url>"><spring:message code="applications.create"/></a></sec:authorize></c:if>
-    <c:if test="${not client.portalEnabled and client.state!='SUBMITTED'}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize></c:if>
+    <c:if test="${not client.portalEnabled and (client.state!='SUBMITTED' or staffSubmission)}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT' or client.state=='RECORDED'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize></c:if>
 </div></c:if>
 </div>
 <c:if test="${provisionalClientCreated}">
@@ -43,7 +43,7 @@
         <div><dt><spring:message code="kyc.recordedBy"/></dt><dd><c:out value="${decision.actorName}"/> &#183; <c:out value="${appTime:display(decision.recordedAt)}"/></dd></div>
     </dl></section></c:forEach>
 </c:if>
-<c:if test="${not historical and not empty reviewForm}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_REVIEW')">
+<c:if test="${not historical and showReview}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_REVIEW')">
 <c:url value="/finance/clients/onboarding/${client.id}/review" var="reviewUrl"/>
 <%@ include file="review-form.jspf" %>
 </sec:authorize></c:if>

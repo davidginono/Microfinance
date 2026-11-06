@@ -141,10 +141,17 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(directCreation.statusCode()).as(directCreation.body()).isEqualTo(302);
             var createdPath=directCreation.headers().firstValue("Location").orElseThrow();
             assertThat(get(client,base+createdPath,true))
-                .contains("Provisional client created.","data-resource-status=\"INFO\">Provisional client", "data-resource-status=\"DISABLED\">Not enabled", "<h2 class=\"sr-only\">History</h2>")
+                .contains("Provisional client created.","data-resource-status=\"INFO\">Recorded by staff", "data-resource-status=\"DISABLED\">Not enabled", "<h2 class=\"sr-only\">History</h2>")
                 .doesNotContain("name=\"checksConfirmed\"");
-            assertThat(get(client,base+createdPath+"?lang=sw",true)).contains("data-resource-status=\"INFO\">Mteja wa usajili wa awali");
+            assertThat(get(client,base+createdPath+"?lang=sw",true)).contains("data-resource-status=\"INFO\">Imerekodiwa na mfanyakazi");
             get(client,base+createdPath+"?lang=en",true);
+            var staffEdit=get(client,base+createdPath+"/edit",true);
+            assertThat(staffEdit).contains("data-review=\"Summary\"","value=\"RECORDED\"","Save changes","Add document")
+                .doesNotContain("Review and send","sending for review","value=\"SUBMITTED\"");
+            var staffChanges=hidden(staffEdit);staffChanges.put("action","RECORDED");staffChanges.put("profile.city","Updated city without documents");
+            post(client,base+createdPath+"/edit",staffChanges,true);
+            assertThat(get(client,base+createdPath,true)).contains("Updated city without documents","Recorded by staff")
+                .doesNotContain("Awaiting review","name=\"checksConfirmed\"");
             var withDocument=hidden(get(client,base+"/finance/clients/onboarding/new",true));withDocument.put("profile.firstName","Optional");withDocument.put("profile.lastName","Documents");withDocument.put("profile.phone",domain.phone());withDocument.put("documents[0].category","IDENTITY");
             String creationBoundary="creation-"+UUID.randomUUID();var creationBytes=new ByteArrayOutputStream();
             for(var field:withDocument.entrySet())creationBytes.write(("--"+creationBoundary+"\r\nContent-Disposition: form-data; name=\""+field.getKey()+"\"\r\n\r\n"+field.getValue()+"\r\n").getBytes(StandardCharsets.UTF_8));

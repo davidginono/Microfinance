@@ -1,3 +1,3 @@
 <%@ page pageEncoding="UTF-8" %>
-<c:set var="onboardingStatusType" value="${onboardingStatusState=='VERIFY'?'SUCCESS':onboardingStatusState=='REJECT' or onboardingStatusState=='REVOKE'?'ERROR':onboardingStatusState=='RETURN' or onboardingStatusState=='EXPIRED' or onboardingStatusState=='STALE'?'WARNING':'PENDING'}"/>
+<c:set var="onboardingStatusType" value="${onboardingStatusState=='RECORDED'?'INFO':onboardingStatusState=='VERIFY'?'SUCCESS':onboardingStatusState=='REJECT' or onboardingStatusState=='REVOKE'?'ERROR':onboardingStatusState=='RETURN' or onboardingStatusState=='EXPIRED' or onboardingStatusState=='STALE'?'WARNING':'PENDING'}"/>
 <span data-resource-status="${onboardingStatusType}"><spring:message code="kyc.state.${empty onboardingStatusState?'NOT_STARTED':onboardingStatusState}"/></span>

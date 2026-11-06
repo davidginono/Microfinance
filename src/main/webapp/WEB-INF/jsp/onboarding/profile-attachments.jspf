@@ -24,7 +24,7 @@
         <button type="button" class="app-btn btn-neutral" data-profile-add-documents hidden><spring:message code="kyc.addDocument"/></button>
         <%@ include file="creation-document.jspf" %>
     </div>
-</c:when><c:when test="${not empty client and client.state=='DRAFT'}"><a class="app-btn btn-neutral" ${formKind=='self'?'data-profile-add-documents':''} href="<c:url value='${uploadPath}'/>"><spring:message code="kyc.addDocument"/></a></c:when><c:otherwise><c:if test="${not empty client and client.state!='SUBMITTED'}"><p><spring:message code="kyc.saveBeforeUpload"/></p></c:if></c:otherwise></c:choose>
+</c:when><c:when test="${client.state=='DRAFT' or (formKind=='profile' and client.state=='RECORDED')}"><a class="app-btn btn-neutral" ${formKind=='self'?'data-profile-add-documents':''} href="<c:url value='${uploadPath}'/>"><spring:message code="kyc.addDocument"/></a></c:when><c:otherwise><c:if test="${not empty client and client.state!='SUBMITTED'}"><p><spring:message code="${formKind=='profile'?'kyc.saveChangesBeforeUpload':'kyc.saveBeforeUpload'}"/></p></c:if></c:otherwise></c:choose>
 <c:if test="${formKind=='self' and not profileReadOnly}">
     <div class="kyc-acknowledgement" data-profile-declaration>
         <label class="kyc-checkbox"><form:checkbox path="declarationAccepted" required="true"/><span><spring:message code="kyc.acceptDeclaration"/></span></label>

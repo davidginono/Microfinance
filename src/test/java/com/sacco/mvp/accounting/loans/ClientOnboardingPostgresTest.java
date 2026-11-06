@@ -44,7 +44,7 @@ class ClientOnboardingPostgresTest {
     void documents(UUID client,UUID revision) {
         for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")){var form=new DocumentForm();form.setRevisionId(revision);form.setCategory(category);service.attach(f.actor,client,form,image());}
     }
-    UUID submitted(UUID client,String identity){UUID draft=draft(client,identity);documents(client,draft);var form=profile(client,identity);form.setAction("SUBMITTED");return service.save(f.actor,client,form);}
+    UUID submitted(UUID client,String identity){UUID draft=draft(client,identity);documents(client,draft);var owner=owner(client);var form=service.ownForm(owner);form.setProfile(profile(client,identity).getProfile());form.setAction("SUBMITTED");form.setNoticeAcknowledged(true);form.setDeclarationAccepted(true);return service.saveOwn(owner,form);}
     ReviewForm decision(UUID revision){var form=new ReviewForm();form.setRevisionId(revision);form.setIdentityChecked(true);form.setAddressChecked(true);form.setActivityChecked(true);form.setContactChecked(true);form.setDuplicatesChecked(true);form.setReason("Synthetic independent evidence review");form.setClientMessage("Please provide a current address document.");form.setCheckedOn(day);return form;}
     void policy(){var controls=f.context.getBean(CreditControlService.class);var p=new PolicyForm();p.setExpectedRevision(controls.policy(f.actor).revision());p.setKycRequired(true);p.setReference("Synthetic approved branch KYC gate");p.setVerified(true);controls.configure(f.actor,p);}
     String gate(){return f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day);}
@@ -79,7 +79,7 @@ class ClientOnboardingPostgresTest {
         var form=new CreateForm();form.getProfile().setFirstName("Synthetic");form.getProfile().setLastName("Upload");form.getProfile().setPhone(phone());
         for(String category:List.of("IDENTITY","ADDRESS")){var document=new CreationDocumentForm();document.setCategory(category);document.setFile(image());form.getDocuments().add(document);}
         UUID client=service.create(f.actor,form);assertThat(service.create(f.actor,form)).isEqualTo(client);
-        assertThat(service.client(f.actor,client).state()).isEqualTo("DRAFT");assertThat(service.documents(f.actor,client)).hasSize(2);
+        assertThat(service.client(f.actor,client).state()).isEqualTo("RECORDED");assertThat(service.documents(f.actor,client)).hasSize(2);
         assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_document where client_id=?",Integer.class,client)).isEqualTo(2);
         assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_decision where client_id=?",Integer.class,client)).isZero();
         var other=f.operator("B2");assertThatThrownBy(()->service.documents(other,client)).isInstanceOf(AccessDeniedException.class);
@@ -89,15 +89,39 @@ class ClientOnboardingPostgresTest {
         int before=f.jdbc.queryForObject("select count(*) from members where sacco_id=?",Integer.class,f.institution);
         assertThatThrownBy(()->service.create(f.actor,bad)).hasMessage("kyc.error.file");assertThat(f.jdbc.queryForObject("select count(*) from members where sacco_id=?",Integer.class,f.institution)).isEqualTo(before);
     }
-    @Test void draftsNeedCurrentEvidenceAndVerificationNeedsIndependentStaff(){
+    @Test void staffSaveIsFinalForTheProvisionalProfileAndPreservesBorrowerReview(){
         var empty=new ProfileForm();UUID draft=service.save(f.actor,f.client,empty);assertThat(service.save(f.actor,f.client,empty)).isEqualTo(draft);
-        f.jdbc.update("update members set phone=null where id=?",f.client);var missingContact=profile(f.client,"TZ-0000-1234");missingContact.setAction("SUBMITTED");assertThatThrownBy(()->service.save(f.actor,f.client,missingContact)).hasMessage("kyc.error.phone");f.jdbc.update("update members set phone=? where id=?",clientPhone,f.client);
-        var form=profile(f.client,"TZ-0000-1234");form.setAction("SUBMITTED");assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.documents");
+        var form=profile(f.client,"TZ-0000-1234");form.setAction("SUBMITTED");assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.action");
+        form.setAction("RECORDED");UUID recorded=service.save(f.actor,f.client,form);
+        assertThat(service.save(f.actor,f.client,form)).isEqualTo(recorded);
+        assertThat(service.client(f.actor,f.client).state()).isEqualTo("RECORDED");
+        assertThat(service.latest(f.actor,f.client).orElseThrow().profile().getConsentReference()).isEmpty();
+        assertThat(service.decisions(f.actor,f.client)).isEmpty();
+        assertThat(service.documents(f.actor,f.client)).isEmpty();
+        assertThatThrownBy(()->service.review(f.operator("B1"),f.client,decision(recorded))).hasMessage("kyc.error.state");
+        assertThatThrownBy(()->service.profileForm(f.operator("B2"),f.client)).isInstanceOf(AccessDeniedException.class);
+        var owner=owner(f.client);var ownForm=service.ownForm(owner);ownForm.setAction("RECORDED");
+        assertThatThrownBy(()->service.saveOwn(owner,ownForm)).hasMessage("kyc.error.action");
+        var attachment=service.documentForm(f.actor,f.client);service.attach(f.actor,f.client,attachment,image());
+        assertThat(service.documents(f.actor,f.client)).hasSize(1);
         UUID submitted=submitted(f.client,"TZ-0000-1234");var review=decision(submitted);assertThatThrownBy(()->service.review(f.actor,f.client,review)).hasMessage("kyc.error.independent");
+        assertThatThrownBy(()->service.profileForm(f.actor,f.client)).hasMessage("kyc.error.state");
         var selfMember=Member.builder().id(f.client).saccoId(f.institution).stationId("B1").memberNo(f.client.toString()).memberAccount(true).fullName("Synthetic client").phone(clientPhone).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE',client_portal_enabled=true,password_hash='test-only' where id=?",f.client);when(f.context.getBean(MemberDirectoryService.class).find(f.client)).thenReturn(Optional.of(selfMember));var selfReviewer=new AppUserPrincipal(selfMember,EnumSet.allOf(UserClaim.class),true);assertThatThrownBy(()->service.review(selfReviewer,f.client,review)).hasMessage("kyc.error.independent");
-        var verifier=f.operator("B1");UUID saved=service.review(verifier,f.client,review);assertThat(service.review(verifier,f.client,review)).isEqualTo(saved);assertThat(gate()).isNull();assertThat(service.documents(f.actor,f.client)).hasSize(4);
+        var verifier=f.operator("B1");UUID saved=service.review(verifier,f.client,review);assertThat(service.review(verifier,f.client,review)).isEqualTo(saved);assertThat(gate()).isNull();assertThat(service.documents(f.actor,f.client)).hasSize(5);
         assertThatThrownBy(()->f.jdbc.update("delete from client_onboarding_decision where id=?",saved)).isInstanceOf(DataAccessException.class);
         assertThatThrownBy(()->f.jdbc.execute("truncate client_onboarding_revision cascade")).isInstanceOf(DataAccessException.class);
+    }
+    @Test void staffCanReplaceAnOldAssistedSubmissionWithoutChangingHistory() {
+        UUID legacy=UUID.randomUUID();
+        f.jdbc.update("insert into client_onboarding_revision values(?,?,?,?,1,'SUBMITTED','{}'::jsonb,null,?,?,?,now())",
+            legacy,f.client,f.institution,"B1",UUID.randomUUID(),"0".repeat(64),f.actor.getMemberId());
+        assertThatThrownBy(()->service.review(f.operator("B1"),f.client,decision(legacy))).hasMessage("kyc.error.state");
+        var edit=service.profileForm(f.actor,f.client);edit.setAction("RECORDED");
+        edit.getProfile().setAddress("Direct staff correction");
+        service.save(f.actor,f.client,edit);
+        assertThat(service.client(f.actor,f.client).state()).isEqualTo("RECORDED");
+        assertThat(service.version(f.actor,f.client,1).mode()).isEqualTo("SUBMITTED");
+        assertThat(service.decisions(f.actor,f.client)).isEmpty();
     }
     @Test void verificationRetainsUnknownScreeningAndRetriesIgnoreOnlyRetiredInputs(){
         UUID revision=submitted(f.client,"TZ-SIMPLE-"+UUID.randomUUID());var reviewer=f.operator("B1");var review=decision(revision);
@@ -326,15 +350,15 @@ class ClientOnboardingPostgresTest {
         assertThat(f.jdbc.queryForObject("select profile::text from client_onboarding_revision where id=?",String.class,submitted)).isEqualTo(original);
         assertThat(f.jdbc.queryForObject("select english from client_onboarding_notice where id=?",String.class,legacyId)).isEqualTo("Legacy English notice");
     }
-    @Test void databaseRejectsAnAlteredStandardMessageAndAssistedConsentComesFromEvidence() {
+    @Test void databaseRejectsAnAlteredStandardMessageOnAClientSubmission() {
         UUID submitted=submitted(f.client,"TZ-STANDARD-EVIDENCE");var revision=service.latest(f.actor,f.client).orElseThrow();
-        assertThat(revision.profile().getConsentReference()).startsWith("Client consent document / ");
-        assertThat(revision.profile().isNoticeAcknowledged()).isFalse();assertThat(revision.profile().getAcknowledgedAt()).isNull();
+        assertThat(revision.profile().getConsentReference()).startsWith("Client acknowledgement / ");
+        assertThat(revision.profile().isNoticeAcknowledged()).isTrue();assertThat(revision.profile().getAcknowledgedAt()).isNotNull();
         assertThat(f.jdbc.queryForObject("select client_onboarding_complete(?,?)",Boolean.class,submitted,day)).isTrue();
         var returned=decision(submitted);returned.setKind("RETURN");service.review(f.operator("B1"),f.client,returned);
         UUID altered=UUID.randomUUID();var records=f.context.getBean(com.sacco.mvp.clients.onboarding.repository.OnboardingRepository.class);var changed=revision.profile();changed.setNoticeEnglish("Use for anything");
         new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class)).executeWithoutResult(tx->{
-            records.revision(f.actor,f.client,altered,3,"SUBMITTED",changed,"0".repeat(64),UUID.randomUUID(),"0".repeat(64),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));
+            records.revision(owner(f.client),f.client,altered,3,"SUBMITTED",changed,"0".repeat(64),UUID.randomUUID(),"0".repeat(64),day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));
             records.copyDocuments(f.actor,f.client,submitted,altered);
         });
         assertThat(f.jdbc.queryForObject("select client_onboarding_complete(?,?)",Boolean.class,altered,day)).isFalse();
@@ -376,7 +400,7 @@ class ClientOnboardingPostgresTest {
     }
     @Test void extendedAssistedProfileCreatesOneIdentityWithOptionalEmailAndPreservesItsNumberOnCorrection() {
         UUID group=group("B1");var form=new CreateForm();var p=form.getProfile();p.setFirstName("Synthetic");p.setLastName("Borrower");p.setPhone(phone());p.setMaritalStatus("MARRIED");p.setGender("FEMALE");p.setDependants(2);p.setGroupId(group);p.setCity("Synthetic city");p.setBusinessName("Synthetic shop");p.setBusinessTin("123-456-789");p.setDailySales(new java.math.BigDecimal("125000.50"));p.setDailyExpenditure(new java.math.BigDecimal("75000.25"));p.setSpouseName("Synthetic spouse");p.setSpousePhone("0712345678");p.setBankName("Synthetic bank");p.setBankAccountName("Synthetic Borrower");p.setBankAccountNumber("1234567890");
-        UUID id=service.create(f.actor,form);assertThat(service.create(f.actor,form)).isEqualTo(id);var c=service.client(f.actor,id);String number=c.number();assertThat(number).matches("CL-[0-9]{8,}");assertThat(c.portalEnabled()).isFalse();assertThat(c.state()).isEqualTo("DRAFT");assertThat(c.email()).isNull();
+        UUID id=service.create(f.actor,form);assertThat(service.create(f.actor,form)).isEqualTo(id);var c=service.client(f.actor,id);String number=c.number();assertThat(number).matches("CL-[0-9]{8,}");assertThat(c.portalEnabled()).isFalse();assertThat(c.state()).isEqualTo("RECORDED");assertThat(c.email()).isNull();
         var saved=service.latest(f.actor,id).orElseThrow().profile();assertThat(saved.getDailySales()).isEqualByComparingTo("125000.50");assertThat(saved.getDailyExpenditure()).isEqualByComparingTo("75000.25");assertThat(saved.getGroupId()).isEqualTo(group);assertThat(saved.getGroupName()).contains("Synthetic group");assertThat(saved.getSpousePhone()).isEqualTo("255712345678");assertThat(saved.getBankAccountNumber()).isEqualTo("1234567890");assertThat(saved.getMiddleName()).isEmpty();
         assertThat(f.jdbc.queryForObject("select count(*) from lending_group_member where client_id=?",Integer.class,id)).isZero();
         UUID otp=UUID.randomUUID();f.jdbc.update("insert into email_otp_tokens(id,email,purpose,member_id,code_hash,expires_at,created_at,resend_count) values(?,'synthetic@example.invalid','REGISTRATION',?,'!SYNTHETIC',now()+interval '10 minutes',now(),0)",otp,id);

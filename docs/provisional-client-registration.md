@@ -2,6 +2,8 @@
 
 31 October 2026. Provisional registration supports staff-assisted intake and self-service onboarding before the client's verification and normal loan application are complete.
 
+Authorized staff can create a provisional client and save later profile edits directly, without mandatory documents or another reviewer. The final save appends an audited `RECORDED` profile revision. Save draft remains available when editing an existing profile. Staff can replace an older pending staff submission by saving a new revision, leaving the earlier version intact. Records created through this path still have no portal access or independent verification evidence. Client-submitted profiles retain their own evidence checks and independent review.
+
 ## Identity and access
 
 Both channels allocate `CL-00000001`-style client numbers from the existing PostgreSQL `client_number_seq`, using the existing collision check. Staff cannot submit a client number. Existing numbers are preserved; activation never allocates another number. Rollbacks may leave sequence gaps, and numbers are never recycled.

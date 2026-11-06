@@ -110,7 +110,7 @@ public class OnboardingRepository {
     private static final String EVIDENCE_FROM = """
         from client_onboarding_revision r join client_onboarding_document d
           on d.client_id=r.client_id and d.sacco_id=r.sacco_id and d.station_id=r.station_id
-          and ((r.mode='DRAFT' and (
+          and ((r.mode in ('DRAFT','RECORDED') and (
         """+VISIBLE_ATTACHMENTS+"""
           )) or (r.mode='SUBMITTED' and exists(select 1 from client_onboarding_document_link x
               where x.revision_id=r.id and x.document_id=d.id)))
