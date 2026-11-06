@@ -64,10 +64,11 @@
         }
         form.addEventListener('change', syncRequirements, true);
         syncRequirements();
-        const breadcrumb = wizard.closest('.portal-entry')?.querySelector(':scope > .erp-page-path');
+        const breadcrumb = wizard.closest('.shell-main')?.querySelector(':scope > .erp-page-path')
+            || wizard.closest('.kyc-form-workspace, .portal-entry')?.querySelector(':scope > .erp-page-path');
         const measureSticky = () => {
             wizard.style.setProperty('--kyc-step-nav-height', nav.offsetHeight + 'px');
-            if (breadcrumb) wizard.style.setProperty('--kyc-breadcrumb-height', breadcrumb.offsetHeight + 'px');
+            if (breadcrumb) wizard.style.setProperty('--kyc-breadcrumb-height', breadcrumb.getBoundingClientRect().height + 'px');
         };
         measureSticky();
         if (window.ResizeObserver) {
