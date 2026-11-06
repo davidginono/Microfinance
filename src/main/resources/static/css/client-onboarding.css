@@ -17,14 +17,13 @@
 .kyc-client-form > [data-profile-tabs] > .console-detail-tabs { margin-top: 0; }
 .kyc-client-form { display: grid; gap: 20px; min-width: 0; }
 .kyc-detail-group { display: grid; gap: 16px; min-width: 0; }
-[data-creation-documents] { display: grid; gap: 16px; }
-.kyc-creation-document { display: grid; gap: 12px; min-width: 0; padding-bottom: 16px; border-bottom: 1px solid #eaeded; }
-.kyc-creation-document input { max-width: 100%; min-width: 0; }
-.kyc-creation-document [data-creation-remove] { justify-self: start; }
+.kyc-creation-uploads { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
+.kyc-creation-uploads > .app-btn { justify-self: start; }
+.kyc-creation-uploads > .app-btn[hidden] { display: none; }
+[data-profile-creation-files] input[type="file"] { width: 100%; min-width: 0; }
 .kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
 .kyc-review-fields { display: grid; gap: 16px; min-width: 0; }
 .kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.kyc-document-facts + .kyc-document-facts { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eaeded; }
 .kyc-income-choices { border: 0; margin: 0; padding: 0; min-width: 0; }
 .kyc-income-choices legend { padding: 0; margin-bottom: 6px; font-size: 14px; line-height: 20px; font-weight: 700; }
 .kyc-income-options { display: flex; flex-flow: row wrap; align-items: center; gap: 8px 16px; min-width: 0; min-height: 32px; }
@@ -105,8 +104,6 @@
 [data-profile-tabs], [data-detail-panel] { min-width:0; }
 [data-detail-panel] > .erp-resource-section + .erp-resource-section { margin-top:20px; }
 .kyc-profile-note { grid-column:1 / -1; margin:0; color:var(--aws-muted,#545b64); font-size:14px; }
-.kyc-photo { display:inline-grid; gap:8px; margin:0 20px 16px 0; max-width:100%; }
-.kyc-photo img { display:block; width:160px; height:180px; object-fit:contain; border:1px solid #d5dbdb; }
 @media(max-width:640px) { .kyc-profile-grid { grid-template-columns:minmax(0,1fr); } }
 
 .kyc-client-form :is([data-profile-business-fields],[data-profile-spouse-section])[hidden] { display: none !important; }
@@ -144,14 +141,23 @@
 .kyc-profile-review dl > div { min-width: 0; overflow-wrap: anywhere; }
 .kyc-profile-review dt { color: var(--aws-muted, #545b64); }
 .kyc-profile-review dd { margin: 4px 0 0; white-space: pre-wrap; }
+.kyc-provisional-create .kyc-profile-wizard { grid-template-columns: 208px minmax(0, 1fr); }
+.kyc-provisional-create .kyc-profile-wizard > nav { padding: 12px; border: 1px solid #d5dbdb; background: #fff; }
+.kyc-provisional-create .kyc-profile-steps { gap: 4px; }
+.kyc-provisional-create .kyc-profile-steps button { padding: 12px; }
+.kyc-provisional-create .kyc-profile-steps button[aria-current="step"] { background: #f1faff; }
+.kyc-provisional-create :is(.kyc-profile-grid,.kyc-section-body) { padding: 20px; }
+.kyc-provisional-create [data-form-actions] { margin-inline-start: 232px; flex-wrap: wrap; padding: 16px 0 0; }
 @media (max-width: 800px) {
     .kyc-profile-wizard { display: block; }
     .kyc-profile-wizard > nav { margin-bottom: 12px; }
     .kyc-profile-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .kyc-profile-step > h2, [data-profile-evidence] h4 { scroll-margin-top: calc(var(--kyc-step-top, 0px) + var(--kyc-step-nav-height, 0px) + 8px); }
+    .kyc-provisional-create [data-form-actions] { margin-inline-start: 0; }
 }
 @media (max-width: 640px) {
     .kyc-profile-review dl { grid-template-columns: minmax(0, 1fr); }
+    .kyc-provisional-create :is(.kyc-profile-grid,.kyc-section-body) { padding: 16px; }
 }
 
 [data-group-open-on-row] [data-group-row] { cursor: pointer; }

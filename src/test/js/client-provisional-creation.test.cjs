@@ -1,47 +1,76 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),{readFileSync}=require('node:fs'),{JSDOM}=require('jsdom');
-const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
-const row='<div data-creation-document-row><label><span>Category</span><select name="documents[0].category"><option value="IDENTITY">Identity</option><option value="ADDRESS">Address</option><option value="PROFILE_PHOTO">Photo</option></select></label><label><span>File</span><input type="file" name="documents[0].file"></label><label><span>Expiry</span><input type="date" name="documents[0].expiresOn"></label><button type="button" data-creation-remove hidden>Remove</button></div>';
-async function setup(){
- const dom=new JSDOM('<body><main><form action="/finance/clients/onboarding/new" method="post" enctype="multipart/form-data" data-onboarding-form="create"><input name="_csrf" value="token"><input name="requestKey" value="key-1"><input name="profile.city" value="Arusha"><input name="profile.firstName" required><template data-creation-labels data-draft-saved="Draft saved" data-draft-files="Draft saved; files attach on Create" data-draft-error="Draft not saved" data-draft-uncertain="Save not confirmed" data-file-error="Invalid file" data-limit-error="Upload limit"></template><div data-creation-documents>'+row+'</div><template data-creation-document-template>'+row+'</template><button type="button" data-creation-add hidden>Add</button><div data-form-actions><button type="submit" name="action" value="DRAFT" formnovalidate>Save draft</button><button type="submit" name="action" value="CREATE">Create</button></div></form></main></body>',{url:'http://localhost/finance/clients/onboarding/new',runScripts:'outside-only'});
- const w=dom.window,d=w.document,form=d.querySelector('form'),requests=[],toasts=[],settled=[];
- w.WorkspaceNavigation={onReady:fn=>fn()};w.showToast=(...args)=>toasts.push(args);w.fetch=(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject}));
- d.addEventListener('workspace:form-settled',event=>settled.push(event.detail));w.eval(readFileSync('src/main/resources/static/js/client-onboarding.js','utf8'));
- const submit=value=>form.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:form.querySelector('[value='+value+']')}));
- const respond=async(data,status=200)=>{requests.at(-1).resolve({ok:status===200,headers:{get:()=> 'application/json'},json:async()=>data});await tick();await tick();};
- return {dom,w,d,form,requests,toasts,settled,submit,respond};
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {readFileSync}=require('node:fs');
+const {JSDOM}=require('jsdom');
+const {implForWrapper}=require('jsdom/lib/generated/idl/utils.js');
+const source=readFileSync('src/main/resources/static/js/client-profile-documents.js','utf8');
+
+async function setup({nativeFallback=false}={}) {
+ const dom=new JSDOM(`<body><form id="client-onboarding-form" data-onboarding-form="create" method="post" enctype="multipart/form-data">
+   <input name="profile.firstName" value="Asha"><input name="_csrf" value="token"><input name="requestKey" value="create-key">
+   <template data-profile-wizard-labels data-done="Done" data-cancel="Cancel" data-close="Close" data-upload-error="Upload error" data-choose-files="Choose files" data-file-label="Images" data-drop-images="Drop images here" data-selected-images="Selected images" data-no-documents="No documents" data-file-size="Size" data-file-modified="Modified" data-remove-selected="Remove file {0}: {1}"></template>
+   <div data-profile-document-list></div><button type="button" data-profile-add-documents hidden>Add document</button>
+   <div data-profile-creation-files><label><span>Category</span><select name="documents[0].category"><option value="IDENTITY">Identity</option><option value="ADDRESS">Address</option><option value="PROFILE_PHOTO">Photo</option></select></label>
+   <label><span>Expiry</span><input type="date" name="documents[0].expiresOn"></label>
+   <input type="file" name="documents[0].file" data-upload-max-bytes="1048576" data-upload-remaining-files="10" data-upload-remaining-bytes="10485760" data-upload-file-error="Invalid image" data-upload-limit-error="Upload limit"></div>
+   <button type="submit" name="action" value="CREATE">Create client</button></form></body>`,{url:'http://localhost/finance/clients/onboarding/new',runScripts:'outside-only',pretendToBeVisual:true});
+ const w=dom.window,d=w.document,profile=d.querySelector('form'),requests=[],created=[],revoked=[];
+ w.fetch=(...args)=>{requests.push(args);throw Error('Selection must stay local');};
+ w.URL.createObjectURL=()=>{const url='blob:test-'+created.length;created.push(url);return url;};
+ w.URL.revokeObjectURL=url=>revoked.push(url);
+ w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
+ w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');this.dispatchEvent(new w.Event('close'));};
+ if(!nativeFallback) w.DataTransfer=class {
+  constructor(){const input=d.createElement('input');input.type='file';this.files=input.files;this.items={add:file=>implForWrapper(this.files).push(implForWrapper(file))};}
+ };
+ w.eval(source);await new Promise(resolve=>d.addEventListener('DOMContentLoaded',resolve,{once:true}));
+ const add=()=>d.querySelector('[data-profile-add-documents]').click();
+ const file=name=>new w.File(['image'],name,{type:'image/png',lastModified:Date.UTC(2026,10,3,10)});
+ const choose=(...files)=>{const picker=d.querySelector('dialog input[type=file]');Object.defineProperty(picker,'files',{value:files,configurable:true});picker.dispatchEvent(new w.Event('change',{bubbles:true}));};
+ const drop=(...files)=>{const event=new w.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{files}});d.querySelector('dialog .kyc-upload-dropzone').dispatchEvent(event);};
+ const done=()=>d.querySelector('dialog form').dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true}));
+ const data=()=>new w.FormData(profile,profile.querySelector('[value=CREATE]'));
+ return {dom,w,d,profile,requests,created,revoked,add,file,choose,drop,done,data};
 }
-test('Save draft confirms success without a page request or replacement and preserves selected files',async()=>{
+
+test('staff uses the shared chooser and file tokens, then submits selected files with Create',async()=>{
  const f=await setup();try{
-  const input=f.form.querySelector('[type=file]'),file=new f.w.File(['image'],'id.png',{type:'image/png'});Object.defineProperty(input,'files',{value:[file],configurable:true});
-  const error=f.d.createElement('div');error.dataset.workspaceFormError='';error.textContent='Old uncertainty';f.form.append(error);
-  let genericSubmissions=0;f.w.addEventListener('submit',()=>genericSubmissions++);
-  assert.equal(f.submit('DRAFT'),false);f.submit('DRAFT');assert.equal(f.requests.length,1);assert.equal(f.toasts.length,0);assert.equal(genericSubmissions,0);
-  assert.equal(f.requests[0].options.headers.Accept,'application/json');assert.equal(f.requests[0].options.body.get('_csrf'),'token');assert.equal(f.requests[0].options.body.get('action'),'DRAFT');assert.equal(f.requests[0].options.body.has('documents[0].file'),false);
-  await f.respond({saved:true,requestKey:'key-1'});
-  assert.equal(f.toasts[0][0],'success');assert.equal(f.toasts[0][1],'Draft saved; files attach on Create');assert.equal(f.toasts[0][2].placement,'workspace');assert.equal(input.files[0],file);assert.equal(f.form.elements['profile.city'].value,'Arusha');assert.equal(f.form.querySelector('[data-workspace-form-error]'),null);
-  assert.equal(f.settled.at(-1).saved,false);assert.equal(f.form.hasAttribute('aria-busy'),false);assert.equal(f.form.inert,false);assert.equal(f.form.querySelector('[value=DRAFT]').disabled,false);
+  f.add();assert.equal(f.d.querySelector('dialog').parentElement,f.d.body);assert.equal(f.d.activeElement.dataset.profileChoose,'');
+  f.choose(f.file('id.png'));f.drop(f.file('photo.png'));
+  const [photo,identity]=f.d.querySelectorAll('dialog .kyc-upload-row');
+  assert.match(photo.textContent,/photo\.png.*5 B.*03\/11\/2026/s);assert.ok(photo.querySelector('.kyc-upload-thumbnail'));
+  photo.querySelector('select').value='PROFILE_PHOTO';photo.querySelector('select').dispatchEvent(new f.w.Event('change'));
+  assert.equal(photo.querySelector('input[type=date]').disabled,true);
+  identity.querySelector('select').value='ADDRESS';identity.querySelector('input[type=date]').value='2027-01-01';
+  assert.equal(f.data().has('documents[0].file'),false);
+  f.done();assert.equal(f.d.querySelector('dialog'),null);
+  assert.deepEqual([...f.profile.querySelectorAll('[data-profile-file-name]')].map(node=>node.textContent),['photo.png','id.png']);
+  const data=f.data();assert.equal(data.get('documents[0].file').name,'id.png');assert.equal(data.get('documents[0].category'),'ADDRESS');assert.equal(data.get('documents[0].expiresOn'),'2027-01-01');
+  assert.equal(data.get('documents[1].file').name,'photo.png');assert.equal(data.get('documents[1].category'),'PROFILE_PHOTO');assert.equal(data.has('documents[1].expiresOn'),false);
+  assert.equal(data.get('action'),'CREATE');assert.equal(data.get('_csrf'),'token');assert.equal(data.get('profile.firstName'),'Asha');assert.equal(f.requests.length,0);
+  f.w.dispatchEvent(new f.w.PageTransitionEvent('pagehide'));assert.equal(f.revoked.length,f.created.length);
  }finally{f.dom.window.close();}
 });
-test('an empty optional document section permits saving and creation remains the native command',async()=>{
+
+test('Cancel preserves the prior selection and individual removal reindexes the multipart files',async()=>{
  const f=await setup();try{
-  assert.equal(f.form.querySelector('[type=file]').required,false);f.submit('DRAFT');await f.respond({saved:true,requestKey:'key-1'});assert.equal(f.settled.at(-1).saved,true);assert.equal(f.toasts[0][0],'success');assert.equal(f.toasts[0][1],'Draft saved');
-  assert.equal(f.submit('CREATE'),true);assert.equal(f.requests.length,1);
+  f.add();f.choose(f.file('first.png'),f.file('second.png'));f.done();
+  f.add();assert.equal(f.d.querySelectorAll('dialog .kyc-upload-row').length,2);
+  f.d.querySelector('dialog .kyc-upload-remove').click();f.d.querySelector('dialog .app-modal-close').click();
+  assert.equal(f.data().get('documents[1].file').name,'second.png');assert.equal(f.d.activeElement,f.d.querySelector('[data-profile-add-documents]'));
+  f.profile.querySelector('button[aria-label$="first.png"]').click();assert.equal(f.data().get('documents[0].file').name,'second.png');assert.equal(f.data().has('documents[1].file'),false);
+  f.add();f.d.querySelector('dialog .kyc-upload-remove').click();f.done();assert.equal(f.data().has('documents[0].file'),false);assert.equal(f.requests.length,0);
  }finally{f.dom.window.close();}
 });
-test('rejected or unconfirmed drafts preserve values and only acknowledged saves show success',async()=>{
+
+test('invalid files stay out of the form and browsers without the shared picker retain native attachment',async()=>{
  const f=await setup();try{
-  f.submit('DRAFT');await f.respond({saved:false,message:'Invalid phone'},400);assert.equal(f.form.querySelector('[data-creation-draft-error]').dataset.messageType,'error');assert.equal(f.toasts.length,0);
-  f.submit('DRAFT');f.requests.at(-1).reject(new TypeError('Disconnected'));await tick();await tick();assert.equal(f.form.querySelectorAll('[data-creation-draft-error]').length,1);assert.equal(f.form.querySelector('[data-creation-draft-error]').dataset.messageType,'warning');
-  assert.equal(f.requests.length,2);assert.equal(f.form.elements['profile.city'].value,'Arusha');assert.equal(f.form.querySelector('[value=DRAFT]').disabled,false);assert.equal(f.toasts.length,0);
-  f.submit('DRAFT');await f.respond({saved:true,requestKey:'other-key'});assert.equal(f.toasts.length,0);
+  f.add();f.choose(f.file('bad.pdf'));assert.match(f.d.querySelector('dialog [data-upload-error]').textContent,/Invalid image/);
+  f.drop(...Array.from({length:11},(_,index)=>f.file(index+'.png')));assert.match(f.d.querySelector('dialog [data-upload-error]').textContent,/Upload limit/);
+  assert.equal(f.d.querySelectorAll('dialog .kyc-upload-row').length,0);assert.equal(f.data().has('documents[0].file'),false);
  }finally{f.dom.window.close();}
-});
-test('optional upload rows keep category and file pairs, enforce bounds and renumber after removal',async()=>{
- const f=await setup();try{
-  const first=f.form.querySelector('[data-creation-document-row]'),fileInput=first.querySelector('[type=file]');Object.defineProperty(fileInput,'files',{value:[new f.w.File(['a'],'id.png')],configurable:true});
-  const add=f.form.querySelector('[data-creation-add]');for(let i=0;i<12;i++)add.click();assert.equal(f.form.querySelectorAll('[data-creation-document-row]').length,10);assert.equal(add.disabled,true);
-  const second=f.form.querySelectorAll('[data-creation-document-row]')[1];second.querySelector('select').value='PROFILE_PHOTO';second.querySelector('select').dispatchEvent(new f.w.Event('change'));assert.equal(second.querySelector('[type=date]').disabled,true);
-  first.querySelector('[data-creation-remove]').click();assert.equal(second.querySelector('select').name,'documents[0].category');assert.equal(second.querySelector('select').value,'PROFILE_PHOTO');assert.equal(add.disabled,false);
-  const input=second.querySelector('[type=file]');Object.defineProperty(input,'files',{value:[new f.w.File(['bad'],'bad.pdf')],configurable:true});input.dispatchEvent(new f.w.Event('change'));assert.equal(input.validationMessage,'Invalid file');
- }finally{f.dom.window.close();}
+ const fallback=await setup({nativeFallback:true});try{
+  assert.ok(fallback.profile.elements['documents[0].file']);assert.equal(fallback.profile.elements['documents[0].file'].required,false);
+  assert.equal(fallback.d.querySelector('[data-profile-add-documents]').hidden,true);
+ }finally{fallback.dom.window.close();}
 });

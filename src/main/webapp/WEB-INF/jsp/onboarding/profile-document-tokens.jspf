@@ -1,0 +1,45 @@
+<%@ page pageEncoding="UTF-8" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<c:if test="${not empty profileDocuments}">
+    <ul class="kyc-upload-queue" aria-label="<spring:message code='kyc.uploadedFiles'/>">
+        <c:forEach items="${profileDocuments}" var="doc">
+            <li class="kyc-upload-row" data-profile-document>
+                <div class="kyc-upload-token">
+                    <c:url var="fileUrl" value="${documentRoot}/${doc.id}"/>
+                    <c:if test="${formKind=='self' and canReadProfileDocuments and (doc.contentType=='image/jpeg' or doc.contentType=='image/png')}">
+                        <img class="kyc-upload-thumbnail" src="${fileUrl}?preview=true" alt="" loading="lazy" decoding="async"/>
+                    </c:if>
+                    <c:if test="${staffDocumentDetails and canReadProfileDocuments and (doc.category=='PROFILE_PHOTO' or doc.category=='SPOUSE_PHOTO')}">
+                        <img class="kyc-upload-thumbnail" src="<c:url value='/finance/clients/onboarding/${client.id}/photos/${doc.id}'/>" alt="" loading="lazy" decoding="async"/>
+                    </c:if>
+                    <div class="kyc-upload-details">
+                        <p class="kyc-upload-name" data-profile-file-name><c:choose>
+                            <c:when test="${canReadProfileDocuments}"><a class="console-resource-link" href="${fileUrl}" download><c:out value="${doc.name}"/></a></c:when>
+                            <c:otherwise><c:out value="${doc.name}"/></c:otherwise>
+                        </c:choose></p>
+                        <dl class="kyc-upload-metadata">
+                            <c:if test="${formKind!='self' or doc.category!='PROFILE_PHOTO'}"><div><dt><spring:message code="kyc.field.category"/></dt><dd><spring:message code="kyc.category.${doc.category}"/></dd></div></c:if>
+                            <div><dt><spring:message code="kyc.fileSize"/></dt><dd><c:choose>
+                                <c:when test="${doc.sizeBytes ge 1048576}"><fmt:formatNumber value="${doc.sizeBytes / 1048576}" maxFractionDigits="1"/> MB</c:when>
+                                <c:when test="${doc.sizeBytes ge 1024}"><fmt:formatNumber value="${doc.sizeBytes / 1024}" maxFractionDigits="1"/> KB</c:when>
+                                <c:otherwise><fmt:formatNumber value="${doc.sizeBytes}"/> B</c:otherwise>
+                            </c:choose></dd></div>
+                            <c:choose><c:when test="${staffDocumentDetails}">
+                                <c:if test="${not empty doc.expiresOn}"><div><dt><spring:message code="kyc.field.expiresOn"/></dt><dd><c:out value="${appTime:display(doc.expiresOn)}"/></dd></div></c:if>
+                                <div><dt><spring:message code="kyc.recordedBy"/></dt><dd><c:out value="${doc.actor}"/> · <c:out value="${appTime:display(doc.recordedAt)}"/></dd></div>
+                            </c:when><c:otherwise>
+                                <div><dt><spring:message code="kyc.uploaded"/></dt><dd><c:out value="${appTime:display(doc.recordedAt)}"/></dd></div>
+                            </c:otherwise></c:choose>
+                        </dl>
+                    </div>
+                    <c:if test="${formKind=='self' and not profileReadOnly and client.state=='DRAFT'}">
+                        <button type="button" class="erp-icon-btn kyc-upload-remove" data-profile-remove="<c:url value='${documentRoot}/${doc.id}/remove'/>"
+                                aria-label="<spring:message code='kyc.removeFile'/>: <c:out value='${doc.name}'/>" hidden>
+                            <svg class="console-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 3l10 10M13 3L3 13"/></svg>
+                        </button>
+                    </c:if>
+                </div>
+            </li>
+        </c:forEach>
+    </ul>
+</c:if>

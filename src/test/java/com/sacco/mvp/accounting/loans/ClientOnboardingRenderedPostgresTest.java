@@ -89,7 +89,7 @@ class ClientOnboardingRenderedPostgresTest {
             String renderedReview=get(client,staffDetailsUrl,true);
             assertThat(renderedReview)
                 .contains("name=\"checksConfirmed\"", "Save review")
-                .containsPattern("(?s)class=\"erp-detail-facts kyc-document-facts\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
+                .containsPattern("(?s)class=\"kyc-upload-metadata\".*?<dd>[^<]* \\x{B7} \\d{2}/\\d{2}/\\d{4}")
                 .doesNotContain("Verification checks", "name=\"identityChecked\"", "name=\"addressChecked\"", "name=\"screening\"", "name=\"screeningReference\"", "name=\"policyReference\"", "name=\"reviewDue\"", "\u00c2\u00b7");
             int reviewSeconds=Integer.getInteger("microfinance.onboarding.review-browser-seconds",0);
             if(reviewSeconds>0){
@@ -134,11 +134,7 @@ class ClientOnboardingRenderedPostgresTest {
             assertThat(get(client,base+"/app/onboarding/edit?lang=sw",false)).contains("Taarifa zangu","Tunalinda taarifa zako binafsi", "data-personal=\"Taarifa binafsi\"", "data-review=\"Kagua na tuma\"");get(client,base+"/app/onboarding?lang=en",false);
             String creation=get(client,base+"/finance/clients/onboarding/new",true);assertThat(creation).contains("Business TIN","Daily sales (TZS)","Spouse details","Bank details").doesNotContain("name=\"profile.clientNumber\"");
             assertThat(creation).contains("Optional. You can create the client without uploading documents.","name=\"documents[0].file\"","enctype=\"multipart/form-data\"").doesNotContain("Create the client before adding documents.");
-            var sessionDraft=hidden(creation);sessionDraft.put("action","DRAFT");sessionDraft.put("profile.city","Synthetic draft city");
-            var draftData=new StringJoiner("&");sessionDraft.forEach((key,value)->draftData.add(URLEncoder.encode(key,StandardCharsets.UTF_8)+"="+URLEncoder.encode(value,StandardCharsets.UTF_8)));
-            var acknowledged=client.send(HttpRequest.newBuilder(URI.create(base+"/finance/clients/onboarding/new")).header("X-Onboarding-Test-Actor","reviewer").header("X-Profile-Draft","save").header("Accept","application/json").header("Content-Type","application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(draftData.toString())).build(),HttpResponse.BodyHandlers.ofString());
-            assertThat(acknowledged.statusCode()).as(acknowledged.body()).isEqualTo(200);assertThat(acknowledged.body()).contains("\"saved\":true",sessionDraft.get("requestKey")).doesNotContain("<html");
-            assertThat(get(client,base+"/finance/clients/onboarding/new",true)).contains("Synthetic draft city");
+            assertThat(creation).doesNotContain("data-profile-save-draft","value=\"DRAFT\"","data-draft-saved");
             var created=hidden(creation);created.put("profile.firstName","Rendered");created.put("profile.lastName","Borrower");created.put("profile.phone",domain.phone());created.put("profile.city","Rendered city");created.put("profile.businessName","Rendered business");created.put("profile.dailyExpenditure","99.50");
             post(client,base+"/finance/clients/onboarding/new",created,true);
             var withDocument=hidden(get(client,base+"/finance/clients/onboarding/new",true));withDocument.put("profile.firstName","Optional");withDocument.put("profile.lastName","Documents");withDocument.put("profile.phone",domain.phone());withDocument.put("documents[0].category","IDENTITY");

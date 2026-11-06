@@ -5,7 +5,7 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/client-profile-wizard.js','utf8');
 const conditions=readFileSync('src/main/resources/static/js/client-onboarding.js','utf8');
 const validation=readFileSync('src/main/resources/static/js/form-validation.js','utf8');
-async function setup({error='',saved='',start='',name='Asha',registration=false,requiredProfile=false}={}){
+async function setup({error='',saved='',start='',name='Asha',registration=false,creation=false,requiredProfile=false}={}){
  const dom=new JSDOM(`<form data-onboarding-form="self"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="requestKey" value="request-key">
  <template data-profile-wizard-labels data-personal="Personal details" data-finances="Income and bank details" data-documents="Documents and privacy" data-review="Review and send" data-navigation="Profile steps" data-step="Step" data-edit="Edit" data-empty="Not provided" data-yes="Yes" data-no="No" data-no-documents="No documents" data-documents-error="Upload required documents" data-document-expiry-error="Expired document" data-acknowledgement-error="Accept consent" data-notice-changed-error="Notice changed"></template>
  <div data-profile-wizard data-profile-start="${start}"><div><fieldset>
@@ -17,6 +17,11 @@ async function setup({error='',saved='',start='',name='Asha',registration=false,
  ${error==='documents'?'<div data-workspace-form-error role="alert">Upload required documents</div>':''}
  <a href="/profile">Cancel</a><button type="submit" name="action" value="DRAFT" formnovalidate>Save draft</button><button type="button" data-profile-previous hidden>Previous</button><button type="button" data-profile-next hidden>Next</button><button type="submit" name="action" value="SUBMITTED" data-profile-send>Send for review</button></form>`,{url:registration?'http://localhost/client-portal/register':'http://localhost/app/onboarding',runScripts:'outside-only',pretendToBeVisual:true});
  const {window:w}=dom,d=w.document;
+ if(creation){
+  d.querySelector('form').dataset.onboardingForm='create';d.querySelector('[value="DRAFT"]').remove();
+  const send=d.querySelector('[data-profile-send]');send.value='CREATE';send.textContent='Create client';
+  d.querySelector('[name="noticeAcknowledged"]').closest('section').remove();d.querySelector('[name="declarationAccepted"]').closest('label').remove();d.querySelector('[data-profile-document]').remove();
+ }
  if(requiredProfile){
   d.querySelector('[data-profile-section="personal"]').insertAdjacentHTML('beforeend','<label class="kyc-field"><span>Home address</span><input name="profile.address" data-profile-required="true"></label>');
   d.querySelector('[data-profile-section="finances"]').insertAdjacentHTML('beforeend','<label class="kyc-field"><span>Source of funds</span><input name="profile.sourceOfFunds" data-profile-required="true"></label>');
@@ -37,6 +42,15 @@ async function setup({error='',saved='',start='',name='Asha',registration=false,
  const next=()=>d.querySelector('[data-profile-next]').click();
  return {dom,w,d,form:d.querySelector('form'),next,active:()=>d.querySelector('[aria-current="step"]').textContent};
 }
+
+test('staff creation progresses through optional documents to Create without a draft command',async()=>{
+ const {dom,w,d,form,next,active}=await setup({creation:true});try{
+  next();next();assert.match(active(),/Documents/);assert.equal(form.querySelector('[value="DRAFT"]'),null);
+  next();assert.match(active(),/Review/);assert.equal(form.querySelector('[data-profile-send]').hidden,false);
+  let submitted;form.addEventListener('submit',event=>{event.preventDefault();submitted=new w.FormData(form,event.submitter);});
+  d.querySelector('[data-profile-send]').click();assert.equal(submitted.get('action'),'CREATE');assert.equal(submitted.get('_csrf'),'token');assert.equal(submitted.get('profile.firstName'),'Asha');
+ }finally{dom.window.close();}
+});
 test('registration draft stays available on every step and bypasses completion and OTP submission',async()=>{
  const {dom,w,d,form,next}=await setup({registration:true,name:''});try{
   const draft=d.querySelector('[value="DRAFT"]');assert.equal(draft.formNoValidate,true);assert.equal(draft.getAttribute('formaction'),'/client-portal/register/draft');assert.equal(draft.hidden,false);

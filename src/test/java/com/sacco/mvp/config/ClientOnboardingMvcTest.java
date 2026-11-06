@@ -42,32 +42,20 @@ class ClientOnboardingMvcTest {
         String register=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/register.jsp"));
         assertThat(register).contains("data-group-open-on-row","data-target=\"${registerUrl}/${row.id}\"");
     }
-    @Test void incompleteStaffCreationDraftResumesOnlyInItsActorAndBranchScope() throws Exception {
-        var http=new org.springframework.mock.web.MockHttpSession();UUID request=UUID.randomUUID();
-        when(service.encodeProfileDraft(any())).thenReturn("private profile draft");var profile=new ClientProfile();profile.setCity("Arusha");when(service.decodeProfileDraft("private profile draft")).thenReturn(profile);
-        mvc.perform(post(root+"/new").session(http).with(user(staff)).with(csrf()).param("action","DRAFT").param("requestKey",request.toString()).param("profile.city","Arusha"))
-            .andExpect(redirectedUrl(root+"/new")).andExpect(flash().attribute("profileDraftSaved",true));
-        verify(service,never()).create(any(),any());
-        var result=mvc.perform(get(root+"/new").session(http).with(user(staff))).andExpect(view().name("onboarding/form")).andReturn();
-        var restored=(CreateForm)result.getModelAndView().getModel().get("createForm");assertThat(restored.getProfile().getCity()).isEqualTo("Arusha");assertThat(restored.getRequestKey()).isEqualTo(request);
-        for(var scope:List.of(List.of(UUID.randomUUID().toString(),"I1","B1"),List.of(staff.getMemberId().toString(),"I1","B2"),List.of(staff.getMemberId().toString(),"I2","B1"))) {
-            var other=new AppUserPrincipal(Member.builder().id(UUID.fromString(scope.get(0))).saccoId(scope.get(1)).stationId(scope.get(2)).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
-            var foreign=mvc.perform(get(root+"/new").session(http).with(user(other))).andReturn();
-            assertThat(((CreateForm)foreign.getModelAndView().getModel().get("createForm")).getProfile().getCity()).isEmpty();
+    @Test void staffCreationRejectsDraftCommandsAndDoesNotRestoreOldSessionDrafts() throws Exception {
+        var session=new org.springframework.mock.web.MockHttpSession();var old=new ProfileDraft("old profile",staff.getMemberId(),"I1","B1",UUID.randomUUID());session.setAttribute("clientProfileStaffDraft",old);
+        var page=mvc.perform(get(root+"/new").session(session).with(user(staff))).andExpect(view().name("onboarding/form")).andReturn();
+        assertThat(((CreateForm)page.getModelAndView().getModel().get("createForm")).getProfile().getCity()).isEmpty();
+        for(boolean legacyJson:List.of(false,true)) {
+            var request=post(root+"/new").session(session).with(user(staff)).with(csrf()).param("action","DRAFT").param("profile.city","Arusha");
+            if(legacyJson)request.header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON);
+            mvc.perform(request).andExpect(view().name("onboarding/form")).andExpect(model().attributeHasErrors("createForm")).andExpect(flash().attributeCount(0));
         }
-        verify(service,times(1)).decodeProfileDraft(anyString());
+        verify(service,never()).create(any(),any());verify(service,never()).encodeProfileDraft(any());verify(service,never()).decodeProfileDraft(anyString());
     }
-    @Test void actualClientCreationClearsTheTemporaryDraft() throws Exception {
-        var http=new org.springframework.mock.web.MockHttpSession();http.setAttribute("clientProfileStaffDraft",new ProfileDraft("profile",staff.getMemberId(),"I1","B1",UUID.randomUUID()));when(service.create(eq(staff),any())).thenReturn(id);
-        mvc.perform(post(root+"/new").session(http).with(user(staff)).with(csrf()).param("action","CREATE")).andExpect(redirectedUrl(root+"/"+id));
-        assertThat(http.getAttribute("clientProfileStaffDraft")).isNull();
-    }
-    @Test void staffDraftAcknowledgesPersistenceWithoutRenderingOrRedirecting() throws Exception {
-        var http=new org.springframework.mock.web.MockHttpSession();UUID key=UUID.randomUUID();when(service.encodeProfileDraft(any())).thenReturn("encoded");
-        mvc.perform(post(root+"/new").header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON).session(http).with(user(staff)).with(csrf()).param("action","DRAFT").param("requestKey",key.toString()).param("profile.city","Arusha"))
-            .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.saved").value(true)).andExpect(jsonPath("$.requestKey").value(key.toString())).andExpect(header().doesNotExist("Location"));
-        assertThat(((ProfileDraft)http.getAttribute("clientProfileStaffDraft")).profile()).isEqualTo("encoded");verify(service,never()).create(any(),any());
-        mvc.perform(post(root+"/new").header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON).with(user(staff)).param("action","DRAFT")).andExpect(status().isForbidden());
+    @Test void staffCreationPostsDirectlyToTheClient() throws Exception {
+        when(service.create(eq(staff),any())).thenReturn(id);
+        mvc.perform(post(root+"/new").with(user(staff)).with(csrf()).param("action","CREATE")).andExpect(redirectedUrl(root+"/"+id));
     }
     @Test void optionalCreationFilesBindOnlyTheirAllowedMetadataAndFile() throws Exception {
         when(service.create(eq(staff),any())).thenReturn(id);
@@ -75,13 +63,6 @@ class ClientOnboardingMvcTest {
             .with(user(staff)).with(csrf()).param("action","CREATE").param("documents[0].category","IDENTITY").param("documents[0].expiresOn","2027-01-01").param("documents[0].revisionId",UUID.randomUUID().toString()).param("profile.firstName","Asha"))
             .andExpect(redirectedUrl(root+"/"+id));
         verify(service).create(eq(staff),argThat(f->f.getDocuments().size()==1&&f.getDocuments().getFirst().getCategory().equals("IDENTITY")&&f.getDocuments().getFirst().getFile().getOriginalFilename().equals("id.png")&&f.getDocuments().getFirst().getExpiresOn().equals(java.time.LocalDate.of(2027,1,1))));
-    }
-    @Test void rejectedDraftAcknowledgementPreservesThePreviousDraft() throws Exception {
-        var http=new org.springframework.mock.web.MockHttpSession();var prior=new ProfileDraft("saved",staff.getMemberId(),"I1","B1",UUID.randomUUID());http.setAttribute("clientProfileStaffDraft",prior);
-        when(service.encodeProfileDraft(any())).thenThrow(new IllegalArgumentException("kyc.error.phone"));
-        mvc.perform(post(root+"/new").header("X-Profile-Draft","save").accept(org.springframework.http.MediaType.APPLICATION_JSON).locale(Locale.ENGLISH).session(http).with(user(staff)).with(csrf()).param("action","DRAFT").param("profile.phone","123"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.saved").value(false)).andExpect(jsonPath("$.message").isNotEmpty());
-        assertThat(http.getAttribute("clientProfileStaffDraft")).isSameAs(prior);verify(service,never()).create(any(),any());
     }
     @Test void onboardingStatesUseSharedStatusIconsRatherThanCopyControls() throws Exception {
         String fragment=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/onboarding/status.jspf"));
@@ -248,7 +229,6 @@ class ClientOnboardingMvcTest {
         assertThat(json.readValue(snapshot,ClientProfile.class).getActivity()).isEqualTo(p.getActivity());
     }
     @Configuration @EnableWebMvc static class Config {
-        @Bean org.springframework.context.MessageSource messageSource(){var messages=new org.springframework.context.support.ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");return messages;}
         @Bean OnboardingController controller(OnboardingService service){return new OnboardingController(service);}
         @Bean ClientOnboardingController clientController(OnboardingService service){return new ClientOnboardingController(service);}
     }

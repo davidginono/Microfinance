@@ -65,13 +65,15 @@ The packaged WAR started successfully on loopback port 8092 against the fresh sm
 
 ## Extended registration and profile fields
 
-### Optional staff attachments and draft feedback (2026-11-05)
+### Optional staff attachments and creation layout (2026-11-05)
 
 Staff may register a provisional client without uploading documents. The creation form also accepts optional categorized PNG/JPEG attachments before the client exists, within the existing 10-image, 1 MB per image and 10 MB total limits. Image validation runs before the creation transaction; the client, initial profile, attachments and audit events commit together. Repeating the same creation request does not duplicate the client or its attachments. Uploading a copy does not establish verification, consent or portal access; independent review and borrower evidence requirements retain their existing rules.
 
-The enhanced staff Save draft command receives a scoped, no-store server acknowledgement and displays the shared success Flashbar while retaining the live form and selected local files. The session draft stores profile fields only. Local files attach on Create client and must be reselected after leaving or reloading; the successful draft notice explains this when files are selected. Invalid or unconfirmed saves retain the entries and recovery controls, and never show success without acknowledgement. Native browser draft submissions retain their redirect and server-rendered success notice.
+Staff provisional creation has no draft-saving action, endpoint or session persistence. The shared footer renders Cancel, Previous/Next and Create client for this flow; existing-client profile editing and portal registration retain their own draft behavior. Stale native or former JSON draft commands are rejected without saving data or creating a client. Recoverable creation errors preserve the live entries and selected files; the shared dirty-exit guard protects unfinished work.
 
-Verification: 97 focused JavaScript checks and 83 Java/JSP/PostgreSQL checks passed, including real HTTP draft acknowledgements and multipart staff creation on an owned disposable PostgreSQL 17.9 database at `127.0.0.1:55579`. The rendered test now uses Client details for review and the shared pending status indicator. Browser visual checks remain pending because browser access was unavailable; no throughput claim is made.
+The staff creation layout uses a white step panel, shaded section headers and a footer aligned with the form. Staff use the same file chooser, drag and drop, thumbnails and file tokens as Complete My Profile. Done applies the selection to the live form. Create client submits the selected files with their categories and expiry dates. Client details display saved files with the same token layout and existing access controls.
+
+Verification covered the shared chooser and multipart payload, attachment limits, native fallback, non-scrolling detail tabs, rejection of obsolete draft requests, JSP compilation and HTTP rendering of the shared footer in English and Kiswahili. Browser visual checks remain pending because browser access was unavailable.
 
 The staff-assisted creation form and both profile editors share the requested bio data, contact, business, spouse and bank sections. First and last names and the phone number identify a new assisted client; middle name and assisted email are optional. Existing portal users retain the protected account-contact change flow. The client number is read-only and uses the same shared allocation sequence. Saving a structured assisted registration atomically creates its first profile draft without a second client identity.
 

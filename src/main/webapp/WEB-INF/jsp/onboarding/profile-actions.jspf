@@ -1,7 +1,7 @@
 <%@ page pageEncoding="UTF-8" %>
 <div class="accounting-actions accounting-form-actions" data-form-actions>
     <a class="app-btn btn-neutral" href="${profileCancelUrl}"><spring:message code="common.cancel"/></a>
-    <button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formaction="${profileDraftUrl}" formnovalidate data-profile-save-draft><spring:message code="kyc.saveDraft"/></button>
+    <c:if test="${formKind!='create'}"><button class="app-btn btn-neutral" type="submit" name="action" value="DRAFT" formaction="${profileDraftUrl}" formnovalidate data-profile-save-draft><spring:message code="kyc.saveDraft"/></button></c:if>
     <button class="app-btn btn-neutral" type="button" data-profile-previous hidden><spring:message code="common.previous"/></button>
     <button class="app-btn btn-launch" type="button" data-profile-next hidden><spring:message code="common.next"/></button>
     <button class="app-btn btn-launch" type="submit" name="action" value="${profileSubmitValue}" formaction="${profileSubmitUrl}" data-profile-send><spring:message code="${profileSubmitLabel}"/></button>

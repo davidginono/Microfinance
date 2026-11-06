@@ -1,20 +1,86 @@
-/* Upload files without leaving or saving the live client profile. */
+/* Share document selection between existing profiles and provisional creation. */
 (() => {
     'use strict';
     const ready = window.WorkspaceNavigation?.onReady || (fn => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', fn, {once:true}) : fn());
-    ready(() => document.querySelectorAll('form[data-onboarding-form="self"]').forEach(profile => {
+    ready(() => document.querySelectorAll('form:is([data-onboarding-form="self"],[data-onboarding-form="create"])').forEach(profile => {
         if (typeof HTMLDialogElement === 'undefined' || !HTMLDialogElement.prototype.showModal) return;
         const link = profile.querySelector('[data-profile-add-documents]'), labels = profile.querySelector('[data-profile-wizard-labels]')?.dataset;
         const notice = profile.querySelector('[data-profile-confirmations]'), declaration = profile.querySelector('[data-profile-declaration]');
-        if (!labels || !notice || !declaration || profile.dataset.uploadReady) return;
+        const stagedMode = profile.dataset.onboardingForm === 'create';
+        const stagedSource = profile.querySelector('[data-profile-creation-files]');
+        if (!labels || profile.dataset.uploadReady) return;
+        if (stagedMode ? !stagedSource || typeof DataTransfer === 'undefined' : !notice || !declaration) return;
         profile.dataset.uploadReady = 'true';
-        const checks = [profile.elements.noticeAcknowledged, profile.elements.declarationAccepted];
-        const placements = [notice, declaration].map(block => {const anchor = document.createComment('Profile confirmation');block.before(anchor);block.hidden = true;return {block, anchor};});
+        const checks = stagedMode ? [] : [profile.elements.noticeAcknowledged, profile.elements.declarationAccepted];
+        const placements = (stagedMode ? [] : [notice, declaration]).map(block => {const anchor = document.createComment('Profile confirmation');block.before(anchor);block.hidden = true;return {block, anchor};});
         checks.forEach(check => check.required = false);
         if (!link) return;
         const node = (tag, text, className) => {const el = document.createElement(tag);if (text !== undefined) el.textContent = text;if (className) el.className = className;return el;};
         let dialog, pending = false, removing = false, controller, returnFocus, overflow, rootOverflow;
         const savedList = profile.querySelector('[data-profile-document-list]');
+        const number = new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits:1});
+        const date = new Intl.DateTimeFormat('en-GB', {timeZone:'Africa/Dar_es_Salaam',day:'2-digit',month:'2-digit',year:'numeric'});
+        const fileSize = bytes => bytes < 1024 ? number.format(bytes)+' B' : bytes < 1024*1024 ? number.format(bytes/1024)+' KB' : number.format(bytes/(1024*1024))+' MB';
+        const fileToken = (file, index, previews) => {
+            const displayName = file.name.replace(/\\/g,'/').split('/').pop();
+            const token = node('div', undefined, 'kyc-upload-token');
+            const details = node('div', undefined, 'kyc-upload-details');
+            const name = node('p', displayName, 'kyc-upload-name');
+            name.dataset.profileFileName = '';
+            const metadata = node('dl', undefined, 'kyc-upload-metadata');
+            const detail = (label, value) => {
+                const pair = node('div');pair.append(node('dt',label),node('dd',value));metadata.append(pair);
+            };
+            detail(labels.fileSize,fileSize(file.size));
+            if (Number.isFinite(file.lastModified)) detail(labels.fileModified,date.format(new Date(file.lastModified)));
+            details.append(name,metadata);
+            let preview;
+            if (URL.createObjectURL) {
+                preview = URL.createObjectURL(file);previews.add(preview);
+                const image = node('img',undefined,'kyc-upload-thumbnail');
+                image.src = preview;image.alt = '';image.loading = 'lazy';image.decoding = 'async';
+                image.addEventListener('error',()=>image.hidden = true);token.append(image);
+            }
+            const remove = node('button', undefined, 'erp-icon-btn kyc-upload-remove');remove.type = 'button';
+            remove.innerHTML = '<svg class="console-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 3l10 10M13 3L3 13"/></svg>';
+            const removeLabel = labels.removeSelected.replace('{0}',String(index)).replace('{1}',displayName);
+            remove.setAttribute('aria-label',removeLabel);remove.title = removeLabel;
+            token.append(details,remove);
+            return {token,details,detail,remove,preview};
+        };
+        let staged = [];
+        const stagedPreviews = new Set();
+        const releaseStagedPreviews = () => {
+            stagedPreviews.forEach(url => URL.revokeObjectURL(url));stagedPreviews.clear();
+        };
+        function renderStaged() {
+            releaseStagedPreviews();
+            if (!staged.length) {savedList.replaceChildren(node('p',labels.noDocuments));return;}
+            const list = node('ul',undefined,'kyc-upload-queue');list.setAttribute('aria-label',labels.selectedImages);
+            const payload = node('div');payload.hidden = true;
+            const categoryLabel = stagedSource.querySelector('select').closest('label').querySelector('span').textContent;
+            const expiryLabel = stagedSource.querySelector('input[type="date"]').closest('label').querySelector('span').textContent;
+            staged.forEach(({file,category,categoryText,expiry},index) => {
+                const item = node('li',undefined,'kyc-upload-row');item.dataset.profileDocument = '';
+                const {token,detail,remove} = fileToken(file,index+1,stagedPreviews);
+                detail(categoryLabel,categoryText);
+                if (expiry) detail(expiryLabel,expiry.split('-').reverse().join('/'));
+                remove.addEventListener('click',()=>{
+                    staged.splice(index,1);renderStaged();profile.dispatchEvent(new Event('change',{bubbles:true}));
+                    (savedList.querySelector('.kyc-upload-remove') || link).focus();
+                });
+                item.append(token);list.prepend(item);
+                const fileInput = node('input');fileInput.type = 'file';fileInput.name = `documents[${index}].file`;
+                const transfer = new DataTransfer();transfer.items.add(file);fileInput.files = transfer.files;
+                payload.append(fileInput);
+                for (const [field,value] of [['category',category],['expiresOn',expiry]]) {
+                    if (!value) continue;
+                    const input = node('input');input.type = 'hidden';input.name = `documents[${index}].${field}`;input.value = value;payload.append(input);
+                }
+            });
+            savedList.replaceChildren(list,payload);
+        }
+        if (stagedMode) {stagedSource.remove();link.hidden = false;renderStaged();}
         const showRemoveButtons = () => savedList.querySelectorAll('[data-profile-remove]').forEach(button => button.hidden = false);
         showRemoveButtons();
         const restore = () => {
@@ -77,7 +143,8 @@
         async function open() {
             if (dialog?.open || removing) return;
             const previousChecks = checks.map(check => check.checked), previews = new Set();let accepted = false, attachmentsChanged = false;
-            returnFocus = document.activeElement;overflow = document.body.style.overflow;rootOverflow = document.documentElement.style.overflow;
+            returnFocus = stagedMode ? link : document.activeElement;
+            overflow = document.body.style.overflow;rootOverflow = document.documentElement.style.overflow;
             dialog = node('dialog', undefined, 'app-modal-panel kyc-upload-dialog');dialog.setAttribute('aria-labelledby', 'profile-upload-title');
             const header = node('div', undefined, 'app-modal-header'), title = node('h2', link.textContent.trim(), 'erp-panel-title');title.id = 'profile-upload-title';
             const dismiss = node('button', '×', 'app-modal-close');dismiss.type = 'button';dismiss.setAttribute('aria-label', labels.close);dismiss.addEventListener('click', close);
@@ -92,7 +159,7 @@
                 window.addEventListener('resize', alignWithPortal);
             }
             document.body.style.overflow = 'hidden';document.documentElement.style.overflow = 'hidden';dialog.showModal();
-            const fail = message => {
+            const fail = (message, anchor) => {
                 let error = body.querySelector('[data-upload-error]');
                 if (!error) {
                     error = node('div', undefined, 'console-message');
@@ -100,9 +167,10 @@
                     error.dataset.messageType = 'error';
                     error.setAttribute('role', 'alert');
                     error.tabIndex = -1;
-                    (body.querySelector('form') || body).append(error);
                 }
                 error.textContent = message;
+                if (anchor) anchor.after(error);
+                else (body.querySelector('form') || body).append(error);
                 window.ConsoleResourceDetails?.init(dialog);
                 error.focus();
             };
@@ -111,25 +179,29 @@
                 window.removeEventListener('resize', alignWithPortal);
                 controller?.abort();previews.forEach(url => URL.revokeObjectURL(url));restore();if (!accepted) checks.forEach((check,index) => {check.checked = attachmentsChanged ? false : previousChecks[index];check.dispatchEvent(new Event('change',{bubbles:true}));});dialog.remove();document.body.style.overflow = overflow;document.documentElement.style.overflow = rootOverflow;returnFocus?.focus();
             }, {once:true});
-            controller = new AbortController();window.AppLoading?.begin(body);
+            controller = new AbortController();
             try {
-                const initialPage = await parse(await fetch(link.href, {credentials:'same-origin', cache:'no-store', signal:controller.signal}));
-                let metadata = uploadForm(initialPage);if (!metadata) throw new Error(labels.uploadError);
-                window.AppLoading?.end(body);
-                const sourcePicker = metadata.querySelector('[name="file"]');
+                let metadata = stagedSource;
+                if (!stagedMode) {
+                    window.AppLoading?.begin(body);
+                    metadata = uploadForm(await parse(await fetch(link.href, {credentials:'same-origin', cache:'no-store', signal:controller.signal})));
+                    if (!metadata) throw new Error(labels.uploadError);
+                    window.AppLoading?.end(body);
+                }
+                const sourcePicker = metadata.querySelector('input[type="file"]');
                 const maxBytes = Number(sourcePicker.dataset.uploadMaxBytes), remainingFiles = Number(sourcePicker.dataset.uploadRemainingFiles), remainingBytes = Number(sourcePicker.dataset.uploadRemainingBytes);
-                const categoryTemplate = metadata.querySelector('[name="category"]'), expiryTemplate = metadata.querySelector('[name="expiresOn"]');
+                const categoryTemplate = metadata.querySelector('select'), expiryTemplate = metadata.querySelector('input[type="date"]');
                 const categoryLabel = categoryTemplate.closest('label').querySelector('span').textContent;
                 const expiryLabel = expiryTemplate.closest('label').querySelector('span').textContent;
-                const cancelText = metadata.querySelector('.accounting-form-actions a').textContent.trim();
+                const cancelText = stagedMode ? labels.cancel : metadata.querySelector('.accounting-form-actions a').textContent.trim();
                 const form = node('form', undefined, 'kyc-client-form');form.id = 'profile-document-upload-form';form.dataset.nativeNavigation = '';
                 const pickerField = node('div', undefined, 'kyc-field'), pickerLabel = node('label', undefined, 'kyc-field'), picker = node('input');picker.id = 'profile-upload-images';pickerLabel.htmlFor = picker.id;picker.type = 'file';picker.multiple = true;picker.accept = '.png,.jpg,.jpeg';picker.hidden = true;pickerLabel.append(node('span', labels.fileLabel));
                 const dropzone = node('div', undefined, 'kyc-upload-dropzone'), choose = node('button', labels.chooseFiles, 'app-btn btn-neutral');choose.type = 'button';choose.addEventListener('click', () => picker.click());dropzone.append(node('span', labels.dropImages), choose, picker);
-                const help = node('p', sourcePicker.closest('.kyc-field')?.querySelector('.kyc-field-hint')?.textContent || sourcePicker.dataset.uploadFileError, 'kyc-field-hint');help.id = 'profile-upload-help';choose.setAttribute('aria-describedby',help.id);pickerField.append(pickerLabel,dropzone,help);
+                const help = node('p', metadata.querySelector('.kyc-field-hint')?.textContent || sourcePicker.dataset.uploadFileError, 'kyc-field-hint');help.id = 'profile-upload-help';choose.setAttribute('aria-describedby',help.id);pickerField.append(pickerLabel,dropzone,help);
                 const queue = node('ul', undefined, 'kyc-upload-queue'), confirmations = node('div', undefined, 'kyc-upload-confirmations'), announcement = node('span', undefined, 'sr-only');queue.setAttribute('aria-label',labels.selectedImages);announcement.setAttribute('role','status');
                 choose.dataset.profileChoose = '';
                 const saved = node('section', undefined, 'kyc-upload-saved');
-                if (savedList.querySelector('[data-profile-document]')) {
+                if (!stagedMode && savedList.querySelector('[data-profile-document]')) {
                     saved.append(node('h3', labels.uploadedFiles), ...[...savedList.children]
                         .filter(child => !child.matches('[data-profile-evidence]')).map(child => child.cloneNode(true)));
                 } else {
@@ -147,31 +219,31 @@
                 placements.forEach(({block}) => {confirmations.append(block);block.hidden = false;});
                 checks.forEach(check => {check.setAttribute('form', profile.id);check.required = true;});
                 const rows = [];let tokenIndex = 0;
-                const number = new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits:1}), date = new Intl.DateTimeFormat('en-GB', {timeZone:'Africa/Dar_es_Salaam',day:'2-digit',month:'2-digit',year:'numeric'});
-                const fileSize = bytes => bytes < 1024 ? number.format(bytes)+' B' : bytes < 1024*1024 ? number.format(bytes/1024)+' KB' : number.format(bytes/(1024*1024))+' MB';
                 const hasDocuments = () => Boolean(savedList.querySelector('[data-profile-document]'));
-                const update = () => {queue.hidden = !rows.length;confirmations.hidden = !rows.length && !hasDocuments();submit.hidden = confirmations.hidden;submit.textContent = rows.some(row => !row.done) ? labels.upload : labels.done;};
+                const update = () => {
+                    queue.hidden = !rows.length;
+                    confirmations.hidden = stagedMode || (!rows.length && !hasDocuments());
+                    submit.hidden = stagedMode ? !rows.length && !staged.length : confirmations.hidden;
+                    submit.textContent = !stagedMode && rows.some(row => !row.done) ? labels.upload : labels.done;
+                };
                 dialog.addEventListener('profile:file-removed', () => {attachmentsChanged = true;update();});
-                const addFiles = incoming => {
+                const addFiles = (incoming, initial = []) => {
                     if (pending || !incoming.length) return;
                     const invalid = incoming.find(file => !/\.(png|jpe?g)$/i.test(file.name) || file.size<1 || file.size>maxBytes);
-                    if(invalid){fail(invalid.name+': '+sourcePicker.dataset.uploadFileError);picker.value='';return;}
-                    if(rows.length+incoming.length>remainingFiles || [...rows.map(row=>row.file),...incoming].reduce((total,file)=>total+file.size,0)>remainingBytes){fail(sourcePicker.dataset.uploadLimitError);picker.value='';return;}
+                    if(invalid){fail(invalid.name+': '+sourcePicker.dataset.uploadFileError,pickerField);picker.value='';return;}
+                    if(rows.length+incoming.length>remainingFiles || [...rows.map(row=>row.file),...incoming].reduce((total,file)=>total+file.size,0)>remainingBytes){fail(sourcePicker.dataset.uploadLimitError,pickerField);picker.value='';return;}
                     body.querySelector('[data-upload-error]')?.remove();
                     checks.forEach(check => {check.checked = false;check.dispatchEvent(new Event('change', {bubbles:true}));});
-                    for (const file of incoming) {
-                        const row = {file, done:false, metadata:null}, item = node('li', undefined, 'kyc-upload-row');
-                        const displayName = file.name.replace(/\\/g,'/').split('/').pop(), token = node('div', undefined, 'kyc-upload-token'), details = node('div', undefined, 'kyc-upload-details');
-                        const name = node('p', displayName, 'kyc-upload-name'), category = categoryTemplate.cloneNode(true), expiry = expiryTemplate.cloneNode(true), metadataList = node('dl',undefined,'kyc-upload-metadata');
-                        const detail = (label,value) => {const pair = node('div');pair.append(node('dt',label),node('dd',value));metadataList.append(pair);};
-                        detail(labels.fileSize,fileSize(file.size));if(Number.isFinite(file.lastModified))detail(labels.fileModified,date.format(new Date(file.lastModified)));
-                        row.status = node('div',undefined,'kyc-upload-status');row.status.hidden = true;details.append(name,metadataList,row.status);
-                        if(URL.createObjectURL){row.preview = URL.createObjectURL(file);previews.add(row.preview);const image = node('img',undefined,'kyc-upload-thumbnail');image.src = row.preview;image.alt = '';image.loading = 'lazy';image.decoding = 'async';image.addEventListener('error',()=>image.hidden = true);token.append(image);}
+                    for (const [index,file] of incoming.entries()) {
+                        const item = node('li', undefined, 'kyc-upload-row');
+                        const {token,details,remove,preview} = fileToken(file,++tokenIndex,previews);
+                        const category = categoryTemplate.cloneNode(true), expiry = expiryTemplate.cloneNode(true);
+                        if (initial[index]) {category.value = initial[index].category;expiry.value = initial[index].expiry;}
                         category.removeAttribute('id');expiry.removeAttribute('id');category.name = '';expiry.name = '';category.dataset.nativeSelect = 'true';
-                        const categoryField = node('label', undefined, 'kyc-field'), expiryField = node('label', undefined, 'kyc-field');categoryField.append(node('span', categoryLabel), category);expiryField.append(node('span', expiryLabel), expiry);
-                        const remove = node('button', undefined, 'erp-icon-btn kyc-upload-remove');remove.type = 'button';remove.innerHTML = '<svg class="console-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 3l10 10M13 3L3 13"/></svg>';const removeLabel = labels.removeSelected.replace('{0}',String(++tokenIndex)).replace('{1}',displayName);remove.setAttribute('aria-label',removeLabel);remove.title = removeLabel;
-                        token.append(details,remove);
-                        row.item = item;row.category = category;row.expiry = expiry;row.remove = remove;
+                        const categoryField = node('label', undefined, 'kyc-field'), expiryField = node('label', undefined, 'kyc-field');
+                        categoryField.append(node('span',categoryLabel),category);expiryField.append(node('span',expiryLabel),expiry);
+                        const status = node('div',undefined,'kyc-upload-status');status.hidden = true;details.append(status);
+                        const row = {file,done:false,metadata:null,item,category,expiry,remove,preview,status};
                         const refresh = () => {const photo = ['PROFILE_PHOTO','SPOUSE_PHOTO'].includes(category.value);expiryField.hidden = photo;expiry.disabled = photo;if (photo) expiry.value = '';checks.forEach(check => check.checked = false);};
                         category.addEventListener('change', refresh);expiry.addEventListener('change', () => checks.forEach(check => check.checked = false));refresh();
                         remove.addEventListener('click', () => {
@@ -198,6 +270,11 @@
                 dropzone.addEventListener('drop',event=>{event.preventDefault();event.stopPropagation();dropzone.classList.remove('is-dragging');addFiles([...(event.dataTransfer?.files || [])]);});
                 form.addEventListener('submit', async event => {
                     event.preventDefault();event.stopPropagation();if (pending || removing) return;
+                    if (stagedMode) {
+                        staged = rows.map(({file,category,expiry}) => ({file,category:category.value,categoryText:category.selectedOptions[0].textContent,expiry:expiry.value}));
+                        renderStaged();profile.dispatchEvent(new Event('change',{bubbles:true}));
+                        accepted = true;dialog.close();return;
+                    }
                     const missing = checks.find(check => !check.checkValidity());if (missing) {missing.reportValidity();return;}
                     body.querySelector('[data-upload-error]')?.remove();
                     const pendingRows = rows.filter(row => !row.done);announcement.textContent = pendingRows.length ? labels.uploadingFiles.replace('{0}',String(pendingRows.length)) : '';
@@ -229,22 +306,23 @@
                         rows.forEach(row => {row.category.disabled = row.done;row.expiry.disabled = row.done || ['PROFILE_PHOTO','SPOUSE_PHOTO'].includes(row.category.value);row.remove.disabled = row.done;});update();
                     }
                 });
+                if (stagedMode && staged.length) addFiles(staged.map(row => row.file),staged);
                 update();window.FormValidation?.refresh(form);choose.focus();
             } catch (error) {window.AppLoading?.end(body);if (error.name !== 'AbortError') fail(labels.uploadError);}
         }
         link.addEventListener('click', event => {if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;event.preventDefault();event.stopPropagation();void open();});
-        profile.addEventListener('profile:before-review', event => {
+        if (!stagedMode) profile.addEventListener('profile:before-review', event => {
             if (removing || checks.some(check => !check.checked)) {
                 event.preventDefault();
                 if (!removing) void open();
             }
         });
-        profile.addEventListener('submit', event => {
+        if (!stagedMode) profile.addEventListener('submit', event => {
             if (!event.defaultPrevented && (removing || (event.submitter?.value === 'SUBMITTED' && checks.some(check => !check.checked)))) {
                 event.preventDefault();event.stopPropagation();
                 if (!removing) void open();
             }
         });
-        window.addEventListener('pagehide', () => {controller?.abort();if (dialog?.open) {pending = false;dialog.close();}});
+        window.addEventListener('pagehide', event => {controller?.abort();if (dialog?.open) {pending = false;dialog.close();}if (!event.persisted) releaseStagedPreviews();});
     }));
 })();

@@ -1,7 +1,9 @@
 <%@ page pageEncoding="UTF-8" %>
-<div class="kyc-creation-document" data-creation-document-row>
-    <label class="kyc-field"><span><spring:message code="kyc.field.category"/></span><select name="documents[0].category" class="aws-control"><c:forEach items="${['IDENTITY','ADDRESS','ACTIVITY','CONSENT','PROFILE_PHOTO','SPOUSE_PHOTO']}" var="category"><option value="${category}"><spring:message code="kyc.category.${category}"/></option></c:forEach></select></label>
-    <label class="kyc-field"><span><spring:message code="kyc.field.file"/></span><input type="file" name="documents[0].file" class="aws-control" accept=".png,.jpg,.jpeg"/></label>
-    <label class="kyc-field"><span><spring:message code="kyc.field.expiresOn"/></span><input type="date" name="documents[0].expiresOn" class="aws-control"/></label>
-    <button type="button" class="app-btn btn-neutral" data-creation-remove hidden><spring:message code="kyc.removeFile"/></button>
+<div class="kyc-form-fields" data-profile-creation-files>
+    <label class="kyc-field"><span><spring:message code="kyc.field.category"/></span><select name="documents[0].category" class="aws-control" data-native-select="true"><c:forEach items="${['IDENTITY','ADDRESS','ACTIVITY','CONSENT','PROFILE_PHOTO','SPOUSE_PHOTO']}" var="category"><option value="${category}"><spring:message code="kyc.category.${category}"/></option></c:forEach></select></label>
+    <label class="kyc-field"><span><spring:message code="kyc.uploadImages"/></span><input type="file" name="documents[0].file" class="aws-control" accept=".png,.jpg,.jpeg" aria-describedby="kyc-creation-file-help"
+        data-upload-max-bytes="${creationDocumentLimits.maxFileBytes}" data-upload-remaining-files="${creationDocumentLimits.remainingFiles}" data-upload-remaining-bytes="${creationDocumentLimits.remainingBytes}"
+        data-upload-file-error="<spring:message code='kyc.error.file'/>" data-upload-limit-error="<spring:message code='kyc.error.uploadLimit'/>"/></label>
+    <label class="kyc-field" data-date-native><span><spring:message code="kyc.field.expiresOn"/></span><input type="date" name="documents[0].expiresOn" class="aws-control"/></label>
+    <p id="kyc-creation-file-help" class="kyc-field-hint"><spring:message code="kyc.fileHelp"/></p>
 </div>

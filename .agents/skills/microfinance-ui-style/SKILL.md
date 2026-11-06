@@ -75,6 +75,8 @@ Do not stack routine information banners below a page heading or use success not
 
 ## Controls And Forms
 
+- Share `client-profile-documents.js` and the profile document tokens between Complete My Profile and provisional-client creation. Follow Cloudscape [File upload](https://cloudscape.design/components/file-upload/) and [File token group](https://cloudscape.design/components/file-token-group/): a keyboard-accessible file chooser, optional drag and drop, thumbnail and file metadata, individual removal, and validation next to the picker. Staff selection stays in the live multipart creation form until Create client. Existing clients continue to use their authorized upload and consent workflow. Display private downloads and previews only where the existing permissions allow them.
+
 - For form validation changes, read the [Cloudscape validation implementation](references/form-validation.md). Match the supplied classic console reference: red control border, a small outlined triangle and plain red error text immediately below the control, then any essential constraint text. Reuse shared `form-validation.css` / `form-validation.js`; validate on blur and while correcting errors, keep pristine forms quiet, and focus the first error after a failed submission. Preserve native constraints, draft bypasses and server validation.
 
 - Resource tables use the [reusable console table contract](../microfinance-table-standard/SKILL.md#reusable-console-table-component): compact rectangular header actions, a separate filter/paginator/preferences row, and an independently scrolling table canvas. Reuse `resource-table.css` and `resource-table.js`; do not create page-specific gear dialogs or paginator styling.
