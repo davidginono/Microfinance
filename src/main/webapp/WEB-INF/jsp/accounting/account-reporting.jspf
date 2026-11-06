@@ -1,0 +1,9 @@
+<details class="accounting-additional" ${not empty reportingForm.cashSection or not empty reportingForm.equityComponent or reportingForm.note!=null or not empty reportingForm.noteText?'open':''}>
+ <summary><spring:message code="coa.reporting" /></summary>
+ <div class="accounting-grid">
+  <label><spring:message code="coa.cashSection" /><form:select path="cashSection" cssClass="aws-control"><form:option value=""><spring:message code="coa.inherit" /></form:option><c:forEach items="${['OPERATING','INVESTING','FINANCING','UNCLASSIFIED']}" var="category"><form:option value="${category}"><spring:message code="fs.section.${category}" /></form:option></c:forEach></form:select></label>
+  <c:choose><c:when test="${selectedParent.type=='EQUITY' or account.type=='EQUITY'}"><label><spring:message code="coa.equityComponent" /><form:input path="equityComponent" cssClass="aws-control" maxlength="100" /><form:errors path="equityComponent" cssClass="coa-error" /></label></c:when><c:otherwise><form:hidden path="equityComponent" /></c:otherwise></c:choose>
+  <label><spring:message code="fs.note" /><form:input path="note" cssClass="aws-control" type="number" min="0" max="999" /><form:errors path="note" cssClass="coa-error" /></label>
+  <label><spring:message code="coa.noteText" /><form:textarea path="noteText" cssClass="aws-control" maxlength="2000" rows="2" /></label>
+ </div>
+</details>

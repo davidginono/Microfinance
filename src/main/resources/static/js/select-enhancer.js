@@ -105,7 +105,7 @@
             const selectedLabel = selectedOption ? selectedOption.textContent.trim() : '';
             const placeholderSelected = selectedOption != null && selectedOption.value === '' && !select.value && selectedOption.dataset.emptyOption !== 'true';
             const query = (state.search?.value || '').trim().toLocaleLowerCase();
-            const visibleOptions = state.loading ? [] : options.filter(function (option) {
+            const visibleOptions = options.filter(function (option) {
                 return !option.hidden && option.dataset.placeholder !== 'true'
                     && (!state.search || option.value !== '' || option.dataset.emptyOption === 'true')
                     && (!query || option.textContent.toLocaleLowerCase().includes(query) || option.dataset.searchQuery === query);

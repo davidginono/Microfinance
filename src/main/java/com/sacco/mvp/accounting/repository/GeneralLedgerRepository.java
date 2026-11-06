@@ -30,10 +30,22 @@ public class GeneralLedgerRepository {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))", "GL_SETUP/" + institution);
     }
     public List<Account> accounts(String institution, int offset, int limit) {
-        return jdbc.query("select * from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
+        return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
+    }
+    public boolean reportingDefaultsMissing(String institution) {
+        return jdbc.queryForObject("select count(*)<4 from gl_account_reporting_section where sacco_id=?",Boolean.class,institution);
+    }
+    public boolean pendingCode(String institution,String code) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account_version where sacco_id=? and operation='CREATE' and state in ('DRAFT','PENDING') and snapshot->>'code'=?)",Boolean.class,institution,code));
+    }
+    public boolean reportingRole(String institution,UUID id,String section) {
+        return jdbc.update("insert into gl_account_reporting_section(account_id,sacco_id,section) values(?,?,?) on conflict do nothing",id,institution,section)==1;
+    }
+    public boolean standardReportingGroup(String institution,UUID id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account_reporting_section where sacco_id=? and account_id=?)",Boolean.class,institution,id));
     }
     public List<Account> chartRoots(String institution) {
-        return jdbc.query("select * from gl_account where sacco_id=? and code in ('100000','200000','300000','400000','500000') order by code limit 5",this::account,institution);
+        return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? and code in ('100000','200000','300000','400000','500000') order by code limit 5",this::account,institution);
     }
     public List<AccountRow> chart(String institution,AccountFilter filter,int offset,int limit) {
         return chart(institution,filter,offset,limit,"code","asc");
@@ -57,17 +69,17 @@ public class GeneralLedgerRepository {
         if(!filter.kind().isEmpty()){where+=" and (a.kind=? or (?='POSTING' and a.kind='CONTROL'))";args.add(filter.kind());args.add(filter.kind());}
         if(!filter.state().isEmpty()){where+=" and a.active=?";args.add("ACTIVE".equals(filter.state()));}
         args.add(limit);args.add(offset);
-        return jdbc.query("select a.*,p.code parent_code,p.name parent_name,p.name_sw parent_name_sw from gl_account a left join gl_account p on p.id=a.parent_id and p.sacco_id=a.sacco_id"+where+" order by "+column+order+",a.id"+order+" limit ? offset ?",
+        return jdbc.query("select a.*,(select snapshot->'reporting' from gl_account_version where id=a.current_version_id) reporting,p.code parent_code,p.name parent_name,p.name_sw parent_name_sw from gl_account a left join gl_account p on p.id=a.parent_id and p.sacco_id=a.sacco_id"+where+" order by "+column+order+",a.id"+order+" limit ? offset ?",
             (r,n)->new AccountRow(account(r,n),r.getString("parent_code"),r.getString("parent_name"),r.getString("parent_name_sw")),args.toArray());
     }
     public List<Account> chartParents(String institution,boolean groups,String search,int offset,int limit) {
         String pattern=groups?"^[1-5]([0-9]0000)$":"^[1-5][1-9][1-9]000$";
         String term=search.toLowerCase(java.util.Locale.ROOT);
-        return jdbc.query("select * from gl_account where sacco_id=? and active and kind='HEADING' and code ~ ? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) order by code,id limit ? offset ?",
+        return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? and active and kind='HEADING' and code ~ ? and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) order by code,id limit ? offset ?",
             this::account,institution,pattern,term,term,term,limit,offset);
     }
     public List<Account> chartPath(String institution,UUID id) {
-        return jdbc.query("with recursive path as (select a.*,0 depth from gl_account a where a.sacco_id=? and a.id=? union all select a.*,p.depth+1 from gl_account a join path p on a.id=p.parent_id and a.sacco_id=p.sacco_id where p.depth<16) select * from path order by depth desc limit 17",
+        return jdbc.query("with recursive path as (select a.*,0 depth from gl_account a where a.sacco_id=? and a.id=? union all select a.*,p.depth+1 from gl_account a join path p on a.id=p.parent_id and a.sacco_id=p.sacco_id where p.depth<16) select path.*,(select snapshot->'reporting' from gl_account_version where id=path.current_version_id) reporting from path order by depth desc limit 17",
             this::account,institution,id);
     }
     public Optional<String> availableChartCode(String institution,int start,int end,int step) {
@@ -79,10 +91,10 @@ public class GeneralLedgerRepository {
     }
     public void reactivate(String institution,UUID id) {jdbc.update("update gl_account set active=true where sacco_id=? and id=?",institution,id);}
     public Optional<Account> account(String institution, UUID id) {
-        return jdbc.query("select * from gl_account where sacco_id=? and id=?",this::account,institution,id).stream().findFirst();
+        return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? and id=?",this::account,institution,id).stream().findFirst();
     }
     public Optional<Account> accountCode(String institution,String code) {
-        return jdbc.query("select * from gl_account where sacco_id=? and code=?",this::account,institution,code).stream().findFirst();
+        return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? and code=?",this::account,institution,code).stream().findFirst();
     }
     public void createAccount(String institution, UUID id, AccountCommand c, UUID maker, OffsetDateTime now) {
         jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at,name_sw,description) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -163,6 +175,6 @@ public class GeneralLedgerRepository {
             r.getObject("reviewer_id",UUID.class),r.getString("reviewer_name"),r.getString("decision_reason"),r.getObject("created_at",OffsetDateTime.class),r.getObject("submitted_at",OffsetDateTime.class),r.getObject("decided_at",OffsetDateTime.class),r.getObject("request_key",UUID.class),r.getString("request_hash"));
     }
     private Account account(ResultSet r,int n) throws SQLException {
-        return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("normal_balance"),r.getString("kind"),r.getString("purpose"),r.getObject("parent_id",UUID.class),r.getBoolean("active"),r.getString("name_sw"),r.getString("description"));
+        return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("normal_balance"),r.getString("kind"),r.getString("purpose"),r.getObject("parent_id",UUID.class),r.getBoolean("active"),r.getString("name_sw"),r.getString("description"),r.getString("reporting")==null?null:JSON.readValue(r.getString("reporting"),Reporting.class));
     }
 }

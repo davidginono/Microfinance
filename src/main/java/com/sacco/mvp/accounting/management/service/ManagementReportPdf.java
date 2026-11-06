@@ -29,8 +29,8 @@ public class ManagementReportPdf {
             boolean asAt=r.kind()==Kind.PORTFOLIO_RISK || r.kind()==Kind.PORTFOLIO_ANALYSIS;
             var context=new ArrayList<>(List.of(r.institution()+" | "+r.branch(),message(asAt?"asAt":"period",locale)+": "+(asAt?"":com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().from())+" — ")+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().through())+" | TZS",
                 message("cutoff",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().cutoff()),message("excluded",locale)+": "+r.excluded()));
-            if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message("accounts",locale)+": "+(r.parameters().startAccount()==null && r.parameters().endAccount()==null?message("allAccounts",locale):r.accountRange()));
-            if(!r.parameters().client().isBlank())context.add(message("clientSearch",locale)+": "+r.parameters().client());
+            if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message("accounts",locale)+": "+(r.parameters().groupId()==null && r.parameters().accountIds().isEmpty()?message("allAccounts",locale):r.accountSelection()));
+            if(!r.clientSelection().isBlank())context.add(message("client",locale)+": "+r.clientSelection());
             if(!r.parameters().product().isBlank())context.add(message("productSearch",locale)+": "+r.parameters().product());
             try(var page=new AccountingPdfDocument(document,font,true,message("title."+r.kind(),locale),context,null,AccountingPdfDocument.Style.REFERENCE)){
                 float total=(float)r.columns().stream().mapToDouble(Column::width).sum();float[] widths=new float[r.columns().size()];boolean[] numeric=new boolean[widths.length];

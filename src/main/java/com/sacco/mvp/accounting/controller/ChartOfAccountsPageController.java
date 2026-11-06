@@ -24,7 +24,7 @@ import java.util.UUID;
 public class ChartOfAccountsPageController {
     private final GeneralLedgerService ledger;
     @InitBinder("accountForm") void bind(WebDataBinder binder) {
-        binder.setAllowedFields("parentId","code","name","nameSw","normalBalance","kind","purpose","description","requestKey","reason");
+        binder.setAllowedFields("parentId","code","name","nameSw","normalBalance","kind","purpose","description","requestKey","reason","cashSection","equityComponent","note","noteText");
     }
     @GetMapping
     String chart(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,

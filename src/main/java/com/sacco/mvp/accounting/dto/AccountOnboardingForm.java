@@ -16,4 +16,6 @@ public class AccountOnboardingForm {
     private String kind = "POSTING";
     private String purpose = "OTHER";
     private String description;
+        private String cashSection="", equityComponent="", noteText="";
+        private Integer note;
 }

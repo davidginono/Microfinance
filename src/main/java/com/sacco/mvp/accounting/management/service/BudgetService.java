@@ -23,8 +23,8 @@ public class BudgetService {
     public void authorize(AppUserPrincipal a,boolean create){guard.requireActor(a,create?"ACCOUNTING_ACCOUNTS_CREATE":"ACCOUNTING_ACCOUNTS_VIEW");}
     @Transactional(readOnly=true) public BudgetPage list(AppUserPrincipal a,int year,int page,String sort,String direction){authorize(a,false);check(year>=1900 && year<=2200 && page>=0 && page<=10000,"parameters");var rows=budgets.list(a,year,page,sort,direction);return new BudgetPage(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional(readOnly=true) public Budget view(AppUserPrincipal a,UUID id){authorize(a,false);return budgets.find(a,id).orElseThrow(()->error("budget"));}
-    @Transactional(readOnly=true) public List<Choice> accounts(AppUserPrincipal a,String search,int page){authorize(a,false);check(search!=null && search.length()<=100 && page>=0 && page<=10000,"parameters");return budgets.accounts(a,search,page,false);}
-    @Transactional(readOnly=true) public Choice selected(AppUserPrincipal a,UUID id){authorize(a,false);return id==null?null:budgets.account(a,id,false).orElseThrow(()->error("account"));}
+    @Transactional(readOnly=true) public List<Choice> accounts(AppUserPrincipal a,String search,int page){authorize(a,false);check(search!=null && search.length()<=100 && page>=0 && page<=10000,"parameters");return budgets.accounts(a,search,page);}
+    @Transactional(readOnly=true) public Choice selected(AppUserPrincipal a,UUID id){authorize(a,false);return id==null?null:budgets.account(a,id).orElseThrow(()->error("account"));}
     @Transactional public UUID save(AppUserPrincipal a,BudgetForm f){
         authorize(a,true);validate(f,clock.today());
         if(f.getReplacesId()!=null)guard.requireActor(a,"ACCOUNTING_ACCOUNTS_UPDATE");
@@ -33,7 +33,7 @@ public class BudgetService {
         // Lock one account/year only. Posted money and other budgets are independent.
         budgets.lockRequest(a,f.getRequestKey());budgets.lock(a,f.getAccountId(),f.getYear());
         var retry=budgets.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get();
-        budgets.account(a,f.getAccountId(),false).orElseThrow(()->error("account"));
+        budgets.account(a,f.getAccountId()).orElseThrow(()->error("account"));
         var previous=budgets.latest(a,f.getAccountId(),f.getYear());
         check(previous.isEmpty()?f.getReplacesId()==null:previous.get().id().equals(f.getReplacesId()),"revision");
         int revision=previous.map(b->b.revision()+1).orElse(1);UUID id=UUID.randomUUID();

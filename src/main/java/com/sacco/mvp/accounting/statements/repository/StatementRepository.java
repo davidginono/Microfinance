@@ -12,7 +12,19 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class StatementRepository {
     private final JdbcTemplate jdbc;
-    private static final String MAPPING="m.line_name,m.section,m.cash_section,m.equity_component,m.note_no,m.note_text,m.revision";
+    // Stable report sections, actual parent IDs and current approved versions. Legacy cash/note
+    // settings are read only as migration compatibility; legacy line/section overrides are retired.
+    private static final String MAPPING="""
+      coalesce(f.name,'fs.unclassified.'||lower(a.type)) line_name,
+      case when a.type in ('EQUITY','INCOME','EXPENSE') then a.type
+           when f.id is not null then coalesce(role.section,'UNCLASSIFIED') else 'UNCLASSIFIED' end section,
+      coalesce(nullif(av.snapshot->'reporting'->>'cashSection',''),nullif(fv.snapshot->'reporting'->>'cashSection',''),nullif(gv.snapshot->'reporting'->>'cashSection',''),nullif(rv.snapshot->'reporting'->>'cashSection',''),m.cash_section,'UNCLASSIFIED') cash_section,
+      coalesce(nullif(av.snapshot->'reporting'->>'equityComponent',''),nullif(fv.snapshot->'reporting'->>'equityComponent',''),nullif(gv.snapshot->'reporting'->>'equityComponent',''),nullif(rv.snapshot->'reporting'->>'equityComponent',''),m.equity_component,'') equity_component,
+      coalesce((av.snapshot->'reporting'->>'note')::int,(fv.snapshot->'reporting'->>'note')::int,(gv.snapshot->'reporting'->>'note')::int,(rv.snapshot->'reporting'->>'note')::int,m.note_no,0) note_no,
+      coalesce(nullif(av.snapshot->'reporting'->>'noteText',''),nullif(fv.snapshot->'reporting'->>'noteText',''),nullif(gv.snapshot->'reporting'->>'noteText',''),nullif(rv.snapshot->'reporting'->>'noteText',''),m.note_text,'') note_text,
+      f.id group_id,f.code group_code
+      """;
+
     public record Stored(UUID id,LocalDate from,LocalDate through,OffsetDateTime generated,boolean wide,boolean saved,String payload,String checksum) {}
     public record Artifact(byte[] bytes,String checksum) {}
     public Optional<Stored> duplicate(AppUserPrincipal a,UUID key){return jdbc.query("select * from statement_run where sacco_id=? and station_id=? and requested_by=? and request_key=?",this::stored,a.getSaccoId(),a.getStationId(),a.getMemberId(),key).stream().findFirst();}
@@ -50,8 +62,18 @@ public class StatementRepository {
              coalesce(x.previous_opening,0) previous_opening,coalesce(x.previous_debit,0) previous_debit,
              coalesce(x.previous_credit,0) previous_credit,coalesce(x.previous_closing,0) previous_closing
              from gl_account a left join amounts x on x.account_id=a.id
+             left join gl_account g0 on g0.id=a.parent_id and g0.sacco_id=a.sacco_id and g0.kind='HEADING'
+             left join gl_account g on g.id=g0.parent_id and g.sacco_id=a.sacco_id and g.kind='HEADING'
+             left join gl_account r on r.id=g.parent_id and r.sacco_id=a.sacco_id and r.kind='HEADING' and r.parent_id is null and r.type=a.type
+             left join gl_account f on f.id=g0.id and f.sacco_id=a.sacco_id and r.id is not null and g.type=a.type and g0.type=a.type
+             left join gl_account_reporting_section role on role.account_id=g.id and role.sacco_id=a.sacco_id
+             left join gl_account_version av on av.id=a.current_version_id and av.sacco_id=a.sacco_id
+             left join gl_account_version fv on fv.id=f.current_version_id and fv.sacco_id=a.sacco_id
+             left join gl_account_version gv on gv.id=g.current_version_id and gv.sacco_id=a.sacco_id
+             left join gl_account_version rv on rv.id=r.current_version_id and rv.sacco_id=a.sacco_id
              left join statement_account_mapping m on m.account_id=a.id and m.sacco_id=a.sacco_id
-             where a.sacco_id=? and a.kind<>'HEADING' order by a.code,a.id limit 2001
+             where a.sacco_id=? and a.kind<>'HEADING'
+             order by coalesce(r.code,a.code),coalesce(g.code,a.code),coalesce(f.code,a.code),a.code,a.id limit 2001
             """,(r,n)->new Balance(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("purpose"),mapping(r),r.getBigDecimal("opening"),r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("closing"),r.getBigDecimal("previous_opening"),r.getBigDecimal("previous_debit"),r.getBigDecimal("previous_credit"),r.getBigDecimal("previous_closing")),
             p.from(),p.from(),p.through(),p.from(),p.through(),p.previousFrom(),p.previousFrom(),p.previousThrough(),p.previousFrom(),p.previousThrough(),p.previousThrough(),id,institution);
     }
@@ -69,16 +91,6 @@ public class StatementRepository {
     public Optional<Stored> find(UUID id,AppUserPrincipal a){return jdbc.query("select * from statement_run where id=? and sacco_id=? and station_id=?",this::stored,id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Stored> history(AppUserPrincipal a,int page,String sort,boolean wideAllowed){String order=switch(sort){case "oldest"->"generated_at asc,id";case "from"->"date_from asc,id";case "from_desc"->"date_from desc,id";case "through"->"date_through asc,id";case "through_desc"->"date_through desc,id";case "status"->"saved_at nulls first,id";case "status_desc"->"saved_at desc nulls last,id";default->"generated_at desc,id";};return jdbc.query("select id,date_from,date_through,generated_at,institution_wide,saved_at,null::text payload,null::text checksum from statement_run where sacco_id=? and station_id=? and (not institution_wide or ?) and payload is not null order by "+order+" limit 31 offset ?",this::stored,a.getSaccoId(),a.getStationId(),wideAllowed,page*30);}
     public void save(UUID id,AppUserPrincipal a,OffsetDateTime now){jdbc.update("update statement_run set saved_at=? where id=? and sacco_id=? and station_id=? and saved_at is null",now,id,a.getSaccoId(),a.getStationId());}
-    public List<MappingRow> mappings(String institution,String search,int page,String sort,String direction){String column=Map.of("code","a.code","name","a.name","line","coalesce(m.line_name,'')","section","coalesce(m.section,'')").get(sort);if(column==null||!Set.of("asc","desc").contains(direction))throw new IllegalArgumentException("fs.error.filter");return jdbc.query("select a.id,a.code,a.name,a.type,a.purpose,"+MAPPING+" from gl_account a left join statement_account_mapping m on m.account_id=a.id and m.sacco_id=a.sacco_id where a.sacco_id=? and a.kind<>'HEADING' and strpos(lower(a.code||' '||a.name),?)>0 order by "+column+" "+direction+",a.id limit 31 offset ?",(r,n)->new MappingRow(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("purpose"),mapping(r),r.getObject("revision",UUID.class)),institution,search.toLowerCase(Locale.ROOT),page*30);}
-    public Optional<MappingRow> account(String institution,UUID id){return jdbc.query("select a.id,a.code,a.name,a.type,a.purpose,"+MAPPING+" from gl_account a left join statement_account_mapping m on m.account_id=a.id and m.sacco_id=a.sacco_id where a.sacco_id=? and a.id=? and a.kind<>'HEADING'",(r,n)->new MappingRow(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("purpose"),mapping(r),r.getObject("revision",UUID.class)),institution,id).stream().findFirst();}
-
-    public int map(AppUserPrincipal a,Mapping m,UUID expected,OffsetDateTime now){return jdbc.update("""
-        insert into statement_account_mapping(account_id,sacco_id,line_name,section,cash_section,equity_component,note_no,note_text,revision,updated_by,updated_at)
-        values(?,?,?,?,?,?,?,?,?,?,?) on conflict(account_id) do update set line_name=excluded.line_name,section=excluded.section,
-        cash_section=excluded.cash_section,equity_component=excluded.equity_component,note_no=excluded.note_no,note_text=excluded.note_text,
-        revision=excluded.revision,updated_by=excluded.updated_by,updated_at=excluded.updated_at
-        where statement_account_mapping.revision=? and statement_account_mapping.sacco_id=excluded.sacco_id
-        """,m.accountId(),a.getSaccoId(),m.line(),m.section(),m.cashSection(),m.equityComponent(),m.note(),m.noteText(),UUID.randomUUID(),a.getMemberId(),now,expected);}
     public List<Activity> activity(UUID run,UUID account,Parameters p,int page,int limit){return jdbc.query("""
         with activity as (
          select j.id,j.sacco_id,j.station_id,j.effective_date,j.reason,sum(l.debit) debit,sum(l.credit) credit,
@@ -113,6 +125,6 @@ public class StatementRepository {
     public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,artifactKind(kind),format,language,bytes,checksum);}
     private static String artifactKind(Kind kind){return kind.name()+"_V3";}
     private Stored stored(ResultSet r,int n)throws SQLException{return new Stored(r.getObject("id",UUID.class),r.getObject("date_from",LocalDate.class),r.getObject("date_through",LocalDate.class),r.getObject("generated_at",OffsetDateTime.class),r.getBoolean("institution_wide"),r.getObject("saved_at")!=null,r.getString("payload"),r.getString("checksum"));}
-    private Mapping mapping(ResultSet r)throws SQLException{return r.getString("line_name")==null?null:new Mapping(r.getObject("id",UUID.class),r.getString("line_name"),r.getString("section"),r.getString("cash_section"),r.getString("equity_component"),r.getInt("note_no"),r.getString("note_text"));}
+    private Mapping mapping(ResultSet r)throws SQLException{return new Mapping(r.getObject("id",UUID.class),r.getString("line_name"),r.getString("section"),r.getString("cash_section"),r.getString("equity_component"),r.getInt("note_no"),r.getString("note_text"),r.getObject("group_id",UUID.class),r.getString("group_code"));}
     private String source(ResultSet r)throws SQLException{if(r.getObject("voucher_id")!=null)return "/finance/vouchers/"+switch(r.getString("voucher_type")){case "RECEIPT"->"receipts";case "PAYMENT"->"payments";default->"journals";}+"/"+r.getObject("voucher_id");return null;}
 }

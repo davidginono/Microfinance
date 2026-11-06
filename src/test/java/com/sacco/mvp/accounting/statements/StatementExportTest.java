@@ -29,30 +29,25 @@ class StatementExportTest {
     final StatementExportService exporter=new StatementExportService(presentation,new ReportExportLimiter(1),new com.sacco.mvp.service.ApplicationClock("Africa/Nairobi"));
     Snapshot snapshot(){var bank=balance("ASSET","BANK","CURRENT_ASSETS","OPERATING","123.45","0","0");var capital=balance("EQUITY","CAPITAL","EQUITY","FINANCING","-123.45","0","0");var accounts=List.of(bank,capital);var c=StatementCalculator.calculate(accounts,List.of(),PERIOD);return new Snapshot(1,UUID.randomUUID(),PERIOD,OffsetDateTime.parse("2026-01-31T12:00:00+03:00"),"I","B","Synthetic institution","Test branch",accounts,c.position(),c.income(),c.cash(),c.equityColumns(),c.equity(),c.checks());}
     @Test void pdfUsesReferenceTypographyAndNeverExportsDetailsControls()throws Exception{
-        var s=snapshot();for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){var doc=presentation.document(s,Kind.POSITION,s.balances(),locale);byte[] bytes=exporter.export(s,List.of(doc),"PDF",locale);try(var pdf=Loader.loadPDF(bytes)){String text=new PDFTextStripper().getText(pdf);assertThat(text).contains("123.45",s.institutionName()).doesNotContain("Details");assertThat(pdf.getPage(0).getMediaBox().getHeight()).isGreaterThan(pdf.getPage(0).getMediaBox().getWidth());}}
+        var s=snapshot();for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){var doc=presentation.document(s,Kind.POSITION,s.balances(),locale);byte[] bytes=exporter.export(s,doc,"PDF",locale);try(var pdf=Loader.loadPDF(bytes)){String text=new PDFTextStripper().getText(pdf);assertThat(text).contains("123.45",s.institutionName()).doesNotContain("Details");assertThat(pdf.getPage(0).getMediaBox().getHeight()).isGreaterThan(pdf.getPage(0).getMediaBox().getWidth());}}
     }
     @Test void excelHasNumericAmountsPrintSettingsAndNoDetailsOrFormulas()throws Exception{
-        var s=snapshot();var doc=presentation.document(s,Kind.TRIAL,s.balances(),Locale.ENGLISH);try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,List.of(doc),"XLSX",Locale.ENGLISH)))){
+        var s=snapshot();var doc=presentation.document(s,Kind.TRIAL,s.balances(),Locale.ENGLISH);try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,doc,"XLSX",Locale.ENGLISH)))){
             var sheet=book.getSheetAt(0);assertThat(sheet.getPrintSetup().getLandscape()).isTrue();assertThat(sheet.getPaneInformation().isFreezePane()).isTrue();boolean found=false;
             for(var row:sheet)for(var cell:row){assertThat(cell.getCellType()).isNotEqualTo(CellType.FORMULA);if(cell.getCellType()==CellType.STRING)assertThat(cell.getStringCellValue()).doesNotContain("Details");if(cell.getCellType()==CellType.NUMERIC&&cell.getNumericCellValue()==123.45)found=true;}
             assertThat(found).isTrue();assertThat(book.getFontAt(0).getFontName()).isNotNull();assertThat(sheet.getRow(7).getLastCellNum()).isEqualTo((short)7);
         }
     }
     @Test void investmentDetailsSelectTheExactMappedAccounts(){var s=snapshot();var line=s.position().stream().filter(r->!r.accounts().isEmpty()).findFirst().orElseThrow();var service=new StatementService(null,null,null,null,null,null,null);assertThat(service.selected(s,Kind.POSITION,line.key())).extracting(Balance::id).containsExactlyElementsOf(line.accounts());assertThatThrownBy(()->service.selected(s,Kind.POSITION,"foreign-line")).hasMessage("fs.error.selection");}
-    @Test void completePackageContainsSixPrintableStatementsWithoutDetails()throws Exception{
+    @Test void eachStatementExportsSeparatelyWithoutDetails()throws Exception {
         var s=snapshot();
-        var documents=List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL).stream()
-                .map(kind->presentation.document(s,kind,s.balances(),Locale.ENGLISH)).toList();
-        try(var pdf=Loader.loadPDF(exporter.export(s,documents,"PDF",Locale.ENGLISH))){
-            assertThat(pdf.getNumberOfPages()).isEqualTo(6);
-            assertThat(new PDFTextStripper().getText(pdf)).doesNotContain("Details");
-        }
-        try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,documents,"XLSX",Locale.ENGLISH)))){
-            assertThat(book.getNumberOfSheets()).isEqualTo(6);
-            for(var sheet:book){
-                assertThat(book.getPrintArea(book.getSheetIndex(sheet))).isNotBlank();
-                for(var row:sheet)for(var cell:row)if(cell.getCellType()==CellType.STRING)
-                    assertThat(cell.getStringCellValue()).doesNotContain("Details");
+        for(var kind:List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL)) {
+            var document=presentation.document(s,kind,s.balances(),Locale.ENGLISH);
+            try(var pdf=Loader.loadPDF(exporter.export(s,document,"PDF",Locale.ENGLISH))) {
+                assertThat(pdf.getNumberOfPages()).isGreaterThanOrEqualTo(1);assertThat(new PDFTextStripper().getText(pdf)).doesNotContain("Details");
+            }
+            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,document,"XLSX",Locale.ENGLISH)))) {
+                assertThat(book.getNumberOfSheets()).isEqualTo(1);assertThat(book.getPrintArea(0)).isNotBlank();
             }
         }
     }
@@ -67,18 +62,18 @@ class StatementExportTest {
         var model=new ExtendedModelMap();
         assertThat(controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),model,Locale.ENGLISH,new MockHttpServletResponse())).isEqualTo("accounting/statements/print");
         verify(service).exportAccess(actor,run);verify(service).activityExport(actor,s.id(),account.id());
-        @SuppressWarnings("unchecked") var documents=(List<StatementPresentation.Document>)model.get("documents");
-        assertThat(documents).hasSize(1);assertThat(documents.getFirst().rows()).hasSize(37);
+        var document=(StatementPresentation.Document)model.get("document");
+        assertThat(document.rows()).hasSize(37);
         doThrow(new AccessDeniedException("Export denied")).when(service).exportAccess(actor,run);
         clearInvocations(service);
         assertThatThrownBy(()->controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),new ExtendedModelMap(),Locale.ENGLISH,new MockHttpServletResponse())).isInstanceOf(AccessDeniedException.class);
         verify(service,never()).activityExport(any(),any(),any());
     }
-    @Test void ledgerAndPackagePdfTextStaysInsideEveryPage()throws Exception{
+    @Test void individualPdfTextStaysInsideEveryPage()throws Exception{
         var s=snapshot();var documents=new ArrayList<StatementPresentation.Document>();
         for(var kind:List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL))documents.add(presentation.document(s,kind,s.balances(),Locale.ENGLISH));
         documents.add(presentation.ledger(s,s.balances().getFirst(),List.of(),Locale.ENGLISH));
-        try(var pdf=Loader.loadPDF(exporter.export(s,documents,"PDF",Locale.ENGLISH))){
+        for(var document:documents)try(var pdf=Loader.loadPDF(exporter.export(s,document,"PDF",Locale.ENGLISH))){
             new PDFTextStripper(){
                 float pageWidth;
                 @Override protected void startPage(org.apache.pdfbox.pdmodel.PDPage page)throws IOException{pageWidth=page.getCropBox().getWidth();super.startPage(page);}
@@ -88,7 +83,7 @@ class StatementExportTest {
                     super.processTextPosition(text);
                 }
             }.getText(pdf);
-            assertThat(pdf.getPage(6).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(6).getMediaBox().getHeight());
+            if(document.style().equals("trial"))assertThat(pdf.getPage(0).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(0).getMediaBox().getHeight());
         }
     }
     @Test void ledgerAccountNumbersMatchAcrossPreviewPdfAndExcelInBothLanguages()throws Exception{
@@ -102,11 +97,11 @@ class StatementExportTest {
             assertThat(document.rows().get(1).cells().get(1).text()).isEqualTo("LN-000123");
             assertThat(document.rows().get(2).cells().get(1).text()).isEqualTo("CL-000045");
             assertThat(document.rows().get(3).cells().get(1).text()).isEqualTo(presentation.label("fs.unavailable",locale));
-            try(var pdf=Loader.loadPDF(exporter.export(s,List.of(document),"PDF",locale))){
+            try(var pdf=Loader.loadPDF(exporter.export(s,document,"PDF",locale))){
                 String text=new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ").toLowerCase(locale);
                 assertThat(text).contains(heading.toLowerCase(locale),"ln-000123","cl-000045").doesNotContain(presentation.label("fs.reference",locale).toLowerCase(locale));
             }
-            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,List.of(document),"XLSX",locale)))){
+            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,document,"XLSX",locale)))){
                 var numbers=new ArrayList<String>();for(var row:book.getSheetAt(0)){var cell=row.getCell(1);if(cell!=null&&cell.getCellType()==CellType.STRING)numbers.add(cell.getStringCellValue());}
                 assertThat(numbers).contains(heading,"LN-000123","CL-000045",presentation.label("fs.unavailable",locale)).doesNotContain(presentation.label("fs.reference",locale));
             }
@@ -118,11 +113,11 @@ class StatementExportTest {
             var doc=presentation.document(s,kind,s.balances(),locale);
             assertThat(doc.asAt()).isTrue();
             assertThat(doc.title()).endsWith("31/01/2026");
-            try(var pdf=Loader.loadPDF(exporter.export(s,List.of(doc),"PDF",locale))){
+            try(var pdf=Loader.loadPDF(exporter.export(s,doc,"PDF",locale))){
                 assertThat(new PDFTextStripper().getText(pdf)).contains(doc.title().toUpperCase(locale),presentation.label("fs.outputNotice",locale),"31/01/2026","01/01/2025")
                         .doesNotContain(s.id().toString(),presentation.label("fs.check.coverage",locale));
             }
-            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,List.of(doc),"XLSX",locale)))){
+            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,doc,"XLSX",locale)))){
                 var sheet=book.getSheetAt(0);assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo(doc.title().toUpperCase(locale));
                 for(var row:sheet)for(var cell:row)if(cell.getCellType()==CellType.STRING)
                     assertThat(cell.getStringCellValue()).doesNotContain(s.id().toString(),presentation.label("fs.check.coverage",locale));

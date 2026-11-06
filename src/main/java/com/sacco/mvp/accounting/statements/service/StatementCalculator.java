@@ -14,7 +14,10 @@ public final class StatementCalculator {
         // The reset removed verified source-opening/reconciliation workflows. These numbers are recorded-ledger figures only.
         checks.add(new Check("coverage",null));
         if(accounts.isEmpty())checks.add(new Check("empty",null));
-        if(accounts.stream().anyMatch(a->a.mapping()==null && (a.closing().signum()!=0||a.previousClosing().signum()!=0||a.movement().signum()!=0)))checks.add(new Check("mappings",null));
+        if(accounts.stream().anyMatch(a -> (a.mapping()==null || a.mapping().groupId()==null || "UNCLASSIFIED".equals(a.mapping().section()))
+            && (a.closing().signum()!=0 || a.previousClosing().signum()!=0 || a.movement().signum()!=0 || a.previousMovement().signum()!=0))) {
+            checks.add(new Check("mappings",null));
+        }
         var income=group(accounts,true);var position=group(accounts,false);
         BigDecimal profit=profit(accounts,false,false),previousProfit=profit(accounts,true,false);
         BigDecimal cumulative=profit(accounts,false,true),previousCumulative=profit(accounts,true,true);
@@ -40,7 +43,13 @@ public final class StatementCalculator {
         difference(checks,"equity",rows.get(0).total().add(rows.get(1).total()).add(rows.get(2).total()).subtract(rows.get(3).total()));
         return new Result(List.copyOf(position),List.copyOf(income),List.copyOf(cash),List.copyOf(columns),rows,List.copyOf(checks));
     }
-    private static String component(Balance a){return "account:"+(a.mapping()!=null&&!a.mapping().equityComponent().isBlank()?a.mapping().equityComponent():a.name());}
+    private static String component(Balance a) {
+        var mapping=a.mapping();
+        if(mapping==null)return "account:"+a.name();
+        if(!mapping.equityComponent().isBlank())return "account:"+mapping.equityComponent();
+        if(mapping.groupId()==null && mapping.line().startsWith("fs.unclassified."))return mapping.line();
+        return "account:"+mapping.line();
+    }
     private static EquityRow equityRow(String label,Map<String,BigDecimal> values,boolean summary){return new EquityRow(label,Map.copyOf(values),values.values().stream().reduce(ZERO,BigDecimal::add),summary);}
     private static BigDecimal sum(List<Balance>a,String type,boolean previous){return a.stream().filter(b->type.equals(b.type())).map(b->previous?b.previousClosing():b.closing()).reduce(ZERO,BigDecimal::add);}
     private static BigDecimal profit(List<Balance>a,boolean previous,boolean closing){return a.stream().filter(b->Set.of("INCOME","EXPENSE").contains(b.type())).map(b->closing?(previous?b.previousClosing():b.closing()):(previous?b.previousMovement():b.movement())).reduce(ZERO,BigDecimal::add).negate();}
@@ -48,22 +57,24 @@ public final class StatementCalculator {
         var groups=new LinkedHashMap<String,List<Balance>>();
         for(var a:accounts)if(income==Set.of("INCOME","EXPENSE").contains(a.type())){
             String section=a.mapping()==null?(income?a.type():"UNCLASSIFIED"):a.mapping().section();
-            String label=a.mapping()==null?a.name():a.mapping().line();int note=a.mapping()==null?0:a.mapping().note();
-            groups.computeIfAbsent(section+"\u001f"+label+"\u001f"+note,k->new ArrayList<>()).add(a);
+            String label=a.mapping()==null?a.name():a.mapping().line();
+            groups.computeIfAbsent(section+"\u001f"+(a.mapping()!=null && a.mapping().groupId()!=null?a.mapping().groupId():label),k->new ArrayList<>()).add(a);
         }
         var result=new ArrayList<Row>();int n=0;
         for(var values:groups.values()){
             var first=values.getFirst();var m=first.mapping();String section=m==null?(income?first.type():"UNCLASSIFIED"):m.section();
             BigDecimal current=ZERO,previous=ZERO;
             for(var a:values){int sign=Set.of("LIABILITY","EQUITY","INCOME").contains(a.type())?-1:1;current=current.add((income?a.movement():a.closing()).multiply(BigDecimal.valueOf(sign)));previous=previous.add((income?a.previousMovement():a.previousClosing()).multiply(BigDecimal.valueOf(sign)));}
-            result.add(new Row("line-"+(++n),values.size()==1?first.code():"",m==null?first.name():m.line(),m==null?0:m.note(),section,values.stream().map(Balance::id).toList(),current,previous,false));
+            if(current.signum()==0 && previous.signum()==0)continue;
+            int note=values.stream().map(a->a.mapping()==null?0:a.mapping().note()).distinct().count()==1 && m!=null?m.note():0;
+            result.add(new Row("line-"+(++n),m!=null && m.groupCode()!=null?m.groupCode():"",m==null?first.name():m.line(),note,section,values.stream().map(Balance::id).toList(),current,previous,false));
         }
         return result;
     }
     private static List<Row> cash(List<Balance> accounts,List<Cash> lines,Parameters p,List<Check> checks){
         var byAccount=new HashMap<UUID,Balance>();accounts.forEach(a->byAccount.put(a.id(),a));
         var journals=new LinkedHashMap<UUID,List<Cash>>();lines.forEach(l->journals.computeIfAbsent(l.journalId(),k->new ArrayList<>()).add(l));
-        var values=new LinkedHashMap<String,BigDecimal[]>();var sources=new LinkedHashMap<String,Set<UUID>>();boolean ambiguous=false,unmapped=false;
+        var values=new LinkedHashMap<String,BigDecimal[]>();var sources=new LinkedHashMap<String,Set<UUID>>();var labels=new HashMap<String,String>();boolean ambiguous=false,unmapped=false;
         for(var journal:journals.values()){
             BigDecimal money=journal.stream().filter(Cash::money).map(Cash::signed).reduce(ZERO,BigDecimal::add);
             var others=journal.stream().filter(l->!l.money()&&l.signed().signum()!=0).toList();
@@ -72,7 +83,7 @@ public final class StatementCalculator {
             if(others.stream().map(Cash::signed).reduce(money,BigDecimal::add).signum()!=0){ambiguous=true;continue;}
             for(var line:others){var account=byAccount.get(line.accountId());var m=account==null?null:account.mapping();
                 String section=m==null?"UNCLASSIFIED":m.cashSection();if("UNCLASSIFIED".equals(section))unmapped=true;
-                String label=m==null?(account==null?"fs.unclassified":account.name()):m.line();String key=section+"\u001f"+label;
+                String label=m==null?(account==null?"fs.unclassified":account.name()):m.line();String key=section+"\u001f"+(m!=null && m.groupId()!=null?m.groupId():label);labels.put(key,label);
                 sources.computeIfAbsent(key,k->new LinkedHashSet<>()).add(line.accountId());
                 var amount=values.computeIfAbsent(key,k->new BigDecimal[]{ZERO,ZERO});
                 if(!line.date().isBefore(p.from())&&!line.date().isAfter(p.through()))amount[0]=amount[0].subtract(line.signed());
@@ -81,7 +92,7 @@ public final class StatementCalculator {
         }
         if(ambiguous)checks.add(new Check("cashAmbiguous",null));if(unmapped)checks.add(new Check("cashMappings",null));
         var result=new ArrayList<Row>();int n=0;
-        for(var e:values.entrySet()){String[] key=e.getKey().split("\u001f",2);result.add(new Row("cash-"+(++n),"",key[1],0,key[0],List.copyOf(sources.get(e.getKey())),e.getValue()[0],e.getValue()[1],false));}
+        for(var e:values.entrySet()){if(e.getValue()[0].signum()==0 && e.getValue()[1].signum()==0)continue;String[] key=e.getKey().split("\u001f",2);result.add(new Row("cash-"+(++n),"",labels.get(e.getKey()),0,key[0],List.copyOf(sources.get(e.getKey())),e.getValue()[0],e.getValue()[1],false));}
         BigDecimal movement=result.stream().map(Row::current).reduce(ZERO,BigDecimal::add),previousMovement=result.stream().map(Row::previous).reduce(ZERO,BigDecimal::add);
         BigDecimal opening=ZERO,closing=ZERO,previousOpening=ZERO,previousClosing=ZERO;
         for(var a:accounts)if(a.money()){opening=opening.add(a.opening());closing=closing.add(a.closing());previousOpening=previousOpening.add(a.previousOpening());previousClosing=previousClosing.add(a.previousClosing());}

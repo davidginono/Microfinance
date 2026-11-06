@@ -9,14 +9,17 @@ import lombok.Data;
 public final class ManagementReports {
     private ManagementReports() {}
     public enum Kind { DAILY_COLLECTIONS, CASHBOOK, LOAN_PORTFOLIO, PORTFOLIO_RISK, PORTFOLIO_ANALYSIS }
-    public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, UUID startAccount,
-            UUID endAccount, String client, String product, int page) {}
-    public record Choice(UUID id, String code, String name) { public String getLabel(){return name;} public String label(){return getLabel();} }
+    public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, UUID groupId,
+            List<UUID> accountIds, UUID clientId, String product, int page) {}
+    public record Choice(UUID id, String code, String name, String label) {
+        public Choice(UUID id,String code,String name){this(id,code,name,name);}
+        public String getLabel(){return label;}
+    }
     public record Column(String key, boolean money, float width) {}
     public record Group(String name, long count, Map<String,BigDecimal> totals) {}
     public record Result(Kind kind, Parameters parameters, String institution, String branch,
             List<Column> columns, List<Map<String,Object>> rows, List<Group> groups,
-            Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountRange) {
+            Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountSelection, String clientSelection) {
         public List<Group> getDisplayedGroups(){var names=new HashSet<Object>();rows.forEach(r->names.add(r.get("groupName")));return groups.stream().filter(g->names.contains(g.name())).toList();}
         public Map<String,Map<String,BigDecimal>> getDailyTotals(){var days=new LinkedHashMap<String,Map<String,BigDecimal>>();for(var group:groups){var day=days.computeIfAbsent(group.name().substring(0,10),k->new LinkedHashMap<>());group.totals().forEach((k,v)->{if(v!=null)day.merge(k,v,BigDecimal::add);});}return days;}
     }

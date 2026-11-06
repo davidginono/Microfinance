@@ -45,7 +45,7 @@ class AccountVersionPostgresTest {
         when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         return operator("B1",Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
     }
-    @Test void firstChartVisitProvisionsOnlyFiveScopedDefaultsAndRepeatedVisitsPreserveThem() {
+    @Test void firstChartVisitProvisionsScopedDefaultsAndRepeatedVisitsPreserveThem() {
         String original=institution;var reader=emptyChartReader();
         var filter=new AccountFilter("","","","");
         assertThat(ledger.chartDefaultsMissing(reader)).isTrue();
@@ -61,9 +61,9 @@ class AccountVersionPostgresTest {
         ledger.provisionChartDefaults(reader);
         assertThat(ledger.chartDefaultsMissing(reader)).isFalse();
         assertThat(ledger.chart(reader,filter,0).rows()).isEqualTo(first.rows());
-        assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(5);
+        assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(9);
         verifyNoInteractions(audit);
-        assertThat(books.accounts(original,0,10)).hasSize(7);
+        assertThat(books.accounts(original,0,20)).hasSize(10);
         assertThat(jdbc.queryForObject("select count(*) from gl_account_version where sacco_id=? and state<>'BASELINE'",Integer.class,institution)).isZero();
         assertThat(reader.getClaims()).containsExactly("ACCOUNTING_ACCOUNTS_VIEW");
         assertThatThrownBy(()->ledger.onboardAccount(reader,form(first.rows().getFirst().account().id(),"110000","Unauthorized"),true))
@@ -74,15 +74,15 @@ class AccountVersionPostgresTest {
         try(var executor=Executors.newFixedThreadPool(2)) {
             var chart=executor.submit(()->{start.await();ledger.provisionChartDefaults(reader);return ledger.chart(reader,new AccountFilter("","","",""),0);});
             var parents=executor.submit(()->{start.await();ledger.provisionChartDefaults(reader);return ledger.chartParents(reader,true,"",0);});
-            start.countDown();assertThat(chart.get(15,TimeUnit.SECONDS).rows()).hasSize(5);assertThat(parents.get(15,TimeUnit.SECONDS).rows()).hasSize(5);
+            start.countDown();assertThat(chart.get(15,TimeUnit.SECONDS).rows()).hasSize(5);assertThat(parents.get(15,TimeUnit.SECONDS).rows()).hasSize(9);
         }
-        assertThat(books.accounts(institution,0,10)).hasSize(5);
+        assertThat(books.accounts(institution,0,20)).hasSize(9);
     }
     @Test void defaultProvisioningPreservesExistingMetadataAndRejectsConflictingCodes() {
         var reader=emptyChartReader();UUID existing=UUID.randomUUID();
         books.createAccount(institution,existing,new AccountCommand("100000","Institution assets","ASSET","DEBIT","HEADING","OTHER",null,"Mali",null),reader.getMemberId(),now);
         ledger.provisionChartDefaults(reader);
-        assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(5);
+        assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(9);
         assertThat(books.accountCode(institution,"100000").orElseThrow().name()).isEqualTo("Institution assets");
         var conflicting=emptyChartReader();
         books.createAccount(institution,UUID.randomUUID(),new AccountCommand("100000","Conflicting account","ASSET","DEBIT","POSTING","OTHER",null,null,null),conflicting.getMemberId(),now);
@@ -99,6 +99,29 @@ class AccountVersionPostgresTest {
         assertThat(books.account(institution,account).orElseThrow().kind()).isEqualTo("POSTING");
         assertThat(jdbc.queryForObject("select gl_account_requires_loan_source(?)",Boolean.class,account)).isTrue();
     }
+    @Test void reportingSettingsStayFrozenUntilIndependentApprovalAndRemainInHistory() {
+        var policy=new PolicyForm();policy.setVersion(0);policy.setCreateAutomatic(true);policy.setUpdateAutomatic(false);policy.setDeactivateAutomatic(true);policy.setReactivateAutomatic(true);policy.setReason("Synthetic independent updates");ledger.configureAccountApproval(maker,policy);
+        var current=ledger.accountCurrent(maker,family);var edit=GeneralLedgerService.metadataForm(current.proposed());edit.setCashSection("INVESTING");edit.setNote(6);edit.setNoteText("Synthetic note");edit.setReason("Classify group cash flows");
+        UUID pending=ledger.proposeAccountVersion(maker,family,current.id(),"UPDATE",UUID.randomUUID(),edit,true);
+        assertThat(books.account(institution,family).orElseThrow().reporting()).isNull();
+        UUID posting=ledger.onboardAccount(maker,form(family,"111051","Reporting inheritance test"),false);
+        var reports=new com.sacco.mvp.accounting.statements.repository.StatementRepository(jdbc);
+        var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(now.toLocalDate().withDayOfMonth(1),now.toLocalDate(),false);
+        UUID run=UUID.randomUUID();reports.create(run,maker,period,now,UUID.randomUUID());
+        assertThat(reports.balances(run,institution,period)).filteredOn(b->b.id().equals(posting)).singleElement().satisfies(b->assertThat(b.mapping().cashSection()).isEqualTo("UNCLASSIFIED"));
+        var reviewer=operator("B1",EnumSet.allOf(UserClaim.class));var proposal=ledger.accountVersionDetails(reviewer,pending,0,0).version();
+        ledger.accountVersionAction(reviewer,pending,proposal.revision(),"APPROVE","Reviewed synthetic classification");
+        assertThat(books.account(institution,family).orElseThrow().reporting()).isEqualTo(new Reporting("INVESTING","",6,"Synthetic note"));
+        assertThat(reports.balances(run,institution,period)).filteredOn(b->b.id().equals(posting)).singleElement().satisfies(b->{assertThat(b.mapping().cashSection()).isEqualTo("INVESTING");assertThat(b.mapping().note()).isEqualTo(6);assertThat(b.mapping().groupId()).isEqualTo(family);});
+        assertThat(ledger.accountVersionDetails(maker,current.id(),0,0).version().proposed().reporting()).isNull();
+        assertThatThrownBy(()->jdbc.update("update gl_account_version set snapshot=jsonb_set(snapshot,'{reporting,cashSection}','\"OPERATING\"') where id=?",pending)).hasMessageContaining("immutable");
+    }
+    @Test void defaultSectionsAreStableAndProtectedWithoutGrantingAccountCreation() {
+        var reader=emptyChartReader();ledger.provisionChartDefaults(reader);
+        assertThat(jdbc.queryForList("select section from gl_account_reporting_section where sacco_id=? order by section",String.class,institution)).containsExactly("CURRENT_ASSETS","CURRENT_LIABILITIES","NON_CURRENT_ASSETS","NON_CURRENT_LIABILITIES");
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and kind='POSTING'",Integer.class,institution)).isZero();
+        assertThatThrownBy(()->jdbc.update("delete from gl_account_reporting_section where sacco_id=?",institution)).hasMessageContaining("append-only");
+    }
     @BeforeEach void setup(){
         reset(audit,claims,directory,institutions);institution="COA-"+UUID.randomUUID();
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,'Synthetic account version institution',true,now(),now())",institution);
@@ -106,7 +129,7 @@ class AccountVersionPostgresTest {
         when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));maker=operator("B1",EnumSet.allOf(UserClaim.class));
         ledger.initializeChart(maker);UUID root=books.accountCode(institution,"100000").orElseThrow().id();
-        var group=form(root,"110000","Current assets");UUID subgroup=ledger.onboardAccount(maker,group,true);family=ledger.onboardAccount(maker,form(subgroup,"111000","Cash accounts"),true);clearInvocations(audit);
+        UUID subgroup=books.accountCode(institution,"110000").orElseThrow().id();family=ledger.onboardAccount(maker,form(subgroup,"111000","Cash accounts"),true);clearInvocations(audit);
     }
     AppUserPrincipal operator(String branch,Set<UserClaim> permissions){
         UUID id=UUID.randomUUID();String number="COA-"+id;

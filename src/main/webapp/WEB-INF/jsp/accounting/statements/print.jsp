@@ -8,7 +8,6 @@
 <html lang="${pageContext.response.locale.language}">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title><spring:message code="fs.print" /> — <spring:message code="fs.workspace" /></title><link rel="stylesheet" href="<c:url value='/css/financial-statement-print.css' />" /></head>
 <body class="financial-statement-print">
-<c:forEach items="${documents}" var="document">
  <section class="fs-print-document fs-print-${document.style} ${fn:length(document.columns)>5 or document.style=='equity'?'fs-print-landscape':'fs-print-portrait'}">
   <h1><c:out value="${document.title}" /></h1>
   <header>
@@ -27,5 +26,4 @@
   </table>
   <footer><p><spring:message code="fs.provisional" /></p></footer>
  </section>
-</c:forEach>
 </body></html>

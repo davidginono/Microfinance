@@ -43,6 +43,18 @@
  </section>
  <section class="erp-table-wrap"><div class="app-table-titlebar"><h2><spring:message code="coav.changes" /></h2></div><div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr><th><spring:message code="coav.field" /></th><th><spring:message code="coav.before" /></th><th><spring:message code="coav.proposed" /></th></tr></thead><tbody>
   <c:forEach items="${['name','description','active']}" var="field"><tr><td><spring:message code="coav.field.${field}" /></td><td><c:choose><c:when test="${empty v.before}">—</c:when><c:when test="${field=='active'}"><span data-resource-status="${v.before.active?'ACTIVE':'INACTIVE'}"><spring:message code="accounting.active.${v.before.active}" /></span></c:when><c:otherwise><c:out value="${v.before[field]}" /></c:otherwise></c:choose></td><td><c:choose><c:when test="${field=='active'}"><span data-resource-status="${v.proposed.active?'ACTIVE':'INACTIVE'}"><spring:message code="accounting.active.${v.proposed.active}" /></span></c:when><c:otherwise><c:out value="${v.proposed[field]}" /></c:otherwise></c:choose></td></tr></c:forEach>
+  <c:forEach items="${['cashSection','equityComponent','note','noteText']}" var="setting">
+   <c:if test="${not empty v.before.reporting[setting] or not empty v.proposed.reporting[setting]}">
+    <tr><td><spring:message code="coa.${setting}" /></td>
+     <c:forEach items="${[v.before.reporting,v.proposed.reporting]}" var="setup">
+      <td><c:choose>
+       <c:when test="${setting=='cashSection' and not empty setup.cashSection}"><spring:message code="fs.section.${setup.cashSection}" /></c:when>
+       <c:otherwise><c:out value="${setup[setting]}" /></c:otherwise>
+      </c:choose></td>
+     </c:forEach>
+    </tr>
+   </c:if>
+  </c:forEach>
  </tbody></table></div></section>
  <section class="erp-table-wrap" data-resource-table="account-version-history" data-table-page-param="historyPage"><div class="app-table-titlebar"><h2><spring:message code="coav.history" /></h2></div><div class="erp-table-scroll"><table class="erp-table"><thead><tr><th data-table-order="number"><spring:message code="coav.column.number" /></th><th data-table-order="state"><spring:message code="coa.status" /></th><th data-table-order="name"><spring:message code="coav.column.name" /></th><th data-table-order="creator"><spring:message code="coav.column.creator" /></th></tr></thead><tbody>
   <c:forEach items="${details.history}" var="h"><tr><td><a class="resource-table-id-link" href="<c:url value='/finance/accounts/versions/${h.id}' />"><c:out value="${h.number}" /></a></td><td><span data-resource-status="${h.state}"><spring:message code="coav.state.${h.state}" /></span><c:if test="${h.id==details.currentId}"> · <spring:message code="coav.current" /></c:if></td><td><c:out value="${h.proposed.name}" /></td><td><c:out value="${h.creatorName}" /></td></tr></c:forEach>

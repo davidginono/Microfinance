@@ -47,7 +47,7 @@ public class StatementService {
         UUID id=UUID.randomUUID();var now=clock.now();repository.create(id,a,p,now,key);
         require(repository.capture(id,a,p,now)<=100000,"limit");var balances=repository.balances(id,a.getSaccoId(),p);require(balances.size()<=2000,"limit");
         var cash=repository.cash(id,p);require(cash.size()<=20000,"limit");var calculated=StatementCalculator.calculate(balances,cash,p);var identity=repository.identity(a);
-        var snapshot=new Snapshot(1,id,p,now,a.getSaccoId(),a.getStationId(),identity[0],identity[1],balances,calculated.position(),calculated.income(),calculated.cash(),calculated.equityColumns(),calculated.equity(),calculated.checks());
+        var snapshot=new Snapshot(2,id,p,now,a.getSaccoId(),a.getStationId(),identity[0],identity[1],balances,calculated.position(),calculated.income(),calculated.cash(),calculated.equityColumns(),calculated.equity(),calculated.checks());
         String payload=mapper.writeValueAsString(snapshot);require(payload.length()<=8*1024*1024,"limit");repository.payload(id,payload,sha(payload.getBytes(StandardCharsets.UTF_8)));
         log(a,id,"PREVIEW");return id;
     }
@@ -55,22 +55,12 @@ public class StatementService {
     public Run get(AppUserPrincipal a,UUID id){
         authorize(a,false);var stored=repository.find(id,a).orElseThrow(()->new AccessDeniedException("Statement unavailable"));authorize(a,stored.wide());
         if(stored.payload()==null||!sha(stored.payload().getBytes(StandardCharsets.UTF_8)).equals(stored.checksum()))throw new IllegalStateException("Statement integrity check failed");
-        var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require(snapshot.version()==1&&snapshot.id().equals(id),"snapshot");
+        var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require((snapshot.version()==1||snapshot.version()==2)&&snapshot.id().equals(id),"snapshot");
         return new Run(id,stored.from(),stored.through(),stored.generated(),stored.wide(),stored.saved(),snapshot);
     }
     @Transactional(readOnly=true)
     public List<StatementRepository.Stored> history(AppUserPrincipal a,int page,String sort){authorize(a,false);page(page);require(Set.of("newest","oldest","from","from_desc","through","through_desc","status","status_desc").contains(sort),"filter");boolean wide=false;try{access.requireActor(a,"FINANCIAL_REPORTS_INSTITUTION");wide=true;}catch(AccessDeniedException unavailable){/* Hide institution runs when the current grant is absent or revoked. */}return repository.history(a,page,sort,wide);}
     @Transactional public void save(AppUserPrincipal a,UUID id){var run=get(a,id);repository.save(id,a,clock.now());log(a,id,"SAVE_SNAPSHOT");}
-    @Transactional(readOnly=true) public List<MappingRow> mappings(AppUserPrincipal a,String search,int page,String sort,String direction){authorize(a,false);page(page);require(search!=null&&search.length()<=100,"filter");return repository.mappings(a.getSaccoId(),search,page,sort,direction);}
-    @Transactional(readOnly=true) public MappingRow mapping(AppUserPrincipal a,UUID id){authorize(a,false);return repository.account(a.getSaccoId(),id).orElseThrow(()->new AccessDeniedException("Account unavailable"));}
-    @Transactional(readOnly=true) public UUID revision(AppUserPrincipal a,UUID id){return mapping(a,id).revision();}
-    @Transactional public void map(AppUserPrincipal a,Mapping m,UUID expected){
-        authorize(a,false);access.requireActor(a,"ACCOUNTING_ACCOUNTS_UPDATE");var account=mapping(a,m.accountId());
-        safe(m.line(),160,false);safe(m.equityComponent(),100,true);safe(m.noteText(),2000,true);
-        require(SECTIONS.contains(m.section())&&!"UNCLASSIFIED".equals(m.section())&&CASH_SECTIONS.contains(m.cashSection())&&m.note()>=0&&m.note()<=999,"mapping");
-        require(switch(account.type()){case "ASSET"->Set.of("CURRENT_ASSETS","NON_CURRENT_ASSETS").contains(m.section());case "LIABILITY"->Set.of("CURRENT_LIABILITIES","NON_CURRENT_LIABILITIES").contains(m.section());default->account.type().equals(m.section());},"mapping");
-        require(repository.map(a,m,expected,clock.now())==1,"conflict");log(a,m.accountId(),"MAP");
-    }
     public List<Balance> selected(Snapshot s,Kind kind,String line){
         if(line==null||line.isBlank())return s.balances();
         List<Row> rows=switch(kind){case POSITION->s.position();case INCOME->s.income();case CASH_FLOW->s.cashFlow();default->throw new IllegalArgumentException("fs.error.selection");};
@@ -87,6 +77,5 @@ public class StatementService {
     public static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
     private void log(AppUserPrincipal a,UUID id,String action){audit.log("STATEMENT",id,action,a.getMemberId(),null,Map.of("saccoId",a.getSaccoId(),"stationId",a.getStationId()));}
     private static void page(int page){require(page>=0&&page<=10000,"filter");}
-    private static void safe(String value,int max,boolean blank){require(value!=null&&value.length()<=max&&(blank||!value.isBlank())&&value.chars().noneMatch(c->Character.isISOControl(c)&&c!='\n'&&c!='\r'),"mapping");}
     private static void require(boolean condition,String key){if(!condition)throw new IllegalArgumentException("fs.error."+key);}
 }

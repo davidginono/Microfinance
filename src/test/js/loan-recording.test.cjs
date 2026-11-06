@@ -3,6 +3,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 
+test('changing a lookup context resets its search and ignores the previous response',async()=>{
+  const dom=new JSDOM('<label data-loan-choice data-choice-url="/reports/financial/operations/cashbook/choices/accounts"><select data-choice-select><option value="">All</option></select><span data-choice-error data-search-label="Search" data-error="Lookup failed"></span></label>',{url:'http://localhost/',runScripts:'outside-only'});
+  const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button'),calls=[];let resolveOld;
+  w.NeoSelect={search:()=>({input,more,setLoading:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
+  w.fetch=url=>{calls.push(url);return calls.length===1?new Promise(resolve=>resolveOld=resolve):Promise.resolve({ok:true,redirected:false,json:async()=>[{id:'new',label:'New group account'}]});};
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  const select=w.document.querySelector('select');input.value='Old search';select.closest('label').dataset.choiceUrl+='?groupId=new-group';select.dispatchEvent(new w.Event('choice:reload'));
+  await new Promise(resolve=>setImmediate(resolve));
+  resolveOld({ok:true,redirected:false,json:async()=>[{id:'old',label:'Old group account'}]});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(input.value,'');assert.equal(new URL(calls[1],'http://localhost').searchParams.get('groupId'),'new-group');
+  assert.deepEqual([...select.options].map(option=>option.value),['','new']);dom.window.close();
+});
+
 test('shared confirmation does not lock the accepted teller submission',()=>{
   const dom=new JSDOM('<form data-loan-form><button type="submit">Disburse</button></form>',{runScripts:'outside-only'});
   const w=dom.window,form=w.document.querySelector('form');let confirmed=false;

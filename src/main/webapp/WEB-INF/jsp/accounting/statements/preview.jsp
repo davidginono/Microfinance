@@ -33,7 +33,6 @@
  <c:if test="${fn:length(snapshot.checks)>1}"><details class="erp-panel fs-checks"><summary><spring:message code="fs.checks" /></summary><ul><c:forEach items="${snapshot.checks}" var="check"><c:if test="${check.key!='coverage'}"><li><spring:message code="fs.check.${check.key}" /><c:if test="${not empty check.difference}"> <spring:message code="fs.difference" />: TZS <c:out value="${check.difference}" /></c:if></li></c:if></c:forEach></ul></details></c:if>
  </div>
  <div class="fs-preview-footer">
- <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" class="accounting-actions fs-package"><input type="hidden" name="kind" value="ALL" /><button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.packagePdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.packageExcel" /></button></form></sec:authorize>
  <c:if test="${not run.saved}"><form class="fs-save-report" data-fs-save method="post" action="<c:url value='${base}/save' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="kind" value="${kind}" /><button class="app-btn btn-launch"><spring:message code="common.savedraft" /></button></form></c:if>
  </div>
 </div>

@@ -25,9 +25,24 @@ class ManagementReportTest {
     }
     @Test void reportDatesAndCountsAreBoundedAndCannotClaimFutureKnowledge(){
         var p=parameters(0);ManagementReportService.validate(p,DAY,NOW);
-        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY.minusDays(367),DAY,NOW,null,null,"","",0),DAY,NOW)).hasMessage("management.error.parameters");
-        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY,DAY,NOW.plusSeconds(1),null,null,"","",0),DAY,NOW)).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY.minusDays(367),DAY,NOW,null,List.of(),null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY,DAY,NOW.plusSeconds(1),null,List.of(),null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
         assertThatThrownBy(()->ManagementReportService.validate(parameters(-1),DAY,NOW)).hasMessage("management.error.parameters");
+    }
+    @Test void selectorsKeepReportClaimsAndRejectAccountsOutsideTheSelectedGroup(){
+        var repository=org.mockito.Mockito.mock(ManagementReportRepository.class);
+        var guard=org.mockito.Mockito.mock(com.sacco.mvp.accounting.service.GeneralLedgerService.class);
+        var actor=org.mockito.Mockito.mock(com.sacco.mvp.security.AppUserPrincipal.class);
+        var service=new ManagementReportService(repository,guard,org.mockito.Mockito.mock(com.sacco.mvp.service.ApplicationClock.class),new ReportExportLimiter(1));
+        UUID group=UUID.randomUUID(),account=UUID.randomUUID();
+        org.mockito.Mockito.when(repository.accounts(actor,Kind.CASHBOOK,group,"",0,List.of(account))).thenReturn(List.of());
+        assertThatThrownBy(()->service.selectedAccounts(actor,Kind.CASHBOOK,group,List.of(account))).hasMessage("management.error.account");
+        org.mockito.Mockito.verify(guard).requireActor(actor,"FINANCIAL_REPORTS_VIEW");
+        org.mockito.Mockito.verify(guard).requireActor(actor,"ACCOUNTING_JOURNALS_VIEW");
+        org.mockito.Mockito.verify(guard,org.mockito.Mockito.never()).requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");
+        assertThatThrownBy(()->service.choices(actor,Kind.CASHBOOK,"clients",null,"x".repeat(101),0)).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->service.selectedAccounts(actor,Kind.CASHBOOK,null,Collections.nCopies(21,account))).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->service.selectedClient(actor,Kind.CASHBOOK,UUID.randomUUID())).hasMessage("management.error.client");
     }
     @Test void pdfAndPrintDefinitionsRetainAllReferenceColumnsAndBilingualTotals()throws Exception {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
@@ -40,7 +55,7 @@ class ManagementReportTest {
                 rows.add(row);
             }
             var group=new Group(rows.getFirst().get("groupName").toString(),rows.size(),totals);
-            var result=new Result(kind,parameters(0),"Synthetic reference institution","Main branch",columns,rows,List.of(group),totals,60,0,false,"110101 — 110199");
+            var result=new Result(kind,parameters(0),"Synthetic reference institution","Main branch",columns,rows,List.of(group),totals,60,0,false,"111000 Cash and bank","");
             byte[] bytes=exporter.build(result,Locale.forLanguageTag(language));
             try(var doc=Loader.loadPDF(bytes)){
                 String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.40");
@@ -51,7 +66,7 @@ class ManagementReportTest {
             if(Boolean.getBoolean("microfinance.management.samples")){var folder=java.nio.file.Path.of("target/management-reference-previews");java.nio.file.Files.createDirectories(folder);java.nio.file.Files.write(folder.resolve(kind+"-"+language+".pdf"),bytes);}
         }
     }
-    @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
+    @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"","");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
     static BudgetForm budget(){var f=new BudgetForm();f.setAccountId(UUID.randomUUID());f.setDate(DAY);f.setYear(2027);f.setAmounts(new ArrayList<>(Collections.nCopies(12,new BigDecimal("10.01"))));return f;}
-    static Parameters parameters(int page){return new Parameters(DAY.withDayOfMonth(1),DAY,NOW,null,null,"","",page);}
+    static Parameters parameters(int page){return new Parameters(DAY.withDayOfMonth(1),DAY,NOW,null,List.of(),null,"",page);}
 }

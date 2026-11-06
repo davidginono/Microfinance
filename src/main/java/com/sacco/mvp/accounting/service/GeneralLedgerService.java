@@ -101,7 +101,7 @@ public class GeneralLedgerService {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");
         var roots=books.chartRoots(actor.getSaccoId());
         roots.forEach(this::validateChartRoot);
-        return roots.size()<ROOT_TYPES.size();
+        return roots.size()<ROOT_TYPES.size() || books.reportingDefaultsMissing(actor.getSaccoId());
     }
     /** Fixed non-posting defaults grant no permission to create institution-specific accounts. */
     @Transactional
@@ -125,6 +125,22 @@ public class GeneralLedgerService {
                 persistAccount(actor,new AccountCommand(code,ROOT_NAMES.get(index),type,normalBalance(type),"HEADING","OTHER",null,ROOT_NAMES_SW.get(index),null));
             }
         }
+        String[] codes={"110000","120000","210000","220000"};
+        String[] names={"Current assets","Non-current assets","Current liabilities","Non-current liabilities"};
+        String[] sw={"Mali za muda mfupi","Mali za muda mrefu","Madeni ya muda mfupi","Madeni ya muda mrefu"};
+        String[] roles={"CURRENT_ASSETS","NON_CURRENT_ASSETS","CURRENT_LIABILITIES","NON_CURRENT_LIABILITIES"};
+        for(int i=0;i<codes.length;i++) {
+            String type=i<2?"ASSET":"LIABILITY";var parent=books.accountCode(actor.getSaccoId(),i<2?"100000":"200000").orElseThrow();
+            var account=books.accountCode(actor.getSaccoId(),codes[i]);
+            if(account.isEmpty()) {
+                require(!books.pendingCode(actor.getSaccoId(),codes[i]),"mainGroupConflict");
+                UUID id=persistAccount(actor,new AccountCommand(codes[i],names[i],type,normalBalance(type),"HEADING","OTHER",parent.id(),sw[i],null));
+                account=books.account(actor.getSaccoId(),id);
+            }
+            var a=account.orElseThrow();
+            require(a.active() && a.kind().equals("HEADING") && a.type().equals(type) && Objects.equals(a.parentId(),parent.id()) && a.normalBalance().equals(normalBalance(type)),"mainGroupConflict");
+            if(books.reportingRole(actor.getSaccoId(),a.id(),roles[i]))event(actor,a.id(),"REPORTING_SECTION_PROVISIONED",Map.of("section",roles[i]));
+        }
     }
     @Transactional
     public UUID onboardAccount(AppUserPrincipal actor,AccountOnboardingForm form,boolean group) {
@@ -143,7 +159,7 @@ public class GeneralLedgerService {
         String kind=group?"HEADING":form.getKind(),purpose=group?"OTHER":form.getPurpose();
         require(group || "POSTING".equals(kind),"accountClassification");
         require(group || Set.of("DEBIT","CREDIT").contains(form.getNormalBalance()) && PURPOSES.contains(purpose),"accountClassification");
-        var command=new AccountCommand(code,trim(form.getName()),parent.type(),group?normalBalance(parent.type()):form.getNormalBalance(),kind,purpose,parent.id(),trim(form.getNameSw()),trim(form.getDescription()));
+        var command=new AccountCommand(code,trim(form.getName()),parent.type(),group?normalBalance(parent.type()):form.getNormalBalance(),kind,purpose,parent.id(),trim(form.getNameSw()),trim(form.getDescription()),reporting(form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText()));
         return createAccountVersion(actor,command,form.getRequestKey(),trim(form.getReason()),complete);
     }
     private Account onboardingParent(AppUserPrincipal actor,UUID id,boolean groups) {
@@ -163,6 +179,12 @@ public class GeneralLedgerService {
         }
         require(ROOT_TYPES.get(Integer.parseInt(node.code().substring(0,1))-1).equals(parent.type()),"chartParent");
         return parent;
+    }
+    private static Reporting reporting(String cash,String equity,Integer note,String text) {
+        cash=trim(cash);equity=trim(equity);text=trim(text);
+        require(Set.of("","OPERATING","INVESTING","FINANCING","UNCLASSIFIED").contains(cash) && equity.length()<=100 && text.length()<=2000 && (note==null || note>=0 && note<=999),"reporting");
+        require(equity.chars().noneMatch(Character::isISOControl) && text.chars().noneMatch(c->Character.isISOControl(c)&&c!='\n'&&c!='\r'),"reporting");
+        return cash.isEmpty() && equity.isEmpty() && note==null && text.isEmpty()?null:new Reporting(cash,equity,note,text);
     }
     private static String normalBalance(String type) {return Set.of("ASSET","EXPENSE").contains(type)?"DEBIT":"CREDIT";}
     private static String trim(String value) {return value==null?"":value.strip();}
@@ -200,6 +222,7 @@ public class GeneralLedgerService {
         text(c.name(),160,"name");
         require(c.nameSw()==null || c.nameSw().length()<=160,"nameSw");
         require(c.description()==null || c.description().length()<=500,"description");
+        if(c.reporting()!=null)require(Objects.equals(c.reporting(),reporting(c.reporting().cashSection(),c.reporting().equityComponent(),c.reporting().note(),c.reporting().noteText())),"reporting");
         require(TYPES.contains(c.type()) && Set.of("DEBIT","CREDIT").contains(c.normalBalance()) && KINDS.contains(c.kind()) && PURPOSES.contains(c.purpose()),"accountClassification");
         if(c.parentId()!=null) {
             Account parent=books.account(actor.getSaccoId(),c.parentId()).orElseThrow(()->invalid("parent"));
@@ -226,7 +249,7 @@ public class GeneralLedgerService {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");return books.currentVersion(actor.getSaccoId(),account).orElseThrow(()->invalid("account"));
     }
     public static EditForm metadataForm(Account a) {
-        var f=new EditForm();f.setName(a.name());f.setNameSw(a.nameSw());f.setDescription(a.description());return f;
+        var f=new EditForm();f.setName(a.name());f.setNameSw(a.nameSw());f.setDescription(a.description());if(a.reporting()!=null){f.setCashSection(a.reporting().cashSection());f.setEquityComponent(a.reporting().equityComponent());f.setNote(a.reporting().note());f.setNoteText(a.reporting().noteText());}return f;
     }
     @Transactional(readOnly=true)
     public Policy accountApprovalPolicy(AppUserPrincipal actor) {
@@ -254,7 +277,7 @@ public class GeneralLedgerService {
         var prior=books.versionRequest(actor.getSaccoId(),key);
         if(prior.isPresent()) {require(prior.get().creator().equals(actor.getMemberId()) && Objects.equals(prior.get().branch(),actor.getStationId()) && prior.get().requestHash().equals(hash),"versionRetry");return prior.get().id();}
         require(books.accountCode(actor.getSaccoId(),c.code()).isEmpty(),"duplicate");
-        UUID account=UUID.randomUUID();var a=new Account(account,c.code(),c.name(),c.type(),c.normalBalance(),c.kind(),c.purpose(),c.parentId(),true,c.nameSw(),c.description());
+        UUID account=UUID.randomUUID();var a=new Account(account,c.code(),c.name(),c.type(),c.normalBalance(),c.kind(),c.purpose(),c.parentId(),true,c.nameSw(),c.description(),c.reporting());
         var v=newDraft(actor,account,null,"CREATE",null,a,key,hash);
         books.createVersion(actor.getSaccoId(),v);
         return productProvision?saveVersionDraft(actor,v,versionForm(a,reason,0),complete):saveAccountVersion(actor,v.id(),versionForm(a,reason,0),complete);
@@ -263,14 +286,14 @@ public class GeneralLedgerService {
     public UUID proposeAccountVersion(AppUserPrincipal actor,UUID account,UUID base,String operation,UUID key,EditForm form,boolean complete) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");books.lockAccounts(actor.getSaccoId());
         require(Set.of("UPDATE","DEACTIVATE","REACTIVATE").contains(operation) && key!=null,"versionInput");
-        String hash=requestHash(Arrays.asList(account,base,operation,form.getName(),form.getDescription(),form.getReason(),complete));
+        String hash=requestHash(Arrays.asList(account,base,operation,form.getName(),form.getDescription(),form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText(),form.getReason(),complete));
         var prior=books.versionRequest(actor.getSaccoId(),key);
         if(prior.isPresent()) {require(prior.get().creator().equals(actor.getMemberId()) && Objects.equals(prior.get().branch(),actor.getStationId()) && prior.get().requestHash().equals(hash),"versionRetry");return prior.get().id();}
         var current=books.currentVersion(actor.getSaccoId(),account).orElseThrow(()->invalid("account"));
         require(current.id().equals(base),"versionStale");require(!books.openVersion(actor.getSaccoId(),account),"versionOpen");
-        var a=current.proposed();var proposed=new Account(a.id(),a.code(),a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),operation.equals("REACTIVATE") || !operation.equals("DEACTIVATE") && a.active(),a.nameSw(),a.description());
+        var a=current.proposed();var proposed=new Account(a.id(),a.code(),a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),operation.equals("REACTIVATE") || !operation.equals("DEACTIVATE") && a.active(),a.nameSw(),a.description(),a.reporting());
         var v=newDraft(actor,account,base,operation,a,proposed,key,hash);books.createVersion(actor.getSaccoId(),v);
-        return saveAccountVersion(actor,v.id(),versionForm(operation.equals("UPDATE")?new Account(a.id(),a.code(),form.getName(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),form.getDescription()):proposed,form.getReason(),0),complete);
+        return saveAccountVersion(actor,v.id(),versionForm(operation.equals("UPDATE")?new Account(a.id(),a.code(),form.getName(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),form.getDescription(),reporting(form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText())):proposed,form.getReason(),0),complete);
     }
     private Version newDraft(AppUserPrincipal actor,UUID account,UUID base,String op,Account before,Account proposed,UUID key,String hash) {
         return new Version(UUID.randomUUID(),account,books.nextVersion(actor.getSaccoId(),account),base,op,"DRAFT",before,proposed,actor.getMemberId(),"",actor.getStationId(),"",0,0,"DRAFT",null,null,"",clock.now(),null,null,key,hash);
@@ -280,13 +303,13 @@ public class GeneralLedgerService {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");books.lockAccounts(actor.getSaccoId());var old=findVersion(actor,id);
         require(owner(actor,old) && Set.of("REJECTED","WITHDRAWN").contains(old.state()),"versionTransition");
         requireActor(actor,old.operation().equals("CREATE")?"ACCOUNTING_ACCOUNTS_CREATE":"ACCOUNTING_ACCOUNTS_UPDATE");
-        String hash=requestHash(Arrays.asList(id,form.getName(),form.getDescription(),form.getReason(),complete));
+        String hash=requestHash(Arrays.asList(id,form.getName(),form.getDescription(),form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText(),form.getReason(),complete));
         var prior=books.versionRequest(actor.getSaccoId(),key);if(prior.isPresent()){require(owner(actor,prior.get()) && prior.get().requestHash().equals(hash),"versionRetry");return prior.get().id();}
         require(key!=null && !books.openVersion(actor.getSaccoId(),old.accountId()),"versionOpen");
         var current=books.currentVersion(actor.getSaccoId(),old.accountId());var before=current.map(Version::proposed).orElse(null);
         require(old.operation().equals("CREATE")?current.isEmpty():current.isPresent(),"versionStale");
         var source=old.proposed();var a=before==null?source:before;
-        var proposed=new Account(a.id(),a.code(),source.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),old.operation().equals("REACTIVATE") || !old.operation().equals("DEACTIVATE") && a.active(),source.nameSw(),source.description());
+        var proposed=new Account(a.id(),a.code(),source.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),old.operation().equals("REACTIVATE") || !old.operation().equals("DEACTIVATE") && a.active(),source.nameSw(),source.description(),source.reporting());
         var v=newDraft(actor,old.accountId(),current.map(Version::id).orElse(null),old.operation(),before,proposed,key,hash);books.createVersion(actor.getSaccoId(),v);
         form.setRevision(0);return saveAccountVersion(actor,v.id(),form,complete);
     }
@@ -301,7 +324,7 @@ public class GeneralLedgerService {
         require(owner(actor,v) && v.state().equals("DRAFT"),"versionTransition");require(v.revision()==form.getRevision(),"versionStale");
         require(form.getReason()!=null && form.getReason().length()<=500 && form.getName()!=null && form.getName().length()<=160 && (form.getDescription()==null || form.getDescription().length()<=500),"versionInput");
         var a=v.proposed();boolean metadata=Set.of("CREATE","UPDATE").contains(v.operation());
-        var proposed=new Account(a.id(),a.code(),metadata?trim(form.getName()):a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),metadata?trim(form.getDescription()):a.description());
+        var proposed=new Account(a.id(),a.code(),metadata?trim(form.getName()):a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),metadata?trim(form.getDescription()):a.description(),metadata?reporting(form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText()):a.reporting());
         books.saveVersionDraft(actor.getSaccoId(),v,proposed,trim(form.getReason()));v=books.version(actor.getSaccoId(),id).orElseThrow();
         versionEvent(actor,v,"DRAFT_SAVED",v.reason());
         if(complete) {
@@ -343,9 +366,9 @@ public class GeneralLedgerService {
             if(a.code().matches("[1-5][0-9]{5}"))onboardingParent(actor,a.parentId(),a.kind().equals("HEADING"));
         } else {
             require(current.isPresent() && current.get().id().equals(v.baseId()),"versionStale");
-            if(v.operation().equals("DEACTIVATE")) {require(!mainGroup(a),"mainGroupProtected");require(current.get().proposed().active(),"versionTransition");require(!books.activeChildren(actor.getSaccoId(),a.id()),"activeChildren");}
+            if(v.operation().equals("DEACTIVATE")) {require(!mainGroup(a) && !books.standardReportingGroup(actor.getSaccoId(),a.id()),"mainGroupProtected");require(current.get().proposed().active(),"versionTransition");require(!books.activeChildren(actor.getSaccoId(),a.id()),"activeChildren");}
             if(v.operation().equals("REACTIVATE"))require(!current.get().proposed().active(),"versionTransition");
-            if(v.operation().equals("UPDATE"))require(!trim(a.name()).equals(trim(v.before().name())) || !trim(a.nameSw()).equals(trim(v.before().nameSw())) || !trim(a.description()).equals(trim(v.before().description())),"versionUnchanged");
+            if(v.operation().equals("UPDATE"))require(!trim(a.name()).equals(trim(v.before().name())) || !trim(a.nameSw()).equals(trim(v.before().nameSw())) || !trim(a.description()).equals(trim(v.before().description())) || !Objects.equals(a.reporting(),v.before().reporting()),"versionUnchanged");
         }
     }
     @Transactional

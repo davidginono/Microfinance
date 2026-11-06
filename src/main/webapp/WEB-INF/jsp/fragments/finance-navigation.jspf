@@ -129,7 +129,6 @@
                 </c:forEach>
                 <a href="<c:url value='/reports/financial/statements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/reports/financial/statements' ? 'shell-nav-active' : ''}"><spring:message code="fs.workspace" /></a>
                 <a href="<c:url value='/reports/financial/statements/history' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/history') ? 'shell-nav-active' : ''}"><spring:message code="fs.history" /></a>
-                <a href="<c:url value='/reports/financial/statements/mappings' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/mappings') ? 'shell-nav-active' : ''}"><spring:message code="fs.mappings" /></a>
                 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW')">
                     <a href="<c:url value='/reports/financial/portfolio/configure' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/reports/financial/portfolio') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="financial.portfolio.menu" /></a>
                 </sec:authorize>

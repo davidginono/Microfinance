@@ -6,14 +6,12 @@ import java.util.*;
 
 public final class StatementModels {
     private StatementModels() {}
-    public enum Kind { POSITION, INCOME, CASH_FLOW, EQUITY, NOTES, TRIAL, LEDGER, ALL }
-    public static final Set<String> SECTIONS=Set.of("CURRENT_ASSETS","NON_CURRENT_ASSETS","CURRENT_LIABILITIES","NON_CURRENT_LIABILITIES","EQUITY","INCOME","EXPENSE","UNCLASSIFIED");
-    public static final Set<String> CASH_SECTIONS=Set.of("OPERATING","INVESTING","FINANCING","UNCLASSIFIED");
+    public enum Kind { POSITION, INCOME, CASH_FLOW, EQUITY, NOTES, TRIAL, LEDGER }
     public record Parameters(LocalDate from,LocalDate through,boolean institutionWide) {
         public LocalDate previousFrom(){return from.minusYears(1);}
         public LocalDate previousThrough(){return through.minusYears(1);}
     }
-    public record Mapping(UUID accountId,String line,String section,String cashSection,String equityComponent,int note,String noteText) {}
+    public record Mapping(UUID accountId,String line,String section,String cashSection,String equityComponent,int note,String noteText,UUID groupId,String groupCode) {}
     public record Balance(UUID id,String code,String name,String type,String purpose,Mapping mapping,
                           BigDecimal opening,BigDecimal debit,BigDecimal credit,BigDecimal closing,
                           BigDecimal previousOpening,BigDecimal previousDebit,BigDecimal previousCredit,BigDecimal previousClosing) {
@@ -33,5 +31,4 @@ public final class StatementModels {
                            List<Row> cashFlow,List<String> equityColumns,List<EquityRow> equity,List<Check> checks) {}
     public record Run(UUID id,LocalDate from,LocalDate through,OffsetDateTime createdAt,boolean institutionWide,boolean saved,Snapshot snapshot) {}
     public record Activity(UUID journalId,LocalDate date,String accountNumber,String description,BigDecimal debit,BigDecimal credit,BigDecimal running,String sourceUrl) {}
-    public record MappingRow(UUID id,String code,String name,String type,String purpose,Mapping mapping,UUID revision) {}
 }

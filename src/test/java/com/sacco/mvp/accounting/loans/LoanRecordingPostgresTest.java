@@ -41,6 +41,7 @@ class LoanRecordingPostgresTest {
     static final LocalDate TODAY=LocalDate.of(2026,10,8);
     AnnotationConfigApplicationContext context;JdbcTemplate jdbc;LoanRecordingService service;LoanRepaymentLedgerService ledger;
     String institution;AppUserPrincipal actor;UUID client,product,cash,principal,interest;
+    UUID statementLoanFamily;
     com.sacco.mvp.accounting.service.LoanReceiptService receiptService(){return context.getBean(com.sacco.mvp.accounting.service.LoanReceiptService.class);}
     com.sacco.mvp.accounting.dto.VoucherDtos.Form receiptForm(UUID... ids){var f=new com.sacco.mvp.accounting.dto.VoucherDtos.Form();f.setReceiptPurpose("LOAN_REPAYMENT");f.setEffectiveDate(TODAY);f.setClientId(client);f.setMoneyAccountId(cash);f.setInterestAccountId(interest);f.setReference("GROUP-"+UUID.randomUUID());var rows=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.RowForm>();for(var id:ids){var r=new com.sacco.mvp.accounting.dto.VoucherDtos.RowForm();r.setLoanId(id);r.setAmount(new BigDecimal("120.00"));r.setDescription("Loan collection");rows.add(r);}f.setRows(rows);return f;}
     UUID disbursed(String reference){var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00",reference));return id;}
@@ -83,6 +84,12 @@ class LoanRecordingPostgresTest {
         assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);});
     }
     @Test void outstandingLoansDrillDownIncludesProductAccountsAndProvisionsAndReconcilesLoanIds(){
+        UUID root=account("100000","ASSET","DEBIT","HEADING","OTHER");
+        UUID subgroup=statementGroup(root,"110000","Current assets");statementLoanFamily=statementGroup(subgroup,"112000","Outstanding clients' loans");
+        jdbc.update("insert into gl_account_reporting_section values(?,?,'CURRENT_ASSETS')",subgroup,institution);
+        principal=account("112001","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
+        jdbc.update("update loan_product_settings set principal_gl_account_id=? where id=?",principal,product);
+
         UUID otherProduct=UUID.randomUUID();
         jdbc.update("""
             insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,
@@ -101,7 +108,6 @@ class LoanRecordingPostgresTest {
         var repository=new com.sacco.mvp.accounting.statements.repository.StatementRepository(jdbc);
         var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(LocalDate.of(2026,9,1),TODAY,false);
         var now=OffsetDateTime.now();String group="Outstanding clients' loans";
-        for(UUID account:List.of(principal,secondPrincipal,allowance))repository.map(actor,new com.sacco.mvp.accounting.statements.dto.StatementModels.Mapping(account,group,"CURRENT_ASSETS","OPERATING","",4,""),null,now);
         UUID run=UUID.randomUUID();repository.create(run,actor,period,now,UUID.randomUUID());repository.capture(run,actor,period,now);
         var balances=repository.balances(run,institution,period);var calculated=com.sacco.mvp.accounting.statements.service.StatementCalculator.calculate(balances,repository.cash(run,period),period);
         var snapshot=new com.sacco.mvp.accounting.statements.dto.StatementModels.Snapshot(1,run,period,now,institution,"B1","Synthetic institution","Branch",balances,calculated.position(),calculated.income(),calculated.cash(),calculated.equityColumns(),calculated.equity(),calculated.checks());
@@ -432,23 +438,24 @@ class LoanRecordingPostgresTest {
         var first=disbursed("D-REFERENCE-1");var second=disbursed("D-REFERENCE-2");
         var receipt=receiptService().post(actor,receiptForm(first,second));
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
-        var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY.minusMonths(1).withDayOfMonth(1),TODAY,OffsetDateTime.now().plusSeconds(1),null,null,"","",0);
-        var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false);
+        var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY.minusMonths(1).withDayOfMonth(1),TODAY,OffsetDateTime.now().plusSeconds(1),null,List.of(),null,"",0);
+        var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);
         assertThat(daily.count()).isEqualTo(4);assertThat(daily.totals().get("credit")).isEqualByComparingTo("240.00");assertThat(daily.excluded()).isZero();assertThat(daily.rows()).extracting(r->r.get("component")).containsOnly("PRINCIPAL","INTEREST");
-        var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,"","",false);
+        var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,false);
         assertThat(portfolio.count()).isEqualTo(2);assertThat(portfolio.excluded()).isZero();assertThat(portfolio.totals().get("principalBalance")).isEqualByComparingTo("1800.00");
-        var risk=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,p,"","",false);assertThat(risk.totals().get("band0")).isEqualByComparingTo("1800.00");
-        var analysis=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,"","",false);assertThat(analysis.totals().get("principalPaid")).isEqualByComparingTo("200.00");assertThat(analysis.totals().get("interestPaid")).isEqualByComparingTo("40.00");
-        var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,"","",false);assertThat(cashbook.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(cashbook.totals().get("moneyOut")).isEqualByComparingTo("2000.00");
-        assertThat(reports.read(operator("B2"),com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false).count()).isZero();
+        var risk=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,p,false);assertThat(risk.totals().get("band0")).isEqualByComparingTo("1800.00");
+        var analysis=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,false);assertThat(analysis.totals().get("principalPaid")).isEqualByComparingTo("200.00");assertThat(analysis.totals().get("interestPaid")).isEqualByComparingTo("40.00");
+        var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,false);assertThat(cashbook.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(cashbook.totals().get("moneyOut")).isEqualByComparingTo("2000.00");
+        assertThat(reports.read(operator("B2"),com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false).count()).isZero();
         receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Reference report correction");
-        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false);assertThat(corrected.count()).isEqualTo(8);assertThat(corrected.totals().get("debit")).isEqualByComparingTo("240.00");assertThat(corrected.totals().get("credit")).isEqualByComparingTo("240.00");
-        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,"","",false).totals().get("principalBalance")).isEqualByComparingTo("2000.00");
+        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(corrected.count()).isEqualTo(8);assertThat(corrected.totals().get("debit")).isEqualByComparingTo("240.00");assertThat(corrected.totals().get("credit")).isEqualByComparingTo("240.00");
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,false).totals().get("principalBalance")).isEqualByComparingTo("2000.00");
         for(int n=0;n<26;n++){var extra=receiptForm(first);extra.getRows().getFirst().setAmount(BigDecimal.ONE);receiptService().post(actor,extra);}
-        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,"","",false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("credit")).isEqualByComparingTo("266.00");
-        var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,null,"","",1);
-        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,secondPage,"","",false).rows()).hasSize((int)Math.min(26,all.count()-25));
-        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,"ZZZZ","",false).count()).isZero();
+        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("credit")).isEqualByComparingTo("266.00");
+        var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,List.of(),null,"",1);
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,secondPage,false).rows()).hasSize((int)Math.min(26,all.count()-25));
+        var noAccounts=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,List.of(UUID.randomUUID()),null,"",0);
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,noAccounts,false).count()).isZero();
     }
     @Test void accountBudgetsPreserveRevisionsScopeRetriesAndConcurrentCreation()throws Exception{
         var repo=new com.sacco.mvp.accounting.management.repository.BudgetRepository(jdbc);
@@ -805,6 +812,7 @@ class LoanRecordingPostgresTest {
     @BeforeAll void start(){context=new AnnotationConfigApplicationContext(Config.class);jdbc=context.getBean(JdbcTemplate.class);service=context.getBean(LoanRecordingService.class);ledger=context.getBean(LoanRepaymentLedgerService.class);}
     @AfterAll void stop(){if(context!=null)context.close();}
     @BeforeEach void fixture(){
+        statementLoanFamily=null;
         reset(context.getBean(AuditService.class),context.getBean(MemberDirectoryService.class),context.getBean(UserClaimService.class),context.getBean(SaccoRegistryService.class));
         institution="LR-"+UUID.randomUUID().toString().toUpperCase(java.util.Locale.ROOT);jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,'Synthetic loan institution',true,now(),now())",institution);
         for(String branch:List.of("B1","B2"))jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,access_status,created_at,updated_at) values(?,?,?,true,'ACTIVE',now(),now())",UUID.randomUUID(),institution,branch);
@@ -1077,7 +1085,8 @@ class LoanRecordingPostgresTest {
     }
     RecordForm form(){var f=new RecordForm();f.setClientId(client);f.setProductId(product);f.setApplicationDate(LocalDate.of(2026,9,1));f.setFirstPaymentDate(LocalDate.of(2026,10,1));f.setMonths(1);f.setRequestedPrincipal(new BigDecimal("1000.00"));f.setPrincipal(new BigDecimal("1000.00"));f.setPurpose("Business stock");return f;}
     PostForm post(UUID loan,String amount,String reference){var f=new PostForm();f.setLoanId(loan);f.setAmount(new BigDecimal(amount));f.setEffectiveDate(reference.startsWith("D")?LocalDate.of(2026,9,1):TODAY);f.setMoneyAccountId(cash);f.setPrincipalAccountId(principal);f.setReference(reference);return f;}
-    UUID account(String code,String type,String normal,String kind,String purpose){var id=UUID.randomUUID();jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at) values(?,?,?,?,?,?,?,?,?,now())",id,institution,code,code,type,normal,kind,purpose,actor.getMemberId());return id;}
+    UUID statementGroup(UUID parent,String code,String name){UUID id=UUID.randomUUID();jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at) values(?,?,?,?,'ASSET','DEBIT','HEADING','OTHER',?,?,now())",id,institution,code,name,parent,actor.getMemberId());return id;}
+    UUID account(String code,String type,String normal,String kind,String purpose){var id=UUID.randomUUID();UUID parent=statementLoanFamily!=null && Set.of("LOAN_PRINCIPAL","ALLOWANCE").contains(purpose)?statementLoanFamily:null;jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at) values(?,?,?,?,?,?,?,?,?,?,now())",id,institution,code,code,type,normal,kind,purpose,parent,actor.getMemberId());return id;}
     AppUserPrincipal operator(String branch){var id=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,is_member,staff_access_status,password_hash,created_at) values(?,?,?,?, 'Synthetic accountant','ACTIVE','ACCOUNTANT',false,'ACTIVE','test-only',now())",id,institution,branch,id.toString());var member=Member.builder().id(id).saccoId(institution).stationId(branch).memberNo(id.toString()).fullName("Synthetic accountant").status(MemberStatus.ACTIVE).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).build();when(context.getBean(MemberDirectoryService.class).find(id)).thenReturn(Optional.of(member));return new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);}
     @Configuration(proxyBeanMethods=false) @EnableTransactionManagement @EnableJpaRepositories(basePackages="com.sacco.mvp.repository")
     static class Config {

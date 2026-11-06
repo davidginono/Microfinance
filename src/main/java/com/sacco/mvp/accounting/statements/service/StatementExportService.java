@@ -22,8 +22,8 @@ public class StatementExportService {
     private final StatementPresentation presentation;
     private final ReportExportLimiter limiter;
     private final ApplicationClock clock;
-    public byte[] export(Snapshot snapshot,List<Document> documents,String format,Locale locale){
-        return limiter.run(()->{try{return format.equals("PDF")?pdf(snapshot,documents,locale):excel(snapshot,documents,locale);}catch(IOException e){throw new IllegalStateException("Statement document could not be generated",e);}});
+    public byte[] export(Snapshot snapshot,Document doc,String format,Locale locale){
+        return limiter.run(()->{try{return format.equals("PDF")?pdf(snapshot,doc,locale):excel(snapshot,doc,locale);}catch(IOException e){throw new IllegalStateException("Statement document could not be generated",e);}});
     }
     private List<String> context(Snapshot s,Document document,Locale locale){
         var result=new ArrayList<String>();result.add(s.institutionName()+" | "+(s.parameters().institutionWide()?label("fs.institutionScope",locale):s.branchName()));
@@ -31,10 +31,9 @@ public class StatementExportService {
         result.add(label("fs.previous",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().previousFrom())+" — "+com.sacco.mvp.service.ApplicationTimestamps.date(s.parameters().previousThrough()));
         result.add(label("fs.generated",locale)+": "+clock.zoned(s.generatedAt()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm z",locale)));return result;
     }
-    private byte[] pdf(Snapshot s,List<Document> documents,Locale locale)throws IOException{
+    private byte[] pdf(Snapshot s,Document doc,Locale locale)throws IOException{
         try(var pdf=new PDDocument();var fontStream=new ClassPathResource("report-fonts/NotoSans-Regular.ttf").getInputStream();var bytes=new ByteArrayOutputStream()){
             var font=PDType0Font.load(pdf,fontStream);
-            for(var doc:documents){
                 var style=switch(doc.style()){case "trial"->AccountingPdfDocument.Style.TRIAL;case "equity"->AccountingPdfDocument.Style.EQUITY;default->AccountingPdfDocument.Style.STATEMENT;};
                 try(var page=new AccountingPdfDocument(pdf,font,doc.columns().size()>5||doc.style().equals("equity"),doc.title().toUpperCase(locale),context(s,doc,locale),null,style)){
                     float[] weights=new float[doc.columns().size()];boolean[] numeric=new boolean[weights.length];for(int i=0;i<weights.length;i++){weights[i]=doc.columns().get(i).weight();numeric[i]=doc.columns().get(i).numeric();}
@@ -43,14 +42,12 @@ public class StatementExportService {
                     for(var row:doc.rows())if(row.heading())page.section(row.cells().stream().map(Cell::text).filter(t->!t.isBlank()).findFirst().orElse(""));else page.row(row.cells().stream().map(Cell::text).toList(),row.total());
                     page.endTable();page.text(label("fs.outputNotice",locale));
                 }
-            }
             pdf.save(bytes);return bytes.toByteArray();
         }
     }
-    private byte[] excel(Snapshot s,List<Document> documents,Locale locale)throws IOException{
+    private byte[] excel(Snapshot s,Document doc,Locale locale)throws IOException{
         try(var book=new XSSFWorkbook();var bytes=new ByteArrayOutputStream()){
-            for(var doc:documents){
-                String name=doc.title().replaceAll("[\\\\/?*\\[\\]:]"," ");if(name.length()>28)name=name.substring(0,28);String base=name;int suffix=1;while(book.getSheet(name)!=null)name=base+suffix++;
+                String name=doc.title().replaceAll("[\\\\/?*\\[\\]:]"," ");if(name.length()>28)name=name.substring(0,28);
                 var sheet=book.createSheet(name);int count=doc.columns().size(),rowNo=0;
                 var normal=book.createCellStyle();var font=book.createFont();font.setFontName(switch(doc.style()){case "trial"->"Times New Roman";case "equity"->"Courier New";default->"Arial";});font.setFontHeightInPoints((short)10);normal.setFont(font);normal.setWrapText(true);normal.setVerticalAlignment(VerticalAlignment.TOP);
                 var money=book.createCellStyle();money.cloneStyleFrom(normal);money.setDataFormat(book.createDataFormat().getFormat("#,##0.00;(#,##0.00)"));money.setAlignment(HorizontalAlignment.RIGHT);
@@ -67,7 +64,6 @@ public class StatementExportService {
                 rowNo++;text(sheet,rowNo,label("fs.outputNotice",locale),normal,count);
                 sheet.createFreezePane(2,headerRow+1);sheet.setRepeatingRows(new CellRangeAddress(headerRow,headerRow,-1,-1));sheet.setDisplayGridlines(false);
                 sheet.getPrintSetup().setLandscape(count>5||doc.style().equals("equity"));sheet.getPrintSetup().setPaperSize(PrintSetup.A4_PAPERSIZE);sheet.getPrintSetup().setFitWidth((short)1);sheet.getPrintSetup().setFitHeight((short)0);sheet.setFitToPage(true);sheet.setAutobreaks(true);book.setPrintArea(book.getSheetIndex(sheet),0,count-1,0,sheet.getLastRowNum());sheet.getFooter().setRight("Page &P / &N");
-            }
             book.write(bytes);return bytes.toByteArray();
         }
     }
