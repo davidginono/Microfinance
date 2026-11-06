@@ -111,13 +111,16 @@ class LoanRecordingMvcTest {
             .andExpect(model().attribute("selectedProduct",product));
     }
     @Test void unavailableProductRetainsEnteredValuesAndOriginalValidationErrors() throws Exception {
-        var id=UUID.randomUUID();
+        var id=UUID.randomUUID(); var officerId=UUID.randomUUID();
         var evidence=(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService)org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(LoanRecordingController.class),"evidence");
         when(evidence.product(actor,id)).thenThrow(new IllegalArgumentException("applications.error.product"));
+        when(evidence.selectedOfficerLabel(actor,officerId)).thenReturn("Selected loan officer");
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
-            .param("loanMode","CONFIGURED").param("productId",id.toString()).param("principal","invalid").param("purpose","Retained stock purchase"))
+            .param("loanMode","CONFIGURED").param("productId",id.toString()).param("principal","invalid").param("purpose","Retained stock purchase")
+            .param("applicationDetails.loanOfficerId",officerId.toString()))
             .andExpect(status().isOk()).andExpect(view().name("accounting/loans/record-form"))
             .andExpect(model().attributeHasFieldErrors("recordForm","principal"))
+            .andExpect(model().attribute("selectedOfficerLabel","Selected loan officer"))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("purpose",org.hamcrest.Matchers.is("Retained stock purchase"))));
     }
     @Test void documentDownloadChecksScopeThroughServiceAndPreventsSniffing() throws Exception {

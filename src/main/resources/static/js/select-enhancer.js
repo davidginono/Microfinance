@@ -331,6 +331,7 @@
                         }
                         event.preventDefault();
                         if (!button.disabled) {
+                            event.stopPropagation();
                             button.focus({ preventScroll: true });
                             toggleEnhancedSelect(state);
                         }

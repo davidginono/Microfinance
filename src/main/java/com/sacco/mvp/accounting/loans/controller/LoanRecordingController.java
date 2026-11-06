@@ -70,6 +70,8 @@ public class LoanRecordingController {
         if(form.getApplicationId()!=null)model.addAttribute("savedApplicationDocuments",evidence.draftDocuments(actor,form.getApplicationId()));
         model.addAttribute("documentTypes",com.sacco.mvp.clients.applications.service.ClientApplicationService.DOCUMENT_TYPES);
         model.addAttribute("evidenceGuarantorLabels",evidence.labels(actor,form.getApplicationDetails()));
+        if(form.getApplicationDetails().getLoanOfficerId()!=null)
+            model.addAttribute("selectedOfficerLabel",evidence.selectedOfficerLabel(actor,form.getApplicationDetails().getLoanOfficerId()));
         if(form.getClientId()!=null){var client=service.recordClient(actor,form.getClientId());model.addAttribute("selectedClientLabel",client.label());model.addAttribute("selectedClientType",client.purpose());}
         if("CONFIGURED".equals(form.getLoanMode()) && form.getProductId()!=null)
             try{model.addAttribute("evidenceProduct",evidence.product(actor,form.getProductId()));}catch(IllegalArgumentException ignored){/* Preserve entered values if the product became unavailable. */}

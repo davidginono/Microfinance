@@ -2,15 +2,24 @@
   'use strict';
   document.querySelector('[data-loan-print]')?.addEventListener('click', () => window.print());
   const root = document.querySelector('meta[name="app-context-path"]')?.content || '';
-  document.querySelectorAll('[data-loan-choice]').forEach(box => {
+  const choiceCleanup = new WeakMap();
+  const initChoices = scope => scope.querySelectorAll('[data-loan-choice]').forEach(box => {
+    if (choiceCleanup.has(box)) return;
+    const lazy = box.hasAttribute('data-lazy-choice');
     const select = box.querySelector('[data-choice-select]'), error = box.querySelector('[data-choice-error]');
     const picker = window.NeoSelect.search(select), search = picker.input, more = picker.more;
     search.setAttribute('aria-label', error.dataset.searchLabel);
-    let page = 0, request = 0, controller, loading = false, loadedSearch;
+    let page = 0, request = 0, controller, loading = false, loadedSearch, failed = false;
+    function showError(active) {
+      failed = active;
+      if (lazy) picker.setError(active ? error.dataset.error : '');
+      else error.textContent = active ? error.dataset.error : '';
+    }
     async function load(targetPage = 0) {
+      if (!select.isConnected) return;
       controller?.abort(); controller = new AbortController();
       const version = ++request, query = search.value, normalized = query.trim().toLocaleLowerCase();
-      loading = true; picker.setLoading(true); more.disabled = true;
+      loading = true; picker.setLoading(true); showError(false); more.disabled = true;
       try {
         const response = await fetch((box.dataset.choiceUrl || root + '/finance/loan-recording/choices/' + box.dataset.category) + ((box.dataset.choiceUrl || '').includes('?') ? '&' : '?') + new URLSearchParams({search: query, page: targetPage}), {headers: {Accept: 'application/json'}, signal:controller.signal, cache:'no-store', credentials:'same-origin'});
         if (!response.ok || response.redirected) throw new Error('Lookup failed');
@@ -27,15 +36,16 @@
         select.value = value; page = targetPage; loadedSearch = query;
         if(box.dataset.category === 'products' && productFields.some(key=>selected?.dataset[key] !== select.selectedOptions[0]?.dataset[key]))
           select.dispatchEvent(new Event('change', {bubbles:true}));
-        more.hidden = choices.length <= 25; error.textContent = '';
-      } catch (failure) { if (version === request && failure.name !== 'AbortError') {error.textContent = error.dataset.error; more.hidden = true; binding.cancel();} }
+        more.hidden = choices.length <= 25;
+      } catch (failure) { if (version === request && select.isConnected && failure.name !== 'AbortError') {showError(true); more.hidden = true; binding.cancel();} }
       finally {if (version === request) {loading = false; picker.setLoading(false); more.disabled = false;}}
     }
     const binding = window.AppSearch.bind(search, () => load(), () => {++request; controller?.abort(); loading = false; picker.setLoading(true); more.hidden = true;});
     more.addEventListener('click', () => {binding.cancel(); load(page + 1);});
-    select.addEventListener('neo-select:close', () => {binding.cancel(); ++request; controller?.abort(); loading = false; picker.setLoading(false);});
-    select.addEventListener('neo-select:open', () => {if (!loading && (loadedSearch !== search.value || error.textContent)) {binding.cancel(); load();}});
-    window.addEventListener('pagehide', () => {binding.cancel(); ++request; controller?.abort();});
+    const cancel = () => {binding.cancel(); ++request; controller?.abort(); loading = false; picker.setLoading(false); more.disabled = false;};
+    choiceCleanup.set(box, cancel);
+    select.addEventListener('neo-select:close', cancel);
+    select.addEventListener('neo-select:open', () => {if (!loading && (loadedSearch !== search.value || failed || error.textContent)) {binding.cancel(); load();}});
     if(box.hasAttribute('data-hydrate-selection') && select.value){
       const value=select.value;
       fetch(box.dataset.choiceUrl+'?'+new URLSearchParams({selected:value}),{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'})
@@ -43,8 +53,11 @@
         .then(choices=>{if(select.value===value && select.isConnected){const choice=choices.find(c=>c.id===value);if(choice){select.selectedOptions[0].textContent=choice.label;window.refreshEnhancedSelects?.(box);}else error.textContent=error.dataset.error;}})
         .catch(()=>{if(select.isConnected)error.textContent=error.dataset.error;});
     }
-    load();
+    if (!lazy) load();
   });
+  initChoices(document);
+  window.addEventListener('pagehide', () => document.querySelectorAll('[data-loan-choice]').forEach(box => choiceCleanup.get(box)?.()));
+  document.addEventListener('loan:choices-added', event => initChoices(event.target));
   const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');
   if(disbursementSelect){let sequence=0, controller;disbursementSelect.addEventListener('change',async()=>{
     controller?.abort();controller=new AbortController();const version=++sequence,form=disbursementSelect.form;

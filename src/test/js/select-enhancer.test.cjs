@@ -46,6 +46,16 @@ test('searchable options filter immediately without altering native values or su
     search.value='';search.dispatchEvent(new w.Event('input'));assert.equal(labels(d).length,3);dom.window.close();
 });
 
+test('clicking an associated label opens the dropdown and focuses its search',async()=>{
+    const {dom,d}=await setup(local);
+    d.querySelector('label[for=client]').click();
+    assert.equal(d.querySelector('.neo-select-button').getAttribute('aria-expanded'),'true');
+    assert.equal(d.activeElement,d.querySelector('.neo-select-search input'));
+    d.querySelector('[name=purpose]').click();
+    assert.equal(d.querySelector('.neo-select-menu').hidden,true);
+    dom.window.close();
+});
+
 test('keyboard navigation advances from the focused option and selection emits original form events',async()=>{
     const {dom,w,d}=await setup(local);const select=d.querySelector('select');let changes=0;select.addEventListener('change',()=>changes++);
     d.querySelector('.neo-select-button').click();const search=d.querySelector('.neo-select-search input');

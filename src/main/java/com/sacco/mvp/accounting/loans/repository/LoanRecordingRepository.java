@@ -148,15 +148,12 @@ public class LoanRecordingRepository {
             """, (r,n)->new Choice(r.getObject(1,UUID.class),r.getString(2),""),
             actor.getSaccoId(),actor.getStationId(),search.toLowerCase(Locale.ROOT),page*25);
     }
-    public boolean officer(AppUserPrincipal actor, UUID id) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("""
-            select exists(select 1 from members m where m.id=? and m.sacco_id=? and m.station_id=?
-            and m.status='ACTIVE' and m.staff_access_status='ACTIVE' and (m.position='LOAN_OFFICER'
-            or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name='LOAN_OFFICER')))
-            """,Boolean.class,id,actor.getSaccoId(),actor.getStationId()));
-    }
     public String officerLabel(AppUserPrincipal actor,UUID id) {
-        return jdbc.query("select full_name from members where id=? and sacco_id=? and station_id=?",(row,n)->row.getString(1),
+        return jdbc.query("""
+            select m.full_name from members m where m.id=? and m.sacco_id=? and m.station_id=?
+            and m.status='ACTIVE' and m.staff_access_status='ACTIVE' and (m.position='LOAN_OFFICER'
+            or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name='LOAN_OFFICER'))
+            """,(row,n)->row.getString(1),
             id,actor.getSaccoId(),actor.getStationId()).stream().findFirst().orElse("");
     }
     public Map<UUID,String> evidenceClients(AppUserPrincipal actor, Collection<UUID> ids) {

@@ -5,54 +5,27 @@
             root.dataset.evidenceReady = 'true';
             var form = root.closest('form'), endpoint = root.dataset.root;
             var clientSelect = form.querySelector('select[name="clientId"]');
-            var error = root.querySelector('[data-evidence-error]'), requirements = [], productVersion = 0;
+            var error = root.querySelector('[data-evidence-error]'), requirements = [], productVersion = 0, nextFieldId = 0;
             function fail() { error.textContent = root.dataset.error; error.hidden = false; }
             function reindex(list) {
                 list.querySelectorAll('[data-repeat-row]').forEach(function (row, index) {
-                    row.querySelectorAll('input,select,textarea').forEach(function (control, field) {
+                    row.querySelectorAll('input,select,textarea').forEach(function (control) {
                         if (control.dataset.field) control.name = 'applicationDetails.' + list.dataset.repeatList + '[' + index + '].' + control.dataset.field;
                         else if (control.name) control.name = control.name.replace(/\[\d+\]/, '[' + index + ']');
-                        control.id = 'recording-' + list.dataset.repeatList + '-' + index + '-' + field;
-                        var label = control.parentElement.querySelector('label');
-                        if (label && control.type !== 'search') label.htmlFor = control.id;
+                        if (!control.id) control.id = 'recording-evidence-control-' + (++nextFieldId);
+                        var label = control.labels[0] || control.parentElement.querySelector('label');
+                        if (label) label.htmlFor = control.id;
                     });
                 });
             }
-            function bindChoice(select) {
-                if (select.dataset.evidenceChoiceReady) return;
-                select.dataset.evidenceChoiceReady = 'true';
-                var group = select.closest('[data-evidence-choice-group]');
-                var search = group.querySelector('[data-evidence-search]');
-                var sequence = 0, controller;
-                var binding = window.AppSearch.bind(search, async function () {
-                    controller?.abort(); controller = new AbortController();
-                    var request = ++sequence;
-                    try {
-                        var response = await fetch(endpoint + '/choices/' + select.dataset.evidenceChoice + '?' + new URLSearchParams({search:search.value}),
-                            {credentials:'same-origin',cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
-                        if (!response.ok || response.redirected) throw new Error();
-                        var rows = await response.json();
-                        if (request !== sequence || !select.isConnected) return;
-                        var selected = select.selectedOptions[0]?.cloneNode(true);
-                        select.replaceChildren(new Option('', ''));
-                        if (selected?.value) select.add(selected);
-                        rows.slice(0,25).forEach(function (row) { if (row.id === selected?.value) selected.textContent = row.label; else select.add(new Option(row.label,row.id)); });
-                        if (selected) select.value = selected.value;
-                        window.refreshEnhancedSelects?.(group);
-                    } catch (failure) { if (failure.name !== 'AbortError') fail(); }
-                }, function () { ++sequence; controller?.abort(); });
-                search.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); binding.run(); } });
-                binding.run();
-            }
             root.querySelectorAll('[data-repeat-list]').forEach(reindex);
-            root.querySelectorAll('[data-evidence-choice]').forEach(bindChoice);
             root.querySelectorAll('[data-add-row]').forEach(function (button) {
                 button.addEventListener('click', function () {
                     var kind = button.dataset.addRow, list = root.querySelector('[data-repeat-list="' + kind + '"]');
                     if (list.children.length >= 20) return;
                     list.append(root.querySelector('[data-row-template="' + kind + '"]').content.cloneNode(true));
                     reindex(list);
-                    list.lastElementChild.querySelectorAll('[data-evidence-choice]').forEach(bindChoice);
+                    list.lastElementChild.dispatchEvent(new Event('loan:choices-added',{bubbles:true}));
                     list.lastElementChild.querySelector('input,select')?.focus();
                     form.dispatchEvent(new Event('change',{bubbles:true}));
                 });
@@ -67,7 +40,7 @@
                 root.querySelectorAll('[data-document-field="requiredAttachmentIds"]').forEach(function (select) {
                     var value = select.value; while (select.options.length > 1) select.remove(1);
                     requirements.forEach(function (item) { select.add(new Option(item.name + ' (' + item.maxSizeMb + ' MB)',item.id)); });
-                    select.value = value;
+                    select.value = requirements.some(function (item) { return item.id === value; }) ? value : '';
                 });
             }
             var files = form.querySelector('input[type="file"][name="attachments"]');
@@ -104,7 +77,7 @@
                     data.fields.forEach(function (field,index) {
                         var wrap = document.createElement('div'), label = document.createElement('label'), control;
                         if (field.type === 'boolean' || field.enumOptions?.length) {
-                            control = document.createElement('select'); control.add(new Option('',''));
+                            control = document.createElement('select'); control.add(new Option(root.dataset.selectPlaceholder,''));
                             if (field.type === 'boolean') {
                                 control.add(new Option(root.querySelector('[data-evidence-yes]').textContent,'true'));
                                 control.add(new Option(root.querySelector('[data-evidence-no]').textContent,'false'));

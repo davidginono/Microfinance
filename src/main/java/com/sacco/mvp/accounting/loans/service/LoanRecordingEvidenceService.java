@@ -58,13 +58,21 @@ public class LoanRecordingEvidenceService {
             .map(ClientApplicationDtos.Guarantor::getClientId).filter(Objects::nonNull).toList());
     }
 
+    @Transactional(readOnly=true)
+    public String selectedOfficerLabel(AppUserPrincipal actor,UUID officerId) {
+        accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
+        return records.officerLabel(actor,officerId);
+    }
+
     public List<LoanAttachmentService.NamedUpload> prepare(AppUserPrincipal actor,RecordForm form,List<MultipartFile> files) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         var details=form.getApplicationDetails();
         if(details==null)return null;
         text(details.getUseOfFunds(),2000);
-        check(details.getLoanOfficerId()==null || records.officer(actor,details.getLoanOfficerId()),"officer");
-        details.setLoanOfficerLabel(details.getLoanOfficerId()==null?"":records.officerLabel(actor,details.getLoanOfficerId()));
+        var officerId=details.getLoanOfficerId();
+        var officerLabel=officerId==null?"":records.officerLabel(actor,officerId);
+        check(officerId==null || !officerLabel.isBlank(),"officer");
+        details.setLoanOfficerLabel(officerLabel);
         details.setFieldLabels(new LinkedHashMap<>());
         check(details.getGuarantors()!=null && details.getGuarantors().size()<=20 && details.getCollateral()!=null
             && details.getCollateral().size()<=20 && details.getFields()!=null && details.getFields().size()<=100 && details.getDocumentNames()!=null && details.getDocumentTypes()!=null && details.getRequiredAttachmentIds()!=null
