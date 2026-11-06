@@ -18,4 +18,8 @@
 .aws-console .accounting-create-workspace .loan-form-actions{margin:0;}
 .aws-console :is([data-product-amount-limits],[data-product-tenure-limits]){font-size:14px;line-height:20px;}
 
-.recording-application-evidence{padding:16px}.recording-application-evidence h3{font-size:1rem;font-weight:600;margin:16px 0 8px}.recording-evidence-row{padding:12px 0;border-bottom:1px solid #d5dbdb}.recording-evidence-row>button{margin:0 16px 12px}.recording-application-evidence .aws-control{width:100%;min-width:0}.recording-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:16px}.recording-declaration input{flex:0 0 auto}.recording-application-evidence [data-evidence-filename]{display:block;overflow-wrap:anywhere}
+.loan-supporting-information>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none}
+.loan-supporting-information>summary::-webkit-details-marker{display:none}
+.loan-supporting-information>summary:focus-visible{outline:2px solid var(--aws-blue,#0972d3);outline-offset:-2px}
+.loan-supporting-information[open]>summary>.console-icon{transform:rotate(90deg)}
+.recording-application-evidence{margin-top:16px;max-width:728px;min-width:0}.recording-application-evidence h3{font-size:1rem;font-weight:600;margin:16px 0 8px}.recording-evidence-row{padding:12px 0;border-bottom:1px solid #d5dbdb}.recording-evidence-row>button{margin:0 0 12px}.recording-application-evidence .aws-control{width:100%;min-width:0}.recording-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:16px}.recording-declaration input{flex:0 0 auto}.recording-application-evidence [data-evidence-filename]{display:block;overflow-wrap:anywhere}
