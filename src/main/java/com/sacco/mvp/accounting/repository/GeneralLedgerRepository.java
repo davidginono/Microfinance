@@ -33,7 +33,10 @@ public class GeneralLedgerRepository {
         return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? order by code,id limit ? offset ?", this::account, institution,limit,offset);
     }
     public boolean reportingDefaultsMissing(String institution) {
-        return jdbc.queryForObject("select count(*)<4 from gl_account_reporting_section where sacco_id=?",Boolean.class,institution);
+        return jdbc.queryForObject("""
+            select (select count(*) from gl_account_reporting_section where sacco_id=?)<4
+                or not exists(select 1 from gl_cash_bank_group where sacco_id=?)
+            """,Boolean.class,institution,institution);
     }
     public boolean pendingCode(String institution,String code) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account_version where sacco_id=? and operation='CREATE' and state in ('DRAFT','PENDING') and snapshot->>'code'=?)",Boolean.class,institution,code));
@@ -42,7 +45,10 @@ public class GeneralLedgerRepository {
         return jdbc.update("insert into gl_account_reporting_section(account_id,sacco_id,section) values(?,?,?) on conflict do nothing",id,institution,section)==1;
     }
     public boolean standardReportingGroup(String institution,UUID id) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_account_reporting_section where sacco_id=? and account_id=?)",Boolean.class,institution,id));
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from gl_account_reporting_section where sacco_id=? and account_id=?)
+                or exists(select 1 from gl_cash_bank_group where sacco_id=? and id=?)
+            """,Boolean.class,institution,id,institution,id));
     }
     public List<Account> chartRoots(String institution) {
         return jdbc.query("select gl_account.*,(select snapshot->'reporting' from gl_account_version where id=gl_account.current_version_id) reporting from gl_account where sacco_id=? and code in ('100000','200000','300000','400000','500000') order by code limit 5",this::account,institution);

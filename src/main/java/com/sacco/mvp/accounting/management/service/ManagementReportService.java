@@ -21,17 +21,25 @@ public class ManagementReportService {
         guard.requireActor(a,switch(kind){case DAILY_COLLECTIONS->"ACCOUNTING_BUSINESS_VIEW";case CASHBOOK->"ACCOUNTING_JOURNALS_VIEW";default->"LOAN_REPORTS_VIEW";});
         if(export)guard.requireActor(a,"FINANCIAL_REPORTS_EXPORT");
     }
-    @Transactional(readOnly=true) public List<Choice> choices(AppUserPrincipal a,Kind kind,String category,UUID group,String search,int page) {
+    @Transactional(readOnly=true) public List<Choice> choices(AppUserPrincipal a,Kind kind,String category,String search,int page) {
         authorize(a,kind,false);check(search!=null && search.length()<=100 && search.chars().noneMatch(Character::isISOControl) && page>=0 && page<=10000,"parameters");
-        return switch(category){case "accounts"->{accountReport(kind);yield reports.accounts(a,kind,group,search,page,List.of());}case "groups"->{accountReport(kind);yield reports.groups(a,kind,search,page,null);}case "clients"->reports.clients(a,search,page,null);default->throw error("parameters");};
+        return switch(category) {
+            case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of());}
+            case "clients" -> reports.clients(a,search,page,null);
+            default -> throw error("parameters");
+        };
     }
-    @Transactional(readOnly=true) public List<Choice> selectedAccounts(AppUserPrincipal a,Kind kind,UUID group,List<UUID> ids) {
-        authorize(a,kind,false);check(ids!=null && ids.size()<=20 && ids.stream().noneMatch(Objects::isNull),"parameters");
-        if(ids.isEmpty())return List.of();accountReport(kind);
-        var choices=reports.accounts(a,kind,group,"",0,ids);check(choices.size()==new HashSet<>(ids).size(),"account");return choices;
-    }
-    @Transactional(readOnly=true) public Choice selectedGroup(AppUserPrincipal a,Kind kind,UUID group) {
-        authorize(a,kind,false);if(group==null)return null;accountReport(kind);return reports.groups(a,kind,"",0,group).stream().findFirst().orElseThrow(()->error("account"));
+    @Transactional(readOnly=true) public Map<UUID,Choice> selectedRange(AppUserPrincipal a,Kind kind,UUID start,UUID end) {
+        authorize(a,kind,false);
+        if(start==null && end==null)return Map.of();
+        accountReport(kind);
+        var ids=new LinkedHashSet<UUID>();
+        if(start!=null)ids.add(start);
+        if(end!=null)ids.add(end);
+        var selected=new HashMap<UUID,Choice>();
+        reports.accounts(a,"",0,List.copyOf(ids)).forEach(choice->selected.put(choice.id(),choice));
+        check(selected.keySet().equals(ids),"cashBankAccount");
+        return selected;
     }
     @Transactional(readOnly=true) public Choice selectedClient(AppUserPrincipal a,Kind kind,UUID id) {
         authorize(a,kind,false);return id==null?null:reports.clients(a,"",0,id).stream().findFirst().orElseThrow(()->error("client"));
@@ -41,19 +49,24 @@ public class ManagementReportService {
     public Result report(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
         authorize(a,kind,export);validate(p,clock.today(),clock.now());
         return limiter.run(()->{
-            var group=selectedGroup(a,kind,p.groupId());var selected=selectedAccounts(a,kind,p.groupId(),p.accountIds());var client=selectedClient(a,kind,p.clientId());
+            var selected=selectedRange(a,kind,p.startAccount(),p.endAccount());
+            var start=p.startAccount()==null?null:selected.get(p.startAccount());
+            var end=p.endAccount()==null?null:selected.get(p.endAccount());
+            check(start==null || end==null || start.code().compareTo(end.code())<=0,"range");
+            String accountSelection=start==null?(end==null?"":"≤ "+end.label()):end==null?"≥ "+start.label():start.label()+" → "+end.label();
+            var client=selectedClient(a,kind,p.clientId());
             var data=reports.read(a,kind,p,export);
             check(data.groups().size()<=1000 && (!export || data.rows().size()<=5000),"large");
             var identity=reports.identity(a);
             return new Result(kind,p,identity[0],identity[1],com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),
-                export?data.rows():data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),!export && data.rows().size()>25,java.util.stream.Stream.concat(group==null?java.util.stream.Stream.empty():java.util.stream.Stream.of(group.getLabel()),selected.stream().map(Choice::getLabel)).collect(java.util.stream.Collectors.joining("; ")),client==null?"":client.getLabel());
+                export?data.rows():data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),!export && data.rows().size()>25,accountSelection,client==null?"":client.getLabel());
         });
     }
     public static void validate(Parameters p,java.time.LocalDate today,java.time.OffsetDateTime now){
         check(p!=null && p.from()!=null && p.through()!=null && p.cutoff()!=null,"parameters");
         check(p.from().getYear()>=1900 && !p.through().isBefore(p.from()) && !p.through().isAfter(p.from().plusDays(366))
             && !p.through().isAfter(today) && !p.cutoff().isAfter(now) && p.page()>=0 && p.page()<=10000,"parameters");
-        check(p.accountIds()!=null && p.accountIds().size()<=20 && p.accountIds().stream().noneMatch(Objects::isNull) && p.product()!=null && p.product().length()<=100 && p.product().chars().noneMatch(Character::isISOControl),"parameters");
+        check(p.product()!=null && p.product().length()<=100 && p.product().chars().noneMatch(Character::isISOControl),"parameters");
     }
     private static void check(boolean valid,String key){if(!valid)throw error(key);}
     private static IllegalArgumentException error(String key){return new IllegalArgumentException("management.error."+key);}

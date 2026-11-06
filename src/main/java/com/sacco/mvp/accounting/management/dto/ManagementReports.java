@@ -9,8 +9,8 @@ import lombok.Data;
 public final class ManagementReports {
     private ManagementReports() {}
     public enum Kind { DAILY_COLLECTIONS, CASHBOOK, LOAN_PORTFOLIO, PORTFOLIO_RISK, PORTFOLIO_ANALYSIS }
-    public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, UUID groupId,
-            List<UUID> accountIds, UUID clientId, String product, int page) {}
+    public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, UUID startAccount,
+            UUID endAccount, UUID clientId, String product, int page) {}
     public record Choice(UUID id, String code, String name, String label) {
         public Choice(UUID id,String code,String name){this(id,code,name,name);}
         public String getLabel(){return label;}

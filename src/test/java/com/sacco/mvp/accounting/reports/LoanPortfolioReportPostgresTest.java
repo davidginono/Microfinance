@@ -50,16 +50,16 @@ class LoanPortfolioReportPostgresTest {
         var expected=new java.util.LinkedHashMap<UUID,Integer>();int[] days={30,31,90,91,180,181,365,366},bands={0,1,1,2,2,3,3,4};
         for(int n=0;n<days.length;n++)expected.put(loan("B1","10.01","1.00",days[n],true).id(),bands[n]);
         var reports=new ManagementReportRepository(new NamedParameterJdbcTemplate(jdbc));
-        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),OffsetDateTime.now(),null,null,"","",0);
-        var result=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,parameters,"","",false);
+        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),OffsetDateTime.now(),null,null,null,"",0);
+        var result=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,parameters,false);
         assertThat(result.excluded()).isZero();assertThat(result.count()).isEqualTo(8);assertThat(result.totals().get("principalBalance")).isEqualByComparingTo("80.08");assertThat(result.totals().get("referenceProvision")).isEqualByComparingTo("28.03");
         expected.forEach((id,band)->{var row=result.rows().stream().filter(r->r.get("rowOrder").toString().endsWith(id.toString())).findFirst().orElseThrow();for(int b=0;b<5;b++)assertThat((BigDecimal)row.get("band"+b)).isEqualByComparingTo(b==band?"10.01":"0.00");});
     }
     @Test void referenceReportsKeepUnverifiedLoanBalancesAndTotalsUnavailable(){
         loan("B1","100.00","1.00",31,false);
         var reports=new ManagementReportRepository(new NamedParameterJdbcTemplate(jdbc));
-        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),OffsetDateTime.now(),null,null,"","",0);
-        var result=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,parameters,"","",false);
+        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),OffsetDateTime.now(),null,null,null,"",0);
+        var result=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,parameters,false);
         assertThat(result.excluded()).isEqualTo(1);assertThat(result.rows()).singleElement().satisfies(r->assertThat(r.get("principalBalance")).isNull());assertThat(result.totals().get("principalBalance")).isNull();
     }
     @Test void principalWeightedParAndInterestOnlyArrearsUseWholeExposure(){var late=loan("B1","1000.01","1.00",31,true,new BigDecimal("100.01"));loan("B2","9000.00","0.00",0,true);payment(late,"B1","100.01","0.00",DAY,null,true);var summary=repository.summary(wide,cutoff());assertThat(summary.covered()).isEqualTo(2);assertThat(summary.principal()).isEqualByComparingTo("9900.00");assertThat(summary.par30()).isEqualByComparingTo("900.00");assertThat(summary.overduePrincipal()).isZero();assertThat(summary.overdueInterest()).isEqualByComparingTo("1.00");assertThat(repository.rows(branch,cutoff())).singleElement().satisfies(r->assertThat(r.oldest()).isEqualTo(DAY.minusDays(31)));}

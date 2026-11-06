@@ -76,12 +76,16 @@ class AccountVersionPostgresTest {
             var parents=executor.submit(()->{start.await();ledger.provisionChartDefaults(reader);return ledger.chartParents(reader,true,"",0);});
             start.countDown();assertThat(chart.get(15,TimeUnit.SECONDS).rows()).hasSize(5);assertThat(parents.get(15,TimeUnit.SECONDS).rows()).hasSize(9);
         }
-        assertThat(books.accounts(institution,0,20)).hasSize(9);
+        assertThat(books.accounts(institution,0,20)).hasSize(10);
     }
     @Test void defaultProvisioningPreservesExistingMetadataAndRejectsConflictingCodes() {
         var reader=emptyChartReader();UUID existing=UUID.randomUUID();
         books.createAccount(institution,existing,new AccountCommand("100000","Institution assets","ASSET","DEBIT","HEADING","OTHER",null,"Mali",null),reader.getMemberId(),now);
+        UUID current=UUID.randomUUID(),customBank=UUID.randomUUID();
+        books.createAccount(institution,current,new AccountCommand("110000","Current assets","ASSET","DEBIT","HEADING","OTHER",existing),reader.getMemberId(),now);
+        books.createAccount(institution,customBank,new AccountCommand("111000","Existing bank group","ASSET","DEBIT","HEADING","OTHER",current),reader.getMemberId(),now);
         ledger.provisionChartDefaults(reader);
+        assertThat(books.accountCode(institution,"111000")).get().satisfies(a->{assertThat(a.id()).isEqualTo(customBank);assertThat(a.name()).isEqualTo("Existing bank group");});
         assertThat(ledger.chartParents(reader,true,"",0).rows()).hasSize(9);
         assertThat(books.accountCode(institution,"100000").orElseThrow().name()).isEqualTo("Institution assets");
         var conflicting=emptyChartReader();
@@ -117,7 +121,14 @@ class AccountVersionPostgresTest {
         assertThatThrownBy(()->jdbc.update("update gl_account_version set snapshot=jsonb_set(snapshot,'{reporting,cashSection}','\"OPERATING\"') where id=?",pending)).hasMessageContaining("immutable");
     }
     @Test void defaultSectionsAreStableAndProtectedWithoutGrantingAccountCreation() {
-        var reader=emptyChartReader();ledger.provisionChartDefaults(reader);
+        var reader=emptyChartReader();var admin=operator("B1",EnumSet.allOf(UserClaim.class));
+        ledger.configureAccountApproval(admin,policy(false,true,true,true));
+        ledger.provisionChartDefaults(reader);
+        var cashBank=books.accountCode(institution,"111000").orElseThrow();
+        assertThat(cashBank.name()).isEqualTo("Cash and Bank");
+        assertThat(cashBank.parentId()).isEqualTo(books.accountCode(institution,"110000").orElseThrow().id());
+        assertThat(books.currentVersion(institution,cashBank.id()).orElseThrow().state()).isEqualTo("BASELINE");
+        assertThatThrownBy(()->ledger.deactivateAccount(admin,cashBank.id())).hasMessage("accounting.error.mainGroupProtected");
         assertThat(jdbc.queryForList("select section from gl_account_reporting_section where sacco_id=? order by section",String.class,institution)).containsExactly("CURRENT_ASSETS","CURRENT_LIABILITIES","NON_CURRENT_ASSETS","NON_CURRENT_LIABILITIES");
         assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and kind='POSTING'",Integer.class,institution)).isZero();
         assertThatThrownBy(()->jdbc.update("delete from gl_account_reporting_section where sacco_id=?",institution)).hasMessageContaining("append-only");
@@ -128,8 +139,7 @@ class AccountVersionPostgresTest {
         when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
         when(institutions.findStation(eq(institution),anyString())).thenAnswer(i->Optional.of(SaccoStation.builder().saccoId(institution).stationId(i.getArgument(1)).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));maker=operator("B1",EnumSet.allOf(UserClaim.class));
-        ledger.initializeChart(maker);UUID root=books.accountCode(institution,"100000").orElseThrow().id();
-        UUID subgroup=books.accountCode(institution,"110000").orElseThrow().id();family=ledger.onboardAccount(maker,form(subgroup,"111000","Cash accounts"),true);clearInvocations(audit);
+        ledger.initializeChart(maker);family=books.accountCode(institution,"111000").orElseThrow().id();clearInvocations(audit);
     }
     AppUserPrincipal operator(String branch,Set<UserClaim> permissions){
         UUID id=UUID.randomUUID();String number="COA-"+id;
@@ -249,11 +259,13 @@ class AccountVersionPostgresTest {
         assertThatThrownBy(()->jdbc.update("update gl_account_approval_policy set create_automatic=true where sacco_id=? and version=1",institution)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
     @Test void lifecycleApprovalsRecheckChildrenAndParentAvailability(){
-        UUID account=ledger.onboardAccount(maker,form(family,"111007","Cash"),false);var current=ledger.accountCurrent(maker,account);ledger.configureAccountApproval(maker,policy(true,true,false,false));
+        UUID currentAssets=books.accountCode(institution,"110000").orElseThrow().id();
+        UUID customFamily=ledger.onboardAccount(maker,form(currentAssets,"112000","Other current assets"),true);
+        UUID account=ledger.onboardAccount(maker,form(customFamily,"112007","Current asset"),false);var current=ledger.accountCurrent(maker,account);ledger.configureAccountApproval(maker,policy(true,true,false,false));
         UUID id=ledger.proposeAccountVersion(maker,account,current.id(),"DEACTIVATE",UUID.randomUUID(),change(current.proposed(),current.proposed().name()),true);assertThat(books.account(institution,account).orElseThrow().active()).isTrue();
         var reviewer=operator("B2",EnumSet.allOf(UserClaim.class));ledger.accountVersionAction(reviewer,id,version(id).revision(),"APPROVE","Close account");assertThat(books.account(institution,account).orElseThrow().active()).isFalse();
         ledger.configureAccountApproval(maker,policy(true,true,true,true));ledger.reactivateAccount(maker,account);assertThat(books.account(institution,account).orElseThrow().active()).isTrue();
-        assertThatThrownBy(()->ledger.deactivateAccount(maker,family)).hasMessage("accounting.error.activeChildren");
+        assertThatThrownBy(()->ledger.deactivateAccount(maker,customFamily)).hasMessage("accounting.error.activeChildren");
         UUID root=books.accountCode(institution,"100000").orElseThrow().id();assertThatThrownBy(()->ledger.deactivateAccount(maker,root)).hasMessage("accounting.error.mainGroupProtected");
     }
     @Test void staleBasesDraftRevisionsAndParallelOpenVersionsFail(){

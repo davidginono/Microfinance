@@ -25,23 +25,29 @@ class ManagementReportTest {
     }
     @Test void reportDatesAndCountsAreBoundedAndCannotClaimFutureKnowledge(){
         var p=parameters(0);ManagementReportService.validate(p,DAY,NOW);
-        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY.minusDays(367),DAY,NOW,null,List.of(),null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
-        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY,DAY,NOW.plusSeconds(1),null,List.of(),null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY.minusDays(367),DAY,NOW,null,null,null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY,DAY,NOW.plusSeconds(1),null,null,null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
         assertThatThrownBy(()->ManagementReportService.validate(parameters(-1),DAY,NOW)).hasMessage("management.error.parameters");
     }
-    @Test void selectorsKeepReportClaimsAndRejectAccountsOutsideTheSelectedGroup(){
+    @Test void selectorsKeepReportClaimsAndRejectOutsideOrReversedBounds(){
         var repository=org.mockito.Mockito.mock(ManagementReportRepository.class);
         var guard=org.mockito.Mockito.mock(com.sacco.mvp.accounting.service.GeneralLedgerService.class);
         var actor=org.mockito.Mockito.mock(com.sacco.mvp.security.AppUserPrincipal.class);
-        var service=new ManagementReportService(repository,guard,org.mockito.Mockito.mock(com.sacco.mvp.service.ApplicationClock.class),new ReportExportLimiter(1));
-        UUID group=UUID.randomUUID(),account=UUID.randomUUID();
-        org.mockito.Mockito.when(repository.accounts(actor,Kind.CASHBOOK,group,"",0,List.of(account))).thenReturn(List.of());
-        assertThatThrownBy(()->service.selectedAccounts(actor,Kind.CASHBOOK,group,List.of(account))).hasMessage("management.error.account");
+        var clock=org.mockito.Mockito.mock(com.sacco.mvp.service.ApplicationClock.class);
+        org.mockito.Mockito.when(clock.today()).thenReturn(DAY);
+        org.mockito.Mockito.when(clock.now()).thenReturn(NOW);
+        var service=new ManagementReportService(repository,guard,clock,new ReportExportLimiter(1));
+        UUID start=UUID.randomUUID(),end=UUID.randomUUID();
+        assertThatThrownBy(()->service.selectedRange(actor,Kind.CASHBOOK,start,null)).hasMessage("management.error.cashBankAccount");
         org.mockito.Mockito.verify(guard).requireActor(actor,"FINANCIAL_REPORTS_VIEW");
         org.mockito.Mockito.verify(guard).requireActor(actor,"ACCOUNTING_JOURNALS_VIEW");
         org.mockito.Mockito.verify(guard,org.mockito.Mockito.never()).requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");
-        assertThatThrownBy(()->service.choices(actor,Kind.CASHBOOK,"clients",null,"x".repeat(101),0)).hasMessage("management.error.parameters");
-        assertThatThrownBy(()->service.selectedAccounts(actor,Kind.CASHBOOK,null,Collections.nCopies(21,account))).hasMessage("management.error.parameters");
+        org.mockito.Mockito.when(repository.accounts(actor,"",0,List.of(start,end))).thenReturn(List.of(
+            new Choice(start,"111003","Cash"),new Choice(end,"111001","Bank")));
+        var reversed=new Parameters(DAY,DAY,NOW,start,end,null,"",0);
+        assertThatThrownBy(()->service.report(actor,Kind.CASHBOOK,reversed,false)).hasMessage("management.error.range");
+        org.mockito.Mockito.verify(repository,org.mockito.Mockito.never()).read(actor,Kind.CASHBOOK,reversed,false);
+        assertThatThrownBy(()->service.choices(actor,Kind.CASHBOOK,"clients","x".repeat(101),0)).hasMessage("management.error.parameters");
         assertThatThrownBy(()->service.selectedClient(actor,Kind.CASHBOOK,UUID.randomUUID())).hasMessage("management.error.client");
     }
     @Test void pdfAndPrintDefinitionsRetainAllReferenceColumnsAndBilingualTotals()throws Exception {
@@ -68,5 +74,5 @@ class ManagementReportTest {
     }
     @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"","");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
     static BudgetForm budget(){var f=new BudgetForm();f.setAccountId(UUID.randomUUID());f.setDate(DAY);f.setYear(2027);f.setAmounts(new ArrayList<>(Collections.nCopies(12,new BigDecimal("10.01"))));return f;}
-    static Parameters parameters(int page){return new Parameters(DAY.withDayOfMonth(1),DAY,NOW,null,List.of(),null,"",page);}
+    static Parameters parameters(int page){return new Parameters(DAY.withDayOfMonth(1),DAY,NOW,null,null,null,"",page);}
 }

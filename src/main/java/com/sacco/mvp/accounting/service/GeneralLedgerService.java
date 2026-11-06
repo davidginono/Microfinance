@@ -94,7 +94,7 @@ public class GeneralLedgerService {
     @Transactional
     public void initializeChart(AppUserPrincipal actor) {
         requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");books.lockAccounts(actor.getSaccoId());
-        initializeChartRoots(actor);
+        initializeChartDefaults(actor);
     }
     @Transactional(readOnly=true)
     public boolean chartDefaultsMissing(AppUserPrincipal actor) {
@@ -108,14 +108,14 @@ public class GeneralLedgerService {
     public void provisionChartDefaults(AppUserPrincipal actor) {
         if(chartDefaultsMissing(actor)) {
             books.lockAccounts(actor.getSaccoId());
-            initializeChartRoots(actor);
+            initializeChartDefaults(actor);
         }
     }
     private void validateChartRoot(Account account) {
         String type=ROOT_TYPES.get(Integer.parseInt(account.code().substring(0,1))-1);
         require(mainGroup(account) && account.active() && account.type().equals(type) && account.normalBalance().equals(normalBalance(type)),"mainGroupConflict");
     }
-    private void initializeChartRoots(AppUserPrincipal actor) {
+    private void initializeChartDefaults(AppUserPrincipal actor) {
         for(int index=0;index<ROOT_TYPES.size();index++) {
             String code=(index+1)+"00000",type=ROOT_TYPES.get(index);
             var existing=books.accountCode(actor.getSaccoId(),code);
@@ -141,6 +141,15 @@ public class GeneralLedgerService {
             require(a.active() && a.kind().equals("HEADING") && a.type().equals(type) && Objects.equals(a.parentId(),parent.id()) && a.normalBalance().equals(normalBalance(type)),"mainGroupConflict");
             if(books.reportingRole(actor.getSaccoId(),a.id(),roles[i]))event(actor,a.id(),"REPORTING_SECTION_PROVISIONED",Map.of("section",roles[i]));
         }
+        String institution=actor.getSaccoId();
+        var cashAndBank=books.accountCode(institution,"111000");
+        if(cashAndBank.isEmpty()) {
+            require(!books.pendingCode(institution,"111000"),"mainGroupConflict");
+            var currentAssets=books.accountCode(institution,"110000").orElseThrow();
+            persistAccount(actor,new AccountCommand("111000","Cash and Bank","ASSET","DEBIT","HEADING","OTHER",
+                currentAssets.id(),"Fedha taslimu na benki",null));
+        }
+        require(!books.reportingDefaultsMissing(institution),"mainGroupConflict");
     }
     @Transactional
     public UUID onboardAccount(AppUserPrincipal actor,AccountOnboardingForm form,boolean group) {
@@ -343,7 +352,7 @@ public class GeneralLedgerService {
         var member=directory.find(creator).orElseThrow(()->new AccessDeniedException("Product creator unavailable"));
         var actor=new AppUserPrincipal(member,userClaims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()),true);
         require(Objects.equals(institution,actor.getSaccoId()),"account");requireActor(actor,"LOAN_PRODUCTS_CREATE");
-        books.lockAccounts(institution);initializeChartRoots(actor);
+        books.lockAccounts(institution);initializeChartDefaults(actor);
         String stem="LP-"+product.toString().replace("-","").toUpperCase(Locale.ROOT),name=trim(productName);
         require(!name.isEmpty(),"name");if(name.length()>140)name=name.substring(0,140);
         var versions=new ArrayList<Version>();

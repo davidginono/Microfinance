@@ -13,31 +13,32 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class ManagementReportRepository {
     private final NamedParameterJdbcTemplate jdbc;
-    public List<Choice> accounts(AppUserPrincipal a,Kind kind,UUID group,String search,int page,List<UUID> selected) {
-        var p=parameters(a,null).addValue("group",group,java.sql.Types.OTHER).addValue("search",search.toLowerCase(Locale.ROOT))
-            .addValue("offset",page*25).addValue("cash",kind==Kind.CASHBOOK).addValue("selected",!selected.isEmpty())
-            .addValue("ids",selected.isEmpty()?List.of(new UUID(0,0)):selected);
-        return jdbc.query("""
-          with recursive tree as (select id,0 depth from gl_account where sacco_id=:institution and id=:group
-            union all select a.id,t.depth+1 from gl_account a join tree t on a.parent_id=t.id where a.sacco_id=:institution and t.depth<16)
-          select a.id,a.code,a.name from gl_account a where a.sacco_id=:institution and a.kind<>'HEADING' and a.type='ASSET'
-            and (not :cash or a.purpose in ('CASH','BANK','MOBILE_MONEY'))
-            and (cast(:group as uuid) is null or a.id in(select id from tree)) and (not :selected or a.id in(:ids))
-            and strpos(lower(a.code||' '||a.name),:search)>0 order by a.code,a.id limit 26 offset :offset
-          """,p,this::choice);
-    }
-    public List<Choice> groups(AppUserPrincipal a,Kind kind,String search,int page,UUID selected) {
-        var p=parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25)
-            .addValue("cash",kind==Kind.CASHBOOK).addValue("id",selected,java.sql.Types.OTHER);
-        return jdbc.query("""
-          with recursive eligible as (
-           select id,parent_id,0 depth from gl_account where sacco_id=:institution and type='ASSET' and kind<>'HEADING'
-            and (not :cash or purpose in ('CASH','BANK','MOBILE_MONEY'))
-           union select a.id,a.parent_id,e.depth+1 from gl_account a join eligible e on a.id=e.parent_id where a.sacco_id=:institution and e.depth<16)
-          select a.id,a.code,a.name from gl_account a where a.sacco_id=:institution and a.type='ASSET' and a.kind='HEADING'
-            and (not :cash or exists(select 1 from eligible e where e.id=a.id)) and (cast(:id as uuid) is null or a.id=:id)
-            and strpos(lower(a.code||' '||a.name),:search)>0 order by a.code,a.id limit 26 offset :offset
-          """,p,this::choice);
+    private static final String CASH_BANK_ACCOUNTS="""
+        from gl_cash_bank_group g join gl_account a on a.parent_id=g.id and a.sacco_id=g.sacco_id
+        where g.sacco_id=:institution and a.type='ASSET' and a.kind<>'HEADING'
+          and a.purpose in ('CASH','BANK','MOBILE_MONEY')
+        """;
+    private static final String CASH_RANGE="with cash_accounts as (select a.id,a.code "+CASH_BANK_ACCOUNTS+"""
+          and :bounded
+        ), cash_range as (
+          select a.id from cash_accounts a
+          left join cash_accounts first_account on first_account.id=:startAccount
+          left join cash_accounts last_account on last_account.id=:endAccount
+          where (cast(:startAccount as uuid) is null or a.code collate "C">=first_account.code)
+            and (cast(:endAccount as uuid) is null or a.code collate "C"<=last_account.code)
+        ),
+        """;
+    public List<Choice> accounts(AppUserPrincipal a,String search,int page,List<UUID> selected) {
+        var p=parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25);
+        String selection="";
+        if(!selected.isEmpty()) {
+            p.addValue("ids",selected);
+            selection=" and a.id in (:ids) ";
+        }
+        return jdbc.query("select a.id,a.code,a.name "+CASH_BANK_ACCOUNTS+selection+"""
+            and strpos(lower(a.code||' '||a.name),:search)>0
+            order by a.code collate "C",a.id limit 26 offset :offset
+            """,p,this::choice);
     }
     public List<Choice> clients(AppUserPrincipal a,String search,int page,UUID selected) {
         return jdbc.query("""
@@ -54,9 +55,10 @@ public class ManagementReportRepository {
     private MapSqlParameterSource parameters(AppUserPrincipal a,Parameters p){var m=new MapSqlParameterSource("institution",a.getSaccoId()).addValue("branch",a.getStationId()).addValue("wide",false);if(p!=null)m.addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.cutoff()).addValue("clientId",p.clientId(),java.sql.Types.OTHER).addValue("product",p.product().toLowerCase(Locale.ROOT));return m;}
     public record Data(List<Map<String,Object>> rows,List<Group> groups,Map<String,BigDecimal> totals,long count,long excluded) {}
     public Data read(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
-        var m=parameters(a,p).addValue("groupId",p.groupId(),java.sql.Types.OTHER).addValue("accountIds",p.accountIds().isEmpty()?List.of(new UUID(0,0)):p.accountIds()).addValue("allAccounts",p.accountIds().isEmpty()).addValue("offset",export?0:p.page()*25).addValue("limit",export?5001:26);
+        var m=parameters(a,p).addValue("startAccount",p.startAccount(),Types.OTHER)
+            .addValue("endAccount",p.endAccount(),Types.OTHER).addValue("bounded",p.startAccount()!=null || p.endAccount()!=null)
+            .addValue("offset",export?0:p.page()*25).addValue("limit",export?5001:26);
         String source=switch(kind){case DAILY_COLLECTIONS->DAILY;case CASHBOOK->CASH;default->loans(kind);};
-        if(kind==Kind.DAILY_COLLECTIONS || kind==Kind.CASHBOOK)source=source.replaceFirst("with ","with recursive selected_group as (select id,0 depth from gl_account where sacco_id=:institution and id=:groupId union all select a.id,g.depth+1 from gl_account a join selected_group g on a.parent_id=g.id where a.sacco_id=:institution and g.depth<16), ");
         var columns=com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind);
         var money=columns.stream().filter(Column::money).map(Column::key).toList();
         boolean loan=kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS;
@@ -79,8 +81,8 @@ public class ManagementReportRepository {
     }
     private static Map<String,Object> row(ResultSet r)throws SQLException{var out=new LinkedHashMap<String,Object>();for(int n=1;n<=r.getMetaData().getColumnCount();n++)out.put(r.getMetaData().getColumnLabel(n),r.getObject(n));return out;}
     private static Map<String,BigDecimal> totals(Map<String,Object> row,List<String> fields){var out=new LinkedHashMap<String,BigDecimal>();for(var k:fields)out.put(k,(BigDecimal)row.get(k));return out;}
-    private static final String DAILY="""
-        with receipts as (
+    private static final String DAILY=CASH_RANGE+"""
+        receipts as (
           select v.id,v.sacco_id,v.station_id,v.effective_date,v.posted_at,v.number,v.reference,v.party,v.money_account_id,v.posted_by,v.client_id,
             t.line_no,t.description,t.transaction_name,tc.code transaction_code,coalesce(ac.code||' — '||ac.name,'@general') activity,t.component,
             null::text loan_id,v.client_number,null::text phone,
@@ -120,12 +122,12 @@ public class ManagementReportRepository {
             r.client_number as "clientNumber",r.loan_id as "loanId",r.component,r.party as name,r.reference as "documentReference",r.number as "documentNumber",r.effective_date as "receiptDate",
             case when r.transaction_name is null then r.description else r.transaction_name||' — '||r.description end as transaction,r.transaction_code as "transactionCode",r.debit,r.credit,r.phone,u.full_name as "recordedBy"
           from receipts r join gl_account b on b.id=r.money_account_id and b.sacco_id=r.sacco_id join members u on u.id=r.posted_by
-          where (cast(:groupId as uuid) is null or b.id in(select id from selected_group)) and (:allAccounts or b.id in(:accountIds))
+          where (not :bounded or b.id in(select id from cash_range))
             and (cast(:clientId as uuid) is null or r.client_id=:clientId)
         )
         """;
-    private static final String CASH="""
-        with report_rows as (
+    private static final String CASH=CASH_RANGE+"""
+        report_rows as (
           select b.code||' | '||b.name as "groupName",j.effective_date::text||j.posted_at::text||l.id::text as "rowOrder",
             j.effective_date as date,coalesce(v.client_number,r.client_number,m.member_no) as "clientNumber",coalesce(v.party,r.party,m.full_name,'') as name,
             coalesce(nullif(v.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as particulars,coalesce(v.reference,r.reference,p.reference,j.source_reference) as reference,
@@ -145,7 +147,7 @@ public class ManagementReportRepository {
           left join accountant_loan_receipt_row x on x.posting_id=p.id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
-            and j.effective_date between :from and :through and (cast(:groupId as uuid) is null or b.id in(select id from selected_group)) and (:allAccounts or b.id in(:accountIds))
+            and j.effective_date between :from and :through and (not :bounded or b.id in(select id from cash_range))
             and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.client_id,m.id)=:clientId)
         )
         """;

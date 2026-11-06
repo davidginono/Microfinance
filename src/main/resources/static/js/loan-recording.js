@@ -43,7 +43,6 @@
         .then(choices=>{if(select.value===value && select.isConnected){const choice=choices.find(c=>c.id===value);if(choice){select.selectedOptions[0].textContent=choice.label;window.refreshEnhancedSelects?.(box);}else error.textContent=error.dataset.error;}})
         .catch(()=>{if(select.isConnected)error.textContent=error.dataset.error;});
     }
-    select.addEventListener('choice:reload', () => {binding.cancel(); search.value = ''; loadedSearch = undefined; load();});
     load();
   });
   const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');

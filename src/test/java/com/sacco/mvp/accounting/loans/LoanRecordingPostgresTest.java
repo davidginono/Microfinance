@@ -438,7 +438,7 @@ class LoanRecordingPostgresTest {
         var first=disbursed("D-REFERENCE-1");var second=disbursed("D-REFERENCE-2");
         var receipt=receiptService().post(actor,receiptForm(first,second));
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
-        var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY.minusMonths(1).withDayOfMonth(1),TODAY,OffsetDateTime.now().plusSeconds(1),null,List.of(),null,"",0);
+        var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY.minusMonths(1).withDayOfMonth(1),TODAY,OffsetDateTime.now().plusSeconds(1),null,null,null,"",0);
         var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);
         assertThat(daily.count()).isEqualTo(4);assertThat(daily.totals().get("credit")).isEqualByComparingTo("240.00");assertThat(daily.excluded()).isZero();assertThat(daily.rows()).extracting(r->r.get("component")).containsOnly("PRINCIPAL","INTEREST");
         var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,false);
@@ -452,9 +452,9 @@ class LoanRecordingPostgresTest {
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,false).totals().get("principalBalance")).isEqualByComparingTo("2000.00");
         for(int n=0;n<26;n++){var extra=receiptForm(first);extra.getRows().getFirst().setAmount(BigDecimal.ONE);receiptService().post(actor,extra);}
         var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("credit")).isEqualByComparingTo("266.00");
-        var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,List.of(),null,"",1);
+        var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,null,null,"",1);
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,secondPage,false).rows()).hasSize((int)Math.min(26,all.count()-25));
-        var noAccounts=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,List.of(UUID.randomUUID()),null,"",0);
+        var noAccounts=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),UUID.randomUUID(),null,null,"",0);
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,noAccounts,false).count()).isZero();
     }
     @Test void accountBudgetsPreserveRevisionsScopeRetriesAndConcurrentCreation()throws Exception{

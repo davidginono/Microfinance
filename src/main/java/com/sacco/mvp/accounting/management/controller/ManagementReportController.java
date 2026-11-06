@@ -27,13 +27,12 @@ public class ManagementReportController {
     @ModelAttribute void headers(HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
     @Data public static class Filter {
         private String from,through,cutoff;
-        private UUID groupId,clientId;
-        private List<UUID> accountIds=new ArrayList<>();
+        private UUID startAccount,endAccount,clientId;
         private String product="";
         private int page;
         private boolean run;
     }
-    @InitBinder("filter") void bind(WebDataBinder binder){binder.setAllowedFields("from","through","cutoff","groupId","accountIds","clientId","product","page","run");}
+    @InitBinder("filter") void bind(WebDataBinder binder){binder.setAllowedFields("from","through","cutoff","startAccount","endAccount","clientId","product","page","run");}
     @GetMapping public String screen(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,org.springframework.validation.BindingResult binding,Model m,HttpServletResponse response){
         Kind kind=kind(reportName);service.authorize(a,kind,false);defaults(f,kind);response.setHeader("Cache-Control","no-store");
         try{context(a,kind,reportName,f,m);if(binding.hasErrors())throw new IllegalArgumentException("management.error.parameters");if(f.isRun()){var report=service.report(a,kind,parameters(f),false);m.addAttribute("report",report);record(a,report,"PREVIEW");}}
@@ -47,10 +46,16 @@ public class ManagementReportController {
     @GetMapping("/print") public String print(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,Model m,HttpServletResponse response){
         Kind kind=kind(reportName);defaults(f,kind);var report=service.report(a,kind,parameters(f),true);m.addAttribute("report",report);record(a,report,"PRINT");m.addAttribute("kind",kind);response.setHeader("Cache-Control","no-store");return "accounting/management/print";
     }
-    @GetMapping("/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@PathVariable String category,@RequestParam(required=false) UUID groupId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,kind(reportName),category,groupId,search,page);}
+    @GetMapping("/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,kind(reportName),category,search,page);}
     private void defaults(Filter f,Kind kind){if(f.getThrough()==null)f.setThrough(clock.today().toString());if(f.getFrom()==null){java.time.LocalDate end;try{end=LocalDate.parse(f.getThrough());}catch(DateTimeException e){end=clock.today();}f.setFrom(end.withDayOfMonth(1).toString());}if(f.getCutoff()==null)f.setCutoff(clock.now().truncatedTo(ChronoUnit.SECONDS).toString());}
-    private Parameters parameters(Filter f){return new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),f.getGroupId(),f.getAccountIds(),f.getClientId(),f.getProduct(),f.getPage());}
-    private void context(AppUserPrincipal a,Kind kind,String name,Filter f,Model m){m.addAttribute("kind",kind);m.addAttribute("reportName",name);m.addAttribute("today",clock.today());m.addAttribute("groupChoice",service.selectedGroup(a,kind,f.getGroupId()));m.addAttribute("accountChoices",service.selectedAccounts(a,kind,f.getGroupId(),f.getAccountIds()));m.addAttribute("clientChoice",service.selectedClient(a,kind,f.getClientId()));}
+    private Parameters parameters(Filter f){return new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),f.getStartAccount(),f.getEndAccount(),f.getClientId(),f.getProduct(),f.getPage());}
+    private void context(AppUserPrincipal a,Kind kind,String name,Filter f,Model m){
+        m.addAttribute("kind",kind);m.addAttribute("reportName",name);m.addAttribute("today",clock.today());
+        var selected=service.selectedRange(a,kind,f.getStartAccount(),f.getEndAccount());
+        if(f.getStartAccount()!=null)m.addAttribute("startChoice",selected.get(f.getStartAccount()));
+        if(f.getEndAccount()!=null)m.addAttribute("endChoice",selected.get(f.getEndAccount()));
+        m.addAttribute("clientChoice",service.selectedClient(a,kind,f.getClientId()));
+    }
     private void record(AppUserPrincipal a,Result r,String action){audit.log("MANAGEMENT_REPORT",null,action+"_"+r.kind(),a.getMemberId(),null,Map.of("saccoId",a.getSaccoId(),"stationId",a.getStationId(),"from",r.parameters().from(),"through",r.parameters().through(),"recordedThrough",r.parameters().cutoff(),"rows",r.count()));}
     public static Kind kind(String name){return switch(name){case "daily-collections"->Kind.DAILY_COLLECTIONS;case "cashbook"->Kind.CASHBOOK;case "loan-portfolio"->Kind.LOAN_PORTFOLIO;case "portfolio-risk"->Kind.PORTFOLIO_RISK;case "portfolio-analysis"->Kind.PORTFOLIO_ANALYSIS;default->throw new ResponseStatusException(HttpStatus.NOT_FOUND);};}
     @ExceptionHandler({IllegalArgumentException.class,DateTimeException.class}) String invalid(Exception e,Model m,HttpServletResponse response){response.setStatus(400);m.addAttribute("managementError",e instanceof IllegalArgumentException i?BudgetController.safeKey(i):"management.error.parameters");return "accounting/management/error";}
