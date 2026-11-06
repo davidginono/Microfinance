@@ -117,7 +117,8 @@ class StatementWorkspacePostgresTest {
         var daily=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS;
         UUID middle=account("111002","Cash", "ASSET","CASH");
         UUID end=account("111003","Mobile money","ASSET","MOBILE_MONEY");
-        account("111004","Other asset","ASSET","OTHER");
+        UUID olderBank=account("111004","Existing bank","ASSET","OTHER");
+        post(olderBank,capital,"25.00","Existing bank funding");
         UUID other=account("121002","Legacy bank","ASSET","BANK");
         for(UUID id:List.of(bank,middle,end,other)) {
             var f=new VoucherDtos.Form();f.setEffectiveDate(from);f.setParty("Synthetic payer");
@@ -126,9 +127,10 @@ class StatementWorkspacePostgresTest {
             row.setCreditAccountId(capital);f.setRows(List.of(row));vouchers.post(actor,VoucherDtos.Type.RECEIPT,f);
         }
         var choices=reports.accounts(actor,"",0,List.of());
-        assertThat(choices).extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Choice::id).containsExactly(bank,middle,end);
+        assertThat(choices).extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Choice::id).containsExactly(bank,middle,end,olderBank);
         assertThat(choices.getFirst().label()).isEqualTo("111001 — Bank");
         assertThat(reports.accounts(actor,"Mobile",0,List.of())).extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Choice::id).containsExactly(end);
+        assertThat(reports.accounts(actor,"",0,List.of(olderBank))).extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Choice::id).containsExactly(olderBank);
         assertThat(reports.accounts(actor,"",0,List.of(other))).isEmpty();
         var cutoff=OffsetDateTime.now();
         var range=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,middle,end,null,"",0);
@@ -136,11 +138,14 @@ class StatementWorkspacePostgresTest {
         assertThat(reports.read(actor,cashbook,range,true).count()).isEqualTo(2);
         var oneSided=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,middle,null,null,"",0);
         assertThat(reports.read(actor,daily,oneSided,false).count()).isEqualTo(2);
+        assertThat(reports.read(actor,cashbook,oneSided,false).count()).isEqualTo(3);
         var upperOnly=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,null,middle,null,"",0);
         assertThat(reports.read(actor,daily,upperOnly,false).count()).isEqualTo(2);
         var unfiltered=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,null,null,null,"",0);
         assertThat(reports.read(actor,daily,unfiltered,false).count()).isEqualTo(4);
-        assertThat(reports.read(actor,cashbook,unfiltered,false).count()).isEqualTo(7);
+        assertThat(reports.read(actor,cashbook,unfiltered,false).count()).isEqualTo(8);
+        var existingBankOnly=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,olderBank,olderBank,null,"",0);
+        assertThat(reports.read(actor,cashbook,existingBankOnly,false).totals().get("moneyIn")).isEqualByComparingTo("25.00");
         var invalid=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,other,null,null,"",0);
         assertThat(reports.read(actor,daily,invalid,false).count()).isZero();
         var foreign=new AppUserPrincipal(Member.builder().id(actor.getMemberId()).saccoId("OTHER").stationId("B1").build(),Set.of(),true);

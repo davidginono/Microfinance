@@ -13,13 +13,12 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class ManagementReportRepository {
     private final NamedParameterJdbcTemplate jdbc;
+    // The institution's Cash and Bank family defines the range, including older posting accounts with purpose OTHER.
     private static final String CASH_BANK_ACCOUNTS="""
         from gl_cash_bank_group g join gl_account a on a.parent_id=g.id and a.sacco_id=g.sacco_id
         where g.sacco_id=:institution and a.type='ASSET' and a.kind<>'HEADING'
-          and a.purpose in ('CASH','BANK','MOBILE_MONEY')
         """;
     private static final String CASH_RANGE="with cash_accounts as (select a.id,a.code "+CASH_BANK_ACCOUNTS+"""
-          and :bounded
         ), cash_range as (
           select a.id from cash_accounts a
           left join cash_accounts first_account on first_account.id=:startAccount
@@ -137,7 +136,7 @@ public class ManagementReportRepository {
             case when p.id is not null then case when l.debit>0 then p.interest_amount else 0 end else null end as "interestIn",
             case when p.id is not null then case when l.credit>0 then p.interest_amount else 0 end else null end as "interestOut"
           from gl_journal j join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
-          join gl_account b on b.id=l.account_id and b.sacco_id=j.sacco_id and b.purpose in ('CASH','BANK','MOBILE_MONEY')
+          join gl_account b on b.id=l.account_id and b.sacco_id=j.sacco_id
           left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id
           left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=j.sacco_id and p.station_id=j.station_id and p.state='POSTED' and p.recorded_at<=:cutoff
           left join loan_adjustment_decision ad on ad.journal_id=j.id
@@ -147,7 +146,8 @@ public class ManagementReportRepository {
           left join accountant_loan_receipt_row x on x.posting_id=p.id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
-            and j.effective_date between :from and :through and (not :bounded or b.id in(select id from cash_range))
+            and j.effective_date between :from and :through
+            and (b.id in(select id from cash_range) or (not :bounded and b.purpose in ('CASH','BANK','MOBILE_MONEY')))
             and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.client_id,m.id)=:clientId)
         )
         """;

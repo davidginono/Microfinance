@@ -1,6 +1,6 @@
 # Chart of accounts onboarding
 
-Cash and Bank (111000) is a fixed heading under Current assets. Chart setup reuses a compatible heading and its account IDs or provisions a system baseline for the missing heading. Report range selectors read its cash, bank and mobile-money posting accounts directly from the institution chart.
+Cash and Bank (111000) is a fixed heading under Current assets. Chart setup reuses a compatible heading, its existing name and account IDs, or provisions a system baseline for the missing heading. Daily Collections and Cashbook range selectors use its posting accounts directly from the institution chart, including older accounts recorded with the Other purpose. Cashbook with blank bounds also retains historical cash, bank and mobile-money activity outside the subgroup.
 
 The 2026-11-05 reporting increment adds fixed Current and Non-current asset and liability subgroups to the setup below. These institution-owned headings reuse compatible metadata and reject conflicting accounts or pending versions. Immutable section roles reference the group IDs. Second-subgroup parent relationships supply statement lines. Cash-flow, equity and note settings use approved account versions and the shared Reporting setup form. [COA-driven reporting](financial-statement-workspace.md#coa-driven-reporting-2026-11-05)
 
