@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="<c:url value='/css/management-reports.css' />" />
 <div class="accounting-workspace management-workspace">
 <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="management.nav.${kind}" /></h1></div>
+<c:choose>
+<c:when test="${empty report}">
 <c:url value="/reports/financial/operations/${reportName}" var="runUrl" />
 <form method="get" action="<c:out value='${runUrl}' />" class="erp-panel management-parameters">
   <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="management.parameters" /></h2></div>
@@ -36,16 +38,24 @@
     <c:if test="${kind!='DAILY_COLLECTIONS' and kind!='CASHBOOK'}"><label><spring:message code="management.productSearch" /><input class="aws-control" name="product" maxlength="100" value="<c:out value='${filter.product}' />" /></label></c:if>
   </div><div class="accounting-form-actions"><button class="app-btn btn-neutral"><spring:message code="management.run" /></button></div>
 </form>
-<c:if test="${not empty report}">
-<section class="erp-table-wrap management-preview">
-  <div class="app-table-titlebar"><h2><spring:message code="management.preview" /> (<c:out value="${report.count}" />)</h2><div class="accounting-actions">
-    <sec:authorize access="@access.has(principal,'FINANCIAL_REPORTS_EXPORT')"><c:forEach items="${['pdf','print']}" var="output"><c:url value="/reports/financial/operations/${reportName}/${output}" var="outputUrl"><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><spring:message code="management.${output}" /></a></c:forEach></sec:authorize>
-  </div></div>
-  <div class="erp-table-scroll management-canvas"><%@ include file="document.jspf" %></div>
-  <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
-</section>
-</c:if>
-</div>
 <script src="<c:url value='/js/loan-recording.js' />" defer></script>
 <script src="<c:url value='/js/management-reports.js' />" defer></script>
+</c:when>
+<c:otherwise>
+<c:url value="/reports/financial/operations/${reportName}" var="parametersUrl">
+  <c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" />
+  <c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" />
+  <c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" />
+</c:url>
+<section class="erp-table-wrap management-preview">
+  <div class="app-table-titlebar"><h2 id="management-preview-title"><spring:message code="management.preview" /> <span class="app-table-count">(<c:out value="${report.count}" />)</span></h2><div class="accounting-actions">
+    <a class="app-btn btn-neutral" href="<c:out value='${parametersUrl}' />"><spring:message code="management.editParameters" /></a>
+    <sec:authorize access="@access.has(principal,'FINANCIAL_REPORTS_EXPORT')"><c:forEach items="${['pdf','print']}" var="output"><c:url value="/reports/financial/operations/${reportName}/${output}" var="outputUrl"><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><spring:message code="management.${output}" /></a></c:forEach></sec:authorize>
+  </div></div>
+  <div class="management-canvas" role="region" aria-labelledby="management-preview-title" tabindex="0"><%@ include file="document.jspf" %></div>
+  <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
+</section>
+</c:otherwise>
+</c:choose>
+</div>
 <%@ include file="../../fragments/footer.jspf" %>
