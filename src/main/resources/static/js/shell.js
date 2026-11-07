@@ -731,6 +731,13 @@
         });
     };
     promotePageHeadersToShell();
+    const workspaceBreadcrumb = document.querySelector('.shell-main > .erp-page-path');
+    if (workspaceBreadcrumb) {
+        const breadcrumbSize = new ResizeObserver(function () {
+            workspaceBreadcrumb.parentElement.style.setProperty('--shell-breadcrumb-height', Math.ceil(workspaceBreadcrumb.getBoundingClientRect().height) + 'px');
+        });
+        breadcrumbSize.observe(workspaceBreadcrumb);
+    }
     const resolveToastContextElement = function (options) {
         if (!options || typeof options !== 'object') {
             return null;
@@ -1649,8 +1656,12 @@
         const navHeight = Number.parseFloat(navHeightValue) || 58;
         window.requestAnimationFrame(function () {
             const rect = element.getBoundingClientRect();
-            const top = Math.max(window.scrollY + rect.top - navHeight - 18, 0);
-            window.scrollTo({ top: top, behavior: 'instant' });
+            const main = element.closest('.shell-main');
+            const breadcrumb = main?.querySelector('.erp-page-path');
+            const offset = breadcrumb ? breadcrumb.getBoundingClientRect().height + 12 : 18;
+            const top = main ? main.scrollTop + rect.top - main.getBoundingClientRect().top - offset
+                : window.scrollY + rect.top - navHeight - 18;
+            (main || window).scrollTo({ top: Math.max(top, 0), behavior: 'instant' });
             element.setAttribute('tabindex', '-1');
             if (typeof element.focus === 'function') {
                 try {

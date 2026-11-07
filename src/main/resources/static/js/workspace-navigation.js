@@ -109,10 +109,11 @@
     // Geometry only, never cloned page HTML or business data. First visits use the
     // normal workspace spinner until the authorized destination HTML arrives.
     const layouts=new Map();
+    const scrollPositions=new Map();
     const sections='.dashboard-widget,.erp-panel,.erp-resource-section,.erp-detail-card,.accounting-section,.loan-flow-panel,[data-resource-table],.erp-table-wrap,.erp-stat-card';
     function layoutSpace(main){
         const rect=main.getBoundingClientRect(),css=getComputedStyle(main),number=name=>parseFloat(css[name]) || 0;
-        return {x:rect.left+number('borderLeftWidth')+number('paddingLeft'),y:rect.top+number('borderTopWidth')+number('paddingTop'),
+        return {x:rect.left+number('borderLeftWidth')+number('paddingLeft'),y:rect.top+number('borderTopWidth')+number('paddingTop')-main.scrollTop,
             width:Math.round(rect.width-number('borderLeftWidth')-number('borderRightWidth')-number('paddingLeft')-number('paddingRight'))};
     }
     function layoutKey(url,main){
@@ -320,6 +321,11 @@
         let didCommit=false,initialized=false,staged;
         const recover=options.submission?.form?.dataset.workspaceSubmit==='recover';
         const timeout=timers.setTimeout(()=>controller.abort(),20000);
+        const sourceMain=document.querySelector('.shell-main');
+        if(sourceMain && !sourceMain.hasAttribute('aria-busy')){
+            scrollPositions.delete(viewKey);scrollPositions.set(viewKey,{top:sourceMain.scrollTop,left:sourceMain.scrollLeft});
+            if(scrollPositions.size>32)scrollPositions.delete(scrollPositions.keys().next().value);
+        }
         if(!recover)feedback(false,url.href);
         try{
             const requestStartedAt=Date.now();
@@ -382,12 +388,13 @@
             initialized=true;
             booting=false;window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
             const title=document.querySelector('[data-workspace-flashbar] [data-app-toast]') || document.querySelector('.erp-page-title,h1,[data-workspace-title]');if(title){title.setAttribute('tabindex','-1');title.focus({preventScroll:true});}
-            if(!options.pop){
+            if(options.pop)document.querySelector('.shell-main').scrollTo({...scrollPositions.get(viewKey),behavior:'instant'});
+            else{
                 const notice=options.submission && document.querySelector('[data-workspace-flashbar] [data-app-toast]');
                 const anchor=finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));
                 if(notice && window.scrollToFeedback)window.scrollToFeedback(notice);
                 else if(notice || anchor)(notice || (anchor.previousElementSibling?.matches('[data-workspace-flashbar]')?anchor.previousElementSibling:anchor)).scrollIntoView({block:'start',behavior:'instant'});
-                else window.scrollTo({top:0,left:0,behavior:'instant'});
+                else document.querySelector('.shell-main').scrollTo({top:0,left:0,behavior:'instant'});
             }
             document.dispatchEvent(new CustomEvent('workspace:navigated',{detail:{url:finalUrl.href}}));
         }catch(error){

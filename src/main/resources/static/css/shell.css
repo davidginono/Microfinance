@@ -1135,7 +1135,6 @@ body.aws-console {
 }
 
 .shell-main {
-    min-height: calc(100vh - var(--shell-nav-height));
     --shell-workspace-inset: 12px;
     padding: var(--shell-workspace-inset) !important;
 }
@@ -3909,13 +3908,9 @@ body.aws-console {
 
 /* Section surfaces and facts are shared in workspace-resources.css. */
 
-.shell-main {
-    padding-top: 12px !important;
-}
-
 .erp-page-path {
     position: sticky !important;
-    top: var(--shell-nav-height) !important;
+    top: var(--shell-breadcrumb-top, var(--shell-nav-height)) !important;
     z-index: 37;
     display: flex;
     flex-wrap: wrap;
@@ -3968,13 +3963,30 @@ body.aws-console {
     margin-top: 0 !important;
 }
 
-/* Horizontal clipping must not turn shell ancestors into sticky scroll containers. */
-html:has(body.aws-console),
-body.aws-console,
-.aws-console-root,
-.aws-app-shell {
-    overflow-x: clip !important;
-    overflow-y: visible !important;
+/* The workspace scrolls below the fixed top bar; navigation scrolls independently. */
+@media screen {
+    html:has(body.aws-console),
+    body.aws-console,
+    .aws-console-root,
+    .aws-app-shell {
+        height: 100dvh;
+        overflow: hidden !important;
+    }
+
+    .shell-main {
+        --shell-breadcrumb-top: calc(-1 * var(--shell-workspace-inset));
+        height: calc(100dvh - var(--shell-nav-height));
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto !important;
+        scrollbar-gutter: stable;
+        overscroll-behavior-y: contain;
+        scroll-padding-top: calc(var(--shell-breadcrumb-height, 36px) + 12px);
+    }
+
+    body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([hidden]):not(.hidden), dialog[open], #sidebarOverlay:not(.hidden)) .shell-main {
+        overflow-y: hidden !important;
+    }
 }
 
 /* Active dialogs keep the document locked while their own body remains scrollable. */
@@ -3983,7 +3995,6 @@ body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([
     overflow: hidden !important;
 }
 
-.shell-main,
 .shell-content-frame {
     overflow-y: visible !important;
 }
@@ -4771,7 +4782,6 @@ body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([
 .app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #414d5c; color: #fff;}
 .workspace-navigation-feedback {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#f2f8fc;color:#414d5c;font-size:14px;line-height:20px;}
 .workspace-navigation-feedback[role=alert] {border:1px solid #d13212;background:#fff3f1;}
-html:has(body.aws-console) {scrollbar-gutter:stable;}
 .shell-main.is-workspace-pending {position:relative;}
 .shell-main.is-workspace-pending > :not(#workspace-navigation-feedback) {display:none!important;}
 .workspace-navigation-feedback.workspace-navigation-pending {display:block;background:transparent;padding:0;min-width:0;}
