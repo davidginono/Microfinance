@@ -318,6 +318,11 @@ public class GeneralLedgerService {
         var current=books.currentVersion(actor.getSaccoId(),old.accountId());var before=current.map(Version::proposed).orElse(null);
         require(old.operation().equals("CREATE")?current.isEmpty():current.isPresent(),"versionStale");
         var source=old.proposed();var a=before==null?source:before;
+        if(before==null && a.code().matches("LP-[A-F0-9]{32}-[PI]") && books.generatedLoanAccount(actor.getSaccoId(),a.id())) {
+            var parent=loanAccountFamily(actor,a.code().endsWith("-P"));int base=Integer.parseInt(parent.code());
+            String code=books.availableChartCode(actor.getSaccoId(),base+1,base+999,1).orElseThrow(()->invalid("chartCode"));
+            a=new Account(a.id(),code,a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),parent.id(),a.active(),a.nameSw(),a.description(),a.reporting());
+        }
         var proposed=new Account(a.id(),a.code(),source.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),old.operation().equals("REACTIVATE") || !old.operation().equals("DEACTIVATE") && a.active(),source.nameSw(),source.description(),source.reporting());
         var v=newDraft(actor,old.accountId(),current.map(Version::id).orElse(null),old.operation(),before,proposed,key,hash);books.createVersion(actor.getSaccoId(),v);
         form.setRevision(0);return saveAccountVersion(actor,v.id(),form,complete);
@@ -353,19 +358,37 @@ public class GeneralLedgerService {
         var actor=new AppUserPrincipal(member,userClaims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()),true);
         require(Objects.equals(institution,actor.getSaccoId()),"account");requireActor(actor,"LOAN_PRODUCTS_CREATE");
         books.lockAccounts(institution);initializeChartDefaults(actor);
-        String stem="LP-"+product.toString().replace("-","").toUpperCase(Locale.ROOT),name=trim(productName);
+        String name=trim(productName);
         require(!name.isEmpty(),"name");if(name.length()>140)name=name.substring(0,140);
         var versions=new ArrayList<Version>();
         for(String component:List.of("PRINCIPAL","INTEREST")) {
             boolean principal=component.equals("PRINCIPAL");UUID key=UUID.nameUUIDFromBytes(("PRODUCT_ACCOUNT/"+product+"/"+component).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             var prior=books.versionRequest(institution,key);
-            if(prior.isPresent()){versions.add(prior.get());continue;}
-            var parent=books.accountCode(institution,principal?"100000":"500000").orElseThrow(()->invalid("parent"));
-            var command=new AccountCommand(stem+(principal?"-P":"-I"),name+(principal?" - Principal":" - Interest"),principal?"ASSET":"INCOME",principal?"DEBIT":"CREDIT","POSTING",principal?"OTHER":"INCOME",parent.id(),null,"Loan product "+product+" "+component.toLowerCase(Locale.ROOT));
+            if(prior.isPresent()){versions.add(prior.get().state().equals("APPROVED")?prior.get():books.generatedAccountVersion(institution,prior.get().accountId()).orElseThrow());continue;}
+            var parent=loanAccountFamily(actor,principal);
+            int base=Integer.parseInt(parent.code());
+            String code=books.availableChartCode(institution,base+1,base+999,1).orElseThrow(()->invalid("chartCode"));
+            var command=new AccountCommand(code,name+(principal?" - Principal":" - Interest"),principal?"ASSET":"INCOME",principal?"DEBIT":"CREDIT","POSTING",principal?"OTHER":"INCOME",parent.id(),null,"Loan product "+product+" "+component.toLowerCase(Locale.ROOT));
             UUID version=createAccountVersion(actor,command,key,"Generated for loan product "+product,true,true);
             versions.add(books.version(institution,version).orElseThrow());
         }
         return new ProductAccountVersions(versions.get(0),versions.get(1));
+    }
+    private Account loanAccountFamily(AppUserPrincipal actor,boolean principal) {
+        var root=books.accountCode(actor.getSaccoId(),principal?"100000":"500000").orElseThrow(()->invalid("parent"));
+        var group=loanAccountGroup(actor,root,principal?"130000":"510000",principal?"Loans":"Loan income",principal?"Mikopo":"Mapato ya mikopo");
+        return loanAccountGroup(actor,group,principal?"131000":"511000",principal?"Loan principal":"Loan interest",principal?"Mtaji wa mkopo":"Riba ya mkopo");
+    }
+    private Account loanAccountGroup(AppUserPrincipal actor,Account parent,String code,String name,String nameSw) {
+        var group=books.accountCode(actor.getSaccoId(),code);
+        if(group.isEmpty()) {
+            require(!books.pendingCode(actor.getSaccoId(),code),"mainGroupConflict");
+            UUID id=persistAccount(actor,new AccountCommand(code,name,parent.type(),normalBalance(parent.type()),"HEADING","OTHER",parent.id(),nameSw,null));
+            group=books.account(actor.getSaccoId(),id);
+        }
+        var a=group.orElseThrow();
+        require(a.active() && a.kind().equals("HEADING") && a.type().equals(parent.type()) && a.normalBalance().equals(normalBalance(parent.type())) && Objects.equals(a.parentId(),parent.id()),"mainGroupConflict");
+        return a;
     }
     private void validateVersion(AppUserPrincipal actor,Version v) {
         var a=v.proposed();validateAccount(actor,new AccountCommand(a.code(),a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.nameSw(),a.description()));

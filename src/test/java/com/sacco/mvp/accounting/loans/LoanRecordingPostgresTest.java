@@ -640,6 +640,32 @@ class LoanRecordingPostgresTest {
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
         assertThatThrownBy(()->service.postingPreview(operator("B2"),post(loan,"120.00","WRONG-BRANCH"),"PAYMENT")).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void generatedAccountRenumberingPreservesPostedLoansAndContinuesRepayment() throws Exception {
+        var accounting=context.getBean(GeneralLedgerService.class);accounting.initializeChart(actor);
+        var books=new GeneralLedgerRepository(jdbc);
+        String stem="LP-"+product.toString().replace("-","").toUpperCase(Locale.ROOT);
+        principal=accounting.createAccount(actor,new com.sacco.mvp.accounting.dto.GeneralLedgerDtos.AccountCommand(stem+"-P","Legacy product principal","ASSET","DEBIT","POSTING","OTHER",books.accountCode(institution,"100000").orElseThrow().id(),null,null));
+        interest=accounting.createAccount(actor,new com.sacco.mvp.accounting.dto.GeneralLedgerDtos.AccountCommand(stem+"-I","Legacy product interest","INCOME","CREDIT","POSTING","INCOME",books.accountCode(institution,"500000").orElseThrow().id(),null,null));
+        configureProductAccounts(principal,interest);
+        var pair=new com.sacco.mvp.accounting.dto.GeneralLedgerDtos.ProductAccountVersions(books.currentVersion(institution,principal).orElseThrow(),books.currentVersion(institution,interest).orElseThrow());
+        var tx=new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        tx.executeWithoutResult(t->new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc).provision(institution,actor.getStationId(),product,actor.getMemberId(),pair,OffsetDateTime.now()));
+        UUID loan=disbursed("D-NUMBER-CORRECTION");receiptService().post(actor,receiptForm(loan));
+        var lines=jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where sacco_id=? order by id",institution);
+        var binding=jdbc.queryForMap("select * from loan_product_account_binding where loan_id=?",loan);
+        var balance=service.detail(actor,loan).loan().outstandingPrincipal();
+        String sql=new org.springframework.core.io.ClassPathResource("db/migration/V150__generated_loan_account_coa_numbers.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        tx.executeWithoutResult(t->jdbc.execute(sql));
+        assertThat(jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where sacco_id=? order by id",institution)).isEqualTo(lines);
+        assertThat(jdbc.queryForMap("select * from loan_product_account_binding where loan_id=?",loan)).isEqualTo(binding);
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo(balance);
+        assertThat(books.account(institution,principal).orElseThrow().code()).isEqualTo("131001");
+        assertThat(books.account(institution,interest).orElseThrow().code()).isEqualTo("511001");
+        var input=receiptForm(loan);var collected=receiptService().post(actor,input);
+        assertThat(receiptService().post(actor,input).header().id()).isEqualTo(collected.header().id());
+        receiptService().reverse(operator("B1"),collected.header().id(),UUID.randomUUID(),TODAY,"Correct post-numbering receipt");
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo(balance);
+    }
     @Test void arbitraryProductAccountTypesSupportChargedLoansAndBatchReceipts(){
         principal=account("CUSTOM-PRINCIPAL","EQUITY","CREDIT","POSTING","OTHER");interest=account("CUSTOM-INTEREST","ASSET","DEBIT","POSTING","INTEREST_RECEIVABLE");
         configureProductAccounts(principal,interest);chargePolicy("SEPARATE");

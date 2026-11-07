@@ -133,6 +133,12 @@ public class GeneralLedgerRepository {
     public int nextVersion(String institution,UUID account) {
         return jdbc.queryForObject("select coalesce(max(number),0)+1 from gl_account_version where sacco_id=? and account_id=?",Integer.class,institution,account);
     }
+    public Optional<Version> generatedAccountVersion(String institution,UUID account) {
+        return jdbc.query(VERSION_SELECT+" where v.sacco_id=? and v.account_id=? and v.operation in ('CREATE','BASELINE') order by v.number desc limit 1",this::version,institution,account).stream().findFirst();
+    }
+    public boolean generatedLoanAccount(String institution,UUID account) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_product_account_provision where sacco_id=? and (principal_account_id=? or interest_account_id=?))",Boolean.class,institution,account,account));
+    }
     public void createVersion(String institution,Version v) {
         jdbc.update("""
             insert into gl_account_version(id,sacco_id,account_id,number,base_id,operation,state,before_snapshot,snapshot,
