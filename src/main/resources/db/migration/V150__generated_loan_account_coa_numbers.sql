@@ -64,9 +64,10 @@ BEGIN
   WHERE EXISTS(SELECT 1 FROM gl_account_version v WHERE v.account_id=x.account_id AND v.sacco_id=g.sacco_id AND v.snapshot->>'code' ~ '^LP-[A-F0-9]{32}-[PI]$')
   ORDER BY g.sacco_id,g.created_at,g.product_id,x.principal DESC
  LOOP
+  PERFORM pg_advisory_xact_lock(hashtextextended('GL_SETUP/'||r.sacco_id,0));
   SELECT v.* INTO STRICT old FROM gl_account_version v
    WHERE v.sacco_id=r.sacco_id AND v.account_id=r.account_id AND v.operation IN ('CREATE','BASELINE')
-   ORDER BY v.number DESC LIMIT 1 FOR UPDATE;
+   ORDER BY v.number DESC LIMIT 1;
   -- Rejected/withdrawn creations get a fresh number when explicitly revised.
   IF NOT EXISTS(SELECT 1 FROM gl_account WHERE id=r.account_id AND sacco_id=r.sacco_id)
     AND old.state NOT IN ('DRAFT','PENDING') THEN CONTINUE; END IF;
@@ -99,7 +100,7 @@ BEGIN
    UPDATE gl_account SET code=number_code,parent_id=family,current_version_id=vid WHERE id=r.account_id AND sacco_id=r.sacco_id;
    -- Rebase an open metadata/lifecycle proposal without changing its submitted evidence
    -- or making an approval decision on behalf of its reviewer.
-   SELECT * INTO pending FROM gl_account_version WHERE sacco_id=r.sacco_id AND account_id=r.account_id AND state IN ('DRAFT','PENDING') FOR UPDATE;
+   SELECT * INTO pending FROM gl_account_version WHERE sacco_id=r.sacco_id AND account_id=r.account_id AND state IN ('DRAFT','PENDING');
    IF FOUND THEN
     replacement:=gen_random_uuid();
     UPDATE gl_account_version SET state='WITHDRAWN',revision=revision+1,decided_at=now(),decision_reason='System numbering correction; replacement '||replacement WHERE id=pending.id;
@@ -120,7 +121,6 @@ BEGIN
 END $$;
 ALTER TABLE gl_account ENABLE TRIGGER gl_account_protection;
 ALTER TABLE gl_account ENABLE TRIGGER gl_account_version_commit;
-DROP FUNCTION pg_temp.loan_number_group(varchar,uuid,varchar,varchar,varchar,varchar);
 
 -- A corrected baseline retains the original, real creation approval in the provision record.
 CREATE OR REPLACE FUNCTION link_generated_product_accounts(product uuid) RETURNS void LANGUAGE plpgsql AS $$
