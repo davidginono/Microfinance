@@ -120,7 +120,7 @@
                 <sec:authorize access="@access.has(principal, 'LOAN_REPORTS_VIEW') and @access.has(principal, 'ACCOUNTING_RECONCILIATION_VIEW')">
                     <a href="<c:url value='/reports/financial/sl-gl-reconciliation' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/reports/financial/sl-gl-reconciliation')?'shell-nav-active':''}"><spring:message code="reconciliation.title" /></a>
                 </sec:authorize>
-                <c:forEach items="${['DAILY_COLLECTIONS','CASHBOOK','LOAN_PORTFOLIO','PORTFOLIO_RISK','PORTFOLIO_ANALYSIS']}" var="reportKind">
+                <c:forEach items="${['DAILY_COLLECTIONS','CASHBOOK','LOAN_PORTFOLIO','PORTFOLIO_RISK','PORTFOLIO_ANALYSIS','DISBURSED_LOANS_AUDIT','EXPECTED_REPAYMENTS','LOAN_REPAYMENT_TRANSACTIONS']}" var="reportKind">
                     <c:set var="reportClaim" value="${reportKind=='DAILY_COLLECTIONS'?'ACCOUNTING_BUSINESS_VIEW':reportKind=='CASHBOOK'?'ACCOUNTING_JOURNALS_VIEW':'LOAN_REPORTS_VIEW'}" />
                     <sec:authorize access="@access.has(principal, '${reportClaim}')">
                         <c:set var="reportSlug" value="${fn:toLowerCase(fn:replace(reportKind,'_','-'))}" /><c:set var="reportPath" value="/reports/financial/operations/${reportSlug}" />

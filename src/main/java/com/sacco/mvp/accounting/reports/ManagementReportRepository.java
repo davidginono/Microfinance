@@ -57,9 +57,8 @@ public class ManagementReportRepository {
         var m=parameters(a,p).addValue("startAccount",p.startAccount(),Types.OTHER)
             .addValue("endAccount",p.endAccount(),Types.OTHER).addValue("bounded",p.startAccount()!=null || p.endAccount()!=null)
             .addValue("offset",export?0:p.page()*25).addValue("limit",export?5001:26);
-        String source=switch(kind){case DAILY_COLLECTIONS->DAILY;case CASHBOOK->CASH;default->loans(kind);};
-        var columns=com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind);
-        var money=columns.stream().filter(Column::money).map(Column::key).toList();
+        String source=switch(kind){case DAILY_COLLECTIONS->DAILY;case CASHBOOK->CASH;case DISBURSED_LOANS_AUDIT->disbursements();case EXPECTED_REPAYMENTS->expected();case LOAN_REPAYMENT_TRANSACTIONS->repayments();default->loans(kind);};
+        var money=com.sacco.mvp.accounting.management.dto.ManagementReports.totalFields(kind);
         boolean loan=kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS;
         String sums=money.stream().map(k->(loan?"case when count(*)=0 then 0 else sum(\""+k+"\") end":kind==Kind.CASHBOOK && !Set.of("moneyIn","moneyOut").contains(k)?"sum(\""+k+"\")":"coalesce(sum(\""+k+"\"),0)")+" as \""+k+"\"").reduce((x,y)->x+","+y).orElseThrow();
         var total=jdbc.queryForMap(source+" select count(*) count,"+sums+" from report_rows",m);
@@ -75,7 +74,8 @@ public class ManagementReportRepository {
               and (not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
                 or exists(select 1 from accountant_loan_receipt_row x join accountant_loan_receipt r on r.id=x.receipt_id
                   where x.posting_id=p.id and r.posted_at<=:cutoff)))
-            """,m,Long.class):kind==Kind.CASHBOOK?0:jdbc.queryForObject(source+" select (select count(*) from exposure where not complete)+(select coalesce(sum(excluded),0) from missing)",m,Long.class);
+            """,m,Long.class):kind==Kind.CASHBOOK?0:jdbc.queryForObject(source+" select (select count(*) from exposure where not complete)+(select coalesce(sum(excluded),0) from missing)"+(Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind)?"+(select count(*) from exposure e join cohort c using(loan_application_id) left join lifecycle x using(loan_application_id) where e.complete and (c.application_client is null"+(kind==Kind.EXPECTED_REPAYMENTS?" or x.written_off<>0 or x.cancelled<>0":"")+"))":""),m,Long.class);
+        if(loan && excluded>0 && ((Number)total.get("count")).longValue()==0)money.forEach(key->total.put(key,null));
         return new Data(rows,groups,totals(total,money),((Number)total.get("count")).longValue(),excluded);
     }
     private static Map<String,Object> row(ResultSet r)throws SQLException{var out=new LinkedHashMap<String,Object>();for(int n=1;n<=r.getMetaData().getColumnCount();n++)out.put(r.getMetaData().getColumnLabel(n),r.getObject(n));return out;}
@@ -151,6 +151,82 @@ public class ManagementReportRepository {
             and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.client_id,m.id)=:clientId)
         )
         """;
+    private static final String CLIENT_JOINS="""
+        join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch
+        join members m on m.id=a.applicant_member_id and m.sacco_id=a.sacco_id
+        left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id
+        """;
+    private static final String CLIENT_FILTER="""
+        (cast(:clientId as uuid) is null or m.id=:clientId)
+        and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)
+        """;
+    private static String disbursements(){
+        return LoanPortfolioReportRepository.SOURCE+"""
+            , report_rows as (
+              select to_char(e.disbursement_date,'YYYY-MM')||' | '||coalesce(r.product_name,a.loan_type) as "groupName",
+                e.disbursement_date::text||e.loan_id||a.id::text as "rowOrder",m.member_no as "clientNumber",m.full_name as name,e.loan_id as "loanId",
+                case when e.complete then e.original_principal end as disbursed,
+                case when e.complete then e.scheduled_interest end as "totalInterest",
+                case when e.complete then e.periodic_payment end as instalment,
+                a.repayment_frequency as frequency,e.disbursement_date as "disbursementDate",
+                case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,
+                p.reference,p.money_account_name as "disbursementAccount"
+              from exposure e
+            """+CLIENT_JOINS+"""
+              left join accountant_loan_post p on p.loan_id=a.id and p.sacco_id=a.sacco_id and p.station_id=a.station_id
+                and p.kind='DISBURSEMENT' and p.state='POSTED' and p.recorded_at<=:cutoff
+                and exists(select 1 from gl_journal j where j.id=p.journal_id and j.state='POSTED' and j.posted_at<=:cutoff)
+              where e.disbursement_date>=:from and
+            """+CLIENT_FILTER+") ";
+    }
+    private static String expected(){
+        String known=LoanPortfolioReportRepository.SOURCE.replace(":through","least(:through,cast(:cutoff at time zone 'Africa/Dar_es_Salaam' as date))");
+        return known+"""
+            , report_rows as (
+              select coalesce(r.product_name,a.loan_type) as "groupName",i.due_date::text||e.loan_id||i.id::text as "rowOrder",
+                m.member_no as "clientNumber",m.full_name as name,m.phone,e.loan_id as "loanId",i.due_date as "dueDate",
+                e.principal as "principalBalance",i.principal-coalesce(pa.principal,0) as "principalDue",
+                i.interest-coalesce(pa.interest,0)-coalesce(pa.excluded,0)-coalesce(w.waived,0) as "interestDue",
+                i.principal-coalesce(pa.principal,0)+i.interest-coalesce(pa.interest,0)-coalesce(pa.excluded,0)-coalesce(w.waived,0) as "expectedTotal"
+              from exposure e
+            """+CLIENT_JOINS+"""
+              join loan_ledger_installments i on i.loan_application_id=e.loan_application_id
+              left join installment_allocations pa on pa.installment_id=i.id
+              left join waiver_allocations w on w.installment_id=i.id
+              where e.complete and not exists(select 1 from lifecycle x where x.loan_application_id=e.loan_application_id and (x.written_off<>0 or x.cancelled<>0))
+                and i.due_date between :from and :through
+                and (i.principal>coalesce(pa.principal,0) or i.interest>coalesce(pa.interest,0)+coalesce(pa.excluded,0)+coalesce(w.waived,0)) and
+            """+CLIENT_FILTER+") ";
+    }
+    private static String repayments(){
+        return LoanPortfolioReportRepository.SOURCE+"""
+            , principal_events as (
+              select t.loan_application_id,t.id,t.id transaction_id,t.payment_date date,t.posted_at,t.sequence,-t.sign*t.principal_amount change
+              from transactions t join exposure e on e.loan_application_id=t.loan_application_id where e.complete
+              union all
+              select q.loan_id,q.id,null::uuid,q.effective_date,j.posted_at,0,q.principal_change
+              from loan_adjustment_request q join loan_adjustment_decision d on d.request_id=q.id
+              join gl_journal j on j.id=d.journal_id and j.state='POSTED'
+              join exposure e on e.loan_application_id=q.loan_id and e.complete
+              where q.sacco_id=:institution and q.station_id=:branch and q.effective_date<=:through and j.posted_at<=:cutoff
+            ), running_principal as (
+              select v.*,e.original_principal+sum(v.change) over(partition by v.loan_application_id order by v.date,v.posted_at,v.sequence,v.id rows unbounded preceding) balance
+              from principal_events v join exposure e on e.loan_application_id=v.loan_application_id
+            ), report_rows as (
+              select m.member_no||' | '||m.full_name||' | '||e.loan_id||' | '||coalesce(r.product_name,a.loan_type) as "groupName",
+                t.payment_date::text||t.posted_at::text||lpad(t.sequence::text,20,'0')||t.id::text as "rowOrder",
+                t.payment_date date,t.receipt_reference reference,t.kind as "entryKind",original.receipt_reference as "reversesReference",
+                v.balance-v.change as "openingPrincipal",t.sign*t.principal_amount as "principalPaid",t.sign*t.interest_amount as "interestPaid",
+                t.sign*t.amount as payment,t.sign*t.future_interest_excluded as "interestExcluded",v.balance as "closingPrincipal",e.original_principal disbursed,e.principal as "principalBalance"
+              from exposure e
+            """+CLIENT_JOINS+"""
+              join transactions t on t.loan_application_id=e.loan_application_id
+              join running_principal v on v.transaction_id=t.id
+              left join loan_repayment_transactions original on original.id=t.reverses_transaction_id
+                and original.sacco_id=:institution and original.station_id=:branch
+              where e.complete and t.payment_date>=:from and
+            """+CLIENT_FILTER+") ";
+    }
     private static String loans(Kind kind){
         String band="case when e.dpd<=30 then 0 when e.dpd<=90 then 1 when e.dpd<=180 then 2 when e.dpd<=365 then 3 else 4 end";
         var values=new LinkedHashMap<String,String>();

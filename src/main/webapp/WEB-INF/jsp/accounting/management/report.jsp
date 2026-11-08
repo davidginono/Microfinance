@@ -18,8 +18,8 @@
   <c:if test="${not empty formError}"><p class="coa-error" role="alert" tabindex="-1"><spring:message code="${formError}" /></p></c:if>
   <input type="hidden" name="run" value="true" />
   <div class="management-filter-grid">
-    <c:if test="${kind!='PORTFOLIO_RISK' and kind!='PORTFOLIO_ANALYSIS'}"><label><spring:message code="${kind=='LOAN_PORTFOLIO'?'management.disbursedFrom':'management.from'}" /><input class="aws-control" name="from" type="date" value="<c:out value='${filter.from}' />" max="${today}" required /></label></c:if>
-    <label><spring:message code="${kind=='PORTFOLIO_RISK' or kind=='PORTFOLIO_ANALYSIS'?'management.asAt':(kind=='LOAN_PORTFOLIO'?'management.disbursedThrough':'management.through')}" /><input class="aws-control" name="through" type="date" value="<c:out value='${filter.through}' />" max="${today}" required /></label>
+    <c:if test="${kind!='PORTFOLIO_RISK' and kind!='PORTFOLIO_ANALYSIS'}"><label><spring:message code="${(kind=='LOAN_PORTFOLIO' or kind=='DISBURSED_LOANS_AUDIT')?'management.disbursedFrom':kind=='EXPECTED_REPAYMENTS'?'management.dueFrom':'management.from'}" /><input class="aws-control" name="from" type="date" value="<c:out value='${filter.from}' />" max="${kind=='EXPECTED_REPAYMENTS'?today.plusDays(366):today}" required /></label></c:if>
+    <label><spring:message code="${kind=='PORTFOLIO_RISK' or kind=='PORTFOLIO_ANALYSIS'?'management.asAt':((kind=='LOAN_PORTFOLIO' or kind=='DISBURSED_LOANS_AUDIT')?'management.disbursedThrough':kind=='EXPECTED_REPAYMENTS'?'management.dueThrough':'management.through')}" /><input class="aws-control" name="through" type="date" value="<c:out value='${filter.through}' />" max="${kind=='EXPECTED_REPAYMENTS'?today.plusDays(366):today}" required /></label>
     <c:if test="${kind=='DAILY_COLLECTIONS' or kind=='CASHBOOK'}">
       <c:url value="/reports/financial/operations/${reportName}/choices/accounts" var="accountLookup" />
       <c:forEach items="${['start','end']}" var="edge">

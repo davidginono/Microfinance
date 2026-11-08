@@ -32,21 +32,26 @@ public class ManagementReportPdf {
             if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message("accounts",locale)+": "+(r.parameters().startAccount()==null && r.parameters().endAccount()==null?message("allAccounts",locale):r.accountSelection()));
             if(!r.clientSelection().isBlank())context.add(message("client",locale)+": "+r.clientSelection());
             if(!r.parameters().product().isBlank())context.add(message("productSearch",locale)+": "+r.parameters().product());
-            try(var page=new AccountingPdfDocument(document,font,true,message("title."+r.kind(),locale),context,null,AccountingPdfDocument.Style.REFERENCE)){
+            try(var page=new AccountingPdfDocument(document,font,true,message("title."+r.kind(),locale),context,null,r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS?AccountingPdfDocument.Style.REPAYMENT:AccountingPdfDocument.Style.REFERENCE)){
                 float total=(float)r.columns().stream().mapToDouble(Column::width).sum();float[] widths=new float[r.columns().size()];boolean[] numeric=new boolean[widths.length];
                 for(int n=0;n<widths.length;n++){widths[n]=r.columns().get(n).width()/total;numeric[n]=r.columns().get(n).money();}
                 var labels=r.columns().stream().map(c->message("field."+c.key(),locale)).toList();
-                String day=null;
+                var groupFacts=r.getGroupFacts();
+                String day=null,month=null;
                 for(var group:r.groups()){
+                    if(r.kind()==Kind.DISBURSED_LOANS_AUDIT && month!=null && !group.name().startsWith(month))page.row(totalRow(r,r.getMonthlyTotals().get(month),message("monthTotal",locale),locale),true);
                     if(r.kind()==Kind.DAILY_COLLECTIONS && day!=null && !group.name().startsWith(day))page.row(totalRow(r,r.getDailyTotals().get(day),message("dayTotal",locale),locale),true);
                     String activity=group.name().contains(" | ")?group.name().substring(group.name().indexOf(" | ")+3):"";
                     String groupTitle=Set.of("@loan","@general").contains(activity)?group.name().substring(0,group.name().indexOf(" | ")+3)+message(activity.equals("@loan")?"loanRepayments":"generalReceipts",locale):group.name();
-                    page.endTable();page.section(com.sacco.mvp.service.ApplicationTimestamps.display(groupTitle));page.columns(labels,widths,numeric);
-                    for(var row:r.rows())if(Objects.equals(row.get("groupName"),group.name()))page.row(r.columns().stream().map(c->"transaction".equals(c.key()) && Set.of("PRINCIPAL","INTEREST").contains(Objects.toString(row.get("component"),""))?message("component."+row.get("component"),locale)+" — "+value(row.get(c.key()),locale):value(row.get(c.key()),locale)).toList(),false);
+                    page.endTable();page.section(com.sacco.mvp.service.ApplicationTimestamps.display(groupTitle));
+                    if(r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS){var facts=groupFacts.get(group.name());page.text(message("field.disbursed",locale)+": "+value(facts.get("disbursed"),locale)+" | "+message("field.principalBalance",locale)+": "+value(facts.get("principalBalance"),locale));}
+                    page.columns(labels,widths,numeric);
+                    for(var row:r.rows())if(Objects.equals(row.get("groupName"),group.name()))page.row(r.columns().stream().map(c->"entryKind".equals(c.key())?message("entry."+row.get(c.key()),locale):"frequency".equals(c.key()) && Set.of("MONTHLY","WEEKLY").contains(Objects.toString(row.get(c.key()),""))?messages.getMessage("recording.frequency."+row.get(c.key()),null,locale):"transaction".equals(c.key()) && Set.of("PRINCIPAL","INTEREST").contains(Objects.toString(row.get("component"),""))?message("component."+row.get("component"),locale)+" — "+value(row.get(c.key()),locale):value(row.get(c.key()),locale)).toList(),false);
                     page.row(totalRow(r,group.totals(),message("groupTotal",locale),locale),true);
-                    day=group.name().substring(0,Math.min(10,group.name().length()));
+                    day=group.name().substring(0,Math.min(10,group.name().length()));month=group.name().substring(0,Math.min(7,group.name().length()));
                 }
                 if(r.kind()==Kind.DAILY_COLLECTIONS && day!=null)page.row(totalRow(r,r.getDailyTotals().get(day),message("dayTotal",locale),locale),true);
+                if(r.kind()==Kind.DISBURSED_LOANS_AUDIT && month!=null)page.row(totalRow(r,r.getMonthlyTotals().get(month),message("monthTotal",locale),locale),true);
                 if(r.groups().isEmpty()){page.columns(labels,widths,numeric);page.text(message("empty",locale));}
                 page.row(totalRow(r,r.totals(),message("total",locale),locale),true);
                 page.endTable();page.section(message("basis",locale));page.text(message("coverage."+r.kind(),locale));
@@ -61,6 +66,6 @@ public class ManagementReportPdf {
             document.save(out);return out.toByteArray();
         }catch(IOException failure){throw new IllegalStateException("PDF generation failed",failure);}
     }
-    private List<String> totalRow(Result r,Map<String,BigDecimal> totals,String title,Locale locale){var values=new ArrayList<String>();for(int n=0;n<r.columns().size();n++){var c=r.columns().get(n);values.add(n==0?title:c.money()?value(totals.get(c.key()),locale):"");}return values;}
+    private List<String> totalRow(Result r,Map<String,BigDecimal> totals,String title,Locale locale){var values=new ArrayList<String>();for(int n=0;n<r.columns().size();n++){var c=r.columns().get(n);values.add(n==0?title:c.money() && totals.containsKey(c.key())?value(totals.get(c.key()),locale):"");}return values;}
     private String value(Object value,Locale locale){if(value==null)return "—";if(value instanceof BigDecimal n){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(n);}return com.sacco.mvp.service.ApplicationTimestamps.display(value);}
 }

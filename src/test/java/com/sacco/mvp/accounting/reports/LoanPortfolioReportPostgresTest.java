@@ -30,9 +30,10 @@ class LoanPortfolioReportPostgresTest {
     JdbcTemplate jdbc;TransactionTemplate tx;LoanPortfolioReportRepository repository;LoanPortfolioReportService service;
     MemberDirectoryService members;UserClaimService claims;SaccoRegistryService institutions;ApplicationClock clock;
     String institution;AppUserPrincipal actor;Scope branch,wide;Parameters p;int number;
-    @BeforeAll void start(){var ds=new DriverManagerDataSource(System.getenv("MICROFINANCE_ACCOUNTING_E_DATABASE_URL"),"microfinance_test","");Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
+    @BeforeAll void start(){var ds=new SingleConnectionDataSource(System.getenv("MICROFINANCE_ACCOUNTING_E_DATABASE_URL"),"microfinance_test","",true);var connectionProperties=new Properties();connectionProperties.setProperty("sslmode","disable");ds.setConnectionProperties(connectionProperties);Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);clock=mock(ApplicationClock.class);
         repository=new LoanPortfolioReportRepository(new NamedParameterJdbcTemplate(jdbc));var proxy=new ProxyFactory(new LoanPortfolioReportService(members,claims,institutions,clock,repository));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(LoanPortfolioReportService)proxy.getProxy();}
+    @AfterAll void close(){if(jdbc!=null)((SingleConnectionDataSource)jdbc.getDataSource()).destroy();}
     @BeforeEach void fixture(){reset(members,claims,institutions,clock);institution="PORTFOLIO-"+UUID.randomUUID();number=jdbc.queryForObject("select coalesce(max(application_number),999)+1 from loan_applications",Integer.class);
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic portfolio tests");
         for(String b:List.of("B1","B2")){jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at,access_status) values(?,?,?,true,now(),now(),'ACTIVE')",UUID.randomUUID(),institution,b);when(institutions.findStation(institution,b)).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId(b).active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));}
@@ -43,9 +44,79 @@ class LoanPortfolioReportPostgresTest {
         var schedule=new ArrayList<Map<String,Object>>();schedule.add(Map.of("dueDate",due.toString(),"principalComponent",duePrincipal,"interestComponent",i,"amount",duePrincipal.add(i)));if(duePrincipal.compareTo(amount)<0)schedule.add(Map.of("dueDate",DAY.plusDays(30).toString(),"principalComponent",amount.subtract(duePrincipal),"interestComponent",BigDecimal.ZERO,"amount",amount.subtract(duePrincipal)));var json=JsonMapper.builder().build().writeValueAsString(Map.of("schedule",schedule));
         tx.executeWithoutResult(s->{jdbc.update("insert into loan_applications(id,amount,applicant_member_id,created_at,updated_at,disbursement_date,form_data,loan_type,policy_snapshot,repayment_schedule_json,required_guarantors,sacco_id,station_id,status,tenor_months,version,loan_id,application_number) values(?,?,?,now(),now(),?,'{}','DEVELOPMENT_LOAN','{}',?::jsonb,0,?,?,'DISBURSED',1,0,?,?)",id,amount,actor.getMemberId(),disbursed,json,institution,b,Integer.toString(n),n);jdbc.update("insert into loan_ledgers(loan_application_id,sacco_id,station_id,loan_id,applicant_member_id,disbursement_date,principal,created_at) values(?,?,?,?,?,?,?,now())",id,institution,b,Integer.toString(n),actor.getMemberId(),disbursed,amount);jdbc.update("insert into loan_ledger_installments(id,loan_application_id,installment_number,due_date,principal,interest) values(?,?,1,?,?,?)",installment,id,due,duePrincipal,i);if(duePrincipal.compareTo(amount)<0)jdbc.update("insert into loan_ledger_installments(id,loan_application_id,installment_number,due_date,principal,interest) values(?,?,2,?,?,0)",UUID.randomUUID(),id,DAY.plusDays(30),amount.subtract(duePrincipal));if(origin){UUID voucher=UUID.randomUUID();journal(id,null,voucher,"LOAN_PRINCIPAL",amount,BigDecimal.ZERO,disbursed);journal(id,null,voucher,"DISBURSEMENT_CLEARING",BigDecimal.ZERO,amount,disbursed);}});return new Loan(id,installment,amount,i,due);}
     void journal(UUID loan,UUID transaction,UUID voucher,String code,BigDecimal debit,BigDecimal credit,LocalDate date){jdbc.update("insert into loan_journal_entries(id,loan_application_id,transaction_id,voucher_id,account_code,debit,credit,effective_date,posted_at) values(?,?,?,?,?,?,?,?,now())",UUID.randomUUID(),loan,transaction,voucher,code,debit,credit,date);}
-    UUID payment(Loan loan,String b,String principal,String interest,LocalDate date,UUID reverses,boolean allocations){UUID id=UUID.randomUUID();BigDecimal a=new BigDecimal(principal),i=new BigDecimal(interest);boolean reverse=reverses!=null;
-        tx.executeWithoutResult(s->{jdbc.update("insert into loan_repayment_transactions(id,loan_application_id,sacco_id,station_id,sequence,receipt_reference,request_key,kind,channel,channel_reference,payment_date,amount,principal_amount,interest_amount,actor_member_id,reverses_transaction_id,reason,loan_status_before,posted_at) values(?,?,?,?,?,?,?,?, 'CASH',?,?,?,?,?,?,?,?,'DISBURSED',now())",id,loan.id(),institution,b,reverse?2:1,id.toString(),UUID.randomUUID(),reverse?"REVERSAL":"PAYMENT",id.toString(),date,a.add(i),a,i,actor.getMemberId(),reverses,reverse?"Synthetic reversal":null);if(allocations)jdbc.update("insert into loan_repayment_allocations(id,transaction_id,installment_id,principal_amount,interest_amount) values(?,?,?,?,?)",UUID.randomUUID(),id,loan.installment(),a,i);journal(loan.id(),id,id,"CASH_CLEARING",reverse?BigDecimal.ZERO:a.add(i),reverse?a.add(i):BigDecimal.ZERO,date);if(a.signum()>0)journal(loan.id(),id,id,"LOAN_PRINCIPAL",reverse?a:BigDecimal.ZERO,reverse?BigDecimal.ZERO:a,date);if(i.signum()>0)journal(loan.id(),id,id,"INTEREST_COLLECTIONS_CLEARING",reverse?i:BigDecimal.ZERO,reverse?BigDecimal.ZERO:i,date);});return id;}
+    UUID payment(Loan loan,String b,String principal,String interest,LocalDate date,UUID reverses,boolean allocations){return payment(loan,b,principal,interest,date,reverses,allocations,"0");}
+    UUID payment(Loan loan,String b,String principal,String interest,LocalDate date,UUID reverses,boolean allocations,String excluded){UUID id=UUID.randomUUID();BigDecimal a=new BigDecimal(principal),i=new BigDecimal(interest);boolean reverse=reverses!=null;
+        tx.executeWithoutResult(s->{jdbc.update("insert into loan_repayment_transactions(id,loan_application_id,sacco_id,station_id,sequence,receipt_reference,request_key,kind,channel,channel_reference,payment_date,amount,principal_amount,interest_amount,actor_member_id,reverses_transaction_id,reason,loan_status_before,posted_at,future_interest_excluded) values(?,?,?,?,?,?,?,?, 'CASH',?,?,?,?,?,?,?,?,'DISBURSED',now(),?)",id,loan.id(),institution,b,reverse?2:1,id.toString(),UUID.randomUUID(),reverse?"REVERSAL":"PAYMENT",id.toString(),date,a.add(i),a,i,actor.getMemberId(),reverses,reverse?"Synthetic reversal":null,new BigDecimal(excluded));if(allocations)jdbc.update("insert into loan_repayment_allocations(id,transaction_id,installment_id,principal_amount,interest_amount,interest_excluded) values(?,?,?,?,?,?)",UUID.randomUUID(),id,loan.installment(),a,i,new BigDecimal(excluded));if(new BigDecimal(excluded).signum()>0){var sign=reverse?BigDecimal.ONE.negate():BigDecimal.ONE;jdbc.update("update loan_ledgers set principal_paid=principal_paid+?,interest_paid=interest_paid+? where loan_application_id=?",a.multiply(sign),i.multiply(sign),loan.id());jdbc.update("update loan_ledger_installments set principal_paid=principal_paid+?,interest_paid=interest_paid+?,interest_excluded=interest_excluded+? where id=?",a.multiply(sign),i.multiply(sign),new BigDecimal(excluded).multiply(sign),loan.installment());}journal(loan.id(),id,id,"CASH_CLEARING",reverse?BigDecimal.ZERO:a.add(i),reverse?a.add(i):BigDecimal.ZERO,date);if(a.signum()>0)journal(loan.id(),id,id,"LOAN_PRINCIPAL",reverse?a:BigDecimal.ZERO,reverse?BigDecimal.ZERO:a,date);if(i.signum()>0)journal(loan.id(),id,id,"INTEREST_COLLECTIONS_CLEARING",reverse?i:BigDecimal.ZERO,reverse?BigDecimal.ZERO:i,date);});return id;}
     Parameters cutoff(){return new Parameters(p.from(),p.through(),OffsetDateTime.now(),0);}
+    com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters reportParameters(LocalDate from,LocalDate through,OffsetDateTime cutoff,int page){
+        return new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,null,null,null,"",page);
+    }
+    ManagementReportRepository management(){return new ManagementReportRepository(new NamedParameterJdbcTemplate(jdbc));}
+    @Test void futureInterestExclusionsAreNotCashAndReversalRestoresExpectedAmounts(){
+        var loan=loan("B1","100.00","5.00",-30,true);
+        var payment=payment(loan,"B1","100.00","0.00",DAY,null,true,"5.00");
+        var expected=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.EXPECTED_REPAYMENTS;
+        var p=reportParameters(DAY,DAY.plusDays(30),OffsetDateTime.now(),0);
+        assertThat(management().read(actor,expected,p,false).count()).isZero();
+        var transactions=management().read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_REPAYMENT_TRANSACTIONS,p,false);
+        assertThat(transactions.totals().get("payment")).isEqualByComparingTo("100.00");
+        assertThat(transactions.totals().get("interestExcluded")).isEqualByComparingTo("5.00");
+        payment(loan,"B1","100.00","0.00",DAY,payment,true,"5.00");
+        assertThat(management().read(actor,expected,reportParameters(DAY,DAY.plusDays(30),OffsetDateTime.now(),0),false).totals().get("expectedTotal")).isEqualByComparingTo("105.00");
+    }
+    @Test void excludedHistoryCannotClaimZeroExpectedRepayments(){
+        loan("B1","100.00","5.00",0,false);
+        var result=management().read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.EXPECTED_REPAYMENTS,reportParameters(DAY,DAY,OffsetDateTime.now(),0),false);
+        assertThat(result.count()).isZero();assertThat(result.excluded()).isEqualTo(1);
+        assertThat(result.totals().get("expectedTotal")).isNull();
+    }
+    @Test void expectedRepaymentsUseUnpaidFutureTermsAndRecordedCutoffs(){
+        var loan=loan("B1","100.00","5.00",0,true,new BigDecimal("40.00"));
+        loan("B2","900.00","9.00",0,true);
+        var before=OffsetDateTime.now();
+        payment(loan,"B1","10.00","5.00",DAY,null,true);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.EXPECTED_REPAYMENTS;
+        var now=management().read(actor,kind,reportParameters(DAY,DAY.plusDays(30),OffsetDateTime.now(),0),false);
+        assertThat(now.count()).isEqualTo(2);assertThat(now.excluded()).isZero();
+        assertThat(now.totals()).containsOnlyKeys("principalDue","interestDue","expectedTotal");
+        assertThat(now.totals().get("principalDue")).isEqualByComparingTo("90.00");
+        assertThat(now.totals().get("interestDue")).isZero();
+        var old=management().read(actor,kind,reportParameters(DAY,DAY.plusDays(30),before,0),false);
+        assertThat(old.totals().get("expectedTotal")).isEqualByComparingTo("105.00");
+        assertThat(now.rows()).allSatisfy(row->assertThat((BigDecimal)row.get("principalBalance")).isEqualByComparingTo("90.00"));
+    }
+    @Test void repaymentTransactionsRetainSignedCorrectionsAndBalancesBeforeDateFilter(){
+        var loan=loan("B1","100.00","5.00",0,true);
+        var first=payment(loan,"B1","20.00","5.00",DAY.minusDays(1),null,true);
+        payment(loan,"B1","20.00","5.00",DAY,first,true);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_REPAYMENT_TRANSACTIONS;
+        var result=management().read(actor,kind,reportParameters(DAY,DAY,OffsetDateTime.now(),0),false);
+        assertThat(result.rows()).singleElement().satisfies(row->{
+            assertThat(row.get("entryKind")).isEqualTo("REVERSAL");assertThat(row.get("reversesReference")).isEqualTo(first.toString());
+            assertThat((BigDecimal)row.get("openingPrincipal")).isEqualByComparingTo("80.00");
+            assertThat((BigDecimal)row.get("closingPrincipal")).isEqualByComparingTo("100.00");
+        });
+        assertThat(result.totals().get("payment")).isEqualByComparingTo("-25.00");
+        assertThat(result.totals()).doesNotContainKeys("openingPrincipal","closingPrincipal");
+    }
+    @Test void disbursementAuditUsesMonthGroupsAndPreservesUnknownSources(){
+        loan("B1","100.00","5.00",0,true);loan("B1","200.00","5.00",0,false);loan("B2","900.00","9.00",0,true);
+        var result=management().read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DISBURSED_LOANS_AUDIT,reportParameters(DAY.minusDays(100),DAY,OffsetDateTime.now(),0),false);
+        assertThat(result.count()).isEqualTo(2);assertThat(result.excluded()).isEqualTo(1);
+        assertThat(result.totals().get("disbursed")).isEqualByComparingTo("100.00");
+        assertThat(result.groups()).singleElement().satisfies(g->assertThat(g.name()).startsWith("2026-06 | "));
+        assertThat(result.rows()).allSatisfy(row->assertThat(row.get("disbursementAccount")).isNull());
+    }
+    @Test void expectedPreviewIsBoundedAndUnverifiedSchedulesNeverBecomeReceivables(){
+        for(int n=0;n<28;n++)loan("B1","0.01","0.00",0,true);
+        loan("B1","99.00","1.00",0,false);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.EXPECTED_REPAYMENTS;
+        var first=management().read(actor,kind,reportParameters(DAY,DAY,OffsetDateTime.now(),0),false);
+        assertThat(first.rows()).hasSize(26);assertThat(first.count()).isEqualTo(28);assertThat(first.excluded()).isEqualTo(1);
+        assertThat(first.totals().get("expectedTotal")).isEqualByComparingTo("0.28");
+        var second=management().read(actor,kind,reportParameters(DAY,DAY,OffsetDateTime.now(),1),false);
+        assertThat(second.rows()).hasSize(3);assertThat(second.totals()).isEqualTo(first.totals());
+    }
     @Test void referenceRiskBandsUseWholeExposureAtEveryBoundaryAndRoundEachLoan(){
         var expected=new java.util.LinkedHashMap<UUID,Integer>();int[] days={30,31,90,91,180,181,365,366},bands={0,1,1,2,2,3,3,4};
         for(int n=0;n<days.length;n++)expected.put(loan("B1","10.01","1.00",days[n],true).id(),bands[n]);

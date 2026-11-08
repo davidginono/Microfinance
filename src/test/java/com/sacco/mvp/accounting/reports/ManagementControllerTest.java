@@ -48,6 +48,16 @@ class ManagementControllerTest {
         mvc.perform(get("/reports/financial/operations/cashbook")).andExpect(status().isOk()).andExpect(view().name("accounting/management/report"));verify(reports,never()).report(any(),any(),any(),anyBoolean());
         mvc.perform(get("/reports/financial/operations/cashbook").param("run","true").param("from","invalid")).andExpect(status().isBadRequest()).andExpect(model().attribute("formError","management.error.parameters"));
     }
+    @Test void newLoanReportsKeepParameterAndExportPaths()throws Exception{
+        for(var slug:List.of("disbursed-loans-audit","expected-repayments","loan-repayment-transactions")){
+            var kind=ManagementReportController.kind(slug);
+            var result=mvc.perform(get("/reports/financial/operations/"+slug)).andExpect(status().isOk()).andExpect(model().attribute("kind",kind)).andReturn();
+            if(kind==Kind.EXPECTED_REPAYMENTS)assertThat(((ManagementReportController.Filter)result.getModelAndView().getModel().get("filter")).getThrough()).isEqualTo("2026-10-31");
+            verify(reports).authorize(actor,kind,false);
+            when(reports.report(eq(actor),eq(kind),any(),eq(true))).thenThrow(new AccessDeniedException("Export revoked"));
+            for(var output:List.of("pdf","print"))assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/"+slug+"/"+output))).hasRootCauseInstanceOf(AccessDeniedException.class);
+        }
+    }
     @Test void printAndPdfRequireTheExportAuthorizationPath()throws Exception{
         when(reports.report(eq(actor),eq(Kind.CASHBOOK),any(),eq(true))).thenThrow(new AccessDeniedException("Export revoked"));
         assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/cashbook/pdf"))).hasRootCauseInstanceOf(AccessDeniedException.class);

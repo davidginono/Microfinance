@@ -47,7 +47,7 @@ public class ManagementReportService {
     private static void accountReport(Kind kind){check(kind==Kind.CASHBOOK || kind==Kind.DAILY_COLLECTIONS,"parameters");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
     public Result report(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
-        authorize(a,kind,export);validate(p,clock.today(),clock.now());
+        authorize(a,kind,export);validate(p,clock.today(),clock.now(),kind);
         return limiter.run(()->{
             var selected=selectedRange(a,kind,p.startAccount(),p.endAccount());
             var start=p.startAccount()==null?null:selected.get(p.startAccount());
@@ -63,9 +63,12 @@ public class ManagementReportService {
         });
     }
     public static void validate(Parameters p,java.time.LocalDate today,java.time.OffsetDateTime now){
+        validate(p,today,now,null);
+    }
+    public static void validate(Parameters p,java.time.LocalDate today,java.time.OffsetDateTime now,Kind kind){
         check(p!=null && p.from()!=null && p.through()!=null && p.cutoff()!=null,"parameters");
         check(p.from().getYear()>=1900 && !p.through().isBefore(p.from()) && !p.through().isAfter(p.from().plusDays(366))
-            && !p.through().isAfter(today) && !p.cutoff().isAfter(now) && p.page()>=0 && p.page()<=10000,"parameters");
+            && !p.through().isAfter(kind==Kind.EXPECTED_REPAYMENTS?today.plusDays(366):today) && !p.cutoff().isAfter(now) && p.page()>=0 && p.page()<=10000,"parameters");
         check(p.product()!=null && p.product().length()<=100 && p.product().chars().noneMatch(Character::isISOControl),"parameters");
     }
     private static void check(boolean valid,String key){if(!valid)throw error(key);}

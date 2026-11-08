@@ -29,6 +29,19 @@ class ManagementReportTest {
         assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY,DAY,NOW.plusSeconds(1),null,null,null,"",0),DAY,NOW)).hasMessage("management.error.parameters");
         assertThatThrownBy(()->ManagementReportService.validate(parameters(-1),DAY,NOW)).hasMessage("management.error.parameters");
     }
+    @Test void expectedDatesAllowForecastsWithoutFutureRecordedKnowledgeOrOtherFutureReports(){
+        var future=new Parameters(DAY,DAY.plusDays(30),NOW,null,null,null,"",0);
+        ManagementReportService.validate(future,DAY,NOW,Kind.EXPECTED_REPAYMENTS);
+        for(var kind:List.of(Kind.DISBURSED_LOANS_AUDIT,Kind.LOAN_REPAYMENT_TRANSACTIONS))
+            assertThatThrownBy(()->ManagementReportService.validate(future,DAY,NOW,kind)).hasMessage("management.error.parameters");
+        assertThatThrownBy(()->ManagementReportService.validate(new Parameters(DAY,DAY.plusDays(30),NOW.plusSeconds(1),null,null,null,"",0),DAY,NOW,Kind.EXPECTED_REPAYMENTS)).hasMessage("management.error.parameters");
+        assertThat(ManagementReports.totalFields(Kind.DISBURSED_LOANS_AUDIT)).doesNotContain("instalment");
+        assertThat(ManagementReports.totalFields(Kind.EXPECTED_REPAYMENTS)).doesNotContain("principalBalance");
+        assertThat(ManagementReports.totalFields(Kind.LOAN_REPAYMENT_TRANSACTIONS)).doesNotContain("openingPrincipal","closingPrincipal");
+        var unknown=new LinkedHashMap<String,BigDecimal>();unknown.put("disbursed",null);
+        var result=new Result(Kind.DISBURSED_LOANS_AUDIT,parameters(0),"Institution","Branch",ManagementReports.columns(Kind.DISBURSED_LOANS_AUDIT),List.of(),List.of(new Group("2026-10 | Business loan",1,unknown)),unknown,1,1,false,"","");
+        assertThat(result.getMonthlyTotals().get("2026-10")).containsEntry("disbursed",null);
+    }
     @Test void selectorsKeepReportClaimsAndRejectOutsideOrReversedBounds(){
         var repository=org.mockito.Mockito.mock(ManagementReportRepository.class);
         var guard=org.mockito.Mockito.mock(com.sacco.mvp.accounting.service.GeneralLedgerService.class);
@@ -57,7 +70,7 @@ class ManagementReportTest {
             var columns=ManagementReports.columns(kind);var rows=new ArrayList<Map<String,Object>>();var totals=new LinkedHashMap<String,BigDecimal>();
             for(int n=0;n<60;n++){
                 var row=new LinkedHashMap<String,Object>();row.put("groupName",kind==Kind.DAILY_COLLECTIONS?"2026-10-15 | Loan repayments":"Business loans");
-                for(var c:columns)if(c.money()){row.put(c.key(),new BigDecimal("99999999999999.99"));totals.merge(c.key(),(BigDecimal)row.get(c.key()),BigDecimal::add);}else row.put(c.key(),c.key().equals("name")?"Synthetic client with a long readable name — sample "+n:c.key().equals("particulars")?"Long collection description ".repeat(2):"REF-"+n);
+                for(var c:columns)if(c.money()){row.put(c.key(),new BigDecimal("99999999999999.99"));if(ManagementReports.totalFields(kind).contains(c.key()))totals.merge(c.key(),(BigDecimal)row.get(c.key()),BigDecimal::add);}else row.put(c.key(),c.key().equals("entryKind")?"PAYMENT":c.key().equals("name")?"Synthetic client with a long readable name — sample "+n:c.key().equals("particulars")?"Long collection description ".repeat(2):"REF-"+n);
                 rows.add(row);
             }
             var group=new Group(rows.getFirst().get("groupName").toString(),rows.size(),totals);

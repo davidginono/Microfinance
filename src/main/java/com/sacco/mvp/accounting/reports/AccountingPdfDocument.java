@@ -12,7 +12,7 @@ import java.util.*;
 
 /** Monochrome accounting stationery. Fixed columns, repeated headings and lossless row continuation. */
 public final class AccountingPdfDocument implements AutoCloseable {
-    public enum Style { ORIGINAL, STATEMENT, EQUITY, TRIAL, ACCOUNT, REFERENCE }
+    public enum Style { ORIGINAL, STATEMENT, EQUITY, TRIAL, ACCOUNT, REFERENCE, REPAYMENT }
     private final PDDocument document;
     private final PDFont font;
     private final PDRectangle size;
@@ -38,10 +38,10 @@ public final class AccountingPdfDocument implements AutoCloseable {
         this.document=document;this.font=font;this.title=title;this.context=context;this.logo=logo;
         firstPage=document.getNumberOfPages();
         this.style=style;
-        bodyFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REFERENCE?FontName.COURIER:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
-        headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REFERENCE?FontName.TIMES_BOLD:style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
-        titleFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY||style==Style.ACCOUNT||style==Style.REFERENCE?FontName.HELVETICA_BOLD:FontName.HELVETICA);
-        var paper=style==Style.REFERENCE?PDRectangle.A3:PDRectangle.A4;
+        bodyFont=style==Style.ORIGINAL?font:new PDType1Font((style==Style.REFERENCE||style==Style.REPAYMENT)?FontName.COURIER:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
+        headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REPAYMENT?FontName.HELVETICA_BOLD:style==Style.REFERENCE?FontName.TIMES_BOLD:style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
+        titleFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REPAYMENT?FontName.TIMES_BOLD:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY||style==Style.ACCOUNT||style==Style.REFERENCE?FontName.HELVETICA_BOLD:FontName.HELVETICA);
+        var paper=(style==Style.REFERENCE||style==Style.REPAYMENT)?PDRectangle.A3:PDRectangle.A4;
         size=landscape?new PDRectangle(paper.getHeight(),paper.getWidth()):paper;
         next();document.getDocumentInformation().setTitle(title);
     }
@@ -53,7 +53,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
         for(String line:wrap(title,14,headingWidth)){
             float titleWidth=face(line,titleFont).getStringWidth(line)*14/1000,x=left+(headingWidth-titleWidth)/2;
             drawWith(line,x,y,14,titleFont,style==Style.ORIGINAL,false,style==Style.EQUITY);
-            if(style==Style.TRIAL||style==Style.ACCOUNT)line(x,x+titleWidth,y-2);
+            if(style==Style.TRIAL||style==Style.ACCOUNT||style==Style.REPAYMENT)line(x,x+titleWidth,y-2);
             y-=19;
         }
         y-=3;
@@ -70,7 +70,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
         for(int i=0;i<headers.size();i++){var value=wrap(headers.get(i),8,width()*weights[i]-10);lines.add(value);count=Math.max(count,value.size());}
         if(y-count*12-10<55)nextWithoutHeader();
         if(style==Style.ORIGINAL)rule(y+10);
-        if(style==Style.ACCOUNT){stream.setNonStrokingColor(.85f);stream.addRect(32,y-count*12-2,width(),count*12+12);stream.fill();}
+        if(style==Style.ACCOUNT||style==Style.REPAYMENT){stream.setNonStrokingColor(style==Style.REPAYMENT?.90f:.85f);stream.addRect(32,y-count*12-2,width(),count*12+12);stream.fill();}
         float x=32;
         for(int i=0;i<lines.size();i++){
             for(int n=0;n<lines.get(i).size();n++){
@@ -84,9 +84,9 @@ public final class AccountingPdfDocument implements AutoCloseable {
     private void nextWithoutHeader()throws IOException {var saved=headers;headers=List.of();next();headers=saved;}
     public void row(List<String> values,boolean total)throws IOException {
         var lines=new ArrayList<List<String>>();var points=new ArrayList<Float>();int count=1;
-        float leading=style==Style.REFERENCE?10:13;
+        float leading=(style==Style.REFERENCE||style==Style.REPAYMENT)?10:13;
         for(int i=0;i<values.size();i++){
-            float max=width()*weights[i]-10,point=style==Style.REFERENCE?7.5f:numeric[i]?8:9;
+            float max=width()*weights[i]-10,point=(style==Style.REFERENCE||style==Style.REPAYMENT)?7.5f:numeric[i]?8:9;
             if(numeric[i] && values.get(i).matches("[0-9.,()\\-]+"))point=Math.min(point,(max-1)*1000/face(values.get(i),bodyFont).getStringWidth(values.get(i)));
             points.add(point);var value=wrap(values.get(i),point,max);lines.add(value);count=Math.max(count,value.size());
         }
