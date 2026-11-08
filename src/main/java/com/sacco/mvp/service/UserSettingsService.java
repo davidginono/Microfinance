@@ -112,7 +112,7 @@ public class UserSettingsService {
 
     public record OtpPreferences(boolean loginOtpEnabled, boolean approvalOtpEnabled) {
         private static OtpPreferences defaults() {
-            return new OtpPreferences(true, false);
+            return new OtpPreferences(false, false);
         }
     }
 }

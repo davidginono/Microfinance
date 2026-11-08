@@ -32,7 +32,7 @@ public class UserSettings {
 
     @Builder.Default
     @Column(name = "login_otp_enabled", nullable = false)
-    private boolean loginOtpEnabled = true;
+    private boolean loginOtpEnabled = false;
 
     @Builder.Default
     @Column(name = "approval_otp_enabled", nullable = false)

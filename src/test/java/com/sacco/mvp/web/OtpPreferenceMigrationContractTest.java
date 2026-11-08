@@ -20,7 +20,8 @@ class OtpPreferenceMigrationContractTest {
             .contains("name=\"loginOtpEnabled\"")
             .contains("name=\"approvalOtpEnabled\"")
             .contains("action=\"/account/security/preferences\"")
-            .contains("name=\"${_csrf.parameterName}\"");
+            .contains("name=\"${_csrf.parameterName}\"")
+            .doesNotContain("currentPassword", "otpCode", "request-otp", "requestSecurityOtpButton", "Confirmation");
         assertThat(sidebar).contains("href=\"/account/security\"");
         assertThat(adminSettings)
             .contains("name=\"otpDeliveryChannel\"")

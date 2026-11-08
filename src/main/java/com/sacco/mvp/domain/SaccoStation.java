@@ -55,7 +55,7 @@ public class SaccoStation {
     @Enumerated(EnumType.STRING)
     @Column(name = "user_otp_selection_policy", nullable = false)
     @Builder.Default
-    private OtpSelectionPolicy userOtpSelectionPolicy = OtpSelectionPolicy.AT_LEAST_ONE;
+    private OtpSelectionPolicy userOtpSelectionPolicy = OtpSelectionPolicy.NONE;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "access_status")
@@ -97,6 +97,6 @@ public class SaccoStation {
     }
 
     public OtpSelectionPolicy getResolvedUserOtpSelectionPolicy() {
-        return userOtpSelectionPolicy == null ? OtpSelectionPolicy.AT_LEAST_ONE : userOtpSelectionPolicy;
+        return userOtpSelectionPolicy == null ? OtpSelectionPolicy.NONE : userOtpSelectionPolicy;
     }
 }

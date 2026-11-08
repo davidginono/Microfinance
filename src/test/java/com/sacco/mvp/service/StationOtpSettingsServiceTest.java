@@ -30,6 +30,24 @@ class StationOtpSettingsServiceTest {
     @Mock private AuditService auditService;
 
     @Test
+    void newAndMissingBranchesDoNotRequireOtpByDefault() {
+        UUID memberId = UUID.randomUUID();
+        StationOtpSettingsService service =
+            new StationOtpSettingsService(stationRepository, userSettingsService, auditService);
+        when(stationRepository.findBySaccoIdAndStationIdAndActiveTrue(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.empty());
+        when(userSettingsService.otpPreferences(memberId))
+            .thenReturn(new UserSettingsService.OtpPreferences(false, false));
+
+        assertThat(SaccoStation.builder().build().getResolvedUserOtpSelectionPolicy())
+            .isEqualTo(OtpSelectionPolicy.NONE);
+        assertThat(new SaccoStation().getResolvedUserOtpSelectionPolicy())
+            .isEqualTo(OtpSelectionPolicy.NONE);
+        assertThat(service.requiresLoginMfa(memberId, SACCO_ID, STATION_ID)).isFalse();
+        assertThat(service.requiresApprovalOtp(memberId, SACCO_ID, STATION_ID)).isFalse();
+    }
+
+    @Test
     void bothPolicyRequiresLoginAndApprovalRegardlessOfUserPreferences() {
         UUID memberId = UUID.randomUUID();
         StationOtpSettingsService service = serviceWithPolicy(OtpSelectionPolicy.BOTH);

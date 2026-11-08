@@ -128,7 +128,7 @@ public class StationOtpSettingsService {
     public record OtpConfiguration(OtpDeliveryChannel deliveryChannel,
                                    OtpSelectionPolicy selectionPolicy) {
         private static OtpConfiguration defaults() {
-            return new OtpConfiguration(OtpDeliveryChannel.EMAIL, OtpSelectionPolicy.AT_LEAST_ONE);
+            return new OtpConfiguration(OtpDeliveryChannel.EMAIL, OtpSelectionPolicy.NONE);
         }
     }
 }
