@@ -54,19 +54,47 @@ class CustomLoanChargeEntryTest {
         f.setCustomApplicationCharge(money("-0.01"));
         assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.amount");
     }
-    @Test void policyCapInsuranceEvidenceAndTopUpRulesStillApply(){
+    @Test void policyCapInsuranceLimitAndTopUpRulesStillApplyWithoutEvidenceInputs(){
         var f=form();f.setCustomApplicationCharge(money("21"));
         assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.custom");
         f.setCustomApplicationCharge(money("3.21"));f.setInsurancePremium(money("10.01"));
         assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.insuranceLimit");
         f.setInsurancePremium(money("7.65"));f.setInsuranceEvidence("");
-        assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.insuranceEvidence");
+        f.setEvidence("");
+        assertThat(service.quote(actor,f,product,true).terms()).allSatisfy(t->assertThat(t.evidence()).startsWith("Loan charge entry / "));
         f.setInsuranceEvidence("Actual premium document");f.setTopUpSourceLoanId(UUID.randomUUID());
         assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.topUpFee");
     }
     @Test void configuredProductsRetainTheirCalculatedFees(){
-        var f=form();f.setLoanMode("CONFIGURED");f.setCustomApplicationCharge(null);f.setCustomProcessingCharge(null);f.setInsurancePremium(money("10"));
+        var f=form();f.setLoanMode("CONFIGURED");f.setCustomApplicationCharge(money("99"));f.setCustomProcessingCharge(money("99"));f.setInsurancePremium(null);f.setInsuranceEvidence(null);
         assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::amount).containsExactly(money("10.00"),money("20.00"),money("10.00"));
+    }
+    @Test void percentageEntriesAreCalculatedOnTheServerAndIgnoreTheDisplayedAmounts(){
+        var f=form();f.setCustomProcessingBasis("PERCENTAGE");f.setCustomProcessingPercent(money("0.75"));f.setCustomProcessingCharge(money("999"));
+        f.setCustomInsuranceBasis("PERCENTAGE");f.setCustomInsurancePercent(money("0.5"));f.setInsurancePremium(money("999"));
+        var plan=service.quote(actor,f,product,true);
+        assertThat(plan.terms()).extracting(Term::amount).containsExactly(money("3.21"),money("7.50"),money("5.00"));
+        assertThat(plan.terms().get(1).basis()).isEqualTo("PRINCIPAL_RATE");assertThat(plan.terms().get(1).basisValue()).isEqualByComparingTo("0.0075");
+        f.setPrincipal(money("2000"));assertThat(service.quote(actor,f,product,true).terms().get(1).amount()).isEqualByComparingTo("15.00");
+    }
+    @Test void amountEntriesRemainExactAndInvalidPercentageSourcesFailClosed(){
+        var f=form();f.setCustomProcessingBasis("AMOUNT");f.setCustomProcessingPercent(money("99.99"));
+        assertThat(service.quote(actor,f,product,true).terms().get(1).amount()).isEqualByComparingTo("6.78");
+        f.setCustomProcessingBasis("PERCENTAGE");f.setCustomProcessingPercent(null);
+        assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.enterFees");
+        f.setCustomProcessingPercent(money("-1"));assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.rate");
+        f.setCustomProcessingBasis("UNKNOWN");assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.input");
+    }
+    @Test void customPermissionIsRequiredEvenForZeroCharges(){
+        doThrow(new org.springframework.security.access.AccessDeniedException("Custom charge permission required")).when(accounting).requireActor(actor,"LOAN_CHARGES_CUSTOM");
+        var f=form();f.setCustomApplicationCharge(BigDecimal.ZERO);f.setCustomProcessingCharge(BigDecimal.ZERO);f.setInsurancePremium(BigDecimal.ZERO);
+        assertThatThrownBy(()->service.quote(actor,f,product,true)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void configuredPercentagesRemainVisibleWhenTheRoundedAmountIsZero(){
+        var f=form();f.setLoanMode("CONFIGURED");f.setPrincipal(money("0.01"));
+        var quote=service.quoteView(actor,f,product);
+        assertThat(quote.fields().get(1).percentage()).isEqualTo("2");assertThat(quote.fields().get(1).amount()).isEqualTo("0.00");
+        assertThat(quote.fields().get(2).percentage()).isEqualTo("1");assertThat(quote.fields().get(2).amount()).isEqualTo("0.00");
     }
     private static BigDecimal money(String value){return new BigDecimal(value);}
 }

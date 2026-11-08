@@ -157,7 +157,7 @@ public class LoanRecordingService {
     private AllocationPreview chargeAllocation(BigDecimal amount,BigDecimal interest,BigDecimal balance,BigDecimal fees){
         if(amount.compareTo(balance.add(interest).add(fees))>0)throw new IllegalArgumentException("repayment.error.advance");var i=amount.min(interest);var fee=amount.subtract(i).min(fees);var p=amount.subtract(i).subtract(fee);return new AllocationPreview(p,i,balance.subtract(p),fee);
     }
-    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan chargeQuote(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");return charges.quote(a,f,product(a,f),false);}
+    @Transactional(readOnly=true) public ChargeQuote chargeQuote(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");return charges.quoteView(a,f,product(a,f));}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary chargeSummary(AppUserPrincipal a,UUID loan,int page){authorize(a,"VIEW");records.record(a,loan,false);return charges.summary(a,loan,page);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary fundingCharges(AppUserPrincipal a,UUID loan){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");return charges.summary(a,loan,0);}
     @Transactional(readOnly=true) public BigDecimal fundingCash(AppUserPrincipal a,UUID id,LocalDate date){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");var loan=records.loan(a,id,clock.today());var source=disbursementTopUp(a,id,date);return loan.principal().subtract(source.map(TopUpQuote::total).orElse(ZERO)).subtract(charges.frozen(a,id).deductions());}
@@ -220,6 +220,17 @@ public class LoanRecordingService {
             }
         }
         var chargePlan=charges.quote(a,f,product,true);var now=clock.now();
+        var storedForm=json.convertValue(f,RecordForm.class);
+        var insuranceTerm=chargePlan.terms().stream().filter(t->t.kind().equals("INSURANCE")).findFirst();
+        storedForm.setInsurancePremium(insuranceTerm.map(t->t.amount()).orElse(ZERO));
+        storedForm.setInsuranceEvidence(insuranceTerm.map(t->t.evidence()).orElse(null));
+        if("CUSTOM".equals(f.getLoanMode())){
+            storedForm.setCustomApplicationCharge(chargePlan.terms().stream().filter(t->t.kind().equals("APPLICATION")).map(t->t.amount()).findFirst().orElse(ZERO));
+            storedForm.setCustomProcessingCharge(chargePlan.terms().stream().filter(t->t.kind().equals("PROCESSING")).map(t->t.amount()).findFirst().orElse(ZERO));
+        }else{
+            storedForm.setCustomApplicationCharge(null);storedForm.setCustomProcessingCharge(null);
+            storedForm.setCustomProcessingPercent(null);storedForm.setCustomInsurancePercent(null);storedForm.setCustomProcessingBasis(null);storedForm.setCustomInsuranceBasis(null);
+        }
         TopUpQuote settlement=null;
         if(f.getTopUpSourceLoanId()!=null){
             check(records.lockReceiptLoans(a,List.of(f.getTopUpSourceLoanId()),f.getClientId()).size()==1,"topUpUnavailable");
@@ -241,7 +252,7 @@ public class LoanRecordingService {
         long number=numbers.nextFor(a.getSaccoId());
         var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).borrowerPartyId(borrowerParty).paymentDetailsSnapshot(payoutSnapshot).topUpSourceLoanId(f.getTopUpSourceLoanId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
-            .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(f))
+            .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(storedForm))
             .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
             .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();

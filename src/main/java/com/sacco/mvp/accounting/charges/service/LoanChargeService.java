@@ -3,6 +3,8 @@ package com.sacco.mvp.accounting.charges.service;
 import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.*;
 import com.sacco.mvp.accounting.charges.repository.LoanChargeRepository;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.RecordForm;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ChargeField;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ChargeQuote;
 import com.sacco.mvp.accounting.repository.VoucherRepository;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.domain.*;
@@ -46,30 +48,56 @@ public class LoanChargeService {
         boolean manual="CUSTOM".equals(f.getLoanMode());
         if(manual)accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");
         var application=amount(manual?f.getCustomApplicationCharge():product.getApplicationFee());
-        var processing=manual?amount(f.getCustomProcessingCharge()):percent(f.getPrincipal(),product.getProcessingFeeRate());
+        var processingInput=manual?enteredAmount(f.getPrincipal(),f.getCustomProcessingBasis(),f.getCustomProcessingPercent(),f.getCustomProcessingCharge()):null;
+        var insuranceInput=manual?enteredAmount(f.getPrincipal(),f.getCustomInsuranceBasis(),f.getCustomInsurancePercent(),f.getInsurancePremium()):null;
+        var processing=manual?amount(processingInput):percent(f.getPrincipal(),product.getProcessingFeeRate());
         var insuranceLimit=percent(f.getPrincipal(),product.getInsuranceRate());
-        var insurance=manual?amount(f.getInsurancePremium()):insuranceLimit;
+        var insurance=manual?amount(insuranceInput):insuranceLimit;
         var policy=repository.policy(a.getSaccoId(),product.getId(),f.getApplicationDate()==null?clock.today():f.getApplicationDate()).orElse(null);
-        boolean custom=manual?application.add(processing).signum()>0:f.getCustomApplicationCharge()!=null || f.getCustomProcessingCharge()!=null;
-        String failure=manual && (f.getCustomApplicationCharge()==null || f.getCustomProcessingCharge()==null || f.getInsurancePremium()==null)?"charges.error.enterFees":"";
+        boolean custom=manual && application.add(processing).signum()>0;
+        String failure=manual && (f.getCustomApplicationCharge()==null || processingInput==null || insuranceInput==null)?"charges.error.enterFees":"";
         if(manual && insurance.compareTo(insuranceLimit)>0)failure="charges.error.insuranceLimit";
-        if(custom){if(!manual)accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");require(policy!=null && policy.enabled() && policy.allowCustom(),"custom");if(f.getCustomApplicationCharge()!=null)application=amount(f.getCustomApplicationCharge());if(f.getCustomProcessingCharge()!=null)processing=amount(f.getCustomProcessingCharge());require(application.add(processing).compareTo(policy.customManagementLimit())<=0,"custom");}
+        if(custom){require(policy!=null && policy.enabled() && policy.allowCustom(),"custom");require(application.add(processing).compareTo(policy.customManagementLimit())<=0,"custom");}
         if(f.getTopUpSourceLoanId()!=null && application.add(processing).signum()>0)failure="charges.error.topUpFee";
         if(application.add(processing).add(insurance).signum()>0 && (policy==null || !policy.enabled()))failure="charges.error.policy";
         var terms=new ArrayList<Term>();
         if(policy!=null && policy.enabled()){
             if(application.add(processing).signum()>0 && policy.managementAccountId()==null)failure="charges.error.account";
-            if(insurance.signum()>0){if(policy.insuranceAccountId()==null || policy.insurer().isBlank() || policy.insurerVerification().isBlank())failure="charges.error.insurance";
-                else if(f.getInsurancePremium()==null || amount(f.getInsurancePremium()).compareTo(insurance)!=0 || f.getInsuranceEvidence()==null || f.getInsuranceEvidence().isBlank())failure="charges.error.insuranceEvidence";}
+            if(insurance.signum()>0 && (policy.insuranceAccountId()==null || policy.insurer().isBlank() || policy.insurerVerification().isBlank()))failure="charges.error.insurance";
         }
-        if(application.signum()>0)terms.add(term("APPLICATION",custom?"CUSTOM_AMOUNT":"FIXED",application,application,policy,false,custom?f.getEvidence():""));
-        if(processing.signum()>0)terms.add(term("PROCESSING",custom?"CUSTOM_AMOUNT":"PRINCIPAL_RATE",custom?processing:product.getProcessingFeeRate(),processing,policy,false,custom?f.getEvidence():""));
-        if(insurance.signum()>0)terms.add(term("INSURANCE",manual?"CUSTOM_AMOUNT":"PRINCIPAL_RATE",manual?insurance:product.getInsuranceRate(),insurance,policy,true,Objects.toString(f.getInsuranceEvidence(),"")));
+        String entryEvidence="Loan charge entry / "+f.getRequestKey();
+        String managementEvidence=f.getEvidence()==null || f.getEvidence().isBlank()?entryEvidence:f.getEvidence();
+        String insuranceEvidence=f.getInsuranceEvidence()==null || f.getInsuranceEvidence().isBlank()?entryEvidence:f.getInsuranceEvidence();
+        boolean processingRate=!manual || "PERCENTAGE".equals(f.getCustomProcessingBasis()),insuranceRate=!manual || "PERCENTAGE".equals(f.getCustomInsuranceBasis());
+        if(application.signum()>0)terms.add(term("APPLICATION",manual?"CUSTOM_AMOUNT":"FIXED",application,application,policy,false,custom?managementEvidence:""));
+        if(processing.signum()>0)terms.add(term("PROCESSING",processingRate?"PRINCIPAL_RATE":"CUSTOM_AMOUNT",processingRate?(manual?f.getCustomProcessingPercent().movePointLeft(2):product.getProcessingFeeRate()):processing,processing,policy,false,custom?managementEvidence:""));
+        if(insurance.signum()>0)terms.add(term("INSURANCE",insuranceRate?"PRINCIPAL_RATE":"CUSTOM_AMOUNT",insuranceRate?(manual?f.getCustomInsurancePercent().movePointLeft(2):product.getInsuranceRate()):insurance,insurance,policy,true,insuranceEvidence));
         if(f.getTopUpSourceLoanId()!=null && application.add(processing).signum()>0)failure="charges.error.topUpFee";
         if(terms.stream().filter(t->t.timing()==Timing.DEDUCT).map(Term::amount).reduce(ZERO,BigDecimal::add).compareTo(f.getPrincipal())>=0)failure="charges.error.amount";
-        if(strict && policy!=null && insurance.signum()>0)require(!repository.insuranceUsed(a.getSaccoId(),policy.insurer(),Objects.toString(f.getInsuranceEvidence(),"")),"insuranceDuplicate");
+        if(strict && policy!=null && insurance.signum()>0)require(!repository.insuranceUsed(a.getSaccoId(),policy.insurer(),insuranceEvidence),"insuranceDuplicate");
         if(strict){require(failure.isEmpty(),failure.isEmpty()?"policy":failure.substring("charges.error.".length()));for(var t:terms){repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");repository.account(a.getSaccoId(),t.liabilityAccountId(),t.kind().equals("INSURANCE")?"INSURANCE":"MANAGEMENT");text(t.evidence(),custom || t.kind().equals("INSURANCE"));}}
         return new Plan(policy==null?null:policy.id(),policy==null?"":policy.policyReference(),policy==null?"":policy.agreementReference(),terms,failure.isEmpty(),failure);
+    }
+    private BigDecimal enteredAmount(BigDecimal principal,String basis,BigDecimal percentage,BigDecimal entered) {
+        require(basis==null || Set.of("AMOUNT","PERCENTAGE").contains(basis),"input");
+        if("PERCENTAGE".equals(basis))return percentage==null?null:percent(principal,percentage.movePointLeft(2).stripTrailingZeros());
+        return entered==null?null:amount(entered);
+    }
+    @Transactional(readOnly=true) public ChargeQuote quoteView(AppUserPrincipal a,RecordForm f,LoanProductSetting product){
+        var plan=quote(a,f,product,false);boolean manual="CUSTOM".equals(f.getLoanMode());
+        var fields=new ArrayList<ChargeField>();
+        for(String kind:List.of("APPLICATION","PROCESSING","INSURANCE")){
+            var term=plan.terms().stream().filter(t->t.kind().equals(kind)).findFirst().orElse(null);var total=term==null?ZERO:term.amount();
+            BigDecimal rate=null;
+            if(!kind.equals("APPLICATION")){
+                boolean processing=kind.equals("PROCESSING");
+                if(!manual)rate=Objects.requireNonNullElse(processing?product.getProcessingFeeRate():product.getInsuranceRate(),BigDecimal.ZERO).movePointRight(2);
+                else if("PERCENTAGE".equals(processing?f.getCustomProcessingBasis():f.getCustomInsuranceBasis()))rate=processing?f.getCustomProcessingPercent():f.getCustomInsurancePercent();
+                else rate=percentage(f.getPrincipal(),total);
+            }
+            fields.add(new ChargeField(kind,rate==null?"":rate.stripTrailingZeros().toPlainString(),total.toPlainString()));
+        }
+        return new ChargeQuote(plan,List.copyOf(fields));
     }
     private Term term(String kind,String basis,BigDecimal value,BigDecimal total,Policy p,boolean insurance,String evidence){return new Term(UUID.randomUUID(),kind,basis,value,total,p==null?Timing.SEPARATE:insurance?p.insuranceTiming():p.managementTiming(),p==null?null:p.receivableAccountId(),p==null?null:insurance?p.insuranceAccountId():p.managementAccountId(),evidence,insurance && p!=null?p.insurer():"",insurance && p!=null?p.insurerVerification():"");}
     @Transactional(propagation=Propagation.MANDATORY) public void freeze(AppUserPrincipal a,UUID loan,Plan plan){repository.freeze(a,loan,plan,clock.now());}

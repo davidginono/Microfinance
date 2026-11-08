@@ -46,6 +46,7 @@
 <%@ include file="attachments.jspf" %>
 <label><spring:message code="voucher.description" /><form:textarea path="notes" cssClass="aws-control" maxlength="500" rows="3" /></label>
 </div><%@ include file="recording-application-fields.jspf" %></details>
+<c:if test="${empty recordForm.applicationId}"><p data-charge-error class="console-message" data-message-type="error" role="alert" hidden></p></c:if>
 <div class="accounting-actions loan-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records' />"><spring:message code="common.cancel" /></a><c:if test="${empty recordForm.topUpSourceLoanId}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><button type="submit" class="app-btn btn-neutral" name="action" value="draft" data-recording-draft><spring:message code="applications.save"/></button></sec:authorize></c:if><button class="app-btn btn-launch" name="action" value="save"><spring:message code="${empty recordForm.applicationId ? 'recording.save' : 'applications.submit'}" /></button></div>
 </form:form>
 <c:if test="${not empty savedApplicationDocuments}">

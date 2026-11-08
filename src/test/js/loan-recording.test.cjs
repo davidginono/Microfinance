@@ -51,7 +51,7 @@ function fixture(withCharges=false) {
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
     <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span class="loan-interest-spinner" hidden></span><output data-interest-value></output><p data-interest-description></p></div>
     <section data-schedule-preview hidden><span data-schedule-summary data-monthly="Monthly" data-weekly="Weekly" data-monthly-period="Month {0}" data-weekly-period="Week {0}"></span><table><tbody data-schedule-rows></tbody></table></section>
-    ${withCharges ? '<section data-charge-preview data-empty-label="No charges"><h2>Charges</h2><table><tbody data-charge-rows><tr><td>Choose loan terms</td></tr></tbody></table><span data-charge-total>—</span><p data-charge-error></p></section>' : ''}
+    ${withCharges ? '<section data-charge-preview data-custom-allowed="true"><h2>Charges<span data-charge-loading data-ui-loading-region hidden></span></h2><div data-charge-kind="APPLICATION"><input name="customApplicationCharge" data-charge-amount></div></section><p data-charge-error hidden></p>' : ''}
     <button name="action" value="save">Save</button><button disabled>Restricted</button>
   </form></html>`, {runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
   const w=dom.window, timers=new Map(), requests=[];let next=0;
@@ -212,7 +212,7 @@ test('Charges stays idle for incomplete terms and clears an interrupted quote wi
     assert.equal(requests.length,0);assert.notEqual(region.getAttribute('aria-busy'),'true');assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('principal','1000');await flush();assert.equal(requests.length,0);assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('tenureValue','6');await flush();assert.equal(requests.length,0);assert.equal(region.querySelector('.app-loading-spinner'),null);
-    const calculation=run();await flush();assert.equal(requests.length,1);assert.equal(region.querySelectorAll('.app-loading-spinner').length,2);assert.ok(region.querySelector('table .app-loading-spinner'));assert.equal(region.querySelector('[data-charge-total] .app-loading-spinner').dataset.loadingSize,'small');
+    const calculation=run();await flush();assert.equal(requests.length,1);assert.equal(region.querySelectorAll('.app-loading-spinner').length,1);assert.equal(region.querySelector('[data-charge-loading] .app-loading-spinner').dataset.loadingSize,'small');
     set('principal','');await flush();assert.equal(requests[0].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
     respond(0,'100.00');await calculation;await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
   }finally{dom.window.close();}
@@ -224,10 +224,10 @@ test('Charges finishes loading on success, failure and cached-page restoration',
     await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));
     const flush=()=>new Promise(resolve=>setImmediate(resolve));
     set('tenureValue','6');set('principal','1000');let calculation=run();await flush();assert.equal(region.getAttribute('aria-busy'),'true');
-    requests[0].resolve({ok:true,redirected:false,json:async()=>({interest:'100.00',product:'Business loan',tenureValue:6,tenureUnit:'MONTHS',charges:{total:'10.50',terms:[]}})});
-    await calculation;await flush();assert.equal(region.querySelector('[data-charge-total]').textContent,'10.50');assert.equal(region.querySelector('.app-loading-spinner'),null);
-    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(region.querySelector('[data-ui-loading-error]').textContent,'Invalid loan termsRetry');assert.equal(region.querySelector('.app-loading-spinner'),null);
-    region.querySelector('[data-ui-loading-error] button').click();calculation=run();assert.equal(requests[2].options.body.get('principal'),'2000');respond(2,'200.00');await calculation;await flush();assert.equal(region.querySelector('[data-ui-loading-error]'),null);
+    requests[0].resolve({ok:true,redirected:false,json:async()=>({interest:'100.00',product:'Business loan',tenureValue:6,tenureUnit:'MONTHS',charges:{terms:[{code:'APPLICATION',amount:'10.50',percentage:''}]}})});
+    await calculation;await flush();assert.equal(region.querySelector('[data-charge-amount]').value,'10.50');assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(d.querySelector('[data-charge-error]').textContent,'Invalid loan terms');assert.equal(region.querySelector('[data-ui-loading-error]'),null);assert.equal(region.querySelector('.app-loading-spinner'),null);
+    d.querySelector('form').dispatchEvent(new w.Event('loan:quote-retry'));calculation=run();assert.equal(requests[2].options.body.get('principal'),'2000');respond(2,'200.00');await calculation;await flush();assert.equal(region.querySelector('[data-ui-loading-error]'),null);
     set('principal','3000');calculation=run();await flush();w.dispatchEvent(new w.Event('pagehide'));await flush();
     assert.equal(requests[3].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('principal','');w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);

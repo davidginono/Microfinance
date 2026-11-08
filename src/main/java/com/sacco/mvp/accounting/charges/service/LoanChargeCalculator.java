@@ -17,4 +17,7 @@ public final class LoanChargeCalculator {
         if(rate.signum()<0 || rate.compareTo(BigDecimal.ONE)>0 || rate.scale()>4)throw new IllegalArgumentException("charges.error.rate");
         return amount(principal.multiply(rate));
     }
+    public static BigDecimal percentage(BigDecimal principal,BigDecimal charge) {
+        return charge.movePointRight(2).divide(principal,8,RoundingMode.HALF_UP).stripTrailingZeros();
+    }
 }

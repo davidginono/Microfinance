@@ -9,6 +9,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 public final class LoanRecordingDtos {
     private LoanRecordingDtos() {}
+    public record ChargeField(String code,String percentage,String amount) {}
+    public record ChargeQuote(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan plan,List<ChargeField> fields) {}
     @Data public static class RecordForm {
         /** Internal group-origination evidence; deliberately excluded from every browser binder. */
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
@@ -50,6 +52,10 @@ public final class LoanRecordingDtos {
         private String notes = "";
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal customApplicationCharge;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal customProcessingCharge;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal customProcessingPercent;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal customInsurancePercent;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String customProcessingBasis;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String customInsuranceBasis;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private BigDecimal insurancePremium;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String insuranceEvidence;
     }

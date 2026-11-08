@@ -1,49 +1,58 @@
 (() => {
   'use strict';
   const region=document.querySelector('[data-charge-preview]');if(!region)return;
-  const form=region.closest('form'), rows=region.querySelector('[data-charge-rows]'), error=region.querySelector('[data-charge-error]');
-  const values=[...region.querySelectorAll('[data-charge-total],[data-charge-deductions],[data-charge-separate],[data-charge-net],[data-charge-management]')];
-  values.forEach(value=>value.setAttribute('data-ui-loading-region',''));
-  const end=()=>{window.AppLoading?.end(rows.closest('table'));values.forEach(value=>window.AppLoading?.end(value));};
-  const money=value=>new Intl.NumberFormat(document.documentElement.lang||'en',{minimumFractionDigits:2,maximumFractionDigits:2}).format(String(value));
-  const policyLink=region.querySelector('[data-charge-policy-link]');
-  const mode=form.querySelector('[name="loanMode"]'), management=region.querySelector('[data-management-charge-inputs]'), insurance=region.querySelector('[data-insurance-fields]');
-  let insuranceRequired=false, lastMode;
+  const form=region.closest('form'),mode=form.elements.loanMode,error=form.querySelector('[data-charge-error]');
+  const rows=[...region.querySelectorAll('[data-charge-kind]')],loading=region.querySelector('[data-charge-loading]');
+  let previousMode=mode.value;
+  const manual=()=>mode.value==='CUSTOM';
+  function feedback(message=''){if(error){error.textContent=message;error.hidden=!message;}}
   function entryMode(){
-    const manual=mode?.value==='CUSTOM';
-    if(lastMode && lastMode!==mode?.value){
-      region.querySelectorAll('[data-recorded-fee],[name="insuranceEvidence"]').forEach(input=>input.value='');
-      insuranceRequired=false;
+    const changed=previousMode!==mode.value;
+    for(const row of rows){
+      const basis=row.querySelector('[data-charge-basis]');
+      if(basis && (!basis.value || changed))basis.value='AMOUNT';
+      const editable=manual() && region.dataset.customAllowed==='true';
+      row.querySelectorAll('[data-charge-amount],[data-charge-percentage]').forEach(input=>{
+        if(changed)input.value='';input.readOnly=!editable;
+        input.required=editable && (input.matches('[data-charge-percentage]')?basis?.value==='PERCENTAGE':!basis || basis.value==='AMOUNT');
+      });
     }
-    const help=region.querySelector('[data-manual-charge-help]'), permission=region.querySelector('[data-manual-charge-permission]');
-    if(help)help.hidden=!manual;if(permission)permission.hidden=!manual;
-    region.querySelectorAll('[data-configured-charge-summary],[data-configured-charge-help]').forEach(box=>box.hidden=manual);
-    if(management){
-      if(manual)management.open=true;else if(lastMode==='CUSTOM')management.open=false;
-      management.querySelector('summary').hidden=manual;
-      management.querySelectorAll('input').forEach(input=>input.required=manual);
-    }
-    if(insurance){insurance.hidden=!manual && !insuranceRequired;insurance.querySelectorAll('input').forEach(input=>input.disabled=!manual && !insuranceRequired);}
-    region.querySelector('[name="insurancePremium"]')?.toggleAttribute('required',manual || insuranceRequired);
-    region.querySelector('[name="insuranceEvidence"]')?.toggleAttribute('required',insuranceRequired);
-    lastMode=mode?.value;
+    previousMode=mode.value;
   }
-  // Run before the quote listener serializes the form on a mode change.
   form.addEventListener('change',event=>{if(event.target===mode)entryMode();},true);
+  function changed(event){
+    const row=event.target.closest('[data-charge-kind]');if(!row || !manual() || !event.target.matches('[data-charge-amount],[data-charge-percentage]'))return;
+    const basis=row.querySelector('[data-charge-basis]');if(basis)basis.value=event.target.matches('[data-charge-percentage]')?'PERCENTAGE':'AMOUNT';
+    entryMode();
+  }
+  region.addEventListener('input',changed,true);region.addEventListener('change',changed,true);
   entryMode();
-  function clear(){end();if(policyLink)policyLink.hidden=true;rows.replaceChildren();for(const name of ['total','deductions','separate','net','management']){const field=region.querySelector('[data-charge-'+name+']');if(field)field.textContent='—';}error.textContent='';region.querySelector(':scope > [data-ui-loading-error]')?.remove();region.setAttribute('aria-busy','false');}
+  function end(){window.AppLoading?.end(loading);if(loading)loading.hidden=true;region.setAttribute('aria-busy','false');}
+  function clear(){
+    end();feedback();
+    for(const row of rows){
+      const basis=row.querySelector('[data-charge-basis]')?.value||'AMOUNT';
+      row.querySelectorAll('[data-charge-amount],[data-charge-percentage]').forEach(input=>{
+        const source=basis==='PERCENTAGE'?input.matches('[data-charge-percentage]'):input.matches('[data-charge-amount]');
+        if(!manual() || !source)input.value='';
+      });
+    }
+  }
   form.addEventListener('loan:quote-reset',clear);
-  form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');window.AppLoading?.begin(rows.closest('table'));values.forEach(value=>window.AppLoading?.begin(value,{table:false,replace:true,size:'small'}));});
-  form.addEventListener('loan:quote-settled',()=>{end();region.setAttribute('aria-busy','false');});
-  form.addEventListener('loan:quote-error',event=>{clear();if(window.AppLoading?.fail)window.AppLoading.fail(region,{label:event.detail,retry:()=>form.dispatchEvent(new Event('loan:quote-retry'))});else error.textContent=event.detail;});
+  form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');if(loading){loading.hidden=false;window.AppLoading?.begin(loading,{table:false,size:'small'});}});
+  form.addEventListener('loan:quote-settled',end);
+  form.addEventListener('loan:quote-error',event=>{clear();feedback(event.detail);});
   form.addEventListener('loan:quote',event=>{
-    const p=event.detail.charges;clear();if(!p)return;
-    insuranceRequired=!!p.insuranceRequired;entryMode();
-    if(!p.terms.length){const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=4;cell.textContent=region.dataset.emptyLabel;row.append(cell);rows.append(row);}
-    for(const t of p.terms){const row=document.createElement('tr');for(const text of [t.kind,t.basis+' · '+t.basisValue,money(t.amount),t.timing]){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}rows.append(row);}
-    for(const [name,value] of Object.entries({management:p.managementTotal||'0.00',total:p.total,deductions:p.deductions,separate:p.separate,net:p.netCash})){const field=region.querySelector('[data-charge-'+name+']');if(field)field.textContent=money(value);}
-    error.textContent=p.error||'';
-    if(policyLink){const id=form.elements.productId?.value;policyLink.hidden=!id;if(id)policyLink.href=(document.querySelector('meta[name="app-context-path"]')?.content||'')+'/finance/loan-recording/charge-policy?productId='+encodeURIComponent(id);}
+    end();const plan=event.detail.charges;if(!plan){clear();return;}
+    for(const term of plan.terms){
+      const row=rows.find(row=>row.dataset.chargeKind===term.code);if(!row)continue;
+      const amount=row.querySelector('[data-charge-amount]'),percentage=row.querySelector('[data-charge-percentage]');
+      const basis=row.querySelector('[data-charge-basis]')?.value||'AMOUNT';
+      const source=basis==='PERCENTAGE'?percentage:amount;
+      if(!manual()){amount.value=term.amount;if(percentage)percentage.value=term.percentage;}
+      else if(source.value!==''){if(basis==='PERCENTAGE')amount.value=term.amount;else if(percentage)percentage.value=term.percentage;}
+    }
+    feedback(plan.error||'');
   });
   window.addEventListener('pagehide',clear);
 })();

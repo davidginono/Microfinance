@@ -222,11 +222,36 @@ class LoanRecordingPostgresTest {
         service.disburse(actor,chargedFunding(id));var second=chargedLoan();service.disburse(actor,chargedFunding(second));var f=receiptForm(id,second);f.getRows().getLast().setAmount(new BigDecimal("99999.00"));assertThatThrownBy(()->receiptService().post(actor,f)).hasMessage("repayment.error.advance");assertThat(jdbc.queryForObject("select count(*) from accountant_loan_post where sacco_id=? and kind='PAYMENT'",Integer.class,institution)).isZero();
     }
     @Test void chargeOverridesRequirePermissionApprovedLimitAndDistinctInsuranceEvidence(){
+        product=jdbc.queryForObject("select id from loan_product_settings where sacco_id=? and custom_recording_configuration",UUID.class,institution);
         chargePolicy("SEPARATE");var latest=chargeService().policy(actor,product).orElseThrow();var p=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();p.setProductId(product);p.setExpectedVersion(latest.id());p.setEffectiveFrom(LocalDate.of(2026,8,1));p.setEnabled(true);p.setPolicyReference("Synthetic approved custom charge limit");p.setAgreementReference("Synthetic approved agreement");p.setReceivableAccountId(chargeAccount);p.setManagementAccountId(managementAccount);p.setInsuranceAccountId(insuranceAccount);p.setInsurer(latest.insurer());p.setInsurerVerification(latest.insurerVerification());p.setAllowCustom(true);p.setCustomManagementLimit(new BigDecimal("10.00"));chargeService().savePolicy(actor,p);assertThat(chargeService().savePolicy(actor,p)).isNotNull();
-        var f=form();f.setEvidence("Synthetic approved custom terms");f.setInsurancePremium(new BigDecimal("10.00"));f.setInsuranceEvidence("Synthetic unique premium "+UUID.randomUUID());f.setCustomApplicationCharge(new BigDecimal("5.00"));f.setCustomProcessingCharge(new BigDecimal("6.00"));assertThatThrownBy(()->service.save(actor,f)).hasMessage("charges.error.custom");f.setCustomProcessingCharge(new BigDecimal("5.00"));
+        var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setInterestPercent(new BigDecimal("12"));f.setEvidence("Synthetic approved custom terms");f.setInsurancePremium(new BigDecimal("10.00"));f.setInsuranceEvidence("Synthetic unique premium "+UUID.randomUUID());f.setCustomApplicationCharge(new BigDecimal("5.00"));f.setCustomProcessingCharge(new BigDecimal("6.00"));assertThatThrownBy(()->service.save(actor,f)).hasMessage("charges.error.custom");f.setCustomProcessingCharge(new BigDecimal("5.00"));
         var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.LOAN_CHARGES_CUSTOM);var member=context.getBean(MemberDirectoryService.class).find(actor.getMemberId()).orElseThrow();var restricted=new AppUserPrincipal(member,permissions,true);assertThatThrownBy(()->service.save(restricted,f)).isInstanceOf(AccessDeniedException.class);
-        var id=service.save(actor,f);assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("20.00");var duplicate=form();duplicate.setInsurancePremium(f.getInsurancePremium());duplicate.setInsuranceEvidence(f.getInsuranceEvidence());assertThatThrownBy(()->service.save(actor,duplicate)).hasMessage("charges.error.insuranceDuplicate");
+        var id=service.save(actor,f);assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("20.00");var duplicate=form();duplicate.setLoanMode("CUSTOM");duplicate.setProductId(null);duplicate.setInterestPercent(new BigDecimal("12"));duplicate.setCustomApplicationCharge(new BigDecimal("5.00"));duplicate.setCustomProcessingCharge(new BigDecimal("5.00"));duplicate.setInsurancePremium(f.getInsurancePremium());duplicate.setInsuranceEvidence(f.getInsuranceEvidence());assertThatThrownBy(()->service.save(actor,duplicate)).hasMessage("charges.error.insuranceDuplicate");
         p.setRequestKey(UUID.randomUUID());p.setExpectedVersion(chargeService().policy(actor,product).orElseThrow().id());p.setEffectiveFrom(LocalDate.of(2026,10,1));p.setManagementTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.FINANCED);assertThatThrownBy(()->chargeService().savePolicy(actor,p)).hasMessage("charges.error.financed");
+    }
+    @Test void percentageAndAmountChargeEntriesFreezeServerAmountsAndPostExactlyOnce(){
+        product=jdbc.queryForObject("select id from loan_product_settings where sacco_id=? and custom_recording_configuration",UUID.class,institution);
+        chargePolicy("DEDUCT",true,new BigDecimal("20.00"));
+        var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setInterestPercent(new BigDecimal("12"));
+        f.setCustomApplicationCharge(new BigDecimal("3.21"));f.setCustomProcessingBasis("PERCENTAGE");f.setCustomProcessingPercent(new BigDecimal("0.75"));f.setCustomProcessingCharge(new BigDecimal("999"));
+        f.setCustomInsuranceBasis("PERCENTAGE");f.setInsurancePremium(new BigDecimal("999"));f.setCustomInsurancePercent(new BigDecimal("0.50"));
+        var id=service.save(actor,f);assertThat(service.save(actor,f)).isEqualTo(id);
+        var plan=service.chargeSummary(actor,id,0).plan();
+        assertThat(plan.terms()).extracting(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term::amount).containsExactly(new BigDecimal("3.21"),new BigDecimal("7.50"),new BigDecimal("5.00"));
+        assertThat(jdbc.queryForObject("select (form_data->>'insurancePremium')::numeric from loan_applications where id=?",BigDecimal.class,id)).isEqualByComparingTo("5.00");
+        assertThat(f.getInsurancePremium()).isEqualByComparingTo("999");
+        assertThat(plan.terms()).allSatisfy(t->assertThat(t.evidence()).startsWith("Loan charge entry / "));
+        var funding=chargedFunding(id);var posted=service.disburse(actor,funding);assertThat(service.disburse(actor,funding).id()).isEqualTo(posted.id());
+        assertThat(service.chargeSummary(actor,id,0).balance().collected()).isEqualByComparingTo("15.71");
+        assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isZero();
+        assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id=?",BigDecimal.class,posted.journalId())).isZero();
+    }
+    @Test void configuredChargesSaveWithoutRemovedInputsAndKeepDistinctRecordedProvenance(){
+        chargePolicy("SEPARATE");var first=service.save(actor,form());var second=service.save(actor,form());
+        var one=service.chargeSummary(actor,first,0).plan();var two=service.chargeSummary(actor,second,0).plan();
+        assertThat(one.total()).isEqualByComparingTo("30.00");assertThat(two.total()).isEqualByComparingTo("30.00");
+        assertThat(one.terms().getLast().evidence()).startsWith("Loan charge entry / ").isNotEqualTo(two.terms().getLast().evidence());
+        assertThat(service.chargeSummary(actor,first,0).balance().assessed()).isZero();
     }
     @Test void chargeTermsAndOutstandingAmountsAppearInEnglishAndKiswahiliPdfDocuments()throws Exception{
         chargePolicy("SEPARATE");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var payment=post(id,"25.00","PDF-CHARGES");payment.setInterestAccountId(interest);service.repay(actor,payment);
