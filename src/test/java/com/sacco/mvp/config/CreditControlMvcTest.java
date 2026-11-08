@@ -43,6 +43,21 @@ class CreditControlMvcTest {
         mvc.perform(post("/finance/credit/collections/"+id+"/events/new").with(user(staff)).with(csrf()).param("kind","PROMISE").param("amount","100.25").param("promiseOn","2026-11-01").param("evidence","Client promised to pay").param("principalPaid","99999").param("state","PAID").param("actorId",client.getMemberId().toString())).andExpect(redirectedUrl("/finance/credit/collections/"+id));verify(service).followUp(eq(staff),eq(id),argThat(f->f.getKind().equals("PROMISE")&&f.getAmount().toPlainString().equals("100.25")));
     }
     @Test void serviceScopeFailuresDoNotExposeForeignRecords()throws Exception{when(service.asset(staff,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));mvc.perform(get("/finance/credit/collateral/"+id).with(user(staff))).andExpect(status().isForbidden());}
+    @Test void completedCreatesReturnToTheirRegistersWithSuccessFeedback()throws Exception{
+        mvc.perform(post("/finance/credit/collateral/new").with(user(staff)).with(csrf()).param("code","ASSET-1").param("owner","Client"))
+            .andExpect(redirectedUrl("/finance/credit/collateral")).andExpect(flash().attribute("successMessageCode","credit.assetCreated"));
+        verify(service).createAsset(eq(staff),argThat(f->f.getCode().equals("ASSET-1")));
+        mvc.perform(post("/finance/credit/collections/new").with(user(staff)).with(csrf()).param("loanId",loan.toString()).param("reason","Follow up"))
+            .andExpect(redirectedUrl("/finance/credit/collections")).andExpect(flash().attribute("successMessageCode","credit.caseCreated"));
+        verify(service).createCase(eq(staff),argThat(f->f.getLoanId().equals(loan)));
+    }
+    @Test void failedCreationRetainsTheFormWithoutSuccessFeedback()throws Exception{
+        when(service.createAsset(eq(staff),any())).thenThrow(new IllegalArgumentException("credit.error.owner"));
+        var result=mvc.perform(post("/finance/credit/collateral/new").with(user(staff)).with(csrf()).param("code","ASSET-1").param("owner","Client"))
+            .andExpect(view().name("credit/form")).andExpect(model().attributeHasFieldErrors("assetForm","owner"))
+            .andExpect(flash().attributeCount(0)).andReturn();
+        assertThat(((AssetForm)result.getModelAndView().getModel().get("assetForm")).getCode()).isEqualTo("ASSET-1");
+    }
     @Test void allNewClaimsRequireExplicitAssignment(){for(var role:Position.values())for(var claim:UserClaim.values())if(Set.of(AccessFeature.CREDIT_CONTROLS,AccessFeature.GUARANTOR_CAPACITY,AccessFeature.COLLATERAL,AccessFeature.COLLECTIONS).contains(claim.getFeature()))assertThat(UserClaim.defaultClaims(Set.of(role),false)).doesNotContain(claim);}
     @Test void staticAndDynamicLabelsExistInBothLanguages()throws Exception{
         var keys=new HashSet<String>();try(var files=Files.list(Path.of("src/main/webapp/WEB-INF/jsp/credit"))){for(var file:files.toList()){var matcher=java.util.regex.Pattern.compile("code=[\"']([^\"'$]+)[\"']").matcher(Files.readString(file));while(matcher.find())keys.add(matcher.group(1));}}

@@ -1,6 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %><%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %><%@ include file="../fragments/sidebar.jspf" %>
+<%@ include file="../fragments/alerts.jspf" %>
 <div class="erp-page-header"><h1 class="erp-page-title" id="group-title"><spring:message code="group.title" /></h1></div>
 <section class="erp-table-wrap" data-resource-table="lending-groups" data-table-title-id="group-title" data-group-register data-table-selection="single">
 <div class="accounting-actions" data-table-toolbar-for="lending-groups"><button class="app-btn btn-neutral" type="button" data-table-command data-group-command="view" disabled><spring:message code="group.open" /></button><span class="sr-only" data-group-selection-status aria-live="polite"></span><sec:authorize access="@access.has(principal,'GROUP_LENDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/groups/new' />"><spring:message code="group.create" /></a></sec:authorize></div>

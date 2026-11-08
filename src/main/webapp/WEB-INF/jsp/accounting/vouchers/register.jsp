@@ -7,6 +7,7 @@
 <%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/accounting-vouchers.css' />" />
+<%@ include file="../../fragments/alerts.jspf" %>
 
 <div class="accounting-workspace voucher-register" data-voucher-register data-base="<c:url value='${base}' />">
 <section data-resource-table="accounting-vouchers-register-1" data-table-selection="single" data-resource-split data-table-page-size="${tablePageSize}" class="erp-table-wrap" data-aws-table-region>

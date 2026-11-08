@@ -1,6 +1,9 @@
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<c:if test="${not empty successMessageCode}">
+    <spring:message code="${successMessageCode}" var="message" />
+</c:if>
 <c:if test="${not empty error and fn:startsWith(error, 'staffClient.')}">
     <spring:message code="${error}" text="${error}" var="error" />
 </c:if>

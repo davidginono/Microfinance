@@ -69,7 +69,8 @@ public class VoucherController {
             if("draft".equals(action) && !loan && approvalGate.required(actor,type(kind)))return "redirect:/finance/approval/"+approvalWorkflows.capture(actor,type(kind),form,false);
             if(!"post".equals(action))throw new Invalid("","request");
             if(!loan && approvalGate.required(actor,type(kind)))return "redirect:/finance/approval/"+approvalWorkflows.capture(actor,type(kind),form);
-            var saved=loan?loanReceipts.post(actor,form).header():vouchers.post(actor,type(kind),form);flash.addFlashAttribute("voucherPosted",true);return "redirect:/finance/vouchers/"+kind+"/"+saved.id();
+            if(loan)loanReceipts.post(actor,form);else vouchers.post(actor,type(kind),form);
+            flash.addFlashAttribute("successMessageCode","voucher.posted");return "redirect:/finance/vouchers/"+kind;
         }catch(Invalid invalid){if(invalid.field().isEmpty())errors.reject(invalid.getMessage());else errors.rejectValue(invalid.field(),invalid.getMessage());}
          catch(DataIntegrityViolationException duplicate){errors.reject("voucher.error.duplicate");}
          catch(IllegalArgumentException invalid){errors.reject(accountingError(invalid));}

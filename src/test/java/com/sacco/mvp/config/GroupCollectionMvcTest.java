@@ -50,6 +50,12 @@ class GroupCollectionMvcTest {
         mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","post").param("rows[0].amount","invalid").param("rows[0].payerId",payer.toString()).param("rows[0].loanId",loan.toString()))
             .andExpect(status().isOk()).andExpect(view().name("groups/collection-form")).andExpect(model().attributeHasErrors("collectionForm")).andExpect(model().attributeExists("labels"));verify(collections,never()).post(any(),any(),any());
     }
+    @Test void postedGroupReceiptReturnsToReceiptRegisterWithSuccessFeedback()throws Exception{
+        mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","post").param("previewHash","confirmed"))
+            .andExpect(redirectedUrl("/finance/vouchers/receipts"))
+            .andExpect(flash().attribute("successMessageCode","voucher.posted"));
+        verify(collections).post(eq(actor),eq(cycle),argThat(f->f.getPreviewHash().equals("confirmed")));
+    }
     @Test void stalePreviewShowsRecoveryWithoutKeepingThePostPreview()throws Exception{
         when(collections.post(eq(actor),eq(cycle),any())).thenThrow(new IllegalArgumentException("group.error.previewChanged"));
         mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","post").param("previewHash","old"))

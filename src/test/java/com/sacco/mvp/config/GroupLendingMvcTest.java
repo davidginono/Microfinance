@@ -38,7 +38,8 @@ class GroupLendingMvcTest {
     @Test void creationBindsOnlyGroupFieldsAndDerivesScopeFromActor()throws Exception{
         when(groups.create(eq(actor),any())).thenReturn(id);
         mvc.perform(post("/finance/groups").with(user(actor)).with(csrf()).param("name","Test group").param("evidence","Identity evidence").param("saccoId","FOREIGN").param("stationId","FOREIGN").param("status","ACTIVE"))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/groups/"+id));
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/groups"))
+            .andExpect(flash().attribute("successMessageCode","group.created"));
         verify(groups).create(eq(actor),argThat(f->f.getName().equals("Test group") && f.getLegalForm().equals("INFORMAL")));
     }
     @Test void invalidMembershipKeepsValuesAndDisplaysLocalError()throws Exception{

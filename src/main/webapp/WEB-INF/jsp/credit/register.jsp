@@ -1,4 +1,5 @@
 <%@ include file="head.jspf" %>
+<%@ include file="../fragments/alerts.jspf" %>
 <c:set var="tableKey" value="credit-${register}"/><c:set var="pagePath" value="/finance/credit/${register}"/><c:url value="${pagePath}" var="registerUrl"/>
 <section class="erp-table-wrap" data-resource-table="${tableKey}" data-group-register data-table-selection="single">
 <h2><spring:message code="credit.title.${register}"/></h2>

@@ -41,8 +41,19 @@ class VoucherMvcTest {
   when(service.post(any(),eq(Type.RECEIPT),any())).thenReturn(voucher());
   mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("effectiveDate","2026-10-08").param("party","Payer").param("reference","REF")
    .param("rows[0].description","First").param("rows[0].amount","1.01").param("rows[1].description","Second").param("rows[1].amount","2.02").param("saccoId","FOREIGN").param("total","999"))
-   .andExpect(redirectedUrl("/finance/vouchers/receipts/"+id));
+   .andExpect(redirectedUrl("/finance/vouchers/receipts")).andExpect(flash().attribute("successMessageCode","voucher.posted"));
   verify(service).post(eq(actor),eq(Type.RECEIPT),argThat(f->f.getRows().size()==2 && f.getRows().get(1).getAmount().compareTo(new BigDecimal("2.02"))==0));
+ }
+ @Test void postedJournalReturnsToJournalRegisterAndExistingDetailsStillOpen()throws Exception{
+  when(service.post(eq(actor),eq(Type.JOURNAL),any())).thenReturn(voucher());
+  var result=mvc.perform(post("/finance/vouchers/journals").with(user(actor)).with(csrf()).param("party","Journal"))
+   .andExpect(redirectedUrl("/finance/vouchers/journals")).andExpect(flash().attribute("successMessageCode","voucher.posted")).andReturn();
+  when(service.list(eq(actor),eq(Type.JOURNAL),any())).thenReturn(new Page(List.of(),0,false));
+  mvc.perform(get("/finance/vouchers/journals").with(user(actor)).flashAttrs(result.getFlashMap()))
+   .andExpect(view().name("accounting/vouchers/register")).andExpect(model().attribute("successMessageCode","voucher.posted"));
+  when(service.view(actor,Type.JOURNAL,id)).thenReturn(voucher());
+  mvc.perform(get("/finance/vouchers/journals/"+id).with(user(actor))).andExpect(view().name("accounting/vouchers/details"));
+  verify(service).post(eq(actor),eq(Type.JOURNAL),any());
  }
  @Test void configuredTypesAndTransactionLookupsUseTheAuthorizedVoucherContext()throws Exception{
   UUID activity=UUID.randomUUID();
@@ -74,7 +85,7 @@ class VoucherMvcTest {
    .andExpect(status().isOk()).andExpect(jsonPath("$[0].number").value("CL-012"));verify(service).clients(actor,Type.PAYMENT,"CL-",1);
   when(service.post(any(),eq(Type.PAYMENT),any())).thenReturn(voucher());
   mvc.perform(post("/finance/vouchers/payments").with(user(actor)).with(csrf()).param("clientId",client.toString()).param("clientNumber","FORGED").param("party","Payee"))
-   .andExpect(redirectedUrl("/finance/vouchers/payments/"+id));verify(service).post(eq(actor),eq(Type.PAYMENT),argThat(f->client.equals(f.getClientId())));
+   .andExpect(redirectedUrl("/finance/vouchers/payments")).andExpect(flash().attribute("successMessageCode","voucher.posted"));verify(service).post(eq(actor),eq(Type.PAYMENT),argThat(f->client.equals(f.getClientId())));
   when(workflows.clients(actor,id,"CL-",0)).thenReturn(List.of(new Client(client,"CL-012","Synthetic client")));
   mvc.perform(get("/finance/approval/"+id+"/clients").with(user(actor)).param("search","CL-"))
    .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(client.toString()));
@@ -122,7 +133,7 @@ class VoucherMvcTest {
  Voucher voucher(){return new Voucher(id,"RV-2026-00000001",Type.RECEIPT,LocalDate.of(2026,10,8),"Payer","REF","","",UUID.randomUUID(),new BigDecimal("3.03"),2,UUID.randomUUID(),actor.getMemberId(),"Accountant",OffsetDateTime.now(),null,null,"Institution","Branch",List.of());}
  @Test void loanReceiptUsesRepaymentUseCaseAndNotGenericJournalPosting()throws Exception{
   var receipt=new LoanReceipt(voucher(),"C100",List.of());when(receipts.post(eq(actor),any())).thenReturn(receipt);when(receipts.selected(eq(actor),any())).thenReturn(Map.of());
-  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("clientId",UUID.randomUUID().toString()).param("rows[0].loanId",UUID.randomUUID().toString()).param("rows[0].amount","120.00").param("rows[0].description","Repayment")).andExpect(redirectedUrl("/finance/vouchers/receipts/"+id));
+  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("clientId",UUID.randomUUID().toString()).param("rows[0].loanId",UUID.randomUUID().toString()).param("rows[0].amount","120.00").param("rows[0].description","Repayment")).andExpect(redirectedUrl("/finance/vouchers/receipts")).andExpect(flash().attribute("successMessageCode","voucher.posted"));
   verify(receipts).post(eq(actor),argThat(f->f.getClientId()!=null && f.getRows().getFirst().getLoanId()!=null));verify(service,never()).post(any(),any(),any());
  }
  @Test void loanPreviewAndErrorsPreserveTheConditionalForm()throws Exception{

@@ -15,6 +15,7 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.*;
 
 @Controller @RequestMapping("/finance/groups") @RequiredArgsConstructor
@@ -33,8 +34,8 @@ public class GroupLendingController {
     @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal actor,Model model) {
         service.authorize(actor,"CREATE");model.addAttribute("groupForm",new GroupForm());return "groups/create";
     }
-    @PostMapping public String create(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute GroupForm groupForm,BindingResult errors) {
-        service.authorize(actor,"CREATE");if(!errors.hasErrors())try{return "redirect:/finance/groups/"+service.create(actor,groupForm);}
+    @PostMapping public String create(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute GroupForm groupForm,BindingResult errors,RedirectAttributes flash) {
+        service.authorize(actor,"CREATE");if(!errors.hasErrors())try{service.create(actor,groupForm);flash.addFlashAttribute("successMessageCode","group.created");return "redirect:/finance/groups";}
         catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("group.error.duplicate");}
         return "groups/create";
     }
