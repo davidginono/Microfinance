@@ -70,13 +70,17 @@ class ManagementReportTest {
             var columns=ManagementReports.columns(kind);var rows=new ArrayList<Map<String,Object>>();var totals=new LinkedHashMap<String,BigDecimal>();
             for(int n=0;n<60;n++){
                 var row=new LinkedHashMap<String,Object>();row.put("groupName",kind==Kind.DAILY_COLLECTIONS?"2026-10-15 | Loan repayments":"Business loans");
-                for(var c:columns)if(c.money()){row.put(c.key(),new BigDecimal("99999999999999.99"));if(ManagementReports.totalFields(kind).contains(c.key()))totals.merge(c.key(),(BigDecimal)row.get(c.key()),BigDecimal::add);}else row.put(c.key(),c.key().equals("entryKind")?"PAYMENT":c.key().equals("name")?"Synthetic client with a long readable name — sample "+n:c.key().equals("particulars")?"Long collection description ".repeat(2):"REF-"+n);
+                for(var c:columns)if(c.money()){row.put(c.key(),new BigDecimal("99999999999999.99"));if(ManagementReports.totalFields(kind).contains(c.key()))totals.merge(c.key(),(BigDecimal)row.get(c.key()),BigDecimal::add);}else row.put(c.key(),c.key().equals("name")?"Synthetic client with a long readable name — sample "+n:c.key().equals("particulars")?"Long collection description ".repeat(2):"REF-"+n);
+                if(kind==Kind.DISBURSED_LOANS_AUDIT){row.put("month","2026-10");row.put("product","Business loans");row.put("disbursementAccount","Bank");}
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){row.put("clientNumber","CL-0041");row.put("name","Synthetic client with a long readable name");row.put("loanId","LN-0102");row.put("product","Business loans");row.put("startDate",DAY);row.put("disbursed",new BigDecimal("2000000.00"));row.put("principalBalance",new BigDecimal("1500000.00"));row.put("reference","REF-"+n);row.put("entryKind","PAYMENT");}
                 rows.add(row);
             }
             var group=new Group(rows.getFirst().get("groupName").toString(),rows.size(),totals);
             var result=new Result(kind,parameters(0),"Synthetic reference institution","Main branch",columns,rows,List.of(group),totals,60,0,false,"111000 Cash and bank","");
             byte[] bytes=exporter.build(result,Locale.forLanguageTag(language));
             try(var doc=Loader.loadPDF(bytes)){
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(612);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(792);}
+                if(kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.EXPECTED_REPAYMENTS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(1008);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(612);}
                 String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.40");
                 if(kind!=Kind.PORTFOLIO_RISK && kind!=Kind.PORTFOLIO_ANALYSIS)assertThat(text).contains("01/10/2026");
                 assertThat(doc.getNumberOfPages()).isGreaterThan(1);
@@ -84,6 +88,11 @@ class ManagementReportTest {
             }
             if(Boolean.getBoolean("microfinance.management.samples")){var folder=java.nio.file.Path.of("target/management-reference-previews");java.nio.file.Files.createDirectories(folder);java.nio.file.Files.write(folder.resolve(kind+"-"+language+".pdf"),bytes);}
         }
+    }
+    @Test void sourceFieldOrderMatchesTheRetainedReferenceColumns(){
+        assertThat(ManagementReports.columns(Kind.DISBURSED_LOANS_AUDIT).stream().map(Column::key)).containsExactly("clientNumber","name","loanId","disbursed","totalInterest","instalment","disbursementDate","maturity","reference","periods","frequency");
+        assertThat(ManagementReports.columns(Kind.EXPECTED_REPAYMENTS).stream().map(Column::key)).containsExactly("clientNumber","loanId","name","phone","dueDate","principalBalance","principalDue","interestDue","expectedTotal");
+        assertThat(ManagementReports.columns(Kind.LOAN_REPAYMENT_TRANSACTIONS).stream().map(Column::key)).containsExactly("date","openingPrincipal","principalPaid","interestPaid","payment","closingPrincipal","interestExcluded");
     }
     @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"","");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
     static BudgetForm budget(){var f=new BudgetForm();f.setAccountId(UUID.randomUUID());f.setDate(DAY);f.setYear(2027);f.setAmounts(new ArrayList<>(Collections.nCopies(12,new BigDecimal("10.01"))));return f;}

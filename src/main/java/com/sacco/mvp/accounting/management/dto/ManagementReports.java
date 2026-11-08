@@ -21,7 +21,9 @@ public final class ManagementReports {
             List<Column> columns, List<Map<String,Object>> rows, List<Group> groups,
             Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountSelection, String clientSelection) {
         public List<String> getTotalFields(){return totalFields(kind);}
-        public Map<String,Map<String,Object>> getGroupFacts(){var facts=new LinkedHashMap<String,Map<String,Object>>();if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS)rows.forEach(row->facts.putIfAbsent(row.get("groupName").toString(),row));return facts;}
+        public boolean isReferenceLayout(){return Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind);}
+        public double getColumnWidthTotal(){return columns.stream().mapToDouble(Column::width).sum();}
+        public Map<String,Map<String,Object>> getGroupFacts(){var facts=new LinkedHashMap<String,Map<String,Object>>();if(isReferenceLayout())rows.forEach(row->facts.putIfAbsent(row.get("groupName").toString(),row));return facts;}
         public List<Group> getDisplayedGroups(){var names=new HashSet<Object>();rows.forEach(r->names.add(r.get("groupName")));return groups.stream().filter(g->names.contains(g.name())).toList();}
         public Map<String,Map<String,BigDecimal>> getDailyTotals(){return periodTotals(10);}
         public Map<String,Map<String,BigDecimal>> getMonthlyTotals(){return periodTotals(7);}
@@ -49,12 +51,12 @@ public final class ManagementReports {
     }
     public static List<Column> columns(Kind kind) {
         return switch(kind) {
-            case DISBURSED_LOANS_AUDIT -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.8f),money("disbursed"),
-                money("totalInterest"),money("instalment"),text("frequency",.9f),text("disbursementDate",1),text("maturity",1),text("periods",1),text("reference",1.2f),text("disbursementAccount",1.6f));
+            case DISBURSED_LOANS_AUDIT -> List.of(text("clientNumber",.8f),text("name",1.8f),text("loanId",.8f),money("disbursed"),
+                money("totalInterest"),money("instalment"),text("disbursementDate",1),text("maturity",1),text("reference",1.1f),text("periods",1),text("frequency",.8f));
             case EXPECTED_REPAYMENTS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.8f),text("phone",1.2f),text("dueDate",1),
                 money("principalBalance"),money("principalDue"),money("interestDue"),money("expectedTotal"));
-            case LOAN_REPAYMENT_TRANSACTIONS -> List.of(text("date",1),text("reference",1.7f),text("entryKind",.9f),text("reversesReference",1.7f),
-                money("openingPrincipal"),money("principalPaid"),money("interestPaid"),money("payment"),money("interestExcluded"),money("closingPrincipal"));
+            case LOAN_REPAYMENT_TRANSACTIONS -> List.of(text("date",1.4f),money("openingPrincipal"),money("principalPaid"),money("interestPaid"),
+                money("payment"),money("closingPrincipal"),money("interestExcluded"));
             case DAILY_COLLECTIONS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.6f),text("documentReference",1),text("documentNumber",1),
                 text("receiptDate",1),text("transactionCode",.7f),text("transaction",1.5f),money("debit"),money("credit"),text("phone",1.2f),text("recordedBy",1));
             case CASHBOOK -> List.of(text("date",1),text("clientNumber",.8f),text("name",1.4f),text("particulars",2),text("reference",1.2f),

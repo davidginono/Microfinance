@@ -29,10 +29,11 @@ public class ManagementReportPdf {
             boolean asAt=r.kind()==Kind.PORTFOLIO_RISK || r.kind()==Kind.PORTFOLIO_ANALYSIS;
             var context=new ArrayList<>(List.of(r.institution()+" | "+r.branch(),message(asAt?"asAt":"period",locale)+": "+(asAt?"":com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().from())+" — ")+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().through())+" | TZS",
                 message("cutoff",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().cutoff()),message("excluded",locale)+": "+r.excluded()));
+            if(r.isReferenceLayout())context=new ArrayList<>(List.of(context.get(1),context.get(0),context.get(2)));
             if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message("accounts",locale)+": "+(r.parameters().startAccount()==null && r.parameters().endAccount()==null?message("allAccounts",locale):r.accountSelection()));
             if(!r.clientSelection().isBlank())context.add(message("client",locale)+": "+r.clientSelection());
             if(!r.parameters().product().isBlank())context.add(message("productSearch",locale)+": "+r.parameters().product());
-            try(var page=new AccountingPdfDocument(document,font,true,message("title."+r.kind(),locale),context,null,r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS?AccountingPdfDocument.Style.REPAYMENT:AccountingPdfDocument.Style.REFERENCE)){
+            try(var page=new AccountingPdfDocument(document,font,r.kind()!=Kind.LOAN_REPAYMENT_TRANSACTIONS,message("title."+r.kind(),locale),context,null,switch(r.kind()){case LOAN_REPAYMENT_TRANSACTIONS->AccountingPdfDocument.Style.REPAYMENT;case DISBURSED_LOANS_AUDIT->AccountingPdfDocument.Style.AUDIT;case EXPECTED_REPAYMENTS->AccountingPdfDocument.Style.EXPECTED;default->AccountingPdfDocument.Style.REFERENCE;})){
                 float total=(float)r.columns().stream().mapToDouble(Column::width).sum();float[] widths=new float[r.columns().size()];boolean[] numeric=new boolean[widths.length];
                 for(int n=0;n<widths.length;n++){widths[n]=r.columns().get(n).width()/total;numeric[n]=r.columns().get(n).money();}
                 var labels=r.columns().stream().map(c->message("field."+c.key(),locale)).toList();
@@ -43,10 +44,15 @@ public class ManagementReportPdf {
                     if(r.kind()==Kind.DAILY_COLLECTIONS && day!=null && !group.name().startsWith(day))page.row(totalRow(r,r.getDailyTotals().get(day),message("dayTotal",locale),locale),true);
                     String activity=group.name().contains(" | ")?group.name().substring(group.name().indexOf(" | ")+3):"";
                     String groupTitle=Set.of("@loan","@general").contains(activity)?group.name().substring(0,group.name().indexOf(" | ")+3)+message(activity.equals("@loan")?"loanRepayments":"generalReceipts",locale):group.name();
-                    page.endTable();page.section(com.sacco.mvp.service.ApplicationTimestamps.display(groupTitle));
-                    if(r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS){var facts=groupFacts.get(group.name());page.text(message("field.disbursed",locale)+": "+value(facts.get("disbursed"),locale)+" | "+message("field.principalBalance",locale)+": "+value(facts.get("principalBalance"),locale));}
+                    page.endTable();
+                    if(r.isReferenceLayout()){
+                        var facts=groupFacts.get(group.name());
+                        if(r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS)page.sourceGroup(List.of(message("field.clientNumber",locale),message("field.name",locale),message("startDate",locale),message("field.loanId",locale),message("productSearch",locale),message("field.disbursed",locale),message("field.principalBalance",locale)),List.of(value(facts.get("clientNumber"),locale),value(facts.get("name"),locale),value(facts.get("startDate"),locale),value(facts.get("loanId"),locale),value(facts.get("product"),locale),value(facts.get("disbursed"),locale),value(facts.get("principalBalance"),locale)));
+                        else if(r.kind()==Kind.DISBURSED_LOANS_AUDIT)page.sourceGroup(List.of(message("month",locale),message("productSearch",locale),message("field.disbursementAccount",locale)),List.of(value(facts.get("month"),locale),value(facts.get("product"),locale),value(facts.get("disbursementAccount"),locale)));
+                        else page.sourceGroup(List.of(message("productSearch",locale)),List.of(group.name()));
+                    }else page.section(com.sacco.mvp.service.ApplicationTimestamps.display(groupTitle));
                     page.columns(labels,widths,numeric);
-                    for(var row:r.rows())if(Objects.equals(row.get("groupName"),group.name()))page.row(r.columns().stream().map(c->"entryKind".equals(c.key())?message("entry."+row.get(c.key()),locale):"frequency".equals(c.key()) && Set.of("MONTHLY","WEEKLY").contains(Objects.toString(row.get(c.key()),""))?messages.getMessage("recording.frequency."+row.get(c.key()),null,locale):"transaction".equals(c.key()) && Set.of("PRINCIPAL","INTEREST").contains(Objects.toString(row.get("component"),""))?message("component."+row.get("component"),locale)+" — "+value(row.get(c.key()),locale):value(row.get(c.key()),locale)).toList(),false);
+                    for(var row:r.rows())if(Objects.equals(row.get("groupName"),group.name()))page.row(r.columns().stream().map(c->cell(r,row,c,locale)).toList(),false);
                     page.row(totalRow(r,group.totals(),message("groupTotal",locale),locale),true);
                     day=group.name().substring(0,Math.min(10,group.name().length()));month=group.name().substring(0,Math.min(7,group.name().length()));
                 }
@@ -54,7 +60,8 @@ public class ManagementReportPdf {
                 if(r.kind()==Kind.DISBURSED_LOANS_AUDIT && month!=null)page.row(totalRow(r,r.getMonthlyTotals().get(month),message("monthTotal",locale),locale),true);
                 if(r.groups().isEmpty()){page.columns(labels,widths,numeric);page.text(message("empty",locale));}
                 page.row(totalRow(r,r.totals(),message("total",locale),locale),true);
-                page.endTable();page.section(message("basis",locale));page.text(message("coverage."+r.kind(),locale));
+                page.endTable();page.section(message("basis",locale));
+                if(r.isReferenceLayout() && r.excluded()>0)page.text(message("excluded",locale)+": "+r.excluded());page.text(message("coverage."+r.kind(),locale));
                 if(r.kind()==Kind.PORTFOLIO_RISK)page.text(message("riskBasis",locale));
                 if(r.kind()==Kind.LOAN_PORTFOLIO || r.kind()==Kind.PORTFOLIO_ANALYSIS)page.text(message("interestBasis",locale));
                 if(r.excluded()>0){
@@ -65,6 +72,15 @@ public class ManagementReportPdf {
             }
             document.save(out);return out.toByteArray();
         }catch(IOException failure){throw new IllegalStateException("PDF generation failed",failure);}
+    }
+    private String cell(Result r,Map<String,Object> row,Column c,Locale locale){
+        String text=value(row.get(c.key()),locale);
+        if(r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS && c.key().equals("date")){
+            if(row.get("entryKind")!=null)text+="\n"+message("entry."+row.get("entryKind"),locale)+" "+value(row.get("reference"),locale);
+            if(row.get("reversesReference")!=null)text+="\n"+message("field.reversesReference",locale)+": "+value(row.get("reversesReference"),locale);
+        }else if(c.key().equals("frequency") && Set.of("MONTHLY","WEEKLY").contains(Objects.toString(row.get(c.key()),"")))return messages.getMessage("recording.frequency."+row.get(c.key()),null,locale);
+        else if(c.key().equals("transaction") && Set.of("PRINCIPAL","INTEREST").contains(Objects.toString(row.get("component"),"")))return message("component."+row.get("component"),locale)+" — "+text;
+        return text;
     }
     private List<String> totalRow(Result r,Map<String,BigDecimal> totals,String title,Locale locale){var values=new ArrayList<String>();for(int n=0;n<r.columns().size();n++){var c=r.columns().get(n);values.add(n==0?title:c.money() && totals.containsKey(c.key())?value(totals.get(c.key()),locale):"");}return values;}
     private String value(Object value,Locale locale){if(value==null)return "—";if(value instanceof BigDecimal n){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(n);}return com.sacco.mvp.service.ApplicationTimestamps.display(value);}

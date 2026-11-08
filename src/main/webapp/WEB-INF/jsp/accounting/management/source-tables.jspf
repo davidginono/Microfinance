@@ -1,0 +1,28 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:forEach items="${report.getDisplayedGroups()}" var="group" varStatus="groupStatus">
+  <c:set var="facts" value="${groupFacts[group.name]}" />
+  <section class="reference-source-group">
+    <c:choose>
+      <c:when test="${report.kind=='LOAN_REPAYMENT_TRANSACTIONS'}">
+        <dl class="reference-client-facts"><div><dt><spring:message code="management.field.clientNumber" /></dt><dd><c:out value="${facts.clientNumber}" default="—" /></dd></div><div><dt><spring:message code="management.field.name" /></dt><dd><c:out value="${facts.name}" default="—" /></dd></div><div><dt><spring:message code="management.startDate" /></dt><dd><c:out value="${appTime:display(facts.startDate)}" default="—" /></dd></div></dl>
+        <dl class="reference-loan-facts"><div><dt><spring:message code="management.field.loanId" /></dt><dd><c:out value="${facts.loanId}" default="—" /></dd></div><div><dt><spring:message code="management.productSearch" /></dt><dd><c:out value="${facts.product}" default="—" /></dd></div><div><dt><spring:message code="management.field.disbursed" /></dt><dd><c:choose><c:when test="${facts.disbursed!=null}"><fmt:formatNumber value="${facts.disbursed}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div><div><dt><spring:message code="management.field.principalBalance" /></dt><dd><c:choose><c:when test="${facts.principalBalance!=null}"><fmt:formatNumber value="${facts.principalBalance}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div></dl>
+      </c:when>
+      <c:when test="${report.kind=='DISBURSED_LOANS_AUDIT'}">
+        <p class="reference-month"><strong><spring:message code="management.month" /></strong> <em><c:out value="${facts.month}" default="—" /></em></p>
+        <div class="reference-audit-group"><p><strong><spring:message code="management.productSearch" /></strong> <c:out value="${facts.product}" default="—" /></p><p><strong><spring:message code="management.field.disbursementAccount" /></strong> <c:out value="${facts.disbursementAccount}" default="—" /></p></div>
+      </c:when>
+      <c:otherwise><p class="reference-product-group"><strong><spring:message code="management.productSearch" /></strong> <c:out value="${group.name}" /></p></c:otherwise>
+    </c:choose>
+    <table data-table-sort-mode="none" data-table-sort-reason="document" class="reference-table">
+      <colgroup><c:forEach items="${report.columns}" var="column"><col style="width:${100*column.width/report.getColumnWidthTotal()}%" /></c:forEach></colgroup>
+      <thead><tr><c:forEach items="${report.columns}" var="column"><th scope="col"><spring:message code="management.field.${column.key}" /></th></c:forEach></tr></thead>
+      <tbody><c:forEach items="${report.rows}" var="row"><c:if test="${row.groupName==group.name}"><tr><c:forEach items="${report.columns}" var="column"><td class="${column.money?'reference-money':''}"><c:choose><c:when test="${row[column.key]==null}">—</c:when><c:when test="${column.money}"><fmt:formatNumber value="${row[column.key]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:when test="${column.key=='frequency' and (row[column.key]=='MONTHLY' or row[column.key]=='WEEKLY')}"><spring:message code="recording.frequency.${row[column.key]}" /></c:when><c:otherwise><c:out value="${appTime:display(row[column.key])}" /></c:otherwise></c:choose><c:if test="${report.kind=='LOAN_REPAYMENT_TRANSACTIONS' and column.key=='date'}"><span class="reference-entry"><spring:message code="management.entry.${row.entryKind}" /> <c:out value="${row.reference}" /></span><c:if test="${not empty row.reversesReference}"><span class="reference-entry"><spring:message code="management.field.reversesReference" />: <c:out value="${row.reversesReference}" /></span></c:if></c:if></td></c:forEach></tr></c:if></c:forEach></tbody>
+      <tfoot>
+        <c:set var="sourceTotals" value="${group.totals}" /><c:set var="sourceTotalLabel" value="management.groupTotal" /><%@ include file="source-total.jspf" %>
+        <c:if test="${report.kind=='DISBURSED_LOANS_AUDIT' and (groupStatus.last or group.name.substring(0,7)!=report.getDisplayedGroups()[groupStatus.index+1].name.substring(0,7))}"><c:set var="sourceTotals" value="${report.getMonthlyTotals()[group.name.substring(0,7)]}" /><c:set var="sourceTotalLabel" value="management.monthTotal" /><%@ include file="source-total.jspf" %></c:if>
+        <c:if test="${groupStatus.last}"><c:set var="sourceTotals" value="${report.totals}" /><c:set var="sourceTotalLabel" value="management.total" /><%@ include file="source-total.jspf" %></c:if>
+      </tfoot>
+    </table>
+  </section>
+</c:forEach>
+<c:if test="${empty report.rows}"><p><spring:message code="management.empty" /></p><table class="reference-table"><colgroup><c:forEach items="${report.columns}" var="column"><col style="width:${100*column.width/report.getColumnWidthTotal()}%" /></c:forEach></colgroup><tbody><c:set var="sourceTotals" value="${report.totals}" /><c:set var="sourceTotalLabel" value="management.total" /><%@ include file="source-total.jspf" %></tbody></table></c:if>

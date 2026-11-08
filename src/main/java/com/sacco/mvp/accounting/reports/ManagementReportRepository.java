@@ -163,7 +163,8 @@ public class ManagementReportRepository {
     private static String disbursements(){
         return LoanPortfolioReportRepository.SOURCE+"""
             , report_rows as (
-              select to_char(e.disbursement_date,'YYYY-MM')||' | '||coalesce(r.product_name,a.loan_type) as "groupName",
+              select to_char(e.disbursement_date,'YYYY-MM')||' | '||coalesce(r.product_name,a.loan_type)||' | '||coalesce(p.money_account_name,'@unknown') as "groupName",
+                to_char(e.disbursement_date,'YYYY-MM') as month,coalesce(r.product_name,a.loan_type) as product,
                 e.disbursement_date::text||e.loan_id||a.id::text as "rowOrder",m.member_no as "clientNumber",m.full_name as name,e.loan_id as "loanId",
                 case when e.complete then e.original_principal end as disbursed,
                 case when e.complete then e.scheduled_interest end as "totalInterest",
@@ -217,11 +218,13 @@ public class ManagementReportRepository {
                 t.payment_date::text||t.posted_at::text||lpad(t.sequence::text,20,'0')||t.id::text as "rowOrder",
                 t.payment_date date,t.receipt_reference reference,t.kind as "entryKind",original.receipt_reference as "reversesReference",
                 v.balance-v.change as "openingPrincipal",t.sign*t.principal_amount as "principalPaid",t.sign*t.interest_amount as "interestPaid",
-                t.sign*t.amount as payment,t.sign*t.future_interest_excluded as "interestExcluded",v.balance as "closingPrincipal",e.original_principal disbursed,e.principal as "principalBalance"
+                t.sign*t.amount as payment,t.sign*t.future_interest_excluded as "interestExcluded",v.balance as "closingPrincipal",e.original_principal disbursed,e.principal as "principalBalance",
+                m.member_no as "clientNumber",m.full_name name,e.loan_id as "loanId",coalesce(r.product_name,a.loan_type) product,initial.due_date as "startDate"
               from exposure e
             """+CLIENT_JOINS+"""
               join transactions t on t.loan_application_id=e.loan_application_id
               join running_principal v on v.transaction_id=t.id
+              left join loan_ledger_installments initial on initial.loan_application_id=e.loan_application_id and initial.installment_number=1
               left join loan_repayment_transactions original on original.id=t.reverses_transaction_id
                 and original.sacco_id=:institution and original.station_id=:branch
               where e.complete and t.payment_date>=:from and

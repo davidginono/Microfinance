@@ -1,0 +1,2 @@
+<%@ page pageEncoding="UTF-8" %>
+<tr class="reference-total"><c:forEach items="${report.columns}" var="column" varStatus="cell"><td class="${column.money?'reference-money':''}"><c:choose><c:when test="${cell.first}"><spring:message code="${sourceTotalLabel}" /></c:when><c:when test="${column.money and sourceTotals[column.key]!=null}"><fmt:formatNumber value="${sourceTotals[column.key]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:when test="${column.money and report.getTotalFields().contains(column.key)}">—</c:when></c:choose></td></c:forEach></tr>
