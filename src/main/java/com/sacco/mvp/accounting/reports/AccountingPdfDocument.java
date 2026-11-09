@@ -23,12 +23,14 @@ public final class AccountingPdfDocument implements AutoCloseable {
     private final int firstPage;
     private final PDFont bodyFont,headingFont,titleFont,metadataFont;
     private final boolean sourceLayout,referenceRows;
+    private final float[] sourceEdges;
     private List<String> groupLabels=List.of(),groupValues=List.of();
     private PDPageContentStream stream;
     private float y;
     private List<String> headers=List.of();
     private float[] weights=new float[0];
     private boolean[] numeric=new boolean[0];
+    private String sourcePageNumber="Page {0} of {1}";
     private boolean finished;
     public AccountingPdfDocument(PDDocument document,PDFont font,boolean landscape,String title,List<String> context)throws IOException {
         this(document,font,landscape,title,context,null);
@@ -41,7 +43,14 @@ public final class AccountingPdfDocument implements AutoCloseable {
         firstPage=document.getNumberOfPages();
         this.style=style;
         sourceLayout=style==Style.REPAYMENT||style==Style.AUDIT||style==Style.EXPECTED;referenceRows=sourceLayout||style==Style.REFERENCE;
-        bodyFont=style==Style.ORIGINAL?font:new PDType1Font(referenceRows?FontName.COURIER:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
+        // Point positions measured on the Legal and Letter reference pages.
+        sourceEdges=switch(style){
+            case AUDIT -> new float[]{4,23,85,226,279,540,630,706,783,856,906,948,1000};
+            case EXPECTED -> new float[]{9,54,94,242,333,416,500,577,710,790};
+            case REPAYMENT -> new float[]{9,76,153,220,292,378,472,544};
+            default -> new float[0];
+        };
+        bodyFont=style==Style.ORIGINAL?font:new PDType1Font(referenceRows&&style!=Style.REPAYMENT?FontName.COURIER:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
         headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REPAYMENT?FontName.HELVETICA_BOLD:style==Style.REFERENCE||style==Style.AUDIT||style==Style.EXPECTED?FontName.TIMES_BOLD:style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
         titleFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REPAYMENT?FontName.TIMES_BOLD:style==Style.EXPECTED?FontName.HELVETICA:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY||style==Style.ACCOUNT||style==Style.REFERENCE||style==Style.AUDIT?FontName.HELVETICA_BOLD:FontName.HELVETICA);
         metadataFont=style==Style.REPAYMENT?new PDType1Font(FontName.HELVETICA):style==Style.AUDIT?new PDType1Font(FontName.TIMES_BOLD_ITALIC):bodyFont;
@@ -49,123 +58,270 @@ public final class AccountingPdfDocument implements AutoCloseable {
         size=landscape?new PDRectangle(paper.getHeight(),paper.getWidth()):paper;
         next();document.getDocumentInformation().setTitle(title);
     }
-    public float width(){return size.getWidth()-64;}
+    public float width(){return sourceLayout?sourceEdges[sourceEdges.length-1]-sourceEdges[0]:size.getWidth()-64;}
+    private float tableLeft(){return sourceLayout?sourceEdges[0]:32;}
+    private float columnWidth(int column){return sourceLayout?sourceEdges[column+1]-sourceEdges[column]:width()*weights[column];}
+    private float rowRight(int column,float left){
+        if(style==Style.AUDIT && column==4)return 419;
+        if(style==Style.EXPECTED && column==7)return 648;
+        return left+columnWidth(column)-(sourceLayout?4:5);
+    }
+    private float rowWidth(int column){
+        if(!sourceLayout)return columnWidth(column)-10;
+        return rowRight(column,sourceEdges[column])-sourceEdges[column];
+    }
     private void next()throws IOException {
-        if(stream!=null)stream.close();var page=new PDPage(size);document.addPage(page);stream=new PDPageContentStream(document,page);y=size.getHeight()-(style==Style.AUDIT?12:style==Style.EXPECTED?22:style==Style.REPAYMENT?42.5f:36);
-        float titleTop=y,left=logo==null?32:115,headingWidth=sourceLayout?width()*(style==Style.REPAYMENT?.8f:.5f):size.getWidth()-32-left;
+        if(stream!=null)stream.close();var page=new PDPage(size);document.addPage(page);stream=new PDPageContentStream(document,page);
+        if(sourceLayout){
+            sourcePageHeading();
+            if(!groupValues.isEmpty())drawSourceGroup();
+            if(!headers.isEmpty())header();
+            return;
+        }
+        y=size.getHeight()-36;
+        float left=logo==null?32:115,headingWidth=size.getWidth()-32-left;
         if(logo!=null){float scale=Math.min(70f/logo.getWidth(),45f/logo.getHeight());stream.drawImage(logo,32,y-45,logo.getWidth()*scale,logo.getHeight()*scale);}
-        float titlePoint=style==Style.AUDIT?11:style==Style.REPAYMENT?12:14;
+        float titlePoint=14;
         for(String line:wrap(title,titlePoint,headingWidth)){
             float titleWidth=face(line,titleFont).getStringWidth(line)*titlePoint/1000,x=left+(headingWidth-titleWidth)/2;
             drawWith(line,x,y,titlePoint,titleFont,style==Style.ORIGINAL,false,style==Style.EQUITY);
-            if(style==Style.TRIAL||style==Style.ACCOUNT||style==Style.REPAYMENT||style==Style.AUDIT)line(x,x+titleWidth,y-2);
+            if(style==Style.TRIAL||style==Style.ACCOUNT)line(x,x+titleWidth,y-2);
             y-=titlePoint+5;
         }
         y-=3;
-        if(sourceLayout && context.size()>2)draw(context.get(2),size.getWidth()-32,style==Style.AUDIT?size.getHeight()-26:style==Style.EXPECTED?size.getHeight()-26:titleTop+3,10,false,true);
-        if(style==Style.REPAYMENT){
-            float contextY=titleTop-12;
-            for(int n:new int[]{1,0})for(String line:wrap(context.get(n),8,width()*.4f)){draw(line,size.getWidth()-32,contextY,8,false,true);contextY-=12;}
-            for(int n=3;n<context.size();n++)for(String line:wrap(context.get(n),8,width()*.4f)){draw(line,size.getWidth()-32,contextY,8,false,true);contextY-=12;}
-            y=Math.min(y,contextY)-6;
-        }else {for(int n=0;n<context.size();n++)if(!sourceLayout||n!=2)for(String line:wrap(context.get(n),sourceLayout?10:8,sourceLayout?width():headingWidth)){draw(line,left,y,sourceLayout?10:8,false,false);y-=12;}y-=12;}
-        if(sourceLayout&&!groupValues.isEmpty())drawSourceGroup();if(!headers.isEmpty())header();
+        for(String detail:context)for(String line:wrap(detail,8,headingWidth)){draw(line,left,y,8,false,false);y-=12;}
+        y-=12;
+        if(!headers.isEmpty())header();
+    }
+    private void sourcePageHeading()throws IOException {
+        float height=size.getHeight();
+        float titleCenter=style==Style.AUDIT?266:style==Style.EXPECTED?255:256;
+        float point=style==Style.AUDIT?11:style==Style.EXPECTED?14:12;
+        float baseline=height-(style==Style.AUDIT?10:style==Style.EXPECTED?22:42);
+        for(String part:wrap(title,point,style==Style.REPAYMENT?198:460,titleFont)){
+            float titleWidth=face(part,titleFont).getStringWidth(part)*point/1000;
+            float left=titleCenter-titleWidth/2;
+            drawWith(part,left,baseline,point,titleFont,false,false,false);
+            if(style!=Style.EXPECTED)line(left,left+titleWidth,baseline-2);
+            baseline-=point+2;
+        }
+        float stampX=style==Style.AUDIT?432:style==Style.EXPECTED?543:368;
+        PDFont stampFont=style==Style.REPAYMENT?new PDType1Font(FontName.COURIER):bodyFont;
+        float stampBaseline=height-(style==Style.REPAYMENT?39:26);
+        float stampBottom=stampBaseline;
+        for(String part:wrap(context.get(2),10,size.getWidth()-stampX-9,stampFont)){
+            drawWith(part,stampX,stampBottom,10,stampFont,false,false,false);
+            stampBottom-=12;
+        }
+        if(style==Style.AUDIT){
+            y=sourceDetail(context.get(0),22,height-30,400,10);
+            y=Math.min(y-12,height-58);
+        }else if(style==Style.EXPECTED){
+            float scope=sourceDetail(context.get(1),20,height-48,345,10);
+            float period=sourceDetail(context.get(0),382,height-48,600,10);
+            y=Math.min(Math.min(scope,period)-14,height-74);
+        }else{
+            float scope=sourceDetail(context.get(1),368,stampBottom-1,235,8);
+            float period=sourceDetail(context.get(0),368,scope,176,8);
+            y=Math.min(period-5,height-85);
+        }
+    }
+    private float sourceDetail(String value,float x,float baseline,float maxWidth,float point)throws IOException {
+        for(String part:wrap(value,point,maxWidth)){
+            draw(part,x,baseline,point,false,false);
+            baseline-=point+2;
+        }
+        return baseline;
     }
     /** Reference metadata stays above its table and repeats on continuation pages. */
     public void sourceGroup(List<String> labels,List<String> values)throws IOException {
         if(!sourceLayout||labels.size()!=values.size()||values.size()!=(style==Style.REPAYMENT?7:style==Style.AUDIT?3:1))throw new IllegalArgumentException("Group metadata mismatch");
         groupLabels=style==Style.REPAYMENT||style==Style.EXPECTED?labels.stream().map(v->v.toUpperCase(Locale.ROOT)).toList():List.copyOf(labels);groupValues=List.copyOf(values);
-        if(y-sourceGroupHeight()<110){next();return;}drawSourceGroup();
+        // Repayment rows can carry several lines of receipt and correction references.
+        float reserve=style==Style.REPAYMENT?205:120;
+        if(y-sourceGroupHeight()<reserve){next();return;}drawSourceGroup();
     }
+    private static final float[] REPAYMENT_IDENTITY={9,139,405,603};
+    private static final float[] REPAYMENT_FACTS={9,76,202,362,544};
+
     private float sourceGroupHeight()throws IOException {
         if(style==Style.REPAYMENT){
-            float[] identity={.22f,.48f,.30f},facts={.14f,.30f,.30f,.26f};int identityLines=1,labelLines=1,valueLines=1;
-            for(int n=0;n<3;n++)identityLines=Math.max(identityLines,wrap(groupValues.get(n),10,Math.max(25,width()*identity[n]-headingFont.getStringWidth(groupLabels.get(n))*10/1000-9)).size());
-            for(int n=0;n<4;n++){labelLines=Math.max(labelLines,wrap(groupLabels.get(n+3),10,width()*facts[n]-10).size());valueLines=Math.max(valueLines,wrap(groupValues.get(n+3),10,width()*facts[n]-10).size());}
-            return identityLines*12+18+labelLines*12+valueLines*12+20;
+            int identityLines=1,labelLines=1,valueLines=1;
+            for(int n=0;n<3;n++)identityLines=Math.max(identityLines,repaymentIdentityValue(n).size());
+            for(int n=0;n<4;n++){
+                labelLines=Math.max(labelLines,repaymentFact(groupLabels.get(n+3),n,headingFont).size());
+                valueLines=Math.max(valueLines,repaymentFact(groupValues.get(n+3),n,metadataFont).size());
+            }
+            return identityLines*12+20+labelLines*12+6+valueLines*12+10;
         }
-        if(style==Style.AUDIT)return 40+12*Math.max(wrap(groupLabels.get(1)+"  "+groupValues.get(1),10,width()*.48f).size(),wrap(groupLabels.get(2)+"  "+groupValues.get(2),10,width()*.48f).size());
-        return wrap(groupLabels.getFirst()+"   "+groupValues.getFirst(),10,width()).size()*14+10;
+        if(style==Style.AUDIT)return 68+12*(wrap(context.get(1),10,960,headingFont).size()-1)
+            +12*Math.max(auditField(1,335).size(),auditField(2,610).size())+10;
+        return wrap(groupLabels.getFirst()+"      "+groupValues.getFirst(),10,width(),headingFont).size()*14+14;
+    }
+    private List<String> repaymentIdentityValue(int column)throws IOException {
+        float slotWidth=REPAYMENT_IDENTITY[column+1]-REPAYMENT_IDENTITY[column];
+        String label=groupLabels.get(column);
+        float labelWidth=face(label,headingFont).getStringWidth(label)*10/1000;
+        return wrap(groupValues.get(column),10,slotWidth-labelWidth-11,metadataFont);
+    }
+    private List<String> repaymentFact(String value,int column,PDFont face)throws IOException {
+        return wrap(value,10,REPAYMENT_FACTS[column+1]-REPAYMENT_FACTS[column]-8,face);
+    }
+    private List<String> auditField(int index,float maxWidth)throws IOException {
+        return wrap(groupLabels.get(index)+"   "+groupValues.get(index),10,maxWidth,headingFont);
     }
     private void drawSourceGroup()throws IOException {
         if(style==Style.REPAYMENT){
-            float[] identity={.22f,.48f,.30f};float x=32;int lines=1;
+            int lines=1;
             for(int n=0;n<3;n++){
-                String label=groupLabels.get(n);float labelWidth=headingFont.getStringWidth(label)*10/1000;
+                float x=REPAYMENT_IDENTITY[n];
+                String label=groupLabels.get(n);float labelWidth=face(label,headingFont).getStringWidth(label)*10/1000;
                 drawWith(label,x,y,10,headingFont,false,false,false);
-                var parts=wrap(groupValues.get(n),10,Math.max(25,width()*identity[n]-labelWidth-9));lines=Math.max(lines,parts.size());
-                for(int p=0;p<parts.size();p++)drawWith(parts.get(p),x+labelWidth+5,y-p*12,10,metadataFont,false,false,false);
-                x+=width()*identity[n];
+                var parts=repaymentIdentityValue(n);lines=Math.max(lines,parts.size());
+                for(int p=0;p<parts.size();p++)drawWith(parts.get(p),x+labelWidth+9,y-p*12,10,metadataFont,false,false,false);
             }
-            y-=lines*12+18;
-            float[] facts={.14f,.30f,.30f,.26f};var labels=new ArrayList<List<String>>();var values=new ArrayList<List<String>>();int labelLines=1,valueLines=1;
+            y-=lines*12+20;
+            var labels=new ArrayList<List<String>>();var values=new ArrayList<List<String>>();int labelLines=1,valueLines=1;
             for(int n=0;n<4;n++){
-                var l=wrap(groupLabels.get(n+3),10,width()*facts[n]-10);var v=wrap(groupValues.get(n+3),10,width()*facts[n]-10);
+                var l=repaymentFact(groupLabels.get(n+3),n,headingFont);var v=repaymentFact(groupValues.get(n+3),n,metadataFont);
                 labels.add(l);values.add(v);labelLines=Math.max(labelLines,l.size());valueLines=Math.max(valueLines,v.size());
             }
-            x=32;
+            float[] centers={37,148,283,453};
             for(int n=0;n<4;n++){
-                float center=x+width()*facts[n]/2;
-                for(int p=0;p<labels.get(n).size();p++){String text=labels.get(n).get(p);drawWith(text,center-headingFont.getStringWidth(text)*10/2000,y-p*12,10,headingFont,false,false,false);}
-                for(int p=0;p<values.get(n).size();p++){String text=values.get(n).get(p);drawWith(text,center-face(text,metadataFont).getStringWidth(text)*10/2000,y-labelLines*12-5-p*12,10,metadataFont,false,false,false);}
-                x+=width()*facts[n];
+                for(int p=0;p<labels.get(n).size();p++)drawCentered(labels.get(n).get(p),centers[n],y-p*12,10,headingFont,REPAYMENT_FACTS[n]+2);
+                for(int p=0;p<values.get(n).size();p++){
+                    String value=values.get(n).get(p);
+                    float top=y-labelLines*12-6-p*12;
+                    if(n<2)drawWith(value,REPAYMENT_FACTS[n],top,10,metadataFont,false,false,false);
+                    else drawCentered(value,centers[n],top,10,metadataFont,REPAYMENT_FACTS[n]+2);
+                }
             }
-            y-=labelLines*12+valueLines*12+20;
+            y-=labelLines*12+6+valueLines*12+10;
         }else if(style==Style.AUDIT){
-            draw(groupLabels.get(0),32,y,10,true,false);drawWith(groupValues.get(0),155,y,11,metadataFont,false,false,false);y-=30;
-            var product=wrap(groupLabels.get(1)+"  "+groupValues.get(1),10,width()*.48f);var account=wrap(groupLabels.get(2)+"  "+groupValues.get(2),10,width()*.48f);
-            for(int n=0;n<product.size();n++)draw(product.get(n),32,y-n*12,10,true,false);
-            for(int n=0;n<account.size();n++)draw(account.get(n),size.getWidth()-32,y-n*12,10,true,true);
+            draw(groupLabels.get(0),22,y,10,true,false);
+            drawWith(groupValues.get(0),140,y,11,metadataFont,false,false,false);
+            y-=32;
+            var scope=wrap(context.get(1),10,960,headingFont);
+            for(int n=0;n<scope.size();n++)draw(scope.get(n),14,y-n*12,10,true,false);
+            y-=36+12*(scope.size()-1);
+            var product=auditField(1,335);var account=auditField(2,610);
+            for(int n=0;n<product.size();n++)draw(product.get(n),27,y-n*12,10,true,false);
+            for(int n=0;n<account.size();n++)draw(account.get(n),378,y-n*12,10,true,false);
             y-=Math.max(product.size(),account.size())*12+10;
         }else {
-            for(String line:wrap(groupLabels.getFirst()+"   "+groupValues.getFirst(),10,width())){draw(line,32,y,10,true,false);y-=14;}y-=10;
+            for(String line:wrap(groupLabels.getFirst()+"      "+groupValues.getFirst(),10,width(),headingFont)){draw(line,9,y,10,true,false);y-=14;}
+            y-=14;
         }
+    }
+    private void drawCentered(String value,float center,float baseline,float point,PDFont preferred,float minLeft)throws IOException {
+        float halfWidth=face(value,preferred).getStringWidth(value)*point/2000;
+        drawWith(value,Math.max(minLeft,center-halfWidth),baseline,point,preferred,false,false,false);
     }
     public void columns(List<String> labels,float[] weights,boolean[] numeric)throws IOException {
         this.headers=List.copyOf(labels);this.weights=weights.clone();this.numeric=numeric.clone();
-        if(labels.size()!=weights.length || labels.size()!=numeric.length)throw new IllegalArgumentException("Column mismatch");
+        if(labels.size()!=weights.length || labels.size()!=numeric.length || sourceLayout && labels.size()!=sourceEdges.length-1)throw new IllegalArgumentException("Column mismatch");
         header();
     }
     private void header()throws IOException {
         var lines=new ArrayList<List<String>>();int count=1;float point=sourceLayout?10:8;
-        for(int i=0;i<headers.size();i++){var value=wrap(headers.get(i),point,width()*weights[i]-10);lines.add(value);count=Math.max(count,value.size());}
+        for(int i=0;i<headers.size();i++){
+            float max=style==Style.AUDIT && i==0?columnWidth(i)-1:rowWidth(i);
+            var value=sourceLayout?wrap(headers.get(i),point,max,headingFont):wrap(headers.get(i),point,columnWidth(i)-10);
+            lines.add(value);count=Math.max(count,value.size());
+        }
         if(y-count*12-10<55)nextWithoutHeader();
         if(style==Style.ORIGINAL)rule(y+10);
-        if(style==Style.ACCOUNT||style==Style.REPAYMENT){stream.setNonStrokingColor(style==Style.REPAYMENT?.90f:.85f);stream.addRect(32,y-count*12-2,width(),count*12+12);stream.fill();}
-        float x=32;
+        if(style==Style.ACCOUNT||style==Style.REPAYMENT){
+            stream.setNonStrokingColor(style==Style.REPAYMENT?.92f:.85f);
+            if(style==Style.REPAYMENT)stream.addRect(tableLeft(),y-count*12+2,width(),count*12+7);
+            else stream.addRect(32,y-count*12-2,width(),count*12+12);
+            stream.fill();
+            if(style==Style.REPAYMENT){
+                float highlight=sourceEdges[headers.size()-1];
+                stream.setNonStrokingColor(1f,.87f,.75f);
+                stream.addRect(highlight,y-count*12+2,sourceEdges[headers.size()]-highlight,count*12+7);
+                stream.fill();
+            }
+        }
+        float x=tableLeft();
         for(int i=0;i<lines.size();i++){
             for(int n=0;n<lines.get(i).size();n++){
-                String label=lines.get(i).get(n);float edge=numeric[i]?x+width()*weights[i]-5:x;
-                draw(label,edge,y-n*12,point,true,numeric[i]);
+                String label=lines.get(i).get(n);float edge=numeric[i]?rowRight(i,x):x;
+                if(sourceLayout && numeric[i] && style!=Style.REPAYMENT)drawCentered(label,(x+edge)/2,y-n*11,point,headingFont,x);
+                else draw(label,sourceLayout?x:edge,y-n*(sourceLayout?11:12),point,true,!sourceLayout && numeric[i]);
                 if(style==Style.TRIAL){float length=face(label,headingFont).getStringWidth(label)*8/1000;line(numeric[i]?edge-length:edge,numeric[i]?edge:edge+length,y-n*12-2);}
-            }x+=width()*weights[i];
+            }x+=columnWidth(i);
         }
-        y-=count*12+4;if(style==Style.ORIGINAL)rule(y);y-=style==Style.ORIGINAL?12:4;
+        if(sourceLayout)y-=count*11+(style==Style.REPAYMENT?12:4);
+        else {y-=count*12+4;if(style==Style.ORIGINAL)rule(y);y-=style==Style.ORIGINAL?12:4;}
     }
     private void nextWithoutHeader()throws IOException {var saved=headers;headers=List.of();next();headers=saved;}
     public void row(List<String> values,boolean total)throws IOException {
         var lines=new ArrayList<List<String>>();var points=new ArrayList<Float>();int count=1;
-        float leading=sourceLayout?12:referenceRows?10:13;
+        float leading=sourceLayout?(style==Style.REPAYMENT?12:13.5f):referenceRows?10:13;
+        PDFont rowFont=total?headingFont:bodyFont;
         for(int i=0;i<values.size();i++){
-            float max=width()*weights[i]-10,point=sourceLayout?10:referenceRows?7.5f:numeric[i]?8:9;
-            if(numeric[i] && values.get(i).matches("[0-9.,()\\-]+"))point=Math.min(point,(max-1)*1000/face(values.get(i),bodyFont).getStringWidth(values.get(i)));
-            points.add(point);var value=wrap(values.get(i),point,max);lines.add(value);count=Math.max(count,value.size());
+            float max=rowWidth(i),point=sourceLayout?10:referenceRows?7.5f:numeric[i]?8:9;
+            if(total && i==0 && sourceLayout){
+                int firstAmount=style==Style.AUDIT?4:style==Style.EXPECTED?5:2;
+                max=sourceEdges[firstAmount]-sourceEdges[0]-4;
+            }
+            if((numeric[i] || style==Style.AUDIT && i==0) && values.get(i).matches("[0-9.,()\\-]+"))
+                point=Math.min(point,(max-1)*1000/face(values.get(i),sourceLayout?rowFont:bodyFont).getStringWidth(values.get(i)));
+            else if(!total && compactSourceColumn(i) && !values.get(i).isBlank() && !values.get(i).contains("\n")){
+                float fit=(max-1)*1000/face(values.get(i),rowFont).getStringWidth(values.get(i));
+                point=Math.max(8,Math.min(point,fit));
+            }
+            points.add(point);
+            var value=sourceLayout?wrap(values.get(i),point,max,rowFont):wrap(values.get(i),point,max);
+            lines.add(value);count=Math.max(count,value.size());
         }
         int offset=0;
         if(y-Math.min(count*leading+10,100)<55)next();
         while(offset<count){
             if(y<70)next();int take=Math.min(count-offset,Math.max(1,(int)((y-55)/leading)));
-            float x=32;
-            for(int i=0;i<lines.size();i++){for(int n=0;n<take && offset+n<lines.get(i).size();n++)draw(lines.get(i).get(offset+n),numeric[i]?x+width()*weights[i]-5:x,y-n*leading,points.get(i),total,numeric[i]);x+=width()*weights[i];}
+            float x=tableLeft();
+            for(int i=0;i<lines.size();i++){
+                float edge=numeric[i]?rowRight(i,x):x;
+                for(int n=0;n<take && offset+n<lines.get(i).size();n++){
+                    String part=lines.get(i).get(offset+n);
+                    float baseline=y-n*leading;
+                    draw(part,edge,baseline,points.get(i),total,numeric[i]);
+                    if(total && sourceLayout && numeric[i] && !part.isBlank()){
+                        float textWidth=face(part,headingFont).getStringWidth(part)*points.get(i)/1000;
+                        line(edge-textWidth,edge,baseline-2);
+                    }
+                }
+                x+=columnWidth(i);
+            }
             y-=take*leading;offset+=take;
         }
-        if(total){if(style==Style.ORIGINAL)rule(y+2);else{float x=32;for(int i=0;i<values.size();i++){if(numeric[i])line(x+width()*weights[i]-5-face(values.get(i),headingFont).getStringWidth(values.get(i))*points.get(i)/1000,x+width()*weights[i]-5,y+leading-2);x+=width()*weights[i];}}y-=5;}
+        if(total){
+            if(style==Style.ORIGINAL)rule(y+2);
+            else if(!sourceLayout){
+                float x=tableLeft();
+                for(int i=0;i<values.size();i++){
+                    if(numeric[i] && !values.get(i).isBlank()){
+                        float edge=rowRight(i,x);
+                        line(edge-face(values.get(i),headingFont).getStringWidth(values.get(i))*points.get(i)/1000,edge,y+leading-2);
+                    }
+                    x+=columnWidth(i);
+                }
+            }
+            y-=style==Style.REPAYMENT?35:style==Style.AUDIT?17:5;
+        }
         if(style==Style.ORIGINAL)y-=5;
     }
-    public void text(String value)throws IOException {for(String line:wrap(value,9,width())){if(y<65)next();draw(line,32,y,9,false,false);y-=13;}y-=4;}
-    public void section(String value)throws IOException {if(y<90)next();y-=style==Style.ORIGINAL?10:16;for(String line:wrap(value,10,width())){if(y<65)next();draw(line,32,y,10,true,false);y-=14;}if(style==Style.ORIGINAL){rule(y+3);y-=8;}else y-=4;}
+    private boolean compactSourceColumn(int column){
+        return style==Style.AUDIT && (column==1 || column==3 || column>=9)
+            || style==Style.EXPECTED && column<=1;
+    }
+    public void text(String value)throws IOException {for(String line:wrap(value,9,width())){if(y<65)next();draw(line,tableLeft(),y,9,false,false);y-=13;}y-=4;}
+    public void section(String value)throws IOException {if(y<90)next();y-=style==Style.ORIGINAL?10:16;for(String line:wrap(value,10,width())){if(y<65)next();draw(line,tableLeft(),y,10,true,false);y-=14;}if(style==Style.ORIGINAL){rule(y+3);y-=8;}else y-=4;}
     /** End table before notes/provenance, so subsequent pages do not repeat an unrelated column header. */
     public void endTable(){headers=List.of();groupLabels=List.of();groupValues=List.of();}
+    public void sourcePageNumbers(String pattern){sourcePageNumber=pattern;}
+    public void sourceTotalsGap(){if(style==Style.AUDIT)y-=17;}
     /** Keep provenance intact on its own page, leaving the financial face uncluttered. */
     public void appendix(String title)throws IOException {endTable();next();section(title);}
     private void rule(float top)throws IOException {stream.setStrokingColor(110/255f);stream.setLineWidth(.5f);stream.moveTo(32,top);stream.lineTo(size.getWidth()-32,top);stream.stroke();}
@@ -180,11 +336,14 @@ public final class AccountingPdfDocument implements AutoCloseable {
         stream.setFont(selected,point);stream.newLineAtOffset(x,top);stream.showText(value);stream.endText();
     }
     private List<String> wrap(String value,float point,float max)throws IOException {
+        return wrap(value,point,max,bodyFont);
+    }
+    private List<String> wrap(String value,float point,float max,PDFont preferred)throws IOException {
         var result=new ArrayList<String>();var line=new StringBuilder();
         for(int cp:value.codePoints().toArray()){
             if(cp=='\n'){result.add(line.toString());line.setLength(0);continue;}if(Character.isISOControl(cp))continue;
             String c=new String(Character.toChars(cp));try{font.encode(c);}catch(IllegalArgumentException unsupported){c="?";}
-            if(!line.isEmpty() && face(line+c,bodyFont).getStringWidth(line+c)*point/1000>max){
+            if(!line.isEmpty() && face(line+c,preferred).getStringWidth(line+c)*point/1000>max){
                 int space=line.lastIndexOf(" ");String rest=space>0?line.substring(space+1):"";
                 result.add(space>0?line.substring(0,space):line.toString());line.setLength(0);line.append(rest);
             }line.append(c);
@@ -194,7 +353,11 @@ public final class AccountingPdfDocument implements AutoCloseable {
         if(finished)return;finished=true;if(stream!=null)stream.close();
         for(int n=firstPage;n<document.getNumberOfPages();n++)try(var footer=new PDPageContentStream(document,document.getPage(n),PDPageContentStream.AppendMode.APPEND,true,true)){
             stream=footer;String number=(n-firstPage+1)+" / "+(document.getNumberOfPages()-firstPage);
-            if(sourceLayout){PDFont footerFont=style==Style.REPAYMENT?metadataFont:bodyFont;drawWith(number,(size.getWidth()-face(number,footerFont).getStringWidth(number)*10/1000)/2,style==Style.AUDIT?49:style==Style.EXPECTED?22:30,10,footerFont,false,false,false);}
+            if(sourceLayout){
+                number=java.text.MessageFormat.format(sourcePageNumber,Integer.toString(n-firstPage+1),Integer.toString(document.getNumberOfPages()-firstPage));
+                PDFont footerFont=style==Style.REPAYMENT?metadataFont:bodyFont;
+                drawCentered(number,size.getWidth()/2,style==Style.AUDIT?49:style==Style.EXPECTED?22:30,10,footerFont,0);
+            }
             else draw(number,size.getWidth()-32,24,8,false,true);
         }stream=null;
     }

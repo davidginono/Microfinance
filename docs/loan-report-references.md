@@ -57,3 +57,9 @@ The portfolio workspace rechecks current staff, loan/report/export claims and op
 GroupCycleService now reads ChargeQuote.plan() before checking support or allocating charge totals/deductions. Both shared and individual origination continue to use the existing quote, exact-decimal allocator and validation paths. Unsupported individual charge plans also stop before saving. No contract is repriced and no approval transition changes.
 
 Validation passed on Java 25 with 38 focused Maven tests and 18 PostgreSQL 17.9 tests on a disposable loopback database. The tests covered workbook cell types, totals, unknowns, corrections, access, cutoff, and branch and institution scope. The browser fixture passed 12 desktop and mobile report layouts and downloaded the portfolio analysis workbook. The three reference workbooks and the portfolio-at-risk workbook were also rendered for inspection. Live login and institution acceptance remain open.
+
+## Downloaded PDF facsimiles
+
+The three PDF downloads use column anchors measured in points from the originals. Audit uses its numbered rows, staggered month and account headings, and spaced subtotal bands. Expected repayments keeps the narrow table and its large right margin. Repayment transactions uses the original portrait grouping, gray headings, and a peach final column for the supported interest exclusion field. The report face shows the actual print time, and the notes show the recorded cutoff with its offset. Page numbers use the original wording and placement. The existing source records and totals supply the contents.
+
+Rendered synthetic samples in English and Kiswahili and checked the first and continuation pages. All 35 focused Maven tests passed, including the management export and shared voucher, statement, and loan PDF checks.

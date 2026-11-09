@@ -65,7 +65,7 @@ class ManagementReportTest {
     }
     @Test void pdfAndPrintDefinitionsRetainAllReferenceColumnsAndBilingualTotals()throws Exception {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
-        var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));
+        var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1),new com.sacco.mvp.service.ApplicationClock("Africa/Dar_es_Salaam"));
         for(var kind:Kind.values())for(var language:List.of("en","sw")){
             var columns=ManagementReports.columns(kind);var rows=new ArrayList<Map<String,Object>>();var totals=new LinkedHashMap<String,BigDecimal>();
             for(int n=0;n<60;n++){
@@ -82,9 +82,18 @@ class ManagementReportTest {
                 if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(612);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(792);}
                 if(kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.EXPECTED_REPAYMENTS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(1008);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(612);}
                 String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.40");
-                if(kind!=Kind.PORTFOLIO_RISK && kind!=Kind.PORTFOLIO_ANALYSIS)assertThat(text).contains("01/10/2026");
+                if(result.isReferenceLayout()){
+                    Locale locale=Locale.forLanguageTag(language);
+                    String start=DAY.withDayOfMonth(1).format(java.time.format.DateTimeFormatter.ofPattern("dd-MMM-uuuu",locale)).toUpperCase(locale);
+                    assertThat(text).contains(start,language.equals("en")?"Page 1":"Ukurasa 1");
+                }else if(kind!=Kind.PORTFOLIO_RISK && kind!=Kind.PORTFOLIO_ANALYSIS)assertThat(text).contains("01/10/2026");
                 assertThat(doc.getNumberOfPages()).isGreaterThan(1);
-                for(var c:columns)assertThat(text.replaceAll("\\s","")).contains(exporter.message("field."+c.key(),Locale.forLanguageTag(language)).split(" ")[0]);
+                for(var column:columns){
+                    String key="field."+column.key();
+                    if(kind==Kind.DISBURSED_LOANS_AUDIT && column.key().equals("reference"))key="pdf.auditReference";
+                    if(kind==Kind.DISBURSED_LOANS_AUDIT && column.key().equals("periods"))key="pdf.auditPeriods";
+                    assertThat(text.replaceAll("\\s","")).contains(exporter.message(key,Locale.forLanguageTag(language)).split("\\s+")[0]);
+                }
             }
             if(Boolean.getBoolean("microfinance.management.samples")){var folder=java.nio.file.Path.of("target/management-reference-previews");java.nio.file.Files.createDirectories(folder);java.nio.file.Files.write(folder.resolve(kind+"-"+language+".pdf"),bytes);}
         }
@@ -94,7 +103,7 @@ class ManagementReportTest {
         assertThat(ManagementReports.columns(Kind.EXPECTED_REPAYMENTS).stream().map(Column::key)).containsExactly("clientNumber","loanId","name","phone","dueDate","principalBalance","principalDue","interestDue","expectedTotal");
         assertThat(ManagementReports.columns(Kind.LOAN_REPAYMENT_TRANSACTIONS).stream().map(Column::key)).containsExactly("date","openingPrincipal","principalPaid","interestPaid","payment","closingPrincipal","interestExcluded");
     }
-    @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"","");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
+    @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1),new com.sacco.mvp.service.ApplicationClock("Africa/Dar_es_Salaam"));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"","");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
     static BudgetForm budget(){var f=new BudgetForm();f.setAccountId(UUID.randomUUID());f.setDate(DAY);f.setYear(2027);f.setAmounts(new ArrayList<>(Collections.nCopies(12,new BigDecimal("10.01"))));return f;}
     static Parameters parameters(int page){return new Parameters(DAY.withDayOfMonth(1),DAY,NOW,null,null,null,"",page);}
     @Test void anUnknownGroupAmountKeepsTheMonthTotalUnknown(){
