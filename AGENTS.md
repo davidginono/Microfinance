@@ -166,6 +166,10 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 - The user's newer instruction enables approval for **individual ordinary receipt/payment/journal vouchers and batches according to branch configuration**. This supersedes the no-approval restriction below only for configured scopes. Preserve direct posting when individual approval is disabled and preserve specialized loan receipt/repayment safeguards. All workspaces and actions require explicit claims; do not grant them automatically. See `docs/voucher-approval-workspaces.md`.
 
+### Loan and portfolio report Excel export (2026-11-08)
+
+- The user authorizes Excel (.xlsx) for Disbursed Loans Audit, Expected Repayments, Loan Repayment Transactions, Loan Portfolio, Portfolio at Risk, Portfolio Detail Analysis, and the loan portfolio risk/ageing workspace. Keep the same filters, recorded cutoff, explicit FINANCIAL_REPORTS_VIEW / LOAN_REPORTS_VIEW / FINANCIAL_REPORTS_EXPORT claims and branch scope. Institution-wide risk exports require FINANCIAL_REPORTS_INSTITUTION and contain aggregates only. Keep exports bounded, read-only and audited. Preserve unknown figures, signed corrections and exact money. This exception does not enable CSV or Excel for vouchers, cashbook or daily collections.
+
 ### Payroll schedule Excel export (2026-10-21)
 
 - The user authorizes employer-ready Excel exports of frozen payroll deduction schedules alongside PDF/print. Preserve the frozen snapshot, institution/branch scope and explicit payroll VIEW/EXPORT claims. Exporting never posts repayments or records employer results. This exception does not enable Excel/CSV for vouchers or other operational reports. See `docs/payroll-deductions.md`.

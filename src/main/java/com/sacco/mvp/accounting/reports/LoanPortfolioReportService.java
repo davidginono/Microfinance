@@ -20,6 +20,7 @@ public class LoanPortfolioReportService {
     private final SaccoRegistryService institutions;
     private final ApplicationClock clock;
     private final LoanPortfolioReportRepository sources;
+    private final ReportExportLimiter limiter;
     public record Scope(String institution, String branch, boolean institutionWide) {}
     public record Parameters(LocalDate from, LocalDate through, OffsetDateTime recordedCutoff, int page) {}
     public record Coverage(long missingOpenings, long unbridgedVouchers, long uncoveredLoans) {
@@ -34,16 +35,27 @@ public class LoanPortfolioReportService {
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=20)
     public Report report(AppUserPrincipal actor,Parameters p,boolean institutionWide) {
-        var scope=authorize(actor,institutionWide);validate(p);
+        return load(actor,p,institutionWide,false);
+    }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
+    public Report export(AppUserPrincipal actor,Parameters p,boolean institutionWide) {
+        return load(actor,p,institutionWide,true);
+    }
+    private Report load(AppUserPrincipal actor,Parameters p,boolean institutionWide,boolean export) {
+        var effective=freshClaims(actor);var scope=authorize(actor,institutionWide,effective);
+        if(export && !effective.contains(UserClaim.FINANCIAL_REPORTS_EXPORT))throw new AccessDeniedException("Financial report export permission required");
+        validate(p);return limiter.run(()->{
         var summary=sources.summary(scope,p);var coverage=sources.coverage(scope,p);
         boolean known=summary.excluded()==0 && coverage.complete();
         var ratios=new Ratios(known?LoanRiskMetrics.percentage(summary.par1(),summary.principal()):null,
             known?LoanRiskMetrics.percentage(summary.par30(),summary.principal()):null,
             known?LoanRiskMetrics.percentage(summary.par90(),summary.principal()):null);
-        var rows=institutionWide?List.<SourceRow>of():sources.rows(scope,p);var branches=sources.branches(scope,p);
+        var rows=institutionWide?List.<SourceRow>of():sources.rows(scope,p,export);
+        if(export && rows.size()>5000)throw new IllegalArgumentException("financial.portfolio.error.exportLarge");var branches=sources.branches(scope,p);
         if(branches.size()>1000)throw new IllegalArgumentException("financial.portfolio.error.branches");
-        return new Report(scope,p,summary,ratios,coverage,rows.stream().limit(25).toList(),sources.buckets(scope,p,false),
-            sources.buckets(scope,p,true),List.copyOf(branches),rows.size()>25,LoanRiskMetrics.VERSION,LoanRiskMetrics.REGULATORY_REFERENCE,sources.adjustments(scope,p));
+        return new Report(scope,p,summary,ratios,coverage,export?List.copyOf(rows):rows.stream().limit(25).toList(),sources.buckets(scope,p,false),
+            sources.buckets(scope,p,true),List.copyOf(branches),!export && rows.size()>25,LoanRiskMetrics.VERSION,LoanRiskMetrics.REGULATORY_REFERENCE,sources.adjustments(scope,p));
+        });
     }
     private Set<UserClaim> freshClaims(AppUserPrincipal actor) {
         if(actor==null || !actor.isStaffSession() || actor.isPlatformIdentity() || actor.getMemberId()==null
@@ -60,7 +72,9 @@ public class LoanPortfolioReportService {
         return claims.effectiveClaims(current.getId(),current.getActiveStaffRolesResolved(),current.isMemberAccess());
     }
     private Scope authorize(AppUserPrincipal actor, boolean wide) {
-        var effective = freshClaims(actor);
+        return authorize(actor,wide,freshClaims(actor));
+    }
+    private Scope authorize(AppUserPrincipal actor,boolean wide,Set<UserClaim> effective) {
         if (!effective.contains(UserClaim.FINANCIAL_REPORTS_VIEW) || !effective.contains(UserClaim.LOAN_REPORTS_VIEW)
             || wide && !effective.contains(UserClaim.FINANCIAL_REPORTS_INSTITUTION))
             throw new AccessDeniedException("Loan portfolio permission required");

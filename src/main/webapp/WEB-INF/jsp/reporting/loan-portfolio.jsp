@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/financial-report.css' />" />
 <c:url value="/reports/financial/portfolio/configure" var="configureUrl"><c:param name="from" value="${report.parameters.from}" /><c:param name="through" value="${report.parameters.through}" /><c:param name="recordedThrough" value="${cutoffInput}" /><c:param name="institutionWide" value="${report.scope.institutionWide}" /></c:url>
+<c:url value="/reports/financial/portfolio/excel" var="excelUrl"><c:param name="from" value="${report.parameters.from}" /><c:param name="through" value="${report.parameters.through}" /><c:param name="recordedThrough" value="${cutoffInput}" /><c:param name="institutionWide" value="${report.scope.institutionWide}" /></c:url>
 <div class="accounting-workspace financial-report portfolio-workspace" data-portfolio-report>
   <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />">
     <span class="erp-page-path__item"><spring:message code="finance.nav.reports" /></span><span class="erp-page-path__separator" aria-hidden="true">/</span>
@@ -16,7 +17,7 @@
   </nav>
   <div class="erp-page-header erp-detail-header" data-aws-page-header data-portfolio-report-header>
     <h1 class="erp-page-title"><spring:message code="financial.portfolio.results" /></h1>
-    <div class="accounting-actions" data-aws-action-pin="true"><a class="app-btn btn-neutral" href="<c:out value='${configureUrl}' />"><spring:message code="financial.portfolio.changeSettings" /></a></div>
+    <div class="accounting-actions" data-aws-action-pin="true"><sec:authorize access="@access.has(principal,'FINANCIAL_REPORTS_EXPORT')"><a class="app-btn btn-neutral" href="<c:out value='${excelUrl}' />"><spring:message code="management.excel" /></a></sec:authorize><a class="app-btn btn-neutral" href="<c:out value='${configureUrl}' />"><spring:message code="financial.portfolio.changeSettings" /></a></div>
   </div>
   <section class="erp-panel" aria-labelledby="portfolio-context-title">
     <div class="erp-panel-header portfolio-context-header"><h2 class="erp-panel-title" id="portfolio-context-title"><spring:message code="financial.portfolio.reportDetails" /></h2><span class="portfolio-draft"><spring:message code="financial.report.draft" /></span></div>

@@ -22,14 +22,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ManagementControllerTest {
-    BudgetService budgets;ManagementReportService reports;AppUserPrincipal actor;MockMvc mvc;
+    BudgetService budgets;ManagementReportService reports;ManagementReportExcel excel;AuditService audit;AppUserPrincipal actor;MockMvc mvc;
     final HttpSessionCsrfTokenRepository tokens=new HttpSessionCsrfTokenRepository();
     final UUID account=UUID.randomUUID(),id=UUID.randomUUID();
     @BeforeEach void setup(){
-        budgets=mock(BudgetService.class);reports=mock(ManagementReportService.class);actor=mock(AppUserPrincipal.class);
+        budgets=mock(BudgetService.class);reports=mock(ManagementReportService.class);actor=mock(AppUserPrincipal.class);excel=mock(ManagementReportExcel.class);audit=mock(AuditService.class);when(actor.getSaccoId()).thenReturn("I1");when(actor.getStationId()).thenReturn("B1");when(actor.getMemberId()).thenReturn(UUID.randomUUID());
         var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(ManagementReportTest.DAY);when(clock.now()).thenReturn(ManagementReportTest.NOW);
         var csrfFilter=new CsrfFilter(tokens);csrfFilter.setRequestHandler(new CsrfTokenRequestAttributeHandler());
-        mvc=MockMvcBuilders.standaloneSetup(new BudgetController(budgets,clock),new ManagementReportController(reports,mock(ManagementReportPdf.class),clock,mock(AuditService.class)))
+        mvc=MockMvcBuilders.standaloneSetup(new BudgetController(budgets,clock),new ManagementReportController(reports,mock(ManagementReportPdf.class),excel,clock,audit))
             .addFilters(csrfFilter).setCustomArgumentResolvers(new HandlerMethodArgumentResolver(){public boolean supportsParameter(MethodParameter p){return p.getParameterType()==AppUserPrincipal.class;}public Object resolveArgument(MethodParameter p,ModelAndViewContainer m,NativeWebRequest r,WebDataBinderFactory b){return actor;}}).build();
     }
     org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder form(){var request=post("/finance/budgets").param("requestKey",UUID.randomUUID().toString()).param("accountId",account.toString()).param("year","2027").param("date","2026-10-15");for(int n=0;n<12;n++)request.param("amounts["+n+"]","10.01");return request;}
@@ -55,7 +55,7 @@ class ManagementControllerTest {
             if(kind==Kind.EXPECTED_REPAYMENTS)assertThat(((ManagementReportController.Filter)result.getModelAndView().getModel().get("filter")).getThrough()).isEqualTo("2026-10-31");
             verify(reports).authorize(actor,kind,false);
             when(reports.report(eq(actor),eq(kind),any(),eq(true))).thenThrow(new AccessDeniedException("Export revoked"));
-            for(var output:List.of("pdf","print"))assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/"+slug+"/"+output))).hasRootCauseInstanceOf(AccessDeniedException.class);
+            for(var output:List.of("pdf","print","excel"))assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/"+slug+"/"+output))).hasRootCauseInstanceOf(AccessDeniedException.class);
         }
     }
     @Test void printAndPdfRequireTheExportAuthorizationPath()throws Exception{
@@ -63,4 +63,21 @@ class ManagementControllerTest {
         assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/cashbook/pdf"))).hasRootCauseInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/cashbook/print"))).hasRootCauseInstanceOf(AccessDeniedException.class);
     }
+    @Test void unrelatedOperationalReportsHaveNoSpreadsheetEndpoint()throws Exception{
+        for(var slug:List.of("cashbook","daily-collections"))mvc.perform(get("/reports/financial/operations/"+slug+"/excel")).andExpect(status().isNotFound());
+        verify(reports,never()).report(any(),any(),any(),anyBoolean());
+    }
+
+    @Test void spreadsheetRoutesKeepFiltersScopeCutoffAndAuditTheDownload()throws Exception{
+        UUID client=UUID.randomUUID(),actorId=actor.getMemberId();
+        for(var slug:List.of("disbursed-loans-audit","expected-repayments","loan-repayment-transactions","loan-portfolio","portfolio-risk","portfolio-analysis")){
+            var kind=ManagementReportController.kind(slug);var result=new LoanReportExcelTest().result(kind,1);
+            var parameters=new Parameters(ManagementReportTest.DAY.withDayOfMonth(1),ManagementReportTest.DAY,ManagementReportTest.NOW,null,null,client,"Business",0);
+            when(reports.report(actor,kind,parameters,true)).thenReturn(result);when(excel.build(result,Locale.ENGLISH)).thenReturn(new byte[]{1,2,3});
+            mvc.perform(get("/reports/financial/operations/"+slug+"/excel").locale(Locale.ENGLISH).param("from","2026-10-01").param("through","2026-10-15").param("cutoff",ManagementReportTest.NOW.toString()).param("clientId",client.toString()).param("product","Business"))
+                .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("Content-Disposition","attachment; filename=\""+slug+".xlsx\"")).andExpect(content().bytes(new byte[]{1,2,3}));
+            verify(reports).report(actor,kind,parameters,true);verify(audit).log(eq("MANAGEMENT_REPORT"),isNull(),eq("EXCEL_"+kind),eq(actorId),isNull(),anyMap());
+        }
+    }
+
 }

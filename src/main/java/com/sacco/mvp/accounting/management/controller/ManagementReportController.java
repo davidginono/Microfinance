@@ -22,6 +22,7 @@ import java.util.*;
 public class ManagementReportController {
     private final ManagementReportService service;
     private final ManagementReportPdf pdf;
+    private final ManagementReportExcel excel;
     private final ApplicationClock clock;
     private final AuditService audit;
     @ModelAttribute void headers(HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
@@ -42,6 +43,11 @@ public class ManagementReportController {
     @GetMapping("/pdf") @ResponseBody public ResponseEntity<byte[]> pdf(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,Locale locale){
         Kind kind=kind(reportName);defaults(f,kind);var report=service.report(a,kind,parameters(f),true);
         byte[] bytes=pdf.build(report,locale);record(a,report,"PDF");return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).header("Cache-Control","no-store").header("Content-Disposition","attachment; filename=\""+reportName+".pdf\"").body(bytes);
+    }
+    @GetMapping("/excel") @ResponseBody public ResponseEntity<byte[]> excel(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,Locale locale){
+        Kind kind=kind(reportName);if(!ManagementReportExcel.supports(kind))throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        defaults(f,kind);var report=service.report(a,kind,parameters(f),true);byte[] bytes=excel.build(report,locale);record(a,report,"EXCEL");
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).header("Cache-Control","no-store").header("Content-Disposition","attachment; filename=\""+reportName+".xlsx\"").body(bytes);
     }
     @GetMapping("/print") public String print(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,Model m,HttpServletResponse response){
         Kind kind=kind(reportName);defaults(f,kind);var report=service.report(a,kind,parameters(f),true);m.addAttribute("report",report);record(a,report,"PRINT");m.addAttribute("kind",kind);response.setHeader("Cache-Control","no-store");return "accounting/management/print";

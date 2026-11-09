@@ -17,6 +17,9 @@ public class LoanPortfolioReportController {
     private final LoanPortfolioReportService reports;
     private final ApplicationClock clock;
     private final org.springframework.context.MessageSource messages;
+    private final LoanPortfolioReportExcel excel;
+    private final com.sacco.mvp.service.AuditService audit;
+    @ModelAttribute void headers(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
     @GetMapping("/configure")
     public String configure(@AuthenticationPrincipal AppUserPrincipal actor,
             @RequestParam(required=false) String from,@RequestParam(required=false) String through,
@@ -50,4 +53,22 @@ public class LoanPortfolioReportController {
             return configure(actor,from,through,recordedThrough,institutionWide,model);
         }
     }
+    @GetMapping("/excel")
+    public Object excel(@AuthenticationPrincipal AppUserPrincipal actor,
+            @RequestParam(required=false) String from,@RequestParam(required=false) String through,
+            @RequestParam(required=false) String recordedThrough,@RequestParam(defaultValue="false") boolean institutionWide,
+            Model model,jakarta.servlet.http.HttpServletResponse response,java.util.Locale locale) {
+        try {
+            var cutoff=recordedThrough==null?clock.now().truncatedTo(ChronoUnit.SECONDS):LocalDateTime.parse(recordedThrough).atZone(clock.zoneId()).toOffsetDateTime();
+            var p=new LoanPortfolioReportService.Parameters(from==null?clock.today().withDayOfMonth(1):LocalDate.parse(from),through==null?clock.today():LocalDate.parse(through),cutoff,0);
+            var report=reports.export(actor,p,institutionWide);byte[] bytes=excel.build(report,locale);
+            audit.log("LOAN_PORTFOLIO_REPORT",null,"EXCEL",actor.getMemberId(),null,java.util.Map.of("saccoId",report.scope().institution(),"stationId",report.scope().branch(),"institutionWide",institutionWide,"from",p.from(),"through",p.through(),"recordedThrough",p.recordedCutoff(),"rows",report.rows().size()));
+            return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).header("Cache-Control","no-store").header("Content-Disposition","attachment; filename=\"loan-portfolio.xlsx\"").body(bytes);
+        } catch(DateTimeException | IllegalArgumentException failure) {
+            String key=failure.getMessage();if(key==null || !key.startsWith("financial."))key="financial.report.error.dates";
+            response.setStatus(400);model.addAttribute("formError",messages.getMessage(key,null,locale));
+            return configure(actor,from,through,recordedThrough,institutionWide,model);
+        }
+    }
+
 }

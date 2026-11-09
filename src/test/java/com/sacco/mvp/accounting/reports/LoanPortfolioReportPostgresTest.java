@@ -32,7 +32,7 @@ class LoanPortfolioReportPostgresTest {
     String institution;AppUserPrincipal actor;Scope branch,wide;Parameters p;int number;
     @BeforeAll void start(){var ds=new SingleConnectionDataSource(System.getenv("MICROFINANCE_ACCOUNTING_E_DATABASE_URL"),"microfinance_test","",true);var connectionProperties=new Properties();connectionProperties.setProperty("sslmode","disable");ds.setConnectionProperties(connectionProperties);Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();jdbc=new JdbcTemplate(ds);var manager=new DataSourceTransactionManager(ds);tx=new TransactionTemplate(manager);
         members=mock(MemberDirectoryService.class);claims=mock(UserClaimService.class);institutions=mock(SaccoRegistryService.class);clock=mock(ApplicationClock.class);
-        repository=new LoanPortfolioReportRepository(new NamedParameterJdbcTemplate(jdbc));var proxy=new ProxyFactory(new LoanPortfolioReportService(members,claims,institutions,clock,repository));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(LoanPortfolioReportService)proxy.getProxy();}
+        repository=new LoanPortfolioReportRepository(new NamedParameterJdbcTemplate(jdbc));var proxy=new ProxyFactory(new LoanPortfolioReportService(members,claims,institutions,clock,repository,new ReportExportLimiter(1)));proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(LoanPortfolioReportService)proxy.getProxy();}
     @AfterAll void close(){if(jdbc!=null)((SingleConnectionDataSource)jdbc.getDataSource()).destroy();}
     @BeforeEach void fixture(){reset(members,claims,institutions,clock);institution="PORTFOLIO-"+UUID.randomUUID();number=jdbc.queryForObject("select coalesce(max(application_number),999)+1 from loan_applications",Integer.class);
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,?,true,now(),now())",institution,"Synthetic portfolio tests");
@@ -142,4 +142,22 @@ class LoanPortfolioReportPostgresTest {
     @Test void unverifiedLegacyLoanWithoutLedgerIsMissingRatherThanZeroExposure(){var l=loan("B1","100.00","1.00",31,true);int n=number++;jdbc.update("insert into loan_applications(id,amount,applicant_member_id,created_at,updated_at,disbursement_date,form_data,loan_type,policy_snapshot,repayment_schedule_json,required_guarantors,sacco_id,station_id,status,tenor_months,version,loan_id,application_number) select ?,amount,applicant_member_id,created_at,updated_at,disbursement_date,form_data,loan_type,policy_snapshot,repayment_schedule_json,required_guarantors,sacco_id,station_id,status,tenor_months,version,?,? from loan_applications where id=?",UUID.randomUUID(),Integer.toString(n),n,l.id());var result=service.report(actor,cutoff(),false);assertThat(result.summary().covered()).isEqualTo(1);assertThat(result.summary().excluded()).isEqualTo(1);assertThat(result.ratios().par30()).isNull();}
     @Test void extraOrMalformedContractTermsAreUnavailableRatherThanCleanRisk(){var l=loan("B1","100.00","1.00",31,true);jdbc.update("insert into loan_ledger_installments(id,loan_application_id,installment_number,due_date,principal,interest) values(?,?,2,?,0,1)",UUID.randomUUID(),l.id(),DAY.minusDays(20));var bad=loan("B1","100.00","1.00",0,true);jdbc.update("update loan_applications set repayment_schedule_json='{\"schedule\":[{\"dueDate\":\"2026-10-03\",\"principalComponent\":\"bad\",\"interestComponent\":0}]}' where id=?",bad.id());assertThat(repository.summary(branch,cutoff()).excluded()).isEqualTo(2);}
     @Test void managementAndOrdinaryReferenceBandsHaveDistinctFiveSixAndThirtyBoundaries(){loan("B1","10.00","1.00",5,true);loan("B1","20.00","1.00",6,true);loan("B1","40.00","1.00",30,true);loan("B1","80.00","1.00",31,true);assertThat(repository.buckets(branch,cutoff(),false)).anySatisfy(b->{assertThat(b.band()).isEqualTo(1);assertThat(b.principal()).isEqualByComparingTo("70.00");});assertThat(repository.buckets(branch,cutoff(),true)).anySatisfy(b->{assertThat(b.band()).isEqualTo(0);assertThat(b.principal()).isEqualByComparingTo("10.00");});assertThat(repository.summary(branch,cutoff()).par30()).isEqualByComparingTo("80.00");}
+    @Test void spreadsheetExportsAllBranchRowsWithTheSameCutoffAndFreshClaims(){
+        for(int n=0;n<31;n++)loan("B1","0.01","0.00",31,true);
+        loan("B2","9000.00","0.00",0,true);
+        var parameters=new Parameters(p.from(),p.through(),OffsetDateTime.now(),2);
+        var exported=service.export(actor,parameters,false);
+        assertThat(exported.rows()).hasSize(31);assertThat(exported.hasNext()).isFalse();
+        assertThat(exported.summary().principal()).isEqualByComparingTo("0.31");
+        assertThat(exported.parameters().recordedCutoff()).isEqualTo(parameters.recordedCutoff());
+        var institution=service.export(actor,parameters,true);assertThat(institution.rows()).isEmpty();
+        assertThat(institution.summary().principal()).isEqualByComparingTo("9000.31");
+        assertThat(institution.branches()).hasSize(2);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.LOAN_REPORTS_VIEW));
+        assertThatThrownBy(()->service.export(actor,parameters,false)).isInstanceOf(AccessDeniedException.class);
+        when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.LOAN_REPORTS_VIEW,UserClaim.FINANCIAL_REPORTS_EXPORT));
+        assertThat(service.export(actor,parameters,false).rows()).hasSize(31);
+        assertThatThrownBy(()->service.export(actor,parameters,true)).isInstanceOf(AccessDeniedException.class);
+    }
+
 }

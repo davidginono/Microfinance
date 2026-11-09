@@ -84,7 +84,7 @@ public class GroupCycleService {
         var weights=rows.stream().map(ParticipantForm::getPrincipal).toList();var principal=weights.stream().reduce(BigDecimal.ZERO,BigDecimal::add);check(principal.compareTo(p.maxPrincipal())<=0,"principalLimit");
         var command=sharedCommand(c,f,principal);
         // A shared facility is quoted once. Separate participant quotes would price a different contract.
-        var quote=loans.interestQuote(a,command);var charges=loans.chargeQuote(a,command);check(charges.supported(),"product");
+        var quote=loans.interestQuote(a,command);var charges=loans.chargeQuote(a,command).plan();check(charges.supported(),"product");
         var frequency=RepaymentFrequency.valueOf(quote.frequency());
         var schedule=quote.schedule().stream().map(row->new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(row.number(),tenure.dueDate(f.getApplicationDate(),f.getFirstPaymentDate(),frequency,row.number(),quote.schedule().size()),row.principal(),row.interest(),row.amount(),row.beginningBalance(),row.endingBalance())).toList();
         var maximum=quote.schedule().stream().map(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow::amount).max(BigDecimal::compareTo).orElseThrow();
@@ -172,7 +172,7 @@ public class GroupCycleService {
             command.setPurpose(f.getPurpose());command.setIncome(row.getIncome());command.setExpenses(row.getExpenses());command.setOtherDebt(row.getOtherDebt());command.setInformationSource("DOCUMENTED");
             command.setEvidence(row.getAssessmentEvidence());command.setCollateral(Objects.toString(row.getCollateral(),""));command.setGuarantors(p.agreementReference());
             command.setInsurancePremium(row.getInsurancePremium());command.setInsuranceEvidence(row.getInsuranceEvidence());
-            var quote=loans.interestQuote(a,command);var charge=loans.chargeQuote(a,command);
+            var quote=loans.interestQuote(a,command);var charge=loans.chargeQuote(a,command).plan();check(charge.supported(),"product");
             BigDecimal maxPayment=quote.schedule().stream().map(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow::amount).max(BigDecimal::compareTo).orElseThrow();
             BigDecimal monthly=LoanAmortizationCalculator.monthlyEquivalent(maxPayment,RepaymentFrequency.valueOf(quote.frequency()));
             BigDecimal debt=row.getOtherDebt().max(exposure.monthlyDebt());BigDecimal disposable=row.getIncome().subtract(row.getExpenses()).subtract(debt);

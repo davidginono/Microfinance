@@ -23,12 +23,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class LoanPortfolioReportControllerTest {
-    LoanPortfolioReportService reports;AppUserPrincipal actor;MockMvc mvc;ResourceBundleMessageSource messages;
+    LoanPortfolioReportService reports;LoanPortfolioReportExcel excel;com.sacco.mvp.service.AuditService audit;AppUserPrincipal actor;MockMvc mvc;ResourceBundleMessageSource messages;
     final LoanPortfolioReportService.Parameters p=new LoanPortfolioReportService.Parameters(LocalDate.of(2026,10,1),LocalDate.of(2026,10,2),OffsetDateTime.parse("2026-10-02T09:15:30+03:00"),2);
     @ControllerAdvice static class WorkspaceContext {
         @ModelAttribute("headerStation") String branch(){return "B1";}
     }
-    @BeforeEach void setup(){reports=mock(LoanPortfolioReportService.class);actor=mock(AppUserPrincipal.class);messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);mvc=MockMvcBuilders.standaloneSetup(new LoanPortfolioReportController(reports,new ApplicationClock("Africa/Nairobi"),messages)).setControllerAdvice(new WorkspaceContext()).setCustomArgumentResolvers(new HandlerMethodArgumentResolver(){public boolean supportsParameter(MethodParameter p){return p.getParameterType()==AppUserPrincipal.class;}public Object resolveArgument(MethodParameter p,ModelAndViewContainer m,NativeWebRequest r,WebDataBinderFactory b){return actor;}}).build();}
+    @BeforeEach void setup(){reports=mock(LoanPortfolioReportService.class);excel=mock(LoanPortfolioReportExcel.class);audit=mock(com.sacco.mvp.service.AuditService.class);actor=mock(AppUserPrincipal.class);messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);mvc=MockMvcBuilders.standaloneSetup(new LoanPortfolioReportController(reports,new ApplicationClock("Africa/Nairobi"),messages,excel,audit)).setControllerAdvice(new WorkspaceContext()).setCustomArgumentResolvers(new HandlerMethodArgumentResolver(){public boolean supportsParameter(MethodParameter p){return p.getParameterType()==AppUserPrincipal.class;}public Object resolveArgument(MethodParameter p,ModelAndViewContainer m,NativeWebRequest r,WebDataBinderFactory b){return actor;}}).build();}
     @Test void filtersRetainExactCutoffAndOwnBranchPage()throws Exception{var summary=new LoanPortfolioReportRepository.Summary(0,1,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO);var report=new LoanPortfolioReportService.Report(new LoanPortfolioReportService.Scope("I1","B1",false),p,summary,new LoanPortfolioReportService.Ratios(null,null,null),new LoanPortfolioReportService.Coverage(1,0,1),List.of(),List.of(),List.of(),List.of(),false,LoanRiskMetrics.VERSION,LoanRiskMetrics.REGULATORY_REFERENCE,Map.of());when(reports.report(actor,p,false)).thenReturn(report);mvc.perform(get("/reports/financial/portfolio").param("from","2026-10-01").param("through","2026-10-02").param("recordedThrough","2026-10-02T09:15:30").param("page","2")).andExpect(status().isOk()).andExpect(view().name("reporting/loan-portfolio")).andExpect(model().attribute("report",report)).andExpect(model().attribute("cutoffInput","2026-10-02T09:15:30"));verify(reports).report(actor,p,false);}
     @Test void configurationRetainsSettingsWithoutRunningReport()throws Exception {
         var scope=new LoanPortfolioReportService.Scope("I1","B1",false);
@@ -71,4 +71,16 @@ class LoanPortfolioReportControllerTest {
         verify(reports,never()).report(any(),any(),anyBoolean());
     }
     @Test void deniedWidePermissionRemainsAccessDenied(){when(reports.report(eq(actor),any(),eq(true))).thenThrow(new AccessDeniedException("No institution claim"));assertThatThrownBy(()->mvc.perform(get("/reports/financial/portfolio").param("institutionWide","true"))).hasRootCauseInstanceOf(AccessDeniedException.class);}
+    @Test void spreadsheetDownloadKeepsTheScopeAndExactCutoffAndRequiresTheExportPath()throws Exception{
+        var parameters=new LoanPortfolioReportService.Parameters(p.from(),p.through(),p.recordedCutoff(),0);
+        var zero=BigDecimal.ZERO;var summary=new LoanPortfolioReportRepository.Summary(0,0,zero,zero,zero,zero,zero,zero,zero,zero,zero);
+        var report=new LoanPortfolioReportService.Report(new LoanPortfolioReportService.Scope("I1","B1",true),parameters,summary,new LoanPortfolioReportService.Ratios(null,null,null),new LoanPortfolioReportService.Coverage(1,0,0),List.of(),List.of(),List.of(),List.of(),false,"TEST","REFERENCE",Map.of());
+        when(reports.export(actor,parameters,true)).thenReturn(report);when(excel.build(report,Locale.ENGLISH)).thenReturn(new byte[]{1,2,3});
+        var request=get("/reports/financial/portfolio/excel").locale(Locale.ENGLISH).param("from","2026-10-01").param("through","2026-10-02").param("recordedThrough","2026-10-02T09:15:30").param("institutionWide","true");
+        mvc.perform(request).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).andExpect(content().bytes(new byte[]{1,2,3}));
+        verify(reports).export(actor,parameters,true);verify(audit).log(eq("LOAN_PORTFOLIO_REPORT"),isNull(),eq("EXCEL"),isNull(),isNull(),anyMap());
+        when(reports.export(actor,parameters,true)).thenThrow(new AccessDeniedException("Export revoked"));
+        assertThatThrownBy(()->mvc.perform(request)).hasRootCauseInstanceOf(AccessDeniedException.class);
+    }
+
 }

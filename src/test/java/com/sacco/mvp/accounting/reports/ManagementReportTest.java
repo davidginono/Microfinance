@@ -97,4 +97,10 @@ class ManagementReportTest {
     @Test void partialPageCannotBecomeACompletePdf(){var messages=new ResourceBundleMessageSource();var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1));var r=new Result(Kind.CASHBOOK,parameters(1),"Institution","Branch",ManagementReports.columns(Kind.CASHBOOK),List.of(),List.of(),Map.of(),100,0,true,"","");assertThatThrownBy(()->exporter.build(r,Locale.ENGLISH)).hasMessage("management.error.large");}
     static BudgetForm budget(){var f=new BudgetForm();f.setAccountId(UUID.randomUUID());f.setDate(DAY);f.setYear(2027);f.setAmounts(new ArrayList<>(Collections.nCopies(12,new BigDecimal("10.01"))));return f;}
     static Parameters parameters(int page){return new Parameters(DAY.withDayOfMonth(1),DAY,NOW,null,null,null,"",page);}
+    @Test void anUnknownGroupAmountKeepsTheMonthTotalUnknown(){
+        var missing=new LinkedHashMap<String,BigDecimal>();missing.put("disbursed",null);
+        var result=new Result(Kind.DISBURSED_LOANS_AUDIT,parameters(0),"Institution","Branch",ManagementReports.columns(Kind.DISBURSED_LOANS_AUDIT),List.of(),List.of(new Group("2026-10 | A",1,missing),new Group("2026-10 | B",1,Map.of("disbursed",BigDecimal.TEN))),Map.of(),0,1,false,"","");
+        assertThat(result.getMonthlyTotals().get("2026-10")).containsEntry("disbursed",null);
+    }
+
 }

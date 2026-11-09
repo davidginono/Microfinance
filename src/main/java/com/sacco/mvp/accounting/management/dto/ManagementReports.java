@@ -21,13 +21,14 @@ public final class ManagementReports {
             List<Column> columns, List<Map<String,Object>> rows, List<Group> groups,
             Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountSelection, String clientSelection) {
         public List<String> getTotalFields(){return totalFields(kind);}
+        public boolean hasSpreadsheet(){return spreadsheetSupported(kind);}
         public boolean isReferenceLayout(){return Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind);}
         public double getColumnWidthTotal(){return columns.stream().mapToDouble(Column::width).sum();}
         public Map<String,Map<String,Object>> getGroupFacts(){var facts=new LinkedHashMap<String,Map<String,Object>>();if(isReferenceLayout())rows.forEach(row->facts.putIfAbsent(row.get("groupName").toString(),row));return facts;}
         public List<Group> getDisplayedGroups(){var names=new HashSet<Object>();rows.forEach(r->names.add(r.get("groupName")));return groups.stream().filter(g->names.contains(g.name())).toList();}
         public Map<String,Map<String,BigDecimal>> getDailyTotals(){return periodTotals(10);}
         public Map<String,Map<String,BigDecimal>> getMonthlyTotals(){return periodTotals(7);}
-        private Map<String,Map<String,BigDecimal>> periodTotals(int length){var days=new LinkedHashMap<String,Map<String,BigDecimal>>();for(var group:groups){var day=days.computeIfAbsent(group.name().substring(0,length),k->new LinkedHashMap<>());group.totals().forEach((k,v)->{if(v!=null)day.merge(k,v,BigDecimal::add);else day.putIfAbsent(k,null);});}return days;}
+        private Map<String,Map<String,BigDecimal>> periodTotals(int length){var days=new LinkedHashMap<String,Map<String,BigDecimal>>();for(var group:groups){var day=days.computeIfAbsent(group.name().substring(0,length),k->new LinkedHashMap<>());group.totals().forEach((k,v)->{if(!day.containsKey(k))day.put(k,v);else day.put(k,v==null || day.get(k)==null?null:day.get(k).add(v));});}return days;}
     }
     @Data public static class BudgetForm {
         private UUID requestKey=UUID.randomUUID();
@@ -44,6 +45,7 @@ public final class ManagementReports {
 
     private static Column text(String key,float width){return new Column(key,false,width);}
     private static Column money(String key){return new Column(key,true,1);}
+    public static boolean spreadsheetSupported(Kind kind){return Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS,Kind.LOAN_PORTFOLIO,Kind.PORTFOLIO_RISK,Kind.PORTFOLIO_ANALYSIS).contains(kind);}
     public static List<String> totalFields(Kind kind) {
         var nonAdditive = kind==Kind.DISBURSED_LOANS_AUDIT ? Set.of("instalment") : kind==Kind.EXPECTED_REPAYMENTS ? Set.of("principalBalance") :
             kind==Kind.LOAN_REPAYMENT_TRANSACTIONS ? Set.of("openingPrincipal","closingPrincipal") : Set.<String>of();
