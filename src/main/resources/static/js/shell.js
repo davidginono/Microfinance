@@ -1031,6 +1031,7 @@
         const finish=window.AppLoading?.action(control?.closest?.('.shell-main,[role="dialog"]') ? control : document.querySelector('.erp-page-title,h1'));
         const controller = new AbortController();
         let timedOut=false;
+        let responseError;
         const cancel=()=>controller.abort();
         window.addEventListener('pagehide',cancel,{once:true});
         const timeout = window.setTimeout(function () {
@@ -1043,6 +1044,10 @@
             });
             const redirectedPath = response.redirected ? new URL(response.url, window.location.href).pathname : '';
             if (!response.ok || /^\/(?:login|auth)(?:\/|$)/.test(redirectedPath)) {
+                if (control?.hasAttribute('data-download-error-response') && response.headers.get('Content-Type')?.includes('text/html')) {
+                    const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    responseError = page.querySelector('[data-download-error-message]')?.textContent.trim();
+                }
                 throw new Error('Export request failed');
             }
             const blob = await response.blob();
@@ -1050,9 +1055,9 @@
         } catch (error) {
             if(controller.signal.aborted && !timedOut)return;
             if (typeof window.showToast === 'function') {
-                window.showToast('error', timedOut
+                window.showToast('error', responseError || (timedOut
                     ? 'The export took too long. Please try again.'
-                    : 'The export could not be completed. Please try again.');
+                    : 'The export could not be completed. Please try again.'));
             }
         } finally {
             window.clearTimeout(timeout);

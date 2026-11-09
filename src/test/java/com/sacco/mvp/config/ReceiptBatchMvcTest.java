@@ -1,14 +1,19 @@
 package com.sacco.mvp.config;
 
 import com.sacco.mvp.accounting.batch.controller.ReceiptBatchController;
+import com.sacco.mvp.accounting.batch.controller.ReceiptBatchSpreadsheetController;
 import com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.*;
 import com.sacco.mvp.accounting.batch.service.ReceiptBatchService;
+import com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkbook;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ReceiptEntryLoan;
 import com.sacco.mvp.accounting.loans.service.LoanRecordingService;
 import com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService;
 import com.sacco.mvp.accounting.service.LoanReceiptService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ReportExportLimiter;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.*;
@@ -71,6 +76,41 @@ class ReceiptBatchMvcTest {
             org.assertj.core.api.Assertions.assertThat(response.getStatus()).isEqualTo(413);org.assertj.core.api.Assertions.assertThat(chain.getRequest()).isNull();
         }
     }
+    @Test void spreadsheetDownloadAndUploadUseTheSameBatchAndRequireCsrf() throws Exception {
+        var path = "/finance/batches/receipts/" + batch + "/spreadsheet";
+        var date = LocalDate.of(2026, 11, 9);
+        var money = UUID.randomUUID();
+        when(batches.spreadsheetBatch(actor, batch)).thenReturn(new Batch(batch, "I1", "B1",
+            actor.getMemberId(), "Collections", 1, "DRAFT", false, null, OffsetDateTime.now()));
+        when(batches.templateLoans(actor, batch, "")).thenReturn(List.of(new ReceiptEntryLoan(UUID.randomUUID(),
+            UUID.randomUUID(), "0001", "Client A", "001", "Business", date.minusMonths(1), date, BigDecimal.TEN)));
+        var downloaded = mvc.perform(get(path + "/template.xlsx").with(user(actor)))
+            .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"repayment-entry.xlsx\""))
+            .andReturn().getResponse().getContentAsByteArray();
+        byte[] completed;
+        try (var file = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(downloaded));
+             var output = new java.io.ByteArrayOutputStream()) {
+            var row = file.getSheetAt(0).getRow(2);
+            row.getCell(4).setCellValue("11.03");
+            row.getCell(5).setCellValue(date.toString());
+            row.getCell(6).setCellValue("00009");
+            file.write(output);
+            completed = output.toByteArray();
+        }
+        var upload = new org.springframework.mock.web.MockMultipartFile("file", "repayment-entry.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", completed);
+        mvc.perform(multipart(path).file(upload).param("moneyAccountId", money.toString()).with(user(actor)))
+            .andExpect(status().isForbidden());
+        var rows = List.of(new ImportRow(3, "0001", new BigDecimal("11.03"), date, "00009"));
+        verify(batches, never()).importDrafts(any(), any(), any(), any());
+        when(context.getBean(LoanRecordingService.class).receiptMoneyAccount(actor, money))
+            .thenReturn(new Choice(money, "Bank", "MONEY"));
+        when(batches.importDrafts(actor, batch, money, rows)).thenReturn(1);
+        mvc.perform(multipart(path).file(upload).param("moneyAccountId", money.toString()).with(user(actor)).with(csrf()))
+            .andExpect(redirectedUrl("/finance/batches/receipts/" + batch)).andExpect(flash().attribute("importedReceiptCount", 1));
+        verify(batches).importDrafts(actor, batch, money, rows);
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary com.sacco.mvp.service.AccessControlService access(){return new com.sacco.mvp.service.AccessControlService();}
         @Bean ReceiptBatchService batches(){return mock(ReceiptBatchService.class);}
@@ -80,5 +120,10 @@ class ReceiptBatchMvcTest {
         @Bean ApplicationClock clock(){return mock(ApplicationClock.class);}
         @Bean ResourceBundleMessageSource messageSource(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
         @Bean ReceiptBatchController controller(ReceiptBatchService batches,LoanReceiptService receipts,LoanRecordingService loans,RepaymentPolicyService policies,ApplicationClock clock,ResourceBundleMessageSource messages){return new ReceiptBatchController(batches,receipts,loans,policies,clock,messages);}
+        @Bean ReceiptBatchSpreadsheetController spreadsheetController(ReceiptBatchService batches, LoanRecordingService loans,
+                                                                    ResourceBundleMessageSource messages) {
+            return new ReceiptBatchSpreadsheetController(batches, new ReceiptBatchWorkbook(messages), loans,
+                new ReportExportLimiter(1), messages);
+        }
     }
 }

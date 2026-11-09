@@ -15,6 +15,10 @@ import java.util.*;
 
 @Repository @RequiredArgsConstructor
 public class ReceiptBatchRepository {
+    private static final String INSERT_ITEM = """
+        insert into receipt_batch_item(id,batch_id,sacco_id,station_id,line_no,form_json,payment_date,total,client_label,loan_labels)
+        values(?,?,?,?,?,?::jsonb,?,?,?,?::jsonb)
+        """;
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     public boolean payrollLinked(UUID batch){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from payroll_remittance where receipt_batch_id=?)",Boolean.class,batch));}
@@ -26,8 +30,25 @@ public class ReceiptBatchRepository {
     public Optional<Item> item(UUID batch,UUID id){return jdbc.query("select * from receipt_batch_item where batch_id=? and id=?",this::item,batch,id).stream().findFirst();}
     public int transactions(UUID batch){return jdbc.queryForObject("select coalesce(sum(jsonb_array_length(form_json->'rows')),0) from receipt_batch_item where batch_id=?",Integer.class,batch);}
     public void save(Batch b,UUID id,int line,int version,Form f,String client,Map<UUID,String> labels,BigDecimal total,boolean fresh){
-        if(fresh)jdbc.update("insert into receipt_batch_item(id,batch_id,sacco_id,station_id,line_no,form_json,payment_date,total,client_label,loan_labels) values(?,?,?,?,?,?::jsonb,?,?,?,?::jsonb)",id,b.id(),b.institution(),b.branch(),line,write(f),f.getEffectiveDate(),total,client,write(labels));
+        if(fresh)jdbc.update(INSERT_ITEM,id,b.id(),b.institution(),b.branch(),line,write(f),f.getEffectiveDate(),total,client,write(labels));
         else jdbc.update("update receipt_batch_item set form_json=?::jsonb,payment_date=?,total=?,client_label=?,loan_labels=?::jsonb,version=version+1 where id=? and batch_id=? and version=? and state<>'POSTED'",write(f),f.getEffectiveDate(),total,client,write(labels),id,b.id(),version);
+    }
+    public List<String> collectionReferences(UUID batch, UUID account) {
+        return jdbc.queryForList("""
+            select btrim(form_json->>'reference') from receipt_batch_item
+            where batch_id=? and form_json->>'moneyAccountId'=? limit 1000
+            """, String.class, batch, account.toString());
+    }
+
+    public void insertImportedDrafts(Batch batch, List<ImportedDraft> drafts) {
+        int line = nextLine(batch.id());
+        var parameters = new ArrayList<Object[]>(drafts.size());
+        for (var draft : drafts) {
+            var form = draft.form();
+            parameters.add(new Object[]{form.getRequestKey(), batch.id(), batch.institution(), batch.branch(), line++,
+                write(form), form.getEffectiveDate(), form.getRows().getFirst().getAmount(), draft.clientLabel(), write(draft.labels())});
+        }
+        jdbc.batchUpdate(INSERT_ITEM, parameters);
     }
     public int nextLine(UUID batch){return jdbc.queryForObject("select coalesce(max(line_no),0)+1 from receipt_batch_item where batch_id=?",Integer.class,batch);}
     public void delete(UUID batch,UUID id){jdbc.update("delete from receipt_batch_item where batch_id=? and id=? and state<>'POSTED'",batch,id);}

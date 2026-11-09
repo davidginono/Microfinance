@@ -71,6 +71,13 @@ public class LoanRecordingService {
     @Transactional(propagation=Propagation.MANDATORY)
     public void lockReceiptLoans(AppUserPrincipal a,List<UUID> ids,UUID client){authorize(a,"VIEW");check(ids!=null && !ids.isEmpty() && ids.size()<=50 && new HashSet<>(ids).size()==ids.size(),"request");check(records.lockReceiptLoans(a,ids,client).size()==ids.size(),"client");}
     @Transactional(readOnly=true)
+    public List<ReceiptEntryLoan> receiptEntryLoans(AppUserPrincipal actor, String search, List<String> numbers) {
+        authorize(actor, "VIEW");
+        check(search != null && search.length() <= 100 && numbers.size() <= 1000, "request");
+        return records.receiptEntryLoans(actor, search.strip(), numbers);
+    }
+
+    @Transactional(readOnly=true)
     public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){authorize(a,"VIEW");check(ids!=null && ids.size()<=50 && date!=null,"request");if(ids.isEmpty())return List.of();var found=records.receiptLoans(a,ids,date);if(found.size()!=new HashSet<>(ids).size())throw new AccessDeniedException("Loan unavailable");return found;}
     @Transactional(readOnly=true)
     public List<AllocationPreview> receiptPreview(AppUserPrincipal a,com.sacco.mvp.accounting.dto.VoucherDtos.Form f){

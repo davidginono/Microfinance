@@ -19,6 +19,16 @@ public final class ReceiptBatchDtos {
     }
     public record SaveItem(int expectedVersion,Form form) {}
     public record LinkAccounts(int expectedVersion) {}
+    public record ImportRow(int line, String loanNumber, BigDecimal amount, LocalDate date, String reference) {}
+    public record ImportedDraft(Form form, String clientLabel, Map<UUID,String> labels) {}
+    public static final class ImportRowError extends IllegalArgumentException {
+        private final int line;
+        public ImportRowError(String message, int line) {
+            super(message);
+            this.line = line;
+        }
+        public int line() { return line; }
+    }
     public record Plan(UUID policyId,int policyVersion,AllocationOrder allocationOrder,String moneyAccount,
                        String interestAccount,List<PlanLine> lines,@JsonFormat(shape=STRING) BigDecimal total,
                        @JsonFormat(shape=STRING) BigDecimal principal,@JsonFormat(shape=STRING) BigDecimal interest) {}

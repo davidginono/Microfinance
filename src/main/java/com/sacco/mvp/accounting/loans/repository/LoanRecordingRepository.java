@@ -77,6 +77,45 @@ public class LoanRecordingRepository {
         var args=new ArrayList<Object>();args.add(a.getSaccoId());args.add(a.getStationId());args.add(client);args.add(client);args.addAll(ids);
         return jdbc.query("select r.loan_id from accountant_loan_record r join loan_applications l on l.id=r.loan_id where r.sacco_id=? and r.station_id=? and (?::uuid is null or l.borrower_party_id=?::uuid) and r.loan_id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by r.loan_id for update of r",(r,n)->r.getObject(1,UUID.class),args.toArray());
     }
+    public List<ReceiptEntryLoan> receiptEntryLoans(AppUserPrincipal actor, String search, List<String> numbers) {
+        var parameters = new ArrayList<Object>();
+        parameters.add(actor.getSaccoId());
+        parameters.add(actor.getStationId());
+        String filter;
+        if (numbers.isEmpty()) {
+            filter = "strpos(lower(concat_ws(' ',l.loan_id,m.full_name,m.member_no)), ?) > 0";
+            parameters.add(search.toLowerCase(Locale.ROOT));
+        } else {
+            filter = "l.loan_id in (" + String.join(",", Collections.nCopies(numbers.size(), "?")) + ")";
+            parameters.addAll(numbers);
+        }
+        return jdbc.query("""
+            select eligible.*, i.due_date, i.amount
+            from (
+                select l.id, m.party_id, l.loan_id, m.full_name, m.member_no, r.product_name, b.disbursement_date
+                from accountant_loan_record r
+                join loan_applications l on l.id=r.loan_id and l.sacco_id=r.sacco_id and l.station_id=r.station_id
+                join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id and m.kind='CLIENT'
+                join loan_ledgers b on b.loan_application_id=l.id and b.sacco_id=r.sacco_id and b.station_id=r.station_id
+                where r.sacco_id=? and r.station_id=? and l.status in ('DISBURSED','PAR','DEFAULTED')
+                  and b.disbursement_date is not null and l.loan_id is not null and
+            """ + filter + """
+                order by l.loan_id,l.id limit 1001
+            ) eligible
+            left join lateral (
+                select due_date, principal-principal_paid+interest-interest_paid-interest_excluded-interest_waived amount
+                from loan_ledger_installments
+                where loan_application_id=eligible.id
+                  and (principal>principal_paid or interest>interest_paid+interest_excluded+interest_waived)
+                order by due_date,installment_number limit 1
+            ) i on true
+            order by eligible.loan_id,eligible.id
+            """, (row, index) -> new ReceiptEntryLoan(row.getObject("id", UUID.class),
+                row.getObject("party_id", UUID.class), row.getString("loan_id"), row.getString("full_name"),
+                row.getString("member_no"), row.getString("product_name"), row.getObject("disbursement_date", LocalDate.class),
+                row.getObject("due_date", LocalDate.class), row.getBigDecimal("amount")), parameters.toArray());
+    }
+
     public List<ReceiptLoan> receiptLoans(AppUserPrincipal a,List<UUID> ids,LocalDate date){
         var args=new ArrayList<Object>();args.add(date);args.add(date);args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(ids);
         return jdbc.query("""

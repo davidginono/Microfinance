@@ -1,5 +1,5 @@
 /* Receipt drafts contain inputs only. Allocations and posting decisions are server-owned. */
-document.addEventListener('DOMContentLoaded', () => {
+function initializeReceiptBatches() {
     'use strict';
     const root = document.querySelector('meta[name="app-context-path"]')?.content || '';
     const base = root + '/finance/batches/receipts';
@@ -225,6 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function rerender(){cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',t('empty'));td.colSpan = 9;tr.append(td);body.append(tr);}}
     function controls(){
+        const spreadsheet = editor.querySelector('[data-batch-spreadsheet]');
+        if (spreadsheet) spreadsheet.hidden = !editable();
         if(editor.dataset.payrollSealed === 'true')editor.querySelectorAll('[data-default-date],[data-default-account]').forEach(n=>{n.disabled = true;n.closest('label').hidden = true;});
         editor.querySelector('[data-batch-add]').disabled = !editable() || editor.dataset.payrollSealed === 'true';
         editor.querySelector('[data-batch-save]').disabled = !editable() || editor.dataset.payrollSealed === 'true' || (!dirty.size && !pending.size);
@@ -263,4 +265,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const poll = setInterval(async()=>{if(loading || dirty.size || pending.size || document.hidden)return;try{await refreshSummary();if(busy() || loadedBusy)await load();}catch(error){globalError(error.message);}},2500);
     window.addEventListener('pagehide',()=>{clearInterval(poll);cleanups.forEach(fn=>fn());rows.forEach(item=>clearTimeout(item.timer));});
     load();
-});
+}
+if (window.WorkspaceNavigation) window.WorkspaceNavigation.onReady(initializeReceiptBatches);
+else document.addEventListener('DOMContentLoaded', initializeReceiptBatches, {once: true});

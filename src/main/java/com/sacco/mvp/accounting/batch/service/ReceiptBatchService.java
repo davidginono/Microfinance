@@ -4,6 +4,7 @@ import com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.*;
 import com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.Page;
 import com.sacco.mvp.accounting.batch.repository.ReceiptBatchRepository;
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ReceiptEntryLoan;
 import com.sacco.mvp.accounting.loans.service.LoanRecordingService;
 import com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator;
 import com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService;
@@ -40,6 +41,80 @@ public class ReceiptBatchService {
     public boolean payrollLinked(AppUserPrincipal a,UUID id){authorize(a,false);find(a,id,false);return repository.payrollLinked(id);}
     @Transactional(readOnly=true)
     public Page<Item> items(AppUserPrincipal a,UUID id,int page,String state){authorize(a,false);query("",page);require(Set.of("","DRAFT","READY","FAILED","POSTED").contains(state),"input");find(a,id,false);var rows=repository.items(id,page,state);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
+
+    @Transactional(readOnly = true)
+    public Batch spreadsheetBatch(AppUserPrincipal actor, UUID id) {
+        authorize(actor, true);
+        return spreadsheetBatch(actor, id, false);
+    }
+
+    @Transactional
+    public List<ReceiptEntryLoan> templateLoans(AppUserPrincipal actor, UUID id, String search) {
+        authorize(actor, true);
+        spreadsheetBatch(actor, id, false);
+        query(search, 0);
+        var results = loans.receiptEntryLoans(actor, search, List.of());
+        require(!results.isEmpty(), "templateEmpty");
+        require(results.size() <= ReceiptBatchWorkbook.MAX_ROWS, "templateLimit");
+        event(actor, id, "RECEIPT_BATCH_TEMPLATE_REQUESTED", Map.of("loans", results.size()));
+        return results;
+    }
+
+    @Transactional
+    public int importDrafts(AppUserPrincipal actor, UUID id, UUID accountId, List<ImportRow> rows) {
+        authorize(actor, true);
+        var batch = spreadsheetBatch(actor, id, true);
+        require(accountId != null, "importAccount");
+        require(!rows.isEmpty() && rows.size() <= ReceiptBatchWorkbook.MAX_ROWS, "importEmpty");
+        require(repository.summary(batch).receipts() + rows.size() <= 1000
+            && repository.transactions(id) + rows.size() <= 2000, "limit");
+        var account = loans.receiptMoneyAccount(actor, accountId);
+        var references = new HashSet<>(repository.collectionReferences(id, accountId));
+        var numbers = rows.stream().map(ImportRow::loanNumber).distinct().toList();
+        var eligible = loans.receiptEntryLoans(actor, "", numbers).stream()
+            .collect(java.util.stream.Collectors.groupingBy(ReceiptEntryLoan::number));
+        var drafts = new ArrayList<ImportedDraft>(rows.size());
+        var today = clock.today();
+        for (var input : rows) {
+            if (input.amount() == null || input.amount().signum() <= 0 || input.date() == null
+                || input.reference() == null || input.reference().isBlank()) {
+                throw new ImportRowError("batch.error.importRow", input.line());
+            }
+            var matches = eligible.getOrDefault(input.loanNumber(), List.of());
+            if (matches.size() != 1) throw new ImportRowError("batch.error.importLoan", input.line());
+            var loan = matches.getFirst();
+            if (input.date().isAfter(today) || input.date().isBefore(loan.disbursed())) {
+                throw new ImportRowError("batch.error.importDate", input.line());
+            }
+            if (!references.add(input.reference())) {
+                throw new ImportRowError("batch.error.importReference", input.line());
+            }
+            var form = new Form();
+            form.setClientId(loan.clientId());
+            form.setMoneyAccountId(accountId);
+            form.setEffectiveDate(input.date());
+            form.setReference(input.reference());
+            String loanLabel = loan.number() + " - " + loan.product();
+            var payment = new RowForm();
+            payment.setLoanId(loan.id());
+            payment.setAmount(input.amount());
+            payment.setDescription(loanLabel);
+            form.setRows(List.of(payment));
+            drafts.add(new ImportedDraft(canonical(UUID.randomUUID(), form), loan.clientNumber() + " - " + loan.client(),
+                Map.of(loan.id(), loanLabel, accountId, account.label())));
+        }
+        repository.insertImportedDrafts(batch, drafts);
+        repository.invalidate(id);
+        repository.state(id, "DRAFT", clock.now());
+        event(actor, id, "RECEIPT_BATCH_DRAFTS_IMPORTED", Map.of("receipts", drafts.size()));
+        return drafts.size();
+    }
+
+    private Batch spreadsheetBatch(AppUserPrincipal actor, UUID id, boolean lock) {
+        var batch = editable(actor, id, lock);
+        require(!repository.payrollLinked(id), "payroll");
+        return batch;
+    }
     @Transactional
     public Item save(AppUserPrincipal a,UUID batch,UUID id,SaveItem input){
         authorize(a,true);var b=editable(a,batch);require(!repository.payrollLinked(batch),"payroll");require(input!=null && input.form()!=null,"input");var prior=repository.item(batch,id);require(prior.isEmpty() || (!prior.get().state().equals("POSTED") && prior.get().version()==input.expectedVersion()),"stale");
@@ -92,7 +167,8 @@ public class ReceiptBatchService {
         for(int n=0;n<actual.lines().size();n++){var e=expected.lines().get(n);var a=actual.lines().get(n);if(!e.loanId().equals(a.loanId()) || e.servicingAllocations()==null || !Objects.equals(e.servicingAllocations(),a.servicingAllocations()) || !Objects.equals(e.paymentDate(),a.paymentDate()) || !Objects.equals(e.principalAccountId(),a.principalAccountId()) || !Objects.equals(e.interestAccountId(),a.interestAccountId()) || e.principalAccountId()==null || e.interestAccountId()==null || !Objects.equals(e.principalAccount(),a.principalAccount()) || e.amount().compareTo(a.amount())!=0 || e.principal().compareTo(a.principal())!=0 || e.interest().compareTo(a.interest())!=0 || e.principalBalance().compareTo(a.principalBalance())!=0 || e.duePrincipal().compareTo(a.duePrincipal())!=0 || e.dueInterest().compareTo(a.dueInterest())!=0)return false;}return true;
     }
     Batch find(AppUserPrincipal a,UUID id,boolean lock){return repository.find(a,id,lock).orElseThrow(()->new AccessDeniedException("Batch unavailable"));}
-    private Batch editable(AppUserPrincipal a,UUID id){var b=find(a,id,true);owner(a,b);require(!Set.of("VALIDATING","POSTING","COMPLETED").contains(b.state()),"busy");return b;}
+    private Batch editable(AppUserPrincipal a,UUID id){return editable(a,id,true);}
+    private Batch editable(AppUserPrincipal a,UUID id,boolean lock){var b=find(a,id,lock);owner(a,b);require(!Set.of("VALIDATING","POSTING","COMPLETED").contains(b.state()),"busy");return b;}
     private static void owner(AppUserPrincipal a,Batch b){if(!a.getMemberId().equals(b.owner()))throw new AccessDeniedException("Batch owner required");}
     private static Form canonical(UUID id,Form source){
         require(source.getRows()!=null && !source.getRows().isEmpty() && source.getRows().size()<=50,"limit");var f=new Form();f.setRequestKey(id);f.setReceiptPurpose("LOAN_REPAYMENT");f.setClientId(source.getClientId());f.setEffectiveDate(source.getEffectiveDate());f.setMoneyAccountId(source.getMoneyAccountId());
@@ -102,5 +178,6 @@ public class ReceiptBatchService {
     private static String text(String value,int max){String s=value==null?"":value.strip();require(s.length()<=max && s.chars().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t'),"input");return s;}
     private static void query(String search,int page){require(search!=null && search.length()<=100 && page>=0 && page<=10000,"input");}
     private static void require(boolean condition,String key){if(!condition)throw new IllegalArgumentException("batch.error."+key);}
-    private void event(AppUserPrincipal a,UUID id,String action){audit.logEvent("ACCOUNTING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,"Receipt batch","RECEIPT_BATCH",id.toString(),a.getSaccoId(),a.getStationId(),Map.of());}
+    private void event(AppUserPrincipal a,UUID id,String action){event(a,id,action,Map.of());}
+    private void event(AppUserPrincipal a,UUID id,String action,Map<String,Object> details){audit.logEvent("ACCOUNTING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,"Receipt batch","RECEIPT_BATCH",id.toString(),a.getSaccoId(),a.getStationId(),details);}
 }

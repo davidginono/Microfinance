@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.loans;
 
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
+import com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.ImportRow;
 import com.sacco.mvp.accounting.loans.repository.LoanRecordingRepository;
 import com.sacco.mvp.accounting.loans.service.LoanRecordingService;
 import com.sacco.mvp.accounting.loans.repository.LoanPostingAuthorizationRepository;
@@ -755,6 +756,31 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=? and allocation_policy_id is not null",Integer.class,institution)).isEqualTo(3);
         var saved=batches().items(actor,batch,0,"").rows().getFirst();assertThat(receiptService().find(actor,saved.receiptId()).orElseThrow().rows()).hasSize(2);
         assertThatThrownBy(()->jdbc.update("update receipt_batch_item set receipt_id=null where id=?",saved.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+    @Test void spreadsheetImportIsScopedAtomicAndUsesTheExistingBatchWorker() {
+        seedHistoricalPolicy();
+        var loan = disbursed("D-SHEET");
+        var batch = batches().create(actor, "Spreadsheet collections");
+        var eligible = batches().templateLoans(actor, batch, "");
+        assertThat(eligible).singleElement().satisfies(entry -> {
+            assertThat(entry.id()).isEqualTo(loan);
+            assertThat(entry.instalmentAmount()).isEqualByComparingTo("1020.00");
+        });
+        assertThatThrownBy(() -> batches().templateLoans(operator("B2"), batch, "")).isInstanceOf(AccessDeniedException.class);
+        var entry = new ImportRow(3, eligible.getFirst().number(), new BigDecimal("119.99"), TODAY, "BANK-0001");
+        var unknown = new ImportRow(4, "FOREIGN", new BigDecimal("30.00"), TODAY, "BANK-0002");
+        assertThatThrownBy(() -> batches().importDrafts(actor, batch, cash, List.of(entry, unknown)))
+            .hasMessage("batch.error.importLoan");
+        assertThat(batches().get(actor, batch).receipts()).isZero();
+        assertThat(batches().importDrafts(actor, batch, cash, List.of(entry))).isEqualTo(1);
+        assertThatThrownBy(() -> batches().importDrafts(actor, batch, cash, List.of(entry)))
+            .hasMessage("batch.error.importReference");
+        assertThat(batches().get(actor, batch).posted()).isZero();
+        assertThat(service.detail(actor, loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        processBatch(batch, false);
+        assertThat(batches().get(actor, batch).ready()).isEqualTo(1);
+        processBatch(batch, true);
+        assertThat(batches().get(actor, batch).postedTotal()).isEqualByComparingTo("119.99");
     }
     @Test void statutoryPolicyIsAppliedByPreviewAndLedgerAndRetainedOnCorrection(){
         seedHistoricalPolicy();var loan=disbursed("D-PFIRST");var f=receiptForm(loan);var preview=receiptService().preview(actor,f).getFirst();assertThat(preview.principal()).isEqualByComparingTo("100.00");assertThat(preview.interest()).isEqualByComparingTo("20.00");

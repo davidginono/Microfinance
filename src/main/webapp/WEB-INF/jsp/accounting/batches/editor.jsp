@@ -8,11 +8,15 @@
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${summary.batch.title}" /></h1></div>
 <div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-payroll-sealed="${payrollLinked}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
 <c:if test="${payrollLinked}"><p role="status"><spring:message code="payroll.feedback.sealed" /></p></c:if>
+<c:if test="${not empty importedReceiptCount}"><p class="console-message" data-message-type="success" role="status"><spring:message code="batch.sheet.imported" arguments="${importedReceiptCount}" /></p></c:if>
 <section class="erp-resource-section"><h2><spring:message code="batch.batchDetails" /></h2><dl class="erp-detail-facts" data-batch-summary aria-live="polite"></dl></section>
 <div class="batch-alert" role="alert" tabindex="-1" data-batch-error hidden></div>
 <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2><spring:message code="batch.receiptRows" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-batch-refresh data-aws-table-refresh><spring:message code="common.refresh" /></button>
 <button type="button" class="app-btn btn-neutral" data-batch-save><spring:message code="batch.saveDraft" /></button>
+<c:if test="${canPostBatch and not payrollLinked and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
+<a class="app-btn btn-neutral" data-batch-spreadsheet href="<c:url value='/finance/batches/receipts/${summary.batch.id}/spreadsheet' />" hidden><spring:message code="batch.sheet.import" /></a>
+</c:if>
 <button type="button" class="app-btn btn-launch" data-batch-add><spring:message code="batch.addReceipt" /></button></div></div>
 <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label><spring:message code="batch.defaultDate" /><input type="date" class="aws-control" data-default-date value="${today}" max="${today}" /></label><label><spring:message code="batch.defaultAccount" /><select class="aws-control" data-default-account data-batch-choice="money" data-searchable="true"><option value=""><spring:message code="batch.choose" /></option></select></label>
 <label><spring:message code="batch.show" /><select class="aws-control" data-batch-filter><option value=""><spring:message code="voucher.all" /></option><c:forEach items="${['DRAFT','READY','FAILED','POSTED']}" var="state"><option value="${state}"><spring:message code="batch.state.${state}" /></option></c:forEach></select></label>

@@ -2,7 +2,13 @@
 
 2026-10-19: principal and interest routing now uses immutable loan bindings from product account links; batch entry shows the loan product without its GL mapping. The shared interest-account setup described in the historical increment below is superseded. Existing loans require explicit linking before collection. See [loan product account links](loan-product-account-links.md).
 
-The staff sidebar provides **Batch Processing → Receipt Batch Processing** at `/finance/batches/receipts`. This increment covers verified TZS repayments for directly recorded, disbursed loans with an existing ledger opening. It does not import Excel or enable new voucher export formats.
+The staff sidebar provides **Batch Processing → Receipt Batch Processing** at `/finance/batches/receipts`. This increment covers verified TZS repayments for directly recorded, disbursed loans with an existing ledger opening.
+
+## Excel entry
+
+Open a batch you own and choose **Import repayments**. **Download template** lists eligible individual loans in your branch. Search by Loan ID or client to narrow the list. The Loan ID dropdown updates the client and first unpaid scheduled instalment shown for reference. Fill in the actual amount received, payment date and collection reference. Enter dates as YYYY-MM-DD and keep references as text to preserve leading zeros. Leave payment cells blank on rows you are skipping.
+
+Choose the receiving account and upload the completed template to the same batch. The file can contain up to 1,000 rows and be up to 2 MB. Each filled row adds one draft receipt. The server resolves Loan IDs within the selected branch and rejects the entire upload on an invalid or duplicate row. Existing batch limits apply. Review the drafts, then use the existing **Validate batch** and **Post batch** actions.
 
 ## Entry and review
 
