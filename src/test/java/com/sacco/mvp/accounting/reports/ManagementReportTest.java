@@ -16,6 +16,19 @@ import static org.assertj.core.api.Assertions.*;
 class ManagementReportTest {
     static final LocalDate DAY=LocalDate.of(2026,10,15);
     static final OffsetDateTime NOW=OffsetDateTime.parse("2026-10-15T18:00:00+03:00");
+    @Test void reportKeepsOnlyTheMostUsefulNote(){
+        var kind=Kind.LOAN_REPAYMENT_TRANSACTIONS;
+        assertThat(result(kind,0,0,Map.of()).getNoteKey()).isEmpty();
+        assertThat(result(kind,0,2,Map.of()).getNoteKey()).isEqualTo("exclusionBasis");
+        assertThat(result(Kind.DAILY_COLLECTIONS,1,2,Map.of()).getNoteKey()).isEqualTo("unlinkedReceipts");
+        assertThat(result(Kind.CASHBOOK,1,0,Map.of()).getNoteKey()).isEmpty();
+        assertThat(result(kind,1,0,Collections.singletonMap("payment",null)).getNoteKey()).isEqualTo("unknownAmounts");
+        assertThat(result(kind,1,0,Map.of("payment",BigDecimal.ZERO)).getNoteKey()).isEqualTo("coverage.LOAN_REPAYMENT_TRANSACTIONS");
+    }
+    private Result result(Kind kind,long count,long excluded,Map<String,BigDecimal> totals){
+        return new Result(kind,parameters(0),"Institution","Branch",ManagementReports.columns(kind),
+            List.of(),List.of(),totals,count,excluded,false,"","");
+    }
     @Test void budgetsRequireEveryMonthAndExactNonnegativeCents(){
         var f=budget();BudgetService.validate(f,DAY);
         f.getAmounts().set(11,null);assertThatThrownBy(()->BudgetService.validate(f,DAY)).hasMessage("management.error.months");

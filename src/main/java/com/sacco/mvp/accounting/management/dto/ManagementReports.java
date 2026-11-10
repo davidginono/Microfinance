@@ -23,6 +23,12 @@ public final class ManagementReports {
         public List<String> getTotalFields(){return totalFields(kind);}
         public boolean hasSpreadsheet(){return spreadsheetSupported(kind);}
         public boolean isReferenceLayout(){return Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind);}
+        public String getNoteKey(){
+            if(excluded>0) return kind==Kind.DAILY_COLLECTIONS?"unlinkedReceipts":"exclusionBasis";
+            if(count==0) return "";
+            if(totals.values().stream().anyMatch(Objects::isNull)) return "unknownAmounts";
+            return kind==Kind.CASHBOOK?"":"coverage."+kind;
+        }
         public double getColumnWidthTotal(){return columns.stream().mapToDouble(Column::width).sum();}
         public Map<String,Map<String,Object>> getGroupFacts(){var facts=new LinkedHashMap<String,Map<String,Object>>();if(isReferenceLayout())rows.forEach(row->facts.putIfAbsent(row.get("groupName").toString(),row));return facts;}
         public List<Group> getDisplayedGroups(){var names=new HashSet<Object>();rows.forEach(r->names.add(r.get("groupName")));return groups.stream().filter(g->names.contains(g.name())).toList();}

@@ -90,20 +90,15 @@ public class ManagementReportPdf {
                 if(audit && month!=null)page.row(totalRow(r,monthlyTotals.get(month),message("monthTotal",locale),locale),true);
                 if(r.groups().isEmpty()){page.columns(labels,widths,numeric);page.text(message("empty",locale));}
                 page.row(totalRow(r,r.totals(),message("total",locale),locale),true);
-                page.endTable();page.section(message("basis",locale));
+                page.endTable();
                 if(r.isReferenceLayout()){
                     page.text(r.institution()+" | "+r.branch()+" | TZS");
                     page.text(message("cutoff",locale)+": "+clock.zoned(r.parameters().cutoff()).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm XXX")));
                     for(int n=3;n<context.size();n++)page.text(context.get(n));
                 }
-                if(r.isReferenceLayout() && r.excluded()>0)page.text(message("excluded",locale)+": "+r.excluded());page.text(message("coverage."+r.kind(),locale));
-                if(r.kind()==Kind.PORTFOLIO_RISK)page.text(message("riskBasis",locale));
-                if(r.kind()==Kind.LOAN_PORTFOLIO || r.kind()==Kind.PORTFOLIO_ANALYSIS)page.text(message("interestBasis",locale));
-                if(r.excluded()>0){
-                    if(r.kind()!=Kind.DAILY_COLLECTIONS && r.kind()!=Kind.CASHBOOK)page.text(message("exclusionBasis",locale));
-                    page.text(message("missingNext",locale));
-                }
-                page.text(message("fullTotals",locale));
+                if(r.isReferenceLayout() && r.excluded()>0)page.text(message("excluded",locale)+": "+r.excluded());
+                String noteKey=r.getNoteKey();
+                if(!noteKey.isEmpty())page.text(message(noteKey,locale));
             }
             document.save(out);return out.toByteArray();
         }catch(IOException failure){throw new IllegalStateException("PDF generation failed",failure);}

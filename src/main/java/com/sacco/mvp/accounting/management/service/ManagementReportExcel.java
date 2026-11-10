@@ -55,9 +55,9 @@ public class ManagementReportExcel {
             if(firstHeader<0){firstHeader=book.headers(sheet,r.columns().stream().map(c->field(c.key(),locale)).toList());book.line(sheet,label("empty",locale),columns,false);}
             total(book,sheet,r,r.totals(),label("total",locale),monetary);
             sheet.createFreezePane(0,contextEnd);
-            book.line(sheet,label("coverage."+r.kind(),locale),columns,false);book.line(sheet,label("fullTotals",locale),columns,false);
-            if(r.kind()==Kind.PORTFOLIO_RISK)book.line(sheet,label("riskBasis",locale),columns,false);
-            if(r.excluded()>0){book.line(sheet,label("exclusionBasis",locale),columns,false);book.line(sheet,label("missingNext",locale),columns,false);}
+            String noteKey=r.getNoteKey();
+            if(noteKey.equals("unknownAmounts"))noteKey="sheet.unknown";
+            if(!noteKey.isEmpty())book.line(sheet,label(noteKey,locale),columns,false);
             // A flat typed sheet retains identifiers and correction evidence when users sort or filter.
             var keys=new ArrayList<>(r.columns().stream().map(Column::key).toList());
             var extra=new ArrayList<>(List.of("groupName","product"));
@@ -65,6 +65,7 @@ public class ManagementReportExcel {
             if(r.kind()==Kind.DISBURSED_LOANS_AUDIT)extra.addAll(List.of("month","disbursementAccount"));
             for(var key:extra)if(!keys.contains(key))keys.add(key);
             var data=book.sheet(label("sheet.data",locale),keys.size(),true,PrintSetup.A3_PAPERSIZE);context(book,data,r,keys.size(),locale);
+            book.line(data,label("sheet.unknown",locale),keys.size(),false);
             int dataHeader=book.headers(data,keys.stream().map(k->field(k,locale)).toList());
             var dataMoney=new HashSet<Integer>();for(int i=0;i<keys.size();i++)if(monetary.contains(i) || Set.of("disbursed","principalBalance").contains(keys.get(i)))dataMoney.add(i);
             for(var row:r.rows())book.row(data,keys.stream().map(k->value(row.get(k),k,locale)).toList(),dataMoney,false);
@@ -76,7 +77,7 @@ public class ManagementReportExcel {
     private void context(AccountingReportWorkbook b,Sheet s,Result r,int n,Locale l){
         b.title(s,label("title."+r.kind(),l).replace('\n',' '),n,r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS?"Times New Roman":"Arial",r.kind()==Kind.DISBURSED_LOANS_AUDIT?11:r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS?12:14,r.kind()!=Kind.EXPECTED_REPAYMENTS,r.kind()==Kind.DISBURSED_LOANS_AUDIT || r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS);b.line(s,r.institution()+" | "+r.branch()+" | TZS",n,false);
         b.line(s,label("period",l)+": "+r.parameters().from()+" — "+r.parameters().through(),n,false);
-        b.line(s,label("cutoff",l)+": "+r.parameters().cutoff(),n,false);b.line(s,label("excluded",l)+": "+r.excluded(),n,false);b.line(s,label("sheet.unknown",l),n,false);
+        b.line(s,label("cutoff",l)+": "+r.parameters().cutoff(),n,false);b.line(s,label("excluded",l)+": "+r.excluded(),n,false);
         if(!r.clientSelection().isBlank())b.line(s,label("client",l)+": "+r.clientSelection(),n,false);
         if(!r.parameters().product().isBlank())b.line(s,label("productSearch",l)+": "+r.parameters().product(),n,false);
     }

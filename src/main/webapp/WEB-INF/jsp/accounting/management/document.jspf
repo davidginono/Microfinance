@@ -7,7 +7,7 @@
   <c:if test="${report.kind=='CASHBOOK' or report.kind=='DAILY_COLLECTIONS'}"><p><spring:message code="management.accounts" />: <c:choose><c:when test="${empty report.parameters.startAccount and empty report.parameters.endAccount}"><spring:message code="management.allAccounts" /></c:when><c:otherwise><c:out value="${report.accountSelection}" /></c:otherwise></c:choose></p></c:if>
   <c:if test="${not empty report.clientSelection}"><p><spring:message code="management.client" />: <c:out value="${report.clientSelection}" /></p></c:if>
   <c:if test="${not empty report.parameters.product}"><p><spring:message code="management.productSearch" />: <c:out value="${report.parameters.product}" /></p></c:if>
-  <c:if test="${!report.isReferenceLayout()}"><p class="reference-basis"><spring:message code="management.excluded" />: <c:out value="${report.excluded}" /></p></c:if>
+  <c:if test="${report.excluded>0}"><p><spring:message code="management.excluded" />: <c:out value="${report.excluded}" /></p></c:if>
   <c:set var="groupFacts" value="${report.getGroupFacts()}" />
   <c:choose><c:when test="${report.isReferenceLayout()}"><%@ include file="source-tables.jspf" %></c:when><c:otherwise>
   <table data-table-sort-mode="none" data-table-sort-reason="document" class="reference-table"><thead><tr><c:forEach items="${report.columns}" var="column"><th scope="col"><spring:message code="management.field.${column.key}" /></th></c:forEach></tr></thead>
@@ -19,9 +19,7 @@
   </tbody></c:forEach>
   <c:if test="${empty report.rows}"><tbody><tr><td colspan="${report.columns.size()}"><spring:message code="management.empty" /></td></tr></tbody></c:if>
   <tfoot><tr class="reference-total"><c:forEach items="${report.columns}" var="column" varStatus="cell"><td class="${column.money?'reference-money':''}"><c:choose><c:when test="${cell.first}"><spring:message code="management.total" /></c:when><c:when test="${column.money and report.totals[column.key]!=null}"><fmt:formatNumber value="${report.totals[column.key]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:when test="${column.money and report.getTotalFields().contains(column.key)}">—</c:when></c:choose></td></c:forEach></tr></tfoot>
-  </table></c:otherwise></c:choose><footer class="reference-basis"><strong><spring:message code="management.basis" /></strong><c:if test="${report.isReferenceLayout() and report.excluded>0}"><p><spring:message code="management.excluded" />: <c:out value="${report.excluded}" /></p></c:if><p><spring:message code="management.coverage.${report.kind}" /></p>
-  <c:if test="${report.kind=='PORTFOLIO_RISK'}"><p><spring:message code="management.riskBasis" /></p></c:if>
-  <c:if test="${report.kind=='LOAN_PORTFOLIO' or report.kind=='PORTFOLIO_ANALYSIS'}"><p><spring:message code="management.interestBasis" /></p></c:if>
-  <c:if test="${report.excluded>0}"><p><c:if test="${report.kind!='DAILY_COLLECTIONS' and report.kind!='CASHBOOK'}"><spring:message code="management.exclusionBasis" /> </c:if><spring:message code="management.missingNext" /></p></c:if>
-  <p><spring:message code="management.fullTotals" /></p></footer>
+  </table></c:otherwise></c:choose>
+  <c:set var="noteKey" value="${report.getNoteKey()}" />
+  <c:if test="${not empty noteKey}"><p class="reference-basis"><spring:message code="management.${noteKey}" /></p></c:if>
 </article>
