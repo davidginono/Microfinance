@@ -285,6 +285,30 @@ test('sidebar switches JSP documents in place, initializes destination controls 
  }finally{dom.window.close();}
 });
 
+test('sidebar highlights a pending click immediately and restores the current item on failure or cancellation',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  const sidebar=d.querySelector('#appSidebar');sidebar.classList.add('shell-sidebar-scroll');
+  const [dashboard,users,products]=sidebar.querySelectorAll('a');
+  dashboard.classList.add('shell-nav-active');dashboard.setAttribute('aria-current','page');
+  const pending=()=>sidebar.querySelector('[data-workspace-nav-pending]');
+  users.click();
+  assert.equal(pending(),users);assert.equal(dashboard.getAttribute('aria-current'),'page');assert.equal(users.hasAttribute('aria-current'),false);
+  assert.equal(d.querySelector('h1').textContent,'Dashboard');
+  requests.at(-1).resolve({ok:false});await until(()=>d.querySelector('[role=alert]'));
+  assert.equal(pending(),null);assert.equal(dashboard.getAttribute('aria-current'),'page');
+  d.querySelector('[role=alert] button').click();assert.equal(pending(),users);
+  const retry=requests.at(-1);
+  dashboard.click();assert.equal(pending(),null);assert.equal(retry.options.signal.aborted,true);
+  retry.resolve({ok:false});
+
+  users.click();const stale=requests.at(-1);assert.equal(pending(),users);
+  products.click();assert.equal(pending(),products);assert.equal(stale.options.signal.aborted,true);
+  stale.resolve({ok:false});await until(()=>w.loaded.includes('Products'));
+  assert.equal(pending(),null);assert.equal(w.location.search,'?section=loan');
+ }finally{dom.window.close();}
+});
+
 test('Back and Forward restore server-rendered workspaces while query-only history keeps its current document',async()=>{
  const {dom,w,d}=await setup();try{
   await w.WorkspaceNavigation.visit('/admin/users');await w.WorkspaceNavigation.visit('/admin/settings-controls?section=loan');

@@ -8,7 +8,7 @@
     let scope, booting=false, committing=false, queued, request, generation=0, serial=Date.now(), collapsed;
     let viewKey=history.state?.workspaceNavigation?.key || ++serial;
     let entry={url:location.href,index:history.state?.workspaceNavigation?.index || 0};
-    let reversing=false, pendingDestination, layoutObserver;
+    let reversing=false, pendingDestination, pendingSidebarLink, layoutObserver;
     const submissions=new WeakSet();
     const timers = {};
     for (const [schedule,cancel] of [['setTimeout','clearTimeout'],['setInterval','clearInterval'],['requestAnimationFrame','cancelAnimationFrame'],['requestIdleCallback','cancelIdleCallback']]) {
@@ -160,6 +160,12 @@
         const main=document.querySelector('.shell-main.is-workspace-pending');
         if(main){main.classList.remove('is-workspace-pending','is-workspace-preview');main.removeAttribute('aria-busy');}
     }
+    function highlightSidebarLink(link){
+        // Keep aria-current on the displayed page until its replacement arrives.
+        pendingSidebarLink?.removeAttribute('data-workspace-nav-pending');
+        pendingSidebarLink=link;
+        pendingSidebarLink?.setAttribute('data-workspace-nav-pending','');
+    }
     const feedback=(failed,url,options={})=>{
         if(!failed)rememberLayout();
         clearFeedback();
@@ -184,7 +190,7 @@
             const actions=document.createElement('div');actions.className='workspace-navigation-actions';
             const retry=document.createElement('button');retry.type='button';retry.className='app-btn btn-neutral';retry.textContent=document.body.dataset.navigationRetry;
             retry.onclick=()=>{
-                if(!options.submission)return visit(url,{force:true});
+                if(!options.submission)return visit(url,{force:true,sidebarLink:options.sidebarLink});
                 const {form,submitter}=options.submission;if(submitter)form.requestSubmit(submitter);else form.requestSubmit();
             };
             const dismiss=document.createElement('button');dismiss.type='button';dismiss.className='workspace-navigation-dismiss';
@@ -312,12 +318,13 @@
     }
     async function visit(destination,options={}){
         const url=new URL(destination,location.href);if(!eligible(url))return false;
-        if(committing){queued=[url.href,options];return true;}
-        if(!options.force && !options.pop && url.href===location.href){++generation;request?.abort();clearFeedback();return true;}
+        if(committing){queued=[url.href,options];highlightSidebarLink(options.sidebarLink);return true;}
+        if(!options.force && !options.pop && url.href===location.href){++generation;request?.abort();highlightSidebarLink();clearFeedback();return true;}
         if(!allowed(url.href,()=>options.pop?history.go(options.pop.index-options.previous.index):visit(url.href,options))){
             if(options.pop)undoPop(options.previous,options.pop);return false;
         }
         request?.abort();const controller=new AbortController();request=controller;const version=++generation;
+        highlightSidebarLink(options.sidebarLink);
         let didCommit=false,initialized=false,staged;
         const recover=options.submission?.form?.dataset.workspaceSubmit==='recover';
         const timeout=timers.setTimeout(()=>controller.abort(),20000);
@@ -360,7 +367,7 @@
             staged=await prepareStyles(page,controller.signal);
             if(version!==generation)return true;
             if(!allowed(url.href,()=>options.pop?history.go(options.pop.index-options.previous.index):visit(url.href,options))){if(options.pop)undoPop(options.previous,options.pop);return false;}
-            clearFeedback();committing=true;didCommit=true;
+            highlightSidebarLink();clearFeedback();committing=true;didCommit=true;
             collapsed=window.matchMedia('(min-width: 1024px)').matches?document.documentElement.classList.contains('shell-sidebar-collapsed'):(collapsed ?? true);
             if(page.querySelector('[data-resource-form-page]'))collapsed=true;
             const scripts=[...page.querySelectorAll('script')].filter(script=>!script.type || /^(?:text\/javascript|application\/javascript|module)$/.test(script.type));
@@ -411,8 +418,9 @@
                 if(initialized)reveal();
                 else{const main=document.querySelector('[data-workspace-initializing]');if(main){main.inert=false;main.removeAttribute('aria-busy');main.querySelector('[data-workspace-boot-status]')?.remove();}}
             }
+            if(version===generation && !didCommit)highlightSidebarLink();
             if(version===generation && document.getElementById('workspace-navigation-feedback')?.getAttribute('role')==='status')clearFeedback();
-            if(didCommit && queued){const next=queued;queued=null;void visit(...next);}
+            if(didCommit && queued){const next=queued;queued=null;highlightSidebarLink();void visit(...next);}
         }
         return true;
     }
@@ -420,7 +428,7 @@
     native.add.call(window,'click',event=>{
         if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)return;
         const link=event.target.closest?.('a[href]');if(!handles(link))return;
-        event.preventDefault();void visit(link.href);
+        event.preventDefault();void visit(link.href,{sidebarLink:link.closest('.shell-sidebar-scroll')?link:undefined});
     });
     native.add.call(window,'submit',event=>{
         const form=event.target,submitter=event.submitter;

@@ -5024,7 +5024,8 @@ body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([
     box-shadow: none !important;
 }
 
-.aws-console .shell-sidebar-scroll :is(.shell-nav-active, [aria-current="page"]) {
+.aws-console .shell-sidebar-scroll:not(:has([data-workspace-nav-pending])) :is(.shell-nav-active, [aria-current="page"]),
+.aws-console .shell-sidebar-scroll [data-workspace-nav-pending] {
     color: #0073bb !important;
     font-weight: 700 !important;
 }
