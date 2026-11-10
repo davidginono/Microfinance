@@ -64,7 +64,8 @@ public class GroupOrganizationService {
         check(h.signers().size()>=p.minMembers() && h.signers().size()<=p.maxMembers() && h.signers().stream().anyMatch(s->s.clientId().equals(o.getRepresentativeId()) && s.mayApply()),"authoritySigners");
         check(authorities.people(a,h.signers().stream().map(s->s.clientId()).toList()).size()==h.signers().size(),"client");
         check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()) && !f.getApplicationDate().isBefore(h.recordedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).toLocalDate())
-            && !f.getApplicationDate().isBefore(h.validFrom()) && !f.getApplicationDate().isAfter(h.validThrough()) && f.getFirstPaymentDate()!=null && f.getFirstPaymentDate().isAfter(f.getApplicationDate()),"date");
+            && !f.getApplicationDate().isBefore(h.validFrom()) && (h.validThrough()==null || !f.getApplicationDate().isAfter(h.validThrough()))
+            && f.getFirstPaymentDate()!=null && f.getFirstPaymentDate().isAfter(f.getApplicationDate()),"date");
         check(f.getTenureValue()!=null,"terms");var tenure=new LoanTenure(f.getTenureUnit(),f.getTenureValue());
         text(f.getPurpose(),500,true);text(o.getBusiness(),1000,true);text(o.getAssessmentEvidence(),500,true);money(o.getPrincipal(),true);money(o.getIncome(),true);money(o.getExpenses(),false);money(o.getOtherDebt(),false);
         check(o.getPrincipal().compareTo(p.maxPrincipal().min(h.maxPrincipal()))<=0,"principalLimit");var rules=cycles.rules(a,c.productId());

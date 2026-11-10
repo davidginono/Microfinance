@@ -29,7 +29,7 @@ class GroupAuthorityPostgresTest {
     @BeforeAll void start(){f.context=new AnnotationConfigApplicationContext(Config.class);f.jdbc=f.context.getBean(JdbcTemplate.class);f.service=f.context.getBean(com.sacco.mvp.accounting.loans.service.LoanRecordingService.class);service=f.context.getBean(GroupAuthorityService.class);groups=f.context.getBean(GroupLendingService.class);}
     @AfterAll void stop(){f.stop();}
     @BeforeEach void fixture(){f.fixture();var clock=f.context.getBean(ApplicationClock.class);reset(clock);when(clock.today()).thenReturn(LoanRecordingPostgresTest.TODAY);when(clock.now()).thenReturn(OffsetDateTime.parse("2026-10-08T12:00:00+03:00"));var form=new GroupForm();form.setName("Synthetic organization <Company>");form.setLegalForm("ORGANIZATION");form.setEvidence("Synthetic organization identity source");group=groups.create(f.actor,form);}
-    AuthorityForm form(){var form=service.editor(f.actor,group,null).form();form.setValidFrom(LocalDate.of(2026,10,1));form.setValidThrough(LocalDate.of(2027,10,1));form.setMaxPrincipal(new BigDecimal("100000.00"));form.setRequiredSignatures(1);form.setCapacityEvidence("Synthetic verified legal capacity");form.setResolutionEvidence("Synthetic governing resolution");form.setSignatureEvidence("Synthetic checked original signatures");form.setPayoutType(PaymentDestinationType.BANK_ACCOUNT);form.setPayoutProvider("Synthetic bank");form.setPayoutHolder("Synthetic organization");form.setPayoutIdentifier("QA-ACCOUNT");form.setPayoutEvidence("Synthetic account verification");form.setVerified(true);var signer=form.getSigners().getFirst();signer.setClientId(f.client);signer.setMayApply(true);signer.setMaySign(true);signer.setMayReceive(true);return form;}
+    AuthorityForm form(){var form=service.editor(f.actor,group,null).form();form.setValidFrom(LocalDate.of(2026,10,1));form.setMaxPrincipal(new BigDecimal("100000.00"));form.setRequiredSignatures(1);form.setCapacityEvidence("Synthetic verified legal capacity");form.setResolutionEvidence("Synthetic governing resolution");form.setSignatureEvidence("Synthetic checked original signatures");form.setPayoutType(PaymentDestinationType.BANK_ACCOUNT);form.setPayoutProvider("Synthetic bank");form.setPayoutHolder("Synthetic organization");form.setPayoutIdentifier("QA-ACCOUNT");form.setPayoutEvidence("Synthetic account verification");form.setVerified(true);var signer=form.getSigners().getFirst();signer.setClientId(f.client);signer.setMayApply(true);signer.setMaySign(true);signer.setMayReceive(true);return form;}
     int count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Integer.class,f.institution);}
     @Test void authorityNamesExplicitNonMemberPowersWithoutCreatingPersonalDebtOrGuarantees(){
         UUID id=service.record(f.actor,group,form());var authority=service.detail(f.actor,group,id);
@@ -87,23 +87,47 @@ class GroupAuthorityPostgresTest {
         doThrow(new IllegalStateException("Synthetic authority audit failure")).when(f.context.getBean(AuditService.class)).logEvent(eq("GROUP_LENDING"),any(),eq("GROUP_AUTHORITY_RECORDED"),any(),any(),any(),any(),any(),any(),any(),any());
         assertThatThrownBy(()->service.record(f.actor,group,form())).hasMessage("Synthetic authority audit failure");assertThat(count("lending_group_authority")).isZero();assertThat(f.jdbc.queryForObject("select count(*) from lending_group_authority_signer s join members m on m.id=s.client_id where m.sacco_id=?",Integer.class,f.institution)).isZero();
     }
-    @Test void validityDatesAreInclusiveAndFutureAndExpiredDocumentsAreDistinct(){
-        var form=form();form.setValidFrom(LoanRecordingPostgresTest.TODAY);form.setValidThrough(LoanRecordingPostgresTest.TODAY);var id=service.record(f.actor,group,form);assertThat(service.detail(f.actor,group,id).state()).isEqualTo("CURRENT");
+    @Test void openEndedAuthorityStartsOnItsEffectiveDateAndStaysCurrent(){
+        var form=form();form.setValidFrom(LoanRecordingPostgresTest.TODAY);var id=service.record(f.actor,group,form);assertThat(service.detail(f.actor,group,id).state()).isEqualTo("CURRENT");
         var tomorrow=LoanRecordingPostgresTest.TODAY.plusDays(1);when(f.context.getBean(ApplicationClock.class).today()).thenReturn(tomorrow);
         assertThat(f.context.getBean(ApplicationClock.class).today()).isEqualTo(tomorrow);
-        assertThat(service.detail(f.actor,group,id).state()).isEqualTo("EXPIRED");
+        assertThat(service.detail(f.actor,group,id).state()).isEqualTo("CURRENT");
+        assertThat(service.detail(f.actor,group,id).validThrough()).isNull();
         when(f.context.getBean(ApplicationClock.class).today()).thenReturn(LoanRecordingPostgresTest.TODAY.minusDays(1));assertThat(service.detail(f.actor,group,id).state()).isEqualTo("NOT_YET_VALID");
+    }
+    @Test void aRecordedEndDateStillExpiresAndNeverRevivesAnOlderRevision(){
+        var original=service.record(f.actor,group,form());
+        var dated=UUID.randomUUID();
+        var today=LoanRecordingPostgresTest.TODAY;
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        transaction.executeWithoutResult(status->{
+            f.jdbc.update("""
+                insert into lending_group_authority select (jsonb_populate_record(null::lending_group_authority,to_jsonb(a)||
+                  jsonb_build_object('id',?::uuid,'revision',2,'previous_id',a.id,'request_key',?::uuid,'valid_through',?::date))).*
+                from lending_group_authority a where a.id=?
+                """,dated,UUID.randomUUID(),today,original);
+            f.jdbc.update("""
+                insert into lending_group_authority_signer(authority_id,ordinal,client_id,client_number,name,may_apply,may_sign,may_receive,may_view_account)
+                select ?,ordinal,client_id,client_number,name,may_apply,may_sign,may_receive,may_view_account
+                from lending_group_authority_signer where authority_id=?
+                """,dated,original);
+        });
+        assertThat(service.detail(f.actor,group,dated).state()).isEqualTo("CURRENT");
+        when(f.context.getBean(ApplicationClock.class).today()).thenReturn(today.plusDays(1));
+        assertThat(service.detail(f.actor,group,dated).state()).isEqualTo("EXPIRED");
+        assertThat(service.detail(f.actor,group,original).state()).isEqualTo("SUPERSEDED");
+        assertThat(service.history(f.actor,group,0,"through").page().rows()).extracting(Summary::validThrough).containsExactly(today,null);
     }
     @Test void authorityPermissionsAreNeverAutomaticallyGrantedWithAnyRole(){for(var role:Position.values())assertThat(UserClaim.defaultClaims(List.of(role),false)).noneMatch(c->c.getFeature()==AccessFeature.GROUP_AUTHORITY);}
     @Test void malformedLimitsDatesCollectionsAndSortsFailBeforeCreatingRecords(){
-        var form=form();form.setMaxPrincipal(new BigDecimal("1.001"));assertThatThrownBy(()->service.record(f.actor,group,form)).hasMessage("group.error.amount");form.setMaxPrincipal(BigDecimal.TEN);form.setValidThrough(form.getValidFrom().minusDays(1));assertThatThrownBy(()->service.record(f.actor,group,form)).hasMessage("group.error.date");
-        form.setValidThrough(form.getValidFrom());form.getSigners().addAll(Collections.nCopies(50,form.getSigners().getFirst()));assertThatThrownBy(()->service.record(f.actor,group,form)).hasMessage("group.error.request");assertThatThrownBy(()->service.history(f.actor,group,0,"revision;delete")).hasMessage("group.error.query");assertThat(count("lending_group_authority")).isZero();
+        var form=form();form.setMaxPrincipal(new BigDecimal("1.001"));assertThatThrownBy(()->service.record(f.actor,group,form)).hasMessage("group.error.amount");form.setMaxPrincipal(BigDecimal.TEN);form.setValidFrom(null);assertThatThrownBy(()->service.record(f.actor,group,form)).hasMessage("group.error.date");
+        form.setValidFrom(LoanRecordingPostgresTest.TODAY);form.getSigners().addAll(Collections.nCopies(50,form.getSigners().getFirst()));assertThatThrownBy(()->service.record(f.actor,group,form)).hasMessage("group.error.request");assertThatThrownBy(()->service.history(f.actor,group,0,"revision;delete")).hasMessage("group.error.query");assertThat(count("lending_group_authority")).isZero();
     }
     @Test void historyPaginationAndEveryDisplayedColumnHaveStableScopedOrdering(){
-        var ids=new ArrayList<UUID>();for(int n=0;n<27;n++){var form=form();form.setMaxPrincipal(new BigDecimal("100000.00").add(BigDecimal.valueOf(n)));form.setValidFrom(LocalDate.of(2026,9,1).plusDays(n));form.setValidThrough(LocalDate.of(2027,9,1).plusDays(n));ids.add(service.record(f.actor,group,form));}
+        var ids=new ArrayList<UUID>();for(int n=0;n<27;n++){var form=form();form.setMaxPrincipal(new BigDecimal("100000.00").add(BigDecimal.valueOf(n)));form.setValidFrom(LocalDate.of(2026,9,1).plusDays(n));ids.add(service.record(f.actor,group,form));}
         var first=service.history(f.actor,group,0,"revision_desc").page();var second=service.history(f.actor,group,1,"revision_desc").page();assertThat(first.rows()).hasSize(25);assertThat(first.hasNext()).isTrue();assertThat(second.rows()).hasSize(2);assertThat(second.hasNext()).isFalse();
         var returned=new ArrayList<UUID>();first.rows().forEach(r->returned.add(r.id()));second.rows().forEach(r->returned.add(r.id()));var reversed=new ArrayList<>(ids);Collections.reverse(reversed);assertThat(returned).containsExactlyElementsOf(reversed);
-        for(String sort:List.of("revision","from","through","principal")){assertThat(service.history(f.actor,group,0,sort).page().rows().getFirst().id()).as(sort).isEqualTo(ids.getFirst());assertThat(service.history(f.actor,group,0,sort+"_desc").page().rows().getFirst().id()).as(sort).isEqualTo(ids.getLast());}
+        for(String sort:List.of("revision","from","principal")){assertThat(service.history(f.actor,group,0,sort).page().rows().getFirst().id()).as(sort).isEqualTo(ids.getFirst());assertThat(service.history(f.actor,group,0,sort+"_desc").page().rows().getFirst().id()).as(sort).isEqualTo(ids.getLast());}
         var states=service.history(f.actor,group,0,"state").page().rows();assertThat(states.getFirst().state()).isEqualTo("CURRENT");assertThat(service.history(f.actor,group,0,"state_desc").page().rows().getFirst().state()).isEqualTo("SUPERSEDED");
     }
     @Configuration(proxyBeanMethods=false) @Import(GroupLendingPostgresTest.Config.class) static class Config {

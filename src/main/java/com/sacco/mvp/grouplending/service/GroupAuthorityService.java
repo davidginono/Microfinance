@@ -49,7 +49,7 @@ public class GroupAuthorityService {
     }
     private static void rows(AuthorityForm f){check(f!=null && f.getSigners()!=null && f.getSigners().size()<=50 && f.getSigners().stream().allMatch(Objects::nonNull),"request");}
     private static void validate(AuthorityForm f){
-        rows(f);check(f.getRequestKey()!=null && f.isVerified(),"authorityVerification");check(f.getValidFrom()!=null && f.getValidThrough()!=null && f.getValidFrom().getYear()>=1 && f.getValidThrough().getYear()<=9999 && !f.getValidThrough().isBefore(f.getValidFrom()),"date");
+        rows(f);check(f.getRequestKey()!=null && f.isVerified(),"authorityVerification");check(f.getValidFrom()!=null && f.getValidFrom().getYear()>=1 && f.getValidFrom().getYear()<=9999,"date");
         BigDecimal amount=f.getMaxPrincipal();check(amount!=null && amount.signum()>0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");
         text(f.getCapacityEvidence(),500);text(f.getResolutionEvidence(),500);text(f.getSignatureEvidence(),500);text(f.getPayoutProvider(),120);text(f.getPayoutHolder(),160);text(f.getPayoutIdentifier(),160);text(f.getPayoutEvidence(),500);check(f.getPayoutType()!=null,"form");
         check(!f.getSigners().isEmpty() && f.getRequiredSignatures()!=null && f.getRequiredSignatures()>0 && f.getRequiredSignatures()<=f.getSigners().size(),"authoritySigners");

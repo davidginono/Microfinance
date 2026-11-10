@@ -23,7 +23,7 @@ public class GroupOrganizationAgreementRepository {
     public Row own(AppUserPrincipal a,UUID cycle,LocalDate date){return jdbc.query("""
         select p.*,c.state,l.status loan_status,own.signed_at,s.may_receive,
           (select count(*) from lending_group_org_signature s where s.cycle_id=p.cycle_id) signed_count,
-          g.status='ACTIVE' and h.valid_from<=?::date and h.valid_through>=?::date
+          g.status='ACTIVE' and h.valid_from<=?::date and coalesce(h.valid_through,'infinity'::date)>=?::date
           and not exists(select 1 from lending_group_authority_revocation r where r.authority_id=h.id)
           and not exists(select 1 from lending_group_authority n where n.group_id=h.group_id and n.revision>h.revision) current_authority
         from lending_group_org_agreement p join lending_group_cycle c on c.id=p.cycle_id

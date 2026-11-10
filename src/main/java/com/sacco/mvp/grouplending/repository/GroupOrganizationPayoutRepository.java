@@ -23,7 +23,7 @@ public class GroupOrganizationPayoutRepository {
           (p.snapshot->'financial'->>'recordedNetCashEstimate')::numeric net,p.snapshot->'payout' destination,
           (select count(*) from lending_group_org_signature s where s.cycle_id=p.cycle_id) signed_count,
           h.required_signatures,c.state,l.status loan_status,p.snapshot->'document'->>'id' is not null full_document,
-          g.status='ACTIVE' and h.valid_from<=?::date and h.valid_through>=?::date
+          g.status='ACTIVE' and h.valid_from<=?::date and coalesce(h.valid_through,'infinity'::date)>=?::date
             and not exists(select 1 from lending_group_authority_revocation r where r.authority_id=h.id)
             and not exists(select 1 from lending_group_authority n where n.group_id=h.group_id and n.revision>h.revision) current_authority,
           x.client_id confirmed_by,x.client_name,x.client_number,x.authorized_at,x.otp_required

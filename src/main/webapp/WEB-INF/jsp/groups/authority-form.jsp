@@ -13,7 +13,7 @@
 <c:set var="groupFormNotice" value="authority.notLoanApproval" />
 <%@ include file="form-group-details.jspf" %>
 <section class="erp-resource-section"><h2><spring:message code="authority.limits" /></h2><div class="accounting-grid group-form-fields">
-<c:forEach items="${['validFrom','validThrough']}" var="field"><label><spring:message code="authority.${field}" /><form:input path="${field}" type="date" cssClass="aws-control" required="required" /><form:errors path="${field}" cssClass="coa-error" /></label></c:forEach>
+<label><spring:message code="authority.validFrom" /><form:input path="validFrom" type="date" cssClass="aws-control" required="required" /><form:errors path="validFrom" cssClass="coa-error" /></label>
 <label><spring:message code="authority.principal" /> (TZS)<form:input path="maxPrincipal" type="number" data-amount-input="true" min="0.01" step="0.01" cssClass="aws-control" required="required" /><form:errors path="maxPrincipal" cssClass="coa-error" /></label>
 <label><spring:message code="authority.requiredSignatures" /><form:input path="requiredSignatures" type="number" min="1" max="50" cssClass="aws-control" required="required" /><form:errors path="requiredSignatures" cssClass="coa-error" /></label>
 </div></section>

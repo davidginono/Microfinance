@@ -18,7 +18,7 @@ public class GroupOrganizationFundingRepository {
     public Optional<Context> context(AppUserPrincipal a,UUID loan,LocalDate date){return jdbc.query("""
         select p.cycle_id,p.packet_hash,l.amount principal,q.net_amount,l.first_repayment_date,
           c.state='SUBMITTED' and l.status='READY_FOR_DISBURSEMENT' and g.status='ACTIVE'
-          and ?::date between h.valid_from and h.valid_through
+          and ?::date between h.valid_from and coalesce(h.valid_through,'infinity'::date)
           and not exists(select 1 from lending_group_authority_revocation r where r.authority_id=h.id)
           and not exists(select 1 from lending_group_authority n where n.group_id=h.group_id and n.revision>h.revision)
           and p.snapshot->'document' is not null and p.snapshot->'document'<>'null'::jsonb

@@ -19,7 +19,7 @@ public class GroupOrganizationAccountRepository {
         join lending_group_authority h on h.group_id=c.group_id and h.sacco_id=c.sacco_id and h.station_id=c.station_id
         join lending_group_authority_signer s on s.authority_id=h.id and s.client_id=? and s.may_view_account
         where c.sacco_id=? and c.station_id=? and c.model='ORGANIZATION' and g.status='ACTIVE'
-          and h.valid_from<=?::date and h.valid_through>=?::date
+          and h.valid_from<=?::date and coalesce(h.valid_through,'infinity'::date)>=?::date
           and not exists(select 1 from lending_group_authority_revocation r where r.authority_id=h.id)
           and not exists(select 1 from lending_group_authority n where n.group_id=h.group_id and n.revision>h.revision)
         """;

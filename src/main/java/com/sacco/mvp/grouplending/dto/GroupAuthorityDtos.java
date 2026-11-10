@@ -13,7 +13,6 @@ public final class GroupAuthorityDtos {
         private UUID requestKey=UUID.randomUUID();
         private UUID expectedPreviousId;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate validFrom;
-        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate validThrough;
         private BigDecimal maxPrincipal;
         private Integer requiredSignatures;
         private String capacityEvidence="",resolutionEvidence="",signatureEvidence="";
