@@ -178,23 +178,6 @@ public class LoanRecordingRepository {
         select id,member_no||' - '||full_name label,case when client_portal_enabled then 'BORROWER' else 'PROVISIONAL' end client_kind from members where sacco_id=? and station_id=? and status='ACTIVE' and is_member
         and strpos(lower(member_no||' '||full_name),?)>0 order by member_no,id limit 26 offset ?
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("client_kind")),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
-    public List<Choice> officers(AppUserPrincipal actor, String search, int page) {
-        return jdbc.query("""
-            select m.id,m.full_name from members m where m.sacco_id=? and m.station_id=?
-            and m.status='ACTIVE' and m.staff_access_status='ACTIVE'
-            and (m.position='LOAN_OFFICER' or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name='LOAN_OFFICER'))
-            and strpos(lower(m.full_name),?)>0 order by m.full_name,m.id limit 26 offset ?
-            """, (r,n)->new Choice(r.getObject(1,UUID.class),r.getString(2),""),
-            actor.getSaccoId(),actor.getStationId(),search.toLowerCase(Locale.ROOT),page*25);
-    }
-    public String officerLabel(AppUserPrincipal actor,UUID id) {
-        return jdbc.query("""
-            select m.full_name from members m where m.id=? and m.sacco_id=? and m.station_id=?
-            and m.status='ACTIVE' and m.staff_access_status='ACTIVE' and (m.position='LOAN_OFFICER'
-            or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name='LOAN_OFFICER'))
-            """,(row,n)->row.getString(1),
-            id,actor.getSaccoId(),actor.getStationId()).stream().findFirst().orElse("");
-    }
     public Map<UUID,String> evidenceClients(AppUserPrincipal actor, Collection<UUID> ids) {
         if(ids.isEmpty())return Map.of();
         if(ids.size()>20)throw new IllegalArgumentException("applications.error.guarantors");

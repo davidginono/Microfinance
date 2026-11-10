@@ -25,14 +25,10 @@ public class LoanRecordingEvidenceService {
     private final ClientApplicationService applications;
 
     @Transactional(readOnly=true)
-    public List<Choice> choices(AppUserPrincipal actor,String kind,String search,int page) {
+    public List<Choice> guarantorChoices(AppUserPrincipal actor,String search,int page) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         check(search!=null && search.length()<=100 && page>=0 && page<=10000,"query");
-        return switch(kind) {
-            case "officers" -> records.officers(actor,search,page);
-            case "guarantors" -> records.clients(actor,search,page);
-            default -> throw new IllegalArgumentException("applications.error.query");
-        };
+        return records.clients(actor,search,page);
     }
 
     @Transactional(readOnly=true)
@@ -58,21 +54,11 @@ public class LoanRecordingEvidenceService {
             .map(ClientApplicationDtos.Guarantor::getClientId).filter(Objects::nonNull).toList());
     }
 
-    @Transactional(readOnly=true)
-    public String selectedOfficerLabel(AppUserPrincipal actor,UUID officerId) {
-        accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
-        return records.officerLabel(actor,officerId);
-    }
-
     public List<LoanAttachmentService.NamedUpload> prepare(AppUserPrincipal actor,RecordForm form,List<MultipartFile> files) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         var details=form.getApplicationDetails();
         if(details==null)return null;
         text(details.getUseOfFunds(),2000);
-        var officerId=details.getLoanOfficerId();
-        var officerLabel=officerId==null?"":records.officerLabel(actor,officerId);
-        check(officerId==null || !officerLabel.isBlank(),"officer");
-        details.setLoanOfficerLabel(officerLabel);
         details.setFieldLabels(new LinkedHashMap<>());
         check(details.getGuarantors()!=null && details.getGuarantors().size()<=20 && details.getCollateral()!=null
             && details.getCollateral().size()<=20 && details.getFields()!=null && details.getFields().size()<=100 && details.getDocumentNames()!=null && details.getDocumentTypes()!=null && details.getRequiredAttachmentIds()!=null
@@ -145,7 +131,7 @@ public class LoanRecordingEvidenceService {
         form.setPrincipal(draft.getAmount());form.setApplicationDate(draft.getApplicationDate());form.setTenureUnit(draft.getTenureUnit());form.setTenureValue(draft.getTenureValue());
         form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(draft.getExpenses());form.setOtherDebt(draft.getOtherDebt());
         var details=form.getApplicationDetails()==null?new ApplicationDetails():form.getApplicationDetails();
-        details.setLoanOfficerId(draft.getLoanOfficerId());details.setUseOfFunds(draft.getUseOfFunds());
+        details.setUseOfFunds(draft.getUseOfFunds());
         details.setGuarantors(draft.getGuarantors());details.setCollateral(draft.getCollateral());details.setFields(draft.getFields());
         details.setDocumentNames(new ArrayList<>());details.setDocumentTypes(new ArrayList<>());details.setRequiredAttachmentIds(new ArrayList<>());
         details.setDeclarationAccepted(false);form.setApplicationDetails(details);return form;
@@ -180,7 +166,7 @@ public class LoanRecordingEvidenceService {
         draft.setBusiness(form.getBusiness());draft.setIncome(form.getIncome());draft.setExpenses(form.getExpenses());draft.setOtherDebt(form.getOtherDebt());
         var details=form.getApplicationDetails();
         if(details!=null) {
-            draft.setLoanOfficerId(details.getLoanOfficerId());draft.setUseOfFunds(details.getUseOfFunds());
+            draft.setUseOfFunds(details.getUseOfFunds());
             draft.setGuarantors(details.getGuarantors());draft.setCollateral(details.getCollateral());draft.setFields(details.getFields());
             draft.setDocumentNames(details.getDocumentNames());draft.setDocumentTypes(details.getDocumentTypes());
             draft.setRequiredAttachmentIds(details.getRequiredAttachmentIds());draft.setDeclarationAccepted(details.isDeclarationAccepted());

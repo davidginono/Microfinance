@@ -131,9 +131,9 @@ class ClientApplicationEndToEndPostgresTest {
             UUID id = applications.save(fixture.f.actor, draft, List.of(file, file));
             var staffHttp = login(base, staffLogin, password, true);
             String staffForm = get(staffHttp, base + "/finance/loan-records/new?applicationId=" + id);
-            assertThat(staffForm).contains("Record Loan Application", "Preferred loan officer",
+            assertThat(staffForm).contains("Record Loan Application",
                 "data-recording-evidence", "data-schedule-preview", "Signed synthetic application", "name=\"loanMode\"")
-                .doesNotContain("href=\"/finance/client-applications\"", "data-application-tab");
+                .doesNotContain("href=\"/finance/client-applications\"", "data-application-tab", "Preferred loan officer");
             var staffQuote = ClientOnboardingRenderedPostgresTest.hidden(staffForm);
             staffQuote.put("productId", fixture.f.product.toString());
             staffQuote.put("principal", "100000.00");

@@ -41,14 +41,6 @@
 <label><spring:message code="recording.expenses" /> (TZS)<form:input path="expenses" type="number" data-amount-input="true" min="0" step="0.01" cssClass="aws-control" /></label>
 <label><spring:message code="recording.otherDebt" /> (TZS)<form:input path="otherDebt" type="number" data-amount-input="true" min="0" step="0.01" cssClass="aws-control" /></label>
 <label><spring:message code="voucher.description" /><form:textarea path="notes" cssClass="aws-control" maxlength="500" rows="3" /></label>
-    <div data-loan-choice data-lazy-choice data-choice-url="<c:url value='/finance/loan-recording/evidence/choices/officers'/>">
-        <label for="recordingLoanOfficer"><spring:message code="applications.officer"/></label>
-        <form:select path="applicationDetails.loanOfficerId" id="recordingLoanOfficer" cssClass="aws-control" data-choice-select="true">
-            <form:option value="" data-empty-option="true"><spring:message code="common.optional"/></form:option>
-            <c:if test="${not empty recordForm.applicationDetails.loanOfficerId}"><form:option value="${recordForm.applicationDetails.loanOfficerId}"><c:choose><c:when test="${not empty selectedOfficerLabel}"><c:out value="${selectedOfficerLabel}"/></c:when><c:otherwise><spring:message code="recording.unavailable"/></c:otherwise></c:choose></form:option></c:if>
-        </form:select>
-        <%@ include file="choice-search.jspf" %>
-    </div>
     <label for="recordingUseOfFunds"><spring:message code="applications.useOfFunds"/><form:textarea path="applicationDetails.useOfFunds" id="recordingUseOfFunds" cssClass="aws-control" maxlength="2000" rows="2"/></label>
 <div data-evidence-fields>
 <c:forEach items="${evidenceProduct.fields}" var="field" varStatus="index">

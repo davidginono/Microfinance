@@ -1,7 +1,7 @@
 <%@ page pageEncoding="UTF-8" %>
 <c:if test="${not empty supportingDetails}">
 <section class="accounting-section erp-detail-card"><h2><spring:message code="applications.information"/></h2><dl class="erp-detail-facts">
-<div><dt><spring:message code="applications.officer"/></dt><dd><c:out value="${supportingDetails.loanOfficerLabel}"/></dd></div>
+<c:if test="${not empty supportingDetails.loanOfficerLabel}"><div><dt><spring:message code="applications.officer"/></dt><dd><c:out value="${supportingDetails.loanOfficerLabel}"/></dd></div></c:if>
 <div><dt><spring:message code="applications.useOfFunds"/></dt><dd><c:out value="${supportingDetails.useOfFunds}"/></dd></div>
 <c:forEach items="${supportingDetails.fields}" var="field"><div><dt><spring:message code="${supportingDetails.fieldLabels[field.key]}" text="${field.key}"/></dt><dd><c:out value="${field.value}"/></dd></div></c:forEach>
 </dl></section>
