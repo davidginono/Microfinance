@@ -1,0 +1,30 @@
+.group-editor .erp-resource-section + .erp-resource-section {
+    margin-top: -1px;
+}
+
+.group-editor .group-form-fields :is(label, [data-loan-choice]) {
+    min-width: 0;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.group-editor .group-form-fields label:not(.aws-settings-checkbox-row) {
+    display: grid;
+}
+
+.group-editor .group-form-fields button[name="action"] {
+    justify-self: start;
+}
+
+.group-editor .accounting-form-actions {
+    margin-top: 16px;
+    padding-top: 0;
+    border-top: 0;
+}
+
+@media (min-width: 1024px) {
+    .aws-console .group-form-context .erp-detail-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 66.6667%;
+    }
+}
