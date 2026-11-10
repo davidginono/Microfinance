@@ -99,7 +99,7 @@ class RecordedLoanDetailScheduleTest {
         if(disbursed){loan.setDisbursementDate(today);loan.setFirstRepaymentDate(today.plusMonths(1));}
         var form=new RecordForm();form.setMonths(1);form.setTenureValue(1);form.setLoanMode("CUSTOM");form.setInterestEntry("AMOUNT");
         when(clock.today()).thenReturn(today);
-        when(charges.frozen(actor,id)).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan(null,"","",List.of(),true,""));
+        when(charges.quotedTerms(actor,id)).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan(null,"","",List.of(),true,""));
         when(loans.findById(id)).thenReturn(Optional.of(loan));
         when(records.record(actor,id,false)).thenReturn(Map.of("metadata",json.writeValueAsString(form),"sacco_name","Test institution","branch_name","Branch 1","actor_name","Accountant","recorded_at",today.atStartOfDay().atOffset(ZoneOffset.UTC)));
         when(records.loan(actor,id,today)).thenReturn(new LoanRow(id,"100102",UUID.randomUUID(),"Client Three","CL10003","Customised loan",today,money("1000.00"),money("1000.00"),loan.getStatus().name(),money("0.00"),money("0.00"),money("0.00"),money("0.00"),money("0.00"),money("0.00")));

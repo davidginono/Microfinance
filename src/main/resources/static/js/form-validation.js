@@ -81,7 +81,7 @@
         members(control).forEach(member => new Set([member, proxy(member)]).forEach(node => {
             node.classList.remove('erp-validation-invalid', 'field-error-input'); node.removeAttribute('aria-invalid'); describe(node, state.error.id, false);
         }));
-        if (state.server) state.error.hidden = true; else state.error.remove();
+        if (state.server && !state.error.hasAttribute('data-live-field-error')) state.error.hidden = true; else state.error.remove();
         states.delete(control);
     }
     function validate(control, edited = false) {
@@ -93,14 +93,34 @@
         else show(control, message(control));
     }
     function reveal(control) {
-        for (let parent = control.parentElement; parent; parent = parent.parentElement) if (parent.tagName === 'DETAILS') parent.open = true;
+        for (let parent = control.parentElement; parent; parent = parent.parentElement) {
+            if (parent.tagName === 'DETAILS') parent.open = true;
+            if (parent.hidden && parent.matches('[data-validation-tab-panel][role="tabpanel"]')) {
+                document.getElementById(parent.getAttribute('aria-labelledby'))?.click();
+            }
+        }
         const visible = proxy(control);
         visible.focus({preventScroll:true}); visible.scrollIntoView?.({block:'center', behavior:'instant'});
     }
     function focusFirst(form) {
-        const control = Array.from(form.elements).find(el => states.has(el) && !el.disabled && !states.get(el).error.hidden);
-        if (!control || control.closest('[hidden],.hidden')) return false;
+        const control = Array.from(form.elements).find(el => states.has(el) && !el.disabled && !states.get(el).error.hidden
+            && !el.closest('[hidden]:not([data-validation-tab-panel]),.hidden'));
+        if (!control) return false;
         reveal(control); return true;
+    }
+    function applyServerErrors(form, messages) {
+        for (const [control, state] of states) if (control.form === form && state.server) clear(control);
+        const unbound = [];
+        for (const message of messages) {
+            const control = Array.from(form.elements).find(field => field.name === message.dataset.fieldErrorFor && field.type !== 'hidden' && !field.disabled);
+            if (!control) {unbound.push(message.textContent.trim()); continue;}
+            const error = message.cloneNode(true);
+            error.removeAttribute('id');
+            error.setAttribute('data-live-field-error','');
+            control.after(error);
+            show(control, error.textContent, error);
+        }
+        return unbound;
     }
     function scan(root = document) {
         const nodes = [...root.querySelectorAll(errors)]; if (root.matches?.(errors)) nodes.unshift(root);
@@ -146,7 +166,7 @@
         for (const record of records) record.addedNodes.forEach(node => {if (node.nodeType === 1) scan(node);});
         for (const [control, state] of states) if (!control.isConnected || !state.error.isConnected) {clear(control); states.delete(control);}
     }).observe(document.body, {childList:true, subtree:true});
-    window.FormValidation = {refresh:scan, focusFirst, setError(control, text) {
+    window.FormValidation = {refresh:scan, focusFirst, applyServerErrors, setError(control, text) {
         if (!eligible(control)) return;
         control.setCustomValidity(text);
         if (text) show(control, text); else clear(control);

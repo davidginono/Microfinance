@@ -17,6 +17,9 @@
 <div class="product-config-page-actions">
     <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral"><spring:message code="admin.workspace.backProducts" /></a>
     <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.title" /></a>
+    <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')">
+        <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />"><spring:message code="charges.postingSetup" /></a>
+    </sec:authorize>
     <form action="/admin/settings-controls/loan-products/${product.id}/delete"
           method="post"
           data-confirm-eyebrow="Confirm Deletion"

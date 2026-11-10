@@ -79,17 +79,22 @@ public class LoanRecordingEvidenceService {
             && details.getDocumentNames().size()<=10 && details.getDocumentTypes().size()<=10 && details.getRequiredAttachmentIds().size()<=10,"details");
         var labels=labels(actor,details);
         var selected=new HashSet<UUID>();
-        for(var guarantor:details.getGuarantors()) {
-            check(guarantor!=null && guarantor.getClientId()!=null && !guarantor.getClientId().equals(form.getClientId())
-                && labels.containsKey(guarantor.getClientId()) && selected.add(guarantor.getClientId()),"guarantors");
-            text(guarantor.getRelationship(),255);text(guarantor.getBusiness(),255);text(guarantor.getLocation(),255);phone(guarantor.getPhone());
+        for(int index=0;index<details.getGuarantors().size();index++) {
+            var guarantor=details.getGuarantors().get(index);
+            String row="applicationDetails.guarantors["+index+"].";
+            checkField(guarantor!=null && guarantor.getClientId()!=null && !guarantor.getClientId().equals(form.getClientId())
+                && labels.containsKey(guarantor.getClientId()) && selected.add(guarantor.getClientId()),row+"clientId","guarantors");
+            text(guarantor.getRelationship(),255);text(guarantor.getBusiness(),255);text(guarantor.getLocation(),255);
+            phone(guarantor.getPhone(),row+"phone");
         }
-        for(var asset:details.getCollateral()) {
-            check(asset!=null && asset.getItemName()!=null && !asset.getItemName().isBlank(),"collateral");
+        for(int index=0;index<details.getCollateral().size();index++) {
+            var asset=details.getCollateral().get(index);
+            String row="applicationDetails.collateral["+index+"].";
+            checkField(asset!=null && asset.getItemName()!=null && !asset.getItemName().isBlank(),row+"itemName","collateral");
             text(asset.getItemName(),255);text(asset.getItemNumber(),100);text(asset.getItemType(),100);text(asset.getDescription(),500);
-            text(asset.getOwner(),255);text(asset.getLocation(),255);phone(asset.getPhone());
+            text(asset.getOwner(),255);text(asset.getLocation(),255);phone(asset.getPhone(),row+"phone");
             BigDecimal value=asset.getEstimatedValue();
-            check(value==null || value.signum()>=0 && value.scale()<=2 && value.precision()<=18,"collateral");
+            checkField(value==null || value.signum()>=0 && value.scale()<=2 && value.precision()<=18,row+"estimatedValue","money");
         }
         var definitions="CONFIGURED".equals(form.getLoanMode())?requirements.activeForProduct(form.getProductId()):List.<com.sacco.mvp.domain.LoanProductRequiredAttachment>of();
         var required=new HashMap<UUID,com.sacco.mvp.domain.LoanProductRequiredAttachment>();definitions.forEach(d->required.put(d.getId(),d));
@@ -206,6 +211,19 @@ public class LoanRecordingEvidenceService {
 
     private static String at(List<String> values,int index) {return values!=null && index<values.size()?Objects.toString(values.get(index),""):"";}
     private static void text(String value,int max) {check(value!=null && value.length()<=max && value.codePoints().noneMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9),"details");}
-    private static void phone(String value) {text(value,32);if(!value.isBlank())try{TanzaniaPhoneNumber.normalizeRequired(value);}catch(IllegalStateException ex){throw new IllegalArgumentException("applications.error.phone");}}
+    private static void phone(String value,String field) {
+        try{
+            text(value,32);
+            if(!value.isBlank())TanzaniaPhoneNumber.normalizeRequired(value);
+        }catch(IllegalArgumentException|IllegalStateException ex){throw new FieldValidation(field,"phone");}
+    }
+    private static void checkField(boolean valid,String field,String key) {
+        if(!valid)throw new FieldValidation(field,key);
+    }
+    public static final class FieldValidation extends IllegalArgumentException {
+        private final String field;
+        private FieldValidation(String field,String key){super("applications.error."+key);this.field=field;}
+        public String field(){return field;}
+    }
     private static void check(boolean value,String key) {if(!value)throw new IllegalArgumentException("applications.error."+key);}
 }

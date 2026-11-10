@@ -7,6 +7,24 @@
             var clientSelect = form.querySelector('select[name="clientId"]');
             var error = root.querySelector('[data-evidence-error]'), requirements = [], productVersion = 0, nextFieldId = 0;
             function fail() { error.textContent = root.dataset.error; error.hidden = false; }
+            var tabs = [...root.querySelectorAll('[role="tab"]')];
+            function selectTab(selected) {
+                tabs.forEach(function (tab) {
+                    var active = tab === selected;
+                    tab.setAttribute('aria-selected', String(active));
+                    tab.tabIndex = active ? 0 : -1;
+                    document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+                });
+            }
+            tabs.forEach(function (tab, index) {
+                tab.addEventListener('click', function () { selectTab(tab); });
+                tab.addEventListener('keydown', function (event) {
+                    var next = {ArrowLeft: (index + tabs.length - 1) % tabs.length, ArrowRight: (index + 1) % tabs.length, Home: 0, End: tabs.length - 1}[event.key];
+                    if (next == null) return;
+                    event.preventDefault(); selectTab(tabs[next]); tabs[next].focus();
+                });
+            });
+            selectTab(tabs[0]);
             function reindex(list) {
                 list.querySelectorAll('[data-repeat-row]').forEach(function (row, index) {
                     row.querySelectorAll('input,select,textarea').forEach(function (control) {
@@ -20,20 +38,27 @@
             }
             root.querySelectorAll('[data-repeat-list]').forEach(reindex);
             root.querySelectorAll('[data-add-row]').forEach(function (button) {
+                var kind = button.dataset.addRow, list = root.querySelector('[data-repeat-list="' + kind + '"]');
+                button.disabled = list.children.length >= 20;
                 button.addEventListener('click', function () {
-                    var kind = button.dataset.addRow, list = root.querySelector('[data-repeat-list="' + kind + '"]');
                     if (list.children.length >= 20) return;
                     list.append(root.querySelector('[data-row-template="' + kind + '"]').content.cloneNode(true));
                     reindex(list);
                     list.lastElementChild.dispatchEvent(new Event('loan:choices-added',{bubbles:true}));
-                    list.lastElementChild.querySelector('input,select')?.focus();
+                    (list.lastElementChild.querySelector('.neo-select-button') || list.lastElementChild.querySelector('input,select'))?.focus();
+                    button.disabled = list.children.length >= 20;
                     form.dispatchEvent(new Event('change',{bubbles:true}));
                 });
             });
             root.addEventListener('click', function (event) {
                 var button = event.target.closest('[data-remove-row]');
                 if (!button) return;
-                var list = button.closest('[data-repeat-list]'); button.closest('[data-repeat-row]').remove(); reindex(list);
+                var list = button.closest('[data-repeat-list]'), row = button.closest('[data-repeat-row]');
+                var next = row.nextElementSibling || row.previousElementSibling;
+                row.remove(); reindex(list);
+                var add = root.querySelector('[data-add-row="' + list.dataset.repeatList + '"]');
+                add.disabled = false;
+                (next?.querySelector('[data-remove-row]') || add).focus();
                 form.dispatchEvent(new Event('change',{bubbles:true}));
             });
             function documentRequirements() {
@@ -44,24 +69,44 @@
                 });
             }
             var files = form.querySelector('input[type="file"][name="attachments"]');
+            var uploads = [], documentList = root.querySelector('[data-evidence-documents]');
+            function syncFiles() {
+                var selection = new DataTransfer();
+                uploads.forEach(function (upload) { selection.items.add(upload.file); });
+                files.files = selection.files;
+                files.setCustomValidity(uploads.length > 10 ? root.dataset.uploadLimit : '');
+            }
             files.addEventListener('change', function () {
-                var list = root.querySelector('[data-evidence-documents]'); list.replaceChildren();
-                Array.from(files.files).forEach(function (file,index) {
-                    list.append(root.querySelector('[data-evidence-document-template]').content.cloneNode(true));
-                    var row = list.lastElementChild; row.querySelector('[data-evidence-filename]').textContent = file.name;
-                    row.querySelectorAll('[data-document-field]').forEach(function (control) {
-                        control.name = 'applicationDetails.' + control.dataset.documentField + '[' + index + ']';
-                        control.id = 'recording-document-' + index + '-' + control.dataset.documentField;
-                        control.parentElement.htmlFor = control.id;
-                    });
+                Array.from(files.files).forEach(function (file) {
+                    if (uploads.some(function (upload) { return upload.file.name === file.name && upload.file.size === file.size && upload.file.lastModified === file.lastModified; })) return;
+                    documentList.append(root.querySelector('[data-evidence-document-template]').content.cloneNode(true));
+                    var row = documentList.lastElementChild; row.querySelector('[data-evidence-filename]').textContent = file.name;
                     row.querySelector('[data-document-field="documentNames"]').value = file.name.slice(0,120);
                     row.querySelector('[data-document-field="documentTypes"]').value = 'OTHER';
+                    var upload = {file: file, row: row}; uploads.push(upload);
+                    row.querySelector('[data-remove-upload]').addEventListener('click', function () {
+                        var index = uploads.indexOf(upload);
+                        uploads.splice(index,1); row.remove(); bindUploads();
+                        (uploads[Math.min(index, uploads.length - 1)]?.row.querySelector('[data-remove-upload]') || files).focus();
+                        files.dispatchEvent(new Event('input',{bubbles:true}));
+                    });
                 });
-                documentRequirements();
+                bindUploads(); documentRequirements();
             });
+            function bindUploads() {
+                uploads.forEach(function (upload,index) {
+                    upload.row.querySelectorAll('[data-document-field]').forEach(function (control) {
+                        control.name = 'applicationDetails.' + control.dataset.documentField + '[' + index + ']';
+                        if (!control.id) control.id = 'recording-document-' + (++nextFieldId);
+                        control.parentElement.htmlFor = control.id;
+                    });
+                });
+                syncFiles();
+            }
             async function product(changed) {
                 var id = form.elements.productId.value, sequence = ++productVersion;
                 var draft = form.querySelector('[data-recording-draft]'); if (draft) draft.disabled = form.elements.loanMode.value !== 'CONFIGURED' || clientSelect?.selectedOptions[0]?.dataset.clientKind !== 'PROVISIONAL';
+                error.hidden = true;
                 if (form.elements.loanMode.value !== 'CONFIGURED' || !id) {
                     requirements = []; documentRequirements(); root.querySelector('[data-evidence-fields]').replaceChildren();
                     root.querySelector('[data-evidence-requirements]').textContent = ''; return;
@@ -89,7 +134,7 @@
                             control.step = field.type === 'integer' ? '1' : '0.01';
                         }
                         control.name = 'applicationDetails.fields[' + field.name + ']'; control.id = 'recording-field-' + index;
-                        control.className = 'aws-control'; control.maxLength = 1000;
+                        control.className = 'aws-control'; control.maxLength = 1000; control.required = field.required;
                         label.htmlFor = control.id; label.textContent = field.label + (field.required ? ' *' : '');
                         wrap.append(label,control); fields.append(wrap);
                     });
@@ -108,6 +153,10 @@
             });
             form.addEventListener('loan:quote-reset',function () { var fees=form.querySelector('[data-intake-fees]');if(fees)fees.hidden=true; });
             product(false);
+            if (form.querySelector('[data-workspace-response-error]')) {
+                window.FormValidation?.refresh(form);
+                window.FormValidation?.focusFirst(form);
+            }
         });
     }
     if (window.WorkspaceNavigation) window.WorkspaceNavigation.onReady(init);

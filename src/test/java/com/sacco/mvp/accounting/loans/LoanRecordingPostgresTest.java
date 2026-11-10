@@ -1059,12 +1059,29 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->ledger.post(id,actor,new LoanRepaymentLedgerService.PaymentCommand(new BigDecimal("120.00"),TODAY,LoanRepaymentTransaction.Channel.CASH,"R1",UUID.randomUUID()))).hasMessage("recording.error.directPath");
         var f=post(id,"120.00","R1");f.setPrincipalAccountId(null);f.setInterestAccountId(interest);service.repay(actor,f);f.setRequestKey(UUID.randomUUID());assertThatThrownBy(()->service.repay(actor,f)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
-    @Test void previewsDoNotPostAndCannotSilentlyIgnoreProductCharges(){
+    @Test void recordingKeepsQuotedChargesUntilAccountingCanPostThem(){
+        jdbc.update("update loan_product_settings set application_fee=10 where id=?",product);
+        var request=form();
+        var quote=service.chargeQuote(actor,request).plan();
+        assertThat(quote.error()).isEmpty();
+        assertThat(quote.total()).isEqualByComparingTo("10.00");
+        var id=service.save(actor,request);
+        assertThat(service.save(actor,request)).isEqualTo(id);
+        assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("10.00");
+        var funding=chargedFunding(id);
+        assertThatThrownBy(()->service.disburse(actor,funding)).hasMessage("charges.error.fundingSetup");
+        assertThat(chargeService().balance(actor,id,TODAY).assessed()).isEqualByComparingTo("0.00");
+        chargePolicy("SEPARATE");
+        jdbc.update("update loan_product_settings set application_fee=30 where id=?",product);
+        service.disburse(actor,funding);
+        var funded=service.chargeSummary(actor,id,0);
+        assertThat(funded.plan().supported()).isTrue();
+        assertThat(funded.balance().assessed()).isEqualByComparingTo("10.00");
+    }
+
+    @Test void previewsDoNotPost(){
         assertThat(service.preview(actor,form()).interest()).isEqualByComparingTo("20.00");
         assertThat(jdbc.queryForObject("select count(*) from accountant_loan_record where sacco_id=?",Integer.class,institution)).isZero();
-        jdbc.update("update loan_product_settings set application_fee=10 where id=?",product);
-        assertThatThrownBy(()->service.save(actor,form())).hasMessage("charges.error.policy");
-        jdbc.update("update loan_product_settings set application_fee=0 where id=?",product);
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));
         var f=post(id,"120.00","R1");f.setInterestAccountId(interest);
         var preview=service.postingPreview(actor,f,"PAYMENT");

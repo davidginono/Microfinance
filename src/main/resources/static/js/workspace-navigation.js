@@ -353,6 +353,16 @@
                 if(error){
                     const form=options.submission.form;
                     form.inert=false;
+                    if(form.hasAttribute('data-workspace-field-errors')){
+                        const fields=[...error.querySelectorAll('[data-field-error-for]')];
+                        const global=error.querySelector('[data-workspace-global-error]');
+                        const unbound=window.FormValidation?.applyServerErrors(form,fields) || fields.map(field=>field.textContent.trim());
+                        const summary=[global?.textContent.trim(),...unbound].filter(Boolean).join(' ');
+                        if(summary || !fields.length)formError(form,summary || error.dataset.toastMessage || error.textContent.trim());
+                        else form.querySelector('[data-workspace-form-error]')?.remove();
+                        if(fields.length)window.FormValidation?.focusFirst(form);
+                        return true;
+                    }
                     const returned=page.querySelector('form[data-onboarding-form="self"]');
                     if(form.dataset.onboardingForm!=='self'||!returned||
                         form.dispatchEvent(new CustomEvent('profile:validation-response',{cancelable:true,detail:returned}))) {

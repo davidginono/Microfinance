@@ -169,11 +169,15 @@ class LoanRecordingMvcTest {
         mvc.perform(post("/finance/loan-records/"+id+"/charges/assess").with(user(actor)).with(csrf()).param("requestKey",key.toString()).param("date","2026-09-01").param("evidence","Synthetic signed agreement").param("amount","1.00").param("saccoId","FOREIGN"))
             .andExpect(redirectedUrl("/finance/loan-records/"+id));verify(charges).assess(eq(actor),eq(id),argThat(f->f.getRequestKey().equals(key) && f.getDate().equals(java.time.LocalDate.of(2026,9,1)) && f.getEvidence().equals("Synthetic signed agreement")));
     }
-    @Test void chargePolicyUsesIsoDatesAndSessionScope() throws Exception {
+    @Test void chargePolicyUsesTheAdminProductRouteAndSessionScope() throws Exception {
         var product=UUID.randomUUID();var charges=context.getBean(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);reset(charges);
-        mvc.perform(post("/finance/loan-recording/charge-policy").with(user(actor))).andExpect(status().isForbidden());
-        mvc.perform(post("/finance/loan-recording/charge-policy").with(user(actor)).with(csrf()).param("productId",product.toString()).param("effectiveFrom","2026-09-01").param("enabled","true").param("managementTiming","DEDUCT").param("insuranceTiming","SEPARATE").param("saccoId","FOREIGN"))
-            .andExpect(redirectedUrl("/finance/loan-recording/charge-policy?productId="+product));verify(charges).savePolicy(eq(actor),argThat(f->f.getProductId().equals(product) && f.getEffectiveFrom().equals(java.time.LocalDate.of(2026,9,1)) && f.getManagementTiming()==com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT));
+        var admin=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MINOR_ADMIN)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE),true);
+        var path="/admin/settings-controls/loan-products/"+product+"/charge-accounts";
+        mvc.perform(post(path).with(user(admin))).andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(actor)).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(admin)).with(csrf()).param("productId",UUID.randomUUID().toString()).param("effectiveFrom","2026-09-01").param("enabled","true").param("managementTiming","DEDUCT").param("insuranceTiming","SEPARATE").param("saccoId","FOREIGN"))
+            .andExpect(redirectedUrl(path));verify(charges).savePolicy(eq(admin),argThat(f->f.getProductId().equals(product) && f.getEffectiveFrom().equals(java.time.LocalDate.of(2026,9,1)) && f.getManagementTiming()==com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT));
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}

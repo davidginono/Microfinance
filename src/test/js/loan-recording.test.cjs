@@ -226,11 +226,56 @@ test('Charges finishes loading on success, failure and cached-page restoration',
     set('tenureValue','6');set('principal','1000');let calculation=run();await flush();assert.equal(region.getAttribute('aria-busy'),'true');
     requests[0].resolve({ok:true,redirected:false,json:async()=>({interest:'100.00',product:'Business loan',tenureValue:6,tenureUnit:'MONTHS',charges:{terms:[{code:'APPLICATION',amount:'10.50',percentage:''}]}})});
     await calculation;await flush();assert.equal(region.querySelector('[data-charge-amount]').value,'10.50');assert.equal(region.querySelector('.app-loading-spinner'),null);
-    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(d.querySelector('[data-charge-error]').textContent,'Invalid loan terms');assert.equal(region.querySelector('[data-ui-loading-error]'),null);assert.equal(region.querySelector('.app-loading-spinner'),null);
+    set('principal','2000');calculation=run();respond(1,'0',false);await calculation;await flush();assert.equal(d.querySelector('[data-interest-description]').textContent,'Invalid loan terms');assert.equal(d.querySelector('[data-charge-error]').hidden,true);assert.equal(region.querySelector('[data-ui-loading-error]'),null);assert.equal(region.querySelector('.app-loading-spinner'),null);
     d.querySelector('form').dispatchEvent(new w.Event('loan:quote-retry'));calculation=run();assert.equal(requests[2].options.body.get('principal'),'2000');respond(2,'200.00');await calculation;await flush();assert.equal(region.querySelector('[data-ui-loading-error]'),null);
     set('principal','3000');calculation=run();await flush();w.dispatchEvent(new w.Event('pagehide'));await flush();
     assert.equal(requests[3].options.signal.aborted,true);assert.equal(region.getAttribute('aria-busy'),'false');assert.equal(region.querySelector('.app-loading-spinner'),null);
     set('principal','');w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));await flush();assert.equal(region.querySelector('.app-loading-spinner'),null);
     respond(3,'300.00');await calculation;assert.equal(d.querySelector('[data-interest-value]').textContent,'—');
   }finally{dom.window.close();}
+});
+
+test('evidence tabs preserve entered rows and keep attachments aligned after removal', () => {
+  const source = require('node:fs').readFileSync('src/main/resources/static/js/loan-recording-evidence.js','utf8');
+  const dom = new JSDOM(`<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId">
+    <div data-recording-evidence>
+      <button type="button" role="tab" aria-controls="collateral">Collateral</button>
+      <button type="button" role="tab" aria-controls="documents">Attachments</button>
+      <section id="collateral"><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
+      <section id="documents"><input type="file" name="attachments"><div data-evidence-documents></div></section>
+      <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName"></div><button type="button" data-remove-row>Remove</button></div></template>
+      <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
+      <div data-evidence-error hidden></div><div data-evidence-fields></div><div data-evidence-requirements></div>
+    </div></form>`, {runScripts:'outside-only'});
+  try {
+    const w = dom.window, d = w.document, tabs = d.querySelectorAll('[role="tab"]');
+    const input = d.querySelector('[type="file"]');
+    Object.defineProperty(input,'files',{value:[],writable:true});
+    w.DataTransfer = class {files=[]; items={add:file=>this.files.push(file)};};
+    w.WorkspaceNavigation = {onReady:callback=>callback()};
+    w.eval(source);
+    d.querySelector('[data-add-row]').click();
+    d.querySelector('[data-field]').value = 'Motorcycle';
+    d.querySelector('[data-add-row]').click();
+    const first = d.querySelector('[data-remove-row]');
+    first.click();
+    assert.equal(d.querySelector('[data-field]').name,'applicationDetails.collateral[0].itemName');
+    d.querySelector('[data-field]').value = 'Bicycle';
+    tabs[1].click();
+    const addFile = name => {
+      input.files = [new w.File(['evidence'],name)];
+      input.dispatchEvent(new w.Event('change',{bubbles:true}));
+    };
+    addFile('first.pdf'); addFile('second.pdf');
+    d.querySelectorAll('[data-document-field="documentNames"]')[1].value = 'Signed form';
+    d.querySelector('[data-remove-upload]').click();
+    assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf']);
+    const title = d.querySelector('[data-document-field="documentNames"]');
+    assert.equal(title.name,'applicationDetails.documentNames[0]');
+    assert.equal(title.value,'Signed form');
+    tabs[1].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft'}));
+    assert.equal(d.getElementById('documents').hidden,true);
+    assert.equal(d.querySelector('[data-field]').value,'Bicycle');
+    assert.equal(d.activeElement,tabs[0]);
+  } finally {dom.window.close();}
 });

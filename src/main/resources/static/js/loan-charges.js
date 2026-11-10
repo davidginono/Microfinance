@@ -5,7 +5,13 @@
   const rows=[...region.querySelectorAll('[data-charge-kind]')],loading=region.querySelector('[data-charge-loading]');
   let previousMode=mode.value;
   const manual=()=>mode.value==='CUSTOM';
-  function feedback(message=''){if(error){error.textContent=message;error.hidden=!message;}}
+  function feedback(message='', field=''){
+    if(!error)return;
+    const control=field ? form.elements[field] : null;
+    const anchor=control?.closest?.('label');
+    if(anchor)anchor.after(error);else region.append(error);
+    error.textContent=message;error.hidden=!message;
+  }
   function entryMode(){
     const changed=previousMode!==mode.value;
     for(const row of rows){
@@ -41,7 +47,7 @@
   form.addEventListener('loan:quote-reset',clear);
   form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');if(loading){loading.hidden=false;window.AppLoading?.begin(loading,{table:false,size:'small'});}});
   form.addEventListener('loan:quote-settled',end);
-  form.addEventListener('loan:quote-error',event=>{clear();feedback(event.detail);});
+  form.addEventListener('loan:quote-error',clear);
   form.addEventListener('loan:quote',event=>{
     end();const plan=event.detail.charges;if(!plan){clear();return;}
     for(const term of plan.terms){
@@ -52,7 +58,7 @@
       if(!manual()){amount.value=term.amount;if(percentage)percentage.value=term.percentage;}
       else if(source.value!==''){if(basis==='PERCENTAGE')amount.value=term.amount;else if(percentage)percentage.value=term.percentage;}
     }
-    feedback(plan.error||'');
+    feedback(plan.error||'',plan.errorField);
   });
   window.addEventListener('pagehide',clear);
 })();

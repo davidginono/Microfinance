@@ -69,6 +69,28 @@ test('Save draft bypasses native completeness validation and preserves the submi
         assert.equal(form.querySelector('.erp-field-error'), null);
     } finally {await tick(); dom.window.close();}
 });
+test('returned field errors reveal the affected tab and leave the live form intact', async () => {
+    const {dom,w,d,form,fire} = fixture(`
+        <button type="button" id="collateral-tab">Collateral</button>
+        <section role="tabpanel" data-validation-tab-panel aria-labelledby="collateral-tab" hidden>
+            <label>Phone<input name="applicationDetails.collateral[1].phone" value="123"></label>
+        </section>
+        <input type="file" name="attachments">`);
+    try {
+        const panel = d.querySelector('[role="tabpanel"]');
+        d.getElementById('collateral-tab').onclick = () => {panel.hidden = false;};
+        const phone = panel.querySelector('input');
+        const upload = form.elements.attachments;
+        const returned = new w.DOMParser().parseFromString('<span data-field-error-for="applicationDetails.collateral[1].phone">Enter a valid phone number.</span>', 'text/html');
+        assert.deepEqual(Array.from(w.FormValidation.applyServerErrors(form, returned.querySelectorAll('span'))), []);
+        assert.equal(w.FormValidation.focusFirst(form), true);
+        assert.equal(d.activeElement, phone);
+        assert.equal(phone.nextElementSibling.textContent, 'Enter a valid phone number.');
+        assert.equal(form.elements.attachments, upload);
+        phone.value = '255700000000'; fire(phone, 'input');
+        assert.equal(panel.querySelector('.erp-field-error'), null);
+    } finally {await tick(); dom.window.close();}
+});
 test('moving focus to Submit leaves layout stable until native submission validates the form', async () => {
     const {dom,w,d,form} = fixture('<label>Name<input name="name" required></label>');
     try {

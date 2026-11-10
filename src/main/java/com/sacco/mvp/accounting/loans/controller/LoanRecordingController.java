@@ -55,10 +55,30 @@ public class LoanRecordingController {
             if(action.equals("draft"))return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments,false)+"/edit";
             if(action.equals("preview")){model.addAttribute("quote",service.preview(a,recordForm));recordProductContext(a,recordForm,model);return "accounting/loans/record-form";}
             if(!action.equals("save"))throw new IllegalArgumentException("recording.error.request");if(recordForm.getApplicationId()!=null)return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments,true);UUID id=service.save(a,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
-        }catch(IllegalArgumentException|IllegalStateException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
+        }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
+        catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,error(e));}
+        catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
         if(recordForm.getTopUpSourceLoanId()!=null)try{model.addAttribute("topUpQuote",service.topUpQuote(a,recordForm.getTopUpSourceLoanId(),recordForm.getApplicationDate(),null));}catch(IllegalArgumentException ex){model.addAttribute("topUpError",error(ex));}
         recordProductContext(a,recordForm,model);
         return "accounting/loans/record-form";
+    }
+    private void rejectRecordField(BindingResult errors,String key){
+        var field=switch(key){
+            case "recording.error.product","charges.error.topUpFee"->"productId";
+            case "recording.error.customConfiguration","charges.error.custom"->"loanMode";
+            case "recording.error.client","applications.error.client","applications.error.verification"->"clientId";
+            case "recording.error.date","applications.error.date"->"applicationDate";
+            case "recording.error.productLimits","recording.error.topUpCash"->"principal";
+            case "applications.error.officer"->"applicationDetails.loanOfficerId";
+            case "applications.error.declaration"->"applicationDetails.declarationAccepted";
+            case "recording.error.attachments","applications.error.attachments","applications.error.signedApplication"->"attachments";
+            case "charges.error.insuranceLimit","charges.error.insuranceDuplicate"->"insurancePremium";
+            default->"";
+        };
+        if(field.equals("attachments")){
+            errors.addError(new org.springframework.validation.FieldError("recordForm",field,null,false,new String[]{key},null,null));
+        }else if(field.isEmpty())errors.reject(key);
+        else errors.rejectValue(field,key);
     }
     private void recordProductContext(AppUserPrincipal a,RecordForm form,Model model){
         supportingFormContext(a,form,model);
@@ -326,7 +346,16 @@ public class LoanRecordingController {
         fields.add(printField("charges.managementTotal",statementMoney(plan.managementTotal(),locale),locale));fields.add(printField("charges.total",statementMoney(plan.total(),locale),locale));fields.add(printField("charges.deductions",statementMoney(plan.deductions(),locale),locale));return fields;
     }
     private Map<String,Object> chargeView(ChargeQuote quote,Locale locale){
-        var plan=quote.plan();return Map.of("terms",quote.fields(),"supported",plan.supported(),"error",plan.error().isBlank()?"":label(plan.error(),locale));
+        var plan=quote.plan();return Map.of("terms",quote.fields(),"supported",plan.supported(),"error",plan.error().isBlank()?"":label(plan.error(),locale),"errorField",chargeField(plan.error()));
+    }
+
+    private String chargeField(String error){
+        return switch(error){
+            case "charges.error.topUpFee"->"productId";
+            case "charges.error.custom"->"loanMode";
+            case "charges.error.insuranceLimit","charges.error.insuranceDuplicate","charges.error.insurance"->"insurancePremium";
+            default->"";
+        };
     }
 
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
