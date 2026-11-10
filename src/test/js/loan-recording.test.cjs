@@ -239,13 +239,15 @@ test('evidence tabs preserve entered rows and keep attachments aligned after rem
   const source = require('node:fs').readFileSync('src/main/resources/static/js/loan-recording-evidence.js','utf8');
   const dom = new JSDOM(`<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId">
     <div data-recording-evidence>
+      <button type="button" role="tab" aria-controls="loan">Loan details</button>
       <button type="button" role="tab" aria-controls="collateral">Collateral</button>
       <button type="button" role="tab" aria-controls="documents">Attachments</button>
+      <section id="loan"><input name="purpose"><div data-evidence-fields></div></section>
       <section id="collateral"><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
       <section id="documents"><input type="file" name="attachments"><div data-evidence-documents></div></section>
       <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName"></div><button type="button" data-remove-row>Remove</button></div></template>
       <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
-      <div data-evidence-error hidden></div><div data-evidence-fields></div><div data-evidence-requirements></div>
+      <div data-evidence-error hidden></div><div data-evidence-requirements></div>
     </div></form>`, {runScripts:'outside-only'});
   try {
     const w = dom.window, d = w.document, tabs = d.querySelectorAll('[role="tab"]');
@@ -254,6 +256,12 @@ test('evidence tabs preserve entered rows and keep attachments aligned after rem
     w.DataTransfer = class {files=[]; items={add:file=>this.files.push(file)};};
     w.WorkspaceNavigation = {onReady:callback=>callback()};
     w.eval(source);
+    assert.equal(tabs[0].getAttribute('aria-selected'),'true');
+    assert.equal(d.getElementById('loan').hidden,false);
+    const purpose = d.querySelector('[name="purpose"]');
+    purpose.value = 'Business stock';
+    tabs[1].click();
+    assert.equal(d.getElementById('loan').hidden,true);
     d.querySelector('[data-add-row]').click();
     d.querySelector('[data-field]').value = 'Motorcycle';
     d.querySelector('[data-add-row]').click();
@@ -261,7 +269,7 @@ test('evidence tabs preserve entered rows and keep attachments aligned after rem
     first.click();
     assert.equal(d.querySelector('[data-field]').name,'applicationDetails.collateral[0].itemName');
     d.querySelector('[data-field]').value = 'Bicycle';
-    tabs[1].click();
+    tabs[2].click();
     const addFile = name => {
       input.files = [new w.File(['evidence'],name)];
       input.dispatchEvent(new w.Event('change',{bubbles:true}));
@@ -273,9 +281,13 @@ test('evidence tabs preserve entered rows and keep attachments aligned after rem
     const title = d.querySelector('[data-document-field="documentNames"]');
     assert.equal(title.name,'applicationDetails.documentNames[0]');
     assert.equal(title.value,'Signed form');
-    tabs[1].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft'}));
+    tabs[2].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft'}));
     assert.equal(d.getElementById('documents').hidden,true);
     assert.equal(d.querySelector('[data-field]').value,'Bicycle');
+    assert.equal(d.activeElement,tabs[1]);
+    tabs[1].dispatchEvent(new w.KeyboardEvent('keydown',{key:'Home'}));
     assert.equal(d.activeElement,tabs[0]);
+    assert.equal(d.getElementById('loan').hidden,false);
+    assert.equal(purpose.value,'Business stock');
   } finally {dom.window.close();}
 });

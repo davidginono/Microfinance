@@ -22,4 +22,9 @@
 .aws-console [data-charge-preview] .loan-form-grid+[data-charge-kind]{margin-top:16px}
 .aws-console [data-charge-kind="APPLICATION"]>label{max-width:356px}
 @media(max-width:640px){.aws-console [data-charge-kind="APPLICATION"]>label{max-width:none}}
-.recording-application-evidence{margin-top:16px;min-width:0}.recording-evidence-panel{padding:16px 20px}.recording-evidence-panel[hidden]{display:none}.recording-evidence-panel [data-add-row]{margin-top:12px}.recording-application-evidence h3{font-size:1rem;font-weight:600;margin:16px 0 8px}.recording-evidence-row{padding:12px 0;border-bottom:1px solid #d5dbdb}.recording-evidence-row>button{margin-top:8px}.recording-application-evidence .aws-control{width:100%;min-width:0}.recording-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:16px}.recording-declaration input{flex:0 0 auto}.recording-application-evidence [data-evidence-filename]{display:block;overflow-wrap:anywhere}
+.recording-application-evidence{min-width:0}
+.aws-console .recording-application-evidence > .console-detail-tabs{margin-top:0}
+.recording-loan-panel:not([hidden]){display:grid;gap:20px}
+.aws-console .recording-loan-panel > .accounting-section{margin:0}
+.recording-loan-panel [data-evidence-fields]{display:contents}
+.recording-evidence-panel{padding:16px 20px}.recording-evidence-panel[hidden]{display:none}.recording-evidence-panel [data-add-row]{margin-top:12px}.recording-evidence-panel h3{font-size:1rem;font-weight:600;margin:16px 0 8px}.recording-evidence-row{padding:12px 0;border-bottom:1px solid #d5dbdb}.recording-evidence-row>button{margin-top:8px}.recording-evidence-panel .aws-control{width:100%;min-width:0}.recording-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:16px}.recording-declaration input{flex:0 0 auto}.recording-application-evidence [data-evidence-filename]{display:block;overflow-wrap:anywhere}
