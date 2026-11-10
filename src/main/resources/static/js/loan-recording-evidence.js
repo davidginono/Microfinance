@@ -1,5 +1,69 @@
 (function () {
     'use strict';
+    function initWizard(root, form) {
+        const nav = root.querySelector('[data-recording-steps]');
+        const buttons = [...nav.querySelectorAll('[data-recording-step-button]')];
+        const panels = buttons.map(button => document.getElementById(button.getAttribute('aria-controls')));
+        const previous = form.querySelector('[data-recording-previous]');
+        const next = form.querySelector('[data-recording-next]');
+        const submit = form.querySelector('[data-recording-submit]');
+        const last = panels.length - 1;
+        let active = 0, reached = 0;
+
+        function show(index, focus = true) {
+            active = index;
+            reached = Math.max(reached, index);
+            panels.forEach((panel, i) => { panel.hidden = i !== index; });
+            buttons.forEach((button, i) => {
+                button.disabled = i > reached;
+                if (i === index) button.setAttribute('aria-current', 'step');
+                else button.removeAttribute('aria-current');
+            });
+            previous.hidden = index === 0;
+            next.hidden = index === last;
+            submit.hidden = index !== last;
+            if (focus) {
+                const heading = panels[index].querySelector('[data-recording-step-heading]');
+                heading.focus({preventScroll:true});
+                heading.scrollIntoView?.({block:'start'});
+            }
+        }
+
+        function go(index) {
+            for (let step = active; step < index; step++) {
+                const invalid = [...panels[step].querySelectorAll('input,select,textarea')]
+                    .filter(control => control.willValidate && !control.validity.valid);
+                if (invalid.length) {
+                    show(step, false);
+                    invalid.forEach(control => control.checkValidity());
+                    return;
+                }
+            }
+            show(index);
+        }
+
+        buttons.forEach((button, index) => button.addEventListener('click', () => go(index)));
+        panels.forEach((panel, index) => panel.addEventListener('validation:reveal', () => show(index, false)));
+        previous.addEventListener('click', () => go(active - 1));
+        next.addEventListener('click', () => go(active + 1));
+        form.addEventListener('keydown', event => {
+            if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented
+                || !panels[active].contains(event.target)
+                || !event.target.matches('input:not([type="hidden"],[type="checkbox"],[type="radio"],[type="file"],[type="button"],[type="submit"])')) return;
+            event.preventDefault();
+            if (active === last) form.requestSubmit(submit);
+            else go(active + 1);
+        });
+        form.addEventListener('submit', event => {
+            if (event.submitter !== submit || active === last) return;
+            event.preventDefault();
+            go(active + 1);
+        });
+        show(0, false);
+        nav.hidden = false;
+        root.classList.add('recording-wizard-ready');
+    }
+
     function init() {
         document.querySelectorAll('[data-recording-evidence]:not([data-evidence-ready])').forEach(function (root) {
             root.dataset.evidenceReady = 'true';
@@ -7,24 +71,7 @@
             var clientSelect = form.querySelector('select[name="clientId"]');
             var error = root.querySelector('[data-evidence-error]'), requirements = [], productVersion = 0, nextFieldId = 0;
             function fail() { error.textContent = root.dataset.error; error.hidden = false; }
-            var tabs = [...root.querySelectorAll('[role="tab"]')];
-            function selectTab(selected) {
-                tabs.forEach(function (tab) {
-                    var active = tab === selected;
-                    tab.setAttribute('aria-selected', String(active));
-                    tab.tabIndex = active ? 0 : -1;
-                    document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
-                });
-            }
-            tabs.forEach(function (tab, index) {
-                tab.addEventListener('click', function () { selectTab(tab); });
-                tab.addEventListener('keydown', function (event) {
-                    var next = {ArrowLeft: (index + tabs.length - 1) % tabs.length, ArrowRight: (index + 1) % tabs.length, Home: 0, End: tabs.length - 1}[event.key];
-                    if (next == null) return;
-                    event.preventDefault(); selectTab(tabs[next]); tabs[next].focus();
-                });
-            });
-            selectTab(tabs[0]);
+            initWizard(root, form);
             function reindex(list) {
                 list.querySelectorAll('[data-repeat-row]').forEach(function (row, index) {
                     row.querySelectorAll('input,select,textarea').forEach(function (control) {

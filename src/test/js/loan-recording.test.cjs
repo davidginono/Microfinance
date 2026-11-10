@@ -235,33 +235,49 @@ test('Charges finishes loading on success, failure and cached-page restoration',
   }finally{dom.window.close();}
 });
 
-test('evidence tabs preserve entered rows and keep attachments aligned after removal', () => {
+test('the recording wizard validates each step and preserves fields and uploads', () => {
   const source = require('node:fs').readFileSync('src/main/resources/static/js/loan-recording-evidence.js','utf8');
   const dom = new JSDOM(`<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId">
     <div data-recording-evidence>
-      <button type="button" role="tab" aria-controls="loan">Loan details</button>
-      <button type="button" role="tab" aria-controls="collateral">Collateral</button>
-      <button type="button" role="tab" aria-controls="documents">Attachments</button>
-      <section id="loan"><input name="purpose"><div data-evidence-fields></div></section>
-      <section id="collateral"><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
-      <section id="documents"><input type="file" name="attachments"><div data-evidence-documents></div></section>
+      <nav data-recording-steps hidden>
+        <button type="button" data-recording-step-button aria-controls="loan">Loan details</button>
+        <button type="button" data-recording-step-button aria-controls="guarantors">Guarantors</button>
+        <button type="button" data-recording-step-button aria-controls="collateral">Collateral</button>
+        <button type="button" data-recording-step-button aria-controls="documents">Attachments</button>
+      </nav>
+      <section id="loan" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Loan details</h2><input name="purpose" required><div data-evidence-fields></div></section>
+      <section id="guarantors" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Guarantors</h2></section>
+      <section id="collateral" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Collateral</h2><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
+      <section id="documents" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Attachments</h2><input type="file" name="attachments"><div data-evidence-documents></div></section>
       <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName"></div><button type="button" data-remove-row>Remove</button></div></template>
       <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
       <div data-evidence-error hidden></div><div data-evidence-requirements></div>
-    </div></form>`, {runScripts:'outside-only'});
+    </div><button type="button" data-recording-previous hidden>Previous</button><button type="button" data-recording-next hidden>Next</button>
+    <button type="submit" data-recording-submit>Save</button></form>`, {runScripts:'outside-only'});
   try {
-    const w = dom.window, d = w.document, tabs = d.querySelectorAll('[role="tab"]');
+    const w = dom.window, d = w.document, steps = d.querySelectorAll('[data-recording-step-button]');
+    const next = d.querySelector('[data-recording-next]');
+    const previous = d.querySelector('[data-recording-previous]');
+    const save = d.querySelector('[data-recording-submit]');
     const input = d.querySelector('[type="file"]');
     Object.defineProperty(input,'files',{value:[],writable:true});
     w.DataTransfer = class {files=[]; items={add:file=>this.files.push(file)};};
     w.WorkspaceNavigation = {onReady:callback=>callback()};
     w.eval(source);
-    assert.equal(tabs[0].getAttribute('aria-selected'),'true');
-    assert.equal(d.getElementById('loan').hidden,false);
+    assert.equal(steps[0].getAttribute('aria-current'),'step');
+    assert.equal(steps[1].disabled,true);
+    assert.equal(save.hidden,true);
     const purpose = d.querySelector('[name="purpose"]');
+    let invalid = false;
+    purpose.addEventListener('invalid', () => {invalid = true;});
+    next.click();
+    assert.equal(invalid,true);
+    assert.equal(d.getElementById('loan').hidden,false);
     purpose.value = 'Business stock';
-    tabs[1].click();
-    assert.equal(d.getElementById('loan').hidden,true);
+    purpose.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    assert.equal(steps[1].getAttribute('aria-current'),'step');
+    next.click();
+    assert.equal(steps[2].getAttribute('aria-current'),'step');
     d.querySelector('[data-add-row]').click();
     d.querySelector('[data-field]').value = 'Motorcycle';
     d.querySelector('[data-add-row]').click();
@@ -269,7 +285,10 @@ test('evidence tabs preserve entered rows and keep attachments aligned after rem
     first.click();
     assert.equal(d.querySelector('[data-field]').name,'applicationDetails.collateral[0].itemName');
     d.querySelector('[data-field]').value = 'Bicycle';
-    tabs[2].click();
+    next.click();
+    assert.equal(steps[3].getAttribute('aria-current'),'step');
+    assert.equal(save.hidden,false);
+    assert.equal(next.hidden,true);
     const addFile = name => {
       input.files = [new w.File(['evidence'],name)];
       input.dispatchEvent(new w.Event('change',{bubbles:true}));
@@ -281,13 +300,19 @@ test('evidence tabs preserve entered rows and keep attachments aligned after rem
     const title = d.querySelector('[data-document-field="documentNames"]');
     assert.equal(title.name,'applicationDetails.documentNames[0]');
     assert.equal(title.value,'Signed form');
-    tabs[2].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft'}));
+    previous.click();
     assert.equal(d.getElementById('documents').hidden,true);
     assert.equal(d.querySelector('[data-field]').value,'Bicycle');
-    assert.equal(d.activeElement,tabs[1]);
-    tabs[1].dispatchEvent(new w.KeyboardEvent('keydown',{key:'Home'}));
-    assert.equal(d.activeElement,tabs[0]);
+    assert.equal(d.activeElement,d.querySelector('#collateral h2'));
+    steps[0].click();
     assert.equal(d.getElementById('loan').hidden,false);
     assert.equal(purpose.value,'Business stock');
+    d.getElementById('documents').dispatchEvent(new w.Event('validation:reveal'));
+    assert.equal(steps[3].getAttribute('aria-current'),'step');
+    assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf']);
+    let submitter;
+    save.form.addEventListener('submit', event => {event.preventDefault(); submitter = event.submitter;});
+    title.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    assert.equal(submitter,save);
   } finally {dom.window.close();}
 });

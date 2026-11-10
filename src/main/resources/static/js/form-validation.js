@@ -95,8 +95,8 @@
     function reveal(control) {
         for (let parent = control.parentElement; parent; parent = parent.parentElement) {
             if (parent.tagName === 'DETAILS') parent.open = true;
-            if (parent.hidden && parent.matches('[data-validation-tab-panel][role="tabpanel"]')) {
-                document.getElementById(parent.getAttribute('aria-labelledby'))?.click();
+            if (parent.hidden && parent.hasAttribute('data-validation-step')) {
+                parent.dispatchEvent(new Event('validation:reveal'));
             }
         }
         const visible = proxy(control);
@@ -104,7 +104,7 @@
     }
     function focusFirst(form) {
         const control = Array.from(form.elements).find(el => states.has(el) && !el.disabled && !states.get(el).error.hidden
-            && !el.closest('[hidden]:not([data-validation-tab-panel]),.hidden'));
+            && !el.closest('[hidden]:not([data-validation-step]),.hidden'));
         if (!control) return false;
         reveal(control); return true;
     }

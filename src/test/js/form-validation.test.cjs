@@ -69,16 +69,16 @@ test('Save draft bypasses native completeness validation and preserves the submi
         assert.equal(form.querySelector('.erp-field-error'), null);
     } finally {await tick(); dom.window.close();}
 });
-test('returned field errors reveal the affected tab and leave the live form intact', async () => {
+test('returned field errors reveal the affected wizard step and leave the live form intact', async () => {
     const {dom,w,d,form,fire} = fixture(`
         <button type="button" id="collateral-tab">Collateral</button>
-        <section role="tabpanel" data-validation-tab-panel aria-labelledby="collateral-tab" hidden>
+        <section data-validation-step aria-labelledby="collateral-tab" hidden>
             <label>Phone<input name="applicationDetails.collateral[1].phone" value="123"></label>
         </section>
         <input type="file" name="attachments">`);
     try {
-        const panel = d.querySelector('[role="tabpanel"]');
-        d.getElementById('collateral-tab').onclick = () => {panel.hidden = false;};
+        const panel = d.querySelector('[data-validation-step]');
+        panel.addEventListener('validation:reveal', () => {panel.hidden = false;});
         const phone = panel.querySelector('input');
         const upload = form.elements.attachments;
         const returned = new w.DOMParser().parseFromString('<span data-field-error-for="applicationDetails.collateral[1].phone">Enter a valid phone number.</span>', 'text/html');

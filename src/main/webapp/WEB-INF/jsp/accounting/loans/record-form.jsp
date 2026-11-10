@@ -7,24 +7,29 @@
 <form:form modelAttribute="recordForm" action="${saveUrl}" method="post" enctype="multipart/form-data" data-loan-form="true" data-resource-form-page="true" data-workspace-submit="recover" data-workspace-field-errors="true" cssClass="accounting-create-form"><form:hidden path="requestKey" /><form:hidden path="applicationId"/><form:hidden path="expectedVersion"/><c:if test="${not empty recordForm.topUpSourceLoanId}"><form:hidden path="topUpSourceLoanId" /><form:hidden path="clientId" /></c:if>
 <spring:message code="recording.attachments.help" var="recordingAttachmentHelp" />
 <spring:message code="applications.add" var="recordingAddLabel" />
+<spring:message code="applications.documents" var="recordingDocumentsLabel" />
+<spring:message code="recording.attachmentsTab" text="${recordingDocumentsLabel}" var="recordingAttachmentsLabel" />
 <div class="recording-application-evidence" data-recording-evidence data-root="<c:url value='/finance/loan-recording/evidence'/>" data-error="<spring:message code='applications.error.details'/>" data-upload-limit="<spring:message code='recording.attachmentLimit' text='${recordingAttachmentHelp}' htmlEscape='true'/>" data-select-placeholder="<c:out value='${chooseLabel}' />">
-<div class="console-detail-tabs" role="tablist" aria-label="<spring:message code='applications.title'/>">
-<c:forEach items="${['loan','guarantors','collateral','attachments']}" var="tab">
-<button type="button" role="tab" id="recording-tab-${tab}" aria-controls="recording-panel-${tab}" aria-selected="${tab=='loan'}" tabindex="${tab=='loan'?0:-1}">
+<nav class="recording-wizard-nav" data-recording-steps aria-label="<spring:message code='applications.title'/>" hidden>
+<ol>
+<c:forEach items="${['loan','guarantors','collateral','attachments']}" var="step" varStatus="status">
+<li><button type="button" data-recording-step-button aria-controls="recording-panel-${step}">
+    <span class="recording-step-number" aria-hidden="true">${status.count}</span>
+    <span>
     <c:choose>
-        <c:when test="${tab=='attachments'}">
-            <spring:message code="applications.documents" var="recordingDocumentsLabel" />
-            <spring:message code="recording.attachmentsTab" text="${recordingDocumentsLabel}" />
-        </c:when>
-        <c:when test="${tab=='loan'}"><spring:message code="recording.loanDetails" /></c:when>
-        <c:otherwise><spring:message code="applications.${tab}" /></c:otherwise>
+        <c:when test="${step=='attachments'}"><c:out value="${recordingAttachmentsLabel}" /></c:when>
+        <c:when test="${step=='loan'}"><spring:message code="recording.loanDetails" /></c:when>
+        <c:otherwise><spring:message code="applications.${step}" /></c:otherwise>
     </c:choose>
-</button>
+    </span>
+</button></li>
 </c:forEach>
-</div>
-<div class="recording-loan-panel" data-validation-tab-panel role="tabpanel" id="recording-panel-loan" aria-labelledby="recording-tab-loan">
+</ol>
+</nav>
+<div class="recording-wizard-content">
+<section class="recording-loan-panel" data-validation-step id="recording-panel-loan" aria-labelledby="loan-basic-information">
 <c:if test="${not empty recordForm.topUpSourceLoanId}"><%@ include file="topup-quote.jspf" %></c:if>
-<section class="accounting-section" aria-labelledby="loan-basic-information"><h2 id="loan-basic-information"><spring:message code="recording.loanDetails" /></h2><div class="loan-form-grid">
+<section class="accounting-section" aria-labelledby="loan-basic-information"><h2 id="loan-basic-information" tabindex="-1" data-recording-step-heading><spring:message code="recording.loanDetails" /></h2><div class="loan-form-grid">
 <div data-loan-choice data-category="clients"><label for="clientId"><spring:message code="recording.client" /><form:select path="clientId" id="clientId" required="required" disabled="${not empty recordForm.topUpSourceLoanId}" cssClass="aws-control" data-choice-select="true"><form:option value="" label="${chooseLabel}" /><c:if test="${not empty recordForm.clientId}"><form:option value="${recordForm.clientId}" data-client-kind="${selectedClientType}" label="${empty topUpQuote ? (empty selectedClientLabel ? recordForm.clientId : selectedClientLabel) : topUpQuote.client}" /></c:if></form:select></label><%@ include file="choice-search.jspf" %></div>
 <label for="loanMode"><spring:message code="recording.loanMode" /><form:select path="loanMode" id="loanMode" cssClass="aws-control"><form:option value="CONFIGURED"><spring:message code="recording.mode.CONFIGURED" /></form:option><c:if test="${empty recordForm.applicationId}"><form:option value="CUSTOM"><spring:message code="recording.mode.CUSTOM" /></form:option></c:if></form:select></label>
 <div data-configured-product ${recordForm.loanMode eq 'CUSTOM' ? 'hidden' : ''} data-loan-choice data-category="products"><label for="productId"><spring:message code="recording.product" /><form:select path="productId" id="productId" required="required" cssClass="aws-control" data-choice-select="true"><form:option value="" label="${chooseLabel}" /><c:if test="${not empty recordForm.productId}"><form:option value="${recordForm.productId}" label="${empty selectedProduct ? recordForm.productId : selectedProduct.label}" data-tenure-unit="${selectedProduct.tenureUnit}" data-minimum-amount="${selectedProduct.minimumAmount}" data-maximum-amount="${selectedProduct.maximumAmount}" data-minimum-tenure="${selectedProduct.minimumTenure}" data-maximum-tenure="${selectedProduct.maximumTenure}" /></c:if></form:select></label><%@ include file="choice-search.jspf" %></div>
@@ -71,8 +76,9 @@
 <c:if test="${empty recordForm.applicationId}"><%@ include file="charges-form.jspf" %></c:if>
 <c:if test="${not empty recordForm.applicationId}"><section class="accounting-section" data-intake-fees hidden><h2><spring:message code="applications.quote"/></h2><dl class="erp-detail-facts"><c:forEach items="${['applicationFee','processingFee','insuranceFee','totalDeductions']}" var="fee"><div><dt><spring:message code="applications.quote.${fee}"/></dt><dd data-intake-fee="${fee}"></dd></div></c:forEach></dl></section></c:if>
 <c:if test="${not empty recordForm.topUpSourceLoanId}"><section class="accounting-section"><h2><spring:message code="recording.topUp.agreement" /></h2><label for="topUpEvidence"><spring:message code="recording.topUp.agreement" /><form:input path="evidence" id="topUpEvidence" cssClass="aws-control" required="required" maxlength="500" /></label></section></c:if>
-</div>
+</section>
 <%@ include file="recording-evidence-panels.jspf" %>
+</div>
 </div>
 <spring:hasBindErrors name="recordForm">
 <div data-workspace-response-error>
@@ -80,7 +86,9 @@
 <div hidden><c:forEach items="${errors.fieldErrors}" var="fieldError"><span class="coa-error" data-field-error-for="<c:out value='${fieldError.field}'/>"><spring:message message="${fieldError}" /></span></c:forEach></div>
 </div>
 </spring:hasBindErrors>
-<div class="accounting-actions loan-form-actions" data-form-actions><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records' />"><spring:message code="common.cancel" /></a><c:if test="${empty recordForm.topUpSourceLoanId}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><button type="submit" class="app-btn btn-neutral" name="action" value="draft" formnovalidate data-recording-draft><spring:message code="applications.save"/></button></sec:authorize></c:if><button class="app-btn btn-launch" name="action" value="save"><spring:message code="${empty recordForm.applicationId ? 'recording.save' : 'applications.submit'}" /></button></div>
+<div class="accounting-actions loan-form-actions" data-form-actions><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records' />"><spring:message code="common.cancel" /></a><c:if test="${empty recordForm.topUpSourceLoanId}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><button type="submit" class="app-btn btn-neutral" name="action" value="draft" formnovalidate data-recording-draft><spring:message code="applications.save"/></button></sec:authorize></c:if><button type="button" class="app-btn btn-neutral" data-recording-previous hidden><spring:message code="common.previous" /></button>
+<button type="button" class="app-btn btn-launch" data-recording-next hidden><spring:message code="common.next" /></button>
+<button type="submit" class="app-btn btn-launch" name="action" value="save" data-recording-submit><spring:message code="${empty recordForm.applicationId ? 'recording.save' : 'applications.submit'}" /></button></div>
 </form:form>
 <c:if test="${not empty savedApplicationDocuments}">
 <c:forEach items="${savedApplicationDocuments}" var="file" varStatus="index">
