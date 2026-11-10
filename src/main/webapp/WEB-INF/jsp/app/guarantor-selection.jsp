@@ -5,7 +5,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Borrower Workspace / Guarantor Selection" /></p>
+    <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Client Workspace / Guarantor Selection" /></p>
     <h1 class="erp-page-title"><spring:message code="guarantor.select" text="Select Guarantor" /></h1>
 </div>
 <form method="post" action="/app/loan-applications/${app.id}/guarantors" class="erp-form-wrap guarantor-selection-page">

@@ -10,7 +10,7 @@
 <c:set var="currentQuery" value="fromDate=${fromDate}&toDate=${toDate}&loanProductId=${loanProductId}&loanType=${loanType}" />
 
 <div class="erp-page-header erp-detail-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Borrower Workspace / Reports &amp; Analytics" /></p>
+    <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Client Workspace / Reports &amp; Analytics" /></p>
     <h1 class="erp-page-title" id="app-reports-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
     <div class="report-page-actions" data-aws-action-pin="true" role="group" aria-label="<spring:message code='staff.analytics.reportActions' />">
         <a href="/documents/reports/member-loans.pdf?${currentQuery}" class="app-btn btn-neutral" data-print-action="true"><report:reportExport format="print" /></a>

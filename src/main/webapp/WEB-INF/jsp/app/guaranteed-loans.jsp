@@ -7,7 +7,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Borrower Workspace / Guarantees" /></p>
+    <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Client Workspace / Guarantees" /></p>
     <h1 class="erp-page-title" id="app-guaranteed-loans-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
 </div>
 

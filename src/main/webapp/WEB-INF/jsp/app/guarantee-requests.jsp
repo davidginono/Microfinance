@@ -7,7 +7,7 @@
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="guaranteeRequests.breadcrumb" text="Borrower Workspace / Guarantee Requests" /></p>
+    <p class="erp-breadcrumb"><spring:message code="guaranteeRequests.breadcrumb" text="Client Workspace / Guarantee Requests" /></p>
     <h1 class="erp-page-title" id="app-guarantee-requests-title"><spring:message code="menu.grequests" /></h1>
 </div>
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />

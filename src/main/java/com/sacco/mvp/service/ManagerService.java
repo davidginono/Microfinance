@@ -202,7 +202,7 @@ public class ManagerService {
         if(referenceLoanId==null || saccoId==null || stationId==null || stationId.isBlank())throw new org.springframework.security.access.AccessDeniedException("Loan scope unavailable");
         var rows=loanApplicationRepository.findActiveBorrowerLoansForReference(referenceLoanId,saccoId,stationId,
             List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF),PageRequest.of(0,101));
-        if(rows.size()>100)throw new IllegalArgumentException("Borrower loan history requires a scoped report");
+        if(rows.size()>100)throw new IllegalArgumentException("Client loan history requires a scoped report");
         return rows;
     }
 

@@ -7,7 +7,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="archives.breadcrumb" text="Borrower Workspace / Archives" /></p>
+    <p class="erp-breadcrumb"><spring:message code="archives.breadcrumb" text="Client Workspace / Archives" /></p>
     <h1 class="erp-page-title" id="app-archives-title"><spring:message code="archives.title" text="Archives" /></h1>
 </div>
 

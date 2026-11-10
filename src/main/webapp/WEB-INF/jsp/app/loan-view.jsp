@@ -25,7 +25,7 @@
 </c:if>
 
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Borrower Workspace / Application Detail" /></p>
+    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Client Workspace / Application Detail" /></p>
     <h1 class="erp-page-title" id="app-loan-view-title"><spring:message code="loan.detail" /></h1>
 </div>
 <div class="loan-application-detail-page">
