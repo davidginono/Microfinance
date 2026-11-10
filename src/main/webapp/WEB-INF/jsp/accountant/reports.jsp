@@ -1,3 +1,4 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
@@ -6,20 +7,20 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
+<div class="erp-page-header erp-detail-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.reports.breadcrumb" text="Accountant Panel / Reports" /></p>
     <h1 class="erp-page-title"><spring:message code="accountant.reports.title" text="Accountant Review Reports" /></h1>
+    <form method="get" action="/documents/reports/accountant-loans.pdf" data-page-preloader="false" data-table-export-for="accountant-reports-1" class="report-page-actions" data-aws-action-pin="true">
+        <input type="hidden" name="fromDate" value="${fromDateValue}" />
+        <input type="hidden" name="toDate" value="${toDateValue}" />
+        <input type="hidden" name="decisionFilter" value="${decisionFilterValue}" />
+        <button type="submit" class="app-btn btn-neutral" data-print-action="true"><report:reportExport format="print" /></button>
+        <button type="submit" class="app-btn btn-neutral"><report:reportExport format="pdf" /></button>
+    </form>
 </div>
 
-<form method="get" action="/documents/reports/accountant-loans.pdf" data-page-preloader="false" data-table-toolbar-for="accountant-reports-1" data-table-export-for="accountant-reports-1" class="app-table-toolbar">
-    <input type="hidden" name="fromDate" value="${fromDateValue}" />
-    <input type="hidden" name="toDate" value="${toDateValue}" />
-    <input type="hidden" name="decisionFilter" value="${decisionFilterValue}" />
-    <button type="submit" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" /></button>
-    <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" /></button>
-</form>
-
 <div data-table-sync-query="true" data-resource-table="accountant-reports-1" class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <h2><spring:message code="reports.results" /></h2>
 <form method="get" action="/accountant/reports" class="erp-filter-form erp-table-toolbar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="accountant-reports-1">
     <div class="erp-table-toolbar__control">
         <label for="accountant-reports-1-fromDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>

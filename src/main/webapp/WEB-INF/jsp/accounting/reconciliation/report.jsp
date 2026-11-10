@@ -1,3 +1,4 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
@@ -9,17 +10,17 @@
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <link rel="stylesheet" href="<c:url value='/css/sl-gl-reconciliation.css' />" />
 <div class="accounting-workspace reconciliation-workspace">
-<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="reconciliation.title" /></h1></div>
+<div class="erp-page-header erp-detail-header" data-aws-page-header>
+  <h1 class="erp-page-title"><spring:message code="reconciliation.title" /></h1>
+  <c:if test="${not empty report and canExportReport}"><div class="report-page-actions" data-aws-action-pin="true">
+        <c:forEach items="${['print','pdf']}" var="output"><c:url value="/reports/financial/sl-gl-reconciliation/${output}" var="outputUrl"><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="component" value="${filter.component}" /><c:param name="activityId" value="${filter.activityFilter}" /></c:url>
+          <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><report:reportExport format="${output}" /></a>
+        </c:forEach>
+  </div></c:if>
+</div>
 <c:if test="${not empty formError}"><p class="coa-error" role="alert" tabindex="-1"><spring:message code="${formError}" /></p></c:if>
 <section class="erp-table-wrap" data-resource-table="sl-gl-reconciliation" data-aws-table-region>
   <div class="app-table-titlebar"><h2><spring:message code="reconciliation.discrepancies" /><c:if test="${not empty report}"> <span class="app-table-count">(<c:out value="${report.count}" />)</span></c:if></h2>
-    <div class="accounting-actions resource-table-actions">
-      <c:if test="${not empty report}"><c:if test="${canExportReport}">
-        <c:forEach items="${['pdf','print']}" var="output"><c:url value="/reports/financial/sl-gl-reconciliation/${output}" var="outputUrl"><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="component" value="${filter.component}" /><c:param name="activityId" value="${filter.activityFilter}" /></c:url>
-          <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><spring:message code="management.${output}" /></a>
-        </c:forEach>
-      </c:if></c:if>
-    </div>
   </div>
   <form method="get" action="<c:url value='/reports/financial/sl-gl-reconciliation' />" class="resource-table-filters" data-reconciliation-query data-aws-filter-toolbar>
     <input type="hidden" name="run" value="true" /><input type="hidden" name="cutoff" value="<c:out value='${filter.cutoff}' />" />

@@ -55,7 +55,7 @@
 }
 @media print {
   .financial-report .financial-number { text-align: right; }
-  [data-portfolio-report-header] .accounting-actions, .portfolio-tabs, .portfolio-pagination { display: none; }
+  .portfolio-tabs, .portfolio-pagination { display: none; }
   .portfolio-section[hidden] { display: grid; }
   .portfolio-section .erp-table-scroll { overflow: visible; max-height: none; }
 }

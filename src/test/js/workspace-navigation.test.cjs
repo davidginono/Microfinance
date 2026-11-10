@@ -22,7 +22,7 @@ async function setup({guard=false,holdNavigation=false,pageScript=init,assets={}
  const console=new VirtualConsole();console.on('jsdomError',error=>failures.push(error));
  const dom=new JSDOM(html('Dashboard',guard),{url:'http://localhost/admin/dashboard',runScripts:'dangerously',resources,pretendToBeVisual:true,virtualConsole:console,beforeParse(w){
    for(const key of ['initialized','commands','ready','loaded','hidden','late'])w[key]=[];
-   w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};
+   w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.HTMLElement.prototype.scrollTo=()=>{};
    w.fetch=(url,options={})=>{const target=new URL(url,w.location.href),item={url:target,options};requests.push(item);if(target.pathname.startsWith('/card/') || (holdNavigation && (target.pathname==='/admin/users' || options.method==='POST')))return new Promise(resolve=>item.resolve=resolve);if(target.pathname==='/pending')return new Promise(()=>{});return Promise.resolve({ok:pages.has(target.pathname+target.search),url:target.href,headers:{get:()=> 'text/html'},text:async()=>pages.get(target.pathname+target.search) || '<h1>Denied</h1>'});};
  }});
  await new Promise(resolve=>dom.window.addEventListener('load',resolve,{once:true}));
@@ -192,26 +192,27 @@ test('focused form destinations enter with desktop navigation collapsed',async()
 const statementUrl=kind=>'/reports/financial/statements/example?kind='+kind;
 function statementPage(kind){
  return html('Reports Preview').replace('</head>','<script src="/js/financial-statements.js" defer></script><style>'+fs.readFileSync('src/main/resources/static/css/financial-statements.css','utf8')+'</style></head>')
- .replace('</main>',`<div class="fs-workspace" data-tab-loading="Loading statement" data-tab-error="Could not load statement">
+ .replace('</main>',`<header class="erp-page-header"><form data-fs-export class="report-page-actions" action="/reports/financial/statements/example/export"><input type="hidden" name="kind" value="${kind}"><a data-print-action href="/reports/financial/statements/example/print?kind=${kind}">Print</a><button name="format" value="PDF">PDF</button></form></header>
+ <div class="fs-workspace" data-tab-loading="Loading statement" data-tab-error="Could not load statement">
  <nav class="fs-tabs">${['POSITION','INCOME','TRIAL'].map(k=>`<a data-fs-tab data-no-page-preloader="true" href="${statementUrl(k)}" ${kind===k?'aria-current="page"':''}>${k}</a>`).join('')}</nav>
  <div class="fs-toolbar"><details class="fs-view-settings"><summary>Settings</summary><select data-fs-font><option value="reference">Reference</option><option value="sans">Arial</option><option value="serif">Times</option><option value="mono">Courier</option></select><select data-fs-density><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select><label data-fs-comparison-setting><input type="checkbox" data-fs-comparison checked>Comparison</label></details>
- <form action="/reports/financial/statements/example/export"><input type="hidden" name="kind" value="${kind}"><a data-print-action href="/reports/financial/statements/example/print?kind=${kind}">Print</a><button name="format" value="PDF">PDF</button></form></div>
+</div>
  <div data-fs-report-section><article data-fs-paper data-kind="${kind}"><h2>${kind}</h2></article></div>
  <div class="fs-preview-footer"><form data-fs-save class="fs-save-report" method="post" action="/reports/financial/statements/example/save"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="kind" value="${kind}"><button>Save Draft</button></form></div></div></main>`);
 }
 
-test('statement tabs load only the report section while preserving workspace, tabs, settings and save form',async()=>{
+test('statement tabs load only the report section while preserving workspace, tabs, settings and page actions',async()=>{
  const {dom,w,d,pages,failures}=await setup();
  try{
   pages.set(statementUrl('POSITION'),statementPage('POSITION'));await w.WorkspaceNavigation.visit(statementUrl('POSITION'));
-  const main=d.querySelector('main'),workspace=d.querySelector('.fs-workspace'),tabs=d.querySelector('.fs-tabs'),settings=d.querySelector('.fs-view-settings'),font=d.querySelector('[data-fs-font]'),save=d.querySelector('[data-fs-save]'),exportForm=d.querySelector('.fs-toolbar form');
+  const main=d.querySelector('main'),workspace=d.querySelector('.fs-workspace'),tabs=d.querySelector('.fs-tabs'),settings=d.querySelector('.fs-view-settings'),font=d.querySelector('[data-fs-font]'),save=d.querySelector('[data-fs-save]'),exportForm=d.querySelector('[data-fs-export]');
   settings.open=true;font.value='serif';font.dispatchEvent(new w.Event('change'));
   let release;const fetch=w.fetch;w.fetch=(url,options)=>new URL(url,w.location.href).searchParams.get('kind')==='INCOME'?new Promise(resolve=>{release=()=>resolve({ok:true,text:async()=>statementPage('INCOME')});}):fetch(url,options);
   tabs.querySelector('a[href*="INCOME"]').click();await until(()=>release);
   assert.equal(d.querySelector('main'),main);assert.equal(main.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
   assert.equal(d.querySelector('[data-fs-report-section]').getAttribute('aria-busy'),'true');assert.equal(w.getComputedStyle(d.querySelector('[data-fs-paper]')).visibility,'hidden');assert.ok(d.querySelector('.fs-tab-status .app-loading-spinner'));assert.equal(d.querySelector('.fs-tab-status').textContent,'');
   release();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='INCOME');
-  for(const [selector,node] of [['.fs-workspace',workspace],['.fs-tabs',tabs],['.fs-view-settings',settings],['[data-fs-font]',font],['[data-fs-save]',save],['.fs-toolbar form',exportForm]])assert.equal(d.querySelector(selector),node);
+  for(const [selector,node] of [['.fs-workspace',workspace],['.fs-tabs',tabs],['.fs-view-settings',settings],['[data-fs-font]',font],['[data-fs-save]',save],['[data-fs-export]',exportForm]])assert.equal(d.querySelector(selector),node);
   assert.equal(settings.open,true);assert.equal(save.querySelector('[name=kind]').value,'INCOME');assert.equal(save.querySelector('[name=_csrf]').value,'token');assert.equal(exportForm.querySelector('[name=kind]').value,'INCOME');assert.match(exportForm.querySelector('a').href,/kind=INCOME/);
   assert.equal(w.location.search,'?kind=INCOME');assert.equal(d.querySelector('.fs-tabs [aria-current]').textContent,'INCOME');assert.equal(d.querySelector('.fs-tab-status'),null);
   font.value='sans';font.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[data-fs-paper]').dataset.font,'sans');

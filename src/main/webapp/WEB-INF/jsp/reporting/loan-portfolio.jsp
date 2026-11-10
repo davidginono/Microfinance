@@ -1,3 +1,4 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
@@ -15,9 +16,9 @@
     <a class="erp-page-path__link" href="<c:out value='${configureUrl}' />"><spring:message code="financial.portfolio.menu" /></a><span class="erp-page-path__separator" aria-hidden="true">/</span>
     <span class="erp-page-path__item" aria-current="page"><spring:message code="financial.portfolio.results" /></span>
   </nav>
-  <div class="erp-page-header erp-detail-header" data-aws-page-header data-portfolio-report-header>
+  <div class="erp-page-header erp-detail-header" data-aws-page-header>
     <h1 class="erp-page-title"><spring:message code="financial.portfolio.results" /></h1>
-    <div class="accounting-actions" data-aws-action-pin="true"><sec:authorize access="@access.has(principal,'FINANCIAL_REPORTS_EXPORT')"><a class="app-btn btn-neutral" href="<c:out value='${excelUrl}' />"><spring:message code="management.excel" /></a></sec:authorize><a class="app-btn btn-neutral" href="<c:out value='${configureUrl}' />"><spring:message code="financial.portfolio.changeSettings" /></a></div>
+    <div class="report-page-actions" data-aws-action-pin="true"><sec:authorize access="@access.has(principal,'FINANCIAL_REPORTS_EXPORT')"><a class="app-btn btn-neutral" href="<c:out value='${excelUrl}' />"><report:reportExport format="excel" /></a></sec:authorize><a class="app-btn btn-neutral" href="<c:out value='${configureUrl}' />"><spring:message code="financial.portfolio.changeSettings" /></a></div>
   </div>
   <section class="erp-panel" aria-labelledby="portfolio-context-title">
     <div class="erp-panel-header portfolio-context-header"><h2 class="erp-panel-title" id="portfolio-context-title"><spring:message code="financial.portfolio.reportDetails" /></h2><span class="portfolio-draft"><spring:message code="financial.report.draft" /></span></div>

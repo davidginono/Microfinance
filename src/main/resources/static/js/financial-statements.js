@@ -56,7 +56,7 @@
    }
    const comparison=workspace.querySelector('[data-fs-comparison-setting]');
    if(comparison)comparison.hidden=!['POSITION','INCOME','CASH_FLOW','NOTES'].includes(paper.dataset.kind);
-   const exportForm=workspace.querySelector('.fs-toolbar form'),nextExport=parsed.querySelector('.fs-toolbar form');
+   const exportForm=document.querySelector('[data-fs-export]'),nextExport=parsed.querySelector('[data-fs-export]');
    if(exportForm&&nextExport){
     exportForm.querySelectorAll('input[type=hidden]').forEach(input=>input.remove());
     for(const input of nextExport.querySelectorAll('input[type=hidden]'))exportForm.prepend(input);

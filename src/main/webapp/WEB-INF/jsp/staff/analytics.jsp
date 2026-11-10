@@ -1,15 +1,10 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="staff.analytics.breadcrumb" text="Staff Workspace / Staff Reports and Analytics" /></p>
-    <h1 class="erp-page-title" id="staff-analytics-title">${staffAnalyticsTitle}</h1>
-</div>
-
-<section class="erp-panel staff-analytics-command-panel" aria-labelledby="staffAnalyticsControlsTitle">
     <c:url var="staffPdfExportUrl" value="/documents/reports/staff-loan-analytics.pdf">
         <c:param name="fromDate" value="${fromDate}" />
         <c:param name="toDate" value="${toDate}" />
@@ -24,28 +19,20 @@
         <c:param name="loanType" value="${loanType}" />
         <c:param name="viewAs" value="${viewAs}" />
     </c:url>
+<div class="erp-page-header erp-detail-header" data-aws-page-header>
+    <p class="erp-breadcrumb"><spring:message code="staff.analytics.breadcrumb" text="Staff Workspace / Staff Reports and Analytics" /></p>
+    <h1 class="erp-page-title" id="staff-analytics-title">${staffAnalyticsTitle}</h1>
+    <div class="report-page-actions" data-aws-action-pin="true" role="group" aria-label="<spring:message code='staff.analytics.reportActions' />">
+        <a href="${staffPdfExportUrl}" class="app-btn btn-neutral" data-print-action="true"><report:reportExport format="print" /></a>
+        <a href="${staffPdfExportUrl}" class="app-btn btn-neutral" data-download-action="true"><report:reportExport format="pdf" /></a>
+        <a href="${staffAnalyticsRefreshUrl}" class="app-btn btn-neutral"><spring:message code="common.refresh" /></a>
+    </div>
+</div>
+
+<section class="erp-panel staff-analytics-command-panel" aria-labelledby="staffAnalyticsControlsTitle">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2 id="staffAnalyticsControlsTitle"><spring:message code="staff.analytics.reportControls" text="Report controls" /></h2>
-        </div>
-        <div class="app-table-toolbar staff-analytics-actions" data-aws-action-pin="true" aria-label="<spring:message code='staff.analytics.reportActions' text='Report actions' />">
-            <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action" data-download-action="true">
-                <span class="staff-action-icon is-pdf" aria-hidden="true">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
-                </span>
-                <spring:message code="reports.exportPdf" text="Export PDF" />
-            </a>
-            <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action" data-print-action="true">
-                <span class="staff-action-icon" aria-hidden="true">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-                </span>
-                <spring:message code="common.print" text="Print" />
-            </a>
-            <a href="${staffAnalyticsRefreshUrl}" class="app-icon-button btn-neutral" aria-label="<spring:message code='common.refresh' text='Refresh' />" title="<spring:message code='common.refresh' text='Refresh' />">
-                <span class="staff-action-icon is-refresh" aria-hidden="true">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.6 6.1"/><path d="M3 12A9 9 0 0 1 18.6 5.9"/><path d="M3 18h5v-5"/><path d="M21 6h-5v5"/></svg>
-                </span>
-            </a>
         </div>
     </div>
     <form action="/staff/analytics" method="get" class="staff-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true" data-view-position-key="staff-analytics-filters">

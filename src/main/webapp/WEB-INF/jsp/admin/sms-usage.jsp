@@ -1,3 +1,4 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
@@ -5,9 +6,18 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
+<c:url var="loanUsagePdfUrl" value="/documents/reports/sms-usage.pdf">
+    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" />
+    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" />
+    <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
+</c:url>
+
+<div class="erp-page-header erp-detail-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / SMS Usage</p>
     <h1 class="erp-page-title" id="admin-sms-usage-title">SMS Usage</h1>
+    <div class="report-page-actions" data-aws-action-pin="true">
+        <a class="app-btn btn-neutral" href="${loanUsagePdfUrl}" data-download-action="true"><report:reportExport format="pdf" /></a>
+    </div>
 </div>
 
 <c:url var="smsRefreshUrl" value="/admin/sms-usage">
@@ -159,12 +169,6 @@
     <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" /><c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
 </c:url>
 
-<c:url var="loanUsagePdfUrl" value="/documents/reports/sms-usage.pdf">
-    <c:param name="saccoId" value="${selectedSaccoId}" /><c:param name="stationId" value="${selectedStationId}" />
-    <c:param name="fromDate" value="${selectedLoanFromDate}" /><c:param name="toDate" value="${selectedLoanToDate}" /><c:param name="loanStatus" value="${selectedLoanStatus}" />
-    <c:forEach items="${selectedApplicantIds}" var="applicantId"><c:param name="applicantIds" value="${applicantId}" /></c:forEach>
-</c:url>
-
 <section class="erp-table-wrap mt-3" aria-label="Loan application SMS usage" data-resource-table="admin-sms-usage-2" data-table-page-param="loanUsagePage">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
@@ -173,7 +177,6 @@
         </div>
         <div class="app-table-toolbar">
             <a class="app-icon-button" href="${smsRefreshUrl}" aria-label="Refresh loan application SMS usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg></a>
-            <a class="app-btn btn-neutral" href="${loanUsagePdfUrl}" data-download-action="true">PDF</a>
             <div data-table-pagination data-table-for="admin-sms-usage-2" data-page="${loanSmsUsage.number}">
 <span class="admin-register-count">Page ${loanSmsUsage.number + 1} of ${loanSmsUsage.totalPages gt 0 ? loanSmsUsage.totalPages : 1}</span>
             <c:choose><c:when test="${loanSmsUsage.first}"><span class="app-icon-button opacity-50" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></c:when><c:otherwise><a class="app-icon-button aws-pagination-chevron" data-page-direction="previous" href="${loanUsagePreviousUrl}" aria-label="Previous loan application SMS usage page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a></c:otherwise></c:choose>

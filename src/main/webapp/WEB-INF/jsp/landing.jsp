@@ -51,35 +51,48 @@
     <div class="landing-width landing-overview">
         <section aria-labelledby="stepsTitle">
             <h2 id="stepsTitle"><spring:message code="home.steps.title" text="How it works" /></h2>
-            <div class="landing-feature-grid">
-                <article class="landing-panel landing-feature">
-                    <svg viewBox="0 0 96 64" fill="none" aria-hidden="true" focusable="false" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="10" y="12" width="76" height="44" rx="4" />
-                        <circle class="landing-art-accent" cx="34" cy="28" r="7" />
-                        <path class="landing-art-accent" d="M22 47a12 12 0 0 1 24 0" />
-                        <path d="M56 25h18m-18 9h18m-18 9h11" />
+            <div class="landing-panel landing-flow-card">
+              <ol class="landing-flow" role="list">
+                <li class="landing-flow-step">
+                    <svg viewBox="0 0 96 64" aria-hidden="true" focusable="false">
+                        <path d="M22 22H10v32h25m30-42H54m16 12h15v29H61M15 29h8m-8 6h8m54 0h4m-4 6h4" />
+                        <rect x="25" y="15" width="49" height="31" rx="2" />
+                        <circle cx="38" cy="26" r="4" />
+                        <path d="M31 38a7 7 0 0 1 14 0M51 25h16m-16 6h16m-16 6h10" />
+                        <path class="landing-art-accent" d="M39 51h19m-4-4 4 4-4 4" />
                     </svg>
-                    <h3><spring:message code="home.steps.profile" text="Set up your profile" /></h3>
-                    <p><spring:message code="home.steps.profileCopy" text="Tell us a little about yourself and add your documents." /></p>
-                </article>
-                <article class="landing-panel landing-feature">
-                    <svg viewBox="0 0 96 64" fill="none" aria-hidden="true" focusable="false" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M23 55h-7V9h35l11 11v13M51 9v11h11M25 23h15m-15 10h25m-25 10h17" />
-                        <circle class="landing-art-accent" cx="66" cy="47" r="13" />
-                        <path class="landing-art-accent" d="M60 47l4 4 8-8" />
+                    <h3><spring:message code="home.steps.profile" /></h3>
+                    <p><spring:message code="home.steps.profileCopy" /></p>
+                </li>
+                <li class="landing-flow-step landing-flow-apply">
+                    <svg viewBox="0 0 96 64" aria-hidden="true" focusable="false">
+                        <path d="M50 56H24V9h33l12 12v11M57 9v12h12M32 23h17m-17 9h20m-20 9h13m-13 8h12M18 16h-4v44h38" />
+                        <path class="landing-art-accent" d="m48 43 34-11-11 23-8-8-7 9 1-11-9-2Zm9 2 25-13" />
                     </svg>
-                    <h3><spring:message code="home.steps.loan" text="Apply for a loan" /></h3>
-                    <p><spring:message code="home.steps.loanCopy" text="Choose a loan that fits your plans and send your request." /></p>
-                </article>
-                <article class="landing-panel landing-feature">
-                    <svg viewBox="0 0 96 64" fill="none" aria-hidden="true" focusable="false" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="12" y="10" width="72" height="44" rx="4" />
-                        <path d="M12 22h72m-63-6h1m5 0h1m5 0h1m-10 31h48" />
-                        <path class="landing-art-accent" d="m25 40 13-9 12 6 20-9m-7 0h7v7" />
+                    <h3><spring:message code="home.steps.loan" /></h3>
+                    <p><spring:message code="home.steps.loanCopy" /></p>
+                </li>
+                <li class="landing-flow-step">
+                    <svg viewBox="0 0 96 64" aria-hidden="true" focusable="false">
+                        <rect x="20" y="12" width="41" height="44" rx="2" />
+                        <path d="M30 12V7h20v5m-20 12h21m-21 9h10m-10 9h9m-9 8h13" />
+                        <circle cx="61" cy="37" r="13" />
+                        <path d="m70 46 12 12M11 21h4m-4 9h4m-4 9h4" />
+                        <path class="landing-art-accent" d="m53 40 5-5 4 2 6-6" />
                     </svg>
-                    <h3><spring:message code="home.steps.track" text="Check your progress" /></h3>
-                    <p><spring:message code="home.steps.trackCopy" text="Log in to see where your request stands and what’s next." /></p>
-                </article>
+                    <h3><spring:message code="home.steps.review" /></h3>
+                    <p><spring:message code="home.steps.reviewCopy" /></p>
+                </li>
+                <li class="landing-flow-step landing-flow-track">
+                    <svg viewBox="0 0 96 64" aria-hidden="true" focusable="false">
+                        <rect x="12" y="10" width="72" height="44" rx="2" />
+                        <path d="M12 21h72m-64-5h2m4 0h2m4 0h2m-12 9v21h28m8-15h17m-17 7h17m-17 7h13" />
+                        <path class="landing-art-accent" d="m26 40 7-8 6 4 9-8m-6 0h6v6" />
+                    </svg>
+                    <h3><spring:message code="home.steps.track" /></h3>
+                    <p><spring:message code="home.steps.trackCopy" /></p>
+                </li>
+              </ol>
             </div>
         </section>
         <aside class="landing-panel landing-portal" aria-labelledby="portalTitle">

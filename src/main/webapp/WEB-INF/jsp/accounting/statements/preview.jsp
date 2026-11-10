@@ -1,10 +1,20 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
 <c:set var="base" value="/reports/financial/statements/${run.id}" />
 <div class="accounting-workspace">
  <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.previewTitle" text="Reports Preview" /></span></nav>
- <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1></div>
+ <div class="erp-page-header erp-detail-header" data-aws-page-header>
+  <h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1>
+  <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" data-fs-export class="report-page-actions" data-aws-action-pin="true">
+   <input type="hidden" name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><input type="hidden" name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><input type="hidden" name="line" value="<c:out value='${line}' />" /></c:if><c:if test="${not empty account}"><input type="hidden" name="account" value="${account}" /></c:if>
+   <c:url value="${base}/print" var="printUrl"><c:param name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><c:param name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><c:param name="line" value="${line}" /></c:if><c:if test="${not empty account}"><c:param name="account" value="${account}" /></c:if></c:url>
+   <a class="app-btn btn-neutral" href="<c:out value='${printUrl}' />" data-print-action="true"><report:reportExport format="print" /></a>
+   <button type="submit" class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><report:reportExport format="pdf" /></button>
+   <button type="submit" class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><report:reportExport format="excel" /></button>
+  </form></sec:authorize>
+ </div>
  <div class="fs-workspace" data-tab-loading="<spring:message code='fs.tabLoading' />" data-tab-error="<spring:message code='fs.tabError' />">
  <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
  <div class="fs-toolbar">
@@ -13,11 +23,6 @@
    <label class="fs-select-setting"><span><spring:message code="fs.density" /></span><select class="aws-control" data-fs-density><option value="compact"><spring:message code="fs.compact" /></option><option value="comfortable"><spring:message code="fs.comfortable" /></option></select></label>
    <label data-fs-comparison-setting ${kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES'?'':'hidden'}><input type="checkbox" checked data-fs-comparison /><spring:message code="fs.showComparison" /></label>
   <p class="fs-help"><spring:message code="fs.previewSettingsHelp" /></p></div></details>
-  <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" class="accounting-actions">
-   <input type="hidden" name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><input type="hidden" name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><input type="hidden" name="line" value="<c:out value='${line}' />" /></c:if><c:if test="${not empty account}"><input type="hidden" name="account" value="${account}" /></c:if>
-   <c:url value="${base}/print" var="printUrl"><c:param name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><c:param name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><c:param name="line" value="${line}" /></c:if><c:if test="${not empty account}"><c:param name="account" value="${account}" /></c:if></c:url>
-   <button class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><spring:message code="fs.pdf" /></button><button class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><spring:message code="fs.excel" /></button><a class="app-btn btn-neutral" href="<c:out value='${printUrl}' />" data-print-action="true"><spring:message code="fs.print" /></a>
-  </form></sec:authorize>
  </div>
  <div data-fs-report-section>
  <c:if test="${filtered}"><p class="fs-help"><spring:message code="fs.filteredTrial" /></p></c:if>

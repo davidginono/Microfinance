@@ -1165,51 +1165,9 @@
     }
 
 /* Source: src/main/webapp/WEB-INF/jsp/app/reports.jsp */
-.loan-analytics-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
     .loan-analytics-command-panel {
         display: flex;
         flex-direction: column;
-    }
-    .loan-analytics-command-panel .loan-analytics-actions {
-        order: 0;
-        min-height: 40px;
-        align-items: center;
-        flex-wrap: nowrap;
-        justify-content: flex-end;
-        border-bottom: 1px solid #d5dbdb;
-        background: #f7f8f8;
-        padding: 8px 10px;
-    }
-    .loan-analytics-command-panel .loan-analytics-actions .app-btn {
-        gap: 6px;
-        white-space: nowrap;
-        text-align: center;
-    }
-    .loan-report-action-icon {
-        display: inline-flex;
-        width: 14px;
-        height: 14px;
-        flex: 0 0 14px;
-        align-items: center;
-        justify-content: center;
-        color: var(--aws-muted);
-    }
-    .loan-report-action-icon svg {
-        width: 14px;
-        height: 14px;
-    }
-    .loan-report-action-icon.is-pdf {
-        color: var(--aws-danger);
-    }
-    .loan-report-action-icon.is-excel {
-        color: var(--aws-success);
-    }
-    .loan-report-action-icon.is-refresh {
-        color: var(--aws-blue);
     }
     .loan-analytics-filter {
         order: 1;
@@ -1486,20 +1444,6 @@
         }
     }
     @media (max-width: 760px) {
-        .loan-analytics-command-panel .loan-analytics-actions {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            justify-content: stretch;
-        }
-        .loan-analytics-command-panel .loan-analytics-actions .app-btn {
-            width: 100%;
-            min-width: 0;
-            min-height: 36px;
-            height: auto;
-        }
-        .loan-analytics-command-panel .loan-analytics-actions .app-btn:last-child:nth-child(odd) {
-            grid-column: 1 / -1;
-        }
         .loan-analytics-filter {
             align-items: stretch;
         }
@@ -1548,15 +1492,9 @@
         min-height: 39px;
         background: #f7f8f8;
     }
-    .staff-analytics-actions,
     .staff-analytics-filter,
     .staff-view-switch {
         display: flex;
-    }
-    .staff-analytics-actions {
-        flex-flow: row nowrap;
-        align-items: center;
-        gap: 6px;
     }
     .staff-analytics-filter {
         align-items: flex-end;
@@ -1757,21 +1695,6 @@
         padding-bottom: 0;
         white-space: nowrap;
     }
-    .staff-action-icon {
-        display: inline-flex;
-        width: 14px;
-        height: 14px;
-        align-items: center;
-        justify-content: center;
-        color: var(--aws-muted);
-    }
-    .staff-action-icon svg {
-        width: 14px;
-        height: 14px;
-    }
-    .staff-action-icon.is-pdf { color: var(--aws-danger); }
-    .staff-action-icon.is-excel { color: var(--aws-success); }
-    .staff-action-icon.is-refresh { color: var(--aws-blue); }
     .shell-content-frame > .staff-analytics-command-panel,
     .shell-content-frame > .staff-metric-grid,
     .shell-content-frame > .staff-analytics-layout {
@@ -2229,9 +2152,6 @@
             top: auto;
             z-index: 1;
         }
-        .staff-analytics-actions {
-            flex-wrap: wrap;
-        }
         .staff-analytics-filter {
             align-items: stretch;
             flex-wrap: wrap;
@@ -2270,9 +2190,6 @@
         }
         .staff-filter-actions {
             grid-template-columns: minmax(0, 1fr);
-        }
-        .staff-analytics-actions .app-btn {
-            flex: 1 1 auto;
         }
         .staff-view-option span {
             overflow: visible;

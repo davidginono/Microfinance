@@ -1,3 +1,4 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
@@ -5,20 +6,20 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
+<div class="erp-page-header erp-detail-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="loanOfficer.reports.breadcrumb" text="Loan Officer Panel / Loan Reports" /></p>
     <h1 class="erp-page-title" id="loan-officer-reports-title"><spring:message code="loanOfficer.reports.title" text="Loan Officer Review Reports" /></h1>
+    <form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" data-table-export-for="loan-officer-reports-1" class="report-page-actions" data-aws-action-pin="true">
+        <input type="hidden" name="fromDate" value="${fromDateValue}" />
+        <input type="hidden" name="toDate" value="${toDateValue}" />
+        <input type="hidden" name="decisionFilter" value="${decisionFilterValue}" />
+        <button type="submit" class="app-btn btn-neutral" data-print-action="true"><report:reportExport format="print" /></button>
+        <button type="submit" class="app-btn btn-neutral"><report:reportExport format="pdf" /></button>
+    </form>
 </div>
 
-<form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" data-table-toolbar-for="loan-officer-reports-1" data-table-export-for="loan-officer-reports-1" class="app-table-toolbar">
-    <input type="hidden" name="fromDate" value="${fromDateValue}" />
-    <input type="hidden" name="toDate" value="${toDateValue}" />
-    <input type="hidden" name="decisionFilter" value="${decisionFilterValue}" />
-    <button type="submit" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" /></button>
-    <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" /></button>
-</form>
-
-<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-table-sync-query="true" data-resource-table="loan-officer-reports-1" data-resource-split data-table-title-id="loan-officer-reports-title">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-table-sync-query="true" data-resource-table="loan-officer-reports-1" data-resource-split>
+    <h2><spring:message code="reports.results" /></h2>
 <form method="get" action="/loan-officer/reports" class="erp-filter-form erp-table-toolbar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="loan-officer-reports-1">
     <div class="erp-table-toolbar__control">
         <label for="loan-officer-reports-1-fromDate" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>

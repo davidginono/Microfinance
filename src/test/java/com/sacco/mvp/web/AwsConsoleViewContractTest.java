@@ -682,14 +682,16 @@ class AwsConsoleViewContractTest {
             .contains("data-aws-filter-pin=\"true\"")
             .contains("data-aws-action-pin=\"true\"")
             .contains("data-download-action=\"true\"")
-            .contains("class=\"loan-report-action-icon is-pdf\"")
+            .contains("<report:reportExport format=\"pdf\" />")
             .contains("data-print-action=\"true\"")
             .doesNotContain("is-excel", ".xlsx", ".csv")
-            .contains("class=\"loan-report-action-icon is-refresh\"")
+            .contains("<spring:message code=\"common.refresh\" />")
             .contains("loan-spark-row")
             .contains("renderMetricSparklines")
             .doesNotContain("loan-analytics-command-header")
             .doesNotContain("reports.controls");
+        assertThat(reports.indexOf("class=\"report-page-actions\"")).isLessThan(reports.indexOf("class=\"erp-panel loan-analytics-command-panel"));
+        assertThat(staffAnalytics.indexOf("class=\"report-page-actions\"")).isLessThan(staffAnalytics.indexOf("class=\"erp-panel staff-analytics-command-panel"));
         int portfolioPanelIndex = staffAnalytics.indexOf("class=\"erp-panel staff-portfolio-panel\"");
         int trendPanelIndex = staffAnalytics.indexOf("class=\"erp-panel staff-trend-panel\"");
         int productPanelIndex = staffAnalytics.indexOf("class=\"erp-panel staff-product-panel\"");
@@ -698,7 +700,7 @@ class AwsConsoleViewContractTest {
         assertThat(productPanelIndex).isGreaterThan(trendPanelIndex);
         assertThat(staffAnalytics)
             .contains("class=\"erp-panel staff-analytics-command-panel\"")
-            .contains("class=\"app-table-toolbar staff-analytics-actions\" data-aws-action-pin=\"true\"")
+            .contains("class=\"report-page-actions\" data-aws-action-pin=\"true\"")
             .contains("data-aws-filter-pin=\"true\"")
             .contains("class=\"erp-breadcrumb\"")
             .contains("staff.analytics.breadcrumb")
@@ -738,9 +740,6 @@ class AwsConsoleViewContractTest {
             .contains("<sec:authorize access=\"@authz.staffAnalyticsAccess(principal)\">")
             .contains("<c:set var=\"showStaffAnalyticsPanel\" value=\"true\" />");
         assertThat(consoleCss)
-            .contains(".loan-analytics-command-panel .loan-analytics-actions")
-            .contains(".loan-report-action-icon")
-            .contains(".loan-report-action-icon.is-refresh")
             .contains("height: var(--sacco-control-height)")
             .contains(".staff-analytics-command-panel")
             .contains(".staff-analytics-filter")
@@ -1037,16 +1036,16 @@ class AwsConsoleViewContractTest {
             .contains("loan-guarantor-search-action");
 
         assertThat(memberReports)
-            .contains("class=\"loan-analytics-actions\" data-aws-action-pin=\"true\"")
-            .contains("class=\"loan-report-action-icon is-pdf\"")
+            .contains("class=\"report-page-actions\" data-aws-action-pin=\"true\"")
+            .contains("<report:reportExport format=\"pdf\" />")
             .doesNotContain("is-excel", ".xlsx", ".csv")
-            .contains("class=\"loan-report-action-icon is-refresh\"")
+            .contains("<spring:message code=\"common.refresh\" />")
             .contains("data-print-action=\"true\"");
         assertThat(staffAnalytics)
-            .contains("class=\"app-table-toolbar staff-analytics-actions\" data-aws-action-pin=\"true\"")
-            .contains("class=\"staff-action-icon is-pdf\"")
+            .contains("class=\"report-page-actions\" data-aws-action-pin=\"true\"")
+            .contains("<report:reportExport format=\"pdf\" />")
             .doesNotContain("is-excel", ".xlsx", ".csv")
-            .contains("class=\"staff-action-icon is-refresh\"")
+            .contains("<spring:message code=\"common.refresh\" />")
             .contains("data-print-action=\"true\"")
             .contains("class=\"erp-table-scroll\" data-view-position-key=\"staff-analytics-financial-breakdown\"");
 
@@ -1078,12 +1077,8 @@ class AwsConsoleViewContractTest {
             .contains("--erp-table-height: clamp(11rem, 30vh, 15rem)")
             .contains(".loan-calculator-steps li")
             .contains(".loan-calculator-steps strong")
-            .contains(".loan-analytics-command-panel .loan-analytics-actions")
             .contains("grid-template-columns: repeat(2, minmax(0, 1fr))")
-            .contains(".loan-analytics-command-panel .loan-analytics-actions .app-btn")
             .contains("white-space: normal")
-            .contains(".staff-analytics-actions")
-            .contains(".staff-analytics-actions .app-btn")
             .contains(".loan-guarantor-search-row")
             .contains(".loan-guarantor-format-indicator")
             .contains("order: 3")

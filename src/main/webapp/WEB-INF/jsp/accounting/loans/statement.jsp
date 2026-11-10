@@ -1,3 +1,4 @@
+<%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
@@ -8,9 +9,9 @@
     <div class="erp-page-header erp-detail-header" data-aws-page-header>
         <h1 class="erp-page-title"><spring:message code="recording.statement" /></h1>
         <sec:authorize access="@access.has(principal,'LOAN_RECORDING_EXPORT')">
-            <div class="accounting-actions" data-aws-action-pin="true">
-                <a class="app-btn btn-neutral" href="<c:url value='/finance/client-ledgers/${clientId}/pdf' />"><spring:message code="voucher.pdf" /></a>
-                <a class="app-btn btn-neutral" data-print-action="true" href="<c:url value='/finance/client-ledgers/${clientId}/print' />"><spring:message code="voucher.print" /></a>
+            <div class="report-page-actions" data-aws-action-pin="true">
+                <a class="app-btn btn-neutral" data-print-action="true" href="<c:url value='/finance/client-ledgers/${clientId}/print' />"><report:reportExport format="print" /></a>
+                <a class="app-btn btn-neutral" href="<c:url value='/finance/client-ledgers/${clientId}/pdf' />"><report:reportExport format="pdf" /></a>
             </div>
         </sec:authorize>
     </div>
