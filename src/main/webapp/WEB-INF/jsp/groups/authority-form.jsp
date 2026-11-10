@@ -17,7 +17,6 @@
 <label><spring:message code="authority.principal" /> (TZS)<form:input path="maxPrincipal" type="number" data-amount-input="true" min="0.01" step="0.01" cssClass="aws-control" required="required" /><form:errors path="maxPrincipal" cssClass="coa-error" /></label>
 <label><spring:message code="authority.requiredSignatures" /><form:input path="requiredSignatures" type="number" min="1" max="50" cssClass="aws-control" required="required" /><form:errors path="requiredSignatures" cssClass="coa-error" /></label>
 </div></section>
-<section class="erp-resource-section"><h2><spring:message code="authority.documents" /></h2><div class="accounting-grid group-form-fields"><c:forEach items="${['capacityEvidence','resolutionEvidence','signatureEvidence']}" var="field"><label><spring:message code="authority.${field}" /><form:input path="${field}" cssClass="aws-control" maxlength="500" required="required" /><form:errors path="${field}" cssClass="coa-error" /></label></c:forEach></div></section>
 <section class="erp-resource-section">
     <h2><spring:message code="authority.signers" /></h2>
     <div class="group-attribute-list">

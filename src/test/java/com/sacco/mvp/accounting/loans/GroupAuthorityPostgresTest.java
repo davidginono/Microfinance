@@ -29,11 +29,12 @@ class GroupAuthorityPostgresTest {
     @BeforeAll void start(){f.context=new AnnotationConfigApplicationContext(Config.class);f.jdbc=f.context.getBean(JdbcTemplate.class);f.service=f.context.getBean(com.sacco.mvp.accounting.loans.service.LoanRecordingService.class);service=f.context.getBean(GroupAuthorityService.class);groups=f.context.getBean(GroupLendingService.class);}
     @AfterAll void stop(){f.stop();}
     @BeforeEach void fixture(){f.fixture();var clock=f.context.getBean(ApplicationClock.class);reset(clock);when(clock.today()).thenReturn(LoanRecordingPostgresTest.TODAY);when(clock.now()).thenReturn(OffsetDateTime.parse("2026-10-08T12:00:00+03:00"));var form=new GroupForm();form.setName("Synthetic organization <Company>");form.setLegalForm("ORGANIZATION");form.setEvidence("Synthetic organization identity source");group=groups.create(f.actor,form);}
-    AuthorityForm form(){var form=service.editor(f.actor,group,null).form();form.setValidFrom(LocalDate.of(2026,10,1));form.setMaxPrincipal(new BigDecimal("100000.00"));form.setRequiredSignatures(1);form.setCapacityEvidence("Synthetic verified legal capacity");form.setResolutionEvidence("Synthetic governing resolution");form.setSignatureEvidence("Synthetic checked original signatures");form.setPayoutType(PaymentDestinationType.BANK_ACCOUNT);form.setPayoutProvider("Synthetic bank");form.setPayoutHolder("Synthetic organization");form.setPayoutIdentifier("QA-ACCOUNT");form.setPayoutEvidence("Synthetic account verification");form.setVerified(true);var signer=form.getSigners().getFirst();signer.setClientId(f.client);signer.setMayApply(true);signer.setMaySign(true);signer.setMayReceive(true);return form;}
+    AuthorityForm form(){var form=service.editor(f.actor,group,null).form();form.setValidFrom(LocalDate.of(2026,10,1));form.setMaxPrincipal(new BigDecimal("100000.00"));form.setRequiredSignatures(1);form.setPayoutType(PaymentDestinationType.BANK_ACCOUNT);form.setPayoutProvider("Synthetic bank");form.setPayoutHolder("Synthetic organization");form.setPayoutIdentifier("QA-ACCOUNT");form.setPayoutEvidence("Synthetic account verification");form.setVerified(true);var signer=form.getSigners().getFirst();signer.setClientId(f.client);signer.setMayApply(true);signer.setMaySign(true);signer.setMayReceive(true);return form;}
     int count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Integer.class,f.institution);}
     @Test void authorityNamesExplicitNonMemberPowersWithoutCreatingPersonalDebtOrGuarantees(){
         UUID id=service.record(f.actor,group,form());var authority=service.detail(f.actor,group,id);
         assertThat(authority.state()).isEqualTo("CURRENT");assertThat(authority.revision()).isEqualTo(1);assertThat(authority.groupName()).isEqualTo("Synthetic organization <Company>");assertThat(authority.signers()).singleElement().satisfies(s->{assertThat(s.clientId()).isEqualTo(f.client);assertThat(s.maySign()).isTrue();assertThat(s.mayApply()).isTrue();assertThat(s.mayReceive()).isTrue();});
+        assertThat(authority.capacityEvidence()).isNull();assertThat(authority.resolutionEvidence()).isNull();assertThat(authority.signatureEvidence()).isNull();
         assertThat(authority.recordedBy()).isEqualTo(f.actor.getMemberId());assertThat(authority.payoutIdentifier()).isEqualTo("QA-ACCOUNT");assertThat(groups.detail(f.actor,group).members()).isZero();
         for(String table:List.of("loan_applications","loan_ledgers","gl_journal","lending_group_guarantee"))assertThat(count(table)).as(table).isZero();
     }
@@ -103,7 +104,9 @@ class GroupAuthorityPostgresTest {
         transaction.executeWithoutResult(status->{
             f.jdbc.update("""
                 insert into lending_group_authority select (jsonb_populate_record(null::lending_group_authority,to_jsonb(a)||
-                  jsonb_build_object('id',?::uuid,'revision',2,'previous_id',a.id,'request_key',?::uuid,'valid_through',?::date))).*
+                  jsonb_build_object('id',?::uuid,'revision',2,'previous_id',a.id,'request_key',?::uuid,'valid_through',?::date,
+                    'capacity_evidence','Historical capacity reference','resolution_evidence','Historical resolution',
+                    'signature_evidence','Historical signature reference'))).*
                 from lending_group_authority a where a.id=?
                 """,dated,UUID.randomUUID(),today,original);
             f.jdbc.update("""
@@ -114,7 +117,11 @@ class GroupAuthorityPostgresTest {
         });
         assertThat(service.detail(f.actor,group,dated).state()).isEqualTo("CURRENT");
         when(f.context.getBean(ApplicationClock.class).today()).thenReturn(today.plusDays(1));
-        assertThat(service.detail(f.actor,group,dated).state()).isEqualTo("EXPIRED");
+        var historical=service.detail(f.actor,group,dated);
+        assertThat(historical.state()).isEqualTo("EXPIRED");
+        assertThat(historical.capacityEvidence()).isEqualTo("Historical capacity reference");
+        assertThat(historical.resolutionEvidence()).isEqualTo("Historical resolution");
+        assertThat(historical.signatureEvidence()).isEqualTo("Historical signature reference");
         assertThat(service.detail(f.actor,group,original).state()).isEqualTo("SUPERSEDED");
         assertThat(service.history(f.actor,group,0,"through").page().rows()).extracting(Summary::validThrough).containsExactly(today,null);
     }

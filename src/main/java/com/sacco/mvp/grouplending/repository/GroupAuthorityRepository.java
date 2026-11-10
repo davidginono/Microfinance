@@ -47,12 +47,12 @@ public class GroupAuthorityRepository {
         jdbc.update("""
             insert into lending_group_authority(id,group_id,sacco_id,station_id,revision,previous_id,request_key,payload_hash,
               group_name,group_code,legal_form,valid_from,max_principal,required_signatures,signer_count,
-              capacity_evidence,resolution_evidence,signature_evidence,payout_type,payout_provider,payout_holder,payout_identifier,payout_evidence,recorded_by,recorded_by_name,recorded_at)
-            select ?,?,?,?,coalesce((select max(revision) from lending_group_authority where group_id=?),0)+1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,m.full_name,?
+              payout_type,payout_provider,payout_holder,payout_identifier,payout_evidence,recorded_by,recorded_by_name,recorded_at)
+            select ?,?,?,?,coalesce((select max(revision) from lending_group_authority where group_id=?),0)+1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,m.full_name,?
             from members m where m.id=? and m.sacco_id=? and m.station_id=?
             """,id,group.id(),a.getSaccoId(),a.getStationId(),group.id(),f.getExpectedPreviousId(),f.getRequestKey(),hash,
             group.name(),group.code(),group.legalForm(),f.getValidFrom(),f.getMaxPrincipal(),f.getRequiredSignatures(),f.getSigners().size(),
-            f.getCapacityEvidence().strip(),f.getResolutionEvidence().strip(),f.getSignatureEvidence().strip(),f.getPayoutType().name(),f.getPayoutProvider().strip(),f.getPayoutHolder().strip(),f.getPayoutIdentifier().strip(),f.getPayoutEvidence().strip(),a.getMemberId(),now,a.getMemberId(),a.getSaccoId(),a.getStationId());
+            f.getPayoutType().name(),f.getPayoutProvider().strip(),f.getPayoutHolder().strip(),f.getPayoutIdentifier().strip(),f.getPayoutEvidence().strip(),a.getMemberId(),now,a.getMemberId(),a.getSaccoId(),a.getStationId());
         var rows=new ArrayList<Object[]>();int ordinal=0;for(var signer:f.getSigners()){var p=people.get(signer.getClientId());rows.add(new Object[]{id,++ordinal,p.clientId(),p.number(),p.name(),signer.isMayApply(),signer.isMaySign(),signer.isMayReceive(),signer.isMayViewAccount()});}
         jdbc.batchUpdate("insert into lending_group_authority_signer(authority_id,ordinal,client_id,client_number,name,may_apply,may_sign,may_receive,may_view_account) values(?,?,?,?,?,?,?,?,?)",rows);return id;
     }

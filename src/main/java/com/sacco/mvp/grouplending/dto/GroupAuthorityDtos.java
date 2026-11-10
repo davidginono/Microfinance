@@ -15,7 +15,6 @@ public final class GroupAuthorityDtos {
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate validFrom;
         private BigDecimal maxPrincipal;
         private Integer requiredSignatures;
-        private String capacityEvidence="",resolutionEvidence="",signatureEvidence="";
         private PaymentDestinationType payoutType;
         private String payoutProvider="",payoutHolder="",payoutIdentifier="",payoutEvidence="";
         private List<SignerForm> signers=new ArrayList<>();

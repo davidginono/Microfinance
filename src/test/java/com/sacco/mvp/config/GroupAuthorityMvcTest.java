@@ -37,23 +37,23 @@ class GroupAuthorityMvcTest {
     @Test void recordingRequiresCsrfAndBindsOnlyAuthorityInputs()throws Exception{
         mvc.perform(post(path()).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(service);
         when(service.record(eq(actor),eq(group),any())).thenReturn(authority);
-        mvc.perform(post(path()).with(user(actor)).with(csrf()).param("requestKey",UUID.randomUUID().toString()).param("verified","true").param("maxPrincipal","10000.00").param("signers[0].clientId",client.toString()).param("signers[0].maySign","true").param("signers[0].mayViewAccount","true").param("saccoId","FOREIGN").param("stationId","OTHER").param("recordedBy",client.toString()).param("revision","99").param("validThrough","stale-form-value"))
+        mvc.perform(post(path()).with(user(actor)).with(csrf()).param("requestKey",UUID.randomUUID().toString()).param("verified","true").param("maxPrincipal","10000.00").param("signers[0].clientId",client.toString()).param("signers[0].maySign","true").param("signers[0].mayViewAccount","true").param("saccoId","FOREIGN").param("stationId","OTHER").param("recordedBy",client.toString()).param("revision","99").param("validThrough","stale-form-value").param("capacityEvidence","stale evidence").param("resolutionEvidence","stale resolution").param("signatureEvidence","stale signature evidence"))
             .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl(path()+"/"+authority));
         verify(service).record(eq(actor),eq(group),argThat(f->f.isVerified() && f.getMaxPrincipal().toPlainString().equals("10000.00") && f.getSigners().size()==1 && f.getSigners().getFirst().getClientId().equals(client) && f.getSigners().getFirst().isMaySign() && f.getSigners().getFirst().isMayViewAccount() && !f.getSigners().getFirst().isMayApply()));
     }
     @Test void invalidAmountsRetainBoundValuesAndDoNotCreateAuthority()throws Exception{
-        editor();var result=mvc.perform(post(path()).with(user(actor)).with(csrf()).param("maxPrincipal","not-money").param("capacityEvidence","Retained source reference").param("signers[0].clientId",client.toString()))
+        editor();var result=mvc.perform(post(path()).with(user(actor)).with(csrf()).param("maxPrincipal","not-money").param("payoutEvidence","Retained source reference").param("signers[0].clientId",client.toString()))
             .andExpect(status().isOk()).andExpect(view().name("groups/authority-form")).andExpect(model().attributeHasFieldErrors("authorityForm","maxPrincipal")).andReturn();
         var binding=(org.springframework.validation.BindingResult)result.getModelAndView().getModel().get(org.springframework.validation.BindingResult.MODEL_KEY_PREFIX+"authorityForm");
         assertThat(context.getMessage(binding.getFieldError("maxPrincipal"),Locale.ENGLISH)).isEqualTo("Enter a valid amount.");
         assertThat(context.getMessage(binding.getFieldError("maxPrincipal"),Locale.of("sw"))).isEqualTo("Weka kiasi sahihi.");
         assertThat(binding.getFieldError("maxPrincipal").getRejectedValue()).isEqualTo("not-money");
-        verify(service,never()).record(any(),any(),any());verify(service).editor(eq(actor),eq(group),argThat(f->f.getCapacityEvidence().equals("Retained source reference") && f.getSigners().getFirst().getClientId().equals(client)));
+        verify(service,never()).record(any(),any(),any());verify(service).editor(eq(actor),eq(group),argThat(f->f.getPayoutEvidence().equals("Retained source reference") && f.getSigners().getFirst().getClientId().equals(client)));
     }
     @Test void rowCommandsKeepEvidenceWithoutRecordingPartialAuthority()throws Exception{
-        editor();mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","addSigner").param("resolutionEvidence","Retained resolution").param("signers[0].clientId",client.toString()).param("signers[0].mayApply","true"))
+        editor();mvc.perform(post(path()).with(user(actor)).with(csrf()).param("action","addSigner").param("payoutEvidence","Retained payout reference").param("signers[0].clientId",client.toString()).param("signers[0].mayApply","true"))
             .andExpect(status().isOk()).andExpect(view().name("groups/authority-form"));
-        verify(service).editor(eq(actor),eq(group),argThat(f->f.getSigners().size()==2 && f.getSigners().getFirst().isMayApply() && f.getResolutionEvidence().equals("Retained resolution")));verify(service,never()).record(any(),any(),any());
+        verify(service).editor(eq(actor),eq(group),argThat(f->f.getSigners().size()==2 && f.getSigners().getFirst().isMayApply() && f.getPayoutEvidence().equals("Retained payout reference")));verify(service,never()).record(any(),any(),any());
     }
     @Test void revocationRequiresCsrfAndUsesTheAuthenticatedActorAndScopedRecord()throws Exception{
         mvc.perform(post(path()+"/"+authority+"/revoke").with(user(actor)).param("reason","Synthetic revocation")).andExpect(status().isForbidden());verifyNoInteractions(service);
