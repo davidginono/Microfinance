@@ -85,14 +85,14 @@
                 pendingSubmitter = null;
             }
 
-            function openModal(form, submitter) {
+            function openModal(form, submitter, settings) {
                 pendingForm = form;
                 pendingSubmitter = submitter || null;
-                title.textContent = form.dataset.confirmTitle || "<spring:message code='confirm.title' text='Confirm Action' />";
-                eyebrow.textContent = form.dataset.confirmEyebrow || "<spring:message code='confirm.eyebrow' text='Please Confirm' />";
-                message.textContent = form.dataset.confirmMessage || "<spring:message code='confirm.message' text='Do you want to continue?' />";
-                proceed.textContent = form.dataset.confirmProceed || "<spring:message code='common.continue' text='Continue' />";
-                requiredText = form.dataset.confirmText || "";
+                title.textContent = settings.confirmTitle || "<spring:message code='confirm.title' text='Confirm Action' />";
+                eyebrow.textContent = settings.confirmEyebrow || "<spring:message code='confirm.eyebrow' text='Please Confirm' />";
+                message.textContent = settings.confirmMessage;
+                proceed.textContent = settings.confirmProceed || "<spring:message code='common.continue' text='Continue' />";
+                requiredText = settings.confirmText || "";
                 textInput.value = "";
                 requiredTextLabel.textContent = requiredText;
                 textBlock.classList.toggle("hidden", !requiredText);
@@ -105,15 +105,17 @@
 
             document.addEventListener("submit", (event) => {
                 const form = event.target;
-                if (!(form instanceof HTMLFormElement) || !form.dataset.confirmMessage) {
+                if (event.defaultPrevented || !(form instanceof HTMLFormElement)) {
                     return;
                 }
+                const settings = event.submitter?.dataset.confirmMessage ? event.submitter.dataset : form.dataset;
+                if (!settings.confirmMessage) return;
                 if (form.dataset.confirmBypass === "true") {
                     delete form.dataset.confirmBypass;
                     return;
                 }
                 event.preventDefault();
-                openModal(form, event.submitter);
+                openModal(form, event.submitter, settings);
             });
 
             proceed.addEventListener("click", () => {
@@ -140,15 +142,21 @@
                 form.submit();
             });
 
+            function cancelConfirmation() {
+                const submitter = pendingSubmitter;
+                closeModal();
+                submitter?.focus();
+            }
+
             [cancel, close].forEach((button) => {
-                button.addEventListener("click", closeModal);
+                button.addEventListener("click", cancelConfirmation);
             });
 
             textInput.addEventListener("input", syncTypedConfirmation);
 
             document.addEventListener("keydown", (event) => {
                 if (event.key === "Escape" && modal.classList.contains("is-open")) {
-                    closeModal();
+                    cancelConfirmation();
                 }
             });
 
