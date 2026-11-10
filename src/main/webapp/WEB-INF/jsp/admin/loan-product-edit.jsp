@@ -17,9 +17,6 @@
 <div class="product-config-page-actions">
     <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral"><spring:message code="admin.workspace.backProducts" /></a>
     <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.title" /></a>
-    <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')">
-        <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />"><spring:message code="charges.postingSetup" /></a>
-    </sec:authorize>
     <form action="/admin/settings-controls/loan-products/${product.id}/delete"
           method="post"
           data-confirm-eyebrow="Confirm Deletion"
@@ -183,9 +180,19 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section product-config-step" data-product-config-step="accounts" aria-label="<spring:message code='productAccounts.title' />"><div class="product-builder-section-header"><h2><spring:message code="productAccounts.title" /></h2></div>
+                <section class="product-builder-section product-config-step" data-product-config-step="accounts" aria-label="<spring:message code='productAccounts.title' />">
+                    <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')" var="canSetChargeAccounts" />
+                    <div class="product-builder-section-header">
+                        <h2><spring:message code="productAccounts.title" /></h2>
+                        <c:if test="${canSetChargeAccounts}">
+                            <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />"><spring:message code="charges.postingSetup" /></a>
+                        </c:if>
+                    </div>
                     <div id="product-config-accounts" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %><c:set var="productAccountSection" value="${false}" />
+                        <c:if test="${not canSetChargeAccounts}">
+                            <p class="text-sm md:col-span-2"><spring:message code="charges.postingSetupPermission" /></p>
+                        </c:if>
                     </div>
                 </section>
 
